@@ -77,10 +77,19 @@ function member(name: string, role: "child" | "teen" | "guest") {
 }
 
 async function search(actor: Awaited<ReturnType<typeof owner>>) {
-  return (await createHost(actor, manifest()).integration.call("searxng", "search", { query: "node.js runtime" })) as { text: string; rows: { title: string }[] };
+  return (await createHost(actor, manifest(), [], { id: "accepted-hosted-search", policyChecked: true }).integration.call("searxng", "search", { query: "node.js runtime" })) as { text: string; rows: { title: string }[] };
 }
 
 describe("hosted search key (THIN-4H)", () => {
+  test("a minor host call without an accepted turn is refused", async () => {
+    await owner();
+    const child = member("NoContext", "child");
+    const host = createHost(child, manifest());
+    await expect(host.integration.call("searxng", "search", { query: "node.js runtime" })).rejects.toMatchObject({ code: "permission_denied" });
+    expect(providerHits).toEqual([]);
+    expect(searxngHits).toBe(0);
+  });
+
   test("an adult with a key set: the query goes to the provider with the key", async () => {
     const adult = await owner();
     setHouseholdSettingValue(HOSTED_SEARCH_KEY_SETTING, SECRET);

@@ -63,7 +63,7 @@ async function searchAs(role: "child" | "teen" | "admin" | "owner") {
   setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
   __setPageReaderForTests(async (url) => page(url, url.startsWith("https://hostile.") ? HOSTILE : "The Juniper festival is held in June."));
   try {
-    const host = createHost(actor, manifest());
+    const host = createHost(actor, manifest(), [], { id: "accepted-search-floor", policyChecked: true });
     return (await host.integration.call("searxng", "search", { query: "juniper festival", read_page: true })) as {
       rows: { url: string | null }[];
       pages?: { url: string; text: string }[];
@@ -75,6 +75,15 @@ async function searchAs(role: "child" | "teen" | "admin" | "owner") {
 }
 
 describe("page text for a minor passes the deterministic floor (THIN-4C)", () => {
+  test("a minor host call without an accepted turn is refused", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Willow", secret: "correcthorse" });
+    const row = db.select().from(people).where(eq(people.displayName, "Willow")).get()!;
+    const child = { ...row, role: "child" as const };
+    const host = createHost(child, manifest());
+    await expect(host.integration.call("searxng", "search", { query: "juniper festival" })).rejects.toMatchObject({ code: "permission_denied" });
+  });
+
   for (const role of ["child", "teen"] as const) {
     test(`a page that trips a detector is dropped for a ${role} and counted`, async () => {
       const result = await searchAs(role);

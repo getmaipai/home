@@ -75,6 +75,8 @@ import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import { decide, assertGated } from "@/lib/gate/decide";
+import type { Role } from "@/middleware/auth";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { CREDENTIAL_SAFE_MESSAGE, detectCredential } from "@/lib/memoryContentPolicy";
 import { hostedSearch } from "@/lib/hostedSearch";
@@ -1742,13 +1744,46 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number } = {}): Host {
+export interface PackageHostTurnContext {
+  id?: string;
+  conversationId?: string;
+  band?: AgeBand;
+  anonymous?: boolean;
+  temporary?: boolean;
+  /** Set only by the model tool node after policyNode accepted the same call. */
+  policyChecked?: boolean;
+  /** The signed-in person asked for this exact package run directly (the run route); that request is their own confirmation. Never accepts ask_parent or deny. */
+  personInitiated?: boolean;
+}
+
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: PackageHostTurnContext, runtime: { signal?: AbortSignal; deadlineAt?: number } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
-  function requirePermission(perm: string): void {
-    if (!hasPermission(perm)) {
-      throw new HostError("permission_denied", `${manifest.id} did not declare permission ${perm}`);
+  function requireCapability(capability: string, checkManifest = true): void {
+    if (checkManifest && !hasPermission(capability)) {
+      throw new HostError("permission_denied", `${manifest.id} did not declare permission ${capability}`);
     }
+    const decision = decide({
+      who: {
+        personId: actor.id,
+        role: actor.role as Role,
+        band: turn?.band ?? speakerAgeBand(actor, new Date()),
+        anonymous: turn?.anonymous ?? false,
+      },
+      what: { capabilities: [capability], consequential: manifest.consequential },
+      context: { temporary: turn?.temporary ?? (turn?.conversationId ? isTemporaryConversation(turn.conversationId) : false) },
+    });
+    assertGated(decision);
+    if (decision.kind === "allow" || ((decision.kind === "ask_self" || decision.kind === "ask_parent") && turn?.policyChecked === true) || (decision.kind === "ask_self" && turn?.personInitiated === true)) return;
+    if (decision.kind === "allow_with_limits" && decision.limits.length === 0) return;
+    if (decision.kind === "ask_self") {
+      throw new HostError("permission_denied", "This package action needs your confirmation before it can run.");
+    }
+    throw new HostError("permission_denied", "This package action is not allowed in the current turn.");
+  }
+
+  function requirePermission(perm: string): void {
+    requireCapability(perm);
   }
 
   // capability_missing is the closest fit errors.json has ("A required
@@ -2271,6 +2306,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // directly by memory.forget()'s own authorization
       // (assertCanForgetOrExport), not a package permission.
       forget(person: string): number {
+        requireCapability("memory:write", false);
         const result = memory.forget(actor, person);
         if (!result.ok) mapWriteFailure(result.status, result.error);
         deleteAttachmentsForPerson(person);

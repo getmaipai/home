@@ -4,6 +4,7 @@
 // stop at cancellation; the race still records a timeout if a package
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
+import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
@@ -178,7 +179,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
     const startedAt = Date.now();
-    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt }), signal);
+    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state), temporary: state.temporary, policyChecked: true }, { signal, deadlineAt: input.deadlineAt }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

@@ -82,7 +82,7 @@ function member(name: string, role: "child" | "teen") {
 }
 
 function search(actor: PersonRow, conversationId: string, turnId: string) {
-  return createHost(actor, manifest(), [], { id: turnId, conversationId }).integration.call("searxng", "search", { query: QUERY });
+  return createHost(actor, manifest(), [], { id: turnId, conversationId, policyChecked: true }).integration.call("searxng", "search", { query: QUERY });
 }
 
 function conversationFor(actor: PersonRow, mode: "chat" | "temporary"): string {
@@ -93,6 +93,14 @@ function conversationFor(actor: PersonRow, mode: "chat" | "temporary"): string {
 }
 
 describe("THIN-INC row 4: a temporary search keeps no query history or cache", () => {
+  test("a minor host call without an accepted turn is refused", async () => {
+    const child = { ...owner, role: "child" as const };
+    const conversationId = conversationFor(child, "chat");
+    const host = createHost(child, manifest(), [], { id: "turn-no-accept", conversationId });
+    await expect(host.integration.call("searxng", "search", { query: QUERY })).rejects.toMatchObject({ code: "permission_denied" });
+    expect(searxngQueries).toEqual([]);
+  });
+
   test("durable control: the same query twice in a durable chat is served from the cache", async () => {
     const id = conversationFor(owner, "chat");
     await search(owner, id, "turn-d-1");

@@ -18,7 +18,7 @@ import { matchPattern, loadAllManifests } from "@/lib/turnShared";
 import { FORGET_COMMAND_ID, forgetFromConversation, parseForgetCommand } from "@/lib/forgetCommand";
 import { runPlugin, meetsMinRole } from "@/lib/plugins";
 import { outcomeOf } from "@/lib/turnContext";
-import { speakerIsAnonymous, touchesMemory } from "../speaker";
+import { speakerIsAnonymous, touchesMemory, turnAgeBand } from "../speaker";
 import { usableReply } from "@/lib/composer";
 import { answerWhoTurn } from "@/lib/askNames";
 import { classifyTurnSignal } from "@/lib/turnSignal";
@@ -150,7 +150,7 @@ export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, i
         }
       }
       const args = captured ? { [firstArgName(manifest)]: captured } : {};
-      const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId });
+      const result = await runPlugin(id, state.actor, args, { id: state.turnId, conversationId: state.conversationId, band: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()), anonymous: speakerIsAnonymous(state), temporary: state.temporary });
       // COMMAND-FAIL-01 (dev.md "The knowledge hijack" (b)): a failed
       // pattern outcome used to return `matched: true` with the raw
       // `result.error` as the reply text (an MCP error string, a

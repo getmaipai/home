@@ -26,7 +26,7 @@ import { z } from "zod";
 import { join } from "node:path";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
-import { createHost } from "@/lib/packageHost";
+import { createHost, type PackageHostTurnContext } from "@/lib/packageHost";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { tier1PackageDataDir, ensureDataDir, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir } from "@/lib/packageResolve";
@@ -53,6 +53,7 @@ interface SandboxProcess {
    * at process start, so a caller who happens to warm the process is
    * never the one every later caller's host.* calls run as. */
   currentActor: PersonRow;
+  currentTurnContext?: PackageHostTurnContext;
   /** A one-at-a-time queue for this package's `handle` calls (SEC-6):
    * one stdio MCP connection, one in-flight household caller, so
    * `currentActor` above is never ambiguous while a `host/fetch` request
@@ -164,7 +165,7 @@ async function startProcess(id: string, manifest: PackageManifest, actor: Person
   client.setRequestHandler(HostFetchRequestSchema, async (req) => {
     const delay = testFetchDelayMs;
     if (delay !== null) await new Promise((resolve) => setTimeout(resolve, delay));
-    const host = createHost(entry.currentActor, manifest);
+    const host = createHost(entry.currentActor, manifest, [], entry.currentTurnContext);
     try {
       const value = await host.fetch(req.params.url, req.params.opts);
       return { value };
@@ -312,6 +313,7 @@ export async function callTier1Handle(
   manifest: PackageManifest,
   actor: PersonRow,
   inputs: Record<string, unknown>,
+  turn?: PackageHostTurnContext,
 ): Promise<CallTier1Result> {
   if (!isValidPackageId(id)) return { ok: true, value: fallbackResult(manifest) };
   if (disabledUntilReboot.has(id)) return { ok: true, value: fallbackResult(manifest) };
@@ -347,6 +349,7 @@ export async function callTier1Handle(
   });
   await previousTurn;
   entry.currentActor = actor;
+  entry.currentTurnContext = turn;
 
   const timeoutMs = manifest.timeout_ms ?? DEFAULT_HANDLE_TIMEOUT_MS;
   try {
@@ -378,6 +381,7 @@ export async function callTier1Handle(
     await killProcessIfCurrent(id, entry);
     return { ok: true, value: recordFault(id, manifest, (err as Error).message) };
   } finally {
+    entry.currentTurnContext = undefined;
     releaseTurn!();
   }
 }

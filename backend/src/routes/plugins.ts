@@ -136,7 +136,7 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   }
   const actor = c.get("person");
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
-  const result = await runPlugin(id, actor, body);
+  const result = await runPlugin(id, actor, body, { personInitiated: true });
   if (result.ok) {
     // CHAT-02: the one output boundary. A package answer reaches a
     // person through this route the same as through chat, so it meets

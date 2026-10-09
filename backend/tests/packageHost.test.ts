@@ -691,11 +691,20 @@ describe("home.call_service (2026-09-05, the real Home Assistant integration)", 
       const actor = await owner();
       setHouseholdSettingValue("home.base_url", `http://127.0.0.1:${server.port}`);
       setHouseholdSettingValue("home.access_token", "test-token");
-      const host = createHost(actor, manifest({ permissions: ["home:lock"], consequential: true }));
+      const host = createHost(actor, manifest({ permissions: ["home:lock"], consequential: true }), [], { id: "turn-accepted-lock", band: "adult", anonymous: false, temporary: false, policyChecked: true });
       await host.home.call_service("lock", "unlock", { entity_id: "lock.front_door" });
     } finally {
       server.stop(true);
     }
+  });
+
+  test("the same consequential lock call without an accepted turn returns the adult ask_self refusal", async () => {
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["home:lock"], consequential: true }));
+    await expect(host.home.call_service("lock", "unlock", { entity_id: "lock.front_door" })).rejects.toMatchObject({
+      code: "permission_denied",
+      message: "This package action needs your confirmation before it can run.",
+    });
   });
 
   test("a non-security domain (light) never needs consequential: true", async () => {
@@ -898,9 +907,18 @@ describe("integration.call (session-d-packages-and-store.md step 4)", () => {
 });
 
 describe("integration.call searxng (session-d-packages-and-store.md step 7, the websearch package's own case)", () => {
+  test("a minor SearXNG host call without an accepted turn is refused", async () => {
+    const child = { ...(await owner()), role: "child" as const };
+    const host = createHost(child, manifest({ permissions: ["integration:searxng"] }));
+    await expect(host.integration.call("searxng", "search", { query: "node.js" })).rejects.toMatchObject({
+      code: "permission_denied",
+      message: "This package action is not allowed in the current turn.",
+    });
+  });
+
   test("isn't set up yet: invalid_input, the same shape home_assistant gives", async () => {
     const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
     try {
       await host.integration.call("searxng", "search", { query: "node.js" });
       throw new Error("should have thrown");
@@ -912,7 +930,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 
   test("search without a query raises invalid_input before any network attempt", async () => {
     const actor = await owner();
-    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
     try {
       await host.integration.call("searxng", "search", {});
       throw new Error("should have thrown");
@@ -937,7 +955,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       const result = await host.integration.call("searxng", "search", { query: "node.js runtime" });
       expect(seenUrl.pathname).toBe("/search");
       expect(seenUrl.searchParams.get("q")).toBe("node.js runtime");
@@ -983,7 +1001,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       const result = (await host.integration.call("searxng", "search", { query: "japan" })) as {
         rows: { title: string; url: string; snippet: string | null }[];
       };
@@ -1008,7 +1026,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       const result = (await host.integration.call("searxng", "search", { query: "japan" })) as {
         rows: { title: string; url: string; snippet: string | null }[];
       };
@@ -1042,7 +1060,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
         __resetSearxngEnginesCacheForTests();
         const actor = { ...(await owner()), role };
         setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-        const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+        const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
         await host.integration.call("searxng", "search", { query: "is it going to rain" });
         expect(seenUrl.searchParams.get("safesearch")).toBe(expected);
       } finally {
@@ -1063,7 +1081,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       __resetSearxngEnginesCacheForTests();
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       await host.integration.call("searxng", "search", { query: "Marsh Lantern movie poster", category: "images" });
       expect(seenUrl.searchParams.get("safesearch")).toBe("0");
     } finally {
@@ -1095,7 +1113,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       const setResult = setValue(owningAdult, `person:${childRow.id}`, "search.safe_search", "moderate");
       expect(setResult.ok).toBe(true);
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(childRow, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(childRow, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       await host.integration.call("searxng", "search", { query: "is it going to rain" });
       expect(seenUrl.searchParams.get("safesearch")).toBe("1");
     } finally {
@@ -1125,7 +1143,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       __resetSearxngEnginesCacheForTests();
       const actor = { ...(await owner()), role: "child" as const };
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
       const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
       expect(searchUrl.searchParams.get("engines")).toBe("brave");
@@ -1149,7 +1167,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       __resetSearxngEnginesCacheForTests();
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
       expect(seenUrls.some((u) => u.pathname === "/config")).toBe(true);
       const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
@@ -1177,7 +1195,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       __resetSearxngEnginesCacheForTests();
       const actor = { ...(await owner()), role: "teen" as const };
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       await host.integration.call("searxng", "search", { query: "volcano diagram", category: "images" });
       const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
       expect(searchUrl.searchParams.get("safesearch")).toBe("1");
@@ -1201,7 +1219,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       __resetSearxngEnginesCacheForTests();
       const actor = { ...(await owner()), role: "child" as const };
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       const result = await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
       expect(result).toBeTruthy();
       const searchUrl = seenUrls.find((u) => u.pathname === "/search")!;
@@ -1229,7 +1247,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       __resetSearxngEnginesCacheForTests();
       const actor = { ...(await owner()), role: "child" as const };
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       __resetRateLimiterForTests();
       await host.integration.call("searxng", "search", { query: "how do volcanoes work" });
       __resetRateLimiterForTests();
@@ -1253,7 +1271,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       try {
         await host.integration.call("searxng", "search", { query: "node.js" });
         throw new Error("should have thrown");
@@ -1291,7 +1309,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       try {
         await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
         throw new Error("should have thrown");
@@ -1309,7 +1327,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       const result = (await host.integration.call("searxng", "search", { query: "no results fixture" })) as { rows: unknown[] };
       expect(result.rows).toEqual([]);
     } finally {
@@ -1329,7 +1347,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       try {
         await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
         throw new Error("should have thrown");
@@ -1346,7 +1364,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
   test("a real call that fails outright raises searxng_unreachable immediately, and a later real success resolves it", async () => {
     const actor = await owner();
     setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
-    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
     try {
       await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
       throw new Error("should have thrown");
@@ -1370,7 +1388,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       await host.integration.call("searxng", "search", { query: "an obscure question nobody has answered" });
       expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
     } finally {
@@ -1388,7 +1406,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       try {
         await host.integration.call("searxng", "search", { query: "q", read_page: true });
         throw new Error("should have thrown (the linked page itself refuses the connection)");
@@ -1408,7 +1426,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     __resetRateLimiterForTests();
     const actor = await owner();
     setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1"); // refuses the connection - real, fast, deterministic failures
-    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+    const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
     const codes: string[] = [];
     for (let i = 0; i < 4; i++) {
       try {
@@ -1442,7 +1460,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
     try {
       const actor = await owner();
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }), [], { id: "accepted-searxng", policyChecked: true });
       const codes: string[] = [];
       for (let i = 0; i < 4; i++) {
         try {
