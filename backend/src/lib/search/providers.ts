@@ -5,8 +5,10 @@
 // the response with a log warning, never a failed request (searchRoute
 // below is what actually enforces that; this file is just the list).
 import { listConversations } from "@/lib/conversationHistory";
+import { listChatFolders } from "@/lib/chatFolders";
 import { listActivePeople } from "@/lib/access";
 import { listInstalledManifests } from "@/lib/plugins";
+import { listFilesVisibleToActor } from "@/lib/shares";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { placeSetting, settingHref, settingsViewerFor } from "@/lib/settingsAreas";
 import type { PersonRow } from "@/types";
@@ -28,7 +30,10 @@ export interface SearchGroup {
 export interface SearchProvider {
   kind: string;
   heading: string;
-  search(query: string, actor: PersonRow): Promise<SearchResult[]>;
+  /** App identity used by the scoped global search. `settings` providers
+   * may further narrow to one settings area. */
+  apps: readonly string[];
+  search(query: string, actor: PersonRow, appScope?: string): Promise<SearchResult[]>;
 }
 
 const RESULT_CAP = 8;
@@ -44,6 +49,7 @@ const RESULT_CAP = 8;
 const conversationsProvider: SearchProvider = {
   kind: "conversation",
   heading: "Conversations",
+  apps: ["chat"],
   async search(query, actor) {
     return listConversations(actor, undefined, query)
       .slice(0, RESULT_CAP)
@@ -59,6 +65,45 @@ const conversationsProvider: SearchProvider = {
   },
 };
 
+const projectsProvider: SearchProvider = {
+  kind: "project",
+  heading: "Projects",
+  apps: ["chat"],
+  async search(query, actor) {
+    const normalized = query.trim().toLowerCase();
+    return listChatFolders(actor)
+      .filter((project) => project.name.toLowerCase().includes(normalized))
+      .slice(0, RESULT_CAP)
+      .map((project) => ({ kind: "project", id: project.id, title: project.name, subtitle: "Chat project", href: "/next/chat" }));
+  },
+};
+
+const skillsProvider: SearchProvider = {
+  kind: "skill",
+  heading: "Skills",
+  apps: ["chat"],
+  async search(query) {
+    const normalized = query.trim().toLowerCase();
+    return listInstalledManifests()
+      .filter((manifest) => manifest.kind === "skill" && `${manifest.display} ${manifest.description}`.toLowerCase().includes(normalized))
+      .slice(0, RESULT_CAP)
+      .map((manifest) => ({ kind: "skill", id: manifest.id, title: manifest.display, subtitle: manifest.description, href: "/next/settings/chat/skills" }));
+  },
+};
+
+const filesProvider: SearchProvider = {
+  kind: "file",
+  heading: "Files",
+  apps: ["chat", "files"],
+  async search(query, actor) {
+    const normalized = query.trim().toLowerCase();
+    return listFilesVisibleToActor(actor)
+      .filter(({ file }) => `${file.kind} ${file.media_type} ${file.id}`.toLowerCase().includes(normalized))
+      .slice(0, RESULT_CAP)
+      .map(({ file }) => ({ kind: "file", id: file.id, title: file.media_type, subtitle: file.kind, href: `/next/files?file=${encodeURIComponent(file.id)}` }));
+  },
+};
+
 // People by display name. GET /api/people's own comment is the real
 // disclosure rule already in force: "every signed-in person can see the
 // household roster (who's who, not management)" - no per-actor
@@ -69,6 +114,7 @@ const conversationsProvider: SearchProvider = {
 const peopleProvider: SearchProvider = {
   kind: "person",
   heading: "People",
+  apps: ["family"],
   async search(query) {
     const normalized = query.trim().toLowerCase();
     return listActivePeople()
@@ -96,6 +142,7 @@ const peopleProvider: SearchProvider = {
 const appsProvider: SearchProvider = {
   kind: "app",
   heading: "Apps",
+  apps: [],
   async search(query) {
     const normalized = query.trim().toLowerCase();
     const manifests = listInstalledManifests();
@@ -127,7 +174,8 @@ const appsProvider: SearchProvider = {
 const settingsProvider: SearchProvider = {
   kind: "setting",
   heading: "Settings",
-  async search(query, actor) {
+  apps: ["settings"],
+  async search(query, actor, appScope) {
     const normalized = query.trim().toLowerCase();
     const viewer = settingsViewerFor(actor);
     const results: SearchResult[] = [];
@@ -136,6 +184,7 @@ const settingsProvider: SearchProvider = {
       if (!key.honoured_by.includes("home") || key.level === "expert" || !key.label.toLowerCase().includes(normalized)) continue;
       const place = placeSetting(key, viewer);
       if (!place) continue;
+      if (appScope?.startsWith("settings:") && `settings:${place.area}` !== appScope) continue;
       results.push({
         kind: "setting",
         id: key.key,
@@ -150,4 +199,4 @@ const settingsProvider: SearchProvider = {
   },
 };
 
-export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider];
+export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, projectsProvider, skillsProvider, filesProvider, peopleProvider, appsProvider, settingsProvider];

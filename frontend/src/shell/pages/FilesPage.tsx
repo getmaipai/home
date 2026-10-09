@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -36,10 +37,11 @@ interface FileRow extends Record<string, unknown> {
  * moving the direct route into the current sidebar. */
 export function FilesPage({ person }: { person: Roster }) {
   useTabItem("Library");
+  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("all");
   const [kind, setKind] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string | null>(() => searchParams.get("file"));
   const [shareTarget, setShareTarget] = useState("household");
   const queryClient = useQueryClient();
   const filesQuery = useQuery<VisibleFile[]>({ queryKey: ["files"], queryFn: () => api.files() });

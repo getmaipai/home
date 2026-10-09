@@ -42,8 +42,10 @@ interface SearchGroup {
   results: SearchResult[];
 }
 
-async function search(client: TestClient, q: string): Promise<SearchGroup[]> {
-  const res = await client.get(`/api/search?q=${encodeURIComponent(q)}`);
+async function search(client: TestClient, q: string, app?: string): Promise<SearchGroup[]> {
+  const params = new URLSearchParams({ q });
+  if (app) params.set("app", app);
+  const res = await client.get(`/api/search?${params}`);
   expect(res.status).toBe(200);
   const body = (await res.json()) as { groups: SearchGroup[] };
   return body.groups;
@@ -83,6 +85,15 @@ describe("GET /api/search", () => {
 });
 
 describe("GET /api/search: conversations", () => {
+  test("an app scope filters providers to that app", async () => {
+    const { client, actor } = await owner();
+    const conv = createConversation(actor, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    updateConversationTitle(actor, conv.value.id, "Pizza night plans");
+    const groups = await search(client, "pizza", "chat");
+    expect(groups.map((entry) => entry.kind)).toEqual(["conversation"]);
+  });
+
   test("a word from a conversation's title lists it, opening it", async () => {
     const { client, actor } = await owner();
     const conv = createConversation(actor, { surface: "chat" });
@@ -110,6 +121,17 @@ describe("GET /api/search: conversations", () => {
     const { client: childClient } = await addPerson(ownerClient, "Sprout", "child");
     const groups = await search(childClient, "pizza");
     expect(group(groups, "conversation")).toBeUndefined();
+  });
+
+  test("an owner searching Chat never receives a teen's conversations", async () => {
+    const { client: ownerClient } = await owner();
+    const { client: teenClient, actor: teen } = await addPerson(ownerClient, "Nova", "teen");
+    const conv = createConversation(teen, { surface: "chat" });
+    if (!conv.ok) throw new Error(conv.error);
+    updateConversationTitle(teen, conv.value.id, "Private astronomy notes");
+    const results = group(await search(ownerClient, "astronomy", "chat"), "conversation");
+    expect(results).toBeUndefined();
+    expect((await search(teenClient, "astronomy", "chat")).some((entry) => entry.kind === "conversation")).toBe(true);
   });
 });
 
@@ -164,6 +186,14 @@ describe("GET /api/search: settings", () => {
     expect(alerts?.href).toBe("/settings/account/notifications#notifications.browser.enabled");
     const stats = (await search(client, "reply stats")).find((g) => g.kind === "setting")?.results.find((r) => r.id === "ui.show_turn_stats");
     expect(stats?.href).toBe("/settings/chat/general#ui.show_turn_stats");
+  });
+
+  test("settings area scope returns only rows placed in that area", async () => {
+    const { client } = await owner();
+    const home = await search(client, "search", "settings:home");
+    expect(home.flatMap((entry) => entry.results).every((result) => result.href.startsWith("/settings/home/"))).toBe(true);
+    const account = await search(client, "alerts", "settings:account");
+    expect(account.flatMap((entry) => entry.results).every((result) => result.href.startsWith("/settings/account/"))).toBe(true);
   });
 
   // A non-admin has no Home settings at all: a household-scope result would

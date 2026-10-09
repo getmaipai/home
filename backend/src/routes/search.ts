@@ -37,6 +37,7 @@ const searchRoute = createRoute({
   request: {
     query: z.object({
       q: z.string().min(1).openapi({ param: { name: "q", in: "query" }, example: "peo" }),
+      app: z.string().min(1).optional().openapi({ param: { name: "app", in: "query" }, example: "chat" }),
     }),
   },
   responses: {
@@ -46,7 +47,7 @@ const searchRoute = createRoute({
 });
 searchRoutes.openapi(searchRoute, async (c) => {
   const actor = c.get("person");
-  const { q } = c.req.valid("query");
+  const { q, app } = c.req.valid("query");
   // A code review caught this: `z.string().min(1)` passes a single
   // space, and every provider's own `.trim().toLowerCase()` then
   // normalizes it to the empty string - `"".includes("")` is always
@@ -57,8 +58,11 @@ searchRoutes.openapi(searchRoute, async (c) => {
   // provider - the same "one definition" reasoning the providers
   // themselves already follow for their own data.
   if (q.trim().length === 0) return c.json({ groups: [] }, 200);
-  const settled = await Promise.allSettled(SEARCH_PROVIDERS.map((provider) => provider.search(q, actor)));
-  const groups = SEARCH_PROVIDERS.map((provider, i) => {
+  const providers = app
+    ? SEARCH_PROVIDERS.filter((provider) => provider.apps.includes(app) || (app.startsWith("settings:") && provider.apps.includes("settings")))
+    : SEARCH_PROVIDERS;
+  const settled = await Promise.allSettled(providers.map((provider) => provider.search(q, actor, app)));
+  const groups = providers.map((provider, i) => {
     const outcome = settled[i]!;
     // A provider that throws is dropped from the response with a
     // warning in the log, never a failed request (the design's own

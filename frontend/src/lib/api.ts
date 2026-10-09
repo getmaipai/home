@@ -790,7 +790,11 @@ export const api = {
   // imported, never redeclared) - `groups` from GET /api/search is
   // passed straight through, the kit's own render composing every
   // result into a real command item.
-  search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
+  search: (q: string, app?: string) => {
+    const params = new URLSearchParams({ q });
+    if (app) params.set("app", app);
+    return request<{ groups: SearchGroup[] }>(`/api/search?${params}`).then((r) => r.groups);
+  },
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
   settingsValues: (scope: string) =>
