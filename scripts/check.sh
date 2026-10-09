@@ -412,6 +412,9 @@ fi
 preflight_stage() { stage "$1"; }
 run_preflight() {
   local settings_scratch
+  preflight_stage "pre: installed dependencies match bun.lock"
+  bun scripts/gate/installedLock.ts
+
   if [ "$SCOPE" = "backend" ] || [ "$SCOPE" = "full" ]; then
     preflight_stage "pre: settings registry generated files"
     settings_scratch="$(mktemp -d)"
@@ -466,15 +469,6 @@ if [ "$PRE_ONLY" = 1 ]; then
   GATE_RUN_KIND=pre
   run_preflight
   exit 0
-fi
-
-# One root-level install covers both workspaces (bun's own workspace
-# resolution) - needed once for whichever scope actually runs code.
-if [ "$SCOPE" != "docs" ]; then
-  stage "install"
-  bun install --silent
-  record_stage
-  unset STAGE_T STAGE_NAME
 fi
 
 # stage_end() closes out whichever stage a leg's own subshell last

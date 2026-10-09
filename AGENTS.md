@@ -37,6 +37,7 @@ Stack standard: [STACK.md](https://github.com/getmaipai/.github/blob/main/STACK.
 
 From the repo root (the `home/` folder with `package.json`):
 
+- Fresh worktree dependencies: `bash scripts/setup-worktree.sh` runs one root `bun install --frozen-lockfile` and records its duration. Never copy or clone `node_modules` between worktrees.
 - `bun start` builds and starts the local app in the background and prints its URLs; `bun stop` stops it; `bun restart` stops then starts.
 - `bun run dev` in `backend/` or `frontend/` runs a dev server; `bun test` there runs that package's tests.
 - Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend).
