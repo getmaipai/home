@@ -1116,9 +1116,10 @@ export function resolveOrCreateConversation(
     // for a "tv" turn, silently attaching a tv-surface turn under a
     // chat-surface conversation and desyncing the two.
     //
-    // Closed conversations require the explicit resume operation. A stale
-    // turn request must never silently undo retention or reactivate a chat.
-    if (!row || row.personId !== actor.id || row.status !== "open" || row.surface !== surface) {
+    // Deleted, other-person and other-surface rows remain terminal or
+    // inaccessible. A saved closed chat is still an ordinary conversation:
+    // continuing it makes it the one open chat for this person and surface.
+    if (!row || row.personId !== actor.id || row.status === "deleted" || row.surface !== surface) {
       return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
     }
     // The persistence-boundary design (docs/plans/privacy-mode-2026-09-24.md,
@@ -1130,6 +1131,25 @@ export function resolveOrCreateConversation(
     // into using the durable row anyway.
     if (opts.temporary) {
       return { ok: false, status: 400, code: "temporary_mismatch", error: `conversation ${conversationId} is a durable conversation, not temporary` };
+    }
+    if (row.status === "closed") {
+      const reopened = sqlite.transaction(() => {
+        const now = new Date().toISOString();
+        // Match createConversation(): only one durable chat is open per
+        // person and surface. This also keeps implicit resolution's
+        // most-recently-active open conversation unambiguous.
+        db.update(conversations)
+          .set({ status: "closed", updatedAt: now, hlc: nextHlc() })
+          .where(and(eq(conversations.personId, actor.id), eq(conversations.surface, surface), eq(conversations.status, "open")))
+          .run();
+        return db.update(conversations)
+          .set({ status: "open", pendingAsk: null, updatedAt: new Date(Date.now() + 1).toISOString(), hlc: nextHlc() })
+          .where(and(eq(conversations.id, conversationId), eq(conversations.personId, actor.id), eq(conversations.status, "closed")))
+          .returning()
+          .get();
+      })();
+      if (!reopened) return { ok: false, status: 400, error: `conversation not found: ${conversationId}` };
+      return { ok: true, value: toConversationRecord(reopened) };
     }
     return { ok: true, value: toConversationRecord(row) };
   }

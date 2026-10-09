@@ -791,38 +791,39 @@ describe("runRetention()", () => {
     expect(db.select().from(conversations).where(eq(conversations.id, conversationId)).get()!.status).toBe("deleted");
   });
 
-  // A code review (2026-09-06) found the auto-close fix above created a
-  // real gap: resolveOrCreateConversation() only ever rejected an
-  // explicitly-passed conversationId for status "deleted," not the new
-  // "closed" state - so a client holding a stale id for a thread
-  // retention had already closed could still attach a fresh turn to it,
-  // silently growing turn_count on a conversation whose own status
-  // claims there's nothing left in it, forever.
-  test("a closed conversation can never be resumed by its own stale conversationId", async () => {
+  test("CLOSED-CHAT-01: a closed conversation accepts a new turn and keeps history on that conversation", async () => {
     const { actor } = await owner();
     const first = await runTurnNext(actor, "chat", "good morning");
     expect(first.ok).toBe(true);
     if (!first.ok) return;
     const closedId = first.value.conversation_id;
-
-    const staleDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString();
-    db.update(conversationTurns).set({ createdAt: staleDate }).where(eq(conversationTurns.personId, actor.id)).run();
-    runRetention();
+    createConversation(actor, { surface: "chat" });
     expect(db.select().from(conversations).where(eq(conversations.id, closedId)).get()!.status).toBe("closed");
 
-    // A client still holding the closed conversation's own id tries to
-    // attach a new turn to it directly - rejected outright (the same
-    // "conversation not found" a deleted one already gets), exactly
-    // like resolveOrCreateConversation()'s own explicit-id branch treats
-    // every other invalid id: runTurnNext() has no silent fallback to a
-    // fresh conversation, by design (the retired turn engine's own surface-check
-    // precedent).
-    const resumed = await runTurnNext(actor, "chat", "hi again", { conversationId: closedId });
-    expect(resumed.ok).toBe(false);
-    if (resumed.ok) return;
-    expect(resumed.status).toBe(400);
-    expect(db.select().from(conversations).where(eq(conversations.id, closedId)).get()!.status).toBe("closed"); // never reopened
-    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, closedId)).all().length).toBe(0); // no new turn attached
+    const continued = await runTurnNext(actor, "chat", "hi again", { conversationId: closedId });
+    expect(continued.ok).toBe(true);
+    if (!continued.ok) return;
+    expect(continued.value.conversation_id).toBe(closedId);
+    expect(db.select().from(conversations).where(eq(conversations.id, closedId)).get()!.status).toBe("open");
+    const history = listConversationTurns(actor, closedId);
+    expect(history.ok).toBe(true);
+    if (history.ok) expect(history.value.map((turn) => turn.userText)).toEqual(["good morning", "hi again"]);
+  });
+
+  test("CLOSED-CHAT-01: a deleted conversation remains refused", async () => {
+    const { actor } = await owner();
+    const first = await runTurnNext(actor, "chat", "good morning");
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const deletedId = first.value.conversation_id;
+    db.update(conversations).set({ status: "deleted" }).where(eq(conversations.id, deletedId)).run();
+
+    const refused = await runTurnNext(actor, "chat", "hi again", { conversationId: deletedId });
+    expect(refused.ok).toBe(false);
+    if (refused.ok) return;
+    expect(refused.status).toBe(400);
+    expect(db.select().from(conversations).where(eq(conversations.id, deletedId)).get()!.status).toBe("deleted");
+    expect(db.select().from(conversationTurns).where(eq(conversationTurns.conversationId, deletedId)).all()).toHaveLength(1);
   });
 
   // The floor: a safety-flagged minor turn survives even past a shortened
