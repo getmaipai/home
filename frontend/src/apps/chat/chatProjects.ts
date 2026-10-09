@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAui, useAuiState } from "@assistant-ui/react";
 import { toast } from "sonner";
 import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
 import { api, type Roster } from "@/lib/api";
+import { openProjectSettings } from "@/apps/chat/chatProjectSettingsStore";
 import { pendingChatFolderId, setPendingChatFolder, takeCreatedChatFolder } from "@/apps/chat/chatThreadListAdapter";
 
 // PROJECTS-01b (CHAT-PROJECT-01): the person's projects for the kit thread
@@ -14,12 +16,22 @@ import { pendingChatFolderId, setPendingChatFolder, takeCreatedChatFolder } from
 
 export const chatFoldersQueryKey = (personId: string) => ["chat-folders", personId] as const;
 
+/** Starts a new chat that lands in the project: the same path as "New chat
+ * in project" on a column row, shared with the project page's composer. */
+export async function startChatInProject(aui: ReturnType<typeof useAui>, folderId: string): Promise<void> {
+  // Awaited: the pending project is keyed to the new thread the switch
+  // opens, read only once the switch has finished.
+  await Promise.resolve(aui.threads().switchToNewThread());
+  setPendingChatFolder({ threadId: aui.threads().getState().mainThreadId, folderId });
+}
+
 /** The projects mode for the signed-in person's column, or undefined in
  * Incognito. `onNewChatStarted` closes the phone sheet, the same as New chat. */
 export function useChatProjects({ person, temporary, onNewChatStarted }: { person: Roster; temporary: boolean; onNewChatStarted: () => void }): ThreadListProjects | undefined {
   const aui = useAui();
   const queryClient = useQueryClient();
-  const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(), enabled: !temporary });
+  const navigate = useNavigate();
+  const foldersQuery = useQuery({ queryKey: chatFoldersQueryKey(person.id), queryFn: () => api.chatFolders(undefined, { scope: "all" }), enabled: !temporary });
   const refresh = () => queryClient.invalidateQueries({ queryKey: chatFoldersQueryKey(person.id) });
 
   // A chat "New chat in project" just created: put its project on the
@@ -55,7 +67,7 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
     if (temporary) return undefined;
     const canManage = person.role !== "child";
     return {
-      folders: (Array.isArray(folders) ? folders : []).map((folder) => ({ id: folder.id, name: folder.name })),
+      folders: (Array.isArray(folders) ? folders : []).map((folder) => ({ id: folder.id, name: folder.name, icon: folder.icon, color: folder.color, pinned: Boolean(folder.pinned) })),
       canManage,
       canMove: true,
       onCreate: canManage
@@ -93,13 +105,31 @@ export function useChatProjects({ person, temporary, onNewChatStarted }: { perso
           }
         : undefined,
       onNewChat: async (id) => {
-        // Awaited: the pending project is keyed to the new thread the switch
-        // opens, read only once the switch has finished.
-        await Promise.resolve(aui.threads().switchToNewThread());
-        setPendingChatFolder({ threadId: aui.threads().getState().mainThreadId, folderId: id });
+        await startChatInProject(aui, id);
+        onNewChatStarted();
+      },
+      // PROJECTS-UI-04: the name opens the project page; Edit project opens
+      // the one settings dialog; Pin and See all projects are the listing's.
+      onOpen: (id) => {
+        navigate(`/chat/projects/${encodeURIComponent(id)}`);
+        onNewChatStarted();
+      },
+      onEdit: canManage ? (id) => openProjectSettings({ kind: "edit", id }) : undefined,
+      onPin: canManage
+        ? async (id, pinned) => {
+            try {
+              await api.updateChatFolder(id, { pinned });
+              await refresh();
+            } catch {
+              toast.error("Could not change that. Try again.");
+            }
+          }
+        : undefined,
+      onSeeAll: () => {
+        navigate("/chat/projects");
         onNewChatStarted();
       },
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh only closes over stable values
-  }, [temporary, person.role, folders, aui, onNewChatStarted]);
+  }, [temporary, person.role, folders, aui, onNewChatStarted, navigate]);
 }

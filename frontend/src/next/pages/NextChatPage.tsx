@@ -1,5 +1,5 @@
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
@@ -56,6 +56,9 @@ import { CompositeAttachmentAdapter, SimpleTextAttachmentAdapter } from "@assist
 import { useTabItem } from "@/shell/tabIdentity";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
+import { ChatProjectPageController, ProjectPageProvider, useChatProjectPage } from "@/next/pages/ChatProjectPage";
+import { ChatProjectsListing } from "@/next/pages/ChatProjectsListing";
+import { ChatProjectSettingsHost } from "@/apps/chat/chatProjectSettings";
 import { CHAT_COLUMN_ID, ChatColumnToggle, ChatHistoryPanel, useChatColumn } from "@/next/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/next/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
@@ -1054,6 +1057,13 @@ export function NextChatPage({ person }: { person: Roster }) {
   // the column stops being a sheet.
   const chatColumnBreakpoint = useBreakpoint();
   const column = useChatColumn({ isDesktop: chatColumnBreakpoint.atLeast(960) });
+  // PROJECTS-UI-03/04: /chat/projects is the listing, /chat/projects/:id a project's page.
+  const projectPage = useChatProjectPage(person);
+  const onProjectsListing = useMatch("/chat/projects") !== null;
+  // Incognito shows no projects (a temporary chat never joins one).
+  useEffect(() => {
+    if (temporaryNext && (projectPage || onProjectsListing)) navigate("/chat", { replace: true });
+  }, [temporaryNext, projectPage, onProjectsListing, navigate]);
   const { sheetOpen, setSheetOpen } = column;
   const [openArtifactId, setOpenArtifactId] = useState<string | null>(null);
   // Jesse's own standing rule (2026-09-27): every expand/collapse
@@ -1245,6 +1255,8 @@ export function NextChatPage({ person }: { person: Roster }) {
         <ChatMemoryPoll incognito={temporaryNext} />
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
+        <ChatProjectSettingsHost person={person} />
+        {projectPage && !temporaryNext ? <ChatProjectPageController folderId={projectPage.folderId} /> : null}
         <LiveVoiceSession
           open={voiceOpen}
           onOpenChange={setVoiceOpen}
@@ -1357,16 +1369,25 @@ export function NextChatPage({ person }: { person: Roster }) {
           {/* SAFETY-NOTICE-01: crisis resources are no page banner either;
               they sit beside the reply that carried them (the message footer
               and the error slot draw the kit GuardrailNotice). */}
-              <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
-                <ChatThread
-                  temporary={temporaryNext}
-                  onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
-                  modelPickerAllowed={modelPickerAllowed}
-                  canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
-                  onOpenSettings={() => navigate("/settings")}
-                  openingConversationId={openingConversationId}
-                />
-              </ConnectionStateContext.Provider>
+              {onProjectsListing && !temporaryNext ? (
+                <div data-slot="chat-projects-pane" className="min-h-0 flex-1 overflow-y-auto">
+                  <ChatProjectsListing person={person} />
+                </div>
+              ) : (
+                <ConnectionStateContext.Provider value={{ ...connection, setConnection }}>
+                  <ProjectPageProvider value={projectPage && !temporaryNext ? projectPage.value : null}>
+                    <ChatThread
+                      temporary={temporaryNext}
+                      onEditSend={(_messageId, turnId) => setPendingSupersedes(turnId ?? null)}
+                      modelPickerAllowed={modelPickerAllowed}
+                      canUseIncognito={person.age_band === "adult" && canHaveTemporaryChatRole(person.role)}
+                      onOpenSettings={() => navigate("/settings")}
+                      openingConversationId={openingConversationId}
+                      pageSlots={projectPage && !temporaryNext ? projectPage.slots : undefined}
+                    />
+                  </ProjectPageProvider>
+                </ConnectionStateContext.Provider>
+              )}
             </div>
             {isDesktopCanvas ? (
               // Desktop only - the phone/tablet Sheet below covers the

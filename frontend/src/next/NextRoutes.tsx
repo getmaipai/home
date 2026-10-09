@@ -170,7 +170,7 @@ function NextRoutesWithIncognito({ person, onPersonChange, onSignedOut }: { pers
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
         <Route element={<FullLayout rail headerSearchRemote={api.search} railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
-          <Route path="chat" element={<NextChatPage person={person} />} />
+          <Route path="chat/*" element={<NextChatPage person={person} />} />
           <Route element={<NextPageHeaderLayout />}>
             <Route index element={<NextDashboardPage person={person} />} />
             <Route path="people" element={<NextFamilyPage person={person} />} />

@@ -11,6 +11,17 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { Issue } from "@maipai/spec/gen/ts/issue.js";
 import type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { ChatFolder } from "@maipai/spec/gen/ts/chat-folder.js";
+
+/** A project as the hub answers it: the spec record plus what depends on who
+ * asks (`access`) or is computed (`counts`, `last_activity_at`). */
+export type ChatFolderView = ChatFolder & {
+  access: "manage" | "edit" | "use";
+  last_activity_at: string;
+  counts: { chats: number; files: number; artifacts: number };
+};
+/** The look and notes a project is made or edited with. */
+export type ChatFolderLook = Partial<Pick<ChatFolder, "color" | "icon" | "description" | "instructions" | "memory_mode">>;
+export type ChatFolderPatch = ChatFolderLook & { name?: string; pinned?: boolean; archived?: boolean; sort_order?: number };
 import type { ReplyFeedback } from "@maipai/spec/gen/ts/reply-feedback.js";
 import type { Entity } from "@maipai/spec/gen/ts/entity.js";
 import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
@@ -710,12 +721,33 @@ export const api = {
   // PROJECTS-01a: `folderId` starts the chat inside one of the person's projects.
   createConversation: (mode?: Conversation["mode"], carryFrom?: string, folderId?: string) => request<Conversation>("/api/conversations", { method: "POST", body: JSON.stringify({ surface: "chat", ...(mode ? { mode } : {}), ...(carryFrom ? { carry_from: carryFrom } : {}), ...(folderId ? { folder_id: folderId } : {}) }) }),
   // PROJECTS-01a: a person's projects (chat folders) in the chat column.
-  chatFolders: (person?: string) => request<ChatFolder[]>(`/api/chat-folders${person ? `?person=${encodeURIComponent(person)}` : ""}`),
-  createChatFolder: (name: string, person?: string) =>
-    request<ChatFolder>("/api/chat-folders", { method: "POST", body: JSON.stringify({ name, ...(person ? { person } : {}) }) }),
+  // PROJECTS-UI: `person` and the optional filters ride the query string; the
+  // hub puts pinned projects first and answers every project as a ChatFolderView.
+  chatFolders: (person?: string, opts: { q?: string; archived?: boolean; scope?: "mine" | "shared" | "all"; sort?: "order" | "updated" } = {}) => {
+    const query = new URLSearchParams();
+    if (person) query.set("person", person);
+    if (opts.q) query.set("q", opts.q);
+    if (opts.archived !== undefined) query.set("archived", String(opts.archived));
+    if (opts.scope) query.set("scope", opts.scope);
+    if (opts.sort) query.set("sort", opts.sort);
+    const suffix = query.toString();
+    return request<ChatFolderView[]>(`/api/chat-folders${suffix ? `?${suffix}` : ""}`);
+  },
+  // PROJECTS-UI-04: the current artifacts made in a project's chats (read-only).
+  artifactsInFolder: (folderId: string) =>
+    request<Array<{ id: string; conversation_id: string; title: string; kind: string; created_at: string }>>(`/api/artifacts?folder=${encodeURIComponent(folderId)}`),
+  chatFolder: (id: string) => request<ChatFolderView>(`/api/chat-folders/${encodeURIComponent(id)}`),
+  createChatFolder: (name: string, person?: string, look: ChatFolderLook = {}) =>
+    request<ChatFolderView>("/api/chat-folders", { method: "POST", body: JSON.stringify({ name, ...(person ? { person } : {}), ...look }) }),
   renameChatFolder: (id: string, name: string) =>
-    request<ChatFolder>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) }),
-  deleteChatFolder: (id: string) => request<{ ok: true; chats_kept: number }>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    request<ChatFolderView>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ name }) }),
+  updateChatFolder: (id: string, patch: ChatFolderPatch) =>
+    request<ChatFolderView>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify(patch) }),
+  shareChatFolder: (id: string, person: string, role: "can_use" | "can_edit") =>
+    request<ChatFolderView>(`/api/chat-folders/${encodeURIComponent(id)}/shares/${encodeURIComponent(person)}`, { method: "PUT", body: JSON.stringify({ role }) }),
+  unshareChatFolder: (id: string, person: string) =>
+    request<ChatFolderView | { left: true }>(`/api/chat-folders/${encodeURIComponent(id)}/shares/${encodeURIComponent(person)}`, { method: "DELETE" }),
+  deleteChatFolder: (id: string) => request<{ ok: true; chats_kept: number; files_removed: number }>(`/api/chat-folders/${encodeURIComponent(id)}`, { method: "DELETE" }),
   setConversationFolder: (id: string, folderId: string | null) =>
     request<Conversation>(`/api/conversations/${encodeURIComponent(id)}`, { method: "PATCH", body: JSON.stringify({ folder_id: folderId }) }),
   resumeConversation: (id: string) => request<Conversation>(`/api/conversations/${encodeURIComponent(id)}/resume`, { method: "POST" }),
