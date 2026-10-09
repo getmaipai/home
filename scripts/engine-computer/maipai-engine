@@ -144,7 +144,7 @@ pair() {
   response_tool="$(dirname "$0")/pair-response.py"
   [ -f "$response_tool" ] || response_tool=/usr/local/lib/maipai-engine/pair-response.py
   response=$(python3 "$response_tool" "$home" "$code") \
-    || die "Could not fetch or verify pairing details."
+    || die "Pairing did not finish. The message above says what went wrong and what to do. Fix that, then run sudo maipai-engine pair again with a new code from Home."
   local fields=() field
   while IFS= read -r field; do fields+=("$field"); done <<< "$response"
   key="${fields[0]}"

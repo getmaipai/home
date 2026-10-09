@@ -23,18 +23,18 @@ async function readChild(process: ReturnType<typeof Bun.spawn>) {
   return { exitCode, stdout, stderr };
 }
 
-async function startPairServer(body: Record<string, string>, expectedPath?: string) {
+async function startPairServer(body: Record<string, string>, expectedPath?: string, status = 200) {
   const source = `
     const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch(request) {
       const path = new URL(request.url).pathname;
       if (process.env.EXPECTED_PATH && path !== process.env.EXPECTED_PATH) return new Response("wrong path", { status: 404 });
-      return Response.json(JSON.parse(process.env.RESPONSE_BODY));
+      return Response.json(JSON.parse(process.env.RESPONSE_BODY), { status: Number(process.env.RESPONSE_STATUS || 200) });
     }});
     console.log(server.port);
     process.on("SIGTERM", () => { server.stop(true); process.exit(0); });
   `;
   const child = Bun.spawn(["bun", "-e", source], {
-    env: { ...process.env, RESPONSE_BODY: JSON.stringify(body), EXPECTED_PATH: expectedPath ?? "" },
+    env: { ...process.env, RESPONSE_BODY: JSON.stringify(body), EXPECTED_PATH: expectedPath ?? "", RESPONSE_STATUS: String(status) },
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -495,6 +495,86 @@ describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
     } finally {
       await stopPairServer(server.child);
     }
+  });
+
+  // PAIR-WIRE-01: the helper used to drop Home's JSON error body on an HTTP error and print "HTTP Error 403".
+  async function helperSays(status: number, body: Record<string, string>) {
+    const server = await startPairServer(body, undefined, status);
+    try {
+      const child = Bun.spawn(["python3", PAIR_RESPONSE, `http://127.0.0.1:${server.port}`, "K7Q-M2X-RP4-ZT7"], { stdout: "pipe", stderr: "pipe" });
+      return await readChild(child);
+    } finally {
+      await stopPairServer(server.child);
+    }
+  }
+
+  test("an HTTP 403 with Home's JSON error shows Home's words and the next step, not 'HTTP Error 403'", async () => {
+    const { exitCode, stdout, stderr } = await helperSays(403, { error: "Pairing is available only on the household network" });
+    expect(exitCode).toBe(1);
+    expect(stdout).toBe("");
+    expect(stderr).toContain("Pairing is available only on the household network");
+    expect(stderr).toContain("while it is on your home network");
+    expect(stderr).not.toContain("HTTP Error");
+    expect(stderr).not.toContain("KeyError");
+  });
+
+  test("an HTTP 400 (code expired or already used) says to get a new code in Home, with the https:// address", async () => {
+    const { exitCode, stderr } = await helperSays(400, { error: "Pairing code is invalid or expired" });
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Pairing code is invalid or expired");
+    expect(stderr).toContain("Pair engine computer");
+    expect(stderr).toContain("https://");
+  });
+
+  test("an HTTP error with no error field still says what happened and what to do", async () => {
+    const { exitCode, stderr } = await helperSays(500, { note: "nothing useful" });
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("Home answered with HTTP 500.");
+    expect(stderr).toContain("Check that Home is running");
+  });
+
+  test("a 200 reply that carries an error field, or no signature at all, is explained, never a bare KeyError", async () => {
+    const withError = await helperSays(200, { error: "Pairing code is invalid or expired" });
+    expect(withError.exitCode).toBe(1);
+    expect(withError.stderr).toContain("Pairing code is invalid or expired");
+    const noSignature = await helperSays(200, { public_key: "ssh-ed25519 AAAA fixture", household_id: "household-test-01" });
+    expect(noSignature.exitCode).toBe(1);
+    expect(noSignature.stderr).toContain("missing its key, its household or its signature");
+    expect(noSignature.stderr).toContain("Update Home");
+    expect(noSignature.stderr).not.toContain("KeyError");
+  });
+
+  test("a signature with a non-ASCII character fails the check with the explained message, not a Python TypeError", async () => {
+    const { exitCode, stderr } = await helperSays(200, { public_key: "ssh-ed25519 AAAA fixture", household_id: "household-test-01", hmac: "caf\u00e9" });
+    expect(exitCode).toBe(1);
+    expect(stderr).toContain("did not verify");
+    expect(stderr).not.toContain("TypeError");
+  });
+
+  test("the helper accepts the signature under either name (hmac_sha256 or hmac)", async () => {
+    const code = "K7Q-M2X-RP4-ZT7";
+    const normalized = code.replaceAll("-", "").toUpperCase();
+    const lookup = createHmac("sha256", normalized).update("maipai-pair-lookup").digest("hex").slice(0, 32);
+    const macKey = createHmac("sha256", normalized).update("maipai-pair-mac").digest();
+    const publicKey = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITest fixture";
+    const householdId = "household-test-01";
+    const signature = createHmac("sha256", macKey).update(`${publicKey}\n${householdId}`).digest("hex");
+    for (const field of ["hmac", "hmac_sha256"]) {
+      const server = await startPairServer({ public_key: publicKey, household_id: householdId, [field]: signature }, `/api/engine-link/pair/${lookup}`);
+      try {
+        const child = Bun.spawn(["python3", PAIR_RESPONSE, `http://127.0.0.1:${server.port}`, code], { stdout: "pipe", stderr: "pipe" });
+        const { exitCode, stdout, stderr } = await readChild(child);
+        expect(stderr, field).toBe("");
+        expect(exitCode, field).toBe(0);
+        expect(stdout.trim().split("\n")).toEqual([publicKey, householdId]);
+      } finally {
+        await stopPairServer(server.child);
+      }
+    }
+  });
+
+  test("maipai-engine pair's own closing line points at the message above and a new code", () => {
+    expect(readFileSync(ENGINE_HELPER, "utf8")).toContain("The message above says what went wrong and what to do");
   });
 
   test("pair response rejects a mocked endpoint with a bad HMAC", async () => {

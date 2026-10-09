@@ -60,13 +60,18 @@ export function issuePairingCode(now = Date.now()): { code: string; expires_at: 
   ensureKeyPair(); pairing = { code: newCode(), expiresAt: now + PAIR_TTL_MS, used: false, fetchedAt: null, confirmed: false, wrongChecks: 0 }; scannedCandidate = null;
   return { code: pairing.code, expires_at: new Date(pairing.expiresAt).toISOString() };
 }
-export function getPairingPublicKey(lookup: string, householdId: string, now = Date.now()): { public_key: string; household_id: string; hmac: string } | null {
+// PAIR-WIRE-01: the signature travels under BOTH names, same hex. `hmac` is the field Home always sent;
+// `hmac_sha256` is the one the engine computer's installed helper (scripts/engine-computer/pair-response.py)
+// reads. A box cannot be assumed to have the updated helper, so the reply is additive: neither name goes away.
+export type PairingPublicKey = { public_key: string; household_id: string; hmac: string; hmac_sha256: string };
+
+export function getPairingPublicKey(lookup: string, householdId: string, now = Date.now()): PairingPublicKey | null {
   if (!pairing || pairing.used || now >= pairing.expiresAt) return null;
   if (!constantStringEqual(derivePairingLookup(pairing.code), lookup.toLowerCase())) return null;
   const publicKey = readFileSync(publicKeyPath, "utf8").trim();
   const message = `${publicKey}\n${householdId}`;
   const hmac = createHmac("sha256", derivePairingMacKey(pairing.code)).update(message).digest("hex");
-  pairing.used = true; pairing.fetchedAt = now; return { public_key: publicKey, household_id: householdId, hmac };
+  pairing.used = true; pairing.fetchedAt = now; return { public_key: publicKey, household_id: householdId, hmac, hmac_sha256: hmac };
 }
 export function verifyPairingPayload(code: string, payload: { public_key: string; household_id: string; hmac: string }): boolean {
   const expected = createHmac("sha256", derivePairingMacKey(code)).update(`${payload.public_key}\n${payload.household_id}`).digest();

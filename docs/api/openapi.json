@@ -17304,12 +17304,16 @@
                     },
                     "hmac": {
                       "type": "string"
+                    },
+                    "hmac_sha256": {
+                      "type": "string"
                     }
                   },
                   "required": [
                     "public_key",
                     "household_id",
-                    "hmac"
+                    "hmac",
+                    "hmac_sha256"
                   ]
                 }
               }

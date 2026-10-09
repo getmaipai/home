@@ -6,6 +6,7 @@ import { __setLinkKeyCommandForTests, derivePairingLookup, hostKeyCheckCode, get
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { getLinkKeyPaths } from "@/lib/stack/linkKeys";
 import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { __resetStackLinkControlForTests, setStackLinkControl } from "@/lib/remoteStackSettings";
 import { isSecurePairingRequest, pairingSourceAddress, ENGINE_ADDRESS_MISSING_MESSAGE, PAIRING_NEEDS_HTTPS_MESSAGE } from "@/routes/engineLink";
 
@@ -28,6 +29,35 @@ describe("engine link routes", () => {
     const wrong = await client.get(`/api/engine-link/pair/${code}`); expect(wrong.status).toBe(400);
     const result = await client.get(`/api/engine-link/pair/${lookup}`, { "x-real-ip": "8.8.8.8" }); expect(result.status).toBe(200);
     expect(JSON.stringify(await result.json())).not.toContain(code);
+  });
+  // PAIR-WIRE-01 (the exact break): Jesse's engine box printed `'hmac_sha256'` because Home sent the signature as
+  // `hmac` and the box's helper read `hmac_sha256`. This takes the REAL reply of the route and runs the helper's own
+  // python on it (urlopen is the only thing replaced, so the bytes are exactly what Home sent).
+  test("the real pairing reply carries the signature under both names and verifies through the engine helper's python", async () => {
+    const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer");
+    const { code } = await (await client.post("/api/engine-link/pair")).json() as { code: string };
+    const res = await client.get(`/api/engine-link/pair/${derivePairingLookup(code)}`, { "x-real-ip": "192.168.1.40" });
+    expect(res.status).toBe(200);
+    const body = await res.json() as { public_key: string; household_id: string; hmac: string; hmac_sha256: string };
+    expect(body.hmac).toMatch(/^[\da-f]{64}$/);
+    expect(body.hmac_sha256).toBe(body.hmac);
+    const helper = join(import.meta.dir, "..", "..", "scripts", "engine-computer", "pair-response.py");
+    const program = [
+      "import importlib.util, io, json, sys, urllib.request",
+      "spec = importlib.util.spec_from_file_location('pair_response', sys.argv[1])",
+      "m = importlib.util.module_from_spec(spec); spec.loader.exec_module(m)",
+      "raw = sys.argv[3].encode()",
+      "urllib.request.urlopen = lambda url, timeout=10: io.BytesIO(raw)",
+      "print(json.dumps(m.fetch('https://home.example', sys.argv[2])))",
+    ].join("\n");
+    const verify = (reply: Record<string, string>) => Bun.spawnSync(["python3", "-c", program, helper, code, JSON.stringify(reply)]);
+    const { hmac, hmac_sha256, ...rest } = body;
+    for (const reply of [body, { ...rest, hmac }, { ...rest, hmac_sha256 }]) {
+      const out = verify(reply);
+      expect(out.stderr.toString()).toBe("");
+      expect(out.exitCode).toBe(0);
+      expect(JSON.parse(out.stdout.toString())).toEqual([body.public_key, body.household_id]);
+    }
   });
   test("public GET refuses plain HTTP and non-household source", async () => {
     const client = await owner(); setHouseholdSettingValue("engines.stack.where", "another_computer");

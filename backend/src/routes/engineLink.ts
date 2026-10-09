@@ -16,7 +16,8 @@ import { rebuildEngineLinkAfterPairing } from "@/lib/remoteStackSettings";
 export const engineLinkRoutes = apiRouter();
 const ErrorResponses = errorResponses({ 400: "Invalid request or pairing code", 401: "Not signed in", 403: "Admin access required" });
 const PairCodeSchema = z.object({ code: z.string().regex(/^[A-Z2-7]{12}$/), expires_at: z.string() });
-const PairPayloadSchema = z.object({ public_key: z.string(), household_id: z.string(), hmac: z.string() });
+// PAIR-WIRE-01: `hmac_sha256` repeats `hmac` for the engine computer's installed helper (additive; see linkKeys.ts).
+const PairPayloadSchema = z.object({ public_key: z.string(), household_id: z.string(), hmac: z.string(), hmac_sha256: z.string() });
 // PAIR-COPY-01: what both refusals say (starting a pairing, and the engine computer fetching it), in plain words
 // that name the fix. One constant, so the two can never drift apart. The tests assert the https:// text.
 export const PAIRING_NEEDS_HTTPS_MESSAGE =
