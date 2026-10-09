@@ -151,6 +151,7 @@ const TRAIL_THUMBNAIL_PNG_BASE64 =
 const a11yOnly = process.argv.includes("--a11y-only");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
+const chatModeReview = process.argv.includes("--chat-mode-review");
 const chatTemporaryReview = process.argv.includes("--chat-temporary-review");
 const chatContinueReview = process.argv.includes("--chat-continue-review");
 const fitVerdictReview = process.argv.includes("--fit-verdict-review");
