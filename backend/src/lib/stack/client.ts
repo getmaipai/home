@@ -88,7 +88,8 @@ export interface StackClient {
   sweepStorage(opts?: { signal?: AbortSignal }): Promise<StackStorageSweepResult>;
   /** POST /stack/v1/check - the readiness check, run now. */
   runCheck(opts?: { signal?: AbortSignal }): Promise<StackCheckRun>;
-  healthz(opts?: { signal?: AbortSignal }): Promise<{ ok: boolean; version: string; uptimeSeconds: number }>;
+  /** GET /healthz. `version` is the Stack's own release ("0.1.0"); `contract` is the wire contract number Home compares to STACK_CONTRACT_MIN/MAX. */
+  healthz(opts?: { signal?: AbortSignal }): Promise<{ ok: boolean; version: string; contract?: number; uptimeSeconds: number }>;
 }
 
 export interface StackClientOptions {
@@ -341,6 +342,6 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     rollbackEngine: (name, tag, opts) => call(`/stack/v1/updates/engines/${encodeURIComponent(name)}/rollback`, jsonInit({ tag }), json<StackEngineRollbackResult>, opts),
     sweepStorage: (opts) => call("/stack/v1/storage/sweep", { method: "POST" }, json<StackStorageSweepResult>, opts),
     runCheck: (opts) => call("/stack/v1/check", { method: "POST" }, json<StackCheckRun>, opts),
-    healthz: (opts) => call("/healthz", { method: "GET" }, json<{ ok: boolean; version: string; uptimeSeconds: number }>, opts),
+    healthz: (opts) => call("/healthz", { method: "GET" }, json<{ ok: boolean; version: string; contract?: number; uptimeSeconds: number }>, opts),
   };
 }

@@ -5,7 +5,7 @@ import { dataDir } from "@/lib/paths";
 import { __resetPairingForTests, __setLinkKeyCommandForTests, confirmHostKey, derivePairingLookup, getLinkKeyPaths, getPairingPublicKey, issuePairingCode, knownHostsName, revokeLinkKey, scanHostKey } from "@/lib/stack/linkKeys";
 import { configuredLink } from "@/lib/remoteStackSettings";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { authenticateSshArgs, engineLinkKeyFiles, hostKeyPinned, runEngineLinkDoctor, sshAuthenticated, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
+import { authenticateSshArgs, checkGpu, checkStackHealth, engineLinkKeyFiles, hasGpu, hostKeyPinned, runEngineLinkDoctor, sshAuthenticated, type EngineLinkDoctorDependencies } from "../scripts/engine-link-doctor";
 
 function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = "connected"): EngineLinkDoctorDependencies {
   return {
@@ -18,39 +18,12 @@ function deps(failHop?: number, tailnet: "off" | "disconnected" | "connected" = 
     hostKey: async () => failHop !== 4,
     authenticate: async () => failHop !== 5,
     forward: async () => failHop !== 6,
-    health: async () => ({ ok: failHop !== 7, version: "1" }),
+    health: async () => ({ ok: failHop !== 7, version: "0.1.0", contract: 1 }),
     roles: async () => [{ id: "chat", state: { state: failHop === 8 ? "offline" : "ready" } }],
     gpu: async () => failHop !== 9,
     completion: async () => { if (failHop === 10) throw new Error("scripted"); return 123; },
   };
 }
-
-describe("engine-link doctor hop 5 (STACK-LINK-ASKPASS-01)", () => {
-  test("the doctor's ssh arguments do not use BatchMode and do not allow a password", () => {
-    const args = authenticateSshArgs("engine.home", 22, "192.168.1.20", "/data/key", "/data/known_hosts");
-    expect(args.join(" ")).not.toContain("BatchMode");
-    expect(args).toContain("-v");
-    expect(args).toContain("NumberOfPasswordPrompts=1");
-    expect(args).toContain("PasswordAuthentication=no");
-    expect(args).toContain("KbdInteractiveAuthentication=no");
-    expect(args).toContain("HostKeyAlias=engine.home");
-  });
-  test("the classifier passes on a -v transcript that authenticated, even though the no-login shell then exited 1", () => {
-    const transcript = [
-      "debug1: Server accepts key: /data/keys/stack-link/id_ed25519 ED25519 SHA256:abc explicit",
-      "Authenticated to engine.home ([192.168.1.20]:22) using \"publickey\".",
-      "debug1: channel 0: new session [client-session]",
-      "This account is currently not available.",
-    ].join("\n");
-    expect(sshAuthenticated(transcript)).toBe(true);
-    expect(sshAuthenticated("debug1: Authentication succeeded (publickey).")).toBe(true);
-  });
-  test("the classifier fails on Permission denied (publickey,password) and on an empty transcript", () => {
-    expect(sshAuthenticated("debug1: Authentications that can continue: publickey,password\nmaipai-stack@192.168.1.20: Permission denied (publickey,password).")).toBe(false);
-    expect(sshAuthenticated("ssh_askpass: exec(/data/keys/stack-link/askpass.sh): Permission denied\nPermission denied (publickey,password).")).toBe(false);
-    expect(sshAuthenticated("")).toBe(false);
-  });
-});
 
 describe("engine-link doctor hop 5 (STACK-LINK-ASKPASS-01)", () => {
   test("its ssh arguments have no BatchMode and ask for one key prompt, no password", () => {
@@ -192,3 +165,81 @@ describe("key files are looked for where the pairing writes them (STACK-LINK-KEY
     expect(existsSync(config!.knownHostsPath)).toBe(true);
   });
 });
+
+// DOCTOR-HOPS-01: the exact replies of the live box Stack (2026-10-09), as fixtures.
+const REAL_HEALTHZ = '{"ok":true,"version":"0.1.0","contract":1,"uptimeSeconds":4242}';
+const REAL_HARDWARE = '{"hardware":{"cudaDevices":[{"index":0,"name":"NVIDIA GeForce RTX 4090"},{"index":1,"name":"NVIDIA GeForce RTX 4090"}],"isAppleSilicon":false},"memory":{"totalBytes":68719476736}}';
+
+/** A stand-in for the Stack behind the tunnel: answers the given text per path, on a free loopback port. */
+function fakeStack(replies: Record<string, { status?: number; body: string }>): { port: number; stop: () => void } {
+  const server = Bun.serve({ port: 0, hostname: "127.0.0.1", fetch: (request) => {
+    const reply = replies[new URL(request.url).pathname];
+    return reply ? new Response(reply.body, { status: reply.status ?? 200, headers: { "content-type": "application/json" } }) : new Response("not found", { status: 404 });
+  } });
+  return { port: server.port!, stop: () => void server.stop(true) };
+}
+
+describe("doctor hop 7, the Stack health reply (DOCTOR-HOPS-01)", () => {
+  test("the real healthz reply (version \"0.1.0\", contract 1) passes; it used to fail because Number(\"0.1.0\") is NaN", async () => {
+    const stack = fakeStack({ "/healthz": { body: REAL_HEALTHZ } });
+    try { expect(await checkStackHealth(stack.port)).toEqual({ ok: true, version: "0.1.0", contract: 1 }); } finally { stack.stop(); }
+  });
+  test("a contract outside the range this Home speaks fails, and says which contract it saw", async () => {
+    const stack = fakeStack({ "/healthz": { body: '{"ok":true,"version":"0.2.0","contract":2,"uptimeSeconds":1}' } });
+    try { expect(await checkStackHealth(stack.port)).toMatchObject({ ok: false, version: "0.2.0", contract: 2 }); } finally { stack.stop(); }
+  });
+  test("ok:false and a reply with no contract number fail", async () => {
+    for (const body of ['{"ok":false,"version":"0.1.0","contract":1}', '{"ok":true,"version":"0.1.0"}']) {
+      const stack = fakeStack({ "/healthz": { body } });
+      try { expect((await checkStackHealth(stack.port)).ok).toBe(false); } finally { stack.stop(); }
+    }
+  });
+  test("something that is not a Stack health reply (a 404, or a page) is a failed request, not a version problem", async () => {
+    const missing = fakeStack({});
+    try { await expect(checkStackHealth(missing.port)).rejects.toBeDefined(); } finally { missing.stop(); }
+    const page = fakeStack({ "/healthz": { body: "<html>hello</html>" } });
+    try { await expect(checkStackHealth(page.port)).rejects.toBeDefined(); } finally { page.stop(); }
+  });
+  test("the failure text depends on the failure: a failed request says the tunnel did not return a Stack health reply; only a contract mismatch says update", async () => {
+    const failedRequest = await runEngineLinkDoctor({ ...deps(), health: async () => { throw new Error("health probe failed"); } });
+    expect(failedRequest[6]).toMatchObject({ id: 7, pass: false });
+    expect(failedRequest[6]!.fix).toContain("not a Stack health reply");
+    expect(failedRequest[6]!.fix).not.toContain("Update the Stack");
+    const mismatch = await runEngineLinkDoctor({ ...deps(), health: async () => ({ ok: false, version: "0.2.0", contract: 2 }) });
+    expect(mismatch[6]!.pass).toBe(false);
+    expect(mismatch[6]!.fix).toContain("Update the Stack on the engine computer");
+    expect(mismatch[6]!.fix).toContain("contract 2");
+    const unhealthy = await runEngineLinkDoctor({ ...deps(), health: async () => ({ ok: false, version: "0.1.0", contract: 1 }) });
+    expect(unhealthy[6]!.fix).toContain("not healthy");
+    expect(unhealthy[6]!.fix).not.toContain("Update the Stack");
+    const good = await runEngineLinkDoctor(deps());
+    expect(good[6]).toMatchObject({ id: 7, pass: true, fix: "No action needed." });
+  });
+});
+
+describe("doctor hop 9, the engine computer's GPU (DOCTOR-HOPS-01)", () => {
+  test("the real hardware reply (hardware.cudaDevices, two devices) is a GPU; it used to read body.gpus and fail", async () => {
+    expect(hasGpu(JSON.parse(REAL_HARDWARE))).toBe(true);
+    const stack = fakeStack({ "/stack/v1/hardware": { body: REAL_HARDWARE } });
+    try { expect(await checkGpu(stack.port)).toBe(true); } finally { stack.stop(); }
+  });
+  test("no CUDA devices and not Apple silicon is no GPU", async () => {
+    expect(hasGpu({ hardware: { cudaDevices: [], isAppleSilicon: false } })).toBe(false);
+    expect(hasGpu({ hardware: {} })).toBe(false);
+    expect(hasGpu({})).toBe(false);
+    expect(hasGpu(null)).toBe(false);
+    const stack = fakeStack({ "/stack/v1/hardware": { body: '{"hardware":{"cudaDevices":[],"isAppleSilicon":false}}' } });
+    try { expect(await checkGpu(stack.port)).toBe(false); } finally { stack.stop(); }
+    const gone = fakeStack({});
+    try { expect(await checkGpu(gone.port)).toBe(false); } finally { gone.stop(); }
+  });
+  test("Apple silicon is the engine there, so it passes", () => {
+    expect(hasGpu({ hardware: { cudaDevices: [], isAppleSilicon: true } })).toBe(true);
+  });
+  test("the old fields stay as fallbacks", () => {
+    expect(hasGpu({ gpus: [{ name: "x" }] })).toBe(true);
+    expect(hasGpu({ graphics: [{ name: "x" }] })).toBe(true);
+    expect(hasGpu({ gpus: [] })).toBe(false);
+  });
+});
+

@@ -19,7 +19,7 @@ type DoctorDependencies = {
   hostKey: (host: string, port: number) => Promise<boolean>;
   authenticate: (host: string, port: number, address?: string) => Promise<boolean>;
   forward: (port: number) => Promise<boolean>;
-  health: (port: number) => Promise<{ ok: boolean; version: string }>;
+  health: (port: number) => Promise<{ ok: boolean; version: string; contract?: number }>;
   roles: (port: number) => Promise<Array<{ id: string; state: { state: string } }>>;
   gpu: (port: number) => Promise<boolean>;
   completion: (port: number) => Promise<number>;
@@ -76,6 +76,32 @@ function runSshAuth(args: string[], env: NodeJS.ProcessEnv): Promise<string> {
   });
 }
 
+/**
+ * Hop 7: the Stack's health reply, read the way the link reads it (`contract` against STACK_CONTRACT_MIN/MAX). `version` is the Stack's
+ * release string ("0.1.0"), not a number: comparing it was always NaN, so hop 7 always failed. A request that does not return a Stack
+ * health reply (a 404, a page, a dropped connection) throws, so the caller can tell that from a contract mismatch.
+ */
+export async function checkStackHealth(port: number): Promise<{ ok: boolean; version: string; contract?: number }> {
+  const result = await createStackClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 3000 }).healthz();
+  const contract = typeof result.contract === "number" && Number.isInteger(result.contract) ? result.contract : undefined;
+  return { ok: result.ok === true && contract !== undefined && contract >= STACK_CONTRACT_MIN && contract <= STACK_CONTRACT_MAX, version: result.version, ...(contract !== undefined ? { contract } : {}) };
+}
+
+/** True when the Stack's /stack/v1/hardware reply shows an engine GPU: `hardware.cudaDevices`, or Apple silicon (the GPU is the engine there). The old top-level `gpus` and `graphics` stay as fallbacks. */
+export function hasGpu(body: unknown): boolean {
+  if (!body || typeof body !== "object") return false;
+  const top = body as { hardware?: { cudaDevices?: unknown; isAppleSilicon?: unknown; gpus?: unknown; graphics?: unknown }; gpus?: unknown; graphics?: unknown };
+  const count = (value: unknown) => Array.isArray(value) ? value.length : 0;
+  const hardware = top.hardware && typeof top.hardware === "object" ? top.hardware : {};
+  return count(hardware.cudaDevices) > 0 || hardware.isAppleSilicon === true || count(hardware.gpus) > 0 || count(hardware.graphics) > 0 || count(top.gpus) > 0 || count(top.graphics) > 0;
+}
+
+export async function checkGpu(port: number): Promise<boolean> {
+  const response = await fetch(`http://127.0.0.1:${port}/stack/v1/hardware`, { signal: AbortSignal.timeout(3000) }).catch(() => null);
+  if (!response?.ok) return false;
+  return hasGpu(await response.json().catch(() => null));
+}
+
 const defaults: DoctorDependencies = {
   settings: () => ({
     selected: getHouseholdSettingValue("engines.stack.where") === "another_computer",
@@ -109,17 +135,9 @@ const defaults: DoctorDependencies = {
     try { const response = await fetch(`http://127.0.0.1:${port}/healthz`, { signal: AbortSignal.timeout(2500) }); return response.ok; }
     catch { return false; }
   },
-  health: async (port) => {
-    const result = await createStackClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 3000 }).healthz();
-    return { ok: result.ok && Number(result.version) >= STACK_CONTRACT_MIN && Number(result.version) <= STACK_CONTRACT_MAX, version: result.version };
-  },
+  health: checkStackHealth,
   roles: async (port) => (await createStackClient({ baseUrl: `http://127.0.0.1:${port}`, timeoutMs: 3000 }).roles()).roles,
-  gpu: async (port) => {
-    const response = await fetch(`http://127.0.0.1:${port}/stack/v1/hardware`, { signal: AbortSignal.timeout(3000) });
-    if (!response.ok) return false;
-    const body = await response.json() as { gpus?: unknown[]; graphics?: unknown[] };
-    return (body.gpus?.length ?? body.graphics?.length ?? 0) > 0;
-  },
+  gpu: checkGpu,
   completion: async (port) => {
     const start = performance.now();
     const response = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
@@ -180,8 +198,15 @@ export async function runEngineLinkDoctor(deps: DoctorDependencies = defaults): 
   hops.push(fix(6, tunnel, "Start the engine computer's SSH link."));
   if (!tunnel) return hops.concat(Array.from({ length: 4 }, (_, i) => fix(i + 7, false, "Fix hop 6, then rerun doctor.")));
   let health = false;
-  try { health = (await deps.health(config.localPort)).ok; } catch { /* fail this hop */ }
-  hops.push(fix(7, health, "Update the Stack on the engine computer."));
+  let hop7Failure = "The Stack on the engine computer is a different version than this Home can use. Update the Stack on the engine computer, then rerun doctor.";
+  try {
+    const reply = await deps.health(config.localPort);
+    health = reply.ok;
+    const inRange = reply.contract !== undefined && reply.contract >= STACK_CONTRACT_MIN && reply.contract <= STACK_CONTRACT_MAX;
+    if (!health && inRange) hop7Failure = "The Stack on the engine computer answered, but reported that it is not healthy. Check the Stack's status on the engine computer, then rerun doctor.";
+    else if (!health) hop7Failure = `The Stack on the engine computer speaks ${reply.contract === undefined ? "an unknown contract" : `contract ${reply.contract}`}, and this Home needs contract ${STACK_CONTRACT_MIN === STACK_CONTRACT_MAX ? STACK_CONTRACT_MIN : `${STACK_CONTRACT_MIN} to ${STACK_CONTRACT_MAX}`}. Update the Stack on the engine computer, then rerun doctor.`;
+  } catch { hop7Failure = "The SSH tunnel is up, but what answered on it was not a Stack health reply. Check that the Stack is running on the engine computer, then rerun doctor."; }
+  hops.push(fix(7, health, hop7Failure));
   let roleReady = false;
   try {
     const roles = await deps.roles(config.localPort);
