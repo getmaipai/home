@@ -73,3 +73,25 @@ export function configuredServiceComponents(): string[] {
     .filter((need) => need.kind === "service")
     .map((need) => serviceComponent(need.id))))];
 }
+
+export function findUndeclaredNeeds(apps: StatusApp[]): string[] {
+  const messages: string[] = [];
+  for (const app of apps) {
+    if (app.needs.length === 0) {
+      messages.push(`${app.id}: declares no needs`);
+      continue;
+    }
+    for (const need of app.needs) {
+      if (
+        need.id === "" ||
+        need.name === "" ||
+        need.purpose === "" ||
+        typeof need.required !== "boolean"
+      ) {
+        const needId = need.id ?? "(no id)";
+        messages.push(`${app.id}: need ${needId} is incomplete`);
+      }
+    }
+  }
+  return messages;
+}

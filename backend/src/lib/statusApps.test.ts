@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { appResponse, buildAppHistory, componentForNeed, deriveAppState, unionRequiredDowntime, type StatusApp } from "@/lib/statusApps";
 import { __resetInternetProbeForTests, classifyInternetFailures, probeInternet } from "@/lib/internetProbe";
+import { findUndeclaredNeeds } from "@/lib/appNeeds";
 
 describe("app status derivation", () => {
   test("normalizes service host needs to the service health component id", () => {
@@ -96,4 +97,44 @@ test("probe runs both injected endpoints and uses three consecutive combined fai
   expect(await probeInternet(settings, failedDns)).toBe("degraded");
   expect(await probeInternet(settings, failedDns)).toBe("down");
   expect([dnsCalls, tcpCalls]).toEqual([4, 4]);
+});
+
+test("complete apps give an empty array", () => {
+  expect(findUndeclaredNeeds([
+    { id: "home", name: "Home", needs: [{ kind: "engine", id: "hub", name: "Hub", purpose: "Open the hub", required: true }] },
+    { id: "chat", name: "Chat", needs: [
+      { kind: "engine", id: "chat", name: "AI", purpose: "Chat", required: true },
+      { kind: "engine", id: "memory", name: "Memory", purpose: "Recall", required: false },
+    ] },
+  ])).toEqual([]);
+});
+
+test("an app with no needs gives one message", () => {
+  expect(findUndeclaredNeeds([
+    { id: "orphan", name: "Orphan", needs: [] },
+  ])).toEqual(["orphan: declares no needs"]);
+});
+
+test("a need with missing id gives an incomplete message", () => {
+  expect(findUndeclaredNeeds([
+    { id: "test", name: "Test", needs: [{ kind: "engine", name: "NoId", purpose: "Test", required: true }] },
+  ])).toEqual(["test: need (no id) is incomplete"]);
+});
+
+test("a need with missing name gives an incomplete message", () => {
+  expect(findUndeclaredNeeds([
+    { id: "test", name: "Test", needs: [{ kind: "engine", id: "noName", purpose: "Test", required: true }] },
+  ])).toEqual(["test: need noName is incomplete"]);
+});
+
+test("a need with missing purpose gives an incomplete message", () => {
+  expect(findUndeclaredNeeds([
+    { id: "test", name: "Test", needs: [{ kind: "engine", id: "noPurpose", name: "NoPurpose", purpose: "", required: true }] },
+  ])).toEqual(["test: need noPurpose is incomplete"]);
+});
+
+test("a need with non-boolean required gives an incomplete message", () => {
+  expect(findUndeclaredNeeds([
+    { id: "test", name: "Test", needs: [{ kind: "engine", id: "noBool", name: "NoBool", purpose: "Test", required: "yes" as any }] },
+  ])).toEqual(["test: need noBool is incomplete"]);
 });

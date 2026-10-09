@@ -11,6 +11,23 @@ import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import type { StackFixture } from "./stackFixture";
 
+// Kill any process holding the fixed port used by reserveFreePort before attempting to reserve it.
+const fixedPort = 43997;
+try {
+  killPort(fixedPort);
+} catch {
+  // Ignore
+}
+// reserveFreePort tries 65535, 65534, 65533 — kill them too.
+const fixedPorts = [65535, 65534, 65533];
+for (const port of fixedPorts) {
+  try {
+    killPort(port);
+  } catch {
+    // Ignore
+  }
+}
+
 let defaultScriptedStack: StackFixture;
 
 // SINGLE-INSTANCE-02 (#196): a hub booted by a test (or by a script a test
