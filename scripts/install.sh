@@ -27,13 +27,9 @@ STACK_REPO="getmaipai/stack"
 # HOME-STACK-01: the Stack has no release of its own, so this is a
 # commit, not a tag - bumped by whoever cuts a Home release, to whatever
 # stack commit that release is meant to carry (docs/dev.md's own "What
-# Home's release carries" paragraph). Today's value is the commit that
-# fixed scripts/build-binary.sh's own OUT_DIR handling for an absolute
-# path - exactly what this installer always passes it - found live
-# wiring this file up for real; the commit before it (b1f40da) compiles
-# but silently writes the binary to the wrong place under this
-# installer's own real usage.
-STACK_TAG="233bc4fd91c01efd54aa44d9147bcccd6fe956a9"
+# Home's release carries" paragraph). Today's value adds vision URL
+# binding to the Stack supervisor.
+STACK_TAG="60b887c5704bd94bc742254cce48e4d34b1fd035"
 # The Stack at STACK_TAG pins core-v0.1.0 as file:../../commons/core.
 # Keep the Commons pin and the digest of GitHub's archive together here;
 # the archive digest is verified before anything is extracted.
