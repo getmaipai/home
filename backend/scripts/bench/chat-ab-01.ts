@@ -590,7 +590,8 @@ async function streamTurn(actor: { id: string; role?: string }, surface: "chat" 
 
 async function pacedBeforeSearchTurn(): Promise<void> {
   const since = Date.now() - tee.lastSearchAt;
-  if (tee.lastSearchAt > 0 && since < SEARCH_PACE_MS) await new Promise((r) => setTimeout(r, SEARCH_PACE_MS - since));
+  // The pace protects a real search engine from rate limits; the loopback fixture needs none.
+  if (!fixtureSearch && tee.lastSearchAt > 0 && since < SEARCH_PACE_MS) await new Promise((r) => setTimeout(r, SEARCH_PACE_MS - since));
   await waitForHubQuiet(undefined, (m) => console.log(m));
 }
 
