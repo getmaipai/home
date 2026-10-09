@@ -18,8 +18,8 @@ import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
 import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
-import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
-import { telegramConfigured } from "@/lib/telegramChannel";
+import { listInstalledManifests, listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
+import { TELEGRAM_API_BASE, telegramConfigured } from "@/lib/telegramChannel";
 import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
@@ -55,6 +55,20 @@ const DOWNLOAD_CARRIES =
   "the name of the file being downloaded, and your home's internet address. Nothing anyone in the house said, asked, or saved.";
 
 const THIRD_PARTY_RETENTION = "we do not know and cannot control it; see that service's own policy";
+
+/** Named, default-on public reads (getmaipai/.github docs/PRIVACY.md, the
+ * 2026-10-09 bullet): a read of a public service that is on without the
+ * household turning anything on. The list is empty today. A read added here
+ * is declared once, with its host and the reason it is default-on, and the
+ * offline endpoint test (tests/offlineEndpoints.test.ts) then treats the
+ * host as declared. It is not a way to skip the table: the same read must
+ * also appear in platformConnections() or a package's data_sources. */
+export interface DefaultOnPublicRead {
+  id: string;
+  host: string;
+  reason: string;
+}
+export const DEFAULT_ON_PUBLIC_READS: readonly DefaultOnPublicRead[] = [];
 
 /** The hub's own outbound connections. Every one but the update check
  * below is a download the household asked for by turning something on
@@ -107,7 +121,7 @@ export function platformConnections(): PrivacyConnection[] {
     // an unconfigured household reaches nothing, and the table should say
     // so by omission, the same "no host, no row" rule every row above
     // already follows.
-    row("platform:telegram", telegramConfigured() ? "api.telegram.org" : null, {
+    row("platform:telegram", telegramConfigured() ? hostOf(TELEGRAM_API_BASE) : null, {
       when: "when a notification you or your household chose to send to Telegram fires",
       what: "the rendered notification text and your linked Telegram chat id. Nothing anyone in the house said or asked otherwise.",
     }),
@@ -345,4 +359,20 @@ export function privacyPageData(): { connections: PrivacyConnection[]; offlinePl
     connections: privacyConnections(manifests),
     offlinePlugins: offlinePluginNames(manifests),
   };
+}
+
+/** Every host the hub may contact, regardless of what the household has
+ * turned on: the hosts the table above names, the hosts bundled packages
+ * hold a `net:` permission for, the two optional platform hosts that only
+ * get a row once configured, and the named default-on public reads. One
+ * list for the offline endpoint test; nothing here is a second declaration,
+ * each piece is read from the one place that declares it. */
+export function declaredEndpointText(): string {
+  const parts: string[] = [hostOf(TELEGRAM_API_BASE), HOSTED_SEARCH_HOST];
+  for (const row of [...platformConnections(), ...pluginConnections()]) parts.push(row.destination, row.who);
+  for (const manifest of listInstalledManifests()) {
+    for (const permission of manifest.permissions ?? []) if (permission.startsWith("net:")) parts.push(permission.slice(4));
+  }
+  for (const read of DEFAULT_ON_PUBLIC_READS) parts.push(read.host);
+  return parts.join("\n").toLowerCase();
 }

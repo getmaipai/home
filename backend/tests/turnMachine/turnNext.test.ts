@@ -2157,9 +2157,17 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
   };
   const answeringRound = (request: ChatCompletionRequest) => request.messages.at(-1)?.content?.toString().includes("did not happen") === true;
 
-  test("THIN-1D: search down gets the model's own note, told only the failure kind, and two runs read differently", async () => {
-    const searxng = startFakeSearxng();
-    setHouseholdSettingValue("search.searxng_url", searxng.url);
+  test("OFFLINE-TEST-01: denied egress leaves a full turn answer and records only the unavailable failure kind", async () => {
+    const realFetch = globalThis.fetch.bind(globalThis);
+    const deniedFetchImpl = async (input: string | URL | Request, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : String(input);
+      const host = new URL(url).hostname;
+      if (host === "127.0.0.1" || host === "localhost" || host === "::1") return realFetch(input, init);
+      throw new Error("egress denied by offline test");
+    };
+    const deniedFetch = spyOn(globalThis, "fetch").mockImplementation(deniedFetchImpl as typeof fetch);
+    setHouseholdSettingValue("search.searxng_url", "https://search.example.test");
+    setHouseholdSettingValue("search.wikipedia_fallback", false);
     const phrasingRequests: ChatCompletionRequest[] = [];
     const run = (note: string) =>
       withStub(
@@ -2194,15 +2202,15 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
       // The raw details stay on the stored outcome record (for THIN-1E).
       const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, first.value.turn_id)).get();
       const outcomes = row?.outcomes
-        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; detail?: string }[])
+        ? (JSON.parse(row.outcomes as unknown as string) as { packageId: string; status: string; errorCode?: string; failureKind?: string; detail?: string }[])
         : [];
       const websearchOutcome = outcomes.find((o) => o.packageId === "websearch");
       expect(websearchOutcome?.status).toBe("failed");
-      expect(websearchOutcome?.errorCode).toBe("search_unavailable");
+      expect(websearchOutcome?.failureKind).toBe("unavailable");
       // R2: the raw text is the outcome's admin-only `detail` now, never a `userMessage`.
       expect(websearchOutcome?.detail).toBeTruthy();
     } finally {
-      searxng.stop();
+      deniedFetch.mockRestore();
     }
   });
 

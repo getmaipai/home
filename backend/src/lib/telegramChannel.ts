@@ -10,7 +10,7 @@
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { tryConsume, type TokenBucketOptions } from "@/lib/rateLimiter";
 
-const TELEGRAM_API_BASE = "https://api.telegram.org";
+export const TELEGRAM_API_BASE = "https://api.telegram.org";
 
 // One bot, one household (the settings comment's own "one bot token for
 // the whole household"), so one shared key rather than one per chat id -

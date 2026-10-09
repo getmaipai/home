@@ -64,7 +64,7 @@ export function modelFacingArgs(tool: string, args: Record<string, unknown>): Re
 /** R2 (rule 6, tools design T5): a failed run's kind, from its fixed code only. */
 function failureKindOf(code: string | undefined): FailureKind {
   if (code === "bad_arguments") return "bad_arguments";
-  if (code === "search_unavailable") return "unavailable";
+  if (code === "search_unavailable" || code === "network_unreachable") return "unavailable";
   return "errored";
 }
 
