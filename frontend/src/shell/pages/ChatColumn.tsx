@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useAui, useAuiState } from "@assistant-ui/react";
-import { ThreadListItems, ThreadListNew, ThreadListRoot } from "@maipai/ui/src/elements/thread-list.aui";
+import { useThreadListGroups } from "@maipai/ui/src/elements/thread-list.aui";
+import { ThreadListSidebar } from "@maipai/ui/src/elements/thread-list-sidebar.aui";
 import { ThreadSearch, type SearchableThread } from "@maipai/ui/src/elements/thread-search";
-import { Button } from "@maipai/ui/src/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
+import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { type ChatColumnControl } from "@/apps/chat/chatColumnControl";
 import { useChatProjects } from "@/apps/chat/chatProjects";
@@ -30,13 +30,9 @@ export const PEEK_CLOSE_GRACE_MS = 150;
 /** Where "Chat settings" goes: Settings, Me tab, Chat section. */
 export const CHAT_SETTINGS_PATH = "/settings?tab=me&section=chat";
 
-const ColumnCloseIcon = getIcon("panel-left-close");
-const ColumnOpenIcon = getIcon("panel-left-open");
-const NewChatIcon = getIcon("pencil");
 const SearchIcon = getIcon("search");
 const CloseIcon = getIcon("x");
 const ChatSettingsIcon = getIcon("settings");
-const PinIcon = getIcon("pin");
 
 // Focus this page moves on a person's behalf (handing focus between the two
 // toggles, back to the search button) must not pop a tooltip open: a
@@ -52,7 +48,7 @@ function focusQuietly(element: HTMLElement | null | undefined): void {
   element.focus({ preventScroll: true });
   quietFocusTargets.delete(element);
 }
-function skipTooltipOnQuietFocus(event: FocusEvent<HTMLElement>): void {
+export function skipTooltipOnQuietFocus(event: FocusEvent<HTMLElement>): void {
   if (quietFocusTargets.has(event.currentTarget)) event.preventDefault();
 }
 
@@ -220,6 +216,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
     peek,
     peekZoneHandlers,
     peekColumnHandlers,
+    closePeek,
     pinPeek,
     sheetOpen,
     setSheetOpen,
@@ -240,57 +237,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
 
 export type ChatColumnState = ReturnType<typeof useChatColumn>;
 
-/** The one hide/show control. It sits at the top of the open column and,
- * while the column is hidden, at the left edge of the conversation header. */
-export function ChatColumnToggle({ collapsed, onToggle, buttonRef, pin = false }: { collapsed: boolean; onToggle: () => void; buttonRef: RefObject<HTMLButtonElement | null>; pin?: boolean }) {
-  // In the hover peek the control pins the column open (docks it again).
-  const label = pin ? "Keep conversations open" : collapsed ? "Show conversations" : "Hide conversations";
-  const Icon = pin ? PinIcon : collapsed ? ColumnOpenIcon : ColumnCloseIcon;
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild onFocus={skipTooltipOnQuietFocus}>
-        <Button
-          ref={buttonRef}
-          variant="ghost"
-          size="icon-sm"
-          data-slot="chat-column-toggle"
-          aria-label={label}
-          aria-expanded={pin ? undefined : !collapsed}
-          aria-controls={pin ? undefined : CHAT_COLUMN_ID}
-          aria-keyshortcuts="Meta+B Control+B"
-          onClick={onToggle}
-        >
-          <Icon className="size-4.5" />
-        </Button>
-      </TooltipTrigger>
-      <TooltipContent side="bottom">
-        {label} {pin ? null : <span className="ms-1 opacity-60">{chatColumnShortcutLabel()}</span>}
-      </TooltipContent>
-    </Tooltip>
-  );
-}
-
-function useSearchableThreads(): SearchableThread[] {
-  const threadIds = useAuiState((s) => s.threads.threadIds);
-  const threadItems = useAuiState((s) => s.threads.threadItems);
-  return useMemo(() => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const yesterday = today.getTime() - 86_400_000;
-    const byId = new Map(threadItems.map((item) => [item.id, item]));
-    return threadIds.flatMap((id): SearchableThread[] => {
-      const item = byId.get(id);
-      if (!item || item.status === "archived") return [];
-      const time = item.lastMessageAt?.getTime();
-      const group = time === undefined || time >= today.getTime() ? "Today" : time >= yesterday ? "Yesterday" : "Earlier";
-      return [{ id, title: item.title || "New Chat", group, pinned: Boolean(item.custom?.pinned) }];
-    });
-  }, [threadIds, threadItems]);
-}
-
-/** The column's contents, shared by the desktop column and the phone
- * sheet: a header row (the app's name, thread search, the hide control),
- * New chat as a quiet row, then the history (Pinned, Projects, Recents). */
+/** Host data and controls wired directly into the shipped history sidebar. */
 export function ChatHistoryPanel({
   state,
   person,
@@ -298,8 +245,10 @@ export function ChatHistoryPanel({
   onNewThread,
   newChatDisabled,
   pinnable,
+  collapsed = false,
+  peek = false,
+  mobile = false,
   toggle,
-  variant,
 }: {
   state: ChatColumnState;
   person: Roster;
@@ -308,8 +257,10 @@ export function ChatHistoryPanel({
   onNewThread: () => void;
   newChatDisabled: boolean;
   pinnable: boolean;
+  collapsed?: boolean;
+  peek?: boolean;
+  mobile?: boolean;
   toggle?: ReactNode;
-  variant: "column" | "sheet";
 }) {
   const aui = useAui();
   // PROJECTS-01b: the person's projects in the kit thread list.
@@ -317,15 +268,36 @@ export function ChatHistoryPanel({
   const { search, setSearch, searchOpen, setSearchOpen, searchFocusKey } = state;
   const hasThreads = useAuiState((s) => s.threads.threadIds.length > 0);
   const isLoading = useAuiState((s) => s.threads.isLoading);
+  const threadItems = useAuiState((s) => s.threads.threadItems);
   // Nothing to search (a person with no chats asked for search): never
   // leave a search open that would appear later, unfocused.
   useEffect(() => {
     if (searchOpen && !isLoading && !hasThreads) setSearchOpen(false);
   }, [searchOpen, isLoading, hasThreads, setSearchOpen]);
-  const searchableThreads = useSearchableThreads();
+  const { threadIds, groups, filteredIndices, looseIndices } = useThreadListGroups("", { pinnable: pinnable && !temporary });
+  const searchableThreads = useMemo(() => {
+    const byId = new Map(threadItems.map((item) => [item.id, item]));
+    const orderedIndices = groups
+      ? groups.flatMap((group) => group.indices)
+      : filteredIndices.length > 0 ? filteredIndices : looseIndices;
+    return orderedIndices.flatMap((index): SearchableThread[] => {
+      const id = threadIds[index];
+      const item = id ? byId.get(id) : undefined;
+      if (!id || !item || item.status === "archived") return [];
+      const group = groups?.find((entry) => entry.indices.includes(index))?.label ?? "Today";
+      return [{ id, title: item.title || "New Chat", group, pinned: !temporary && Boolean(item.custom?.pinned) }];
+    });
+  }, [filteredIndices, groups, looseIndices, temporary, threadIds, threadItems]);
   const searchRowRef = useRef<HTMLDivElement>(null);
   const searchButtonRef = useRef<HTMLButtonElement>(null);
   const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const content = document.querySelectorAll<HTMLElement>(`[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar-content"]`);
+    const update = (event: Event) => setScrolled((event.currentTarget as HTMLElement).scrollTop > 0);
+    content.forEach((node) => node.addEventListener("scroll", update, { passive: true }));
+    return () => content.forEach((node) => node.removeEventListener("scroll", update));
+  }, []);
 
   // Focus the field when search opens (from the icon or the command
   // palette), but only in the instance a person can see.
@@ -374,12 +346,26 @@ export function ChatHistoryPanel({
     setSearchOpen(false);
   };
 
-  return (
-    <>
-    <ThreadListRoot data-slot="chat-column-panel" data-variant={variant} className="flex h-full min-h-0 flex-col gap-0">
-      <div data-slot="chat-column-top" data-scrolled={scrolled || undefined} className="shrink-0">
+  const collapsedState = collapsed ? (peek ? "peek" : "closed") : "open";
+  const searchButton = hasThreads && !searchOpen ? (
+    <TooltipIconButton
+      ref={searchButtonRef}
+      tooltip="Search chats"
+      data-slot="chat-column-icon"
+      aria-label="Search chats"
+      onFocus={skipTooltipOnQuietFocus}
+      onClick={() => {
+        setSearchOpen(true);
+        state.setSearchFocusKey((key) => key + 1);
+      }}
+    ><SearchIcon className="size-4.5" /></TooltipIconButton>
+  ) : null;
+  const columnToggle = toggle;
+  const header = (
+    <div data-slot="chat-column-top" data-scrolled={scrolled || undefined}>
         {searchOpen && hasThreads ? (
-          <div ref={searchRowRef} data-slot="chat-column-header" className="flex items-center gap-1">
+          <div ref={searchRowRef} data-slot="chat-column-header" className={`flex h-9 w-full items-center gap-1 ps-0.5 ${mobile ? "pe-10" : ""}`}>
+            <div className="min-w-0 flex-1">
             <ThreadSearch
               threads={searchableThreads}
               query={search}
@@ -387,78 +373,56 @@ export function ChatHistoryPanel({
               onQueryChange={setSearch}
               onSelect={(id) => void aui.threads.switchToThread(id)}
               inputOnly
+              density="compact"
               aria-label="Search chats"
-              className="min-w-0 flex-1"
               onKeyDown={onSearchKeyDown}
               onBlur={onSearchBlur}
             />
-            <Button variant="ghost" size="icon-sm" data-slot="chat-column-icon" aria-label="Close search" onClick={() => closeSearch(true)}>
-              <CloseIcon className="size-4" />
-            </Button>
+            </div>
+            <TooltipIconButton tooltip="Close search" data-slot="chat-column-icon" aria-label="Close search" onClick={() => closeSearch(true)}><CloseIcon className="size-4" /></TooltipIconButton>
             {toggle}
           </div>
         ) : (
-          <div data-slot="chat-column-header" className="flex items-center gap-1">
+          <div data-slot="chat-column-header" className={`flex h-9 w-full items-center gap-1 ps-0.5 ${mobile ? "pe-10" : ""}`}>
             <span data-slot="chat-column-title" className="min-w-0 flex-1 truncate">Chat</span>
-            <Tooltip>
-              <TooltipTrigger asChild onFocus={skipTooltipOnQuietFocus}>
-                <Button asChild variant="ghost" size="icon-sm" data-slot="chat-column-icon">
-                  <Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings">
-                    <ChatSettingsIcon className="size-4.5" />
-                  </Link>
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom">Chat settings</TooltipContent>
-            </Tooltip>
-            {hasThreads ? (
-              <Tooltip>
-                <TooltipTrigger asChild onFocus={skipTooltipOnQuietFocus}>
-                  <Button
-                    ref={searchButtonRef}
-                    variant="ghost"
-                    size="icon-sm"
-                    data-slot="chat-column-icon"
-                    aria-label="Search chats"
-                    onClick={() => {
-                      setSearchOpen(true);
-                      state.setSearchFocusKey((key) => key + 1);
-                    }}
-                  >
-                    <SearchIcon className="size-4.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="bottom">Search chats</TooltipContent>
-              </Tooltip>
-            ) : null}
-            {toggle}
+            <TooltipIconButton tooltip="Chat settings" data-slot="chat-column-icon" asChild><Link to={CHAT_SETTINGS_PATH} aria-label="Chat settings"><ChatSettingsIcon className="size-4.5" /></Link></TooltipIconButton>
+            {searchButton}
+            {columnToggle}
           </div>
         )}
-        <nav aria-label="Chat" data-slot="chat-column-nav" className="flex flex-col">
-          <ThreadListNew
-            onClick={() => {
-              // A plain new chat is never inside a project.
-              setPendingChatFolder(null);
-              onNewThread();
-            }}
-            disabled={newChatDisabled}
-          >
-            <NewChatIcon data-slot="aui_thread-list-new-icon" className="size-4.5 shrink-0" />
-            <span data-slot="aui_thread-list-new-label">New chat</span>
-          </ThreadListNew>
-        </nav>
-      </div>
-      <div
-        data-slot="chat-column-list"
-        className="min-h-0 flex-1 overflow-y-auto"
-        onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}
-      >
-        <ThreadListItems searchQuery={hasThreads ? search : ""} pinnable={pinnable} projects={projects} />
-        {!isLoading && !hasThreads ? (
-          <p data-slot="chat-column-empty">Your chats will show up here.</p>
-        ) : null}
-      </div>
-    </ThreadListRoot>
-    {settingsDialog}
-    </>
+    </div>
   );
+  return <>
+    <ThreadListSidebar
+      id={mobile ? undefined : CHAT_COLUMN_ID}
+      data-slot="next-chat-rail"
+      data-state={collapsedState}
+      data-variant={mobile ? "sheet" : "column"}
+      aria-label="Conversations"
+      role="region"
+      variant="compact"
+      header={header}
+      labels={{ newChat: "New chat", searchChats: "Search chats" }}
+      // The shipped provider root is fixed for page level use. This host
+      // embeds it in the in-flow Chat column, so constrain it to the host.
+      // eslint-disable-next-line shadcn/no-inline-styles -- ThreadListSidebar forwards style to its fixed SidebarProvider root; layout geometry is required for the embedded column.
+      style={{ position: "relative", inset: "auto", width: "100%", height: "100%" } as React.CSSProperties}
+      projects={projects}
+      pinnable={pinnable}
+      temporary={temporary}
+      newChatDisabled={newChatDisabled}
+      onNewChat={() => { setPendingChatFolder(null); onNewThread(); }}
+      searchQuery={hasThreads ? search : ""}
+      searchable={false}
+      emptyState={!isLoading ? <p className="px-2.5 py-2 text-sm text-muted-foreground">Your chats will show up here.</p> : undefined}
+      collapsed={collapsed}
+      peek={peek}
+      onPeekZonePointerEnter={state.peekZoneHandlers.onPointerEnter}
+      onPeekZonePointerLeave={state.peekZoneHandlers.onPointerLeave}
+      onPeekPointerEnter={state.peekColumnHandlers.onPointerEnter}
+      onPeekPointerLeave={state.peekColumnHandlers.onPointerLeave}
+      onPeekNavigate={() => state.closePeek(true)}
+    />
+    {settingsDialog}
+  </>;
 }

@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-07T11:16:27.534Z",
-  "kitTag": "ui-v0.5.168",
+  "generatedAt": "2026-10-07T13:35:37.305Z",
+  "kitTag": "ui-v0.5.172",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -56,6 +56,14 @@
       "group": "thread/showcase",
       "verdict": "support",
       "verdictReason": "Developer-only story fixture for K07, covered by the Commons showcase tests; not a standalone Home product surface.",
+      "implemented": false
+    },
+    {
+      "file": "ThreadSearchDensityShowcase.tsx",
+      "name": "ThreadSearchDensityShowcase",
+      "group": "thread/showcase",
+      "verdict": "support",
+      "verdictReason": "Developer-only story fixture for ELT-T1-20 ThreadSearch density, covered by the Commons showcase tests; not a standalone Home product surface.",
       "implemented": false
     },
     {
@@ -243,7 +251,7 @@
       "group": "composer",
       "verdict": "later",
       "verdictReason": "Vendored by ELT-T1-K01a; wired by an ELEMENTS-ADOPT-01 batch, not yet.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "composer-slash-commands.aui.tsx",
@@ -882,7 +890,7 @@
       "group": "message",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "research-report.tsx",
@@ -1077,7 +1085,7 @@
       "group": "thread/navigation",
       "verdict": "later",
       "verdictReason": "Defer the kit sidebar Element until Home's permanent app rail and chat navigation can adopt it without duplicating the shell navigation.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "thread-list.aui.tsx",
