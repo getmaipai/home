@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
@@ -116,26 +116,34 @@ export function PersonProfilePage({ person, onPersonChange }: PersonProfilePageP
             }
             return (
               <>
-                <ProfileHeaderCard profile={profile} viewer={person} viewingSelf={viewingSelf} onPersonChange={onPersonChange} />
+                <Card className={profile.accent ? cn("ring-2 ring-offset-2 ring-offset-background", ACCENT_RING_CLASS[profile.accent]) : undefined}>
+                  <CardContent>
+                    <ProfileHeaderBody profile={profile} viewer={person} viewingSelf={viewingSelf} onPersonChange={onPersonChange} />
+                  </CardContent>
+                </Card>
 
                 <Tabs value={activeTab} onValueChange={onTabChange}>
                   <TabsList>
                     <TabsTrigger value="overview">Overview</TabsTrigger>
                     {canViewMemories ? <TabsTrigger value="memories">Memories</TabsTrigger> : null}
                   </TabsList>
-                  <TabsContent value="overview" className="flex flex-col gap-4 py-2">
-                    <p className="text-base text-muted-foreground">
-                      {viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}
-                    </p>
-                    <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
+                  <TabsContent value="overview">
+                    <div className="flex flex-col gap-4 py-2">
+                      <p className="text-base text-muted-foreground">
+                        {viewingSelf ? "This is your own profile." : `${profile.display_name}'s profile in this household.`}
+                      </p>
+                      <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
+                    </div>
                   </TabsContent>
                   {canViewMemories ? (
-                    <TabsContent value="memories" className="py-2">
-                      {viewingSelf ? (
-                        <OwnMemories filterIds={idsFilter(searchParams)} actorIsAdult={person.role === "adult"} />
-                      ) : (
-                        <OtherPersonMemories personId={profile.id} personName={profile.display_name} />
-                      )}
+                    <TabsContent value="memories">
+                      <div className="py-2">
+                        {viewingSelf ? (
+                          <OwnMemories filterIds={idsFilter(searchParams)} actorIsAdult={person.role === "adult"} />
+                        ) : (
+                          <OtherPersonMemories personId={profile.id} personName={profile.display_name} />
+                        )}
+                      </div>
                     </TabsContent>
                   ) : null}
                 </Tabs>
@@ -217,7 +225,7 @@ function SharedMediaSection({ profile, viewingSelf }: { profile: ProfileEntry; v
  * just self, since the design record's bio field is explicitly "in the
  * person's own words or (for a child) a parent's": an owner/admin editing
  * a child's bio on their behalf is the intended case, not a loophole. */
-function ProfileHeaderCard({
+function ProfileHeaderBody({
   profile,
   viewer,
   viewingSelf,
@@ -241,8 +249,7 @@ function ProfileHeaderCard({
   const accentClass = profile.accent ? ACCENT_RING_CLASS[profile.accent] : null;
 
   return (
-    <Card className={accentClass ? cn("ring-2 ring-offset-2 ring-offset-background", accentClass) : undefined}>
-      <CardContent className="flex flex-wrap items-center gap-4 p-6">
+    <div className="flex flex-wrap items-center gap-4">
         <Avatar
           name={profile.display_name}
           className={accentClass ? cn("h-16 w-16 text-xl ring-2 ring-offset-2 ring-offset-card", accentClass) : "h-16 w-16 text-xl"}
@@ -254,7 +261,7 @@ function ProfileHeaderCard({
         </div>
         <div className="flex flex-col items-end gap-2">
           {canEdit ? (
-            <Button variant="outline" onClick={() => setEditOpen(true)} className="gap-1.5">
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
               <PencilIcon className="size-4" aria-hidden />
               Edit
             </Button>
@@ -265,9 +272,14 @@ function ProfileHeaderCard({
             </Link>
           ) : null}
         </div>
-      </CardContent>
-      {canEdit ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}
-    </Card>
+      {canEdit ? (
+        <Dialog open={editOpen} onOpenChange={setEditOpen}>
+          <DialogContent>
+            <EditProfileFields profile={profile} onOpenChange={setEditOpen} onPersonChange={onPersonChange} />
+          </DialogContent>
+        </Dialog>
+      ) : null}
+    </div>
   );
 }
 
@@ -279,14 +291,12 @@ function ProfileHeaderCard({
  * record's "Customization, bounded" list: bio, accent, the photo opt-in,
  * and display name (moved here from Settings -> Me's own
  * `DisplayNameSection.tsx`, Jesse's 2026-09-26 ruling, decision 3). */
-function EditProfileDialog({
+function EditProfileFields({
   profile,
-  open,
   onOpenChange,
   onPersonChange,
 }: {
   profile: ProfileEntry;
-  open: boolean;
   onOpenChange: (open: boolean) => void;
   onPersonChange: () => void;
 }) {
@@ -297,20 +307,6 @@ function EditProfileDialog({
   const [photoOptIn, setPhotoOptIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  // Reset to the current record every time the dialog opens - the same
-  // "temp state seeded from the real state on open" shape the vendored
-  // UserProfile's own tempPersonal/tempAddress use, so a cancelled edit
-  // (or reopening on a different profile) never leaks stale input.
-  useEffect(() => {
-    if (!open) return;
-    setDisplayName(profile.display_name);
-    setBio(profile.bio ?? "");
-    setAccent(profile.accent ?? NO_ACCENT);
-    setPhotoOptIn(false);
-    setError(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- profile is a fresh object every render (query data); re-running on its identity would reset mid-edit on every unrelated refetch.
-  }, [open, profile.id]);
 
   const trimmedName = displayName.trim();
   const canSave = trimmedName.length > 0 && !submitting;
@@ -357,8 +353,7 @@ function EditProfileDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+    <>
         <DialogHeader>
           <DialogTitle>Edit {profile.display_name}&rsquo;s profile</DialogTitle>
         </DialogHeader>
@@ -422,7 +417,6 @@ function EditProfileDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+    </>
   );
 }

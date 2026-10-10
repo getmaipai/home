@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
+import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
@@ -28,8 +29,13 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
   const queryClient = useQueryClient();
   return (
     <>
-      <ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} />
-      <FaceEnrollmentCard profile={person} viewer={person} />
+      <Card>
+        <CardHeader><CardTitle>Profile</CardTitle></CardHeader>
+        <CardContent>
+          <ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} />
+        </CardContent>
+      </Card>
+      {canViewFaceEnrollment(person, person) ? <Card><FaceEnrollmentBody profile={person} viewer={person} /></Card> : null}
     </>
   );
 }

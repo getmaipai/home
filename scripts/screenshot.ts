@@ -363,6 +363,7 @@ const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
+const rule9PeopleReview = process.argv.includes("--rule9-people-review");
 // SHELL-09 Phase 5: capture every migrated route at the accepted
 // desktop/phone sizes in both themes. Keep these real seeded captures in
 // data-scratch for visual comparison before any docs image is replaced;
@@ -8497,6 +8498,59 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
   }
 }
 
+/** RULE9-CLEANUP-01d: the people area after its kit Elements were rendered as shipped. An owner and a child (Nova), at 1440 and 390 in both
+ * themes: the household list, a profile (the owner on Nova, Nova on herself), Settings -> Me (profile form and face recognition card),
+ * the owner's open Edit dialog, and the face-enrollment page (headless Chromium has no camera, so it lands on a status card). */
+async function captureRule9PeopleReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!peopleResponse.ok) throw new Error(`rule9 people review: household lookup failed: ${peopleResponse.status}`);
+  const people = await peopleResponse.json() as Array<{ id: string; display_name: string; role: string }>;
+  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
+  if (!child) throw new Error("rule9 people review: seeded child Nova was not found");
+  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("rule9 people review: Nova's sign-in carried no session cookie");
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const [who, session] of [["owner", ownerSession], ["child", childSession]] as const) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          const shot = async (name: string) => {
+            await settleAnimations(page);
+            const path = join(outDir, `rule9-people-${name}-${who}-${viewport.width}-${theme}.png`);
+            await page.screenshot({ path, fullPage: slug === "phone" });
+            console.log(`Wrote ${path}`);
+          };
+          await page.goto(`${BASE_URL}/people`);
+          await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
+          await shot("list");
+          await page.goto(`${BASE_URL}/people/${child.id}`);
+          await page.getByRole("heading", { name: "Nova" }).waitFor({ timeout: 15000 });
+          await shot("profile");
+          if (who === "owner") {
+            await page.getByRole("button", { name: "Edit" }).click();
+            await page.getByRole("dialog").waitFor({ timeout: 15000 });
+            await shot("edit-dialog");
+            await page.goto(`${BASE_URL}/people/${child.id}/enroll-face`);
+            await page.getByRole("button", { name: "Try again" }).waitFor({ timeout: 20000 }).catch(() => undefined);
+            await shot("enroll");
+          }
+          await page.goto(`${BASE_URL}/settings?tab=me`);
+          await page.getByText("Face recognition").first().waitFor({ timeout: 8000 }).catch(() => undefined);
+          if (slug === "phone") await page.getByText("Profile", { exact: true }).first().click().catch(() => undefined);
+          await page.getByText("Face recognition").first().waitFor({ timeout: 8000 }).catch(() => undefined);
+          await shot("settings-me");
+          await page.close();
+        } finally { await context.close(); }
+      }
+    }
+  }
+}
+
 async function captureShell09DocsMatrixReview(browser: Browser, sessionValue: string): Promise<void> {
   await captureNextDashboardReview(browser, sessionValue);
   await captureNextPeopleReview(browser, sessionValue);
@@ -10240,6 +10294,11 @@ async function main() {
     if (nextPrivacyReview) {
       await captureNextPrivacyReview(browser, sessionValue);
       console.log("completed named review: --next-privacy-review");
+      return;
+    }
+    if (rule9PeopleReview) {
+      await captureRule9PeopleReview(browser, sessionValue);
+      console.log("completed named review: --rule9-people-review");
       return;
     }
     if (nextPersonProfileReview) {

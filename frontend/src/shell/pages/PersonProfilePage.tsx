@@ -12,7 +12,7 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
 import { ACCENT_RING_CLASS, canManagePerson, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
-import { FaceEnrollmentCard } from "@/apps/people/FaceEnrollmentCard";
+import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
@@ -85,7 +85,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 <TabsContent value="overview" className="flex flex-col gap-4 py-2">
                   {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
                   <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
-                  {viewingSelf ? <FaceStatusRow profile={profile} /> : <FaceEnrollmentCard profile={profile} viewer={person} viewingSelf={false} />}
+                  {viewingSelf ? <FaceStatusRow profile={profile} /> : (canViewFaceEnrollment(person, profile) ? <Card><FaceEnrollmentBody profile={profile} viewer={person} viewingSelf={false} /></Card> : null)}
                 </TabsContent>
                 {canViewMemories ? (
                   <TabsContent value="memories" className="py-2">
