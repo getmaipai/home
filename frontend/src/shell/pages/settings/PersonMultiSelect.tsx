@@ -43,24 +43,26 @@ export function PersonMultiSelect({ value, onValueChange, disabled, excludePerso
   const getLabel = (id: string) => people.find((p) => p.id === id)?.display_name ?? id;
 
   return (
-    <Combobox
-      items={items}
-      multiple
-      value={[...value]}
-      onValueChange={onValueChange}
-      itemToStringLabel={getLabel}
-      disabled={disabled || peopleQuery.isLoading}
-    >
-      <ComboboxChips aria-label={ariaLabel} className="w-64">
-        {value.map((id) => (
-          <ComboboxChip key={id}>{getLabel(id)}</ComboboxChip>
-        ))}
-        <ComboboxChipsInput placeholder={value.length === 0 ? (placeholder ?? "Add a person…") : undefined} />
-      </ComboboxChips>
-      <ComboboxContent>
-        <ComboboxEmpty>{emptyText ?? "No one else in the household."}</ComboboxEmpty>
-        <ComboboxList>{(id: string) => <ComboboxItem key={id} value={id}>{getLabel(id)}</ComboboxItem>}</ComboboxList>
-      </ComboboxContent>
-    </Combobox>
+    <div className="w-64 max-w-full">
+      <Combobox
+        items={items}
+        multiple
+        value={[...value]}
+        onValueChange={onValueChange}
+        itemToStringLabel={getLabel}
+        disabled={disabled || peopleQuery.isLoading}
+      >
+        <ComboboxChips aria-label={ariaLabel}>
+          {value.map((id) => (
+            <ComboboxChip key={id}>{getLabel(id)}</ComboboxChip>
+          ))}
+          <ComboboxChipsInput placeholder={value.length === 0 ? (placeholder ?? "Add a person…") : undefined} />
+        </ComboboxChips>
+        <ComboboxContent>
+          <ComboboxEmpty>{emptyText ?? "No one else in the household."}</ComboboxEmpty>
+          <ComboboxList>{(id: string) => <ComboboxItem key={id} value={id}>{getLabel(id)}</ComboboxItem>}</ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+    </div>
   );
 }

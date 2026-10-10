@@ -230,12 +230,13 @@ export function UsersSection({ person }: UsersSectionProps) {
               if (editingId === p.id) {
                 return (
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 py-1">
-                    <Input
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      aria-label={`Name for ${p.display_name}`}
-                      className="max-w-48"
-                    />
+                    <div className="w-full max-w-48">
+                      <Input
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        aria-label={`Name for ${p.display_name}`}
+                      />
+                    </div>
                     {actorRole === "owner" && p.id !== person.id ? (
                       <Select
                         value={editRole}
@@ -259,15 +260,16 @@ export function UsersSection({ person }: UsersSectionProps) {
                       Require PIN lock
                     </span>
                     {editSessionLockRequired ? (
-                      <Input
-                        type="number"
-                        min={1}
-                        max={120}
-                        value={editSessionLockTimeoutMinutes}
-                        onChange={(e) => setEditSessionLockTimeoutMinutes(Number(e.target.value))}
-                        aria-label={`Session lock timeout, minutes, for ${p.display_name}`}
-                        className="w-20"
-                      />
+                      <div className="w-20 shrink-0">
+                        <Input
+                          type="number"
+                          min={1}
+                          max={120}
+                          value={editSessionLockTimeoutMinutes}
+                          onChange={(e) => setEditSessionLockTimeoutMinutes(Number(e.target.value))}
+                          aria-label={`Session lock timeout, minutes, for ${p.display_name}`}
+                        />
+                      </div>
                     ) : null}
                   </div>
                 );

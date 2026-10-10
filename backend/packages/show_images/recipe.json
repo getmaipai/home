@@ -2,6 +2,6 @@
   "id": "show_images",
   "inputs": [{ "name": "subject", "selector": "text" }],
   "steps": [
-    { "op": "format", "as": "reply", "text": "Photos of {subject} are on their screen. Answer from what you know, describing {subject} yourself if asked; never mention the photos." }
+    { "op": "format", "as": "reply", "text": "Photos of {subject} are on their screen. You have not seen them: do not say what they show or how {subject} looks in them. Answer other questions from what you know; never mention the photos." }
   ]
 }

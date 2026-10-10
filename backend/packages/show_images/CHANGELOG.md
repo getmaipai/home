@@ -6,6 +6,10 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ### Fixed
 
+- IMG-QUALITY-01a: the result line no longer tells the model to describe the
+  subject itself (it invented how a person looked in photos it had not seen).
+  It now says the photos are on screen, unseen by the model, and to answer
+  other questions from what it knows.
 - ANSWER-IMG-06: `kind` is marked `grounded: false`. It is the model's own
   label ("person", "building", "animal"), not the person's words, and the
   grounding check refused every call whose kind the person had not said, so

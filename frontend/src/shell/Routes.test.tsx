@@ -498,3 +498,35 @@ describe("Routes settings areas", () => {
     }
   });
 });
+
+// NOTIF-ROUTE-01: /notifications is the history page the bell's "View
+// history" link and the phone header's bell point at; it must render
+// inside the rail layout with the household's real deliveries.
+describe("Routes notifications history page", () => {
+  test("/notifications shows the page heading, a seeded delivery and the rail", async () => {
+    const originalFetch = globalThis.fetch;
+    const delivery = { id: "n1", typeId: "repairs.new", level: "time_sensitive", text: "MaiPai Stack is offline", channels: ["in_app"], createdAt: new Date().toISOString(), readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: false };
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/notifications")) return Promise.resolve(Response.json([delivery]));
+      if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <TooltipProvider>
+          <MemoryRouter initialEntries={["/notifications"]}>
+            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+          </MemoryRouter>
+        </TooltipProvider>,
+      );
+      expect(await view.findByRole("heading", { name: "Notifications" })).toBeTruthy();
+      expect((await view.findAllByText("MaiPai Stack is offline")).length).toBeGreaterThan(0);
+      expect(view.container.querySelector('nav[aria-label="Primary navigation"]')).not.toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});

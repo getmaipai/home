@@ -22,7 +22,7 @@ import { runRecipe, type PluginResult } from "@maipai/spec/interpreters/ts/recip
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
-import { blocksForRecipeRun, type BlockCapture } from "@/lib/packageBlocks";
+import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
 import { callTier1Handle } from "@/lib/denoHost";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { registerProjectType } from "@/lib/projects/projectTypes";
@@ -567,7 +567,9 @@ export async function runPlugin(
     } catch {
       console.warn(`[answer-block] ${id} could not build its blocks; reply retained`);
     }
-    return { ok: true, value: blocks.length > 0 ? ({ ...value, blocks } as PluginResult) : value };
+    // GENUI-04: data bound only to feed the blocks never reaches the composer.
+    const answer = withoutBlockOnlyData(value);
+    return { ok: true, value: blocks.length > 0 ? ({ ...answer, blocks } as PluginResult) : answer };
   } catch (err) {
     if (err instanceof HostError) {
       const status = err.code === "permission_denied" ? 403 : err.code === "not_found" ? 404 : 400;

@@ -7607,9 +7607,13 @@
                               "wikipedia",
                               "weather",
                               "package",
-                              "archive"
+                              "archive",
+                              "reference",
+                              "shelf",
+                              "hosted",
+                              "wikimedia"
                             ],
-                            "description": "Which evidence rung this came from: web is the household's own SearXNG; wikidata/wikipedia/weather are the typed lookups CHAT-15 already retains; package is a future catalog package's own citation (its manifest names the site); archive is a row from an installed offline knowledge source (a `reference` package's own Kiwix-style snapshot, home/docs/plans/knowledge-sources-2026-09-24.md) - `created_at` on an archive row is the citation's own gather time as usual, never the archive's snapshot date, which the reference package's own installed flavour record carries."
+                            "description": "Which evidence tier produced this citation. reference is an offline library, shelf is a news item or story, web is SearXNG, archive is an archived page, hosted is an optional hosted search provider, and wikimedia is the live Wikimedia API; existing typed kinds remain supported."
                           },
                           "title": {
                             "type": "string",
@@ -7656,6 +7660,31 @@
                             "type": "string",
                             "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
                             "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                          },
+                          "snapshot_date": {
+                            "type": "string",
+                            "format": "date",
+                            "description": "Date of the immutable local snapshot used for this citation."
+                          },
+                          "licence": {
+                            "type": "string",
+                            "enum": [
+                              "cc-by-sa-4.0",
+                              "cc0",
+                              "public-domain",
+                              "publisher"
+                            ],
+                            "description": "The source material licence used for attribution."
+                          },
+                          "local_path": {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "Home proxy path for a page in a locally installed reference archive."
+                          },
+                          "publisher_count": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "description": "Number of distinct registrable publishers represented by a story after wire-copy folding."
                           }
                         },
                         "required": [
@@ -25635,6 +25664,61 @@
           },
           "404": {
             "description": "No picture is available for this person."
+          }
+        }
+      }
+    },
+    "/api/reference/{book}/{path}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "A cited article from the home's offline library",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The article as a static page.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That article is not in the library, or is not available to this person."
           }
         }
       }

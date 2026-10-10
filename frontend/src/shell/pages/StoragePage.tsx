@@ -115,11 +115,11 @@ function StorageContent({ data, isAdmin }: { data: StorageUsageOverview; isAdmin
   }), "No files yet.");
   return (
     <>
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader>
+        <CardTitle><span className="flex items-center gap-2">
           <StorageIcon size={16} className="text-muted-foreground" />
           Storage
-        </CardTitle>
+        </span></CardTitle>
       </CardHeader>
       {data.household?.capBytes && data.household.capBytes > 0 ? (
         <>
@@ -133,10 +133,10 @@ function StorageContent({ data, isAdmin }: { data: StorageUsageOverview; isAdmin
         </>
       ) : data.household ? (
         <Card>
-          <CardHeader className="border-b border-border">
+          <CardHeader>
             <CardTitle>Household total</CardTitle>
           </CardHeader>
-          <CardContent className="p-5">
+          <CardContent>
             <p className="text-sm text-muted-foreground">{formatBytes(data.household.usageBytes)} used, no cap set</p>
           </CardContent>
         </Card>

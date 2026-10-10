@@ -318,7 +318,8 @@ const nextChatAnswerImages = process.argv.includes("--next-chat-answer-images");
 const nextChatSentPictures = process.argv.includes("--next-chat-sent-pictures");
 const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
 const nextChatScrollReview = process.argv.includes("--next-chat-scroll-review");
-const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
+const weatherBlocksReview = process.argv.includes("--weather-blocks-review");
+const nextChatToolsReview = process.argv.includes("--next-chat-tools-review") || weatherBlocksReview;
 const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
 const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
 const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
@@ -336,7 +337,7 @@ const chatNoticeDegradedReview = process.argv.includes("--chat-notice-degraded-r
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || chatNoticeDegradedReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || chatNoticeDegradedReview || notificationsReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -354,6 +355,7 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const adminHomeReview = process.argv.includes("--admin-home-review");
+const rule9PagesReview = process.argv.includes("--rule9-pages-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
 const statusColorsReview = process.argv.includes("--status-colors-review");
@@ -363,6 +365,7 @@ const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
 const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
+const rule9PeopleReview = process.argv.includes("--rule9-people-review");
 // SHELL-09 Phase 5: capture every migrated route at the accepted
 // desktop/phone sizes in both themes. Keep these real seeded captures in
 // data-scratch for visual comparison before any docs image is replaced;
@@ -533,10 +536,23 @@ function seedWeatherCache(dataDir: string): void {
   // carries the same shape): current temperature and weather_code, plus
   // today's high, low and rain chance.
   const forecastUrl =
-    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=auto&temperature_unit=fahrenheit";
+    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
+  const hourTemps = [57.3, 56.8, 56.1, 55.4, 54.9, 54.6, 54.8, 56.0, 58.2, 60.5, 62.4, 63.8, 64.2, 64.0, 63.1, 61.7, 60.0, 58.6, 57.5, 56.9, 56.2, 55.7, 55.1, 54.8];
+  const dayHighs = [64.2, 66.0, 63.5, 61.8, 65.1, 67.3, 62.9];
+  const dayLows = [52.1, 51.4, 50.2, 49.8, 51.0, 52.6, 50.7];
+  const dayRain = [20, 10, 55, 70, 15, 5, 40];
   const forecastValue = {
     current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 57.3, weather_code: 2 },
-    daily: { time: [new Date().toISOString().slice(0, 10)], temperature_2m_max: [64.2], temperature_2m_min: [52.1], precipitation_probability_max: [20] },
+    hourly: {
+      time: hourTemps.map((_, i) => new Date(Date.now() + i * 3600_000).toISOString().slice(0, 13) + ":00"),
+      temperature_2m: hourTemps,
+    },
+    daily: {
+      time: dayHighs.map((_, i) => new Date(Date.now() + i * 86400_000).toISOString().slice(0, 10)),
+      temperature_2m_max: dayHighs,
+      temperature_2m_min: dayLows,
+      precipitation_probability_max: dayRain,
+    },
   };
 
   const entries: Array<[string, unknown]> = [
@@ -586,7 +602,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg)) {
+  if (chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg)) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -2954,6 +2970,68 @@ async function captureAdminHomeReview(browser: Browser, ownerSession: string): P
             if (headings.length) await page.getByRole("heading", { name: headings[headings.length - 1]! }).scrollIntoViewIfNeeded();
             await settleAnimations(page);
             await page.screenshot({ path: join(outDir, `home-settings-${path.split("/").pop()}-${viewport.width}-${theme}.png`) });
+          }
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
+/** RULE9-CLEANUP-01e and 01g: the Family, profile, Backups, Privacy, Voices, Devices and Commands pages for the
+ * seeded owner and a child, at 1440 and 390 in both themes. Prints what each
+ * page drew so a spinner, skeleton, error or sideways scroll is a thrown
+ * error, and writes full-page images under data-scratch/ for a person to open. */
+async function captureRule9PagesReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "rule9-shots");
+  mkdirSync(outDir, { recursive: true });
+  const people = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!people.ok) throw new Error(`rule9 review: people lookup failed: ${people.status}`);
+  const roster = (await people.json()) as Array<{ id: string; display_name: string }>;
+  const sage = roster.find((p) => p.display_name === "Sage");
+  const nova = roster.find((p) => p.display_name === "Nova");
+  if (!sage || !nova) throw new Error("rule9 review: the seeded household lacks Sage or Nova");
+  const selected = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: nova.id }) });
+  const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("rule9 review: the child sign-in carried no session cookie");
+  const personas: Array<[string, string, Array<[string, string]>]> = [
+    ["admin", ownerSession, [["family", "/people"], ["profile-self", `/people/${sage.id}`], ["profile-child", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"], ["engines", "/settings/home/ai"], ["voices", "/voices"], ["devices", "/devices"], ["commands", "/commands"]]],
+    ["child", childSession, [["family", "/people"], ["profile-self", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"], ["voices", "/voices"], ["devices", "/devices"], ["commands", "/commands"]]],
+    ["signed-out", "", [["sign-in", "/sign-in"]]],
+  ];
+  for (const [who, session, pages] of personas) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          for (const [name, path] of pages) {
+            await page.goto(`${BASE_URL}${path}`);
+            await page.waitForLoadState("networkidle");
+            await page.locator('[data-slot="skeleton"]').first().waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
+            await page.waitForTimeout(500);
+            const state = await page.evaluate(() => ({
+              path: location.pathname,
+              heading: document.querySelector("h1, [data-slot='card-title']")?.textContent?.trim(),
+              spinner: document.querySelectorAll('[role="status"][aria-label*="oading"]').length,
+              skeleton: document.querySelectorAll('[data-slot="skeleton"]').length,
+              alert: [...document.querySelectorAll('[role="alert"]')].map((a) => a.textContent?.trim()),
+              overflow: document.documentElement.scrollWidth > window.innerWidth,
+            }));
+            console.log(`rule9 ${who} ${name} ${slug} ${theme}: ${JSON.stringify(state)}`);
+            if (state.overflow) throw new Error(`rule9 review ${who} ${name} ${slug} ${theme} scrolls sideways`);
+            if (state.spinner || state.skeleton || state.alert.length) throw new Error(`rule9 review ${who} ${name} ${slug} ${theme} shows a loading or error state`);
+            await settleAnimations(page);
+            await page.screenshot({ path: join(outDir, `${who}-${name}-${viewport.width}-${theme}.png`), fullPage: true });
+            if (name === "engines") {
+              // The engines console draws below the section's own cards, inside the settings scroll area.
+              await page.getByRole("button", { name: "Check the connection" }).scrollIntoViewIfNeeded();
+              await settleAnimations(page);
+              await page.screenshot({ path: join(outDir, `${who}-${name}-console-${viewport.width}-${theme}.png`) });
+            }
           }
         } finally {
           await context.close();
@@ -5608,7 +5686,9 @@ async function captureNextChatSentPictures(browser: Browser, sessionValue: strin
   }
 }
 
-/** ANSWER-IMG-04: pictures in a chat answer, the kit image gallery. A real
+/** ANSWER-IMG-04, re-pointed by GENUI-05: pictures in a chat answer, the kit image gallery. This run is the
+ * old-stored-turn proof: the picture set goes into the retired `answer_images` column, as a turn stored before
+ * GENUI-05 has it, and the history path must draw it as the `image_gallery` block it reads as. A real
  * scripted turn is sent in a demo conversation, then this run's throwaway
  * demo database gives that stored turn a picture set whose files sit in the
  * hub's own picture cache (generated here: licence-clean synthetic scenes,
@@ -5649,7 +5729,7 @@ async function captureNextChatAnswerImages(browser: Browser, sessionValue: strin
   const seedSource = `
     import sharp from "sharp";
     import { putAnswerImage } from "./src/lib/answerImages/cache";
-    const scenes = [["#7cb7e8", "#f6c453", "#3f7d4e"], ["#f2a65a", "#ffe08a", "#8a5a44"], ["#2f4a7a", "#e8eef7", "#56606e"], ["#a7d8c9", "#ffffff", "#2e6b5e"], ["#e9c2d4", "#fff4c2", "#6b4a7a"]];
+    const scenes = [["#7cb7e8", "#f6c453", "#3f7d4e"], ["#f2a65a", "#ffe08a", "#8a5a44"], ["#2f4a7a", "#e8eef7", "#56606e"], ["#a7d8c9", "#ffffff", "#2e6b5e"], ["#e9c2d4", "#fff4c2", "#6b4a7a"], ["#c9d6a3", "#fff1b8", "#4f6b3a"], ["#9fb4e0", "#fde4c8", "#3a4b73"]];
     const out = [];
     for (const [i, [sky, sun, land]] of scenes.entries()) {
       const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + sky + '"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="1200" height="900" fill="url(#g)"/><circle cx="' + (300 + i * 150) + '" cy="220" r="110" fill="' + sun + '"/><path d="M0 640 Q300 ' + (480 + i * 20) + ' 600 620 T1200 600 V900 H0Z" fill="' + land + '"/><path d="M560 660 L600 260 L640 660 Z" fill="#3b3b44"/><rect x="520" y="640" width="160" height="22" fill="#3b3b44"/></svg>';
@@ -5669,7 +5749,7 @@ async function captureNextChatAnswerImages(browser: Browser, sessionValue: strin
     db.exec("PRAGMA busy_timeout = 5000");
     const turn = db.query("SELECT id FROM conversation_turns WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1").get(withPictures.id) as { id: string } | null;
     if (!turn) throw new Error("captureNextChatAnswerImages: the scripted turn was not stored");
-    db.prepare("UPDATE conversation_turns SET answer_images = ? WHERE id = ?").run(JSON.stringify({ layout: "row", after_paragraph: 0, visible: 3, items }), turn.id);
+    db.prepare("UPDATE conversation_turns SET answer_images = ? WHERE id = ?").run(JSON.stringify({ layout: "row", after_paragraph: 0, visible: 5, items }), turn.id);
   } finally {
     db.close();
   }
@@ -5714,7 +5794,7 @@ async function captureNextChatAnswerImages(browser: Browser, sessionValue: strin
         await openStoredConversation(page, withoutPictures.id, withoutTitle);
         await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).first().waitFor();
         await settleAnimations(page);
-        const galleries = await page.locator('[data-slot="image-gallery"], [data-slot="answer-images"]').count();
+        const galleries = await page.locator('[data-slot="image-gallery"]').count();
         console.log(`captureNextChatAnswerImages ${evidenceTag} ${slug}/${theme}: no-picture reply has ${galleries} gallery boxes`);
         if (galleries !== 0) throw new Error("captureNextChatAnswerImages: a reply with no pictures reserved a gallery box");
         await page.screenshot({ path: join(outDir, `next-chat-answer-images-${evidenceTag}-none-${viewport.width}-${theme}.png`) });
@@ -6282,25 +6362,41 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   });
   if (!setModel.ok) throw new Error(`captureNextChatToolsReview: seeding chat.model_id failed: ${setModel.status}`);
 
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  const context = await newContext(browser, viewport, "dark", sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/chat`);
-    await page.getByRole("textbox", { name: "Message input" }).fill(`What's the weather like in ${WEATHER_HOUSEHOLD_PLACE} today?`);
-    await page.getByRole("button", { name: "Send message", exact: true }).click();
-    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
-    await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
-    // The spec-sheet Element's own root slot, standalone in the message
-    // flow - not a collapsed "N tool call" trigger needing a click.
-    await page.locator('[data-slot="spec-sheet"]').waitFor({ timeout: 15000 });
-    await settleAnimations(page);
-    const path = join(outDir, `next-chat-tools-${viewport.width}-dark.png`);
-    await page.screenshot({ path });
-    console.log(`Wrote ${path}`);
-    await page.close();
-  } finally {
-    await context.close();
+  // GENUI-04: the weather package returns three answer blocks (a spec
+  // sheet, an hourly chart and a 7-day data table), so each viewport and
+  // theme runs one real weather turn and waits for all three Elements.
+  for (const viewport of VIEWPORTS.filter((v) => v.slug === "desktop" || v.slug === "phone")) for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      await page.goto(`${BASE_URL}/chat`);
+      await page.getByRole("textbox", { name: "Message input" }).fill(`What's the weather like in ${WEATHER_HOUSEHOLD_PLACE} today?`);
+      await page.getByRole("button", { name: "Send message", exact: true }).click();
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
+      await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
+      // The three kit Elements, standalone in the message flow.
+      await page.locator('[data-slot="spec-sheet"]').first().waitFor({ timeout: 15000 });
+      await page.locator('[data-slot="chart"]').first().waitFor({ timeout: 15000 });
+      await page.locator('[data-slot="data-table"]').first().waitFor({ timeout: 15000 });
+      // A block the kit could not draw shows only its alt sentence.
+      if (await page.locator('[data-slot="answer-block"][data-fallback]').count() > 0) throw new Error("weather block fell back to its alt sentence");
+      await settleAnimations(page);
+      // The thread scrolls inside the page: one shot with the spec sheet
+      // at the top of the view, one with the table's end and the reply.
+      await page.locator('[data-slot="spec-sheet"]').first().evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await settleAnimations(page);
+      const path = join(outDir, `next-chat-tools-${viewport.width}-${theme}.png`);
+      await page.screenshot({ path });
+      console.log(`Wrote ${path}`);
+      await page.locator('[data-slot="data-table"]').first().evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await settleAnimations(page);
+      const tablePath = join(outDir, `next-chat-tools-${viewport.width}-${theme}-table.png`);
+      await page.screenshot({ path: tablePath });
+      console.log(`Wrote ${tablePath}`);
+      await page.close();
+    } finally {
+      await context.close();
+    }
   }
 }
 
@@ -8497,6 +8593,59 @@ async function captureNextPersonProfileReview(browser: Browser, sessionValue: st
   }
 }
 
+/** RULE9-CLEANUP-01d: the people area after its kit Elements were rendered as shipped. An owner and a child (Nova), at 1440 and 390 in both
+ * themes: the household list, a profile (the owner on Nova, Nova on herself), Settings -> Me (profile form and face recognition card),
+ * the owner's open Edit dialog, and the face-enrollment page (headless Chromium has no camera, so it lands on a status card). */
+async function captureRule9PeopleReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+  const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!peopleResponse.ok) throw new Error(`rule9 people review: household lookup failed: ${peopleResponse.status}`);
+  const people = await peopleResponse.json() as Array<{ id: string; display_name: string; role: string }>;
+  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
+  if (!child) throw new Error("rule9 people review: seeded child Nova was not found");
+  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
+  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("rule9 people review: Nova's sign-in carried no session cookie");
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const [who, session] of [["owner", ownerSession], ["child", childSession]] as const) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          const shot = async (name: string) => {
+            await settleAnimations(page);
+            const path = join(outDir, `rule9-people-${name}-${who}-${viewport.width}-${theme}.png`);
+            await page.screenshot({ path, fullPage: slug === "phone" });
+            console.log(`Wrote ${path}`);
+          };
+          await page.goto(`${BASE_URL}/people`);
+          await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
+          await shot("list");
+          await page.goto(`${BASE_URL}/people/${child.id}`);
+          await page.getByRole("heading", { name: "Nova" }).waitFor({ timeout: 15000 });
+          await shot("profile");
+          if (who === "owner") {
+            await page.getByRole("button", { name: "Edit" }).click();
+            await page.getByRole("dialog").waitFor({ timeout: 15000 });
+            await shot("edit-dialog");
+            await page.goto(`${BASE_URL}/people/${child.id}/enroll-face`);
+            await page.getByRole("button", { name: "Try again" }).waitFor({ timeout: 20000 }).catch(() => undefined);
+            await shot("enroll");
+          }
+          await page.goto(`${BASE_URL}/settings?tab=me`);
+          await page.getByText("Face recognition").first().waitFor({ timeout: 8000 }).catch(() => undefined);
+          if (slug === "phone") await page.getByText("Profile", { exact: true }).first().click().catch(() => undefined);
+          await page.getByText("Face recognition").first().waitFor({ timeout: 8000 }).catch(() => undefined);
+          await shot("settings-me");
+          await page.close();
+        } finally { await context.close(); }
+      }
+    }
+  }
+}
+
 async function captureShell09DocsMatrixReview(browser: Browser, sessionValue: string): Promise<void> {
   await captureNextDashboardReview(browser, sessionValue);
   await captureNextPeopleReview(browser, sessionValue);
@@ -9606,8 +9755,9 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
   try {
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
-    await page.getByRole("button", { name: /Notifications \(2 pending\)/ }).waitFor();
-    await page.getByRole("button", { name: /Notifications \(2 pending\)/ }).click();
+    // RAIL-01: the bell lives behind the rail avatar's profile menu.
+    await page.getByRole("button", { name: /Open profile menu for .*\(2 notifications/ }).click();
+    await page.getByRole("menuitem", { name: /Notifications/ }).click();
     await page.getByRole("button", { name: "Dismiss all" }).waitFor();
     // A review caught this missing: this file's own header (2026-09-12,
     // around settleAnimations' own definition) already found a screenshot
@@ -9622,6 +9772,10 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
 
     await page.goto(`${BASE_URL}/notifications`);
     await page.getByRole("button", { name: "Select" }).waitFor();
+    // NOTIF-ROUTE-01: the real history page, rail and rows, at 1440 and 402.
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "notifications-history-1440.png") });
+    console.log(`Wrote ${join(outDir, "notifications-history-1440.png")}`);
     await page.getByRole("button", { name: "Select" }).click();
     await page.getByLabel("Select all").waitFor();
     await page.getByLabel("Select all").click();
@@ -9631,6 +9785,18 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
     console.log(`Wrote ${join(outDir, "notifications-history-select-mode.png")}`);
   } finally {
     await context.close();
+  }
+
+  const phoneContext = await newContext(browser, { slug: "phone", width: 402, height: 874 }, "light", sessionValue);
+  try {
+    const page = await phoneContext.newPage();
+    await page.goto(`${BASE_URL}/notifications`);
+    await page.getByRole("button", { name: "Select" }).waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "notifications-history-402.png") });
+    console.log(`Wrote ${join(outDir, "notifications-history-402.png")}`);
+  } finally {
+    await phoneContext.close();
   }
 }
 
@@ -10073,7 +10239,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
+  const screenshotStack = chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -10240,6 +10406,11 @@ async function main() {
     if (nextPrivacyReview) {
       await captureNextPrivacyReview(browser, sessionValue);
       console.log("completed named review: --next-privacy-review");
+      return;
+    }
+    if (rule9PeopleReview) {
+      await captureRule9PeopleReview(browser, sessionValue);
+      console.log("completed named review: --rule9-people-review");
       return;
     }
     if (nextPersonProfileReview) {
@@ -10440,10 +10611,16 @@ async function main() {
       return;
     }
 
-    if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
+    if (nextChatToolsReview && !weatherBlocksReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
       await captureNextChatToolsSitesReview(browser, sessionValue);
       await captureNextChatToolsReview(browser, sessionValue);
       console.log("completed named review: --next-chat-tools-review");
+      return;
+    }
+
+    if (weatherBlocksReview) {
+      await captureNextChatToolsReview(browser, sessionValue);
+      console.log("completed named review: --weather-blocks-review");
       return;
     }
 
@@ -10658,6 +10835,12 @@ async function main() {
     if (adminHomeReview) {
       await captureAdminHomeReview(browser, sessionValue);
       console.log("completed named review: --admin-home-review");
+      return;
+    }
+
+    if (rule9PagesReview) {
+      await captureRule9PagesReview(browser, sessionValue);
+      console.log("completed named review: --rule9-pages-review");
       return;
     }
 

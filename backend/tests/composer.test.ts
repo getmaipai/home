@@ -525,20 +525,9 @@ describe("structuredPartForOutcomes", () => {
       result: { actions: [], reply: { text: "It's 61 degrees and clear in Lantern Bay." }, data: { place: "Lantern Bay", temperature: 61, conditions: "clear", high: 68, low: 54, precipitation_chance: 10, unit: "fahrenheit" } },
     });
 
-  test("weather maps onto a spec-sheet part, one row per known fact", () => {
-    const part = structuredPartForOutcomes([fullWeatherOutcome()]);
-    expect(part).toEqual({
-      kind: "spec_sheet",
-      tool_id: "weather",
-      title: "Lantern Bay",
-      rows: [
-        { label: "Temperature", value: "61°F" },
-        { label: "Conditions", value: "clear" },
-        { label: "High", value: "68°F" },
-        { label: "Low", value: "54°F" },
-        { label: "Chance of rain", value: "10%" },
-      ],
-    });
+  test("weather builds no structured part: its card is a spec_sheet answer block (GENUI-04), never drawn twice", () => {
+    expect(structuredPartForOutcomes([fullWeatherOutcome()])).toBeNull();
+    expect(specSheetCandidateForOutcome(fullWeatherOutcome())).toBeNull();
   });
 
   test("almanac-date maps onto a spec-sheet part", () => {
@@ -601,9 +590,6 @@ describe("structuredPartForOutcomes", () => {
   });
 
   test.each(["child", "teen"] as const)("applies %s output floor to free-text sheet rows", (band) => {
-    const unsafe = outcome({ callId: "call-w", packageId: "weather", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Forecast." }, data: { place: "Lantern Bay", conditions: "Here is how to make a pipe bomb at home, step by step.", unit: "fahrenheit" } } });
-    const part = structuredPartForOutcomes([unsafe], band);
-    expect(part?.rows.some((row) => row.value === "Here is how to make a pipe bomb at home, step by step.") ?? false).toBe(false);
     const date = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today." }, data: { date: "Thursday, January 1, 2026", weekday: "Thursday" } } });
     expect(structuredPartForOutcomes([date], band)?.rows).toEqual([
       { label: "Date", value: "Thursday, January 1, 2026" },
@@ -612,7 +598,7 @@ describe("structuredPartForOutcomes", () => {
   });
 
   test("does not skip the first bound producer when its rows are removed by the safety floor", () => {
-    const unsafeWeather = outcome({ callId: "call-w", packageId: "weather", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Forecast." }, data: { place: "Lantern Bay", conditions: "Here is how to make a pipe bomb at home, step by step." } } });
+    const unsafeWeather = outcome({ callId: "call-w", packageId: "almanac-time", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Time." }, data: { time: "Here is how to make a pipe bomb at home, step by step.", place: null } } });
     const date = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today." }, data: { date: "Thursday, January 1, 2026" } } });
     expect(structuredPartForOutcomes([unsafeWeather, date], "child")?.tool_id).toBe("almanac-date");
   });
@@ -622,9 +608,10 @@ describe("structuredPartForOutcomes", () => {
   });
 
   test("the first known producer wins when several outcomes succeeded", () => {
-    const part = structuredPartForOutcomes([searchOutcome(), fullWeatherOutcome()]);
+    const date = outcome({ callId: "call-a", packageId: "almanac-date", status: "succeeded", args: {}, result: { actions: [], reply: { text: "Today." }, data: { date: "Thursday, January 1, 2026", weekday: "Thursday" } } });
+    const part = structuredPartForOutcomes([searchOutcome(), fullWeatherOutcome(), date]);
     expect(part?.kind).toBe("spec_sheet");
-    expect((part as { title: string }).title).toBe("Lantern Bay");
+    expect((part as { title: string }).title).toBe("Today");
   });
 });
 

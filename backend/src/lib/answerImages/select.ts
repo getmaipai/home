@@ -14,6 +14,7 @@ import type { PersonRow } from "@/types";
 import type { AnswerImageItem, AnswerImageSet } from "@/wire";
 import { fetchAnswerImages, type AnswerImageSource } from "./fetch";
 import { putAnswerImage } from "./cache";
+import { ANSWER_IMAGES_MAX_CANDIDATES, GALLERY_VISIBLE, type ShownPictures } from "./gallery";
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
 import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, type FetchJson, type WikimediaEntity } from "./wikimedia";
@@ -23,9 +24,7 @@ import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates
  * person, so there are no pictures. */
 const PERSON_KIND = new RegExp(`\\b(${["person", "people", "human", "man", "woman", "men", "women", "guy", "lady", "boy", "girl", "child", "children", "kid", "baby", "teen", "teenager", "adult", "actor", "actress", "singer", "musician", "band", "member", "rapper", "dj", "athlete", "player", "footballer", "cricketer", "golfer", "gymnast", "boxer", "wrestler", "racer", "driver", "coach", "politician", "president", "senator", "mayor", "celebrity", "influencer", "youtuber", "streamer", "tiktoker", "podcaster", "blogger", "vlogger", "author", "writer", "poet", "journalist", "reporter", "presenter", "host", "comedian", "artist", "painter", "photographer", "designer", "model", "dancer", "chef", "cook", "doctor", "nurse", "scientist", "engineer", "lawyer", "teacher", "professor", "student", "pupil", "classmate", "coworker", "colleague", "boss", "employee", "neighbou?r", "friend", "girlfriend", "boyfriend", "partner", "wife", "husband", "spouse", "mom", "mum", "mother", "dad", "father", "parent", "son", "daughter", "brother", "sister", "sibling", "cousin", "aunt", "uncle", "grandma", "grandpa", "grandparent", "relative", "family", "someone", "somebody", "character", "magician", "entrepreneur", "ceo", "founder", "billionaire", "priest", "pastor", "king", "queen", "prince", "princess", "soldier", "officer", "pilot", "astronaut"].join("|")})(s|es)?\\b`, "i");
 
-/** Tiles shown in the row; the rest open from the badge. */
-export const ANSWER_IMAGES_VISIBLE = 3;
-const MAX_CANDIDATES = 12;
+const MAX_CANDIDATES = ANSWER_IMAGES_MAX_CANDIDATES;
 const CAPTION_MAX = 140;
 
 export type AnswerImageDeps = {
@@ -69,6 +68,9 @@ export type AnswerImageTrace = {
    * verified, merged, left unverified by the deadline, failed). */
   duplicate_check?: Record<string, number>;
   shown?: number;
+  /** IMG-QUALITY-01b: candidates dropped before the fetch (source address already shown in this conversation) plus
+   * fetched pictures dropped after decode (picture id already shown). A count; never ids or addresses. */
+  excluded_already_shown?: number;
 };
 
 export type AnswerImageSelection = { set: Omit<AnswerImageSet, "after_paragraph"> | null; trace: AnswerImageTrace };
@@ -100,12 +102,12 @@ function sizeOfResolution(resolution: string | undefined): { width: number; heig
 
 /** At most this many of the fetch slots from one source, so one source
  * cannot crowd out the other (IMGQ-04). */
-const PER_SOURCE_SLOTS = 8;
+const PER_SOURCE_SLOTS = GALLERY_VISIBLE * 2 + 2;
 /** Commons pictures that make the open web unnecessary (the coordinator's
  * decision on the design's recommended option, 2026-10-06, under the owner's
  * ruling that adults may get general image search: search fills a row only
- * when Commons has fewer than three good ones). */
-const COMMONS_ENOUGH = 3;
+ * when Commons has fewer good ones than the row has tiles). */
+const COMMONS_ENOUGH = GALLERY_VISIBLE;
 
 const trips = (text: string, band: AgeBand): boolean => text.trim().length > 0 && checkSafety(text, { isMinor: band !== "adult" }).flagged;
 
@@ -120,7 +122,7 @@ function clip(text: string, max: number): string {
 /** The pictures for `subject` that `actor` (in `band`) may see. Never
  * throws: any failure is no pictures (rule 6). `deadlineAt` is when the
  * picture fetch must stop so the set is ready inside the turn's budget. */
-export async function selectAnswerImages(input: { subject: string; kind?: string; actor: PersonRow; band: AgeBand; roster: readonly string[]; deadlineAt?: number }): Promise<AnswerImageSelection> {
+export async function selectAnswerImages(input: { subject: string; kind?: string; actor: PersonRow; band: AgeBand; roster: readonly string[]; deadlineAt?: number; shown?: ShownPictures }): Promise<AnswerImageSelection> {
   const subject = input.subject.trim().slice(0, 200);
   const trace: AnswerImageTrace = { subject };
   const skip = (why: AnswerImageSkip): AnswerImageSelection => ({ set: null, trace: { ...trace, skipped: why } });
@@ -205,6 +207,10 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     // a third-party picture host that would only be thrown away); otherwise
     // both are fetched and search only fills what Commons could not (below).
     let searchSkipped = 0;
+    // IMG-QUALITY-01b: what the conversation has already shown ("show me more").
+    const shown = input.shown;
+    const hasShown = shown !== undefined && (shown.ids.size > 0 || shown.sources.size > 0);
+    let excludedShown = 0;
     // For a film, show, game, franchise or character the open web leads and
     // Commons only fills (study, per category); otherwise Commons leads.
     const lead: "wikimedia" | "search" = entity.media ? "search" : "wikimedia";
@@ -221,6 +227,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const byLead = lead === "wikimedia" ? [...commonsRows, ...searchRanked] : [...searchRanked, ...commonsRows];
     for (const c of byLead) {
       if (c.source === follow && perSource[lead] >= COMMONS_ENOUGH * 2) { searchSkipped++; continue; }
+      if (hasShown && c.page && shown!.sources.has(c.page)) { excludedShown++; continue; }
       if (seen.has(c.url)) continue;
       seen.add(c.url);
       if (trips(`${c.title}. ${c.description}`, input.band)) { droppedByFloor++; continue; }
@@ -234,6 +241,8 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     if (droppedByFloor > 0) trace.dropped_by_floor = droppedByFloor;
     if (Object.keys(droppedByRelevance).length > 0) trace.dropped_by_relevance = droppedByRelevance;
     if (searchSkipped > 0) trace.search_held_back = searchSkipped;
+    const traceExcluded = (): void => { if (excludedShown > 0) trace.excluded_already_shown = excludedShown; };
+    traceExcluded();
     if (kept.length === 0) return skip("no_candidates");
 
     const sources: AnswerImageSource[] = kept.map((c, i) => ({ id: `c${i}`, url: c.url, leadImage: c.lead }));
@@ -258,6 +267,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       const id = await putAnswerImage({ tile: image.tile, full: image.full, band: input.band, originalUrl: c.url, leadImage: c.lead });
       if (ids.has(id)) continue;
       ids.add(id);
+      if (hasShown && shown!.ids.has(id)) { excludedShown++; continue; }
       const size = await sharp(image.full).metadata();
       const site = hostOf(c.page);
       const caption = clip(c.description || c.title, CAPTION_MAX);
@@ -275,10 +285,13 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     }
     // Fewer than two validated extras: the extras are dropped and there is no
     // badge, so the number never promises a lone extra (section 6, Counts).
-    const shown = items.length > ANSWER_IMAGES_VISIBLE && items.length - ANSWER_IMAGES_VISIBLE < 2 ? items.slice(0, ANSWER_IMAGES_VISIBLE) : items;
-    trace.shown = shown.length;
-    if (shown.length === 0) return skip("none_survived");
-    return { set: { layout: "row", visible: Math.min(ANSWER_IMAGES_VISIBLE, shown.length), items: shown }, trace };
+    traceExcluded();
+    // Fewer than two new pictures on a "show more": no gallery, the answer stays whole (rule 6).
+    if (hasShown && items.length < 2) return skip("none_survived");
+    const shownItems = items.length > GALLERY_VISIBLE && items.length - GALLERY_VISIBLE < 2 ? items.slice(0, GALLERY_VISIBLE) : items;
+    trace.shown = shownItems.length;
+    if (shownItems.length === 0) return skip("none_survived");
+    return { set: { layout: "row", visible: Math.min(GALLERY_VISIBLE, shownItems.length), items: shownItems }, trace };
   } catch {
     return skip("error");
   }

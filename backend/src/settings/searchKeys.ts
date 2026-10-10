@@ -29,19 +29,19 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.search",
     honoured_by: ["home"],
   }),
-  // SEARCH-FALLBACK-01 (docs/plans/search-resilience-2026-09-24.md):
-  // "a setting under web search, on whenever web search is on" - a
-  // second, real outbound connection (Wikipedia's own official API,
-  // never SearXNG), so it gets its own toggle rather than being folded
-  // silently into search.searxng_url's own behavior. Default true: it
-  // only ever fires when the main search already failed or found
-  // nothing, the exact case a household configured web search to help
-  // with in the first place.
+  // KS-02-PRIV: the off switch for the `wikimedia-live` data source (wikimediaLive.ts).
+  // KS-02 retired this key and silently re-enabled the live call for households that had
+  // stored false; PRIVACY.md says every default-on public read keeps an off switch and a
+  // person's privacy choice is never overridden. The key name is unchanged on purpose, so a
+  // stored value keeps working with no migration, and the commons registry still carries it.
+  // STOPGAP: KS-MODE-01 (live | offline | mix) will map a stored false to `offline`.
   SettingsKey.parse({
     key: "search.wikipedia_fallback",
     scope: "household",
     selector: "boolean",
     default: true,
+    // Label and help are byte-identical to the pinned spec (the gate's drift check); sharpening
+    // the words for the library-first order is a commons follow-up (see docs/BACKLOG.md KS-02-PRIV).
     label: "Ask Wikipedia when web search fails or finds nothing",
     help: "When your SearXNG instance is down or a search comes back empty, MaiPai asks Wikipedia's own official API instead - covers people, shows, places, products and history. On by default whenever web search is set up; turn it off here if you don't want it.",
     level: "advanced",

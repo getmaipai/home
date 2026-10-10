@@ -1,5 +1,7 @@
 # Knowledge sources: offline archives, live sources, and one lookup (2026-09-24)
 
+Superseded in part by KS-02 (2026-10-09): `lookup()` is the model's `scope` argument on `websearch`, `wikimedia-live` replaced the fallback key, and the proxy route is `/api/reference/<book>/<path>`; see docs/dev.md "Superseded by KS-02".
+
 Status: approved by the owner on 2026-09-24, with the decisions in "The owner's calls" below. Research by the design-resolver pass of 2026-09-24; numbers from Kiwix's public catalog that day.
 
 ## Why

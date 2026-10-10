@@ -1,11 +1,7 @@
-import { getIcon } from "@maipai/ui/src/icons";
 import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
-import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import type { PerformanceLabels } from "@/lib/api";
-
-const FilterIcon = getIcon("filter");
 
 interface HitRow extends Record<string, unknown> {
   kind: string;
@@ -22,7 +18,7 @@ interface HitRow extends Record<string, unknown> {
  * of three. `retire_eligible` (the org rule: a rule with zero hits over
  * the window is a candidate to retire) is a plain list underneath,
  * since it names rules, not counts. */
-export function LabelsCard({ labels }: { labels: PerformanceLabels }) {
+export function LabelsBody({ labels }: { labels: PerformanceLabels }) {
   const rows: HitRow[] = [
     ...labels.guard_hits.map((h) => ({ kind: "guard", key: h.key, count: h.count })),
     ...labels.rule_hits.map((h) => ({ kind: "rule", key: h.key, count: h.count })),
@@ -30,19 +26,11 @@ export function LabelsCard({ labels }: { labels: PerformanceLabels }) {
   ];
   const model = useDataTableModel(rows, tableColumns<HitRow>(["kind", "key", "count"], { kind: 100, key: 300, count: 80 }));
   return (
-    <Card className="flex flex-col gap-0!">
-      <CardHeader className="border-b border-border">
-        <CardTitle className="flex items-center gap-2">
-          <FilterIcon size={16} className="text-muted-foreground" />
-          Label harvest ({labels.turns} turn{labels.turns === 1 ? "" : "s"})
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="px-0! flex flex-col gap-4">
-        <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Label harvest counts" getRowId={(row) => `${row.kind}-${row.key}`} />
-        {labels.retire_eligible.length > 0 && (
-          <p className="px-4 pb-4 text-sm text-muted-foreground">Zero hits this window, retire-eligible: {labels.retire_eligible.join(", ")}</p>
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Label harvest counts" getRowId={(row) => `${row.kind}-${row.key}`} />
+      {labels.retire_eligible.length > 0 && (
+        <p className="mt-4 text-sm text-muted-foreground">Zero hits this window, retire-eligible: {labels.retire_eligible.join(", ")}</p>
+      )}
+    </>
   );
 }

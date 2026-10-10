@@ -94,16 +94,16 @@ export function RepairsPage({ person }: { person: Roster }) {
 
   return (
     <>
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader>
+        <CardTitle><span className="flex items-center gap-2">
           <RepairsIcon size={16} className="text-muted-foreground" />
           Repairs
-        </CardTitle>
+        </span></CardTitle>
       </CardHeader>
 
       {!canManage ? (
         <Card>
-          <CardContent className="p-6">
+          <CardContent>
             <p className="text-sm text-muted-foreground">Only an owner or admin can manage repairs.</p>
           </CardContent>
         </Card>

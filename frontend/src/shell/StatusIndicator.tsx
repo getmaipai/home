@@ -45,7 +45,7 @@ export function StatusIndicator({ child = false }: { child?: boolean } = {}) {
       title={title}
       className="inline-flex min-h-12 min-w-12 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <Status status={summary.level} className="gap-1.5 px-2 py-1">
+      <Status status={summary.level}>
         <StatusDot status={summary.level} ping={ping} className="overflow-hidden" />
         <span className="hidden sm:inline">{summary.text}</span>
       </Status>

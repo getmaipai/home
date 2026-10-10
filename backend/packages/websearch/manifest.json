@@ -1,11 +1,14 @@
 {
   "id": "websearch",
-  "version": "0.2.6",
+  "version": "0.3.0",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
-  "description": "You can search the web for news, prices, or current events; read the top pages for anything that may have changed.",
-  "offer": {"mode":"base","priority":9},
+  "description": "Search the home's offline library or the live web, including news and current events, and read the top pages.",
+  "offer": {
+    "mode": "base",
+    "priority": 9
+  },
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -22,21 +25,44 @@
       "what's the current price of that",
       "has there been any news about that lately"
     ],
-    "patterns": ["search the web for *", "search online for *"],
+    "patterns": [
+      "search the web for *",
+      "search online for *"
+    ],
     "always_offer": true
   },
   "args": {
     "type": "object",
-    "required": ["expression"],
+    "required": [
+      "expression"
+    ],
     "properties": {
-      "expression": { "type": "string", "minLength": 1, "search_text": true, "description": "The search words, a short plain query about what the person asked. A follow-up like \"is he in it\" is about the previous message's subject: search for that subject." },
-      "read_page": { "type": "boolean", "description": "Leave this out. Home reads the top result pages itself on every search." }
+      "expression": {
+        "type": "string",
+        "minLength": 1,
+        "search_text": true,
+        "description": "A name or topic, not a question. A follow-up like \"is he in it\" is about the previous message's subject: search for that subject."
+      },
+      "scope": {
+        "type": "string",
+        "enum": [
+          "reference",
+          "web"
+        ],
+        "description": "reference: the home's own offline library (Wikipedia and other reference sets, instant, works without internet). Use it for people, places, things, works, words, science, history and how things work, and to confirm a date, number or spelling you are not sure of. web: the live web and today's news. Use it for anything that may have changed, such as news, prices, releases, scores, schedules, hours, versions, or anything after your training. Leave scope out when you want both."
+      },
+      "read_page": {
+        "type": "boolean",
+        "description": "Leave this out. Home reads the top result pages itself on every search."
+      }
     }
   },
   "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home"],
+  "platforms": [
+    "home"
+  ],
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
@@ -61,16 +87,19 @@
       "retention": "controlled entirely by that site"
     },
     {
-      "id": "wikipedia",
+      "id": "wikimedia-live",
       "destination": "Wikipedia's own official API (en.wikipedia.org)",
-      "when": "web search is set up and either your SearXNG instance is down or a search comes back with nothing - on by default, turn it off under web search settings",
+      "when": "an adult's web search found nothing and the home's offline library had no matching article either",
       "what": "the search query, nothing else",
       "who": "the Wikimedia Foundation",
       "opt_in": false,
       "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
     }
   ],
-  "permissions": ["integration:searxng", "llm:complete"],
+  "permissions": [
+    "integration:searxng",
+    "llm:complete"
+  ],
   "notifications": [],
   "backup": "exclude",
   "background": false,
@@ -78,5 +107,8 @@
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze",
-  "smoke": { "kind": "recipe_fixture", "fixture": "tests/smoke.json" }
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
 }

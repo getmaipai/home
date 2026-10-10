@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { fetchAnswerImages, __setAnswerImageDnsLookupForTests, __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
+import { ANSWER_IMAGES_MAX_CANDIDATES } from "@/lib/answerImages/gallery";
 import { syntheticPhoto } from "./answerImagesFixture";
 
 afterEach(() => { __setAnswerImageDnsLookupForTests(null); __resetAnswerImageFetchForTests(); });
@@ -49,7 +50,7 @@ describe("answer image fetch", () => {
       return new Response(new Uint8Array([1]), { status: 200, headers: { "content-type": "image/png" } });
     };
     await fetchAnswerImages(Array.from({ length: 20 }, (_, i) => ({ id: String(i), url: `https://h${i}.example/image` })), { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
-    expect(calls).toBeLessThanOrEqual(12);
+    expect(calls).toBeLessThanOrEqual(ANSWER_IMAGES_MAX_CANDIDATES);
     expect(peak).toBeLessThanOrEqual(4);
   });
 
@@ -91,11 +92,11 @@ describe("answer image fetch", () => {
     const fetcher = async () => { calls++; return new Response(new Uint8Array([1]), { status: 200, headers: { "content-type": "image/jpeg" } }); };
     const at = Date.now();
     const opts = { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }), now: () => at };
-    const set = (tag: string) => Array.from({ length: 12 }, (_, i) => ({ id: `${tag}-${i}`, url: `https://paced.example/${tag}/${i}` }));
+    const set = (tag: string) => Array.from({ length: ANSWER_IMAGES_MAX_CANDIDATES }, (_, i) => ({ id: `${tag}-${i}`, url: `https://paced.example/${tag}/${i}` }));
     await fetchAnswerImages(set("first"), opts);
-    expect(calls).toBe(12);
+    expect(calls).toBe(ANSWER_IMAGES_MAX_CANDIDATES);
     await fetchAnswerImages(set("second"), opts);
-    expect(calls).toBe(12);
+    expect(calls).toBe(ANSWER_IMAGES_MAX_CANDIDATES);
   });
 
   test("the whole candidate set stops at its 2.5 second deadline and retries one timeout", async () => {

@@ -1,12 +1,15 @@
-// ANSWER-IMG-04: pictures in a chat answer through the kit image-gallery
-// Element. Re-pointed from the retired hand-built ChatMedia's test with the
-// same promises (pictures render with alt text and a source link; no
-// pictures renders nothing) plus the gallery's own acceptance rows.
+// ANSWER-IMG-04, re-pointed by GENUI-05: pictures in a chat answer are an `image_gallery` answer block drawn by the
+// kit's block dispatcher, which draws the image-gallery Element as shipped (the `answer-images` data part and its
+// renderer are retired). The block is built by the hub's one builder, so these cases hold the promises of the old
+// picture test (pictures render with alt text and a source link; none renders nothing; the badge never reads +1)
+// on the shape that now reaches the thread, live and from a stored turn.
 import { afterEach, describe, expect, test } from "bun:test";
 import type { ReactElement } from "react";
 import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
-import { AnswerImagesDataRender, galleryImages, splitAfterParagraph, textWithAnswerImages } from "@/apps/chat/chatAnswerImages";
+import { AnswerBlockDataRender, textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
+import { galleryBlockFor, legacyGalleryBlock } from "@maipai/home-backend/src/lib/answerImages/gallery";
 import type { AnswerImageSet } from "@maipai/home-backend/src/wire";
+import type { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 
 afterEach(cleanup);
 // Hub-relative picture addresses need a page address to resolve against, as in
@@ -18,7 +21,7 @@ function set(count: number, extra: Partial<AnswerImageSet> = {}): AnswerImageSet
   return {
     layout: "row",
     after_paragraph: 0,
-    visible: Math.min(3, count),
+    visible: Math.min(5, count),
     items: Array.from({ length: count }, (_, i) => ({
       id: id(i + 1),
       src: `/api/answer-image/${id(i + 1)}?v=tile`,
@@ -33,11 +36,14 @@ function set(count: number, extra: Partial<AnswerImageSet> = {}): AnswerImageSet
     ...extra,
   };
 }
-const Render = AnswerImagesDataRender as unknown as (props: { data: AnswerImageSet }) => ReactElement | null;
+/** The gallery block the hub would send for this set (the live builder), and the one a stored legacy turn reads as. */
+const live = (s: AnswerImageSet) => galleryBlockFor(s, "Eiffel Tower", "show_images test", "1:0:testnode") as unknown as AnswerBlock;
+const stored = (s: AnswerImageSet) => legacyGalleryBlock(s, "turn-1", "2026-10-01T10:00:00.000Z") as AnswerBlock;
+const Render = AnswerBlockDataRender as unknown as (props: { data: AnswerBlock }) => ReactElement | null;
 
-describe("the answer's pictures (kit image gallery)", () => {
-  test("a message with pictures renders hub-served tiles with alt text, and the gallery links the source page", () => {
-    const { getAllByRole, getByRole } = render(<Render data={set(3)} />);
+describe("the answer's pictures (the image_gallery block, kit image gallery)", () => {
+  test("a gallery renders hub-served tiles with alt text, and links the source page", () => {
+    const { getAllByRole, getByRole } = render(<Render data={stored(set(3))} />);
     const images = getAllByRole("img");
     expect(images).toHaveLength(3);
     for (const img of images) expect(img.getAttribute("src")!.startsWith("/api/answer-image/")).toBe(true);
@@ -51,49 +57,41 @@ describe("the answer's pictures (kit image gallery)", () => {
     expect(within(dialog).getByText(/The tower, view 2 · CC BY-SA 4.0, Iris/)).toBeTruthy();
   });
 
-  test("no pictures renders nothing, and no box is reserved", () => {
-    const { container } = render(<Render data={set(0)} />);
-    expect(container).toBeEmptyDOMElement();
+  test("a stored turn from before GENUI-05 and a live turn draw the same gallery", () => {
+    const a = render(<Render data={live(set(7))} />);
+    const liveHtml = a.container.innerHTML;
+    cleanup();
+    const b = render(<Render data={stored(set(7))} />);
+    expect(b.container.innerHTML).toBe(liveHtml);
   });
 
-  test("the badge counts validated extras, is a button, and equals what the gallery holds", () => {
-    const { getAllByRole, getByText, getByRole } = render(<Render data={set(5)} />);
-    expect(getAllByRole("img")).toHaveLength(3);
+  test("the badge counts the extras, is a button, and equals what the gallery holds", () => {
+    const { getAllByRole, getByText, getByRole } = render(<Render data={live(set(7))} />);
+    expect(getAllByRole("img")).toHaveLength(5);
     expect(getByText("+2")).toBeTruthy();
     fireEvent.click(getByRole("button", { name: "Open image: Tower picture 3" }));
-    expect(within(getByRole("dialog")).getByText("3 / 5")).toBeTruthy();
+    expect(within(getByRole("dialog")).getByText("3 / 7")).toBeTruthy();
   });
 
-  test("never a +1 badge: a lone extra is left out", () => {
-    expect(galleryImages(set(4), new Set())).toHaveLength(3);
-    const { queryByText } = render(<Render data={set(4)} />);
+  test("never a +1 badge: a lone extra is left out by the builder", () => {
+    const block = live(set(6)) as unknown as { props: { images: unknown[] } };
+    expect(block.props.images).toHaveLength(5);
+    const { queryByText } = render(<Render data={live(set(6))} />);
     expect(queryByText("+1")).toBeNull();
   });
 
-  test("a tile that fails to paint is removed silently and the badge updates", () => {
-    const { getAllByRole, queryByText, container } = render(<Render data={set(5)} />);
+  test("a tile that fails to paint shows the kit's placeholder, never a broken image", () => {
+    const { getAllByRole, container } = render(<Render data={live(set(3))} />);
     fireEvent.error(getAllByRole("img")[1]!);
-    const imgs = getAllByRole("img");
-    expect(imgs).toHaveLength(3);
-    expect(imgs.map((i) => i.getAttribute("alt"))).not.toContain("Tower picture 2");
-    expect(queryByText("+2")).toBeNull();
-    expect(queryByText("+1")).toBeNull();
-    // No broken-image icon anywhere.
-    expect(container.querySelector("svg.lucide-image-off")).toBeNull();
-  });
-
-  test("a picture that is not served by the hub is never shown", () => {
-    const outside = set(1);
-    outside.items[0]!.src = "https://upload.example/photo.jpg";
-    const { container } = render(<Render data={outside} />);
-    expect(container).toBeEmptyDOMElement();
+    expect(getAllByRole("img")).toHaveLength(2);
+    expect(container.querySelector("svg.lucide-image-off")).not.toBeNull();
   });
 
   // Focus going back to the tile is checked in a real browser by
   // `scripts/screenshot.ts --next-chat-answer-images` (happy-dom does not run
   // the dialog's focus return).
   test("Escape closes the gallery", async () => {
-    const { getByRole, queryByRole } = render(<Render data={set(3)} />);
+    const { getByRole, queryByRole } = render(<Render data={live(set(3))} />);
     const tile = getByRole("button", { name: "Open image: Tower picture 1" });
     tile.focus();
     fireEvent.click(tile);
@@ -103,20 +101,18 @@ describe("the answer's pictures (kit image gallery)", () => {
 });
 
 describe("where the pictures sit in the reply", () => {
-  test("the set is placed after the paragraph the hub named, and the text is unchanged around it", () => {
-    const text = "First paragraph.\n\nSecond paragraph.\n\nThird.";
-    expect(splitAfterParagraph(text, 0)).toEqual(["", text]);
-    expect(splitAfterParagraph(text, 1)).toEqual(["First paragraph.\n\n", "Second paragraph.\n\nThird."]);
-    expect(splitAfterParagraph(text, 3)).toEqual([text, ""]);
-    const parts = textWithAnswerImages(text, set(3, { after_paragraph: 1 }), "t1-images");
+  const text = "First paragraph.\n\nSecond paragraph.\n\nThird.";
+
+  test("the gallery is placed after the paragraph the hub named, and the text is unchanged around it", () => {
+    const parts = textWithAnswerParts(text, { blocks: [stored(set(3, { after_paragraph: 1 }))] });
     expect(parts.map((p) => p.type)).toEqual(["text", "data", "text"]);
   });
 
   test("a reply with no pictures is one text part, exactly as before", () => {
-    expect(textWithAnswerImages("Hello.", undefined, "t1")).toEqual([{ type: "text", text: "Hello." }]);
+    expect(textWithAnswerParts("Hello.", { blocks: [] })).toEqual([{ type: "text", text: "Hello." }]);
   });
 
   test("leading pictures come before any text", () => {
-    expect(textWithAnswerImages("Hello.", set(2), "t1").map((p) => p.type)).toEqual(["data", "text"]);
+    expect(textWithAnswerParts("Hello.", { blocks: [stored(set(2))] }).map((p) => p.type)).toEqual(["data", "text"]);
   });
 });

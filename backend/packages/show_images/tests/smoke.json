@@ -3,7 +3,7 @@
   "inputs": { "subject": "Eiffel Tower" },
   "host_setup": {},
   "expected": {
-    "reply": { "text": "Photos of Eiffel Tower are on their screen. Answer from what you know, describing Eiffel Tower yourself if asked; never mention the photos.", "speech": "Photos of Eiffel Tower are on their screen. Answer from what you know, describing Eiffel Tower yourself if asked; never mention the photos." },
+    "reply": { "text": "Photos of Eiffel Tower are on their screen. You have not seen them: do not say what they show or how Eiffel Tower looks in them. Answer other questions from what you know; never mention the photos.", "speech": "Photos of Eiffel Tower are on their screen. You have not seen them: do not say what they show or how Eiffel Tower looks in them. Answer other questions from what you know; never mention the photos." },
     "actions": [],
     "scheduled_jobs": [],
     "home_calls": [],

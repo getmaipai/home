@@ -211,9 +211,11 @@ export function AddRobotSection() {
               Paired and its password is rotated - it's ready to use.
             </p>
           ) : null}
-          <Button type="submit" disabled={submitting} className="w-fit">
-            {submitting ? "Pairing…" : "Pair"}
-          </Button>
+          <div className="flex">
+            <Button type="submit" disabled={submitting}>
+              {submitting ? "Pairing…" : "Pair"}
+            </Button>
+          </div>
         </form>
       ) : newRobot ? (
         <div className="flex max-w-sm flex-col gap-2">
@@ -230,30 +232,30 @@ export function AddRobotSection() {
             check the robot list below, or try again.
           </p>
           <div className="flex gap-2">
-            <Button variant="outline" className="w-fit" onClick={() => robotsQuery.refetch()}>
+            <Button variant="outline" onClick={() => robotsQuery.refetch()}>
               Check again
             </Button>
-            <Button variant="ghost" className="w-fit" onClick={startOver}>
+            <Button variant="ghost" onClick={startOver}>
               Start over
             </Button>
           </div>
         </div>
       ) : presumedExpired ? (
-        <div className="flex max-w-sm flex-col gap-2">
+        <div className="flex max-w-sm flex-col items-start gap-2">
           <p className="text-base text-[var(--destructive)]">
             The robot hasn't finished pairing and the code has likely expired. Turn the robot's
             Wi-Fi setup back on so it speaks a fresh code, then try again.
           </p>
-          <Button variant="outline" className="w-fit" onClick={startOver}>
+          <Button variant="outline" onClick={startOver}>
             Start over
           </Button>
         </div>
       ) : (
-        <div className="flex max-w-sm flex-col gap-2">
+        <div className="flex max-w-sm flex-col items-start gap-2">
           <p className="text-base text-[var(--muted-foreground)]">
             Approved. Waiting for the robot to finish pairing on its own end…
           </p>
-          <Button variant="ghost" className="w-fit" onClick={startOver}>
+          <Button variant="ghost" onClick={startOver}>
             Start over
           </Button>
         </div>

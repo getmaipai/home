@@ -43,7 +43,6 @@ import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
 import { preprocessChatMarkdown } from "@/apps/chat/chatStreamingMarkdown";
-import { ANSWER_IMAGES_PART, AnswerImagesDataRender } from "@/apps/chat/chatAnswerImages";
 import { ANSWER_BLOCK_PART, AnswerBlockDataRender } from "@/apps/chat/chatAnswerBlocks";
 import { trustedChatLinks } from "@/apps/chat/trustedChatLinks";
 import type { MarkdownLinkContext } from "@maipai/ui/src/elements/markdown-text";
@@ -88,10 +87,10 @@ export type DataBinding = {
   render: DataMessagePartComponent<any>;
 };
 
-// ANSWER-IMG-04: named `data` parts render in place, where the hub put them
-// in the reply (between two text parts), through the shipped Element.
+// Named `data` parts render in place, where the hub put them in the reply (between two text parts), through the
+// shipped Element. GENUI-05: the picture gallery is an `image_gallery` block, so it is drawn by the same binding as
+// every other block (the `answer-images` binding is retired).
 export const DATA_BINDINGS: readonly DataBinding[] = [
-  { name: ANSWER_IMAGES_PART, element: "image-gallery", render: AnswerImagesDataRender },
   // GENUI-03b: a package's answer block, drawn by the kit dispatcher.
   { name: ANSWER_BLOCK_PART, element: "answer-block", render: AnswerBlockDataRender },
 ];

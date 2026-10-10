@@ -130,9 +130,11 @@ export function BackupsSection({ person }: BackupsSectionProps) {
               someone who can restart the hub should not be the last to
               know the database is about to be replaced. */}
           {canRestore ? (
-            <Button variant="secondary" onClick={handleCancel} className="w-fit">
-              Cancel restore
-            </Button>
+            <div className="flex">
+              <Button variant="secondary" onClick={handleCancel}>
+                Cancel restore
+              </Button>
+            </div>
           ) : null}
         </div>
       ) : null}
@@ -186,9 +188,11 @@ export function BackupsSection({ person }: BackupsSectionProps) {
         </div>
       )}
 
-      <Button variant="secondary" onClick={handleRunBackup} disabled={running} className="w-fit">
-        {running ? "Backing up…" : "Back up now"}
-      </Button>
+      <div className="flex">
+        <Button variant="secondary" onClick={handleRunBackup} disabled={running}>
+          {running ? "Backing up…" : "Back up now"}
+        </Button>
+      </div>
     </Section>
   );
 }

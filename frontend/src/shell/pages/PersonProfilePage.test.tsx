@@ -330,7 +330,7 @@ describe("PersonProfilePage", () => {
     const restore = stubFetch({ "/api/memory": [] });
     try {
       const view = renderProfile("/people/person-sage", viewer({ role: "owner" }));
-      fireEvent.click(await view.findByRole("tab", { name: "Memories" }));
+      fireEvent.mouseDown(await view.findByRole("tab", { name: "Memories" }), { button: 0 });
       expect(await view.findByText("Nothing remembered yet.")).toBeTruthy();
       expect(view.getByRole("tab", { name: "Memories" }).getAttribute("aria-selected")).toBe("true");
     } finally { restore(); }

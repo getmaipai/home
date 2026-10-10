@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as RadixPopover from "@radix-ui/react-popover";
 import { Link } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { pauseTvNavForOverlay } from "@maipai/ui/src/tvNav";
@@ -193,19 +194,21 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
         if (!anchored) pauseTvNavForOverlay(next);
       }}
     >
-      {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : <RadixPopover.Trigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`} className="relative">
-          <BellIcon className="h-5 w-5" aria-hidden />
-          {items.length > 0 ? (
-            // CHAT-CALM-ERRORS-01d (design section 6): the count is red only
-            // when something urgent (an `immediate` item) is waiting; a
-            // Repairs notice or any other item gets a neutral count.
-            <span className={`absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-base leading-none ${items.some((n) => n.level === "immediate") ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"}`}>
-              {items.length}
-            </span>
-          ) : null}
-        </Button>
-      </RadixPopover.Trigger>}
+      {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : (
+        <RadixPopover.Trigger asChild>
+          <Button variant="ghost" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`}>
+            <BellIcon className="h-5 w-5" aria-hidden />
+            {items.length > 0 ? (
+              // RULE9-WRAPDIV-01: the count is the kit Badge as it ships,
+              // inside the button, not a hand-drawn overlay. CHAT-CALM-
+              // ERRORS-01d (design section 6): destructive only when
+              // something urgent (an `immediate` item) is waiting; a
+              // Repairs notice or any other item gets the neutral count.
+              <Badge variant={items.some((n) => n.level === "immediate") ? "destructive" : "secondary"}>{items.length}</Badge>
+            ) : null}
+          </Button>
+        </RadixPopover.Trigger>
+      )}
       <RadixPopover.Portal>
         <RadixPopover.Content
           aria-label="Notifications"
@@ -239,7 +242,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
                   <Button
                     variant="ghost"
                     onClick={() => dismissMutation.mutate(n.id)}
-                    className="shrink-0 px-3 text-sm text-muted-foreground"
+                    className="shrink-0 text-sm text-muted-foreground"
                   >
                     Dismiss
                   </Button>

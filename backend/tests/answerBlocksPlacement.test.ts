@@ -24,17 +24,13 @@ const block = (id: string) => ({
   props: { title: "Facts", rows: [{ label: "Status", value: "Ready" }] },
 });
 const event = (id: string) => ({ t: "block" as const, call_id: "call-1", block: block(id) });
-const result = { layout: "row" as const, visible: 1, items: [] };
 
 type BlockEvent = ReturnType<typeof event>;
 type Stamped = BlockEvent["block"] & { after_paragraph?: number };
 
 // A turn state with only what the placer reads: the turn's tool events and the picture pipeline entry.
-function stateWith(events: BlockEvent[], images?: typeof result): TurnState {
-  return {
-    toolEvents: [...events],
-    ...(images ? { answerImages: { subject: "x", done: Promise.resolve(), result: images } } : {}),
-  } as unknown as TurnState;
+function stateWith(events: BlockEvent[]): TurnState {
+  return { toolEvents: [...events] } as unknown as TurnState;
 }
 const stampOf = (state: TurnState, id: string): number | undefined => {
   const found = state.toolEvents.find((e) => e.t === "block" && e.block.id === bid(id));
@@ -109,25 +105,23 @@ describe("GENUI-13c: the placer puts a ready block at a paragraph boundary", () 
     expect(state.placedBlocks).toHaveLength(1);
   });
 
-  test("two blocks ready together keep their order; a picture set ready with them follows them at the same spot", () => {
-    const state = stateWith([event("g"), event("h")], result);
-    const out: string[] = [];
-    const placer = new AnswerImagePlacer(state, (t) => out.push(t));
+  test("two blocks ready together keep their order at the same spot", () => {
+    const state = stateWith([event("g"), event("h")]);
+    const placer = new AnswerImagePlacer(state, () => {});
     placer.push("Intro.\n\nMore.");
     expect(state.placedBlocks?.map((p) => p.event.block.id)).toEqual([bid("g"), bid("h")]);
     expect(state.placedBlocks?.map((p) => p.offset)).toEqual([0, 0]);
-    expect(state.answerImages?.placed).toEqual({ set: { ...result, after_paragraph: 0 }, offset: 0 });
   });
 
-  test("a block and a picture set ready at different times are placed at their own boundaries", () => {
+  test("a block ready later is placed at its own boundary, after the one ready first", () => {
     const state = stateWith([event("i")]);
     const placer = new AnswerImagePlacer(state, () => {});
     placer.push("One.\n\nTwo");
-    // The block was ready first (paragraph 0); the pictures become ready mid-paragraph two.
-    state.answerImages = { subject: "x", done: Promise.resolve(), result };
+    // The first block was ready first (paragraph 0); the second becomes ready mid-paragraph two.
+    state.toolEvents.push(event("j"));
     placer.push(" ends.\n\nThree.");
     expect(stampOf(state, "i")).toBe(0);
-    expect(state.answerImages?.placed?.set.after_paragraph).toBe(2);
+    expect(stampOf(state, "j")).toBe(2);
   });
 
   test("no block ready: the text passes through untouched and nothing is placed", () => {

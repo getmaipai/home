@@ -140,7 +140,7 @@ export function EnginesConsole({ person }: { person: Roster }) {
     <>
       {!canManage ? (
         <Card>
-          <CardContent className="p-6">
+          <CardContent>
             <p className="text-sm text-muted-foreground">Only an owner or admin can manage engines.</p>
           </CardContent>
         </Card>
@@ -175,24 +175,26 @@ export function EnginesConsole({ person }: { person: Roster }) {
         {({ overview }: { overview: EnginesOverview; health: EnginesHealth }) =>
           !overview.configured ? (
             <Card>
-              <CardContent className="flex items-center gap-3 p-6">
-                <div className="rounded-md border border-border p-2.5">
-                  <EnginesIcon size={16} />
-                </div>
-                <div className="flex flex-col gap-0.5">
-                  <p className="text-sm font-medium">No Stack configured</p>
-                  <p className="text-sm text-muted-foreground">Set up MaiPai Stack in Settings to run your own engines and see their roles, versions and health here.</p>
+              <CardContent>
+                <div className="flex items-center gap-3">
+                  <div className="rounded-md border border-border p-2.5">
+                    <EnginesIcon size={16} />
+                  </div>
+                  <div className="flex flex-col gap-0.5">
+                    <p className="text-sm font-medium">No Stack configured</p>
+                    <p className="text-sm text-muted-foreground">Set up MaiPai Stack in Settings to run your own engines and see their roles, versions and health here.</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>
           ) : (
             <>
               <section className="mb-4 flex flex-col gap-4" aria-labelledby="engine-roles-heading">
-                <CardHeader className="p-0">
-                  <CardTitle id="engine-roles-heading" className="flex items-center gap-2">
+                <CardHeader>
+                  <CardTitle id="engine-roles-heading"><span className="flex items-center gap-2">
                     <RolesIcon size={16} className="text-muted-foreground" />
                     Roles
-                  </CardTitle>
+                  </span></CardTitle>
                 </CardHeader>
                 <DataTable
                   rows={rolesTable.rows}
@@ -206,11 +208,11 @@ export function EnginesConsole({ person }: { person: Roster }) {
               </section>
 
               <section className="mb-4 flex flex-col gap-4" aria-labelledby="installed-engines-heading">
-                <CardHeader className="p-0">
-                  <CardTitle id="installed-engines-heading" className="flex items-center gap-2">
+                <CardHeader>
+                  <CardTitle id="installed-engines-heading"><span className="flex items-center gap-2">
                     <EnginesIcon size={16} className="text-muted-foreground" />
                     Installed engines
-                  </CardTitle>
+                  </span></CardTitle>
                 </CardHeader>
                 <DataTable
                   rows={enginesTable.rows}
@@ -253,11 +255,11 @@ export function EnginesConsole({ person }: { person: Roster }) {
               </section>
 
               <section className="flex flex-col gap-4" aria-labelledby="engine-health-heading">
-                <CardHeader className="p-0">
-                  <CardTitle id="engine-health-heading" className="flex items-center gap-2">
+                <CardHeader>
+                  <CardTitle id="engine-health-heading"><span className="flex items-center gap-2">
                     <HealthIcon size={16} className="text-muted-foreground" />
                     Health
-                  </CardTitle>
+                  </span></CardTitle>
                 </CardHeader>
                 <DataTable
                   rows={healthTable.rows}

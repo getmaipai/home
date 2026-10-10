@@ -17,12 +17,6 @@
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     }
   },
-  "apps/chat/chatAnswerImages.tsx": {
-    "AnswerImagesDataRender": {
-      "ed": "ED-034",
-      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
-    }
-  },
   "apps/chat/chatCitationLink.tsx": {
     "ChatCitationLink": {
       "ed": "ED-002",
@@ -95,50 +89,22 @@
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     }
   },
-  "apps/people/FaceEnrollmentCard.tsx": {
-    "FaceEnrollmentCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "apps/people/FaceEnrollmentPage.tsx": {
-    "StatusCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "apps/people/ProfileForm.tsx": {
-    "ProfileForm": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "apps/settings/ModelsSection.tsx": {
     "ChatModelCard": {
+      "ed": "ED-021",
+      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
+    },
+    "CheckModelCard": {
+      "ed": "ED-021",
+      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
+    },
+    "PlannedRoleCard": {
       "ed": "ED-021",
       "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
     },
     "FitVerdictBadge": {
       "ed": "ED-037",
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "CheckModelCard": {
-      "ed": "ED-021",
-      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
-    },
-    "ComputerMemoryCard": {
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "PlannedRoleCard": {
-      "ed": "ED-021",
-      "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
-    }
-  },
-  "apps/settings/RobotCard.tsx": {
-    "RobotCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
   "dev/ElementsAdoptionPanel.tsx": {
@@ -153,132 +119,10 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/FamilyPage.tsx": {
-    "FamilyCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "PersonCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "FamilyPage": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/PersonProfilePage.tsx": {
-    "ProfileHeaderCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "EditProfileDialog": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/PrivacyPage.tsx": {
-    "ConnectionGroup": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/pages/TurnErrorDetails.tsx": {
     "TurnErrorDetails": {
       "ed": "ED-026",
       "reason": "Hand-built admin detail popover; tool-error ships with optional counts from ui-v0.5.116; ADOPT-02."
-    }
-  },
-  "shell/pages/dashboard/StatCard.tsx": {
-    "StatCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/DiskHardwareCard.tsx": {
-    "DiskHardwareCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/EnginesHealthCard.tsx": {
-    "EnginesHealthCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/LabelsCard.tsx": {
-    "LabelsCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/LayersCard.tsx": {
-    "LayersCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/QueuesCard.tsx": {
-    "QueuesCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/RoutesCard.tsx": {
-    "RoutesCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/TurnsByEngineTable.tsx": {
-    "TurnsByEngineTable": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/performance/TurnsChart.tsx": {
-    "TurnsChart": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/settings/PersonMultiSelect.tsx": {
-    "PersonMultiSelect": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusApps.tsx": {
-    "AppRow": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusBoard.tsx": {
-    "NoteAlert": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "StatusMaintenanceCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusComponents.tsx": {
-    "StatusComponents": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "OverallBanner": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusIncident.tsx": {
-    "StatusIncident": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
   "shell/ThemeToggle.tsx": {

@@ -120,7 +120,7 @@ describe("Used in chat matches the turn", () => {
       setHouseholdSettingValue("chat.model_id", model.id);
       const sent = await toolsSentOnATurn(owner);
       for (const id of base) expect(sent, `${id} for ${model.id}`).toContain(id);
-      expect(sent, `off policy for ${model.id}`).not.toContain("show_images");
+      expect(sent, `IMG-OFFER-01: an adult's written turn is offered show_images for ${model.id}`).toContain("show_images");
     }
   });
 

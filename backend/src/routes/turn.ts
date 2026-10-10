@@ -333,9 +333,6 @@ function shouldDeliver(stored: StoredStreamEvent, resumeFrom: number | null): bo
   // consumer (chatModelAdapter.ts's own toolCalls Map just re-sets the
   // same call's state), so an already-seen resend costs nothing.
   if (!("type" in stored.event)) return true;
-  // ANSWER-IMG-02: the picture set is idempotent on the client (one per
-  // turn), so a resuming client always gets it again, like a tool line.
-  if (stored.event.type === "images") return true;
   if (stored.sequence !== null) return stored.sequence > resumeFrom;
   return stored.afterSequence > resumeFrom;
 }
@@ -602,20 +599,15 @@ export async function* streamTurnEvents(
       yield event as unknown as TurnStreamEvent;
     }
 
-    // ANSWER-IMG-02 and GENUI-13c (rule 9): a ready visual (an answer block or the picture set) goes out exactly where
-    // the placer put it, between two released pieces at a paragraph boundary, so it never lands above text already
-    // sent; one placed after the whole answer goes after the last piece. Blocks first, then pictures, as placed.
-    let imagesSent = false;
+    // ANSWER-IMG-02, GENUI-13c and GENUI-05 (rule 9): a ready visual (an answer block, a picture gallery included) goes
+    // out exactly where the placer put it, between two released pieces at a paragraph boundary, so it never lands above
+    // text already sent; one placed after the whole answer goes after the last piece.
     let blocksSent = 0;
     function* imagesAt(length: number): Generator<TurnStreamEvent, void, void> {
       const blocks = result.placedBlocks?.() ?? [];
       while (blocksSent < blocks.length && length >= blocks[blocksSent]!.offset) {
         yield blocks[blocksSent++]!.event as unknown as TurnStreamEvent;
       }
-      const placed = result.answerImages?.();
-      if (!placed || imagesSent || length < placed.offset) return;
-      imagesSent = true;
-      yield { type: "images", turn_id: result.turnId, ...placed.set };
     }
     while (!current.done) {
       yield* sideEvents();

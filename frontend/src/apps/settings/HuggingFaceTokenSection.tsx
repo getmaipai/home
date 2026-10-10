@@ -99,7 +99,7 @@ export function HuggingFaceTokenSection() {
         {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
         {success ? <p className="text-base text-[var(--primary)]">Saved.</p> : null}
         <div className="flex gap-2">
-          <Button type="submit" disabled={submitting} className="w-fit">
+          <Button type="submit" disabled={submitting}>
             {submitting ? "Saving…" : "Save"}
           </Button>
           {isSet ? (

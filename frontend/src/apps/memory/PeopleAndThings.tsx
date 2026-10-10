@@ -209,9 +209,11 @@ function EntityRow({
           })}
         </ul>
       ) : null}
-      <Button variant="link" size="xs" className="h-auto w-fit p-0 text-muted-foreground" onClick={onStartEdit}>
-        Edit name
-      </Button>
+      <div>
+        <Button variant="link" size="xs" className="text-muted-foreground" onClick={onStartEdit}>
+          Edit name
+        </Button>
+      </div>
     </div>
   );
 }
@@ -537,9 +539,11 @@ export function PeopleAndThings({ actorRole }: { actorRole: Role }) {
             />
           ) : null}
           {createError ? <p className="text-base text-destructive">{createError}</p> : null}
-          <Button type="submit" disabled={creatingBusy || newName.trim() === ""} className="w-fit">
-            {creatingBusy ? "Adding…" : "Add"}
-          </Button>
+          <div>
+            <Button type="submit" disabled={creatingBusy || newName.trim() === ""}>
+              {creatingBusy ? "Adding…" : "Add"}
+            </Button>
+          </div>
         </form>
       ) : null}
 
