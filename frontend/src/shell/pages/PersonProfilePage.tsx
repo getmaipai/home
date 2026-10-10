@@ -26,8 +26,7 @@ function idsFilter(params: URLSearchParams): Set<string> | null {
   return value ? new Set(value.split(",")) : null;
 }
 
-/** The /next equivalent of /people/:id. Its tab permission rule is kept
- * identical to PersonProfilePage: self, or owner/admin viewing another. */
+/** The person profile page at /people/:id. Its tab permission rule: self, or owner/admin viewing another. */
 export function PersonProfilePage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
   useTabItem("Profile");
   const { id } = useParams<{ id: string }>();

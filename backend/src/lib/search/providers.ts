@@ -108,7 +108,7 @@ const appsProvider: SearchProvider = {
         title: m.display,
         subtitle: m.description,
         // No per-app detail route exists in the new shell yet (checked
-        // live: NextRoutes.tsx has only the "apps" list route) - opens
+        // live: Routes.tsx has only the "apps" list route) - opens
         // the Apps page, the same simplification the people provider
         // above makes for the identical reason.
         href: "/apps",

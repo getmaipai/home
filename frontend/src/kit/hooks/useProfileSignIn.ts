@@ -3,13 +3,10 @@ import { api, ApiError, type Roster } from "@/lib/api";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
 
 /** The profile-tap -> secret-prompt -> verify state machine (a code
- * review, SHELL-08: `SignIn.tsx` and `SignInPage.tsx` had copied this
- * verbatim - selected/secret/secretError/tapError/busy plus both submit
- * handlers - the same class of duplication `usePinAutoSubmit` was
- * extracted to close, just one layer up). Leaves the profiles fetch
- * itself to each caller (`SignIn.tsx`'s own plain effect+`useState`,
- * `SignInPage.tsx`'s `useQuery`+`AsyncState`) since that part
- * genuinely differs between the two shells, not just in form. */
+ * review, SHELL-08: selected/secret/secretError/tapError/busy plus both
+ * submit handlers, kept in one hook beside `usePinAutoSubmit`). Leaves
+ * the profiles fetch itself to the caller (`SignInPage.tsx`'s
+ * `useQuery`+`AsyncState`). */
 export function useProfileSignIn(onSignedIn: () => void) {
   const [selected, setSelected] = useState<Roster | null>(null);
   const [secret, setSecret] = useState("");

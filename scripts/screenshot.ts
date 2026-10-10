@@ -9128,7 +9128,7 @@ async function capturePhoneHeaderFoldReview(browser: Browser, sessionValue: stri
 
       await trigger.click();
       await page.getByText("Notifications (1)", { exact: true }).waitFor();
-      // ProfileSwitcher's own "Switch profile" list is a separate fetch
+      // The popover's "Switch profile" list is a separate fetch
       // (api.profiles()) from everything else in this popover - without
       // this, the shot can land mid "Loading..." rather than showing
       // Marlow, the seeded second profile.

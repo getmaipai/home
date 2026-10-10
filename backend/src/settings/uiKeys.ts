@@ -46,12 +46,8 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
   // HOME-UI-04b (2026-09-21): the seven shadcn base-color presets
   // (ui.shadcn.com/docs/theming's own current list - Neutral, Stone,
   // Zinc, Mauve, Olive, Mist, Taupe), each a full style-variant preset
-  // (commons-a/ui/src/dashboard/css/globals.css), applied on /next
-  // only (`useNextLook`) - the old shell's `useLook` still resolves
-  // the value (`Look` widened to match in `@/shell/useLook.ts`) but
-  // has no `.style-<color>` CSS of its own, so an old-shell person who
-  // picked a color preset sees no change there until the old shell
-  // retires.
+  // (commons-a/ui/src/dashboard/css/globals.css), applied by
+  // the shell (`useLook` in `@/shell/useLook.ts` resolves the value).
   //
   // HOME-UI-04e (2026-09-21): the default palette stopped being Home's
   // navy hex set and became the shadcndashboard template's own

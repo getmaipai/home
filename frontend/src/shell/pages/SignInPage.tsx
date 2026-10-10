@@ -20,7 +20,7 @@ import { useTabItem } from "@/shell/tabIdentity";
  * own email/password form: the template's view is the same shape as
  * every other demo (zero data-binding surface, a bare `<form>` with no
  * `onSubmit`), and MaiPai's own sign-in is a profile picker, not an
- * email field, so this mirrors `SignIn.tsx`'s own real state machine
+ * email field, so this mirrors the real state machine
  * (profile list -> tap a profile -> a secret prompt only when that
  * profile has one) onto the template's primitives instead. Reuses
  * `usePinAutoSubmit` (a plain hook, no UI, called inside
@@ -34,9 +34,7 @@ import { useTabItem } from "@/shell/tabIdentity";
  * admin resets another person's secret), and no self-service account
  * creation (profiles are created in Settings -> Household -> Users).
  *
- * A correction, not a gap: the row's own ask named "the child's PIN vs
- * an adult's password as the old page distinguishes them" -
- * `SignIn.tsx` has no such distinction; every profile gets the
+ * Every profile gets the
  * identical `<Input type="password" placeholder="PIN or password">`,
  * and `usePinAutoSubmit`'s own 4-digit-numeric check is what quietly
  * makes a short PIN feel instant without the UI ever needing to know
@@ -45,10 +43,8 @@ import { useTabItem } from "@/shell/tabIdentity";
  * switch that would diverge from it.
  *
  * The tap/select/verify state machine itself is `useProfileSignIn`
- * (a code review, SHELL-08): this page and `SignIn.tsx` had copied it
- * verbatim, the same class of duplication `usePinAutoSubmit` closed one
- * layer down - only the profiles-fetch strategy still differs (this
- * page's own `useQuery`+`AsyncState` vs. `SignIn.tsx`'s plain effect). */
+ * (a code review, SHELL-08), kept out of this page so the profiles-fetch
+ * strategy (this page's `useQuery`+`AsyncState`) stays the page's own. */
 export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   useTabItem("Sign in");
   const profilesQuery = useQuery<Roster[]>({ queryKey: ["auth-profiles"], queryFn: () => api.profiles() });

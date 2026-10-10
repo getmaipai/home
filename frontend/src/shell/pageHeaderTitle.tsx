@@ -2,7 +2,7 @@
 
 // CHAT-HEADER-02: the header's left slot (CHAT-HEADER-01's
 // `HeaderExtraLeft`) shows the current app's icon before its title on
-// every /next page, drawn from the one definition the sidebar already
+// every shell page, drawn from the one definition the sidebar already
 // reads - never a second icon table. `SidebarContent` (commons
 // `sidebaritems.ts`) is that definition for the four pages it lists
 // (Home, Chat, Tools, People). The five "Manage" pages plus Settings

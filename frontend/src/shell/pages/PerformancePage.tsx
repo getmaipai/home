@@ -35,7 +35,7 @@ const icons = {
  * rewrite. Owner/admin only - the route itself carries no client-side
  * role check (matches every sibling `/` page): a non-admin's 403
  * comes entirely from the backend, and this page is reachable only
- * through the Manage section, which `SettingsPage.tsx`'s Household
+ * through the Manage section, which the settings Household
  * tab already hides from non-admins. */
 // Exported: CHAT-HEADER-02's own pageHeaderTitle.tsx imports this
 // directly for the header's left slot. This page has never shown an

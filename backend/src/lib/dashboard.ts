@@ -1,5 +1,5 @@
 // SHELL-01 (docs/BACKLOG.md, docs/plans/shell-on-shadcndashboard-2026-09-21.md):
-// the one aggregate GET /next's modern-dashboard widgets read, built
+// the one aggregate the dashboard widgets read, built
 // entirely from existing libs (updates.ts's own projection, issues.ts's
 // Repairs list, the Stack client, access.ts's own person-visibility
 // rule) rather than a second, parallel read path for any of them.

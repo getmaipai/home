@@ -12,7 +12,7 @@ import type { Appearance } from "@/shell/useAppearance";
 // nor Home mounts - Home already had its own real system before this
 // step, "the kit gets a slot, Home keeps the feature" (AppShell.tsx's
 // own header comment), the same reason PinToggle/ModelPicker/
-// NotificationBell/ProfileSwitcher are Home's own components too.
+// NotificationBell are Home's own components too.
 function isDarkNow(): boolean {
   if (typeof document === "undefined") return false;
   const root = document.documentElement;

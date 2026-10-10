@@ -12,7 +12,7 @@ interface SetupWizardProps {
   /** Fires once the owner account exists and the wizard is done (or the
    * person backs all the way out past step 0, though nothing here offers
    * that once an owner is created - the same "no way to undo the first
-   * person" shape SignIn.tsx's old inline form already had). */
+   * person" shape the sign-in page has too). */
   onDone: () => void;
 }
 
@@ -115,7 +115,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
     }
     // A fresh visit with no resume state at all: real first-run only if
     // nobody exists yet. Fail open on a network error (same posture
-    // SignIn.tsx's own profiles load takes) rather than trap a genuine
+    // the sign-in page's profiles load takes) rather than trap a genuine
     // first-run household behind a spurious redirect.
     api
       .profiles()

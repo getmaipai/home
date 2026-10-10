@@ -10,7 +10,7 @@ const KEY = "voice.hf_token";
 // the real way to change a `secret: true` key ("setting a secret needs
 // its own flow... that no key exercises yet") - voice.hf_token
 // (2026-09-04) is the first one that does. Owner/admin only, the same
-// gate ModelsSection/BackupsSection already use in SettingsPage.tsx:
+// gate ModelsSection/BackupsSection already use:
 // household scope's own write authorization (lib/settings.ts's
 // assertCanAccessScope) already requires it for any household-scope
 // write, this just keeps the control itself from rendering for someone

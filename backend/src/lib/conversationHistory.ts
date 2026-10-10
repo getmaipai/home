@@ -1551,7 +1551,7 @@ export function forkConversationAtTurn(actor: PersonRow, turnId: string): Conver
  * not call this. Preserve the stale-ID guard in resolveOrCreateConversation.
  *
  * Issue #163 inventory item 8: `getConversationId()`
- * (NextChatPage.tsx) calls this right after `initialize()` mints an id,
+ * (ChatPage.tsx) calls this right after `initialize()` mints an id,
  * for every conversation including a temporary one - a temporary
  * session's id was never a `conversations` row, so it must be recognized
  * and returned as-is here the same way resolveOrCreateConversation()'s

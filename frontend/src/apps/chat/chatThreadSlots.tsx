@@ -438,7 +438,7 @@ export function EngineStartingLoader({ Loader = GenerationLoader }: {
   return <Loader label="Starting your AI…" tick={tick} role="status" aria-live="polite" className="py-8" />;
 }
 
-// Incognito is controlled from the global /next header; this welcome
+// Incognito is controlled from the global shell header; this welcome
 // slot only reflects the shared state and does not add a second toggle.
 export function ChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
