@@ -73,7 +73,7 @@ test.each([
 
   try {
     const view = render(
-      <MemoryRouter initialEntries={["/next/chat"]}>
+      <MemoryRouter initialEntries={["/chat"]}>
         <TooltipProvider>
           <SidebarProvider defaultOpen>
             <SidebarLayout />
@@ -82,8 +82,8 @@ test.each([
       </MemoryRouter>,
     );
 
-    const activeLink = view.container.querySelector<HTMLAnchorElement>('a[href="/next/chat"]');
-    const inactiveLink = view.container.querySelector<HTMLAnchorElement>('a[href="/next"]');
+    const activeLink = view.container.querySelector<HTMLAnchorElement>('a[href="/chat"]');
+    const inactiveLink = view.container.querySelector<HTMLAnchorElement>('a[href="/"]');
     expect(activeLink).not.toBeNull();
     expect(inactiveLink).not.toBeNull();
     const activePill = activeLink;

@@ -4,7 +4,7 @@ import { BrowserRouter, Routes as RouterRoutes, Route, Navigate } from "react-ro
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@/i18n";
 import { createQueryClient } from "@/lib/queryClient";
-import { LegacyShellRedirect } from "@/shell/LegacyShellRedirect";
+import { AliasRedirect } from "@/shell/AliasRedirect";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
@@ -121,19 +121,15 @@ export function App() {
                         )
                       }
                     />
-                    <Route
-                      path="/next/*"
-                      element={<LegacyShellRedirect />}
-                    />
-                    <Route path="/conversations" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/users" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/models" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/backups" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/voices" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/commands" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/devices" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/repairs" element={<LegacyShellRedirect />} />
-                    <Route path="/settings/updates" element={<LegacyShellRedirect />} />
+                    <Route path="/conversations" element={<AliasRedirect />} />
+                    <Route path="/settings/users" element={<AliasRedirect />} />
+                    <Route path="/settings/models" element={<AliasRedirect />} />
+                    <Route path="/settings/backups" element={<AliasRedirect />} />
+                    <Route path="/settings/voices" element={<AliasRedirect />} />
+                    <Route path="/settings/commands" element={<AliasRedirect />} />
+                    <Route path="/settings/devices" element={<AliasRedirect />} />
+                    <Route path="/settings/repairs" element={<AliasRedirect />} />
+                    <Route path="/settings/updates" element={<AliasRedirect />} />
                     <Route
                       path="/*"
                       element={

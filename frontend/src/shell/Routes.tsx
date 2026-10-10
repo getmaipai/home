@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect } from "react";
+import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { Navigate, Outlet, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import BlankLayout from "@maipai/ui/src/dashboard/layouts/blank/BlankLayout";
@@ -216,6 +217,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="files" element={<FilesPage person={person} />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
+            <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>
       </RouterRoutes>
