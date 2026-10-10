@@ -42,7 +42,7 @@ const sidebarEntries = new Map<string, PageHeaderEntry>();
 for (const group of SidebarContent) {
   for (const item of group.items ?? []) {
     if (item.url && item.icon && item.name) {
-      const path = item.url.replace(/^\/next(?=\/|$)/, "") || "/";
+      const path = item.url;
       sidebarEntries.set(path, { icon: item.icon, label: item.name });
     }
   }

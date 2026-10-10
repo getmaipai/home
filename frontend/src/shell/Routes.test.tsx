@@ -408,6 +408,16 @@ describe("Routes retired Tools paths", () => {
       restore();
     }
   });
+
+  test("the retired /next/chat address lands on the not-found page that links home", async () => {
+    const { view, restore } = renderRoute("/next/chat");
+    try {
+      await waitFor(() => expect(view.getByText(/That page does not exist/)).toBeTruthy());
+      expect(view.getByRole("button", { name: "Go to Home" })).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
 });
 
 describe("next Manage routes", () => {

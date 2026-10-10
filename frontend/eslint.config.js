@@ -244,7 +244,6 @@ export default tseslint.config(
       "src/shell/pages/**/*.{ts,tsx}",
       "src/shell/components/**/*.{ts,tsx}",
       "src/shell/Routes.tsx",
-      "src/shell/LegacyShellRedirect.tsx",
       "src/apps/chat/ChatThread.tsx",
       "src/apps/chat/elementBindings.ts",
       "src/apps/chat/chatThreadContexts.ts",
