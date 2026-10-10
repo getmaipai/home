@@ -15,7 +15,11 @@ const ALIASES: Record<string, string> = {
 /** Keeps the Conversations bookmark and the old nested /settings/* paths
  * working: sends each to its current route, preserving query and hash. */
 export function AliasRedirect() {
-  const { pathname, search, hash } = useLocation();
+  const location = useLocation();
+  const { search, hash } = location;
+  // The router matches "/conversations/" too; without trimming, the lookup
+  // misses and the redirect points at its own URL forever.
+  const pathname = location.pathname.length > 1 ? location.pathname.replace(/\/+$/, "") : location.pathname;
   const destination = ALIASES[pathname] ?? pathname;
   const params = new URLSearchParams(search);
   if (pathname === "/conversations" && !params.has("list")) params.set("list", "1");

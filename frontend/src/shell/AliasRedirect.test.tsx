@@ -30,4 +30,12 @@ describe("AliasRedirect", () => {
   test("keeps the Conversations bookmark pointed at Chat with its list open", () => {
     expect(landing("/conversations?filter=recent", "/conversations")).toBe("/chat?filter=recent&list=1");
   });
+
+  test("a trailing slash on an alias still lands on the current route instead of redirecting to itself", () => {
+    expect(landing("/settings/backups/?tab=household", "/settings/backups")).toBe("/backups?tab=household");
+  });
+
+  test("a trailing slash on the Conversations bookmark still opens Chat with its list", () => {
+    expect(landing("/conversations/", "/conversations")).toBe("/chat?list=1");
+  });
 });
