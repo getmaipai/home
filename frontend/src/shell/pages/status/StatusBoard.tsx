@@ -4,7 +4,6 @@ import { Alert, AlertAction, AlertDescription, AlertTitle } from "@maipai/ui/src
 import { AlertDialog, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { Field, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
@@ -33,33 +32,24 @@ function dateOnly(date: Date): string {
 
 export function StatusBoardNotes({ person, note }: { person: Roster; note: StatusBoardData["note"] }) {
   const admin = isOwnerOrAdminRole(person.role);
+  const client = useQueryClient();
+  const clear = useMutation({ mutationFn: () => api.clearStatusNote(), onSuccess: async () => { await client.invalidateQueries({ queryKey: STATUS_BOARD_QUERY_KEY }); }, onError: (error) => toast.error(error instanceof Error ? error.message : "Could not clear the note.") });
+  const InfoIcon = getIcon("info");
   return <div className="flex flex-col gap-4">
-    {note ? <NoteAlert person={person} note={note} /> : null}
+    {note ? <Alert>
+      <InfoIcon className="size-5 text-primary" aria-hidden="true" />
+      <div className="min-w-0"><AlertTitle>{note.body}</AlertTitle><AlertDescription>Posted by {note.posted_by_name}, {relativePostedTime(note.posted_at)}</AlertDescription></div>
+      {admin ? <AlertAction><Button variant="outline" onClick={() => clear.mutate()} disabled={clear.isPending}>Clear</Button></AlertAction> : null}
+    </Alert> : null}
     {admin ? <div className="flex justify-end"><PostNoteControl /></div> : null}
   </div>;
 }
 
-function NoteAlert({ person, note }: { person: Roster; note: NonNullable<StatusBoardData["note"]> }) {
-  const admin = isOwnerOrAdminRole(person.role);
-  const client = useQueryClient();
-  const clear = useMutation({ mutationFn: () => api.clearStatusNote(), onSuccess: async () => { await client.invalidateQueries({ queryKey: STATUS_BOARD_QUERY_KEY }); }, onError: (error) => toast.error(error instanceof Error ? error.message : "Could not clear the note.") });
-  const InfoIcon = getIcon("info");
-  return <Alert className="border-primary/40 bg-primary/10">
-    <InfoIcon className="size-5 text-primary" aria-hidden="true" />
-    <div className="min-w-0"><AlertTitle>{note.body}</AlertTitle><AlertDescription>Posted by {note.posted_by_name}, {relativePostedTime(note.posted_at)}</AlertDescription></div>
-    {admin ? <AlertAction><Button variant="outline" onClick={() => clear.mutate()} disabled={clear.isPending}>Clear</Button></AlertAction> : null}
-  </Alert>;
-}
-
-export function StatusMaintenanceCard({ person, windows }: { person: Roster; windows: StatusMaintenance[] }) {
-  const admin = isOwnerOrAdminRole(person.role);
-  if (windows.length === 0 && !admin) return null;
-  return <Card>
-    <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3"><CardTitle>Scheduled maintenance</CardTitle>{admin ? <MaintenanceDialog /> : null}</CardHeader>
-    <CardContent className="flex flex-col divide-y divide-border">
-      {windows.length === 0 ? <p className="py-2 text-sm text-muted-foreground">No maintenance is scheduled.</p> : windows.map((window) => <MaintenanceRow key={window.id} window={window} admin={admin} />)}
-    </CardContent>
-  </Card>;
+/** The rows inside the page's "Scheduled maintenance" card. */
+export function StatusMaintenanceBody({ admin, windows }: { admin: boolean; windows: StatusMaintenance[] }) {
+  return <div className="flex flex-col divide-y divide-border">
+    {windows.length === 0 ? <p className="py-2 text-sm text-muted-foreground">No maintenance is scheduled.</p> : windows.map((window) => <MaintenanceRow key={window.id} window={window} admin={admin} />)}
+  </div>;
 }
 
 function MaintenanceRow({ window, admin }: { window: StatusMaintenance; admin: boolean }) {
@@ -80,7 +70,7 @@ function MaintenanceRow({ window, admin }: { window: StatusMaintenance; admin: b
   </div>;
 }
 
-function MaintenanceDialog() {
+export function MaintenanceDialog() {
   const [open, setOpen] = useState(false);
   const [error, setError] = useState("");
   const [title, setTitle] = useState("");
