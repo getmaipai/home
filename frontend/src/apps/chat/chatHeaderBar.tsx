@@ -170,7 +170,8 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
           <Button
             type="button"
             variant="ghost"
-            className={phoneRow ? "h-12 min-w-12 flex-1 justify-start px-2 text-[15px] font-medium" : "-ms-2 h-9 min-w-0 max-w-full shrink justify-start px-2 text-[15px] font-medium relative before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']"}
+            align="start"
+            className={phoneRow ? "h-12 min-w-12 flex-1 px-2 text-[15px] font-medium" : "-ms-2 h-9 min-w-0 max-w-full shrink px-2 text-[15px] font-medium relative before:absolute before:-inset-y-1.5 before:inset-x-0 before:content-['']"}
             onClick={() => setRenaming(true)}
           >
             <span className="min-w-0 truncate">{title}</span>

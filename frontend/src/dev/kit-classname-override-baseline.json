@@ -42,7 +42,6 @@
         "before:inset-x-0",
         "h-12",
         "h-9",
-        "justify-start",
         "max-w-full",
         "min-w-0",
         "min-w-12",
@@ -107,17 +106,6 @@
       ],
       "ed": "ED-035",
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
-    }
-  },
-  "apps/settings/VoiceCatalogSection.tsx": {
-    "Button": {
-      "tokens": [
-        "h-auto",
-        "min-h-12",
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
   "shell/pages/ChatPage.tsx": {

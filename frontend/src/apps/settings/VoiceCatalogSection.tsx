@@ -104,7 +104,7 @@ export function VoiceCatalogSection({ personId, householdManagement = false }: V
         // whitespace-normal + text-left: Button's own default is a
         // single nowrap line, wrong for a sentence this long on a
         // narrow screen.
-        <Button type="button" variant="link" onClick={expand} className="h-auto min-h-12 w-full text-left whitespace-normal">
+        <Button type="button" variant="link" height="auto" width="full" onClick={expand} className="text-left whitespace-normal">
           Browse the {householdManagement ? "household" : "full community"} voice catalog (2,000+ voices)
         </Button>
       ) : loadError ? (
