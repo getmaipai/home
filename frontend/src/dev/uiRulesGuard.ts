@@ -10,6 +10,7 @@ import {
   type OverrideBaseline,
   type WrapperBaseline,
 } from "./kitElementLints";
+import { normalizeOldBaseline, renamedEntryProblems, type NestedBaseline } from "./baselineRenames";
 import type { HandBuiltBaseline } from "./handBuiltChat";
 
 // PRECOMMIT-RULES-01: the fast half of the pre-commit check. The scans
@@ -34,25 +35,7 @@ const entriesOf = (json: Record<string, Record<string, unknown>>) =>
 
 /** Apply the pure NEXT-RETIRE-01 git-mv path/symbol mapping to the old
  * baseline so the shrink-only check compares the same entries by identity. */
-function normalizeMovedKeys(value: unknown): unknown {
-  if (typeof value === "string") return value
-    .replace(/(^|\/)next\//g, "$1shell/")
-    .replace(/(^|\/)Next([A-Z])/g, "$1$2")
-    .replace(/^Next([A-Z])/, "$1")
-    .replace(/nextPage/g, "page")
-    .replace(/nextChat/g, "chat");
-  if (Array.isArray(value)) return value.map(normalizeMovedKeys);
-  if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
-    const moved = key
-      .replace(/(^|\/)next\//g, "$1shell/")
-      .replace(/(^|\/)Next([A-Z])/g, "$1$2")
-      .replace(/^Next([A-Z])/, "$1")
-      .replace(/nextPage/g, "page")
-      .replace(/nextChat/g, "chat");
-    return [moved, normalizeMovedKeys(entry)];
-  }));
-}
+const normalizeMovedKeys = normalizeOldBaseline;
 
 export function guardProblems(read: Reader, staged: string[]): string[] {
   const out: string[] = [];
@@ -68,6 +51,12 @@ export function guardProblems(read: Reader, staged: string[]): string[] {
   if (isStaged(BASELINES.override)) { const [s, h] = both<OverrideBaseline>(BASELINES.override); if (s && h) grew(BASELINES.override, overrideKeys(s), overrideKeys(normalizeMovedKeys(h) as OverrideBaseline)); }
   if (isStaged(BASELINES.css)) { const [s, h] = both<CssOverrideBaseline>(BASELINES.css); if (s && h) grew(BASELINES.css, cssKeys(s), cssKeys(normalizeMovedKeys(h) as CssOverrideBaseline)); }
   if (isStaged(BASELINES.wrapper)) { const [s, h] = both<WrapperBaseline>(BASELINES.wrapper); if (s && h) grew(BASELINES.wrapper, wrapperKeys(s), wrapperKeys(normalizeMovedKeys(h) as WrapperBaseline)); }
+  // NEXT-RETIRE-02E-GUARD: a renamed entry keeps its reason, ed and properties.
+  for (const path of [BASELINES.override, BASELINES.css, BASELINES.wrapper]) {
+    if (!isStaged(path)) continue;
+    const [s, h] = both<NestedBaseline>(path);
+    if (s && h) for (const p of renamedEntryProblems(h, s)) out.push(`${path} ${p}.`);
+  }
   if (isStaged(BASELINES.handBuilt)) {
     const [s, h] = both<HandBuiltBaseline>(BASELINES.handBuilt);
     const flat = (b: HandBuiltBaseline) => Object.entries(b).flatMap(([f, names]) => names.map((n) => `${f}: ${n}`));

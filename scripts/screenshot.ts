@@ -2614,13 +2614,13 @@ async function captureChatShellReview(browser: Browser, sessionValue: string): P
       rail: box('[data-slot="app-rail"]'),
       railItem: box('[data-slot="app-rail-item"]'),
       profile: box('[data-slot="rail-profile-trigger"]'),
-      history: box('[data-slot="next-chat-rail"]'),
+      history: box('[data-slot="chat-rail"]'),
       newChat: box('[data-slot="aui_thread-list-new"]'),
-      search: box('[data-slot="next-chat-rail"] input'),
+      search: box('[data-slot="chat-rail"] input'),
       row: box('[data-slot="aui_thread-list-item"]'),
       rowFont: font('[data-slot="aui_thread-list-item-title"]'),
       sectionLabelFont: font('[data-slot="aui_thread-list-group-label"]'),
-      header: box('[data-slot="next-chat-header"]'),
+      header: box('[data-slot="chat-header"]'),
       titleFont: font('[data-chat-header-bar] button span'),
       column: box('[data-slot="aui_thread-viewport"] > .mx-auto'),
       userBubble: box('.aui-user-message-content'),
@@ -2632,10 +2632,10 @@ async function captureChatShellReview(browser: Browser, sessionValue: string): P
       sendButton: box('[data-slot="aui_composer-shell"] button[aria-label="Send message"]'),
       historyRows: document.querySelectorAll('[data-slot="aui_thread-list-item"]').length,
       historyRowsVisible: [...document.querySelectorAll<HTMLElement>('[data-slot="aui_thread-list-item"]')].filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
-      tones: { rail: bg('[data-slot="app-rail"]'), history: bg('[data-slot="next-chat-rail"]'), header: bg('[data-slot="next-chat-header"]'), workspace: bg('[data-slot="rail-workspace"]'), composer: bg('[data-slot="aui_composer-shell"]'), userBubble: bg('.aui-user-message-content') },
+      tones: { rail: bg('[data-slot="app-rail"]'), history: bg('[data-slot="chat-rail"]'), header: bg('[data-slot="chat-header"]'), workspace: bg('[data-slot="rail-workspace"]'), composer: bg('[data-slot="aui_composer-shell"]'), userBubble: bg('.aui-user-message-content') },
       composerBorder: (() => { const el = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]'); return el ? getComputedStyle(el).borderTopColor : null; })(),
-      historyDivider: (() => { const el = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"]'); return el ? `${getComputedStyle(el).borderRightWidth} ${getComputedStyle(el).borderRightColor}` : null; })(),
-      headerDivider: (() => { const el = document.querySelector<HTMLElement>('[data-slot="next-chat-header"]'); return el ? getComputedStyle(el).borderBottomWidth : null; })(),
+      historyDivider: (() => { const el = document.querySelector<HTMLElement>('[data-slot="chat-rail"]'); return el ? `${getComputedStyle(el).borderRightWidth} ${getComputedStyle(el).borderRightColor}` : null; })(),
+      headerDivider: (() => { const el = document.querySelector<HTMLElement>('[data-slot="chat-header"]'); return el ? getComputedStyle(el).borderBottomWidth : null; })(),
       vars: Object.fromEntries(["--background", "--foreground", "--shell-main", "--shell-rail", "--shell-history", "--shell-composer-bg"].map((name) => [name, getComputedStyle(document.body).getPropertyValue(name).trim()])),
       pageOverflowX: document.documentElement.scrollWidth > window.innerWidth,
     };
@@ -3059,7 +3059,7 @@ async function captureChatProjectsReview(browser: Browser, ownerSession: string)
     await page.goto(`${BASE_URL}/chat`);
     await page.getByRole("textbox", { name: "Message input" }).waitFor();
   };
-  const panel = (page: Page, phone: boolean) => (phone ? page.getByRole("dialog") : page.locator('[data-slot="next-chat-rail"]'));
+  const panel = (page: Page, phone: boolean) => (phone ? page.getByRole("dialog") : page.locator('[data-slot="chat-rail"]'));
   const measure = (page: Page) => page.evaluate(() => {
     const height = (selector: string) => document.querySelector<HTMLElement>(selector)?.getBoundingClientRect().height ?? null;
     return {
@@ -3606,22 +3606,22 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       const style = getComputedStyle(element);
       return `${style.fontSize}/${style.lineHeight} ${style.fontWeight} ${style.color}`;
     };
-    const rows = [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]')];
+    const rows = [...document.querySelectorAll<HTMLElement>('[data-slot="chat-rail"] [data-slot="aui_thread-list-item"]')];
     return {
-      column: box('[data-slot="next-chat-rail"]'),
-      inner: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar-panel"]'),
-      header: box('[data-slot="next-chat-rail"] [data-slot="chat-column-header"]'),
-      title: font('[data-slot="next-chat-rail"] [data-slot="chat-column-title"]'),
-      toggle: box('[data-slot="next-chat-rail"] [data-slot="chat-column-toggle"]'),
-      newChat: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-new"]'),
-      row: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]'),
-      rowFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item-title"]'),
-      label: box('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
-      labelFont: font('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-group-label"]'),
+      column: box('[data-slot="chat-rail"]'),
+      inner: box('[data-slot="chat-rail"] [data-slot="aui_thread-list-sidebar-panel"]'),
+      header: box('[data-slot="chat-rail"] [data-slot="chat-column-header"]'),
+      title: font('[data-slot="chat-rail"] [data-slot="chat-column-title"]'),
+      toggle: box('[data-slot="chat-rail"] [data-slot="chat-column-toggle"]'),
+      newChat: box('[data-slot="chat-rail"] [data-slot="aui_thread-list-new"]'),
+      row: box('[data-slot="chat-rail"] [data-slot="aui_thread-list-item"]'),
+      rowFont: font('[data-slot="chat-rail"] [data-slot="aui_thread-list-item-title"]'),
+      label: box('[data-slot="chat-rail"] [data-slot="aui_thread-list-group-label"]'),
+      labelFont: font('[data-slot="chat-rail"] [data-slot="aui_thread-list-group-label"]'),
       rowsVisible: rows.filter((row) => { const r = row.getBoundingClientRect(); return r.height > 0 && r.bottom <= window.innerHeight; }).length,
       rows: rows.length,
-      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
-      headerToggle: box('[data-slot="next-chat-header"] [data-slot="chat-column-toggle"]'),
+      borders: [...document.querySelectorAll<HTMLElement>('[data-slot="chat-rail"] [data-slot="aui_thread-list-sidebar"] *')].filter((el) => { const s = getComputedStyle(el); return ["Top", "Right", "Bottom", "Left"].some((side) => parseFloat(s.getPropertyValue(`border-${side.toLowerCase()}-width`)) > 0 && s.getPropertyValue(`border-${side.toLowerCase()}-style`) !== "none"); }).map((el) => el.getAttribute("data-slot") ?? el.tagName),
+      headerToggle: box('[data-slot="chat-header"] [data-slot="chat-column-toggle"]'),
       composer: box('[data-slot="aui_composer-shell"]'),
       overflowX: document.documentElement.scrollWidth > window.innerWidth,
     };
@@ -3643,7 +3643,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       if (open.borders.length) throw new Error(`captureChatColumnReview: borders inside the column: ${open.borders.join(", ")}`);
 
       // A hovered row beside the selected one.
-      await page.locator('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-item"]', { hasText: "Science fair volcano" }).hover();
+      await page.locator('[data-slot="chat-rail"] [data-slot="aui_thread-list-item"]', { hasText: "Science fair volcano" }).hover();
       await shoot(page, `column-hover-1440-${theme}`);
 
       // Thread search.
@@ -3662,8 +3662,8 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       const startedAt = await page.evaluate(() => {
         const samples: Array<[number, number, number, number]> = [];
         (window as unknown as { __col: typeof samples }).__col = samples;
-        const column = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"]')!;
-        const inner = document.querySelector<HTMLElement>('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-sidebar-panel"]')!;
+        const column = document.querySelector<HTMLElement>('[data-slot="chat-rail"]')!;
+        const inner = document.querySelector<HTMLElement>('[data-slot="chat-rail"] [data-slot="aui_thread-list-sidebar-panel"]')!;
         const start = performance.now();
         const tick = () => {
           const composer = document.querySelector<HTMLElement>('[data-slot="aui_composer-shell"]')!;
@@ -3721,14 +3721,14 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.mouse.move(zone.x + 2, 450);
       await page.mouse.move(900, 450);
       await page.waitForTimeout(350);
-      if (await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count()) throw new Error("COLUMN-02: a pass over the zone opened the peek");
+      if (await page.locator('[data-slot="chat-rail"][data-state="peek"]').count()) throw new Error("COLUMN-02: a pass over the zone opened the peek");
       // Resting on it does.
       await page.mouse.move(zone.x + 2, 450);
-      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor();
+      await page.locator('[data-slot="chat-rail"][data-state="peek"]').waitFor();
       await page.waitForTimeout(300);
       await shoot(page, `column-peek-1440-${theme}`);
       const during = await measure(page);
-      const peekBox = await page.locator('[data-slot="next-chat-rail"][data-state="peek"] [data-slot="aui_thread-list-sidebar-panel"]').boundingBox();
+      const peekBox = await page.locator('[data-slot="chat-rail"][data-state="peek"] [data-slot="aui_thread-list-sidebar-panel"]').boundingBox();
       log(`peek 1440/${theme}`, { peekBox, composerBefore: before.composer, composerDuring: during.composer, headerToggleBefore: before.headerToggle, headerToggleDuring: during.headerToggle });
       if (!peekBox || Math.round(peekBox.width) !== 288) throw new Error("COLUMN-02: the peek is not 288 wide");
       if (!before.composer || !during.composer || Math.abs(before.composer.x - during.composer.x) > 4 || before.composer.y !== during.composer.y || before.composer.width !== during.composer.width || before.composer.height !== during.composer.height) {
@@ -3737,12 +3737,12 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       // Stays while the pointer is inside; closes a moment after it leaves.
       await page.mouse.move(peekBox.x + 140, 300);
       await page.waitForTimeout(500);
-      if (!(await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').count())) throw new Error("COLUMN-02: the peek closed with the pointer inside it");
+      if (!(await page.locator('[data-slot="chat-rail"][data-state="peek"]').count())) throw new Error("COLUMN-02: the peek closed with the pointer inside it");
       await page.mouse.move(900, 450);
-      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor({ state: "detached" });
+      await page.locator('[data-slot="chat-rail"][data-state="peek"]').waitFor({ state: "detached" });
       // CHAT-SIDEBAR-PEEK-01: resting on the header's show control opens the
       // same peek, over the conversation, and leaving closes it.
-      const peekSel = '[data-slot="next-chat-rail"][data-state="peek"]';
+      const peekSel = '[data-slot="chat-rail"][data-state="peek"]';
       await shoot(page, `column-toggle-collapsed-1440-${theme}`);
       const toggleBox = await page.getByRole("button", { name: "Show conversations" }).boundingBox();
       if (!toggleBox) throw new Error("CHAT-SIDEBAR-PEEK-01: no show control while the column is hidden");
@@ -3786,7 +3786,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.mouse.move(900, 450);
       await page.waitForTimeout(200);
       await page.mouse.move(zone.x + 2, 450);
-      await page.locator('[data-slot="next-chat-rail"][data-state="peek"]').waitFor();
+      await page.locator('[data-slot="chat-rail"][data-state="peek"]').waitFor();
       await page.getByRole("button", { name: "Keep conversations open" }).click();
       await page.waitForTimeout(500);
       const docked = await measure(page);
@@ -3835,7 +3835,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
       await page.route("**/api/conversations", async (route) => { if (route.request().method() === "GET") await held; await route.continue(); });
       await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
       await page.goto(`${BASE_URL}/chat`);
-      await page.locator('[data-slot="next-chat-rail"] [data-slot="aui_thread-list-skeleton"]').first().waitFor();
+      await page.locator('[data-slot="chat-rail"] [data-slot="aui_thread-list-skeleton"]').first().waitFor();
       await page.waitForTimeout(400);
       await page.screenshot({ path: join(outDir, "column-loading-1440-dark.png") });
       console.log(`Wrote ${join(outDir, "column-loading-1440-dark.png")}`);
@@ -5008,7 +5008,7 @@ async function readComposerGeometry(page: Page) {
     const rect = (element: HTMLElement | null) => element ? element.getBoundingClientRect() : null;
     const composerRect = rect(composer);
     const footerRect = rect(footer);
-    const paneRect = rect(document.querySelector<HTMLElement>("[data-slot=\"next-chat-pane\"]"));
+    const paneRect = rect(document.querySelector<HTMLElement>("[data-slot=\"chat-pane\"]"));
     const rootRect = rect(document.querySelector<HTMLElement>(".aui-thread-root"));
     const viewportRect = rect(document.querySelector<HTMLElement>("[data-slot=\"aui_thread-viewport\"]"));
     const contentRect = rect(document.querySelector<HTMLElement>("[data-slot=\"aui_thread-viewport\"] > .mx-auto"));
@@ -6295,7 +6295,7 @@ async function captureChatHeaderTitleReview(browser: Browser, sessionValue: stri
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
         await page.goto(`${BASE_URL}/chat?conversation=${row.id}`);
         // The same title also appears as a thread-list row in the rail
-        // (`#next-chat-rail`) - scoped to the header's own <nav> (no
+        // (`#chat-rail`) - scoped to the header's own <nav> (no
         // aria-label, unlike the sidebar's "Main navigation") to get
         // the header's copy specifically.
         await page.getByRole("navigation").getByRole("button", { name: title }).waitFor();
@@ -6935,7 +6935,7 @@ sqlite.close();`;
     try {
       const page = await desktopContext.newPage();
       await page.goto(`${BASE_URL}/chat`);
-      const rail = page.locator('[data-slot="next-chat-rail"]');
+      const rail = page.locator('[data-slot="chat-rail"]');
       await rail.getByText(title, { exact: true }).waitFor();
       await rail.getByText("Pinned", { exact: true }).waitFor();
       await settleAnimations(page);
@@ -6996,7 +6996,7 @@ async function captureChatCollapseHoverAudit(browser: Browser, sessionValue: str
         await page.addInitScript(() => localStorage.setItem("maipai.chat.rail-collapsed", "0"));
         await page.goto(`${BASE_URL}/chat`);
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
-        const rail = page.locator('[data-slot="next-chat-rail"]');
+        const rail = page.locator('[data-slot="chat-rail"]');
         const openToggle = page.getByRole("button", { name: "Hide conversations" });
         await openToggle.waitFor({ state: "visible" });
         await openToggle.hover();
@@ -7008,7 +7008,7 @@ async function captureChatCollapseHoverAudit(browser: Browser, sessionValue: str
           className: el.className,
           collapsed: el.classList.contains("w-0") && !el.classList.contains("absolute"),
           peeked: el.classList.contains("absolute"),
-          toggleExpanded: [...document.querySelectorAll<HTMLButtonElement>('button[aria-controls="next-chat-rail"]')].find((button) => !el.contains(button))?.getAttribute("aria-expanded"),
+          toggleExpanded: [...document.querySelectorAll<HTMLButtonElement>('button[aria-controls="chat-rail"]')].find((button) => !el.contains(button))?.getAttribute("aria-expanded"),
         }));
         await page.screenshot({ path: join(outDir, `chat-collapse-hover-after-click-${viewport.width}-${theme}.png`) });
         if (!hovered.collapsed || hovered.width > 1 || hovered.peeked || hovered.toggleExpanded !== "false") {
@@ -7021,7 +7021,7 @@ async function captureChatCollapseHoverAudit(browser: Browser, sessionValue: str
           className: el.className,
           collapsed: el.classList.contains("w-0") && !el.classList.contains("absolute"),
           peeked: el.classList.contains("absolute"),
-          toggleExpanded: [...document.querySelectorAll<HTMLButtonElement>('button[aria-controls="next-chat-rail"]')].find((button) => !el.contains(button))?.getAttribute("aria-expanded"),
+          toggleExpanded: [...document.querySelectorAll<HTMLButtonElement>('button[aria-controls="chat-rail"]')].find((button) => !el.contains(button))?.getAttribute("aria-expanded"),
         }));
         await page.screenshot({ path: join(outDir, `chat-collapse-hover-after-leave-${viewport.width}-${theme}.png`) });
         if (!afterLeave.collapsed || afterLeave.width > 1 || afterLeave.peeked || afterLeave.toggleExpanded !== "false") {
@@ -7306,10 +7306,10 @@ async function captureCanvasPaneReview(browser: Browser, sessionValue: string): 
         }));
         await page.goto(`${BASE_URL}/chat`);
         await page.getByRole("textbox", { name: "Message input" }).waitFor();
-        const column = page.locator('[data-slot="next-chat-rail"]');
+        const column = page.locator('[data-slot="chat-rail"]');
         await column.waitFor({ state: "attached" });
         const expectedColumnState = history === "open" ? "open" : "closed";
-        await page.waitForFunction((expected) => document.querySelector('[data-slot="next-chat-rail"]')?.getAttribute("data-state") === expected, expectedColumnState);
+        await page.waitForFunction((expected) => document.querySelector('[data-slot="chat-rail"]')?.getAttribute("data-state") === expected, expectedColumnState);
         const input = page.getByRole("textbox", { name: "Message input" });
         await input.fill("Write a short note about pizza night");
         await page.getByRole("button", { name: "Send message", exact: true }).click();

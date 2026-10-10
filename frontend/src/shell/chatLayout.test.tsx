@@ -34,7 +34,7 @@ function renderChat(width: number) {
       <MemoryRouter initialEntries={["/chat"]}>
         <Routes>
           <Route element={<FullLayout rail railProfile={<RailProfileMenu displayName="Sage" subtitle="Owner" settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
-            <Route path="/chat" element={<div data-slot="next-chat-shell"><h1>Chat</h1></div>} />
+            <Route path="/chat" element={<div data-slot="chat-shell"><h1>Chat</h1></div>} />
           </Route>
         </Routes>
       </MemoryRouter>

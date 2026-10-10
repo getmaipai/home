@@ -27,7 +27,7 @@ describe("composer in Home (ELT-COMPOSER-KIT-01)", () => {
   });
 
   test("Home only sets the kit's size and colour tokens for the composer", () => {
-    const start = tokens.indexOf('[data-slot="next-chat-pane"] {\n  --composer-compact-row-height');
+    const start = tokens.indexOf('[data-slot="chat-pane"] {\n  --composer-compact-row-height');
     expect(start).toBeGreaterThan(-1);
     const block = tokens.slice(start, tokens.indexOf("}", start));
     const declarations = block.split("\n").filter((line) => line.includes(":")).map((line) => line.trim().split(":")[0]!.replace("{", "").trim());
