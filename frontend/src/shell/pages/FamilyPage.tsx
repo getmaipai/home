@@ -16,18 +16,17 @@ import { useTabItem } from "@/shell/tabIdentity";
 const PetIcon = getIcon("box");
 const RobotIcon = getIcon("bot");
 
-/** One person's card: `Card` (`@maipai/ui/src/dashboard/components/ui/
- * card`) plus the kit's own `Avatar`, no new primitive - `docs/plans/
- * people-profile-2026-09-26.md`'s "The directory: a grid, not a table"
- * names this exact composition ("`Card` in a CSS grid is the whole
- * component"). Photo-in-place-of-initial (`avatar_file_id`) and real
- * DiceBear rendering are `AVATAR-RENDER-01`, not blocking here - `Avatar`
- * still only renders the initial-on-tint fallback its own header
- * documents. Every card gets the same header shape (photo, name, bio)
- * regardless of role, the child-view rule this row's acceptance names:
- * nothing here is sensitive, unlike the shared-media grid a later row
- * adds to the profile page. */
-interface FamilyCardProps {
+/** The inside of one directory card: the kit's own `Avatar` or icon, name,
+ * role/area, bio and a small badge, centered. The page owns the `Card`
+ * (`docs/plans/people-profile-2026-09-26.md`'s "The directory: a grid, not
+ * a table"). Photo-in-place-of-initial (`avatar_file_id`) and real
+ * DiceBear rendering are `AVATAR-RENDER-01`; `Avatar` still only renders
+ * the initial-on-tint fallback. Every card gets the same shape (photo,
+ * name, bio) regardless of role, the child-view rule this row's acceptance
+ * names: nothing here is sensitive. A person's accent shows as the ring on
+ * their `Avatar` alone, since a ring on the Card itself would be a
+ * className override on a kit Element. */
+interface FamilyBodyProps {
   title: string;
   subtitle?: string | null;
   detail?: string | null;
@@ -35,33 +34,26 @@ interface FamilyCardProps {
   icon?: Icon;
   avatarName?: string;
   avatarClassName?: string;
-  to?: string;
-  className?: string;
 }
 
-function FamilyCard({ title, subtitle, detail, badge, icon: IconComponent, avatarName, avatarClassName, to, className }: FamilyCardProps) {
-  const card = (
-    <Card className={className}>
-      <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
-        {IconComponent ? <IconComponent size={32} className="text-muted-foreground" /> : avatarName ? <Avatar name={avatarName} className={avatarClassName ?? "size-16 text-xl"} /> : null}
-        <div className="flex flex-col gap-1">
-          <h2 className="text-base font-semibold">{title}</h2>
-          {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
-          {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
-          {/* deliberate type-floor exception: compact role badge */}
-          {badge ? <span className="self-center rounded-full bg-muted px-1.5 py-0.5 text-xs">{badge}</span> : null}
-        </div>
-      </CardContent>
-    </Card>
-  );
-  return to ? <Link to={to} className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">{card}</Link> : card;
-}
-
-function PersonCard({ entry }: { entry: PersonRosterEntry }) {
-  const accentClass = entry.accent ? ACCENT_RING_CLASS[entry.accent] : null;
+function FamilyBody({ title, subtitle, detail, badge, icon: IconComponent, avatarName, avatarClassName }: FamilyBodyProps) {
   return (
-    <FamilyCard title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={accentClass ? `size-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "size-16 text-xl"} to={`/people/${entry.id}`} className={accentClass ? `ring-2 ring-offset-2 ring-offset-background transition-shadow hover:shadow-md ${accentClass}` : "transition-shadow hover:shadow-md"} />
+    <div className="flex flex-col items-center gap-3 text-center">
+      {IconComponent ? <IconComponent size={32} className="text-muted-foreground" /> : avatarName ? <Avatar name={avatarName} className={avatarClassName ?? "size-16 text-xl"} /> : null}
+      <div className="flex flex-col gap-1">
+        <h2 className="text-base font-semibold">{title}</h2>
+        {subtitle ? <p className="text-sm text-muted-foreground">{subtitle}</p> : null}
+        {detail ? <p className="text-sm text-muted-foreground">{detail}</p> : null}
+        {/* deliberate type-floor exception: compact role badge */}
+        {badge ? <span className="self-center rounded-full bg-muted px-1.5 py-0.5 text-xs">{badge}</span> : null}
+      </div>
+    </div>
   );
+}
+
+function personAvatarClass(entry: PersonRosterEntry): string {
+  const accentClass = entry.accent ? ACCENT_RING_CLASS[entry.accent] : null;
+  return accentClass ? `size-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "size-16 text-xl";
 }
 
 /** /people: the household directory as a card grid (`PEOPLE-GRID-01`,
@@ -95,6 +87,7 @@ export function FamilyPage({ person }: { person: Roster }) {
   }
 
   return (
+    <>
     <Tabs value={activeTab} onValueChange={onTabChange}>
       <TabsList className="h-auto min-h-14 p-1">
         <TabsTrigger value="people" className="min-h-12 min-w-12">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
@@ -118,12 +111,18 @@ export function FamilyPage({ person }: { person: Roster }) {
         });
         return (
           <div className="flex flex-col gap-4">
-            <CardHeader className="p-0">
+            <CardHeader>
               <CardTitle>Family</CardTitle>
             </CardHeader>
             <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>
               {ordered.map((entry) => (
-                <PersonCard key={entry.id} entry={entry} />
+                <Link key={entry.id} to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                  <Card>
+                    <CardContent>
+                      <FamilyBody title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={personAvatarClass(entry)} />
+                    </CardContent>
+                  </Card>
+                </Link>
               ))}
             </div>
           </div>
@@ -135,16 +134,17 @@ export function FamilyPage({ person }: { person: Roster }) {
         <AsyncState data={petsQuery.data} error={petsQuery.isError} isFetching={petsQuery.isFetching} onRetry={() => petsQuery.refetch()} errorMessage="Could not load pets." loadingLabel="Loading pets">
           {(pets: Entity[]) => pets.length === 0 ? <EmptyState icon="inbox" text="Nothing here yet." /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{pets.map((pet) => {
             const unconfirmed = pet.source === "inferred" && !pet.confirmed_by_person_id;
-            return <FamilyCard key={pet.id} title={pet.name} detail={pet.description} icon={PetIcon} badge={unconfirmed ? "Unconfirmed" : undefined} />;
+            return <Card key={pet.id}><CardContent><FamilyBody title={pet.name} detail={pet.description} icon={PetIcon} badge={unconfirmed ? "Unconfirmed" : undefined} /></CardContent></Card>;
           })}</div>}
         </AsyncState>
       </TabsContent>
       <TabsContent value="bots">
         <AsyncState data={botsQuery.data} error={botsQuery.isError} isFetching={botsQuery.isFetching} onRetry={() => botsQuery.refetch()} errorMessage={botsQuery.error instanceof ApiError ? botsQuery.error.message : "Could not load bots."} loadingLabel="Loading bots">
-          {(bots: DeviceInfo[]) => bots.length === 0 ? <EmptyState icon="inbox" text="Nothing here yet." /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{bots.map((bot) => <FamilyCard key={bot.id} title={bot.name} subtitle={bot.area} icon={RobotIcon} />)}</div>}
+          {(bots: DeviceInfo[]) => bots.length === 0 ? <EmptyState icon="inbox" text="Nothing here yet." /> : <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>{bots.map((bot) => <Card key={bot.id}><CardContent><FamilyBody title={bot.name} subtitle={bot.area} icon={RobotIcon} /></CardContent></Card>)}</div>}
         </AsyncState>
       </TabsContent>
     </Tabs>
+    </>
   );
 }
 

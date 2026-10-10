@@ -119,36 +119,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/FamilyPage.tsx": {
-    "FamilyCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "PersonCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "FamilyPage": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/PersonProfilePage.tsx": {
-    "ProfileHeaderCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "EditProfileDialog": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/PrivacyPage.tsx": {
-    "ConnectionGroup": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/pages/TurnErrorDetails.tsx": {
     "TurnErrorDetails": {
       "ed": "ED-026",
