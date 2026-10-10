@@ -269,7 +269,8 @@ describe("IMG-OFFER-01: a forged call from a non-adult", () => {
     if (toolText !== "[]") expect(toolText).toContain(SHOW_IMAGES_UNAVAILABLE_LINE);
     expect(toolText).not.toContain("are on their screen");
     if (!result || !result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.answer_images).toBeUndefined();
+    expect("answer_images" in result.value).toBe(false);
+    expect((result.value.blocks ?? []).filter((b) => b.kind === "image_gallery")).toEqual([]);
     expect(world.log.wikimedia).toEqual([]);
     expect(JSON.stringify(db.select().from(conversationTurns).all())).not.toContain("image_gallery");
     return result.value;
