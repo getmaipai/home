@@ -105,9 +105,9 @@ describe("the bell's count follows how urgent its items are", () => {
     const { view, restore } = renderBell([notification("n1", "time_sensitive")]);
     try {
       const button = await view.findByRole("button", { name: /Notifications \(1 pending\)/ });
-      const count = await waitFor(() => { const found = button.parentElement!.querySelector("span.absolute"); expect(found).toBeTruthy(); return found!; });
-      expect(count.className).not.toContain("destructive");
-      expect(count.className).toContain("bg-foreground");
+      const count = await waitFor(() => { const found = button.querySelector('[data-slot="badge"]'); expect(found).toBeTruthy(); return found!; });
+      expect(count.getAttribute("data-variant")).toBe("secondary");
+      expect(count.className).not.toContain("bg-destructive");
     } finally { restore(); }
   });
 
@@ -115,8 +115,8 @@ describe("the bell's count follows how urgent its items are", () => {
     const { view, restore } = renderBell([notification("n1", "immediate")]);
     try {
       const button = await view.findByRole("button", { name: /Notifications \(1 pending\)/ });
-      const count = await waitFor(() => { const found = button.parentElement!.querySelector("span.absolute"); expect(found).toBeTruthy(); return found!; });
-      expect(count.className).toContain("bg-destructive");
+      const count = await waitFor(() => { const found = button.querySelector('[data-slot="badge"]'); expect(found).toBeTruthy(); return found!; });
+      expect(count.getAttribute("data-variant")).toBe("destructive");
     } finally { restore(); }
   });
 });
