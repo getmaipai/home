@@ -54,7 +54,7 @@ const conversationsProvider: SearchProvider = {
         // a blank bar") - the identical text an untitled conversation
         // already shows everywhere else in the app.
         title: row.title || "New Chat",
-        href: `/next/chat?conversation=${row.id}`,
+        href: `/chat?conversation=${row.id}`,
       }));
   },
 };
@@ -84,7 +84,7 @@ const peopleProvider: SearchProvider = {
         // selection or deep-link today) - opens the list page, the
         // same simplification the apps provider below makes for the
         // identical reason.
-        href: "/next/people",
+        href: "/people",
       }));
   },
 };
@@ -111,7 +111,7 @@ const appsProvider: SearchProvider = {
         // live: NextRoutes.tsx has only the "apps" list route) - opens
         // the Apps page, the same simplification the people provider
         // above makes for the identical reason.
-        href: "/next/apps",
+        href: "/apps",
       }));
   },
 };

@@ -113,11 +113,11 @@ test.each([
 
   try {
     const view = render(
-      <MemoryRouter initialEntries={["/next"]}>
+      <MemoryRouter initialEntries={["/"]}>
         <ThemeProvider defaultTheme={theme}>
           <TooltipProvider>
             <Routes>
-              <Route path="/next" element={<FullLayout profileDisplayName="Jesse" incognito onIncognitoChange={() => {}} />}>
+              <Route path="/" element={<FullLayout profileDisplayName="Jesse" incognito onIncognitoChange={() => {}} />}>
                 <Route index element={<HeaderFixturePage />} />
               </Route>
             </Routes>
