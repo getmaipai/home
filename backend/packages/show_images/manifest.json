@@ -5,7 +5,7 @@
   "category": "Info",
   "display": "Show Pictures",
   "description": "Show photos whenever someone asks about or mentions a famous person, place, film, show, game, animal, car or product.",
-  "offer": {"mode":"off","reason":"measured recall below bar"},
+  "offer": {"mode":"conditional","gate":"answerImagesAllowed","bench_row":"answer-images","reason":"owner ruling 2026-10-10: on for adults below the 85% recall bar; re-run later, back off if worse"},
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",

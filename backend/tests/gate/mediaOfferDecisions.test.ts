@@ -4,19 +4,19 @@ import { people } from "@/db/schema";
 import { decide } from "@/lib/gate/decide";
 import { answerImagesAllowed } from "@/lib/answerImages/turn";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
-import { setValue } from "@/lib/settings";
+import { getPersonSettingValue, setValue } from "@/lib/settings";
 import { createBenchPeople } from "../../scripts/bench/conversationRunner";
 import { resetDb } from "../reset-db";
 
 beforeEach(() => resetDb());
 
 describe("GATE-04 media offer capabilities", () => {
-  test("show_images offer policy is allow for child, teen, and adult while the setting and turn gates still apply", () => {
+  test("IMG-OFFER-01: show_images is offered to an adult only; the gate policy allows every band but the turn gate admits adults alone", () => {
     const { owner, child } = createBenchPeople();
     const teen = db.insert(people).values({ ...owner, id: "teen-media", displayName: "Teen", role: "teen" }).returning().get()!;
     const cases = [
       { actor: child, band: "child" as const, expected: false },
-      { actor: teen, band: "teen" as const, expected: true },
+      { actor: teen, band: "teen" as const, expected: false },
       { actor: owner, band: "adult" as const, expected: true },
     ];
     for (const row of cases) {
@@ -29,7 +29,11 @@ describe("GATE-04 media offer capabilities", () => {
       expect(answerImagesAllowed({ actor: row.actor, band: row.band, surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: true })).toBe(false);
     }
     expect(setValue(owner, `person:${child.id}`, "reference.images", true).ok).toBe(true);
-    expect(answerImagesAllowed({ actor: child, band: "child", surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false })).toBe(true);
+    // A parent turning the child's setting on no longer admits the child (owner ruling 2026-10-10: adults only).
+    expect(answerImagesAllowed({ actor: child, band: "child", surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false })).toBe(false);
+    // A teen who keeps the setting on (its default) is still not admitted.
+    expect(getPersonSettingValue(teen, "reference.images")).not.toBe(false);
+    expect(answerImagesAllowed({ actor: teen, band: "teen", surfaceClass: "written", spoken: false, temporary: false, bare: false, ephemeral: false })).toBe(false);
   });
 
   test("photo upload setting gate remains exact for child, teen, and adult", () => {

@@ -19,6 +19,7 @@ import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { streamTurnEvents } from "@/routes/turn";
 import { listConversationTurns } from "@/lib/conversationHistory";
+import { SHOW_IMAGES_UNAVAILABLE_LINE } from "@/lib/answerImages/turn";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
 import { __setAnswerImageDepsForTests } from "@/lib/answerImages/select";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
@@ -99,8 +100,8 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
     return names;
   }
 
-  test("the off policy keeps it out even when answer images are otherwise allowed", async () => {
-    expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).not.toContain("show_images");
+  test("IMG-OFFER-01: an adult's written chat turn is offered it by the manifest alone", async () => {
+    expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).toContain("show_images");
   });
 
   test("never offered on a spoken turn, a glance surface or a temporary chat", async () => {
@@ -109,7 +110,7 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "who is the president of chile", { temporary: true }))).not.toContain("show_images");
   });
 
-  test("a child's preference can be parent-set but cannot override the off offer policy", async () => {
+  test("a child's preference can be parent-set but never gets the child the tool (adults only)", async () => {
     expect(await toolsSeen(people.child, (a) => runTurnNext(a, "chat", "what does a koala look like"))).not.toContain("show_images");
     expect(setValue(people.child, `person:${people.child.id}`, "reference.images", true).ok).toBe(false);
     expect(setValue(people.owner, `person:${people.child.id}`, "reference.images", true).ok).toBe(true);
@@ -121,7 +122,7 @@ describe("ANSWER-IMG-02: where show_images is offered (rule 0's gates)", () => {
     expect(await toolsSeen(people.owner, (a) => runTurnNext(a, "chat", "what does the Eiffel Tower look like"))).not.toContain("show_images");
   });
 
-  test("teen picture preferences do not override the off offer policy", async () => {
+  test("a teen is never offered it, whatever their picture preference", async () => {
     db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
     const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
     expect(await toolsSeen(teen, (a) => runTurnNext(a, "chat", "what does a red panda look like"))).not.toContain("show_images");
@@ -225,6 +226,42 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
       const phrasing = seen.find(isPhrasing);
       if (phrasing) expect(lastText(phrasing).length).toBeGreaterThan(0);
     });
+  });
+});
+
+describe("IMG-OFFER-01: a forged call from a non-adult", () => {
+  async function forged(actor: typeof people.owner, text: string) {
+    offerShowImages(); // forces the tool into the list, as a forged or buggy proposal would
+    const world = fixtureWorld([TOWER]);
+    __setAnswerImageDepsForTests(world.deps);
+    let result: Awaited<ReturnType<typeof runTurnNext>> | undefined;
+    let toolText = "";
+    await withStub(script("A koala is a marsupial."), async (seen) => {
+      result = await runTurnNext(actor, "chat", text);
+      toolText = JSON.stringify(seen.flatMap((r) => r.messages.filter((m) => m.role === "tool")));
+    });
+    // The call is refused before any tool round runs (the minor's tool list lacks it), or, if it ever
+    // reaches the tool node, answers with the fixed unavailable line; never a picture line.
+    if (toolText !== "[]") expect(toolText).toContain(SHOW_IMAGES_UNAVAILABLE_LINE);
+    expect(toolText).not.toContain("are on their screen");
+    if (!result || !result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.answer_images).toBeUndefined();
+    expect(world.log.wikimedia).toEqual([]);
+    expect(JSON.stringify(db.select().from(conversationTurns).all())).not.toContain("image_gallery");
+    return result.value;
+  }
+
+  test("a child with the picture setting on: the call is refused, no pictures and no gallery block", async () => {
+    expect(setValue(people.owner, `person:${people.child.id}`, "reference.images", true).ok).toBe(true);
+    const value = await forged(people.child, "what does a koala look like");
+    expect(JSON.stringify(value)).not.toContain("image_gallery");
+  });
+
+  test("a teen: the call is refused, no pictures and no gallery block", async () => {
+    db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
+    const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
+    const value = await forged(teen, "what does a red panda look like");
+    expect(JSON.stringify(value)).not.toContain("image_gallery");
   });
 });
 

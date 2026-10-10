@@ -14,7 +14,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import type { SurfaceClass } from "@/lib/surfaceClass";
 import type { TurnState } from "@/lib/turnMachine/contract";
-import { getPersonSettingSource, getPersonSettingValue } from "@/lib/settings";
+import { getPersonSettingValue } from "@/lib/settings";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
 import { selectAnswerImages, type AnswerImageSelection, type AnswerImageTrace } from "./select";
@@ -53,10 +53,12 @@ export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer
 
 /** Rule 0's deterministic gates: never on a spoken or glance turn, a bare or
  * ephemeral turn, or a temporary chat (its memory-only picture cache is not
- * yet released with the chat); a child only once an adult has turned
- * `reference.images` on for them (owner, 2026-10-06: off by default); a teen
- * or adult unless they turned it off. */
+ * yet released with the chat); and, IMG-OFFER-01 (owner ruling 2026-10-10),
+ * every band but an adult: a teen or a child is never offered the tool, even
+ * for a child whose parent turned `reference.images` on. An adult is offered
+ * it unless they turned the setting off. */
 export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; surfaceClass: SurfaceClass; spoken: boolean; temporary: boolean; bare: boolean; ephemeral: boolean }): boolean {
+  if (input.band !== "adult") return false;
   if (input.surfaceClass !== "written" || input.spoken || input.temporary || input.bare || input.ephemeral) return false;
   const gate = decide({
     who: { personId: input.actor.id, role: input.actor.role as Role, band: input.band },
@@ -64,7 +66,6 @@ export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; su
   });
   if (gate.kind !== "allow") return false;
   const value = getPersonSettingValue(input.actor, "reference.images");
-  if (input.band === "child") return Boolean(getPersonSettingSource(input.actor.id, "reference.images")) && value === true;
   return value !== false;
 }
 
