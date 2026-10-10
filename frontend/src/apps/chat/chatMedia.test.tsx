@@ -21,7 +21,7 @@ function set(count: number, extra: Partial<AnswerImageSet> = {}): AnswerImageSet
   return {
     layout: "row",
     after_paragraph: 0,
-    visible: Math.min(3, count),
+    visible: Math.min(5, count),
     items: Array.from({ length: count }, (_, i) => ({
       id: id(i + 1),
       src: `/api/answer-image/${id(i + 1)}?v=tile`,
@@ -58,25 +58,25 @@ describe("the answer's pictures (the image_gallery block, kit image gallery)", (
   });
 
   test("a stored turn from before GENUI-05 and a live turn draw the same gallery", () => {
-    const a = render(<Render data={live(set(5))} />);
+    const a = render(<Render data={live(set(7))} />);
     const liveHtml = a.container.innerHTML;
     cleanup();
-    const b = render(<Render data={stored(set(5))} />);
+    const b = render(<Render data={stored(set(7))} />);
     expect(b.container.innerHTML).toBe(liveHtml);
   });
 
   test("the badge counts the extras, is a button, and equals what the gallery holds", () => {
-    const { getAllByRole, getByText, getByRole } = render(<Render data={live(set(5))} />);
-    expect(getAllByRole("img")).toHaveLength(3);
+    const { getAllByRole, getByText, getByRole } = render(<Render data={live(set(7))} />);
+    expect(getAllByRole("img")).toHaveLength(5);
     expect(getByText("+2")).toBeTruthy();
     fireEvent.click(getByRole("button", { name: "Open image: Tower picture 3" }));
-    expect(within(getByRole("dialog")).getByText("3 / 5")).toBeTruthy();
+    expect(within(getByRole("dialog")).getByText("3 / 7")).toBeTruthy();
   });
 
   test("never a +1 badge: a lone extra is left out by the builder", () => {
-    const block = live(set(4)) as unknown as { props: { images: unknown[] } };
-    expect(block.props.images).toHaveLength(3);
-    const { queryByText } = render(<Render data={live(set(4))} />);
+    const block = live(set(6)) as unknown as { props: { images: unknown[] } };
+    expect(block.props.images).toHaveLength(5);
+    const { queryByText } = render(<Render data={live(set(6))} />);
     expect(queryByText("+1")).toBeNull();
   });
 

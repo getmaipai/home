@@ -208,21 +208,30 @@ describe("IMGQ-04: the pipeline keeps only the subject's pictures", () => {
     expect(result.set?.items.map((i) => i.source.url)).toEqual(["https://press.example.com/stranger-things-season-4"]);
   });
 
-  test("the open web only fills a row: with three good Commons pictures, an adult's search pictures are not used", async () => {
-    const tower: FixtureSubject = { id: "Q243", label: "Eiffel Tower", category: "Eiffel Tower", image: "Eiffel Tower lead.jpg", files: ["Eiffel Tower lead.jpg", "Eiffel Tower night.jpg", "Eiffel Tower river.jpg"] };
+  test("IMG-QUALITY-01a: a disc or label scan is left out and counted as disc_or_label; a normal photo is not", async () => {
+    const singer: FixtureSubject = { id: "Q1013", label: "Vincent Marlow", human: true, birth: "+1971-01-10T00:00:00Z", category: "Vincent Marlow", image: "Vincent Marlow 2017.jpg", files: ["Vincent Marlow 2017.jpg", "Vincent Marlow white label vinyl.jpg", "Vincent Marlow stage.jpg", "Vincent Marlow 2014.jpg", "Vincent Marlow 2009.jpg"], description: "American singer" };
+    __setAnswerImageDepsForTests(fixtureWorld([singer]).deps);
+    const result = await selectAnswerImages({ subject: "Vincent Marlow", actor: people.owner, band: "adult", roster: [] });
+    expect(result.trace.dropped_by_relevance).toEqual({ disc_or_label: 1 });
+    expect(result.set?.items.map((i) => i.caption).some((c) => c.includes("white label vinyl"))).toBe(false);
+    expect(result.set?.items.length).toBe(4);
+  });
+
+  test("the open web only fills a row: with a full row of five good Commons pictures, an adult's search pictures are not used", async () => {
+    const tower: FixtureSubject = { id: "Q243", label: "Eiffel Tower", category: "Eiffel Tower", image: "Eiffel Tower lead.jpg", files: ["Eiffel Tower lead.jpg", "Eiffel Tower night.jpg", "Eiffel Tower river.jpg", "Eiffel Tower base.jpg", "Eiffel Tower top.jpg"] };
     use(tower, () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70), engines: ["bing images"] }]);
     const full = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
     expect(full.trace.search_not_needed).toBe(1);
     expect(full.set?.items.every((i) => i.source.site === "commons.wikimedia.org")).toBe(true);
-    const thin: FixtureSubject = { ...tower, files: ["Eiffel Tower lead.jpg", "Eiffel Tower night.jpg"] };
+    const thin: FixtureSubject = { ...tower, files: ["Eiffel Tower lead.jpg", "Eiffel Tower night.jpg", "Eiffel Tower river.jpg", "Eiffel Tower base.jpg"] };
     use(thin, () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70), engines: ["bing images"] }]);
     const filled = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
     expect(filled.trace.search_not_needed).toBeUndefined();
-    expect(filled.set?.items.map((i) => i.source.site)).toEqual(["commons.wikimedia.org", "commons.wikimedia.org", "travel.example.com"]);
+    expect(filled.set?.items.map((i) => i.source.site)).toEqual(["commons.wikimedia.org", "commons.wikimedia.org", "commons.wikimedia.org", "commons.wikimedia.org", "travel.example.com"]);
   });
 
   test("with Commons enough to fill the row twice over, the open web's pictures are never fetched", async () => {
-    const files = Array.from({ length: 7 }, (_, i) => `Eiffel Tower view ${i + 1}.jpg`);
+    const files = Array.from({ length: 11 }, (_, i) => `Eiffel Tower view ${i + 1}.jpg`);
     const tower: FixtureSubject = { id: "Q243", label: "Eiffel Tower", category: "Eiffel Tower", image: files[0], files };
     const world = fixtureWorld([tower], { searchRows: () => [{ title: "Eiffel Tower at dusk", url: "https://travel.example.com/eiffel-tower-dusk", image: pictureUrl(70), engines: ["bing images"] }] });
     __setAnswerImageDepsForTests(world.deps);
@@ -245,4 +254,19 @@ describe("IMGQ-04: the pipeline keeps only the subject's pictures", () => {
     const world = fixtureWorld([subject], { searchRows: rows });
     __setAnswerImageDepsForTests(world.deps);
   }
+});
+
+describe("IMG-QUALITY-01a: the disc and label veto", () => {
+  const singer = person(["Vincent Marlow"], "Vincent Marlow");
+  test("a file titled, described or categorised as a disc, label or sleeve is vetoed", () => {
+    expect(judgeRelevance(commons("Vincent Marlow white label", "Vincent Marlow single, white label promo"), singer)).toBe("disc_or_label");
+    expect(judgeRelevance(commons("Marlow 45", "Vincent Marlow on stage", { categories: ["Vincent Marlow", "Vinyl records"] }), singer)).toBe("disc_or_label");
+    expect(judgeRelevance(commons("Marlow single", "The record sleeve of the single", { categories: ["Vincent Marlow"] }), singer)).toBe("disc_or_label");
+  });
+  test("a normal photo is not vetoed, and the subject's own words are exempt", () => {
+    expect(judgeRelevance(commons("Vincent Marlow 2018", "Vincent Marlow in a jacket with long sleeves holding a wine label", { categories: ["Vincent Marlow"] }), singer)).toBeNull();
+    expect(judgeRelevance(commons("Vincent Marlow 2017", "Vincent Marlow performing at a festival", { categories: ["Vincent Marlow", "Music festivals"] }), singer)).toBeNull();
+    const records = { ...thing(["Vinyl Records"], "Vinyl Records"), description: "analog sound storage disc" };
+    expect(judgeRelevance(commons("Vinyl Records stack", "A stack of vinyl records in a shop", { categories: ["Vinyl Records"] }), records)).not.toBe("disc_or_label");
+  });
 });

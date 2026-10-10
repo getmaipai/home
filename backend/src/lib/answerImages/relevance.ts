@@ -135,6 +135,13 @@ const GATHERING_WORDS = /\b(fan|fans|protest|protests|protester|protesters|prote
  * smart speaker). */
 const OBJECT_WORDS = /\b(tickets?|stubs?|histograms?|charts?|signage|speakers?|headrests?|head restraints?|apu|wafers?|die shots?|ads|adverts?|advertisements?)\b/;
 
+/** IMG-QUALITY-01a: a record label, a disc or a sleeve is a scan of a product, not a photo of a person or a thing
+ * (a "white label" disc scan came up as a person's second picture). A closed vocabulary read from the file's own
+ * title, name, description and visible categories (never the person's message), the same way as the lists above.
+ * A word the subject's own name or Wikidata description holds is exempt (a record label, an album). A lead image
+ * is the article's own choice and is not judged by it. */
+const DISC_WORDS = /\b(vinyl|white labels?|record labels?|record sleeves?|picture sleeves?|record discs?|album covers?|cd covers?|compact discs?|45 rpm|78 rpm)\b/
+
 /** A place named by its distance from the subject: the picture is of what
  * is opposite it, not of it. */
 const MILITARY_WORDS = /\b(sgt|sergeant|squadron|airman|petty officer|air force)\b/;
@@ -296,6 +303,8 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   const path = c.source === "search" ? withoutNames(normalizeForMatch(pathWords(c.page)), names) : "";
   const screen = firstWord(SCREENSHOT_WORDS, said);
   if (screen) return `caption:${screen}`;
+  const disc = firstUnexempt(DISC_WORDS, said, own) ?? visible.map((cat) => firstUnexempt(DISC_WORDS, cat, own)).find((w) => w !== null) ?? null;
+  if (disc) return "disc_or_label";
   const personal = firstWord(PERSONAL_WORDS, said) ?? firstWord(PERSONAL_WORDS, path);
   if (personal) return `caption:${personal}`;
   if (!subjectIsPerson) {
