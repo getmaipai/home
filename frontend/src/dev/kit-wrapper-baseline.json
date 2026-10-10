@@ -128,27 +128,17 @@
       "ed": "ED-021",
       "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
     },
-    "FitVerdictBadge": {
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
     "CheckModelCard": {
       "ed": "ED-021",
       "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
     },
-    "ComputerMemoryCard": {
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
     "PlannedRoleCard": {
       "ed": "ED-021",
       "reason": "HOME-FIT-02 row names model-picker; hand-built role cards until ELT-T1-10b."
-    }
-  },
-  "apps/settings/RobotCard.tsx": {
-    "RobotCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+    },
+    "FitVerdictBadge": {
+      "ed": "ED-037",
+      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
   "dev/ElementsAdoptionPanel.tsx": {
@@ -201,12 +191,6 @@
   },
   "shell/pages/dashboard/StatCard.tsx": {
     "StatCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/settings/PersonMultiSelect.tsx": {
-    "PersonMultiSelect": {
       "ed": "ED-038",
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }

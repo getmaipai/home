@@ -1,7 +1,8 @@
 import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
-import { didPutDownCountIncrease, RobotCard } from "@/apps/settings/RobotCard";
+import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
+import { didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { DeviceInfo, SessionInfo } from "@/lib/api";
 
@@ -301,7 +302,7 @@ describe("DevicesSection", () => {
       calls += 1;
       if (calls === 1) throw new Error("offline");
     });
-    const view = render(<RobotCard
+    const view = render(<Card><RobotBody
       device={device({
         id: "robot-mute-retry",
         kind: "robot",
@@ -314,7 +315,7 @@ describe("DevicesSection", () => {
       onCancelRemove={() => {}}
       busy={false}
       onSetMuted={onSetMuted}
-    />);
+    /></Card>);
     fireEvent.click(view.getByRole("button", { name: "Mute microphone" }));
     await view.findByRole("alert");
     fireEvent.click(view.getByRole("button", { name: "Retry" }));

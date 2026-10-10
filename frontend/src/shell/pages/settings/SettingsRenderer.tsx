@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Button } from "@maipai/ui/src/ui/button";
 import { groupSettings, sectionTitle, type SettingsGroup } from "@maipai/ui/src/settings/groupSettings";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingField } from "@/shell/pages/settings/SettingField";
@@ -190,20 +190,22 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
                   <CardHeader>
                     <CardTitle>{titleOverrides[group.id] ?? sectionTitle(group.id)}</CardTitle>
                   </CardHeader>
-                  <CardContent className="flex flex-col divide-y divide-border">
+                  <CardContent>
+                    <div className="flex flex-col divide-y divide-border">
                     {group.basic.map((s) => (
                       <SettingField key={s.def.key} setting={s} onChange={(v) => handleChange(s.def.key, v)} onReset={() => handleReset(s.def.key)} disabled={pendingKey === s.def.key} selfPersonId={selfPersonId} />
                     ))}
                     {group.advanced.length > 0 ? (
                       group.foldAdvanced && !expandAdvanced && !advancedOpen[group.id] ? (
-                        <Button
-                          type="button"
-                          variant="link"
-                          onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
-                          className="h-auto min-h-12 w-fit p-0 pt-3 text-muted-foreground"
-                        >
-                          Show {group.advanced.length} advanced settings
-                        </Button>
+                        <div className="flex pt-3">
+                          <Button
+                            type="button"
+                            variant="link"
+                            onClick={() => setAdvancedOpen((prev) => ({ ...prev, [group.id]: true }))}
+                          >
+                            Show {group.advanced.length} advanced settings
+                          </Button>
+                        </div>
                       ) : (
                         <div className="flex flex-col divide-y divide-border border-t border-border pt-1">
                           {group.advanced.map((s) => (
@@ -212,6 +214,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
                         </div>
                       )
                     ) : null}
+                    </div>
                   </CardContent>
                 </Card>
               ))}

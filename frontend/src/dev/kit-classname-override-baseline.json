@@ -210,119 +210,11 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "apps/settings/AddRobotSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/BackupsSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/ChangeSecretSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/ClonedVoicesSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/CommandsSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/HuggingFaceTokenSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/ModelsSection.tsx": {
-    "Badge": {
-      "tokens": [
-        "bg-[var(--hue-orange)]",
-        "bg-[var(--hue-teal)]"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Button": {
-      "tokens": [
-        "gap-1",
-        "justify-start"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/RobotCard.tsx": {
-    "CardFooter": {
-      "tokens": [
-        "gap-2",
-        "justify-end"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/RobotPasswordSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/UsersSection.tsx": {
-    "Input": {
-      "tokens": [
-        "max-w-48",
-        "w-20"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
   "apps/settings/VoiceCatalogSection.tsx": {
     "Button": {
       "tokens": [
         "h-auto",
         "min-h-12",
-        "w-full"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Input": {
-      "tokens": [
         "w-full"
       ],
       "ed": "ED-037",
@@ -772,76 +664,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/settings/SettingField.tsx": {
-    "Input": {
-      "tokens": [
-        "min-h-12",
-        "w-32",
-        "w-40",
-        "w-64"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Button": {
-      "tokens": [
-        "h-auto",
-        "min-h-12",
-        "min-w-12",
-        "p-0",
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Switch": {
-      "tokens": [
-        "after:-inset-y-4"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "SelectTrigger": {
-      "tokens": [
-        "min-h-12",
-        "w-40"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "shell/pages/settings/SettingsRenderer.tsx": {
-    "CardContent": {
-      "tokens": [
-        "divide-border",
-        "divide-y",
-        "flex",
-        "flex-col"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    },
-    "Button": {
-      "tokens": [
-        "h-auto",
-        "min-h-12",
-        "p-0",
-        "pt-3",
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "shell/pages/settings/PersonMultiSelect.tsx": {
-    "ComboboxChips": {
-      "tokens": [
-        "w-64"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
   "shell/pages/status/StatusBoard.tsx": {
     "DialogContent": {
       "tokens": [
@@ -952,6 +774,16 @@
       ],
       "ed": "ED-039",
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
+    }
+  },
+  "apps/settings/ModelsSection.tsx": {
+    "Badge": {
+      "tokens": [
+        "bg-[var(--hue-orange)]",
+        "bg-[var(--hue-teal)]"
+      ],
+      "ed": "ED-037",
+      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   }
 }

@@ -75,7 +75,7 @@ export function ModelsSection() {
       ) : (
         <div className="flex flex-col gap-4">
           <p className="text-base text-[var(--muted-foreground)]">{describeHardware(hardware)}</p>
-          {computerMemory ? <ComputerMemoryCard response={computerMemory} /> : null}
+          {computerMemory ? <ComputerMemory response={computerMemory} /> : null}
           <ChatModelCard
             fits={chatFits}
             selectedModelId={selectedModelId}
@@ -277,7 +277,7 @@ function FitSource({ row }: { row: FitPanelRow }) {
   return <p className="text-sm text-[var(--muted-foreground)]">{row.label}: {fitSourceSentence(row.source, row.asOf)}</p>;
 }
 
-function ComputerMemoryCard({ response }: { response: ComputerMemoryResponse }) {
+function ComputerMemory({ response }: { response: ComputerMemoryResponse }) {
   if (!response.available) return null;
   const { memory } = response;
   const percent = memory.usableGb > 0 ? (memory.usedGb / memory.usableGb) * 100 : 0;
@@ -331,7 +331,7 @@ function Disclosure({
         type="button"
         variant="ghost"
         onClick={onToggle}
-        className="justify-start gap-1 text-muted-foreground hover:text-foreground"
+        className="text-muted-foreground hover:text-foreground"
         aria-expanded={open}
       >
         <Icon className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden />
