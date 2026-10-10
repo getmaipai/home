@@ -69,3 +69,13 @@ docs/assets/webkit/
 # model package instead, docs/dev.md section 12) and its staging report,
 # folded into docs/dev.md by hand rather than committed as a second copy.
 backend/scripts/train/out/
+
+# CLEANUP-2026-10-10: lane reports and stray artifacts belong in data-scratch/reports/, never at the repo root.
+/*.patch
+/*.orig
+/*.bak
+/*.rej
+/*.log
+/codex-*.md
+/*-report.md
+.DS_Store

@@ -750,6 +750,9 @@ else
   fi
 fi
 
+stage "stray root files"
+bash scripts/stray-files-check.sh
+
 stage "docs: reading-level lint"
 [ -n "${GATE_INSTALL:-1}" ] && [ "$SCOPE" = "docs" ] && bun install --silent
 bun run scripts/reading-level.ts
