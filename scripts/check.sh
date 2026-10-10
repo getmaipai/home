@@ -564,6 +564,9 @@ tests_finish() {
 }
 
 run_backend_suite() {
+  stage "scripts: bun test"
+  tests_start scripts scripts . 1
+  tests_finish scripts
   tests_start backend backend tests ""
   stage "backend: settings registry, regenerate and check for drift"
   # $SPEC_DIR is a per-tag worktree shared by every consumer pinning
@@ -621,10 +624,6 @@ NODE
 
   stage "scripts: typecheck"
   (cd backend && bunx tsc --noEmit -p ../scripts/tsconfig.json)
-
-  stage "scripts: bun test"
-  tests_start scripts scripts . 1
-  tests_finish scripts
 
   stage "backend: bun test (started first, running beside the steps above)"
   tests_finish backend
