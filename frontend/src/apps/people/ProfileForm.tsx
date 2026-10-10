@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { Person } from "@maipai/spec/gen/ts/person.js";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { DialogFooter } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
@@ -152,7 +151,7 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
     }
   }
 
-  const body = (
+  return (
     <form onSubmit={handleSave} className="flex flex-col gap-4">
       {layout === "page" && hasUnsavedChanges ? <p role="status">Unsaved changes.</p> : null}
       {saved ? <p role="status">Saved.</p> : null}
@@ -189,13 +188,5 @@ export function ProfileForm({ person, canEdit, onSaved, onCancel, layout = "dial
         </div>
       ) : null}
     </form>
-  );
-
-  if (layout === "dialog") return body;
-  return (
-    <Card>
-      <CardHeader><CardTitle>Profile</CardTitle></CardHeader>
-      <CardContent>{body}</CardContent>
-    </Card>
   );
 }
