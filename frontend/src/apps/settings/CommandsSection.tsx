@@ -175,9 +175,11 @@ export function CommandsSection({ person, management = false }: CommandsSectionP
                 </>
               )}
               {createError ? <p className="text-base text-[var(--destructive)]">{createError}</p> : null}
-              <Button type="submit" disabled={creating} className="w-fit">
-                {creating ? "Creating…" : "Create command"}
-              </Button>
+              <div className="flex">
+                <Button type="submit" disabled={creating}>
+                  {creating ? "Creating…" : "Create command"}
+                </Button>
+              </div>
             </form>
           ) : null}
           {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}

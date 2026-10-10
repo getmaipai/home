@@ -105,9 +105,11 @@ export function RobotPasswordRow({
           </div>
         </div>
       ) : (
-        <Button variant="outline" className="w-fit" onClick={() => setOpen(true)}>
-          {rotated ? "Rotate again" : "Rotate password"}
-        </Button>
+        <div className="flex">
+          <Button variant="outline" onClick={() => setOpen(true)}>
+            {rotated ? "Rotate again" : "Rotate password"}
+          </Button>
+        </div>
       )}
     </div>
   );

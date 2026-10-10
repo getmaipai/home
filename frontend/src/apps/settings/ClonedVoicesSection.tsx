@@ -127,9 +127,11 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
               required
             />
             {uploadError ? <p className="text-base text-[var(--destructive)]">{uploadError}</p> : null}
-            <Button type="submit" disabled={uploading || !file} className="w-fit">
-              {uploading ? "Uploading…" : "Upload"}
-            </Button>
+            <div className="flex">
+              <Button type="submit" disabled={uploading || !file}>
+                {uploading ? "Uploading…" : "Upload"}
+              </Button>
+            </div>
           </form>
           {actionError ? <p className="text-base text-[var(--destructive)]">{actionError}</p> : null}
           {voices === null ? null : voices.length === 0 ? (
