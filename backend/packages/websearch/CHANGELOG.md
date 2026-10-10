@@ -2,6 +2,25 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.1] - 2026-10-10
+
+### Added
+
+- The household search source mode (KS-MODE-01): Library only, Library first
+  or Internet first (`search.source_mode`, default Library first), with a
+  per-source override for the live Wikipedia lookup and for web search. In
+  Library first an unscoped question is answered from the offline library
+  alone when it has a result, and the model's `scope: web` is still honoured.
+  Library only turns off the live Wikipedia lookup and nothing else. The
+  `wikimedia-live` privacy row now names the setting that turns it off.
+
+### Changed
+
+- The `search.wikipedia_fallback` toggle is retired. A household that had it
+  off keeps that choice as the Wikipedia override set to Library only.
+- Children and teens never reach the live Wikipedia lookup or the hosted
+  provider in any mode (unchanged, now stated in one place).
+
 ## [0.3.0] - 2026-10-09
 
 ### Added

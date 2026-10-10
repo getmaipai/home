@@ -17,6 +17,7 @@ import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import { NOTIFICATION_SETTINGS_KEYS } from "@/settings/notificationKeys";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 
+const RETIRED_WIKIPEDIA_FALLBACK_KEY = "search.wikipedia_fallback";
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
 // Package-owned location settings do not enter the core spec registry.
@@ -35,7 +36,9 @@ const LEGACY_HOME_PLACE_KEY = SettingsKey.parse({ key: "household.home_place", s
 
 function loadRegistry(): SettingsKey[] {
   const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as unknown[];
-  const parsed = raw.map((entry) => SettingsKey.parse(entry));
+  // KS-MODE-01: spec-v0.1.116 still declares the retired search.wikipedia_fallback.
+  // Nothing reads it any more, so it must not show or be settable until a commons tag drops it.
+  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY);
   // AI declarations ship with Home's backend, while the shared settings
   // snapshot is pinned independently. Include newly added Home AI keys
   // until the shared snapshot is advanced.

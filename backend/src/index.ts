@@ -34,6 +34,7 @@ import { runConfiguredInternetProbe } from "@/lib/internetProbe";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
+import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
 
@@ -175,6 +176,8 @@ registerAllPackageNotificationTypes();
 // the first turn could ever offer start_project.
 registerAllPackageProjectTypes();
 migratePendingAsksThroughGate();
+// KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
+migrateWikipediaFallbackToSourceMode();
 void runAllSmokeTests().then(({ ran, failed }) => {
   if (failed > 0) console.error(`[smoke] ${failed}/${ran} bundled package(s) failed their smoke test at boot`);
 });

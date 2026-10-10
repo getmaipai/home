@@ -70,6 +70,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { WIKIMEDIA_LIVE_RATE_LIMIT, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, wikimediaLiveBaseUrl } from "@/lib/wikimediaLive";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
+import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
@@ -1535,19 +1536,16 @@ export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand)
   return { ...rest, text, rows, ...(pages && pages.length > 0 ? { pages } : {}), ...(dropped > 0 ? { floor_dropped: dropped } : {}) };
 }
 
-/** KS-02: the live Wikimedia fallback's gate. Adults only (a child's or teen's
- * query never leaves for it), and it counts every call. The household
- * setting `search.wikipedia_fallback` stays as the off switch (false means
- * never called); `wikimedia-live` is also a disclosed data source of the
- * websearch package, and lookup()
- * calls this only when the offline library had no title match. `null` on
- * any failure, the identical "the caller falls back to what it already had"
- * contract `wikipediaFallback()` itself uses. */
+/** KS-02: the live Wikimedia fallback's gate. KS-MODE-01: the search source mode
+ * (sourceMode.ts) decides whether it may run at all: never for a child or teen,
+ * never when the mode (or `search.source_mode.wikimedia`) is `offline`. Whether a
+ * library match keeps it quiet is the caller's `allowWikipediaFallback`. It counts
+ * every call, and `wikimedia-live` is a disclosed data source of the websearch
+ * package. `null` on any failure, the identical "the caller falls back to what it
+ * already had" contract `wikipediaFallback()` itself uses. */
 async function tryWikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number, speakerBand?: "child" | "teen" | "adult"): Promise<SearxngSearchResult | null> {
   if (speakerBand !== "adult") return null;
-  // KS-02-PRIV: the household's off switch (`search.wikipedia_fallback`, default true) is honoured again.
-  // STOPGAP: KS-MODE-01 (live | offline | mix) will map a stored false to `offline`.
-  if ((getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined) === false) return null;
+  if (wikimediaGate(speakerBand) !== "run") return null;
   bumpReferenceCounter("wikimedia_live_call", speakerBand);
   return wikipediaFallback(query, signal, deadlineAt);
 }
@@ -2160,15 +2158,22 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const webSide = async (ctx: { kMatched: boolean; timeRange: "month" | undefined }) => {
             const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
             if (hosted) return hosted;
-            return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { allowWikipediaFallback: false, kMatched: true } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) });
+            return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) });
           };
           // KS-02: the model's `scope` argument. An image search, or a call with no query, is the
           // old single path: the library has no pictures and nothing to look up.
           const scopeArg = (args as { scope?: unknown } | undefined)?.scope;
-          if (typeof input?.query !== "string" || input.query.length === 0 || input.category === "images") return webSide({ kMatched: false, timeRange: undefined });
+          if (typeof input?.query !== "string" || input.query.length === 0 || input.category === "images") {
+            // KS-MODE-01: with web search switched off for the household, an image or bare search is a policy refusal.
+            if (webSideOff(band)) return { text: refuseWeb(band), rows: [] };
+            return webSide({ kMatched: false, timeRange: undefined });
+          }
           return federatedLookup({ query: input.query, band, scope: parseScope(scopeArg), web: webSide });
         }
         if (id === "searxng" && method === "page.read") {
+          // KS-MODE-01: `search.source_mode.web = offline` turns page reads off with web search.
+          const readBand = speakerAgeBand(actor, new Date());
+          if (webSideOff(readBand)) throw new HostError("permission_denied", refuseWeb(readBand));
           const doc = await searxngPageRead(args, runtime.signal);
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.

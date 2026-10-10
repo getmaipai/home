@@ -32,6 +32,9 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // The smoke-disabled test below writes a package_status row; clear it so
+  // it never leaks into a later test file sharing this process's database.
+  sqlite.query("DELETE FROM package_status").run();
   __resetLlmSupervisorForTests();
   __resetPortOwnershipForTests();
   delete process.env.MAIPAI_LLAMA_SERVER_URL;

@@ -1,6 +1,6 @@
 {
   "id": "websearch",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
@@ -89,7 +89,7 @@
     {
       "id": "wikimedia-live",
       "destination": "Wikipedia's own official API (en.wikipedia.org)",
-      "when": "an adult's web search found nothing and the home's offline library had no matching article either",
+      "when": "an adult's web search found nothing and the home's offline library had no matching article either, unless the household turned it off (Settings, Search sources; the setting is search.source_mode)",
       "what": "the search query, nothing else",
       "who": "the Wikimedia Foundation",
       "opt_in": false,
