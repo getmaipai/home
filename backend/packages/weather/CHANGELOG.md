@@ -6,6 +6,11 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ### Added
 
+- Answers now come with a card for the current conditions, a chart of
+  the next 24 hours and a table of the next 7 days (GENUI-04). The same
+  Open-Meteo forecast call carries the extra hours and days, so the
+  privacy row is unchanged.
+
 - Conditions ("rainy", "partly cloudy"), today's high and low, and the
   chance of rain, in the reply and as typed data beside it (`place`,
   `temperature`, `conditions`, `high`, `low`, `precipitation_chance`,

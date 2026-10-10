@@ -2,7 +2,9 @@
 # Weather
 
 Ask MaiPai what the weather is like anywhere: the temperature right now,
-what the sky is doing, today's high and low, and the chance of rain.
+what the sky is doing, today's high and low, and the chance of rain. The
+answer shows a card for right now, a chart of the next 24 hours and a
+table of the next 7 days.
 
 ## Try it
 
@@ -17,7 +19,7 @@ Nothing to set up. Works as soon as it's installed.
 
 ## What it uses
 
-Weather looks up the place, then today's forecast for it, through
+Weather looks up the place, then its forecast (now, the next 24 hours and the next 7 days), through
 Open-Meteo, a free weather service. A recent answer for the same place is remembered for a
 little while so asking again right away doesn't need a new lookup. See
 the household's Privacy page for the full "what leaves the house" row.
