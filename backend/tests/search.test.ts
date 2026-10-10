@@ -133,10 +133,14 @@ describe("GET /api/search: people", () => {
 });
 
 describe("GET /api/search: apps", () => {
-  test("a word from a bundled package's own display name lists it, opening the Apps page", async () => {
+  // SEARCH-APPS-LINK-01: Routes.tsx has no /apps route, and a package is a
+  // tool, not a page, so no result may open /apps (the shell's Apps results
+  // come from its own catalog of real routes).
+  test("a bundled package's name returns no app group and no result opens /apps", async () => {
     const { client } = await owner();
     const groups = await search(client, "math");
-    expect(group(groups, "app")?.results).toContainEqual({ kind: "app", id: "math", title: "Math", subtitle: "Calculate a math expression.", href: "/apps" });
+    expect(group(groups, "app")).toBeUndefined();
+    expect(groups.flatMap((g) => g.results).some((r) => r.href === "/apps")).toBe(false);
   });
 });
 
