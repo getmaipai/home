@@ -1516,13 +1516,17 @@ export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand)
 
 /** KS-02: the live Wikimedia fallback's gate. Adults only (a child's or teen's
  * query never leaves for it), and it counts every call. The household
- * setting `search.wikipedia_fallback` is retired: `wikimedia-live` is a
- * disclosed data source of the websearch package instead, and lookup()
+ * setting `search.wikipedia_fallback` stays as the off switch (false means
+ * never called); `wikimedia-live` is also a disclosed data source of the
+ * websearch package, and lookup()
  * calls this only when the offline library had no title match. `null` on
  * any failure, the identical "the caller falls back to what it already had"
  * contract `wikipediaFallback()` itself uses. */
 async function tryWikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number, speakerBand?: "child" | "teen" | "adult"): Promise<SearxngSearchResult | null> {
   if (speakerBand !== "adult") return null;
+  // KS-02-PRIV: the household's off switch (`search.wikipedia_fallback`, default true) is honoured again.
+  // STOPGAP: KS-MODE-01 (live | offline | mix) will map a stored false to `offline`.
+  if ((getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined) === false) return null;
   bumpReferenceCounter("wikimedia_live_call", speakerBand);
   return wikipediaFallback(query, signal, deadlineAt);
 }

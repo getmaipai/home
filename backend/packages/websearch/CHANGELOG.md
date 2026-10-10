@@ -19,7 +19,8 @@ All notable changes to the Web Search package, in [Keep a Changelog](https://kee
 - The `wikipedia` privacy row is now `wikimedia-live`: the live Wikipedia
   call happens only for an adult's search that the web and the offline
   library both failed to answer. The household setting
-  `search.wikipedia_fallback` is retired.
+  `search.wikipedia_fallback` stays as its off switch: a household that turned
+  it off still never has the live call made (KS-02-PRIV).
 
 ## [0.2.6] - 2026-10-06
 

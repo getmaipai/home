@@ -312,8 +312,13 @@ way `SEARXNG_PAGE_RATE_LIMIT` already is (CLAUDE.md's own Third-party
 services rule) - never shared with SearXNG's own budget, the exact
 class of bug SEARCH-PACE-01's own follow-up just fixed for page reads.
 
-**Superseded by KS-02 (2026-10-09).** The setting below is retired: the key
-`search.wikipedia_fallback` is gone from `searchKeys.ts`, and the live
+**Reworked by KS-02 (2026-10-09), off switch restored by KS-02-PRIV.** The key
+`search.wikipedia_fallback` (household, boolean, default on) stays declared in
+`searchKeys.ts` as the visible off switch for `wikimedia-live`: a stored
+`false` means the live call is never made, and unset keeps the default. (This is a stopgap: KS-MODE-01's live | offline | mix setting will map a
+stored `false` to `offline`.) (KS-02
+first retired it, which silently re-enabled the call for households that had
+turned it off; PRIVACY.md forbids overriding a stored privacy choice.) The live
 Wikipedia call is now the `wikimedia-live` source, defined once in
 `src/lib/wikimediaLive.ts` (base URL, the `wikipedia` rate-limit bucket).
 It runs only for an adult's search that SearXNG and the hosted provider could
