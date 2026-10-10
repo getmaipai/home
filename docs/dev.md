@@ -34344,7 +34344,7 @@ writes markers and a record and moves no file.
 | `tts-models` | `voice/tts/` | the TTS engine's Python, packages and model weights, today in `~/.cache/uv` and `~/.cache/huggingface` | 1 to 3 GB | written once, read at engine start |
 | `vision-models` | `vision/models/` | face detection and embedding models served to browsers | tens of MB | written once, read on request |
 | `logs` | `logs/` | the hub's structured logs, rotated | up to the rotation cap | appends |
-| `cache` | `cache/` | package fetch responses | MB | small random writes |
+| `cache` | `cache/` | package fetch responses; knowledge.db (the reference reader's extracted-article cache) | MB | small random writes |
 | `favicons` | `favicons/` | source icons and their index | MB | small random writes |
 | `runtime` | `local-app/` | `engine-pids.json`, the running engines' pids | bytes | rewritten on each engine start |
 | `labels` | `labels/` | weekly turn-label exports from `scripts/bench/labels.ts` | KB to MB | written by an operator's export |
