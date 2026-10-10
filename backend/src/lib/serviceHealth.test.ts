@@ -34,6 +34,14 @@ describe("outside service request health", () => {
     expect(serviceState("service:api-example-com", at.getTime() + 1500)).toBe("outage");
   });
 
+  test("a limited sample degrades the service and the next ok sample recovers it to operational", async () => {
+    const at = new Date("2026-10-01T12:00:00Z");
+    await recordServiceOutcome("searxng", { ok: false, error: new Error("captcha or service access wall") }, at);
+    expect(serviceState("service:searxng", at.getTime())).toBe("degraded");
+    await recordServiceOutcome("searxng", { ok: true }, new Date(at.getTime() + 1000));
+    expect(serviceState("service:searxng", at.getTime() + 1000)).toBe("operational");
+  });
+
   test("records actual success, then becomes unknown after idle window", async () => {
     const at = new Date("2026-10-01T12:00:00Z");
     await recordServiceOutcome("api.example.com", { ok: true }, at);

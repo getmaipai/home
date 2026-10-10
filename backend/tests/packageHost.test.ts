@@ -15,6 +15,8 @@ import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { remember } from "@/lib/memory";
 import { listIssues } from "@/lib/issues";
+import { __resetServiceHealthForTests, serviceDiagnostics, serviceState } from "@/lib/serviceHealth";
+import { serviceComponent } from "@/lib/serviceComponent";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { useDefaultScriptedStack } from "./stackFixture";
 import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
@@ -1359,6 +1361,125 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
       expect(listIssues().filter((i) => i.source === "websearch")).toHaveLength(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  // SEARCH-HEALTH-02: the chat showed "Search is limited right now" almost
+  // constantly because any single suspended upstream engine sampled the
+  // whole service as an access wall, even when 29 results came back.
+  test("usable results with one 'too many requests' engine keep the search service operational", async () => {
+    __resetServiceHealthForTests();
+    const results = Array.from({ length: 29 }, (_, i) => ({ title: `Result ${i}`, url: `https://example.com/${i}`, content: "snippet", engine: "duckduckgo" }));
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results, unresponsive_engines: [["brave", "Suspended: too many requests"]] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await host.integration.call("searxng", "search", { query: "kevin bacon tv shows" });
+      await __drainBackgroundWorkForTests();
+      expect(serviceDiagnostics(serviceComponent("searxng")).failure_count).toBe(0);
+      expect(serviceState(serviceComponent("searxng"))).toBe("operational");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("zero results with an unresponsive engine mark the search service degraded", async () => {
+    __resetServiceHealthForTests();
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [], unresponsive_engines: [["brave", "Suspended: too many requests"]] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      await Promise.resolve(host.integration.call("searxng", "search", { query: "kevin bacon tv shows" })).catch(() => undefined);
+      await __drainBackgroundWorkForTests();
+      expect(serviceState(serviceComponent("searxng"))).toBe("degraded");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  const poolConfig = { engines: Array.from({ length: 8 }, (_, i) => ({ name: `eng${i}`, enabled: true, safesearch: true, categories: ["general", "web"] })) };
+  const rowOf = (i: number) => ({ title: `Result ${i}`, url: `https://example.com/${i}`, content: "snippet" });
+
+  test("every asked engine unresponsive with zero rows samples the search service degraded", async () => {
+    __resetServiceHealthForTests();
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => new URL(req.url).pathname === "/config" ? Response.json(poolConfig) : Response.json({ results: [], infoboxes: [], unresponsive_engines: [["eng0", "Suspended"]] }) });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await searxngSearch({ query: "all down" }, { safeSearchLevel: "off", bypassCache: true, safeEngines: ["eng0"] } as never).catch(() => undefined);
+      await __drainBackgroundWorkForTests();
+      expect(serviceState(serviceComponent("searxng"))).toBe("degraded");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("every asked engine unresponsive but rows returned stays operational", async () => {
+    __resetServiceHealthForTests();
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [rowOf(1)], unresponsive_engines: [["eng0", "Suspended"]] }) });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const out = await searxngSearch({ query: "partial" }, { safeSearchLevel: "off", bypassCache: true });
+      await __drainBackgroundWorkForTests();
+      expect(out.rows.length).toBe(1);
+      expect(serviceState(serviceComponent("searxng"))).toBe("operational");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a failed top-up request returns the first rows and records no service sample", async () => {
+    __resetServiceHealthForTests();
+    __resetSearxngEnginesCacheForTests();
+    __resetSearchRotationForTests();
+    __resetSearchCacheForTests();
+    let searches = 0;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => {
+      if (new URL(req.url).pathname === "/config") return Response.json(poolConfig);
+      searches++;
+      return searches === 1 ? Response.json({ results: [rowOf(1), rowOf(2)] }) : Response.json({ results: [], infoboxes: [], unresponsive_engines: [["eng5", "Suspended: too many requests"]] });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const out = await searxngSearch({ query: "topup" }, { safeSearchLevel: "off" });
+      await __drainBackgroundWorkForTests();
+      expect(searches).toBe(2);
+      expect(out.rows.length).toBe(2);
+      expect(serviceState(serviceComponent("searxng"))).toBe("operational");
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a cancelled turn aborting the search is not sampled as a SearXNG timeout", async () => {
+    __resetServiceHealthForTests();
+    __resetSearchCacheForTests();
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async () => { await new Promise((r) => setTimeout(r, 300)); return Response.json({ results: [rowOf(1)] }); } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), 30);
+      await searxngSearch({ query: "cancel me" }, { safeSearchLevel: "off", bypassCache: true, signal: controller.signal }).catch(() => undefined);
+      await __drainBackgroundWorkForTests();
+      expect(serviceDiagnostics(serviceComponent("searxng")).failure_count).toBe(0);
+    } finally {
+      server.stop(true);
+    }
+  });
+
+  test("a spent turn budget timing out the search is not sampled as a SearXNG timeout", async () => {
+    __resetServiceHealthForTests();
+    __resetSearchCacheForTests();
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: async () => { await new Promise((r) => setTimeout(r, 400)); return Response.json({ results: [rowOf(1)] }); } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const deadline = Date.now() + 100;
+      await searxngSearch({ query: "budget spent" }, { safeSearchLevel: "off", bypassCache: true, deadlineAt: deadline, fallbackDeadlineAt: deadline }).catch(() => undefined);
+      await __drainBackgroundWorkForTests();
+      expect(serviceDiagnostics(serviceComponent("searxng")).failure_count).toBe(0);
     } finally {
       server.stop(true);
     }
