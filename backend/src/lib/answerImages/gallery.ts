@@ -40,6 +40,23 @@ export function galleryProps(set: Pick<AnswerImageSet, "visible" | "items">): Ga
   };
 }
 
+/** IMG-QUALITY-01b: the pictures a conversation has already shown, read from its stored `image_gallery` blocks (each
+ * item's `id` and `source.url`); nothing is stored for it. */
+export type ShownPictures = { ids: Set<string>; sources: Set<string> };
+
+/** Adds the pictures of every `image_gallery` block in `blocks` to `into`. */
+export function collectShownPictures(blocks: ReadonlyArray<{ kind?: unknown; props?: unknown }>, into: ShownPictures): void {
+  for (const block of blocks) {
+    if (block.kind !== "image_gallery") continue;
+    const images = (block.props as { images?: unknown } | undefined)?.images;
+    if (!Array.isArray(images)) continue;
+    for (const image of images as Array<{ id?: unknown; source?: { url?: unknown } }>) {
+      if (typeof image?.id === "string") into.ids.add(image.id);
+      if (typeof image?.source?.url === "string" && image.source.url) into.sources.add(image.source.url);
+    }
+  }
+}
+
 function altFor(subject: string | null, count: number): string {
   const what = count === 1 ? "A photo" : `${count} photos`;
   return subject ? `${what} of ${subject.replace(/\s+/g, " ").trim().slice(0, ALT_SUBJECT_MAX)}.` : `${what} that ${count === 1 ? "goes" : "go"} with this answer.`;

@@ -83,7 +83,7 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { ConversationTurnRow } from "@/wire";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 import type { AnswerBlock as AnswerBlockValue } from "@maipai/spec/gen/ts/answer-block.js";
-import { legacyGalleryBlock } from "@/lib/answerImages/gallery";
+import { collectShownPictures, legacyGalleryBlock, type ShownPictures } from "@/lib/answerImages/gallery";
 
 /** GENUI-05 (no data debt): a stored turn's answer blocks. A turn written before GENUI-05 kept its pictures in the
  * `answer_images` column (migration 0087); they are read as the `image_gallery` block they would be today, in the same
@@ -96,6 +96,19 @@ function blocksFor(row: { id: string; createdAt: string }, rawBlocks: string | n
   }
   const blocks = legacy ? [...stored, legacy] : stored;
   return blocks.length > 0 ? { blocks } : {};
+}
+
+/** IMG-QUALITY-01b: the pictures this conversation has shown so far, from its stored `image_gallery` blocks (a
+ * temporary chat: from its in-window turns). Derived on read; nothing is stored for "show more". */
+export function shownPicturesIn(conversationId: string): ShownPictures {
+  const shown: ShownPictures = { ids: new Set(), sources: new Set() };
+  const rows: Array<Pick<ConversationTurnRow, "id" | "createdAt" | "blocks" | "answerImages">> = isTemporaryConversation(conversationId)
+    ? temporarySessions.get(conversationId)?.turns ?? []
+    : db.select({ id: conversationTurns.id, createdAt: conversationTurns.createdAt, blocks: conversationTurns.blocks, answerImages: conversationTurns.answerImages }).from(conversationTurns).where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done"))).all();
+  for (const row of rows) {
+    try { collectShownPictures(blocksFor(row, row.blocks, row.answerImages).blocks ?? [], shown); } catch { /* an unreadable block shows nothing */ }
+  }
+  return shown;
 }
 
 function mediaFields(raw: string | null): { media?: Media; media_items?: Media[] } {

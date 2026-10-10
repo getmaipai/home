@@ -23,6 +23,7 @@ import type { Role } from "@/middleware/auth";
 import { blockEventsFor } from "@/lib/turnMachine/blockEvents";
 import { nextHlc } from "@/lib/hlc";
 import { galleryBlockFor } from "./gallery";
+import { shownPicturesIn } from "@/lib/conversationHistory";
 import { selectAnswerImages, type AnswerImageSelection, type AnswerImageTrace } from "./select";
 
 /** The model-facing tool name; the bundled package `backend/packages/show_images`
@@ -90,7 +91,10 @@ export function startAnswerImages(state: TurnState, subject: string, kind = "", 
     timer = setTimeout(() => resolve({ set: null, trace: { subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
   });
   const deadlineAt = Date.now() + ANSWER_IMAGES_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
-  entry.done = Promise.race([selectAnswerImages({ subject, kind, actor: state.actor, band, roster, deadlineAt }), budget])
+  // IMG-QUALITY-01b: a failed read of the shown set is an empty set, never a failed turn (rule 6).
+  let shown: ReturnType<typeof shownPicturesIn> | undefined;
+  try { shown = shownPicturesIn(state.conversationId); } catch { shown = undefined; }
+  entry.done = Promise.race([selectAnswerImages({ subject, kind, actor: state.actor, band, roster, deadlineAt, ...(shown ? { shown } : {}) }), budget])
     .catch((): AnswerImageSelection => ({ set: null, trace: { subject, skipped: "error" } }))
     .then((selection) => {
       clearTimeout(timer);
