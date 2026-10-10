@@ -3,9 +3,10 @@
 // the privacy row id are declared here and nowhere else; the fallback in
 // packageHost.ts reads them. It is the last resort: lookup() reaches it only
 // when the household's offline library had no title match for an adult's
-// search that the live web also failed to answer. The household
-// setting `search.wikipedia_fallback` is its off switch (default on, false
-// means never called); the privacy row "wikimedia-live" on the websearch
+// search that the live web also failed to answer. The household setting
+// `search.source_mode` (and `search.source_mode.wikimedia`) is its off switch
+// (lib/retrieval/sourceMode.ts: `offline` means never called, and a child or
+// teen never reaches it); the privacy row "wikimedia-live" on the websearch
 // package is the disclosure.
 //
 // MAIPAI_WIKIPEDIA_BASE_URL lets a test point this at a local fixture; no

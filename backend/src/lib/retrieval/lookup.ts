@@ -8,7 +8,10 @@
 //              the machine, so the web callback is never called.
 //   web        the live web, plus tier K as a lead when it title-matches,
 //              limited to the last month when the words name no year.
-//   (omitted)  both, labelled.
+//   (omitted)  the search source mode decides (KS-MODE-01, sourceMode.ts):
+//              `mix` (default) answers from the library when it has a result and
+//              goes online only when it has none; `live` is the older "both,
+//              labelled". `scope: web` is honoured in every mode.
 //
 // Every library row carries its kind, so it is never passed off as a web
 // row. A minor's floor and the closed per-band source list live in the tier K
@@ -18,6 +21,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { lookupReference, type ReferenceLookup, type ReferenceReaderDeps } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
+import { effectiveMode, refuseWeb } from "@/lib/retrieval/sourceMode";
 
 export type SearchScope = "reference" | "web" | "both";
 
@@ -96,6 +100,17 @@ export async function federatedLookup<R extends LookupResultShape>(input: Federa
   if (input.scope === "reference") return kOnly;
 
   const kMatched = ref.rows.length > 0;
+  const webMode = effectiveMode("web", input.band);
+  if (webMode === "offline" || webMode === "closed") {
+    // The household turned web search off: a policy refusal with the library's result, not a tool failure (rule 6).
+    return { ...kOnly, text: `${ref.text}\n\n${refuseWeb(input.band)}` };
+  }
+  if (webMode === "mix" && input.scope === "both" && kMatched) {
+    // Library first: it answered, so an unscoped ask stays at home. `scope: web` still goes online.
+    bumpReferenceCounter("mode_mix_library_hit", input.band);
+    bumpReferenceCounter("k_lead", input.band);
+    return kOnly;
+  }
   if (kMatched) {
     bumpReferenceCounter("k_lead", input.band);
   }

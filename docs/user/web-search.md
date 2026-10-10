@@ -50,13 +50,19 @@ Whichever you pick, the search server only answers an address it trusts. Check t
 - [ ] Any firewall in front of the search server allows that same address.
 - [ ] SearXNG was restarted after you changed anything.
 
-## Wikipedia backup for adults
+## Where answers come from: Library only, Library first, Internet first
 
-If your search server does not answer, or finds nothing, MaiPai can ask Wikipedia instead. This is on by default, but only for adults. Children and teens never use it.
+If you have installed the offline library (articles stored on your own computer), you choose how MaiPai uses it. Open **Settings**, then **Search**, then **Search sources**. There are three choices.
 
-What leaves your house: the words of the search go to Wikipedia, which is run by the Wikimedia Foundation. Wikipedia also sees your home's internet address, like any website you visit.
+- **Library first** (the default). MaiPai checks the library first. If it has an answer, MaiPai uses it and sends nothing out of your house. If it has nothing, MaiPai searches the internet. When the question is about something recent, MaiPai can still ask the internet right away.
+- **Internet first.** MaiPai searches the internet every time and shows the library's article next to the results when it has one.
+- **Library only.** MaiPai never asks Wikipedia over the internet. Web search stays on, so it still uses your search server. To turn web search off as well, open the advanced options and set the web source to **Library only**.
 
-To turn it off, open **Settings**, then **AI & connections**, then **Integrations**, and turn off **Ask Wikipedia when web search fails or finds nothing**.
+Children and teens never use Wikipedia over the internet or the paid search service, in any of the three choices. Their web search keeps its safe search level.
+
+What leaves your house when MaiPai asks Wikipedia: the words of the search go to Wikipedia, which is run by the Wikimedia Foundation. Wikipedia also sees your home's internet address, like any website you visit. This happens only for an adult, only when the web search found nothing and the library had no article either (or, in **Internet first**, when the web search found nothing).
+
+If you turned off **Ask Wikipedia when web search fails or finds nothing** in an earlier version, MaiPai keeps that choice. Your Wikipedia source is set to **Library only**, and nothing else changes.
 
 ## Kids and safe search
 

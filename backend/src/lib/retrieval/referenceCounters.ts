@@ -26,6 +26,10 @@ export const REFERENCE_COUNTER_NAMES = [
   "k_lead",
   "wikimedia_live_call",
   "wikimedia_live_skipped_k_match",
+  // KS-MODE-01: the search source mode. Names only, plus the age band.
+  "mode_blocked_offline",
+  "mode_mix_library_hit",
+  "mode_mix_live_fallthrough",
 ] as const;
 
 export type ReferenceCounterName = (typeof REFERENCE_COUNTER_NAMES)[number];

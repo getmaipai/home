@@ -3,7 +3,10 @@
 // promises that matter: scope reference sends nothing outbound; a child never
 // reaches an adult-only book through the web tool; a minor's floor holds at the
 // one choke point; the live Wikimedia call happens only when the library had
-// no match; a stored search.wikipedia_fallback=false keeps it from ever running.
+// no match; search.source_mode.wikimedia=offline keeps it from ever running.
+// This file pins `search.source_mode` to live (the pre-KS-MODE-01 order: web and
+// library together) except where a test names its own mode; tests/sourceMode.test.ts
+// holds the full mode matrix.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -20,7 +23,6 @@ import { __resetReferenceCountersForTests, referenceCounters } from "@/lib/retri
 import { __resetReferenceReaderCachesForTests } from "@/lib/retrieval/referenceReader";
 import { federatedLookup, parseScope, referenceUrl, webTimeRange } from "@/lib/retrieval/lookup";
 import { articleHtml, startFakeKiwix, type FakeBook, type FakeKiwix } from "./support/fakeKiwix";
-import { SEARCH_SETTINGS_KEYS } from "@/settings/searchKeys";
 
 const WIKI = "wikipedia_en_all_mini_2026-09";
 const SIMPLE = "wikipedia_en_simple_all_maxi_2026-09";
@@ -45,6 +47,7 @@ beforeEach(() => {
   __resetSearxngEnginesCacheForTests();
   __resetReferenceReaderCachesForTests();
   __resetReferenceCountersForTests();
+  setHouseholdSettingValue("search.source_mode", "live");
 });
 
 afterEach(() => {
@@ -261,7 +264,8 @@ describe("through the host: integration.call searxng search", () => {
     const wiki = fakeWiki();
     setHouseholdSettingValue("search.searxng_url", web.url);
     const host = createHost(await actorAs("adult"), manifest());
-    const hit = (await host.integration.call("searxng", "search", { query: "Juniper Falls" })) as Result;
+    setHouseholdSettingValue("search.source_mode", "mix");
+    const hit = (await host.integration.call("searxng", "search", { query: "Juniper Falls", scope: "web" })) as Result;
     expect(hit.rows[0]!.kind).toBe("reference");
     expect(wiki.requests).toEqual([]);
     expect(referenceCounters()["reference.wikimedia_live_skipped_k_match.adult"]).toBe(1);
@@ -286,20 +290,13 @@ describe("through the host: integration.call searxng search", () => {
   });
 });
 
-describe("the wikimedia-live off switch (KS-02-PRIV)", () => {
-  test("search.wikipedia_fallback is a declared, visible household key that defaults on", () => {
-    const key = SEARCH_SETTINGS_KEYS.find((k) => k.key === "search.wikipedia_fallback");
-    expect(key?.scope).toBe("household");
-    expect(key?.selector).toBe("boolean");
-    expect(key?.default).toBe(true);
-  });
-
-  test("a household that stored false never has the live Wikimedia call made for an adult", async () => {
+describe("the wikimedia-live off switch (KS-MODE-01)", () => {
+  test("a household whose wikimedia source is offline never has the live Wikimedia call made for an adult", async () => {
     startKiwix([book(WIKI, { Juniper_Falls: falls() })]);
     const web = fakeWeb({ results: [] });
     const wiki = fakeWiki();
     setHouseholdSettingValue("search.searxng_url", web.url);
-    setHouseholdSettingValue("search.wikipedia_fallback", false);
+    setHouseholdSettingValue("search.source_mode.wikimedia", "offline");
     const host = createHost(await actorAs("adult"), manifest());
     await host.integration.call("searxng", "search", { query: "Zzyzx Quartz Harbour" });
     expect(wiki.requests).toEqual([]);

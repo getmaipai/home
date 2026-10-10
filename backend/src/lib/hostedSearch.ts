@@ -11,6 +11,7 @@ import { assertGated, decide } from "@/lib/gate/decide";
 import type { AgeBand } from "@/lib/ageBand";
 import { applySafeSearchLimits, type SafeSearchLevel } from "@/lib/safeSearch";
 import type { Role } from "@/middleware/auth";
+import { effectiveMode } from "@/lib/retrieval/sourceMode";
 
 export const HOSTED_SEARCH_KEY_SETTING = "search.brave_api_key";
 /** What the status and privacy pages name: who gets the query. */
@@ -88,6 +89,9 @@ export async function hostedSearch(query: string, band: AgeBand, safeLevel: Safe
   assertGated(decision);
   // Keep the pre-gate check as a defense until the broader GATE-08 cleanup.
   if (!hostedSearchAllowed(band)) return null;
+  // KS-MODE-01: the search source mode. Closed for a minor in every mode; off when the web side is `offline`.
+  const mode = effectiveMode("hosted", band);
+  if (mode !== "live" && mode !== "mix") return null;
   const effectiveSafeLevel = applySafeSearchLimits(safeLevel, band, decision.kind === "allow_with_limits" ? decision.limits : []);
   // A guest carries no age or identity signal (the band reads "adult" for
   // lack of a minor signal), so a guest's query stays on the household's SearXNG.
