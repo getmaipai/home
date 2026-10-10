@@ -262,8 +262,8 @@ export function exampleDateFor(turnDate: Date): string {
  * matches one, with the speaker's name substituted, is not a fact. */
 export function promptExampleTexts(speakerName: string, turnDate: string): string[] {
   return [
-    `${speakerName} is getting married in <the actual month/year>`,
-    `<name> is ${speakerName}'s wife`,
+    timeExampleText(turnDate),
+    possessiveExampleText(speakerName),
     `${speakerName} was in Brazil, ${turnDate}`,
     `${speakerName} said hi`,
     `Rover loves horror movies, ${speakerName}'s brother`,
@@ -272,6 +272,27 @@ export function promptExampleTexts(speakerName: string, turnDate: string): strin
     `The wifi password is Juniper2026`,
     `${speakerName} was in Brazil visiting his wife's family, ${turnDate}`,
   ];
+}
+
+/** The month after the turn's day, spelled "October 2026": the TIME RULE
+ * example is computed from the turn's date, never a literal, so no
+ * example in the prompt reads as a life fact and none carries a "<...>"
+ * slot a small model can copy (MEM-EXAMPLE-01: a model wrote the old
+ * wedding example into a real person's memory). */
+export function nextMonthLabel(turnDate: string): string {
+  const day = new Date(turnDate);
+  if (Number.isNaN(day.getTime())) return "the following month";
+  return new Date(day.getFullYear(), day.getMonth() + 1, 1).toLocaleDateString("en-US", { year: "numeric", month: "long" });
+}
+
+/** The TIME RULE's example answer, one source for the prompt and the echo filter. */
+export function timeExampleText(turnDate: string): string {
+  return `The recycling pickup moves in ${nextMonthLabel(turnDate)}`;
+}
+
+/** The POSSESSIVE RULE's example answer, one source for the prompt and the echo filter. */
+export function possessiveExampleText(speakerName: string): string {
+  return `Quill is ${speakerName}'s neighbor`;
 }
 
 /** The turn's day as the prompt spells it (and the echo filter reads). */
@@ -303,9 +324,9 @@ export function buildExtractionPrompt(speakerName: string, turnTimestamp: string
 
 SOURCE RULE - extract ONLY facts ${speakerName} asserted or explicitly confirmed. The Assistant's own statements are context, never a source: if the Assistant guessed something and ${speakerName} didn't confirm it, do NOT store it.
 
-TIME RULE - this exchange happened on ${turnDate}. Resolve relative time into absolute terms in the fact text: "I'm getting married next month" said on ${turnDate} becomes "${speakerName} is getting married in <the actual month/year>". Never store a bare "next week" or "yesterday" - those rot.
+TIME RULE - this exchange happened on ${turnDate}. Resolve relative time into absolute terms in the fact text: "The recycling pickup moves to next month" said on ${turnDate} becomes "${timeExampleText(turnDate)}". Never store a bare "next week" or "yesterday" - those rot.
 
-POSSESSIVE RULE - every "my"/"her"/"his" in what ${speakerName} says refers to ${speakerName}. Resolve it to ${speakerName}'s own name in the fact text, from ${speakerName}'s point of view: "my wife" becomes "<name> is ${speakerName}'s wife", never a guess about whose relative someone is. Keep every other name exactly as stated - never blur a named person into "someone".
+POSSESSIVE RULE - every "my"/"her"/"his" in what ${speakerName} says refers to ${speakerName}. Resolve it to ${speakerName}'s own name in the fact text, from ${speakerName}'s point of view: "my neighbor Quill" becomes "${possessiveExampleText(speakerName)}", never a guess about whose relative someone is. Keep every other name exactly as stated - never blur a named person into "someone".
 
 STATE AND TRIP RULE - an ongoing situation ("stressed about a deadline", "recovering from surgery") is category "state". Where ${speakerName} IS during a trip ("I'm in Brazil for two weeks") is also category "state", written in the PAST tense with the actual dates: "${speakerName} was in Brazil, ${turnDate}" with valid_to set to when it ends if stated. Never write a trip as still-current: an undated present-tense whereabouts would have this AI treating someone as abroad long after they came home.
 
@@ -454,7 +475,7 @@ function anchorWords(example: string, speakerName: string, turnDate: string): Se
 
 /** Unfilled template text: "<name>", "<the actual month/year>"; a
  * bracketed phrase that opens with a letter and is not an address. */
-const TEMPLATE_PLACEHOLDER_RE = /<[a-z][^<>@]{1,79}>/i;
+const TEMPLATE_PLACEHOLDER_RE = /<[a-z][^<>@]{1,79}>|\bthe actual month\/year\b/i;
 
 export type EchoDropReason = "example_echo" | "placeholder" | "credential";
 
