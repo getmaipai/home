@@ -68,7 +68,7 @@ Every save applies live with a quiet confirmation, no page-level Save button exc
 | S4 | Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured | the last two sections |
 | S5 | Person page "Limits" card for parents and admins (allowance keys) | allowance leaves Me without being lost |
 | S6 | Household shell: left list, seven grouped sections with the existing cards and link cards | Household grouped |
-| S7 | Screenshot review (`scripts/screenshot.ts --next-settings-review`), fix, retire dead code (`SETTINGS.md`-obsolete sections, old page bits) | polish and cleanup |
+| S7 | Screenshot review (`scripts/screenshot.ts --settings-page-review`), fix, retire dead code (`SETTINGS.md`-obsolete sections, old page bits) | polish and cleanup |
 
 S1 then S2 then S3 (Jesse's asks first), then S4 to S7. FACE-02H is closed by S3.
 

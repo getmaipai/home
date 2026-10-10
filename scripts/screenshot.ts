@@ -198,7 +198,6 @@ const chatFindHeaderAlignmentReview = process.argv.includes("--chat-find-header-
 const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble-hover-width-review");
 const chatFindComposerShiftReview = process.argv.includes("--chat-find-composer-shift-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
-const nextPageHeaderIconReview = process.argv.includes("--next-page-header-icon-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
@@ -273,24 +272,9 @@ const notificationsReview = process.argv.includes("--notifications-review");
 // this item's own judgment, not a permanent docs asset (matches how
 // HOME-UI-02c's own look comparison was done, per docs/dev.md).
 const lookReview = process.argv.includes("--look-review");
-const nextStandupReview = process.argv.includes("--next-standup-review");
-const nextSidebarReview = process.argv.includes("--next-sidebar-review");
-const nextLookPresetsReview = process.argv.includes("--next-look-presets-review");
-const nextAppearanceMismatchReview = process.argv.includes("--next-appearance-mismatch-review");
-const nextPeopleReview = process.argv.includes("--next-people-review");
-const nextDashboardReview = process.argv.includes("--next-dashboard-review");
-const nextProfileSheetReview = process.argv.includes("--next-profile-sheet-review");
-const nextTableRolloutReview = process.argv.includes("--next-table-rollout-review");
-const nextSettingsReview = process.argv.includes("--next-settings-review");
-const nextSettingsS2Review = process.argv.includes("--next-settings-s2-review");
-const nextSettingsS3Review = process.argv.includes("--next-settings-s3-review");
-const nextSettingsS5Review = process.argv.includes("--next-settings-s5-review");
-const nextSettingsS6Review = process.argv.includes("--next-settings-s6-review");
-const nextLaneA13Review = process.argv.includes("--next-lane-a-13-review");
-const nextPersonalManagementReview = process.argv.includes("--next-personal-management-review");
-const nextPrivacyReview = process.argv.includes("--next-privacy-review");
-const nextPersonProfileReview = process.argv.includes("--next-person-profile-review");
-const nextEnginesReview = process.argv.includes("--next-engines-review");
+const nextSidebarReview = process.argv.includes("--sidebar-review");
+const nextSettingsReview = process.argv.includes("--settings-page-review");
+const nextEnginesReview = process.argv.includes("--engines-review");
 const remoteStackSettingsReview = process.argv.includes("--remote-stack-settings-review");
 const statusA2bReview = process.argv.includes("--status-a2b-review");
 const statusA2cReview = process.argv.includes("--status-a2c-review");
@@ -303,33 +287,32 @@ const engineComputerReview = process.argv.includes("--engine-computer-review");
 const statusExpandReview = process.argv.includes("--status-expand-review");
 const statusPolishReview = process.argv.includes("--status-polish-review");
 const browserAlertsReview = process.argv.includes("--browser-alerts-review");
-const nextUpdatesReview = process.argv.includes("--next-updates-review");
-const nextRepairsReview = process.argv.includes("--next-repairs-review");
-const nextBackupsReview = process.argv.includes("--next-backups-review");
-const nextPerformanceReview = process.argv.includes("--next-performance-review");
-const nextStorageReview = process.argv.includes("--next-storage-review");
-const nextSignInReview = process.argv.includes("--next-sign-in-review");
-const nextChatReview = process.argv.includes("--next-chat-review");
+const nextUpdatesReview = process.argv.includes("--updates-review");
+const nextRepairsReview = process.argv.includes("--repairs-review");
+const nextBackupsReview = process.argv.includes("--backups-review");
+const nextPerformanceReview = process.argv.includes("--performance-review");
+const nextStorageReview = process.argv.includes("--storage-review");
+const nextSignInReview = process.argv.includes("--sign-in-review");
+const nextChatReview = process.argv.includes("--chat-turn-review");
 const regenerateMenuReview = process.argv.includes("--regenerate-menu-review");
-const nextChatHistoryReview = process.argv.includes("--next-chat-history-review");
-const nextChatAnswerImages = process.argv.includes("--next-chat-answer-images");
+const nextChatHistoryReview = process.argv.includes("--chat-history-review");
+const nextChatAnswerImages = process.argv.includes("--chat-answer-images");
 // UPLOAD-IMG-02: sent pictures in the composer, above the bubble, in the
 // preview dialog, and a child with photo uploads off.
-const nextChatSentPictures = process.argv.includes("--next-chat-sent-pictures");
+const nextChatSentPictures = process.argv.includes("--chat-sent-pictures");
 const showcaseScrollReview = process.argv.includes("--showcase-scroll-review");
-const nextChatScrollReview = process.argv.includes("--next-chat-scroll-review");
-const nextChatToolsReview = process.argv.includes("--next-chat-tools-review");
-const nextChatArtifactReview = process.argv.includes("--next-chat-artifact-review");
-const nextChatPolishReview = process.argv.includes("--next-chat-polish-review");
-const nextShellFoldReview = process.argv.includes("--next-shell-fold-review");
-const nextChatRichReview = process.argv.includes("--next-chat-rich-review");
-const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextShellFoldReview || nextChatRichReview;
-const nextChatComposerReview = process.argv.includes("--next-chat-composer-review");
-const nextChatQueueReview = process.argv.includes("--next-chat-queue-review");
+const nextChatScrollReview = process.argv.includes("--chat-scroll-review");
+const nextChatToolsReview = process.argv.includes("--chat-tools-review");
+const nextChatArtifactReview = process.argv.includes("--chat-artifact-review");
+const nextChatPolishReview = process.argv.includes("--chat-polish-review");
+const nextChatRichReview = process.argv.includes("--chat-rich-review");
+const chatArtifactCapture = nextChatArtifactReview || nextChatPolishReview || nextChatRichReview;
+const nextChatComposerReview = process.argv.includes("--chat-composer-review");
+const nextChatQueueReview = process.argv.includes("--chat-queue-review");
 const composerLayoutReview = process.argv.includes("--composer-layout-review");
-const nextChatQueueEmptyReview = process.argv.includes("--next-chat-queue-empty-review");
-const nextChatQueueBeforeReview = process.argv.includes("--next-chat-queue-before-review");
-const nextChatAuditReview = process.argv.includes("--next-chat-audit-review");
+const nextChatQueueEmptyReview = process.argv.includes("--chat-queue-empty-review");
+const nextChatQueueBeforeReview = process.argv.includes("--chat-queue-before-review");
+const nextChatAuditReview = process.argv.includes("--chat-audit-review");
 const chatCollapseHoverAudit = process.argv.includes("--chat-collapse-hover-audit");
 const chatStreamGlitchReview = process.argv.includes("--chat-stream-glitch");
 const chatNoticeDegradedReview = process.argv.includes("--chat-notice-degraded-review");
@@ -361,7 +344,7 @@ const traceReview = process.argv.includes("--trace-review");
 const SCREENSHOT_CHAT_REPLY = "This is a short demo reply from the scripted screenshot engine.";
 const SCREENSHOT_STREAM_WORDS = 120;
 const laneBTouchTargetsReview = process.argv.includes("--lane-b-touch-targets-review");
-const nextChatChildComposerReview = process.argv.includes("--next-chat-child-composer-review");
+const nextChatChildComposerReview = process.argv.includes("--chat-child-composer-review");
 const peopleProfileMediaReview = process.argv.includes("--people-profile-media-review");
 // SHELL-09 Phase 5: capture every migrated route at the accepted
 // desktop/phone sizes in both themes. Keep these real seeded captures in
@@ -3811,7 +3794,7 @@ async function captureChatColumnReview(browser: Browser, sessionValue: string): 
  * a fresh new-chat thread, then switches to the stored one once the
  * thread list answers; the switch swaps in that thread's own (empty)
  * composer. Text typed before the switch is dropped and Send stays
- * disabled (found 2026-10-06: `--next-chat-review` timed out on a
+ * disabled (found 2026-10-06: `--chat-turn-review` timed out on a
  * disabled Send whenever the list answered after the fill; reproduced on
  * demand by delaying `/api/conversations`). The active history row is the
  * thread runtime's own signal that the switch has happened. */
@@ -4828,78 +4811,6 @@ async function captureLookComparison(browser: Browser, sessionValue: string): Pr
   }
 }
 
-/** The shell-on-shadcndashboard stand-up's own acceptance (docs/plans/
- * shell-on-shadcndashboard-2026-09-21.md, step 1): "captures at 1440 and
- * 390, both looks, both themes, of every /next route, opened and judged
- * for one thing only, that nothing on them is Home-drawn." `the migrated root shell`
- * (household) gates the whole tree; `ui.look` (person, the same key the
- * old shell's `useLook.ts` reads) drives the vendored template's own
- * `.style-calm`/`.style-studio` body class via `useNextLook.ts` - the
- * same two-setting shape `captureLookComparison` above already uses for
- * the old shell, reused here rather than invented fresh. Written to
- * `docs/assets/screens/` (committed, unlike `captureLookComparison`'s
- * `data-scratch/`): a permanent record of the stand-up's own acceptance,
- * not a one-off review set. `/chat` is excluded - not wired yet
- * (ui-v0.5.4's named gap, CHAT-SDK-01). */
-async function captureNextStandup(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(SCREENS_DIR, "next-standup");
-  mkdirSync(outDir, { recursive: true });
-
-  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
-  const sage = people.find((p) => p.display_name === "Sage");
-  if (!sage) throw new Error("captureNextStandup: seedHousehold() didn't create Sage");
-
-
-  const pages: Array<{ slug: string; path: string; waitFor: string }> = [
-    { slug: "dashboard", path: "/", waitFor: "text=Here is your household today." },
-    { slug: "people", path: "/people", waitFor: 'a[href^="/people/"]' },
-    { slug: "settings", path: "/settings", waitFor: "text=Default Inputs" },
-    { slug: "sign-in", path: "/sign-in", waitFor: "form" },
-  ];
-  const viewports = [VIEWPORTS.find((v) => v.slug === "phone")!, VIEWPORTS.find((v) => v.slug === "desktop")!];
-
-  for (const look of ["calm", "studio"] as const) {
-    const setLook = await fetch(`${BASE_URL}/api/settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.look", value: look }),
-    });
-    if (!setLook.ok) throw new Error(`captureNextStandup: seeding ui.look=${look} failed: ${setLook.status}`);
-
-    for (const viewport of viewports) {
-      for (const theme of THEMES) {
-        const context = await newContext(browser, viewport, theme, sessionValue);
-        try {
-          for (const p of pages) {
-            const page = await context.newPage();
-            await page.goto(`${BASE_URL}${p.path}`);
-            await page.locator(p.waitFor).first().waitFor({ timeout: 15000 });
-            await settleAnimations(page);
-            const file = `${p.slug}-look-${look}-${viewport.slug}-${theme}.png`;
-            // Resize to the real scroll height and take a plain (non-fullPage)
-            // shot instead: FullLayout's header is `sticky top-0`
-            // (dashboard/layouts/full/vertical/header/Header.tsx), and
-            // Chromium's fullPage capture stitches tall pages by scrolling,
-            // which re-paints the sticky header mid-stitch and ghosts
-            // whatever was behind it (the footer's copyright line bled into
-            // the Tables page's title bar in dark desktop until this fix -
-            // found live in this stand-up's own acceptance captures, not a
-            // bug in the header or the footer themselves).
-            const fullHeight = await page.evaluate(() => document.documentElement.scrollHeight);
-            await page.setViewportSize({ width: viewport.width, height: fullHeight });
-            await settleAnimations(page);
-            await page.screenshot({ path: join(outDir, file) });
-            console.log(`Wrote ${join(outDir, file)}`);
-            await page.close();
-          }
-        } finally {
-          await context.close();
-        }
-      }
-    }
-  }
-}
-
 /** Lane 15's own two review shots: the bell popover's "Dismiss all" and
  * the history page's multi-select, each needing at least two real
  * pending notifications on screen - not fabricated rows (this file's
@@ -4980,166 +4891,6 @@ async function captureNextSidebarReview(browser: Browser, sessionValue: string):
   }
 }
 
-// HOME-UI-04b item 3's own proof: the dashboard in three of the nine
-// ui.look presets, 1440 dark (COORDINATOR's own ask) - Neutral and
-// Mauve (two of the seven new shadcn base-color presets) plus Studio
-// (the pre-existing default, proving the old presets still work
-// alongside the new ones on the same mechanism).
-async function captureNextLookPresets(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
-  const sage = people.find((p) => p.display_name === "Sage");
-  if (!sage) throw new Error("captureNextLookPresets: seedHousehold() didn't create Sage");
-
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  for (const look of ["neutral", "mauve", "studio"] as const) {
-    const setLook = await fetch(`${BASE_URL}/api/settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.look", value: look }),
-    });
-    if (!setLook.ok) throw new Error(`captureNextLookPresets: seeding ui.look=${look} failed: ${setLook.status}`);
-
-    const context = await newContext(browser, viewport, "dark", sessionValue);
-    try {
-      const page = await context.newPage();
-      await page.goto(`${BASE_URL}/`);
-      await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
-      await settleAnimations(page);
-      await page.screenshot({ path: join(outDir, `next-look-${look}-desktop-dark.png`) });
-      console.log(`Wrote ${join(outDir, `next-look-${look}-desktop-dark.png`)}`);
-      await page.close();
-    } finally {
-      await context.close();
-    }
-  }
-}
-
-// HOME-UI-04d's own proof: ui.appearance explicitly set opposite the
-// OS's own colorScheme, both directions - the logo (and everything
-// else) must follow the setting, not the media query that used to win
-// for the kit's own CSS variables while the class-driven template
-// parts (the logo among them) followed the setting instead.
-async function captureNextAppearanceMismatch(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  const people = (await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json()) as Array<{ id: string; display_name: string }>;
-  const sage = people.find((p) => p.display_name === "Sage");
-  if (!sage) throw new Error("captureNextAppearanceMismatch: seedHousehold() didn't create Sage");
-
-  const viewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
-  for (const setting of ["light", "dark"] as const) {
-    const osPref = setting === "light" ? "dark" : "light";
-    const setAppearance = await fetch(`${BASE_URL}/api/settings`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-      body: JSON.stringify({ scope: `person:${sage.id}`, key: "ui.appearance", value: setting }),
-    });
-    if (!setAppearance.ok) throw new Error(`captureNextAppearanceMismatch: seeding ui.appearance=${setting} failed: ${setAppearance.status}`);
-
-    // newContext's own colorScheme sets the OS preference; the PUT
-    // above sets the person's explicit choice - opposite each other
-    // on purpose, this capture's whole point.
-    const context = await newContext(browser, viewport, osPref, sessionValue);
-    try {
-      const page = await context.newPage();
-      await page.goto(`${BASE_URL}/`);
-      await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
-      await settleAnimations(page);
-      await page.screenshot({ path: join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`) });
-      console.log(`Wrote ${join(outDir, `next-appearance-${setting}-vs-os-${osPref}.png`)}`);
-      await page.close();
-    } finally {
-      await context.close();
-    }
-  }
-}
-
-/** HOME-UI-04e's own acceptance (1440 and 390, dark, against the
- * vendored template's own demo user-profile view - the single-
- * Tailwind-root and palette fixes it proved are long since landed) -
- * now doubling as SHELL-04's own permanent capture (2026-09-21):
- * extended to both themes, and its wait condition moved off
- * "Personal Information", the vendored `UserProfile`'s own demo
- * section heading that no real `/people` composition has ever
- * shown (SHELL-04 dropped that section entirely - no Home counterpart
- * for email/phone/position/address). Waits on a real table row rather
- * than the profile card's own "This is your own profile." text - a
- * review caught that the profile card renders straight from the
- * `person` prop, outside the household `AsyncState`, so that text
- * paints on first render regardless of whether `GET /api/people` has
- * resolved; `table tbody tr` is gated by the fetch the way the apps
- * row's own capture already established. */
-async function captureNextPeopleReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
-      try {
-        const page = await context.newPage();
-        await page.goto(`${BASE_URL}/people`);
-        // SHELL-04 changed this route from a table to a card grid
-        // (`NextPeoplePage.tsx`); the shared CardTitle is a div, so use
-        // a real person-card link as the data-ready signal. These links
-        // render only after the real `/api/people` query resolves.
-        await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
-        await assertNoLegacyDataTableChrome(page, "People");
-        await settleAnimations(page);
-        const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path, fullPage: slug === "phone" });
-        console.log(`Wrote ${path}`);
-        await page.close();
-      } finally {
-        await context.close();
-      }
-    }
-  }
-}
-
-/** SHELL-01's own acceptance ("1440 and 390, dark and light, judged
- * against dashboard-01's rhythm"): both viewports, both themes, of
- * `/` itself - the pair to `captureNextPeopleReview` above so the
- * dashboard composition has the same permanent, re-runnable capture a
- * live-instance judgment call was originally made from ad hoc. Waits on
- * the greeting's subtitle rather than any one widget's own text: it
- * only renders once `useDashboard()`'s `AsyncState` has resolved real
- * data (`NextDashboardPage.tsx`), and unlike a stat card's value it
- * never changes across viewport, theme, or role. */
-async function captureNextDashboardReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
-      try {
-        const page = await context.newPage();
-        await page.goto(`${BASE_URL}/`);
-        await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
-        await page.locator('[data-slot="timeline"]').waitFor({ timeout: 15000 });
-        await settleAnimations(page);
-        const path = join(outDir, `next-dashboard-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path, fullPage: slug === "phone" });
-        console.log(`Wrote ${path}`);
-        await page.close();
-      } finally {
-        await context.close();
-      }
-    }
-  }
-}
-
 async function captureTurnTraceReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "chat-ab", "trace-shots");
   mkdirSync(outDir, { recursive: true });
@@ -5169,40 +4920,6 @@ async function captureTurnTraceReview(browser: Browser, sessionValue: string): P
         await context.close();
       }
     }
-  }
-}
-
-/** PROFILE-SHEET-01's live acceptance: open the real Home-owned account
- * sheet at the phone viewport, assert the seeded signed-in person and
- * Home destinations, reject every shipped demo identity/link, then
- * save the open sheet for visual review. */
-async function captureNextProfileSheetReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  const viewport = VIEWPORTS.find((v) => v.slug === "phone")!;
-  const context = await newContext(browser, viewport, "dark", sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/`);
-    await page.getByText("Here is your household today.").waitFor({ timeout: 15000 });
-    await page.getByRole("button", { name: "Open account menu for Sage" }).click();
-    const sheet = page.getByRole("dialog");
-    await sheet.getByRole("heading", { name: "Sage" }).waitFor();
-    await sheet.getByRole("link", { name: "Settings" }).waitFor();
-    await sheet.getByRole("link", { name: "Help" }).waitFor();
-    const text = await sheet.innerText();
-    if (/Cameron|shadcndashboard\.com|Invoice|Subscription|Account Settings|Log Out/.test(text)) {
-      throw new Error(`captureNextProfileSheetReview: template content remains in the account sheet: ${text}`);
-    }
-    await settleAnimations(page);
-    const path = join(outDir, `next-profile-sheet-${viewport.width}-dark.png`);
-    await page.screenshot({ path, fullPage: true });
-    console.log(`Wrote ${path}`);
-    await page.close();
-  } finally {
-    await context.close();
   }
 }
 
@@ -6498,42 +6215,6 @@ async function captureChatHeaderTitleReview(browser: Browser, sessionValue: stri
   }
 }
 
-/** CHAT-HEADER-02's own stated acceptance: "the chat header and one
- * other app page show the same icon the sidebar shows for them" - the
- * chat side is `--chat-header-title-review` above (the icon is now
- * part of that same header); this covers the "one other page" half
- * with the dashboard route (`/`, the sidebar's own "Home" entry,
- * `House` in `sidebaritems.ts`), the plainest page to seed - no
- * fixture data needed beyond `the migrated root shell`. */
-async function captureNextPageHeaderIconReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
-      try {
-        const page = await context.newPage();
-        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        await page.goto(`${BASE_URL}/`);
-        // Scoped to the header's own unnamed <nav> - the sidebar's own
-        // "Home" group heading is a second, unrelated match otherwise
-        // (found writing NextRoutes.test.tsx's own equivalent check).
-        await page.getByRole("navigation").getByText("Home").waitFor();
-        await settleAnimations(page);
-        const path = join(outDir, `next-page-header-icon-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path, fullPage: slug === "phone" });
-        console.log(`Wrote ${path}`);
-        await page.close();
-      } finally {
-        await context.close();
-      }
-    }
-  }
-}
-
 /** SHELL-02 slice 6's own stated capture: the composer's "+" menu open -
  * the default-visible set only (photos and files, camera): Apps, Create
  * image, Web search and the voice waveform all stay behind
@@ -7198,7 +6879,7 @@ sqlite.close();`;
     } finally { await context.close(); }
   }
 
-  console.log("completed named review: --next-chat-audit-review");
+  console.log("completed named review: --chat-audit-review");
 }
 
 /** Regression for the chat thread-list collapse control. Keep the pointer
@@ -7607,278 +7288,6 @@ async function captureChatToolsRowReview(browser: Browser, sessionValue: string)
   }
 }
 
-async function captureNextShellFoldReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-  type ShellBox = { state: "folded" | "expanded"; name: string; width: number; height: number; left: number; top: number; centerX: number; centerY: number; borderBottomWidth: number };
-  const measureShell = async (page: Page, state: "folded" | "expanded"): Promise<{ rows: ShellBox[]; iconToken: { width: number; height: number }; headerOverlaps: string[] }> => page.evaluate((currentState) => {
-    const root = document.querySelector<HTMLElement>('[data-slot="sidebar-container"]');
-    if (!root) throw new Error("shell measurement: sidebar container is missing");
-    const stateRoot = document.querySelector<HTMLElement>('[data-slot="sidebar"]');
-    const expectedState = currentState === "folded" ? "collapsed" : "expanded";
-    if (stateRoot?.dataset.state !== expectedState) throw new Error(`shell measurement: expected ${expectedState}, got ${stateRoot?.dataset.state ?? "no state"}`);
-    const rect = (name: string, element: Element | null) => {
-      if (!element) throw new Error(`shell measurement: ${name} element is missing`);
-      const box = element.getBoundingClientRect();
-      return { state: currentState, name, width: box.width, height: box.height, left: box.left, top: box.top, centerX: box.left + box.width / 2, centerY: box.top + box.height / 2, borderBottomWidth: Number.parseFloat(getComputedStyle(element).borderBottomWidth) || 0 };
-    };
-    const button = root.querySelector<HTMLButtonElement>('button[aria-label="Toggle app menu"]');
-    const rows = [rect("sidebar rail container", root), rect("fold button", button)];
-    const sidebarHeader = root.querySelector<HTMLElement>('[data-slot="sidebar-header"]');
-    rows.push(rect("sidebar header", sidebarHeader), rect("sidebar header parent", sidebarHeader?.parentElement ?? null));
-    const logo = sidebarHeader?.querySelector<HTMLElement>('a:has(img[alt="logo"])') ?? null;
-    rows.push(rect("sidebar logo", logo));
-    const footer = root.querySelector<HTMLElement>('[data-slot="sidebar-footer"]');
-    rows.push(rect("sidebar footer", footer));
-    rows.push(rect("footer group", footer?.querySelector('[data-slot="sidebar-group"]') ?? null));
-    rows.push(rect("footer group content", footer?.querySelector('[data-slot="sidebar-group-content"]') ?? null));
-    rows.push(rect("footer menu", footer?.querySelector('[data-slot="sidebar-menu"]') ?? null));
-    const buttonIcon = button?.querySelector("svg") ?? null;
-    rows.push(rect("fold button icon", buttonIcon));
-    const entries = [
-      ["Home", "/next"],
-      ["Chat", "/next/chat"],
-      ["Library", "/next/files"],
-      ["Family", "/next/people"],
-      ["Settings", "/next/settings"],
-      ["Help", "https://github.com/getmaipai/home/blob/main/docs/user/README.md"],
-    ] as const;
-    for (const [name, href] of entries) {
-      const link: HTMLAnchorElement | undefined = [...root.querySelectorAll<HTMLAnchorElement>("a")].find((candidate) => candidate.getAttribute("href") === href);
-      const icon = link?.querySelector("svg") ?? null;
-      const row = rect(`${name} icon`, icon);
-      rows.push(row);
-      rows.push(rect(`${name} entry`, link ?? null));
-      const menuButton = link?.matches('[data-slot="sidebar-menu-button"]') ? link ?? null : link?.querySelector('[data-slot="sidebar-menu-button"]') ?? null;
-      rows.push(rect(`${name} menu button`, menuButton));
-      rows.push(rect(`${name} icon parent`, icon?.parentElement ?? null));
-      const label = link?.querySelector<HTMLElement>(".hide-menu") ?? null;
-      rows.push(rect(`${name} label`, label));
-    }
-    const probe = document.createElement("svg");
-    probe.className = "size-4";
-    probe.style.position = "fixed";
-    probe.style.visibility = "hidden";
-    document.body.append(probe);
-    const token = probe.getBoundingClientRect();
-    probe.remove();
-    const pageHeader = document.querySelector<HTMLElement>("header");
-    rows.push(rect("page header", pageHeader));
-    const headerOverlaps = button && sidebarHeader ? [...sidebarHeader.querySelectorAll<HTMLElement>("*")]
-      .filter((element) => !button.contains(element) && !element.contains(button))
-      .filter((element) => {
-        const style = getComputedStyle(element);
-        const box = element.getBoundingClientRect();
-        if (style.display === "none" || style.visibility === "hidden" || box.width === 0 || box.height === 0) return false;
-        const buttonBox = button.getBoundingClientRect();
-        return buttonBox.left < box.right && buttonBox.right > box.left && buttonBox.top < box.bottom && buttonBox.bottom > box.top;
-      })
-      .map((element) => `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}.${[...element.classList].slice(0, 3).join(".")}`) : [];
-    return { rows, iconToken: { width: token.width, height: token.height }, headerOverlaps };
-  }, state);
-
-  const assertShellGeometry = (state: "folded" | "expanded", data: Awaited<ReturnType<typeof measureShell>>): void => {
-    const near = (actual: number, expected: number) => Math.abs(actual - expected) <= 0.5;
-    const iconRows = data.rows.filter((row) => row.name.endsWith("icon"));
-    for (const icon of iconRows) {
-      if (!near(icon.width, data.iconToken.width) || !near(icon.height, data.iconToken.height)) {
-        throw new Error(`SHELL-FOLD ${state}: ${icon.name} is ${icon.width}×${icon.height}px; shipped size-4 token is ${data.iconToken.width}×${data.iconToken.height}px`);
-      }
-    }
-    const rail = data.rows.find((row) => row.name === "sidebar rail container")!;
-    const sidebarHeader = data.rows.find((row) => row.name === "sidebar header")!;
-    const pageHeader = data.rows.find((row) => row.name === "page header")!;
-    if (sidebarHeader.borderBottomWidth !== 0) throw new Error(`SHELL-FOLD ${state}: sidebar header border-bottom-width is ${sidebarHeader.borderBottomWidth}px, expected 0`);
-    if (pageHeader.borderBottomWidth <= 0) throw new Error(`SHELL-FOLD ${state}: page header border-bottom-width is ${pageHeader.borderBottomWidth}px, expected a visible border`);
-    const navIcons = data.rows.filter((row) => ["Home icon", "Chat icon", "Library icon", "Family icon"].includes(row.name));
-    const foldButton = data.rows.find((row) => row.name === "fold button")!;
-    if (state === "folded") {
-      const logo = data.rows.find((row) => row.name === "sidebar logo")!;
-      if (logo.width > 0 && logo.height > 0) throw new Error(`SHELL-FOLD folded: sidebar logo has visible area ${logo.width}×${logo.height}px`);
-      const buttonBox = data.rows.find((row) => row.name === "fold button")!;
-      if (!near(buttonBox.width, 48) || !near(buttonBox.height, 48)) throw new Error(`SHELL-FOLD folded: fold button hit area is ${buttonBox.width}×${buttonBox.height}px, expected 48×48px`);
-      if (!near(buttonBox.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: fold button center x ${buttonBox.centerX}px differs from rail center x ${rail.centerX}px`);
-      const pageHeader = data.rows.find((row) => row.name === "page header")!;
-      if (!near(buttonBox.centerY, pageHeader.centerY)) throw new Error(`SHELL-FOLD folded: fold button center y ${buttonBox.centerY}px differs from page header row center y ${pageHeader.centerY}px`);
-      const overlaps = data.headerOverlaps;
-      for (const icon of iconRows) {
-        if (!near(icon.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: ${icon.name} center x ${icon.centerX}px differs from rail center x ${rail.centerX}px`);
-      }
-      if (overlaps.length) throw new Error(`SHELL-FOLD folded: fold button overlaps sidebar-header sibling ${overlaps[0]}`);
-      for (const icon of navIcons) {
-        if (!near(foldButton.centerX, icon.centerX)) throw new Error(`SHELL-FOLD folded: fold button center x ${foldButton.centerX}px differs from ${icon.name} center x ${icon.centerX}px`);
-      }
-      for (const name of ["Home", "Chat", "Library", "Family", "Settings", "Help"]) {
-        const target = data.rows.find((row) => row.name === `${name} menu button`)!;
-        if (!near(target.width, 48) || !near(target.height, 48)) throw new Error(`SHELL-FOLD folded: ${name} hit area is ${target.width}×${target.height}px, expected 48×48px`);
-        if (!near(target.centerX, rail.centerX)) throw new Error(`SHELL-FOLD folded: ${name} hit area center x ${target.centerX}px differs from rail center x ${rail.centerX}px`);
-      }
-    } else {
-      const left = navIcons[0]!.left;
-      const menuIcons = data.rows.filter((row) => ["Home icon", "Chat icon", "Library icon", "Family icon", "Settings icon", "Help icon"].includes(row.name));
-      for (const icon of menuIcons) {
-        if (!near(icon.left, left)) throw new Error(`SHELL-FOLD expanded: ${icon.name} left edge ${icon.left}px differs from nav icon left edge ${left}px`);
-      }
-      const iconSize = menuIcons[0]!;
-      for (const icon of menuIcons) {
-        if (!near(icon.width, iconSize.width) || !near(icon.height, iconSize.height)) throw new Error(`SHELL-FOLD expanded: ${icon.name} is ${icon.width}×${icon.height}px, unlike ${iconSize.name} at ${iconSize.width}×${iconSize.height}px`);
-      }
-      const menuLabels = data.rows.filter((row) => ["Home label", "Chat label", "Library label", "Family label", "Settings label", "Help label"].includes(row.name));
-      const labelLeft = menuLabels[0]!.left;
-      for (const label of menuLabels) {
-        if (!near(label.left, labelLeft)) throw new Error(`SHELL-FOLD expanded: ${label.name} left edge ${label.left}px differs from menu label left edge ${labelLeft}px`);
-      }
-    }
-  };
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
-    for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
-      try {
-        const page = await context.newPage();
-        await page.goto(`${BASE_URL}/chat`);
-        await page.getByRole("textbox", { name: "Message input" }).waitFor();
-        await page.evaluate(() => { document.cookie = "sidebar_state=; path=/; max-age=0"; });
-        await page.reload();
-        if (slug === "phone") {
-          await page.getByRole("button", { name: "Show threads" }).waitFor();
-          const historyButton = page.getByRole("button", { name: "Show threads" });
-          const phoneRow = historyButton.locator("xpath=ancestor::div[contains(@class, 'lg:hidden')][1]");
-          await settleAnimations(page);
-          const firstRunPath = join(outDir, `next-shell-fold-phone-first-run-${viewport.width}-${theme}.png`);
-          await page.screenshot({ path: firstRunPath, fullPage: true });
-          console.log(`Wrote ${firstRunPath}`);
-          const phonePath = join(outDir, `next-shell-fold-phone-history-row-${viewport.width}-${theme}.png`);
-          await page.screenshot({ path: phonePath, fullPage: true });
-          console.log(`Wrote ${phonePath}`);
-          const headerTrigger = page.locator('header [data-slot="sidebar-trigger"]');
-          await headerTrigger.click();
-          await page.locator('[data-mobile="true"][data-slot="sidebar"]').waitFor({ state: "visible" });
-          await page.waitForFunction(() => {
-            const header = document.querySelector<HTMLElement>('[data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-header"]');
-            return header !== null && header.getBoundingClientRect().left >= -0.5;
-          });
-          await settleAnimations(page);
-          const phoneBorder = await page.evaluate(() => {
-            const header = document.querySelector<HTMLElement>('[data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-header"]');
-            const pageHeader = document.querySelector<HTMLElement>("header");
-            const measure = (name: string, element: HTMLElement | null) => {
-              if (!element) throw new Error(`shell phone measurement: ${name} is missing`);
-              const box = element.getBoundingClientRect();
-              return { name, width: box.width, height: box.height, left: box.left, top: box.top, centerX: box.left + box.width / 2, centerY: box.top + box.height / 2, borderBottomWidth: Number.parseFloat(getComputedStyle(element).borderBottomWidth) || 0 };
-            };
-            const sheetToggle = document.querySelector<HTMLElement>('[data-mobile="true"][data-slot="sidebar"] [data-slot="sidebar-header"] > button[aria-label="Toggle app menu"]');
-            const headerTrigger = document.querySelector<HTMLElement>('header [data-slot="sidebar-trigger"]');
-            return [measure("phone sidebar header", header), measure("phone page header", pageHeader), measure("phone header menu trigger", headerTrigger), measure("phone sheet duplicate fold button", sheetToggle)];
-          });
-          console.log(`SHELL-FOLD phone header borders (${theme})`);
-          console.table(phoneBorder);
-          if (phoneBorder[0]!.borderBottomWidth !== 0) throw new Error(`SHELL-FOLD phone: sidebar header border-bottom-width is ${phoneBorder[0]!.borderBottomWidth}px, expected 0`);
-          if (phoneBorder[1]!.borderBottomWidth <= 0) throw new Error(`SHELL-FOLD phone: page header border-bottom-width is ${phoneBorder[1]!.borderBottomWidth}px, expected a visible border`);
-          if (phoneBorder[2]!.width < 48 || phoneBorder[2]!.height < 48) throw new Error(`SHELL-FOLD phone: header menu trigger is ${phoneBorder[2]!.width}×${phoneBorder[2]!.height}px, expected at least 48×48px`);
-          if (phoneBorder[3]!.width !== 0 || phoneBorder[3]!.height !== 0) throw new Error(`SHELL-FOLD phone: duplicate sheet fold button remains visible at ${phoneBorder[3]!.width}×${phoneBorder[3]!.height}px`);
-          const sheetPath = join(outDir, `next-shell-fold-phone-menu-sheet-${viewport.width}-${theme}.png`);
-          await page.screenshot({ path: sheetPath, fullPage: true });
-          console.log(`Wrote ${sheetPath}`);
-          await page.close();
-          continue;
-        }
-        const menu = page.locator('[data-slot="sidebar"]').first();
-        await menu.waitFor({ state: "attached" });
-        await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "collapsed");
-        const suffix = `${viewport.width}-${theme}`;
-        if (slug === "desktop") {
-          await menu.getByRole("link", { name: "Chat" }).hover();
-          await page.locator('[data-slot="tooltip-content"]').filter({ hasText: "Chat" }).waitFor({ state: "visible" });
-        }
-        await settleAnimations(page);
-        const foldedGeometry = await measureShell(page, "folded");
-        const foldedPath = join(outDir, `next-shell-fold-chat-first-folded-${suffix}.png`);
-          await page.screenshot({ path: foldedPath, fullPage: false });
-        console.log(`Wrote ${foldedPath}`);
-
-        {
-          const menuTrigger = menu.getByRole("button", { name: "Toggle app menu" });
-          await menuTrigger.waitFor();
-          await menuTrigger.click();
-          await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
-          await settleAnimations(page);
-          const expandedGeometry = await measureShell(page, "expanded");
-          for (const [geometryState, geometry] of [["folded", foldedGeometry], ["expanded", expandedGeometry]] as const) {
-            console.log(`SHELL-FOLD geometry (${geometryState}); shipped SidebarMenuButton icon token size-4 = ${geometry.iconToken.width}×${geometry.iconToken.height}px`);
-            console.log(`SHELL-FOLD ${geometryState} fold button sibling overlaps: ${geometry.headerOverlaps.join(", ") || "none"}`);
-            console.table(geometry.rows.map(({ state: _state, ...row }) => row));
-          }
-          assertShellGeometry("folded", foldedGeometry);
-          assertShellGeometry("expanded", expandedGeometry);
-          const openPath = join(outDir, `next-shell-fold-chat-click-open-${suffix}.png`);
-          await page.screenshot({ path: openPath });
-          console.log(`Wrote ${openPath}`);
-
-          await page.reload();
-          await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
-          await settleAnimations(page);
-          const reloadPath = join(outDir, `next-shell-fold-chat-reload-open-${suffix}.png`);
-          await page.screenshot({ path: reloadPath });
-          console.log(`Wrote ${reloadPath}`);
-        }
-        await page.close();
-      } finally {
-        await context.close();
-      }
-    }
-  }
-
-  for (const theme of THEMES) {
-    const viewport = VIEWPORTS.find((item) => item.slug === "desktop")!;
-    const context = await newContext(browser, viewport, theme, sessionValue);
-    try {
-      const page = await context.newPage();
-      await page.goto(`${BASE_URL}/next`);
-      await page.getByRole("heading", { level: 1 }).first().waitFor();
-      await page.evaluate(() => { document.cookie = "sidebar_state=; path=/; max-age=0"; });
-      await page.reload();
-      await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "collapsed");
-      await settleAnimations(page);
-      const collapsedPath = join(outDir, `next-shell-fold-home-first-folded-1440-${theme}.png`);
-      await page.screenshot({ path: collapsedPath });
-      console.log(`Wrote ${collapsedPath}`);
-      const menu = page.locator('[data-slot="sidebar"]').first();
-      await menu.getByRole("button", { name: "Toggle app menu" }).click();
-      await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
-      await settleAnimations(page);
-      const expandedPath = join(outDir, `next-shell-fold-home-click-open-1440-${theme}.png`);
-      await page.screenshot({ path: expandedPath });
-      console.log(`Wrote ${expandedPath}`);
-    } finally {
-      await context.close();
-    }
-  }
-
-  const desktop = VIEWPORTS.find((item) => item.slug === "desktop")!;
-  const cookie = { Cookie: `session=${sessionValue}` };
-  await seedTitledConversation("captureNextShellFoldReview", cookie, "Weekend garden plans");
-  const context = await newContext(browser, desktop, "dark", sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/chat`);
-    await page.getByRole("textbox", { name: "Message input" }).waitFor();
-    await page.getByRole("button", { name: "Toggle app menu" }).click();
-    await page.waitForFunction(() => document.querySelector('[data-slot="sidebar"]')?.getAttribute("data-state") === "expanded");
-    const list = page.locator('[data-slot="next-chat-rail"]');
-    await list.getByRole("button", { name: "New chat", exact: true }).waitFor();
-    await list.getByRole("searchbox", { name: "Search chats" }).waitFor();
-    await settleAnimations(page);
-    const path = join(outDir, "next-shell-fold-chat-list-1440-dark.png");
-    await page.screenshot({ path });
-    console.log(`Wrote ${path}`);
-  } finally {
-    await context.close();
-  }
-}
-
 /** UI-1 (gap matrix A3): one reply carrying code, math, a wide table, a task
  * list, a link and a diagram (richReplyFixture.ts, shared with the frontend
  * test), captured at desktop and phone, light and dark. Fails when any
@@ -8110,172 +7519,33 @@ async function captureNextSettingsReview(browser: Browser, sessionValue: string)
   }
 }
 
-/** SETTINGS-S2 review: capture the new Me frame at both requested widths
- * and themes, for the seeded owner across every section and for a seeded
- * child to prove the admin-only Limits section is absent. The output
- * directory can be supplied for review artifacts outside this checkout. */
-async function captureNextSettingsS2Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S8_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S2_SCREEN_DIR || join(ROOT, "data-scratch", "screenshots", "settings-s2");
+/** SHELL-01's own acceptance ("1440 and 390, dark and light, judged
+ * against dashboard-01's rhythm"): both viewports, both themes, of
+ * `/` itself - the pair to `captureNextPeopleReview` above so the
+ * dashboard composition has the same permanent, re-runnable capture a
+ * live-instance judgment call was originally made from ad hoc. Waits on
+ * the greeting's subtitle rather than any one widget's own text: it
+ * only renders once `useDashboard()`'s `AsyncState` has resolved real
+ * data (`NextDashboardPage.tsx`), and unlike a stat card's value it
+ * never changes across viewport, theme, or role. */
+async function captureNextDashboardReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
-  const peopleResponse = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
-  if (!peopleResponse.ok) throw new Error(`SETTINGS-S2: household lookup failed: ${peopleResponse.status}`);
-  const people = await peopleResponse.json() as Array<{ id: string; display_name: string; role: string }>;
-  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
-  if (!child) throw new Error("SETTINGS-S2: seeded child Nova was not found");
-  const childSignIn = await fetch(`${BASE_URL}/api/auth/select`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ personId: child.id }),
-  });
-  if (!childSignIn.ok) throw new Error(`SETTINGS-S2: signing in as Nova failed: ${childSignIn.status}`);
-  const childSession = childSignIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
-  if (!childSession) throw new Error("SETTINGS-S2: Nova's sign-in carried no session cookie");
 
-  const ownerPages = [
-    { id: "me", path: "/settings?tab=me", heading: "Profile" },
-    { id: "profile", path: "/settings?tab=me&section=profile", heading: "Profile" },
-    { id: "appearance", path: "/settings?tab=me&section=appearance", heading: "Appearance" },
-    { id: "chat", path: "/settings?tab=me&section=chat", heading: "Chat" },
-    { id: "voice-ai", path: "/settings?tab=me&section=voice-ai", heading: "Voice and AI" },
-    { id: "notifications", path: "/settings?tab=me&section=notifications", heading: "Notifications" },
-    { id: "privacy-data", path: "/settings?tab=me&section=privacy-data", heading: "Privacy and data" },
-  ] as const;
 
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
-    for (const theme of THEMES) {
-      for (const [person, session, pages] of [
-        ["owner", ownerSession, ownerPages],
-        ["member", childSession, [{ id: "me", path: "/settings?tab=me", heading: "Profile" }]],
-      ] as const) {
-        const context = await newContext(browser, viewport, theme, session);
-        try {
-          const page = await context.newPage();
-          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-          for (const entry of pages) {
-            const response = await page.goto(`${BASE_URL}/settings`);
-            if (!response?.ok()) throw new Error(`SETTINGS-S2: ${entry.path} returned ${response?.status() ?? "no response"}`);
-            await page.waitForLoadState("networkidle");
-            const meTab = page.getByRole("tab", { name: "Me", exact: true });
-            if (await meTab.count() > 0) await meTab.click();
-            if (person === "owner" && await meTab.count() === 0) throw new Error("SETTINGS-S2: owner Me tab was not rendered");
-            if (person !== "member") await meTab.waitFor({ state: "visible" });
-            const requestedUrl = new URL(entry.path, BASE_URL);
-            await page.evaluate((url) => { history.pushState(history.state, "", url); window.dispatchEvent(new PopStateEvent("popstate")); }, requestedUrl.pathname + requestedUrl.search);
-            if (entry.id !== "me") {
-              if (slug === "phone") await page.getByRole("tabpanel", { name: "Me" }).getByLabel("Settings section", { exact: true }).selectOption(entry.id);
-              else await page.getByRole("tab", { name: entry.heading, exact: true }).last().click();
-            }
-            if (entry.id === "profile" || entry.id === "me") await page.getByLabel("Name", { exact: true }).waitFor({ state: "visible" });
-            if (entry.id === "appearance") await page.getByRole("combobox", { name: "Appearance", exact: true }).waitFor({ state: "visible" });
-            if (entry.id === "chat") await page.locator('[id="settings-person.persona"]').waitFor({ state: "visible" });
-            if (entry.id === "voice-ai") await page.locator('[id="settings-person.voice"]').waitFor({ state: "visible" });
-            if (entry.id === "notifications") await page.getByRole("button", { name: /Telegram options/ }).waitFor({ state: "visible" });
-            if (entry.id === "privacy-data") await page.getByRole("link", { name: "Privacy" }).waitFor({ state: "visible" });
-            if (person === "member") {
-              const limitsTab = page.locator('[data-slot="tabs-trigger"]').filter({ hasText: /^Limits$/ });
-              const limitsOption = page.locator('[data-slot="native-select-option"][value="limits"]');
-              if (await limitsTab.count() !== 0 || await limitsOption.count() !== 0) {
-                throw new Error("SETTINGS-S2: the child sees an admin-only Limits entry");
-              }
-            }
-            await settleAnimations(page);
-            const file = `settings-s2-${person}-${entry.id}-${viewport.width}-${theme}.png`;
-            const path = join(outDir, file);
-            await page.screenshot({ path, fullPage: slug === "phone" });
-            console.log(`Wrote ${path}`);
-          }
-          await page.close();
-        } finally {
-          await context.close();
-        }
-      }
-    }
-  }
-}
-
-async function captureNextSettingsS3Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S8_SCREEN_DIR || process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s3");
-  mkdirSync(outDir, { recursive: true });
-  const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
-  if (!response.ok) throw new Error(`SETTINGS-S3: household lookup failed: ${response.status}`);
-  const people = await response.json() as Array<{ id: string; display_name: string; role: string }>;
-  const owner = people.find((p) => p.role === "owner");
-  const child = people.find((p) => p.display_name === "Nova" && p.role === "child");
-  if (!owner || !child) throw new Error("SETTINGS-S3: seeded owner and child Nova are required");
-  const signedIn = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: child.id }) });
-  if (!signedIn.ok) throw new Error(`SETTINGS-S3: Nova sign-in failed: ${signedIn.status}`);
-  const childSession = signedIn.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
-  if (!childSession) throw new Error("SETTINGS-S3: Nova sign-in returned no session");
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
-      for (const person of [{ name: "owner", id: owner.id, session: ownerSession }, { name: "nova", id: child.id, session: childSession }]) {
-        const context = await newContext(browser, viewport, theme, person.session);
-        try {
-          const page = await context.newPage(); page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-          const pageResponse = await page.goto(`${BASE_URL}/settings?tab=me&section=profile`);
-          if (!pageResponse?.ok()) throw new Error(`SETTINGS-S3: ${person.name} settings returned ${pageResponse?.status() ?? "no response"}`);
-          await page.waitForLoadState("networkidle");
-          await page.getByText("Face recognition", { exact: true }).waitFor({ state: "visible" });
-          if (person.name === "nova") await page.getByText("Ask an admin to set this up.", { exact: true }).waitFor({ state: "visible" });
-          const file = join(outDir, `settings-s3-${person.name}-profile-${viewport.width}-${theme}.png`);
-          await page.screenshot({ path: file, fullPage: true }); console.log(`Wrote ${file}`);
-          await page.close();
-        } finally { await context.close(); }
-      }
-      const context = await newContext(browser, viewport, theme, ownerSession);
-      try {
-        const page = await context.newPage(); page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        const pageResponse = await page.goto(`${BASE_URL}/people/${owner.id}`);
-        if (!pageResponse?.ok()) throw new Error(`SETTINGS-S3: owner's profile returned ${pageResponse?.status() ?? "no response"}`);
-        await page.waitForLoadState("networkidle");
-        await page.getByRole("link", { name: "Edit profile" }).waitFor({ state: "visible" });
-        const file = join(outDir, `settings-s8-owner-people-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path: file, fullPage: true }); console.log(`Wrote ${file}`);
-        await page.close();
-      } finally { await context.close(); }
-    }
-  }
-}
-
-async function captureNextSettingsS5Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s5");
-  mkdirSync(outDir, { recursive: true });
-  const response = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
-  if (!response.ok) throw new Error(`SETTINGS-S5: household lookup failed: ${response.status}`);
-  const people = await response.json() as Array<{ id: string; display_name: string; role: string }>;
-  const owner = people.find((person) => person.role === "owner");
-  const child = people.find((person) => person.display_name === "Nova" && person.role === "child");
-  if (!owner || !child) throw new Error("SETTINGS-S5: seeded owner and child Nova are required");
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
-    for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, ownerSession);
+      const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        const profileResponse = await page.goto(`${BASE_URL}/people/${child.id}?tab=limits`);
-        if (!profileResponse?.ok()) throw new Error(`SETTINGS-S5: Nova's profile returned ${profileResponse?.status() ?? "no response"}`);
-        await page.getByRole("tab", { name: "Limits", exact: true }).waitFor({ state: "visible" });
-        await page.locator('[id="settings-person.allowance"]').waitFor({ state: "visible" });
-        await page.locator('[id="settings-person.storage"]').waitFor({ state: "visible" });
+        await page.goto(`${BASE_URL}/`);
+        await page.locator("text=Here is your household today.").first().waitFor({ timeout: 15000 });
+        await page.locator('[data-slot="timeline"]').waitFor({ timeout: 15000 });
         await settleAnimations(page);
-        const childPath = join(outDir, `settings-s5-nova-limits-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path: childPath, fullPage: true });
-        console.log(`Wrote ${childPath}`);
-
-        const settingsResponse = await page.goto(`${BASE_URL}/settings?tab=me`);
-        if (!settingsResponse?.ok()) throw new Error(`SETTINGS-S5: owner's Settings returned ${settingsResponse?.status() ?? "no response"}`);
-        await page.locator("#profile-display-name").waitFor({ state: "visible" });
-        const limitsTab = page.getByRole("tab", { name: "Limits", exact: true });
-        const limitsOption = page.locator('select[aria-label="Settings section"] option[value="limits"]');
-        if (await limitsTab.count() > 0 || await limitsOption.count() > 0) throw new Error("SETTINGS-S5: the owner's Me navigation still has a Limits entry");
-        await settleAnimations(page);
-        const mePath = join(outDir, `settings-s5-owner-me-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path: mePath, fullPage: true });
-        console.log(`Wrote ${mePath}`);
+        const path = join(outDir, `next-dashboard-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
         await page.close();
       } finally {
         await context.close();
@@ -8284,32 +7554,83 @@ async function captureNextSettingsS5Review(browser: Browser, ownerSession: strin
   }
 }
 
-async function captureNextSettingsS6Review(browser: Browser, ownerSession: string): Promise<void> {
-  const outDir = process.env.MAIPAI_SETTINGS_S7_SCREEN_DIR || join(ROOT, "../home/data-scratch/screens/settings-s6");
+/** HOME-UI-04e's own acceptance (1440 and 390, dark, against the
+ * vendored template's own demo user-profile view - the single-
+ * Tailwind-root and palette fixes it proved are long since landed) -
+ * now doubling as SHELL-04's own permanent capture (2026-09-21):
+ * extended to both themes, and its wait condition moved off
+ * "Personal Information", the vendored `UserProfile`'s own demo
+ * section heading that no real `/people` composition has ever
+ * shown (SHELL-04 dropped that section entirely - no Home counterpart
+ * for email/phone/position/address). Waits on a real table row rather
+ * than the profile card's own "This is your own profile." text - a
+ * review caught that the profile card renders straight from the
+ * `person` prop, outside the household `AsyncState`, so that text
+ * paints on first render regardless of whether `GET /api/people` has
+ * resolved; `table tbody tr` is gated by the fetch the way the apps
+ * row's own capture already established. */
+async function captureNextPeopleReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
   mkdirSync(outDir, { recursive: true });
-  const sections = [
-    ["general", "General"], ["people", "People"], ["ai", "AI"],
-    ["integrations", "Integrations"], ["storage", "Storage and backups"], ["maintenance", "Maintenance"],
-  ] as const;
+
+
   for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, ownerSession);
+      const context = await newContext(browser, viewport, theme, sessionValue);
       try {
         const page = await context.newPage();
-        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
-        for (const [id, label] of sections) {
-          const response = await page.goto(`${BASE_URL}/settings?tab=household&section=${id}`);
-          if (!response?.ok()) throw new Error(`SETTINGS-S6: Household ${id} returned ${response?.status() ?? "no response"}`);
-          await page.waitForLoadState("networkidle");
-          await page.getByRole("heading", { name: label }).waitFor({ state: "visible" });
-          await settleAnimations(page);
-          const path = join(outDir, `settings-s6-household-${id}-${viewport.width}-${theme}.png`);
-          await page.screenshot({ path, fullPage: true });
-          console.log(`Wrote ${path}`);
-        }
+        await page.goto(`${BASE_URL}/people`);
+        // SHELL-04 changed this route from a table to a card grid
+        // (`NextPeoplePage.tsx`); the shared CardTitle is a div, so use
+        // a real person-card link as the data-ready signal. These links
+        // render only after the real `/api/people` query resolves.
+        await page.locator('a[href^="/people/"]').first().waitFor({ timeout: 15000 });
+        await assertNoLegacyDataTableChrome(page, "People");
+        await settleAnimations(page);
+        const path = join(outDir, `next-people-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path, fullPage: slug === "phone" });
+        console.log(`Wrote ${path}`);
         await page.close();
-      } finally { await context.close(); }
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
+/** Lane A-13 acceptance: capture the two newly migrated admin pages and
+ * their Settings entry points at phone/desktop in both themes. */
+async function captureNextLaneA13Review(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots");
+  mkdirSync(outDir, { recursive: true });
+
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      for (const pageSpec of [
+        { slug: "users", ready: () => "Add someone" },
+        { slug: "models", ready: () => "This computer:" },
+        { slug: "settings", ready: () => "Manage" },
+      ]) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          const page = await context.newPage();
+          await page.goto(`${BASE_URL}/${pageSpec.slug === "settings" ? "settings" : pageSpec.slug}`);
+          await page.getByText(pageSpec.ready(), { exact: false }).first().waitFor({ timeout: 20000 });
+          if (pageSpec.slug === "settings") {
+            await page.getByRole("link", { name: /^Users/ }).waitFor({ timeout: 15000 });
+            await page.getByRole("link", { name: /^AI models/ }).waitFor({ timeout: 15000 });
+          }
+          await settleAnimations(page);
+          const path = join(outDir, `next-${pageSpec.slug}-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path, fullPage: slug === "phone" || pageSpec.slug === "settings" });
+          console.log(`Wrote ${path}`);
+          await page.close();
+        } finally {
+          await context.close();
+        }
+      }
     }
   }
 }
@@ -8404,42 +7725,6 @@ async function captureNextPrivacyReview(browser: Browser, sessionValue: string):
         await page.close();
       } finally {
         await context.close();
-      }
-    }
-  }
-}
-
-/** Lane A-13 acceptance: capture the two newly migrated admin pages and
- * their Settings entry points at phone/desktop in both themes. */
-async function captureNextLaneA13Review(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
-  mkdirSync(outDir, { recursive: true });
-
-  for (const slug of ["desktop", "phone"] as const) {
-    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
-    for (const theme of THEMES) {
-      for (const pageSpec of [
-        { slug: "users", ready: () => "Add someone" },
-        { slug: "models", ready: () => "This computer:" },
-        { slug: "settings", ready: () => "Manage" },
-      ]) {
-        const context = await newContext(browser, viewport, theme, sessionValue);
-        try {
-          const page = await context.newPage();
-          await page.goto(`${BASE_URL}/${pageSpec.slug === "settings" ? "settings" : pageSpec.slug}`);
-          await page.getByText(pageSpec.ready(), { exact: false }).first().waitFor({ timeout: 20000 });
-          if (pageSpec.slug === "settings") {
-            await page.getByRole("link", { name: /^Users/ }).waitFor({ timeout: 15000 });
-            await page.getByRole("link", { name: /^AI models/ }).waitFor({ timeout: 15000 });
-          }
-          await settleAnimations(page);
-          const path = join(outDir, `next-${pageSpec.slug}-${viewport.width}-${theme}.png`);
-          await page.screenshot({ path, fullPage: slug === "phone" || pageSpec.slug === "settings" });
-          console.log(`Wrote ${path}`);
-          await page.close();
-        } finally {
-          await context.close();
-        }
       }
     }
   }
@@ -10198,53 +9483,8 @@ async function main() {
       console.log("completed named review: --fit-verdict-review");
       return;
     }
-    if (nextSettingsS2Review) {
-      await captureNextSettingsS2Review(browser, sessionValue);
-      console.log("completed named review: --next-settings-s2-review");
-      return;
-    }
-    if (nextSettingsS3Review) {
-      await captureNextSettingsS3Review(browser, sessionValue);
-      console.log("completed named review: --next-settings-s3-review");
-      return;
-    }
-    if (nextSettingsS5Review) {
-      await captureNextSettingsS5Review(browser, sessionValue);
-      console.log("completed named review: --next-settings-s5-review");
-      return;
-    }
-    if (nextSettingsS6Review) {
-      await captureNextSettingsS6Review(browser, sessionValue);
-      console.log("completed named review: --next-settings-s6-review");
-      return;
-    }
     if (shell09DocsMatrixReview) {
       await captureShell09DocsMatrixReview(browser, sessionValue);
-      return;
-    }
-    if (nextLaneA13Review) {
-      await captureNextLaneA13Review(browser, sessionValue);
-      console.log("completed named review: --next-lane-a-13-review");
-      return;
-    }
-    if (nextProfileSheetReview) {
-      await captureNextProfileSheetReview(browser, sessionValue);
-      console.log("completed named review: --next-profile-sheet-review");
-      return;
-    }
-    if (nextPersonalManagementReview) {
-      await captureNextPersonalManagementReview(browser, sessionValue);
-      console.log("completed named review: --next-personal-management-review");
-      return;
-    }
-    if (nextPrivacyReview) {
-      await captureNextPrivacyReview(browser, sessionValue);
-      console.log("completed named review: --next-privacy-review");
-      return;
-    }
-    if (nextPersonProfileReview) {
-      await captureNextPersonProfileReview(browser, sessionValue);
-      console.log("completed named review: --next-person-profile-review");
       return;
     }
     if (statusB2bReview) {
@@ -10321,17 +9561,7 @@ async function main() {
     }
     if (nextUpdatesReview) {
       await captureNextUpdatesReview(browser, sessionValue);
-      console.log("completed named review: --next-updates-review");
-      return;
-    }
-    if (nextTableRolloutReview) {
-      await captureNextPeopleReview(browser, sessionValue);
-      await captureNextEnginesReview(browser, sessionValue);
-      await captureNextUpdatesReview(browser, sessionValue);
-      await captureNextRepairsReview(browser, sessionValue);
-      await captureNextBackupsReview(browser, sessionValue);
-      await captureNextPerformanceReview(browser, sessionValue);
-      console.log("completed named review: --next-table-rollout-review (all 12 importing files; 14 table instances)");
+      console.log("completed named review: --updates-review");
       return;
     }
     if (!a11yOnly && pictureReview) {
@@ -10354,65 +9584,45 @@ async function main() {
       await captureLookComparison(browser, sessionValue);
     }
 
-    if (nextStandupReview && !chatReview && !settingsReview && !notificationsReview && !lookReview) {
-      await captureNextStandup(browser, sessionValue);
-    }
-
-    if (nextSidebarReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview) {
+    if (nextSidebarReview && !chatReview && !settingsReview && !notificationsReview && !lookReview) {
       await captureNextSidebarReview(browser, sessionValue);
-      console.log("completed named review: --next-sidebar-review");
+      console.log("completed named review: --sidebar-review");
       return;
-    }
-
-    if (nextLookPresetsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview) {
-      await captureNextLookPresets(browser, sessionValue);
-    }
-
-    if (nextAppearanceMismatchReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview) {
-      await captureNextAppearanceMismatch(browser, sessionValue);
-    }
-
-    if (nextPeopleReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview) {
-      await captureNextPeopleReview(browser, sessionValue);
-    }
-
-    if (nextDashboardReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview) {
-      await captureNextDashboardReview(browser, sessionValue);
     }
 
     if (nextChatRichReview) {
       await captureNextChatRichReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-rich-review");
+      console.log("completed named review: --chat-rich-review");
       return;
     }
 
     if (nextChatAnswerImages) {
       await captureNextChatAnswerImages(browser, sessionValue);
-      console.log("completed named review: --next-chat-answer-images");
+      console.log("completed named review: --chat-answer-images");
       return;
     }
 
     if (nextChatSentPictures) {
       await captureNextChatSentPictures(browser, sessionValue);
-      console.log("completed named review: --next-chat-sent-pictures");
+      console.log("completed named review: --chat-sent-pictures");
       return;
     }
 
     if (nextChatHistoryReview) {
       await captureNextChatHistoryReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-history-review");
+      console.log("completed named review: --chat-history-review");
       return;
     }
 
-    if ((nextChatReview || regenerateMenuReview) && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview) {
+    if ((nextChatReview || regenerateMenuReview) && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview) {
       await captureNextChatReview(browser, sessionValue);
-      console.log(`completed named review: ${regenerateMenuReview ? "--regenerate-menu-review" : "--next-chat-review"}`);
+      console.log(`completed named review: ${regenerateMenuReview ? "--regenerate-menu-review" : "--chat-turn-review"}`);
       return;
     }
 
     if (nextChatScrollReview) {
       await captureNextChatScrollReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-scroll-review");
+      console.log("completed named review: --chat-scroll-review");
       return;
     }
 
@@ -10428,22 +9638,22 @@ async function main() {
       return;
     }
 
-    if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview) {
+    if (nextSettingsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview) {
       await captureNextSettingsReview(browser, sessionValue);
-      console.log("completed named review: --next-settings-review");
+      console.log("completed named review: --settings-page-review");
       return;
     }
 
-    if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview) {
+    if (nextEnginesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview) {
       await captureNextEnginesReview(browser, sessionValue);
-      console.log("completed named review: --next-engines-review");
+      console.log("completed named review: --engines-review");
       return;
     }
 
-    if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
+    if (nextChatToolsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview) {
       await captureNextChatToolsSitesReview(browser, sessionValue);
       await captureNextChatToolsReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-tools-review");
+      console.log("completed named review: --chat-tools-review");
       return;
     }
 
@@ -10453,43 +9663,37 @@ async function main() {
       return;
     }
 
-    if (nextUpdatesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview) {
+    if (nextUpdatesReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview) {
       await captureNextUpdatesReview(browser, sessionValue);
-      console.log("completed named review: --next-updates-review");
+      console.log("completed named review: --updates-review");
       return;
     }
 
-    if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {
+    if (nextRepairsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview) {
       await captureNextRepairsReview(browser, sessionValue);
-      console.log("completed named review: --next-repairs-review");
+      console.log("completed named review: --repairs-review");
       return;
     }
 
-    if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
+    if (nextBackupsReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview) {
       await captureNextBackupsReview(browser, sessionValue);
-      console.log("completed named review: --next-backups-review");
+      console.log("completed named review: --backups-review");
       return;
     }
 
-    if (nextChatPolishReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
+    if (nextChatPolishReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
       await captureNextChatPolishReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-polish-review");
+      console.log("completed named review: --chat-polish-review");
       return;
     }
 
-    if (nextShellFoldReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextChatPolishReview) {
-      await captureNextShellFoldReview(browser, sessionValue);
-      console.log("completed named review: --next-shell-fold-review");
-      return;
-    }
-
-    if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
+    if (nextChatArtifactReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview) {
       await captureNextChatArtifactReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-artifact-review");
+      console.log("completed named review: --chat-artifact-review");
       return;
     }
 
-    if (nextSignInReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
+    if (nextSignInReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview) {
       await captureNextSignInReview(browser, sessionValue);
     }
 
@@ -10501,13 +9705,13 @@ async function main() {
 
     if (nextChatQueueBeforeReview) {
       await captureNextChatQueueBeforeReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-queue-before-review");
+      console.log("completed named review: --chat-queue-before-review");
       return;
     }
 
     if (nextChatQueueEmptyReview) {
       await captureNextChatQueueEmptyReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-queue-empty-review");
+      console.log("completed named review: --chat-queue-empty-review");
       return;
     }
 
@@ -10525,13 +9729,13 @@ async function main() {
 
     if (nextChatQueueReview) {
       await captureNextChatQueueReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-queue-review");
+      console.log("completed named review: --chat-queue-review");
       return;
     }
 
-    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
+    if (nextChatComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatChildComposerReview) {
       await captureNextChatComposerReview(browser, sessionValue);
-      console.log("completed named review: --next-chat-composer-review");
+      console.log("completed named review: --chat-composer-review");
       return;
     }
 
@@ -10561,22 +9765,22 @@ async function main() {
       return;
     }
 
-    if (nextChatChildComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview) {
+    if (nextChatChildComposerReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview) {
       await captureNextChatChildComposerReview(browser, sessionValue);
     }
 
-    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
+    if (nextPerformanceReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextStorageReview) {
       await captureNextPerformanceReview(browser, sessionValue);
-      console.log("completed named review: --next-performance-review");
+      console.log("completed named review: --performance-review");
       return;
     }
 
-    if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
+    if (nextStorageReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview) {
       await captureNextStorageReview(browser, sessionValue);
       return;
     }
 
-    if (peopleProfileMediaReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextStandupReview && !nextSidebarReview && !nextLookPresetsReview && !nextAppearanceMismatchReview && !nextPeopleReview && !nextDashboardReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview && !nextStorageReview) {
+    if (peopleProfileMediaReview && !chatReview && !settingsReview && !notificationsReview && !lookReview && !nextSidebarReview && !nextChatReview && !nextSettingsReview && !nextEnginesReview && !nextChatToolsReview && !nextUpdatesReview && !nextRepairsReview && !nextBackupsReview && !nextChatArtifactReview && !nextSignInReview && !nextChatComposerReview && !nextChatChildComposerReview && !nextPerformanceReview && !nextStorageReview) {
       await capturePeopleProfileMediaReview(browser, sessionValue);
     }
 
@@ -10767,15 +9971,11 @@ async function main() {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && nextPageHeaderIconReview) {
-      await captureNextPageHeaderIconReview(browser, sessionValue);
-    }
-
     if (!a11yOnly && phoneHeaderFoldReview) {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !nextPageHeaderIconReview && !phoneHeaderFoldReview && !nextDashboardReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
+    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -10808,7 +10008,7 @@ async function main() {
     // browser contexts that would only ever iterate zero routes below.
     const combos = filesReview
       ? FILES_REVIEW_COMBOS
-      : notificationsReview || lookReview || nextStandupReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || nextDashboardReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
+      : notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
         ? []
         : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
           ? A11Y_ONLY_COMBOS
@@ -10878,7 +10078,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !nextStandupReview && !pictureReview && !chatShortcutsReview && !nextDashboardReview && !chatMobileSheetReview) {
+    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);
