@@ -9427,7 +9427,7 @@ Plain boolean switches and selects in `/settings` call the save handler immediat
 
 - [x] **RAIL-01: permanent navigation rail at every width** (landed 2026-10-06; kit ui-v0.5.107/108; see `docs/dev.md` RAIL-01 record).
 
-- [ ] **KS-00: Spec: `Source` additive fields (`kind`, `snapshot_date`, `licence`, `local_path`, `publisher_count`); `Feed`, `NewsItem`, `NewsStory` schemas; `model_cutoff` on the model capabilities record; the eight settings keys (design 4.3); three capability registry rows; one tag** (priority 3, designed, not scheduled; S; after none; see `data-scratch/design/KNOWLEDGE-SEARCH-BUILD-SLICES.md`); needs its own architect verdict before dispatch
+- [x] **KS-00: Spec: `Source` additive fields (`kind`, `snapshot_date`, `licence`, `local_path`, `publisher_count`); `Feed`, `NewsItem`, `NewsStory` schemas; `model_cutoff` on the model capabilities record; the eight settings keys (design 4.3); three capability registry rows; one tag** (priority 3, designed, not scheduled; S; after none; see `data-scratch/design/KNOWLEDGE-SEARCH-BUILD-SLICES.md`); architect APPROVED; spec-v0.1.114 pinned in Home
 
 - [ ] **KS-BENCH-00: The KS-BENCH-01 corpus (90 adult, 20 child, 10 spoken rows, held-out 25 fixed first) and KS-BENCH-02's 100 queries as datasets under `backend/scripts/bench/datasets/`; baseline arm run on today's `websearch` (no `scope`) and recorded** (priority 3, designed, not scheduled; S; after none; see `data-scratch/design/KNOWLEDGE-SEARCH-BUILD-SLICES.md`); needs its own architect verdict before dispatch
 

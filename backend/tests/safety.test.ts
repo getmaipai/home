@@ -37,7 +37,7 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
       return true;
     case "number":
     case "duration":
-      return key.range?.max ?? 0;
+      return key.range?.max ?? key.range?.min ?? 0;
     case "time":
       return "23:59";
     case "entity":
