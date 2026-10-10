@@ -583,8 +583,8 @@ export function projectDocumentForChild(document: TurnArtifactValue): ChildTurnA
   return section ? { ...document, sources: [], section } : null;
 }
 
-/** The generative-UI contract, first two producers: weather's and
- * almanac-date's own `result.data` (already typed, already the exact
+/** The generative-UI contract's structured part (weather moved to answer
+ * blocks in GENUI-04; "weather" stays bound only so stored rows render): almanac-date's own `result.data` (already typed, already the exact
  * facts a household member asked for - never model prose) mapped onto
  * spec-sheet's own prop shape. One outcome, not a merge of several: the
  * first succeeded outcome from a known producer wins, the same
@@ -611,7 +611,11 @@ export function structuredPartForOutcomes(outcomes: readonly ToolExecutionOutcom
 export function specSheetCandidateForOutcome(outcome: ToolExecutionOutcome, band: AgeBand = "adult"): Omit<StructuredPart, "tool_id"> | null {
   if (outcome.status !== "succeeded") return null;
   let candidate: Omit<StructuredPart, "tool_id"> | null = null;
-  if (outcome.packageId === "weather") candidate = weatherSpecSheet(outcome as Succeeded);
+  // GENUI-04: weather's current-conditions card is now a `spec_sheet` answer
+  // block the package returns itself, so it no longer also builds a
+  // structured_part (that would draw the same card twice). Rows stored before
+  // this change still carry theirs and keep rendering.
+  if (outcome.packageId === "weather") return null;
   else if (outcome.packageId === "almanac-date") candidate = almanacDateSpecSheet(outcome as Succeeded);
   else if (!SPEC_SHEET_READY.has(outcome.packageId as (typeof SPEC_SHEET_READY extends Set<infer T> ? T : never))) return null;
   if (candidate) return floorSpecSheet(candidate, band);
@@ -734,22 +738,6 @@ export function projectForOutcomes(outcomes: readonly ToolExecutionOutcome[]): {
     if (typeof id === "string") return { id };
   }
   return null;
-}
-
-function weatherSpecSheet(outcome: Succeeded): Omit<StructuredPart, "tool_id"> | null {
-  const data = recordData(outcome.result?.data);
-  const place = typeof data?.place === "string" ? data.place : null;
-  if (!data || !place) return null;
-  const unitSuffix = data.unit === "celsius" ? "°C" : "°F";
-  const temperature = data.temperature === undefined || data.temperature === null ? null : `${data.temperature}${unitSuffix}`;
-  const rows = [
-    temperature ? { label: "Temperature", value: temperature } : null,
-    typeof data.conditions === "string" ? { label: "Conditions", value: data.conditions } : null,
-    data.high !== undefined && data.high !== null ? { label: "High", value: `${data.high}${unitSuffix}` } : null,
-    data.low !== undefined && data.low !== null ? { label: "Low", value: `${data.low}${unitSuffix}` } : null,
-    data.precipitation_chance !== undefined && data.precipitation_chance !== null && data.precipitation_chance !== "" ? { label: "Chance of rain", value: `${data.precipitation_chance}%` } : null,
-  ].filter((row): row is { label: string; value: string } => row !== null);
-  return rows.length > 0 ? { kind: "spec_sheet", title: place, rows } : null;
 }
 
 function almanacDateSpecSheet(outcome: Succeeded): Omit<StructuredPart, "tool_id"> | null {

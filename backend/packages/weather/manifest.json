@@ -40,6 +40,7 @@
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
+  "returns_blocks": ["spec_sheet", "chart", "data_table"],
   "config": [],
   "data_sources": [
     {

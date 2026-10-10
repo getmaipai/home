@@ -202,3 +202,169 @@ describe("GENUI-05: the blocks ride the turn's tool events", () => {
     }
   });
 });
+
+// GENUI-04: weather proves answer blocks end to end. One forecast call (the
+// same Open-Meteo host the manifest already permits) carries the current
+// reading, the next 24 hours and a 7-day daily; the package returns a
+// spec_sheet (now), a chart (next 24 hours) and a data_table (7 days) from
+// that one response, with no extra fetch and no model.
+describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () => {
+  const HOURS = Array.from({ length: 24 }, (_, i) => `2026-10-09T${String((14 + i) % 24).padStart(2, "0")}:00`);
+  const TEMPS = HOURS.map((_, i) => Math.round((60 + 8 * Math.sin(i / 4)) * 10) / 10);
+  const DAYS = ["2026-10-09", "2026-10-10", "2026-10-11", "2026-10-12", "2026-10-13", "2026-10-14", "2026-10-15"];
+  const urls: string[] = [];
+
+  function forecast(): unknown {
+    return {
+      current: { time: "2026-10-09T14:00", temperature_2m: 61.4, weather_code: 3 },
+      hourly: { time: HOURS, temperature_2m: TEMPS },
+      daily: {
+        time: DAYS,
+        temperature_2m_max: [68.2, 70, 66.1, 64, 63.5, 67, 69.9],
+        temperature_2m_min: [52.4, 51, 50.2, 49, 48.8, 50, 53.1],
+        precipitation_probability_max: [10, 0, 30, 70, 80, 20, 5],
+      },
+    };
+  }
+
+  async function withForecast<T>(body: () => Promise<T>, payload: unknown = forecast()): Promise<T> {
+    const { __setPackageFetchForTests } = await import("@/lib/packageHost");
+    const { __resetPackageCacheForTests, __clearPackageCacheDirForTests } = await import("@/lib/packageCache");
+    const { __resetRateLimiterForTests } = await import("@/lib/rateLimiter");
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("weather");
+    __resetRateLimiterForTests();
+    urls.length = 0;
+    __setPackageFetchForTests(async (input) => {
+      const url = typeof input === "string" || input instanceof URL ? input.toString() : input.url;
+      urls.push(url);
+      if (new URL(url).hostname === "geocoding-api.open-meteo.com") {
+        return Response.json({ results: [{ name: "Lantern Bay", latitude: 47.6, longitude: -122.3 }] });
+      }
+      return Response.json(payload);
+    });
+    try {
+      return await body();
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  }
+
+  test("the manifest names the three kinds, and the recipe stays on the hosts the manifest permits", () => {
+    expect(allowed("weather")).toEqual(["spec_sheet", "chart", "data_table"]);
+    const loaded = loadManifestOnly("weather");
+    if (!loaded.ok) throw new Error(loaded.error);
+    expect(loaded.value.permissions).toEqual(["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com"]);
+  });
+
+  test("the forecast request asks for the next 24 hours of temperature and a 7-day daily from the one permitted host", async () => {
+    await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    const forecastUrls = urls.filter((u) => new URL(u).hostname === "api.open-meteo.com");
+    expect(forecastUrls).toHaveLength(1);
+    const q = new URL(forecastUrls[0]!).searchParams;
+    expect(q.get("hourly")).toBe("temperature_2m");
+    expect(q.get("forecast_hours")).toBe("24");
+    expect(q.get("forecast_days")).toBe("7");
+    expect(q.get("current")).toBe("temperature_2m,weather_code");
+    expect(urls.every((u) => ["geocoding-api.open-meteo.com", "api.open-meteo.com"].includes(new URL(u).hostname))).toBe(true);
+  });
+
+  test("three valid blocks in order, the reply unchanged, and no block-only data left for the composer", async () => {
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    expect(value.reply?.text).toBe("It's 61.4 degrees and overcast in Lantern Bay. Today: high 68.2, low 52.4, 10% chance of rain.");
+    const blocks = value.blocks as Block[];
+    expect(blocks.map((b) => b.kind)).toEqual(["spec_sheet", "chart", "data_table"]);
+    for (const block of blocks) {
+      expect(AnswerBlock.safeParse(block).success).toBe(true);
+      expect(block.producer).toBe("weather");
+    }
+    const data = (value as { data?: Record<string, unknown> }).data ?? {};
+    expect(Object.keys(data).sort()).toEqual(["conditions", "high", "low", "place", "precipitation_chance", "temperature", "unit"]);
+  });
+
+  test("spec_sheet: the current reading, in the rows the old card showed", async () => {
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    const sheet = (value.blocks as Block[])[0]!;
+    expect(sheet.props).toEqual({
+      title: "Lantern Bay",
+      rows: [
+        { label: "Temperature", value: "61.4°F" },
+        { label: "Conditions", value: "overcast" },
+        { label: "High", value: "68.2°F" },
+        { label: "Low", value: "52.4°F" },
+        { label: "Chance of rain", value: "10%" },
+      ],
+    });
+    expect(sheet.alt).toContain("Lantern Bay");
+  });
+
+  test("chart: exactly the 24 hourly temperatures in order, with the span and a trend", async () => {
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    const chart = (value.blocks as Block[])[1]!;
+    expect(chart.props.points).toEqual(TEMPS);
+    expect(chart.props.label).toBe("Next 24 hours, °F");
+    expect(chart.props.value).toBe("61.4°F");
+    expect(chart.props.variant).toBe("area");
+    expect(["up", "down", "flat"]).toContain(chart.props.trend);
+    expect(chart.alt).toMatch(/24 hours/);
+    expect(chart.alt).toContain(`${Math.min(...TEMPS)}`);
+    expect(chart.alt).toContain(`${Math.max(...TEMPS)}`);
+  });
+
+  test("data_table: seven days with a weekday, high, low and chance of rain", async () => {
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    const table = (value.blocks as Block[])[2]!;
+    expect(table.props.columns.map((c: { id: string }) => c.id)).toEqual(["day", "high", "low", "rain"]);
+    expect(table.props.rows).toHaveLength(7);
+    expect(table.props.rows[0]).toEqual({ day: "Fri Oct 9", high: 68.2, low: 52.4, rain: 10 });
+    expect(table.props.rows[6]).toEqual({ day: "Thu Oct 15", high: 69.9, low: 53.1, rain: 5 });
+    expect(table.props.caption).toBe("Next 7 days");
+  });
+
+  test("a forecast with no hourly data still answers: no chart, the sheet and the table it can build", async () => {
+    const payload = { current: { time: "2026-10-09T14:00", temperature_2m: 61.4, weather_code: 3 }, daily: { time: [DAYS[0]], temperature_2m_max: [68.2], temperature_2m_min: [52.4], precipitation_probability_max: [10] } };
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }), payload);
+    expect(value.reply?.text).toContain("61.4 degrees");
+    expect((value.blocks as Block[]).map((b) => b.kind)).toEqual(["spec_sheet", "data_table"]);
+  });
+
+  test("a forecast with only the current reading gives the sheet alone, and a malformed hourly array gives no chart", async () => {
+    const current = { time: "2026-10-09T14:00", temperature_2m: 61.4, weather_code: 3 };
+    const sheetOnly = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }), { current });
+    expect((sheetOnly.blocks as Block[]).map((b) => b.kind)).toEqual(["spec_sheet"]);
+    const bad = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }), { current, hourly: { time: ["x"], temperature_2m: ["warm", null] } });
+    expect(bad.reply?.text).toContain("61.4 degrees");
+    expect((bad.blocks as Block[]).map((b) => b.kind)).toEqual(["spec_sheet"]);
+  });
+
+  test("no place or coordinates reach a log line while the blocks are built", async () => {
+    const lines: string[] = [];
+    const { spyOn } = await import("bun:test");
+    const spies = (["log", "warn", "error", "info"] as const).map((m) => spyOn(console, m).mockImplementation((...a: unknown[]) => { lines.push(a.join(" ")); }));
+    try {
+      await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    } finally {
+      for (const s of spies) s.mockRestore();
+    }
+    const text = lines.join("\n");
+    expect(text).not.toContain("Lantern");
+    expect(text).not.toContain("47.6");
+    expect(text).not.toContain("-122.3");
+  });
+
+  test("a child's chart, table or sheet whose text fails the output floor is dropped; the reply stays", async () => {
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }));
+    const blocks = value.blocks as Block[];
+    const unsafe = blocks.map((b, i) => (i === 0 ? { ...b, props: { ...b.props, title: UNSAFE } } : b));
+    const kept = filterAnswerBlocks(unsafe, "weather", allowed("weather"), "child", { displayName: "Sage" }) as Block[];
+    expect(kept.map((b) => b.kind)).toEqual(["chart", "data_table"]);
+  });
+
+  test("the tool round streams the three blocks after the tool result, each valid on the wire", async () => {
+    const state = toolState(people.owner);
+    const { output } = await withForecast(() => toolNode(state, { proposals: [proposal("weather", { place: "Lantern Bay" }, "call-w1")] }, SIGNAL));
+    expect(output.toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result", "block", "block", "block"]);
+    for (const event of output.toolEvents) expect(WireEvent.safeParse(event).success).toBe(true);
+    expect(output.toolEvents.slice(2).map((e) => (e as { block: Block }).block.kind)).toEqual(["spec_sheet", "chart", "data_table"]);
+  });
+});

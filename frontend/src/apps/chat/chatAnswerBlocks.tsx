@@ -54,5 +54,12 @@ export function textWithAnswerParts(
   return placeParts(text, placed);
 }
 
-/** The `answer_block` data part's renderer: the kit dispatcher, given the block. */
-export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ data }) => <AnswerBlockView block={data} />;
+/** The `answer_block` data part's renderer: the kit dispatcher, given the block.
+ * `after_paragraph` is Home's own placement (it already decided where this part sits), and the kit's copy of the
+ * spec refuses a record carrying it and would draw only the `alt` sentence (GENUI-04 found this live with weather),
+ * so the dispatcher gets the block without it. */
+export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ data }) => {
+  const block: Record<string, unknown> = { ...data };
+  delete block.after_paragraph;
+  return <AnswerBlockView block={block} />;
+};
