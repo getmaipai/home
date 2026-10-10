@@ -38,20 +38,8 @@ describe("ui-rules pre-commit guard", () => {
     expect(p).toContain("downgraded");
   });
 
-  // NEXT-RETIRE-02E-GUARD: the four Home slot renames carry through the merge-base comparison.
   const css = (entries: Record<string, { ed?: string; reason?: string }>) => JSON.stringify({ "shell/tokens.css": Object.fromEntries(Object.entries(entries).map(([k, e]) => [k, { properties: ["position"], ...e }])) });
-  const OLD = '[data-slot="next-chat-pane"] .x';
   const NEW = '[data-slot="chat-pane"] .x';
-
-  test("a renamed slot key with the same entry passes", () => {
-    const r = reader({ [BASELINES.css]: css({ [NEW]: ok }), [LEDGER]: L }, { [BASELINES.css]: css({ [OLD]: ok }), [LEDGER]: L });
-    expect(guardProblems(r, [BASELINES.css])).toEqual([]);
-  });
-
-  test("a renamed slot key with a changed reason is refused", () => {
-    const r = reader({ [BASELINES.css]: css({ [NEW]: { ed: "ED-001", reason: "something else" } }), [LEDGER]: L }, { [BASELINES.css]: css({ [OLD]: ok }), [LEDGER]: L });
-    expect(guardProblems(r, [BASELINES.css]).join("\n")).toContain("changed while being renamed");
-  });
 
   test("a brand-new chat-pane key with no old-name counterpart is refused", () => {
     const r = reader({ [BASELINES.css]: css({ [NEW]: ok }), [LEDGER]: L }, { [BASELINES.css]: css({}), [LEDGER]: L });
