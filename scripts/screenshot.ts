@@ -337,7 +337,7 @@ const chatNoticeDegradedReview = process.argv.includes("--chat-notice-degraded-r
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || chatNoticeDegradedReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || chatNoticeDegradedReview || notificationsReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -9755,8 +9755,9 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
   try {
     const page = await context.newPage();
     await page.goto(`${BASE_URL}/`);
-    await page.getByRole("button", { name: /Notifications \(2 pending\)/ }).waitFor();
-    await page.getByRole("button", { name: /Notifications \(2 pending\)/ }).click();
+    // RAIL-01: the bell lives behind the rail avatar's profile menu.
+    await page.getByRole("button", { name: /Open profile menu for .*\(2 notifications/ }).click();
+    await page.getByRole("menuitem", { name: /Notifications/ }).click();
     await page.getByRole("button", { name: "Dismiss all" }).waitFor();
     // A review caught this missing: this file's own header (2026-09-12,
     // around settleAnimations' own definition) already found a screenshot
@@ -9771,6 +9772,10 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
 
     await page.goto(`${BASE_URL}/notifications`);
     await page.getByRole("button", { name: "Select" }).waitFor();
+    // NOTIF-ROUTE-01: the real history page, rail and rows, at 1440 and 402.
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "notifications-history-1440.png") });
+    console.log(`Wrote ${join(outDir, "notifications-history-1440.png")}`);
     await page.getByRole("button", { name: "Select" }).click();
     await page.getByLabel("Select all").waitFor();
     await page.getByLabel("Select all").click();
@@ -9780,6 +9785,18 @@ async function captureNotificationsReview(browser: Browser, sessionValue: string
     console.log(`Wrote ${join(outDir, "notifications-history-select-mode.png")}`);
   } finally {
     await context.close();
+  }
+
+  const phoneContext = await newContext(browser, { slug: "phone", width: 402, height: 874 }, "light", sessionValue);
+  try {
+    const page = await phoneContext.newPage();
+    await page.goto(`${BASE_URL}/notifications`);
+    await page.getByRole("button", { name: "Select" }).waitFor();
+    await settleAnimations(page);
+    await page.screenshot({ path: join(outDir, "notifications-history-402.png") });
+    console.log(`Wrote ${join(outDir, "notifications-history-402.png")}`);
+  } finally {
+    await phoneContext.close();
   }
 }
 
