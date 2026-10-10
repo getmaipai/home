@@ -2,10 +2,10 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { MergedSetting } from "@maipai/ui/src/settings/groupSettings";
 import type { ResolvedSetting } from "@/lib/api";
 import { titleCaseOption, localeDisplayName } from "@maipai/ui/src/settings/SettingField";
-import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/ui/select";
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
-import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Button } from "@maipai/ui/src/ui/button";
 import { ItemDescription } from "@maipai/ui/src/dashboard/components/ui/item";
 import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
@@ -113,25 +113,24 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
   } else if (resolved.secret) {
     control = secretEditing ? (
       <div className="flex flex-col gap-2">
-        <Input
-          type="password"
-          className="min-h-12 w-64"
-          placeholder="Paste the new value"
-          value={secretDraft}
-          disabled={secretSaving}
-          onChange={(e) => setSecretDraft(e.target.value)}
-          aria-label={def.label}
-          autoComplete="off"
-        />
+        <div className="w-64 max-w-full">
+          <Input
+            type="password"
+            placeholder="Paste the new value"
+            value={secretDraft}
+            disabled={secretSaving}
+            onChange={(e) => setSecretDraft(e.target.value)}
+            aria-label={def.label}
+            autoComplete="off"
+          />
+        </div>
         <div className="flex gap-2">
-          <Button type="button" size="sm" className="min-h-12" disabled={secretSaving || !secretDraft} onClick={commitSecret}>
+          <Button type="button" disabled={secretSaving || !secretDraft} onClick={commitSecret}>
             {secretSaving ? "Saving…" : "Save"}
           </Button>
           <Button
             type="button"
-            size="sm"
             variant="outline"
-            className="min-h-12"
             disabled={secretSaving}
             onClick={() => {
               setSecretDraft("");
@@ -145,19 +144,19 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     ) : (
       <div className="flex items-center gap-3">
         <span className="text-sm text-muted-foreground">{resolved.isSet ? "Set" : "Not set"}</span>
-        <Button type="button" size="sm" variant="outline" className="min-h-12 min-w-12" disabled={disabled} onClick={() => setSecretEditing(true)}>
+        <Button type="button" variant="outline" disabled={disabled} onClick={() => setSecretEditing(true)}>
           {resolved.isSet ? "Change" : "Set"}
         </Button>
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} className="after:-inset-y-4" />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+    control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
     const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;
     control = (
       <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled}>
-        <SelectTrigger className="min-h-12 w-40" aria-label={def.label}>
+        <SelectTrigger aria-label={def.label}>
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -172,30 +171,32 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
   } else if (def.selector === "number") {
     const range = def.range as { min?: number; max?: number } | undefined;
     control = (
-      <Input
-        type="number"
-        className="min-h-12 w-32"
-        min={range?.min}
-        max={range?.max}
-        value={draft}
-        disabled={disabled}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commitDraft}
-        aria-label={def.label}
-      />
+      <div className="w-32 max-w-full shrink-0">
+        <Input
+          type="number"
+          min={range?.min}
+          max={range?.max}
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          aria-label={def.label}
+        />
+      </div>
     );
   } else if (def.selector === "time") {
-    control = <div className="flex items-center gap-2"><Input type="time" className="min-h-12 w-40" value={String(resolved.value ?? "")} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} />{resolved.value == null && <><span className="text-sm text-muted-foreground">Inheriting household hours</span><Button type="button" variant="link" size="sm" onClick={onReset} disabled={disabled} className="h-auto min-h-12 w-fit p-0">Use household hours</Button></>}</div>;
+    control = <div className="flex items-center gap-2"><div className="w-40 max-w-full shrink-0"><Input type="time" value={String(resolved.value ?? "")} disabled={disabled} onChange={(e) => void onChange(e.target.value)} aria-label={def.key} /></div>{resolved.value == null && <><span className="text-sm text-muted-foreground">Inheriting household hours</span><Button type="button" variant="link" onClick={onReset} disabled={disabled}>Use household hours</Button></>}</div>;
   } else if (def.selector === "text") {
     control = (
-      <Input
-        className="min-h-12 w-64"
-        value={draft}
-        disabled={disabled}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commitDraft}
-        aria-label={def.label}
-      />
+      <div className="w-64 max-w-full">
+        <Input
+          value={draft}
+          disabled={disabled}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={commitDraft}
+          aria-label={def.label}
+        />
+      </div>
     );
   } else if (def.selector === "person" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
     // NOTIFY-SHARE-02: the one real key on this selector today
@@ -223,7 +224,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
         {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}
         {canReset ? (
-          <Button type="button" variant="link" size="sm" onClick={onReset} disabled={disabled} className="h-auto min-h-12 w-fit p-0">
+          <Button type="button" variant="link" onClick={onReset} disabled={disabled}>
             Reset to default
           </Button>
         ) : null}

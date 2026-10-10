@@ -111,7 +111,7 @@ function CenteredMessage({
   );
 }
 
-function StatusCard({
+function StatusBody({
   icon,
   title,
   body,
@@ -126,16 +126,14 @@ function StatusCard({
 }) {
   const Icon = getIcon(icon);
   return (
-    <Card className="mx-auto w-full max-w-md">
-      <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
-        <Icon className="h-8 w-8 text-muted-foreground" aria-hidden />
-        <p className="text-lg font-medium">{title}</p>
-        <p className="text-base text-muted-foreground">{body}</p>
-        <Button type="button" variant="outline" onClick={onAction}>
-          {actionLabel}
-        </Button>
-      </CardContent>
-    </Card>
+    <div className="flex flex-col items-center gap-3 text-center">
+      <Icon className="h-8 w-8 text-muted-foreground" aria-hidden />
+      <p className="text-lg font-medium">{title}</p>
+      <p className="text-base text-muted-foreground">{body}</p>
+      <Button type="button" variant="outline" onClick={onAction}>
+        {actionLabel}
+      </Button>
+    </div>
   );
 }
 
@@ -666,48 +664,25 @@ function CaptureContent({
   onRetryCamera: () => void;
   onRetryModels: () => void;
 }) {
-  if (cameraState === "denied") {
+  const status =
+    cameraState === "denied"
+      ? { icon: "camera" as const, title: "Camera access is off", body: "MaiPai needs your camera to guide face enrollment. Turn on camera access for this site in your browser's settings, then try again.", onAction: onRetryCamera }
+      : cameraState === "unavailable"
+        ? { icon: "camera" as const, title: "No camera found", body: "Plug in a camera, or try this from a device that has one.", onAction: onRetryCamera }
+        : cameraState === "error"
+          ? { icon: "alert-triangle" as const, title: "Could not start the camera", body: "Something went wrong opening the camera. Try again.", onAction: onRetryCamera }
+          : modelsState === "error"
+            ? { icon: "alert-triangle" as const, title: "Could not load the face models", body: "MaiPai couldn't get what it needs for face recognition. Check the connection and try again.", onAction: onRetryModels }
+            : null;
+  if (status) {
     return (
-      <StatusCard
-        icon="camera"
-        title="Camera access is off"
-        body="MaiPai needs your camera to guide face enrollment. Turn on camera access for this site in your browser's settings, then try again."
-        actionLabel="Try again"
-        onAction={onRetryCamera}
-      />
-    );
-  }
-  if (cameraState === "unavailable") {
-    return (
-      <StatusCard
-        icon="camera"
-        title="No camera found"
-        body="Plug in a camera, or try this from a device that has one."
-        actionLabel="Try again"
-        onAction={onRetryCamera}
-      />
-    );
-  }
-  if (cameraState === "error") {
-    return (
-      <StatusCard
-        icon="alert-triangle"
-        title="Could not start the camera"
-        body="Something went wrong opening the camera. Try again."
-        actionLabel="Try again"
-        onAction={onRetryCamera}
-      />
-    );
-  }
-  if (modelsState === "error") {
-    return (
-      <StatusCard
-        icon="alert-triangle"
-        title="Could not load the face models"
-        body="MaiPai couldn't get what it needs for face recognition. Check the connection and try again."
-        actionLabel="Try again"
-        onAction={onRetryModels}
-      />
+      <div className="mx-auto w-full max-w-md">
+        <Card>
+          <CardContent>
+            <StatusBody icon={status.icon} title={status.title} body={status.body} actionLabel="Try again" onAction={status.onAction} />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 

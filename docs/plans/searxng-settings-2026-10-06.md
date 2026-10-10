@@ -231,8 +231,9 @@ bottom:
    `Badge` pass, warn or fail), "Last checked 3 minutes ago" and a "Check
    again" `Button`. An `Alert` on top when any check fails.
 2. Where search runs: the generic renderer for `search.searxng_url` (empty =
-   "MaiPai's own search service"), `search.wikipedia_fallback` and the hosted
-   key (THIN-4H) as declared.
+   "MaiPai's own search service"), the hosted
+   key (THIN-4H) as declared (`search.wikipedia_fallback` was retired by KS-02
+   on 2026-10-09; the live Wikipedia call needs no setting).
 3. Stack-owned mode: the generic renderer for the `stack.search.*` keys
    (Switches with their privacy help), locked rows for General web and
    Wikipedia, the "Changes waiting" card with `CodeDiff` (the vendored

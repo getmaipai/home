@@ -193,17 +193,18 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
   });
 
   test("a lone validated extra is dropped so the badge never reads one; two extras keep a badge of two", async () => {
-    const four: FixtureSubject = { ...TOWER, files: ["a.jpg", "b.jpg", "c.jpg", "d.jpg"], image: "a.jpg" };
-    use([four]);
-    const r4 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
-    expect(r4.set?.items.length).toBe(3);
-    expect(r4.set?.visible).toBe(3);
-    const five: FixtureSubject = { ...TOWER, files: ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"], image: "a.jpg" };
-    use([five]);
-    const r5 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
-    expect(r5.set?.items.length).toBe(5);
-    expect(r5.set?.visible).toBe(3);
-    expect(new Set(srcs(r5.set?.items)).size).toBe(5);
+    const files = (n: number) => Array.from({ length: n }, (_, i) => `p${i}.jpg`);
+    const six: FixtureSubject = { ...TOWER, files: files(6), image: "p0.jpg" };
+    use([six]);
+    const r6 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(r6.set?.items.length).toBe(5);
+    expect(r6.set?.visible).toBe(5);
+    const seven: FixtureSubject = { ...TOWER, files: files(7), image: "p0.jpg" };
+    use([seven]);
+    const r7 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(r7.set?.items.length).toBe(7);
+    expect(r7.set?.visible).toBe(5);
+    expect(new Set(srcs(r7.set?.items)).size).toBe(7);
   });
 
   // ANSWER-IMG-05, measured on the real network (2026-10-06): the image
@@ -290,53 +291,54 @@ describe("ANSWER-IMG-02: SearXNG image search per band", () => {
   });
 });
 
-describe("ANSWER-IMG-02: the set is placed at a paragraph boundary, never above released text", () => {
-  const ready = { layout: "row" as const, visible: 1, items: [] };
-  const stateWith = (result: typeof ready | null | undefined) => ({ answerImages: { subject: "x", done: Promise.resolve(), ...(result !== undefined ? { result } : {}) } }) as unknown as TurnState;
+describe("ANSWER-IMG-02 and GENUI-05: the picture gallery is placed at a paragraph boundary, never above released text", () => {
+  // The gallery is an ordinary `image_gallery` block event; the one placer treats it like any ready block.
+  const gallery = () => ({ t: "block" as const, call_id: "call-img", block: { id: "blk-gallery1", kind: "image_gallery" } });
+  const stateWith = (ready: boolean) => ({ toolEvents: ready ? [gallery()] : [] }) as unknown as TurnState;
+  const stampOf = (state: TurnState) => (state.toolEvents[0] as { block: { after_paragraph?: number } } | undefined)?.block.after_paragraph;
 
-  test("ready before any text: the set leads", () => {
-    const state = stateWith(ready);
+  test("ready before any text: the gallery leads", () => {
+    const state = stateWith(true);
     const out: string[] = [];
     const placer = new AnswerImagePlacer(state, (t) => out.push(t));
     placer.push("The tower ");
-    expect(state.answerImages?.placed).toEqual({ set: { ...ready, after_paragraph: 0 }, offset: 0 });
+    expect(stampOf(state)).toBe(0);
+    expect(state.placedBlocks?.map((p) => p.offset)).toEqual([0]);
     expect(out.join("")).toBe("The tower ");
   });
 
   test("ready mid-paragraph: placed at the next break, the piece split there and nothing altered", () => {
-    const state = stateWith(undefined);
+    const state = stateWith(false);
     const out: string[] = [];
     const placer = new AnswerImagePlacer(state, (t) => out.push(t));
     placer.push("First para");
-    state.answerImages!.result = ready;
+    state.toolEvents.push(gallery());
     placer.push("graph ends.");
-    expect(state.answerImages?.placed).toBeUndefined();
+    expect(state.placedBlocks).toBeUndefined();
     placer.push(" Done.\n\nSecond");
     placer.push(" paragraph.");
     expect(out.join("")).toBe("First paragraph ends. Done.\n\nSecond paragraph.");
-    const placed = state.answerImages!.placed!;
-    expect(placed.set.after_paragraph).toBe(1);
-    expect(out.join("").slice(0, placed.offset)).toBe("First paragraph ends. Done.\n\n");
+    expect(stampOf(state)).toBe(1);
+    expect(out.join("").slice(0, state.placedBlocks![0]!.offset)).toBe("First paragraph ends. Done.\n\n");
   });
 
-  test("a blank line inside a code block is not a boundary: the set waits for the block to close", () => {
-    const state = stateWith(undefined);
+  test("a blank line inside a code block is not a boundary: the gallery waits for the block to close", () => {
+    const state = stateWith(false);
     const out: string[] = [];
     const placer = new AnswerImagePlacer(state, (t) => out.push(t));
     placer.push("Code:\n\n```\na = 1\n");
-    state.answerImages!.result = ready;
+    state.toolEvents.push(gallery());
     placer.push("\nb = 2\n```\n\nAfter.");
-    const placed = state.answerImages!.placed!;
-    expect(out.join("").slice(0, placed.offset)).toBe("Code:\n\n```\na = 1\n\nb = 2\n```\n\n");
+    expect(out.join("").slice(0, state.placedBlocks![0]!.offset)).toBe("Code:\n\n```\na = 1\n\nb = 2\n```\n\n");
     expect(out.join("")).toBe("Code:\n\n```\na = 1\n\nb = 2\n```\n\nAfter.");
   });
 
-  test("no set ready: nothing is placed and the text passes through untouched", () => {
-    const state = stateWith(null);
+  test("no gallery ready: nothing is placed and the text passes through untouched", () => {
+    const state = stateWith(false);
     const out: string[] = [];
     const placer = new AnswerImagePlacer(state, (t) => out.push(t));
     placer.push("One.\n\nTwo.");
-    expect(state.answerImages?.placed).toBeUndefined();
+    expect(state.placedBlocks).toBeUndefined();
     expect(out).toEqual(["One.\n\nTwo."]);
   });
 });

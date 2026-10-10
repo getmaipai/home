@@ -2,6 +2,26 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.0] - 2026-10-09
+
+### Added
+
+- The optional `scope` argument (`reference` or `web`; leave it out for both),
+  set by the model (KS-02). `reference` searches the household's offline
+  library only and sends nothing off the machine. `web` searches the live
+  web, limited to the last month when the words name no year, with the
+  library's article as a lead when it matches. Library rows are labelled
+  with their source, licence and snapshot date.
+
+### Changed
+
+- The tool description names the kinds of need each scope is for.
+- The `wikipedia` privacy row is now `wikimedia-live`: the live Wikipedia
+  call happens only for an adult's search that the web and the offline
+  library both failed to answer. The household setting
+  `search.wikipedia_fallback` stays as its off switch: a household that turned
+  it off still never has the live call made (KS-02-PRIV).
+
 ## [0.2.6] - 2026-10-06
 
 ### Removed

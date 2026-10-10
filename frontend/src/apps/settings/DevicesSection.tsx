@@ -6,7 +6,8 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { RobotCard } from "@/apps/settings/RobotCard";
+import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
+import { RobotBody } from "@/apps/settings/RobotBody";
 import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 
 function whenText(iso: string): string {
@@ -79,8 +80,8 @@ export function DevicesSection() {
             ) : (
               <div className="flex flex-col gap-4">
               {robots.map((r) => (
-                <RobotCard
-                  key={r.id}
+                <Card key={r.id} data-testid="robot-card">
+                <RobotBody
                   device={r}
                   busy={busy}
                   onSetMuted={(muted) => api.setRobotMuted(r.id, muted).then(() => undefined)}
@@ -89,6 +90,7 @@ export function DevicesSection() {
                   onConfirmRemove={handleRevoke}
                   onCancelRemove={() => setConfirming(null)}
                 />
+                </Card>
               ))}
               {devices.length > 0 ? (
               <List

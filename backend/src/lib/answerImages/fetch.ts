@@ -2,6 +2,7 @@ import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } 
 import { tryConsume, __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { filterAnswerImages, type QualityResult, type ValidatedAnswerImage } from "./quality";
 import { warmGeometry } from "@/lib/imageSimilarity";
+import { ANSWER_IMAGES_MAX_CANDIDATES } from "./gallery";
 
 export const ANSWER_IMAGE_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
 const MAX_BYTES = 8 * 1024 * 1024;
@@ -10,7 +11,7 @@ const MAX_REDIRECTS = 3;
 // A person's pace (THIRD-PARTY-SERVICES.md): one answer's pictures often share
 // a host (upload.wikimedia.org serves every Commons picture), and a person
 // opening that article loads a dozen at once; past the burst, one a second.
-const HOST_RATE = { capacity: 12, refillPerSecond: 1 };
+const HOST_RATE = { capacity: ANSWER_IMAGES_MAX_CANDIDATES, refillPerSecond: 1 };
 const QUIET_MS = 60 * 60 * 1000;
 const quietHosts = new Map<string, number>();
 let testDnsLookup: DnsLookup | null = null;
@@ -152,8 +153,8 @@ export async function fetchAnswerImages(sources: AnswerImageSource[], options: O
   const countDrop = (why: string) => { dropped_by_fetch[why] = (dropped_by_fetch[why] ?? 0) + 1; };
   const now = options.now ?? Date.now;
   const deadline = Math.min(now() + SET_DEADLINE_MS, options.deadlineAt ?? Number.POSITIVE_INFINITY);
-  const input = sources.slice(0, 12);
-  if (sources.length > 12) countDrop("candidate_cap");
+  const input = sources.slice(0, ANSWER_IMAGES_MAX_CANDIDATES);
+  if (sources.length > ANSWER_IMAGES_MAX_CANDIDATES) countDrop("candidate_cap");
   // Four at a time as a pool, not in lockstep groups: a picture that never
   // answers holds one slot until its own timeout, never the other three
   // (ANSWER-IMG-05, measured on Commons 2026-10-06). What has not arrived by

@@ -463,8 +463,9 @@ export const conversationTurns = sqliteTable(
     // Contains only attachment ids and display metadata, never image bytes.
     images: text("images"),
     replyText: text("reply_text").notNull(),
-    // ANSWER-IMG-02: the pictures shown with the reply (wire.ts's
-    // AnswerImageSet as JSON): hub cache ids and display data, never bytes.
+    // ANSWER-IMG-02, legacy since GENUI-05 (read only, never written): the pictures shown with a reply stored before
+    // the gallery became an `image_gallery` block (wire.ts's AnswerImageSet as JSON). conversationHistory.ts reads it
+    // as that block; new turns store the gallery in `blocks` and leave this null.
     answerImages: text("answer_images"),
     // GENUI-02: validated, age-filtered AnswerBlock records in tool-call order.
     blocks: text("blocks"),

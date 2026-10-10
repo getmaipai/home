@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Card, CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import type { DeviceInfo, RobotDeviceState } from "@/lib/api";
@@ -42,11 +42,11 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
   );
 }
 
-/** ROBOT-CARD-01: one paired robot's live state, from the `state` the hub
+/** ROBOT-CARD-01: the body of one paired robot card's live state, from the `state` the hub
  * derives on `GET /api/devices` (`null` until the robot's first report).
- * Composed from the dashboard template's own Card and Progress, the same
- * shipped parts the dashboard's stat cards use. */
-export function RobotCard({
+ * The caller renders the Card around it (data-testid="robot-card"); this
+ * holds the shipped header, content and footer parts. */
+export function RobotBody({
   device,
   onRemove,
   confirmingRemove,
@@ -99,7 +99,7 @@ export function RobotCard({
   const motion = state?.motion ?? null;
   const battery = state?.battery_level;
   return (
-    <Card data-testid="robot-card">
+    <>
       <CardHeader>
         <CardTitle className="truncate">{device.name}</CardTitle>
         <CardDescription>{device.area ?? "Robot"}</CardDescription>
@@ -142,39 +142,41 @@ export function RobotCard({
           />
         ) : null}
       </CardContent>
-      <CardFooter className="justify-end gap-2">
-        {confirmingRemove ? (
-          <>
-            <p className="mr-auto text-base font-medium">Remove {device.name}? It will need to be paired again.</p>
-            <Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>
-              {busy ? "Working…" : "Yes, remove it"}
-            </Button>
-            <Button variant="ghost" onClick={onCancelRemove}>
-              Keep it
-            </Button>
-          </>
-        ) : (
-          <>
-            {state !== null ? (
-              <>
-                {askedMuted !== null && !muteError ? (
-                  <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
-                ) : null}
-                <Button
-                  variant="outline"
-                  disabled={busy || unreachable || askedMuted !== null}
-                  onClick={() => void askMute(!state.muted)}
-                >
-                  {state.muted ? "Unmute microphone" : "Mute microphone"}
-                </Button>
-              </>
-            ) : null}
-            <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
-              Remove
-            </Button>
-          </>
-        )}
+      <CardFooter>
+        <div className="flex w-full items-center justify-end gap-2">
+          {confirmingRemove ? (
+            <>
+              <p className="mr-auto text-base font-medium">Remove {device.name}? It will need to be paired again.</p>
+              <Button variant="destructive" onClick={onConfirmRemove} disabled={busy}>
+                {busy ? "Working…" : "Yes, remove it"}
+              </Button>
+              <Button variant="ghost" onClick={onCancelRemove}>
+                Keep it
+              </Button>
+            </>
+          ) : (
+            <>
+              {state !== null ? (
+                <>
+                  {askedMuted !== null && !muteError ? (
+                    <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
+                  ) : null}
+                  <Button
+                    variant="outline"
+                    disabled={busy || unreachable || askedMuted !== null}
+                    onClick={() => void askMute(!state.muted)}
+                  >
+                    {state.muted ? "Unmute microphone" : "Mute microphone"}
+                  </Button>
+                </>
+              ) : null}
+              <Button variant="ghost" aria-label={`Remove ${device.name}`} onClick={onRemove}>
+                Remove
+              </Button>
+            </>
+          )}
+        </div>
       </CardFooter>
-    </Card>
+    </>
   );
 }

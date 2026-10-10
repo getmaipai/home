@@ -1,0 +1,876 @@
+{
+  "id": "ks-bench-01",
+  "note": "KS-BENCH-01 corpus (design: data-scratch/design/KNOWLEDGE-SEARCH-DESIGN.md section 9.1). 90 adult written rows (30 stable-fact and entity, 30 recency, 30 no-tool), 20 child written rows and 10 spoken rows. `heldOut` marks the 25 rows fixed before any arm was run: tune on the other 95, report on all 120 with the held-out slice shown apart. `arms` names, per category, the call shapes a row may produce (no_tool, scope_reference, scope_web, scope_omitted = a websearch call with no scope, today's only shape, scope_reference_only = reference scope and nothing else). The baseline arm (today's websearch, no scope argument) can only produce no_tool or scope_omitted. Household names are persona names; no real household data.",
+  "arms": {
+    "stable": {
+      "acceptable": [
+        "no_tool",
+        "scope_reference"
+      ],
+      "forbidden": [
+        "scope_web"
+      ]
+    },
+    "recency": {
+      "acceptable": [
+        "scope_web",
+        "scope_omitted"
+      ],
+      "forbidden": [
+        "scope_reference_only"
+      ]
+    },
+    "no_tool": {
+      "acceptable": [
+        "no_tool"
+      ],
+      "forbidden": [
+        "scope_web",
+        "scope_reference",
+        "scope_omitted"
+      ]
+    }
+  },
+  "rows": [
+    {
+      "id": "ks1-adult-stable-01",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who wrote Pride and Prejudice?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-02",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the capital of Australia?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-stable-03",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "How does photosynthesis work?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-04",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who painted the Mona Lisa and when?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-05",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the boiling point of water at sea level in Fahrenheit?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-06",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Tell me about Marie Curie.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-07",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What does the word 'ephemeral' mean?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-stable-08",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who directed the film Jaws?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-09",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the tallest mountain in South America?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-10",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Explain what a black hole is.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-11",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who was the first woman to win a Nobel Prize?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-12",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the chemical symbol for tungsten?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-stable-13",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Where is the city of Timbuktu?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-14",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the plot of Hamlet?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-15",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who composed The Four Seasons?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-16",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "How many bones are in the adult human body?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-17",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the origin of the word 'quarantine'?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-stable-18",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who founded the Mongol Empire?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-19",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the difference between a virus and a bacterium?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-20",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What river runs through Budapest?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-21",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who wrote the novel Frankenstein?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-22",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the speed of light?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-stable-23",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the Pythagorean theorem?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-24",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Tell me about the Battle of Hastings.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-25",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What does the word 'serendipity' mean?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-26",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who discovered penicillin?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-27",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the largest moon of Saturn?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-stable-28",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "Who sang the song Respect first?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-29",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What is the plot of the film Casablanca?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-stable-30",
+      "band": "adult",
+      "category": "stable",
+      "prompt": "What language family does Hungarian belong to?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-01",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the news today?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-02",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the weather going to be like in Denver this weekend?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-03",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the current price of gold?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-recency-04",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Who won the most recent Formula 1 race?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-05",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the latest stable version of Python?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-06",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What time does the nearest hardware store close tonight?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-07",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What did the central bank decide about interest rates this week?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-08",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What movies are out in theatres right now?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-recency-09",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the latest iPhone model and what does it cost?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-10",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the score of the game that is on tonight?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-11",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Is there any news about the new space telescope launch?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-12",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the exchange rate between the euro and the dollar today?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-13",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What are the top headlines in technology this morning?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-recency-14",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the latest release of the Linux kernel?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-15",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Who is the current prime minister of the United Kingdom?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-16",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the price of a barrel of oil right now?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-17",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Is the highway to the airport closed because of the storm?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-18",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What new games were announced this week?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-recency-19",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the latest version of Node.js?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-20",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What are the opening hours of the central library today?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-21",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Did anything happen in the election results overnight?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-22",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "How much does a gallon of milk cost at the supermarket this month?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-23",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the newest episode of the show everyone is talking about?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-recency-24",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the current mortgage rate?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-25",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Is the city marathon still happening this Sunday?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-26",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What was announced at the big developer conference this week?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-27",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the latest on the wildfire north of town?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-28",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the current world record for the men's marathon?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-recency-29",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What is the stock price of the largest chip maker right now?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-recency-30",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Which team leads the league table at the moment?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-01",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Hi, how are you today?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-02",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Thanks, that was helpful.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-03",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is 17 times 23?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-04",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Tell me a joke about cats.",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-notool-05",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is 15 percent of 240?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-06",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Remind me what Willow said she wanted for her birthday.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-07",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Add milk and eggs to the shopping list.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-08",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What did we talk about yesterday?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-09",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Convert 5 kilometres to miles.",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-notool-10",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Write a two-line poem about autumn.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-11",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is Oliver's favourite colour, from what you remember?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-12",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Summarise what I just told you in one sentence.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-13",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Good morning!",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-14",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is 144 divided by 12?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-notool-15",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Can you rephrase this: 'the meeting is moved to three'?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-16",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Pretend you are a pirate and greet me.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-17",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is the square root of 81?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-18",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Set a timer for ten minutes.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-19",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "How would I politely decline an invitation to dinner?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-notool-20",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What should I call my new pet turtle? Give me three ideas.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-21",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Who is in the household?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-22",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is 2 to the power of 10?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-23",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Say goodnight to Pippa for me.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-24",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Help me write a short thank-you note to Marlow.",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-notool-25",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Tell me something you remember about my garden.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-26",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is 9 plus 16?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-27",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Can you count from one to five in French? Use what you already know.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-28",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Cheer me up, I had a rough day.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-adult-notool-29",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Which of us had the dentist appointment, Nadia or Bruno?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-adult-notool-30",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "What is a good name for a band of three friends?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-stable-01",
+      "band": "child",
+      "category": "stable",
+      "prompt": "Why is the sky blue?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-stable-02",
+      "band": "child",
+      "category": "stable",
+      "prompt": "How many legs does a spider have?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-stable-03",
+      "band": "child",
+      "category": "stable",
+      "prompt": "What do pandas eat?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-child-stable-04",
+      "band": "child",
+      "category": "stable",
+      "prompt": "Who was Cleopatra?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-stable-05",
+      "band": "child",
+      "category": "stable",
+      "prompt": "How do volcanoes work?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-stable-06",
+      "band": "child",
+      "category": "stable",
+      "prompt": "What is the biggest animal in the ocean?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-child-stable-07",
+      "band": "child",
+      "category": "stable",
+      "prompt": "Why do leaves change colour in the fall?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-recency-01",
+      "band": "child",
+      "category": "recency",
+      "prompt": "What is the weather like today?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-recency-02",
+      "band": "child",
+      "category": "recency",
+      "prompt": "What is the newest animated movie in theatres?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-recency-03",
+      "band": "child",
+      "category": "recency",
+      "prompt": "What time is sunset today?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-recency-04",
+      "band": "child",
+      "category": "recency",
+      "prompt": "Who won the big kids' science fair this year?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-child-recency-05",
+      "band": "child",
+      "category": "recency",
+      "prompt": "What is the newest book in the dragon series?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-recency-06",
+      "band": "child",
+      "category": "recency",
+      "prompt": "Is it going to snow tomorrow?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-notool-01",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "Can you tell me a bedtime story about a bear?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-notool-02",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "What is 7 plus 8?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-notool-03",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "Let's play 20 questions.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-notool-04",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "Can you say hello to Clover?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-notool-05",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "What rhymes with cat?",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-child-notool-06",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "Tell me a silly joke.",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-child-notool-07",
+      "band": "child",
+      "category": "no_tool",
+      "prompt": "How do you spell 'because'?",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-stable-01",
+      "band": "spoken",
+      "category": "stable",
+      "prompt": "hey who wrote the cat in the hat",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-stable-02",
+      "band": "spoken",
+      "category": "stable",
+      "prompt": "what's the capital of canada",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-spoken-stable-03",
+      "band": "spoken",
+      "category": "stable",
+      "prompt": "how far away is the moon",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-stable-04",
+      "band": "spoken",
+      "category": "stable",
+      "prompt": "who invented the telephone",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-recency-01",
+      "band": "spoken",
+      "category": "recency",
+      "prompt": "what's the weather",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-recency-02",
+      "band": "spoken",
+      "category": "recency",
+      "prompt": "what's the news this morning",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-recency-03",
+      "band": "spoken",
+      "category": "recency",
+      "prompt": "did the home team win last night",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-spoken-notool-01",
+      "band": "spoken",
+      "category": "no_tool",
+      "prompt": "good morning",
+      "heldOut": true
+    },
+    {
+      "id": "ks1-spoken-notool-02",
+      "band": "spoken",
+      "category": "no_tool",
+      "prompt": "what's six times seven",
+      "heldOut": false
+    },
+    {
+      "id": "ks1-spoken-notool-03",
+      "band": "spoken",
+      "category": "no_tool",
+      "prompt": "tell me a joke",
+      "heldOut": false
+    }
+  ]
+}

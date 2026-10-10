@@ -42,10 +42,11 @@ export function ElementsAdoptionPanel({ items = ELEMENTS, scenarioIds, onPlay }:
       <Progress value={percent} aria-label={`${done} of ${items.length} Elements implemented`} />
       <Collapsible>
         <CollapsibleTrigger asChild><Button variant="ghost" size="sm">Show every Element</Button></CollapsibleTrigger>
-        <CollapsibleContent className="flex max-h-64 flex-col gap-1 overflow-y-auto">
+        <CollapsibleContent>
+          <div className="flex max-h-64 flex-col gap-1 overflow-y-auto">
           {groups.map(({ verdict, members }) => (
             <Collapsible key={verdict}>
-              <CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="w-full justify-between">{verdict}<span>{members.reduce((sum, group) => sum + group.members.length, 0)}</span></Button></CollapsibleTrigger>
+              <CollapsibleTrigger asChild><Button variant="ghost" size="sm">{verdict} ({members.reduce((sum, group) => sum + group.members.length, 0)})</Button></CollapsibleTrigger>
               <CollapsibleContent>
                 {members.map(({ status, members: statusItems }) => <div key={status}>
                   <h4 className="px-3 pt-2 text-xs font-semibold uppercase">{status} ({statusItems.length})</h4>
@@ -67,6 +68,7 @@ export function ElementsAdoptionPanel({ items = ELEMENTS, scenarioIds, onPlay }:
               </CollapsibleContent>
             </Collapsible>
           ))}
+          </div>
         </CollapsibleContent>
       </Collapsible>
     </section>

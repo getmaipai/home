@@ -279,7 +279,6 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
               id="acknowledge-unrestricted"
               checked={acknowledged}
               onCheckedChange={(v) => setAcknowledged(v === true)}
-              className="mt-0.5"
             />
             <label htmlFor="acknowledge-unrestricted">I understand and agree.</label>
           </div>

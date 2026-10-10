@@ -23,22 +23,13 @@ function Disclosure({ row }: { row: PrivacyConnection }) {
   );
 }
 
-function ConnectionGroup({ title, intro, rows, label }: { title: string; intro?: string; rows: PrivacyConnection[]; label: string }) {
-  return (
-    <Card>
-      <CardHeader className="border-b border-border">
-        <CardTitle>{title}</CardTitle>
-        {intro ? <p className="text-sm text-muted-foreground">{intro}</p> : null}
-      </CardHeader>
-      <CardContent>
-        {rows.length > 0 ? (
-          <div role="list" aria-label={label} className="divide-y divide-border">
-            {rows.map((row) => <div role="listitem" key={row.id}><Disclosure row={row} /></div>)}
-          </div>
-        ) : <p className="py-4 text-sm text-muted-foreground">Nothing listed.</p>}
-      </CardContent>
-    </Card>
-  );
+/** The disclosure rows inside a group's card; the page owns the Card. */
+function ConnectionRows({ rows, label }: { rows: PrivacyConnection[]; label: string }) {
+  return rows.length > 0 ? (
+    <div role="list" aria-label={label} className="divide-y divide-border">
+      {rows.map((row) => <div role="listitem" key={row.id}><Disclosure row={row} /></div>)}
+    </div>
+  ) : <p className="py-4 text-sm text-muted-foreground">Nothing listed.</p>;
 }
 
 /** The public, data-driven disclosure page. Its connection rows come
@@ -50,8 +41,8 @@ export function PrivacyPage() {
 
   return (
     <div className="flex flex-col gap-4 pb-4">
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2"><PrivacyIcon size={16} className="text-muted-foreground" />Privacy</CardTitle>
+      <CardHeader>
+        <CardTitle><PrivacyIcon size={16} className="mr-2 inline text-muted-foreground" />Privacy</CardTitle>
       </CardHeader>
       <AsyncState
         data={query.data}
@@ -67,40 +58,42 @@ export function PrivacyPage() {
           return (
           <>
             <Card>
-              <CardHeader className="border-b border-border"><CardTitle>Can someone outside see what we say to MaiPai?</CardTitle></CardHeader>
-              <CardContent className="p-5">
+              <CardHeader><CardTitle>Can someone outside see what we say to MaiPai?</CardTitle></CardHeader>
+              <CardContent>
                 <p className="text-sm">No. Everything you say to MaiPai, everything it remembers, and everyone in your household stays on this computer. It is never sent to us. We do not run a server your family's information passes through, and nothing in MaiPai reports back to us about how you use it.</p>
               </CardContent>
             </Card>
 
             {inbound.length > 0 ? (
-              <ConnectionGroup
-                title="Can someone reach into your house?"
-                intro="Only if an adult sets it up on purpose, for a specific app or device you choose."
-                rows={inbound}
-                label="Inbound connections"
-              />
+              <Card>
+                <CardHeader>
+                  <CardTitle>Can someone reach into your house?</CardTitle>
+                  <p className="text-sm text-muted-foreground">Only if an adult sets it up on purpose, for a specific app or device you choose.</p>
+                </CardHeader>
+                <CardContent><ConnectionRows rows={inbound} label="Inbound connections" /></CardContent>
+              </Card>
             ) : null}
 
-            <ConnectionGroup
-              title={`What leaves your house (${outbound.length})`}
-              intro="A few things reach the internet, because you asked them to. Every one is listed below, in full. If it is not on this list, it does not happen."
-              rows={outbound}
-              label="Outbound connections"
-            />
+            <Card>
+              <CardHeader>
+                <CardTitle>{`What leaves your house (${outbound.length})`}</CardTitle>
+                <p className="text-sm text-muted-foreground">A few things reach the internet, because you asked them to. Every one is listed below, in full. If it is not on this list, it does not happen.</p>
+              </CardHeader>
+              <CardContent><ConnectionRows rows={outbound} label="Outbound connections" /></CardContent>
+            </Card>
 
             {data.offlinePlugins.length > 0 ? (
               <Card>
-                <CardHeader className="border-b border-border"><CardTitle className="flex items-center gap-2"><PrivacyIcon size={16} className="text-muted-foreground" />Never leaves your house</CardTitle></CardHeader>
-                <CardContent className="p-5">
+                <CardHeader><CardTitle><PrivacyIcon size={16} className="mr-2 inline text-muted-foreground" />Never leaves your house</CardTitle></CardHeader>
+                <CardContent>
                   <p className="text-sm">{joinNames(data.offlinePlugins)} work entirely on this computer and connect to nothing at all. So does everything MaiPai remembers, every conversation, and every profile in your household.</p>
                 </CardContent>
               </Card>
             ) : null}
 
             <Card>
-              <CardHeader className="border-b border-border"><CardTitle>What we never do</CardTitle></CardHeader>
-              <CardContent className="p-5">
+              <CardHeader><CardTitle>What we never do</CardTitle></CardHeader>
+              <CardContent>
                 <ul className="flex list-none flex-col gap-2 p-0 text-sm">
                   <li>We do not collect usage information, crash reports, or statistics of any kind.</li>
                   <li>Nothing your family says is used to train anything.</li>

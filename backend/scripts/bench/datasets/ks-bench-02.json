@@ -1,0 +1,726 @@
+{
+  "id": "ks-bench-02",
+  "note": "KS-BENCH-02 queries (design section 9.2): 100 entity and topic queries over the installed ZIM, 20 each of exact name, misspelled, ambiguous, phrased as a topic and long tail. `heldOut` marks the 25 queries fixed first (5 per kind). `expectTitle` is the article a right answer opens (a redirect to it counts); for `ambiguous` rows it lists the senses a disambiguation answer should offer, and `expectDisambiguation` means no single guess is correct. Bars: exact top-1 at least 90 percent; misspelled at least 70; ambiguous at least 80; long tail at least 70 on mini, 85 on nopic. Titles follow English Wikipedia; the runner checks each against the installed ZIM and reports a missing title instead of dropping the row.",
+  "queries": [
+    {
+      "id": "ks2-exact-01",
+      "kind": "exact",
+      "query": "Albert Einstein",
+      "expectTitle": "Albert Einstein",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-exact-02",
+      "kind": "exact",
+      "query": "Pride and Prejudice",
+      "expectTitle": "Pride and Prejudice",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-03",
+      "kind": "exact",
+      "query": "Mount Kilimanjaro",
+      "expectTitle": "Mount Kilimanjaro",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-04",
+      "kind": "exact",
+      "query": "Photosynthesis",
+      "expectTitle": "Photosynthesis",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-05",
+      "kind": "exact",
+      "query": "The Beatles",
+      "expectTitle": "The Beatles",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-06",
+      "kind": "exact",
+      "query": "Python (programming language)",
+      "expectTitle": "Python (programming language)",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-exact-07",
+      "kind": "exact",
+      "query": "Great Barrier Reef",
+      "expectTitle": "Great Barrier Reef",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-08",
+      "kind": "exact",
+      "query": "Isaac Newton",
+      "expectTitle": "Isaac Newton",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-09",
+      "kind": "exact",
+      "query": "Tokyo",
+      "expectTitle": "Tokyo",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-10",
+      "kind": "exact",
+      "query": "The Lord of the Rings",
+      "expectTitle": "The Lord of the Rings",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-11",
+      "kind": "exact",
+      "query": "Marie Curie",
+      "expectTitle": "Marie Curie",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-exact-12",
+      "kind": "exact",
+      "query": "Amazon River",
+      "expectTitle": "Amazon River",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-13",
+      "kind": "exact",
+      "query": "Roman Empire",
+      "expectTitle": "Roman Empire",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-14",
+      "kind": "exact",
+      "query": "DNA",
+      "expectTitle": "DNA",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-15",
+      "kind": "exact",
+      "query": "Leonardo da Vinci",
+      "expectTitle": "Leonardo da Vinci",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-16",
+      "kind": "exact",
+      "query": "Jupiter",
+      "expectTitle": "Jupiter",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-exact-17",
+      "kind": "exact",
+      "query": "Jane Austen",
+      "expectTitle": "Jane Austen",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-18",
+      "kind": "exact",
+      "query": "Eiffel Tower",
+      "expectTitle": "Eiffel Tower",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-19",
+      "kind": "exact",
+      "query": "Black hole",
+      "expectTitle": "Black hole",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-exact-20",
+      "kind": "exact",
+      "query": "World War II",
+      "expectTitle": "World War II",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-misspelled-01",
+      "kind": "misspelled",
+      "query": "Albert Einstien",
+      "expectTitle": "Albert Einstein",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-misspelled-02",
+      "kind": "misspelled",
+      "query": "Pride and Prejudise",
+      "expectTitle": "Pride and Prejudice",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-03",
+      "kind": "misspelled",
+      "query": "Kilimanjaro mountin",
+      "expectTitle": "Mount Kilimanjaro",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-04",
+      "kind": "misspelled",
+      "query": "Photosinthesis",
+      "expectTitle": "Photosynthesis",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-05",
+      "kind": "misspelled",
+      "query": "The Beetles band",
+      "expectTitle": "The Beatles",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-06",
+      "kind": "misspelled",
+      "query": "Pythan programming",
+      "expectTitle": "Python (programming language)",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-misspelled-07",
+      "kind": "misspelled",
+      "query": "Barier Reef",
+      "expectTitle": "Great Barrier Reef",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-08",
+      "kind": "misspelled",
+      "query": "Isac Newton",
+      "expectTitle": "Isaac Newton",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-09",
+      "kind": "misspelled",
+      "query": "Tokio",
+      "expectTitle": "Tokyo",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-10",
+      "kind": "misspelled",
+      "query": "Lord of the Ringz",
+      "expectTitle": "The Lord of the Rings",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-11",
+      "kind": "misspelled",
+      "query": "Marie Curry",
+      "expectTitle": "Marie Curie",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-misspelled-12",
+      "kind": "misspelled",
+      "query": "Amazon Rivver",
+      "expectTitle": "Amazon River",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-13",
+      "kind": "misspelled",
+      "query": "Roman Empier",
+      "expectTitle": "Roman Empire",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-14",
+      "kind": "misspelled",
+      "query": "Leonardo da Vinsi",
+      "expectTitle": "Leonardo da Vinci",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-15",
+      "kind": "misspelled",
+      "query": "Jupiterr",
+      "expectTitle": "Jupiter",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-16",
+      "kind": "misspelled",
+      "query": "Jane Austin",
+      "expectTitle": "Jane Austen",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-misspelled-17",
+      "kind": "misspelled",
+      "query": "Eifel Tower",
+      "expectTitle": "Eiffel Tower",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-18",
+      "kind": "misspelled",
+      "query": "Blak hole",
+      "expectTitle": "Black hole",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-19",
+      "kind": "misspelled",
+      "query": "Charls Darwin",
+      "expectTitle": "Charles Darwin",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-misspelled-20",
+      "kind": "misspelled",
+      "query": "Shakespear",
+      "expectTitle": "William Shakespeare",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-ambiguous-01",
+      "kind": "ambiguous",
+      "query": "Mercury",
+      "expectTitle": "Mercury (planet), Mercury (element), Mercury (mythology)",
+      "expectDisambiguation": true,
+      "heldOut": true
+    },
+    {
+      "id": "ks2-ambiguous-02",
+      "kind": "ambiguous",
+      "query": "Java",
+      "expectTitle": "Java (island), Java (programming language)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-03",
+      "kind": "ambiguous",
+      "query": "Mars",
+      "expectTitle": "Mars (planet), Mars (mythology), Mars (confectionery)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-04",
+      "kind": "ambiguous",
+      "query": "Jaguar",
+      "expectTitle": "Jaguar (animal), Jaguar Cars",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-05",
+      "kind": "ambiguous",
+      "query": "Python",
+      "expectTitle": "Python (snake), Python (programming language)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-06",
+      "kind": "ambiguous",
+      "query": "Apple",
+      "expectTitle": "Apple (fruit), Apple Inc.",
+      "expectDisambiguation": true,
+      "heldOut": true
+    },
+    {
+      "id": "ks2-ambiguous-07",
+      "kind": "ambiguous",
+      "query": "Washington",
+      "expectTitle": "Washington (state), Washington, D.C., George Washington",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-08",
+      "kind": "ambiguous",
+      "query": "Turkey",
+      "expectTitle": "Turkey (country), Turkey (bird)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-09",
+      "kind": "ambiguous",
+      "query": "Cell",
+      "expectTitle": "Cell (biology), Cell (prison)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-10",
+      "kind": "ambiguous",
+      "query": "Bass",
+      "expectTitle": "Bass (fish), Bass (sound)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-11",
+      "kind": "ambiguous",
+      "query": "Orange",
+      "expectTitle": "Orange (fruit), Orange (colour)",
+      "expectDisambiguation": true,
+      "heldOut": true
+    },
+    {
+      "id": "ks2-ambiguous-12",
+      "kind": "ambiguous",
+      "query": "Pluto",
+      "expectTitle": "Pluto (dwarf planet), Pluto (mythology)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-13",
+      "kind": "ambiguous",
+      "query": "Phoenix",
+      "expectTitle": "Phoenix (mythology), Phoenix, Arizona",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-14",
+      "kind": "ambiguous",
+      "query": "Mouse",
+      "expectTitle": "Mouse (animal), Mouse (computing)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-15",
+      "kind": "ambiguous",
+      "query": "Mustang",
+      "expectTitle": "Mustang (horse), Ford Mustang",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-16",
+      "kind": "ambiguous",
+      "query": "Victoria",
+      "expectTitle": "Victoria (Australia), Queen Victoria, Lake Victoria",
+      "expectDisambiguation": true,
+      "heldOut": true
+    },
+    {
+      "id": "ks2-ambiguous-17",
+      "kind": "ambiguous",
+      "query": "Springfield",
+      "expectTitle": "Springfield (Massachusetts), Springfield (Illinois), Springfield (The Simpsons)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-18",
+      "kind": "ambiguous",
+      "query": "Paris",
+      "expectTitle": "Paris (France), Paris (mythology)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-19",
+      "kind": "ambiguous",
+      "query": "Saturn",
+      "expectTitle": "Saturn (planet), Saturn (mythology)",
+      "expectDisambiguation": true,
+      "heldOut": false
+    },
+    {
+      "id": "ks2-ambiguous-20",
+      "kind": "ambiguous",
+      "query": "Crane",
+      "expectTitle": "Crane (bird), Crane (machine)",
+      "expectDisambiguation": true,
+      "heldOut": true
+    },
+    {
+      "id": "ks2-topic-01",
+      "kind": "topic",
+      "query": "how do vaccines work",
+      "expectTitle": "Vaccine",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-topic-02",
+      "kind": "topic",
+      "query": "history of the printing press",
+      "expectTitle": "Printing press",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-03",
+      "kind": "topic",
+      "query": "causes of the French Revolution",
+      "expectTitle": "French Revolution",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-04",
+      "kind": "topic",
+      "query": "how airplanes fly",
+      "expectTitle": "Flight",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-05",
+      "kind": "topic",
+      "query": "what is inflation in economics",
+      "expectTitle": "Inflation",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-06",
+      "kind": "topic",
+      "query": "the water cycle",
+      "expectTitle": "Water cycle",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-topic-07",
+      "kind": "topic",
+      "query": "how does the stock market work",
+      "expectTitle": "Stock market",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-08",
+      "kind": "topic",
+      "query": "theory of evolution by natural selection",
+      "expectTitle": "Natural selection",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-09",
+      "kind": "topic",
+      "query": "origin of the Olympic Games",
+      "expectTitle": "Ancient Olympic Games",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-10",
+      "kind": "topic",
+      "query": "how rainbows form",
+      "expectTitle": "Rainbow",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-11",
+      "kind": "topic",
+      "query": "the fall of the Berlin Wall",
+      "expectTitle": "Berlin Wall",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-topic-12",
+      "kind": "topic",
+      "query": "how batteries store energy",
+      "expectTitle": "Battery (electricity)",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-13",
+      "kind": "topic",
+      "query": "what causes earthquakes",
+      "expectTitle": "Earthquake",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-14",
+      "kind": "topic",
+      "query": "the invention of the telephone",
+      "expectTitle": "Telephone",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-15",
+      "kind": "topic",
+      "query": "how the human heart pumps blood",
+      "expectTitle": "Heart",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-16",
+      "kind": "topic",
+      "query": "the discovery of America by Europeans",
+      "expectTitle": "Voyages of Christopher Columbus",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-topic-17",
+      "kind": "topic",
+      "query": "what is machine learning",
+      "expectTitle": "Machine learning",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-18",
+      "kind": "topic",
+      "query": "the plot of Romeo and Juliet",
+      "expectTitle": "Romeo and Juliet",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-19",
+      "kind": "topic",
+      "query": "how bees make honey",
+      "expectTitle": "Honey",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-topic-20",
+      "kind": "topic",
+      "query": "the life cycle of a star",
+      "expectTitle": "Stellar evolution",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-longtail-01",
+      "kind": "longtail",
+      "query": "Kleinian group",
+      "expectTitle": "Kleinian group",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-longtail-02",
+      "kind": "longtail",
+      "query": "Ernest Shackleton's ship Endurance",
+      "expectTitle": "Endurance (1912 ship)",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-03",
+      "kind": "longtail",
+      "query": "Tardigrade",
+      "expectTitle": "Tardigrade",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-04",
+      "kind": "longtail",
+      "query": "Voynich manuscript",
+      "expectTitle": "Voynich manuscript",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-05",
+      "kind": "longtail",
+      "query": "Bonnie Prince Charlie",
+      "expectTitle": "Charles Edward Stuart",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-06",
+      "kind": "longtail",
+      "query": "Antikythera mechanism",
+      "expectTitle": "Antikythera mechanism",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-longtail-07",
+      "kind": "longtail",
+      "query": "Lake Baikal",
+      "expectTitle": "Lake Baikal",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-08",
+      "kind": "longtail",
+      "query": "Rosetta Stone",
+      "expectTitle": "Rosetta Stone",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-09",
+      "kind": "longtail",
+      "query": "Dunning-Kruger effect",
+      "expectTitle": "Dunning-Kruger effect",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-10",
+      "kind": "longtail",
+      "query": "Hedy Lamarr",
+      "expectTitle": "Hedy Lamarr",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-11",
+      "kind": "longtail",
+      "query": "Svalbard Global Seed Vault",
+      "expectTitle": "Svalbard Global Seed Vault",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-longtail-12",
+      "kind": "longtail",
+      "query": "Great Molasses Flood",
+      "expectTitle": "Great Molasses Flood",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-13",
+      "kind": "longtail",
+      "query": "Mpemba effect",
+      "expectTitle": "Mpemba effect",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-14",
+      "kind": "longtail",
+      "query": "Piltdown Man",
+      "expectTitle": "Piltdown Man",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-15",
+      "kind": "longtail",
+      "query": "Chladni figures",
+      "expectTitle": "Chladni figures",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-16",
+      "kind": "longtail",
+      "query": "Ada Lovelace",
+      "expectTitle": "Ada Lovelace",
+      "heldOut": true
+    },
+    {
+      "id": "ks2-longtail-17",
+      "kind": "longtail",
+      "query": "Krakatoa eruption of 1883",
+      "expectTitle": "1883 eruption of Krakatoa",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-18",
+      "kind": "longtail",
+      "query": "Zeigarnik effect",
+      "expectTitle": "Zeigarnik effect",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-19",
+      "kind": "longtail",
+      "query": "Trans-Siberian Railway",
+      "expectTitle": "Trans-Siberian Railway",
+      "heldOut": false
+    },
+    {
+      "id": "ks2-longtail-20",
+      "kind": "longtail",
+      "query": "Tunguska event",
+      "expectTitle": "Tunguska event",
+      "heldOut": true
+    }
+  ]
+}

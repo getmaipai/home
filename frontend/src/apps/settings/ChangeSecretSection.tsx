@@ -85,9 +85,11 @@ export function ChangeSecretSection({ person, onChanged }: ChangeSecretSectionPr
         />
         {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
         {success ? <p className="text-base text-[var(--primary)]">Done.</p> : null}
-        <Button type="submit" disabled={submitting} className="w-fit">
-          {submitting ? "Saving…" : person.hasSecret ? "Change it" : "Set it"}
-        </Button>
+        <div className="flex">
+          <Button type="submit" disabled={submitting}>
+            {submitting ? "Saving…" : person.hasSecret ? "Change it" : "Set it"}
+          </Button>
+        </div>
       </form>
     </Section>
   );

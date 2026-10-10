@@ -82,6 +82,34 @@ export type { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 // here since this is where callers already look for it.
 import type { ConversationTurnRow } from "@/wire";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
+import type { AnswerBlock as AnswerBlockValue } from "@maipai/spec/gen/ts/answer-block.js";
+import { collectShownPictures, legacyGalleryBlock, type ShownPictures } from "@/lib/answerImages/gallery";
+
+/** GENUI-05 (no data debt): a stored turn's answer blocks. A turn written before GENUI-05 kept its pictures in the
+ * `answer_images` column (migration 0087); they are read as the `image_gallery` block they would be today, in the same
+ * place, so an old turn renders as it always did and nothing else reads that column. */
+function blocksFor(row: { id: string; createdAt: string }, rawBlocks: string | null, rawAnswerImages: string | null): { blocks?: AnswerBlockValue[] } {
+  const stored = rawBlocks ? (JSON.parse(rawBlocks) as AnswerBlockValue[]) : [];
+  let legacy: AnswerBlockValue | null = null;
+  if (rawAnswerImages) {
+    try { legacy = legacyGalleryBlock(JSON.parse(rawAnswerImages), row.id, row.createdAt); } catch { legacy = null; }
+  }
+  const blocks = legacy ? [...stored, legacy] : stored;
+  return blocks.length > 0 ? { blocks } : {};
+}
+
+/** IMG-QUALITY-01b: the pictures this conversation has shown so far, from its stored `image_gallery` blocks (a
+ * temporary chat: from its in-window turns). Derived on read; nothing is stored for "show more". */
+export function shownPicturesIn(conversationId: string): ShownPictures {
+  const shown: ShownPictures = { ids: new Set(), sources: new Set() };
+  const rows: Array<Pick<ConversationTurnRow, "id" | "createdAt" | "blocks" | "answerImages">> = isTemporaryConversation(conversationId)
+    ? temporarySessions.get(conversationId)?.turns ?? []
+    : db.select({ id: conversationTurns.id, createdAt: conversationTurns.createdAt, blocks: conversationTurns.blocks, answerImages: conversationTurns.answerImages }).from(conversationTurns).where(and(eq(conversationTurns.conversationId, conversationId), eq(conversationTurns.status, "done"))).all();
+  for (const row of rows) {
+    try { collectShownPictures(blocksFor(row, row.blocks, row.answerImages).blocks ?? [], shown); } catch { /* an unreadable block shows nothing */ }
+  }
+  return shown;
+}
 
 function mediaFields(raw: string | null): { media?: Media; media_items?: Media[] } {
   if (!raw) return {};
@@ -377,7 +405,7 @@ export function resolveSupersedes(supersedes: string | null | undefined, convers
   return superseded && superseded.conversationId === conversationId ? supersedes : null;
 }
 
-export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; answerImages?: import("@/wire").AnswerImageSet; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; status?: "done" | "failed" };
+export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; status?: "done" | "failed" };
 
 /** The row a completed turn would produce, with no persistence of its
  * own - pulled out of logTurn() (TEMP-CHAT-01) so a temporary
@@ -459,7 +487,8 @@ function buildTurnRow(
     conversationId: value.conversation_id,
     userText,
     images: images.length ? JSON.stringify(images) : null,
-    answerImages: opts.answerImages ? JSON.stringify(opts.answerImages) : null,
+    // GENUI-05: new turns keep their pictures in `blocks`; this legacy column (migration 0087) is only read.
+    answerImages: null,
     blocks: value.blocks?.length ? JSON.stringify(value.blocks) : null,
     // The reply side too (a package answer that echoes a credential would
     // otherwise land in reply_text and its episode embedding). REASONING-04:
@@ -1929,7 +1958,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...(rawBlocks ? { blocks: JSON.parse(rawBlocks) as import("@maipai/spec/gen/ts/answer-block.js").AnswerBlock[] } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksFor(r, rawBlocks, rawAnswerImages), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2881,7 +2910,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...(rawAnswerImages ? { answer_images: JSON.parse(rawAnswerImages) as import("@/wire").AnswerImageSet } : {}), ...(rawBlocks ? { blocks: JSON.parse(rawBlocks) as import("@maipai/spec/gen/ts/answer-block.js").AnswerBlock[] } : {}), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksFor(r, rawBlocks, rawAnswerImages), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

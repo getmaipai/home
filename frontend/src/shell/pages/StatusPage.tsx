@@ -1,13 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { Timeline } from "@maipai/ui/src/elements/timeline";
-import { StatusComponents } from "@/shell/pages/status/StatusComponents";
+import { StatusLegend, StatusPartsBody } from "@/shell/pages/status/StatusComponents";
 import { StatusBanner } from "@/shell/pages/status/StatusBanner";
-import { StatusIncident } from "@/shell/pages/status/StatusIncident";
+import { StatusIncidentBody, statusIncidentFacts } from "@/shell/pages/status/StatusIncident";
 import { api, isOwnerOrAdminRole, type HealthStatus, type Roster, type StatusHistory } from "@/lib/api";
 import { statusSummary } from "@/shell/statusSummary";
 import { useTabItem } from "@/shell/tabIdentity";
 import { getIcon } from "@maipai/ui/src/icons";
-import { StatusBoardNotes, StatusMaintenanceCard, STATUS_BOARD_QUERY_KEY } from "@/shell/pages/status/StatusBoard";
+import { MaintenanceDialog, StatusBoardNotes, StatusMaintenanceBody, STATUS_BOARD_QUERY_KEY } from "@/shell/pages/status/StatusBoard";
 import { activeMaintenanceParts } from "@/shell/pages/status/statusBoardFormat";
 import { StatusApps } from "@/shell/pages/status/StatusApps";
 import { useStatusApps } from "@/shell/useStatusApps";
@@ -46,6 +46,9 @@ export function StatusPage({ person }: { person: Roster }) {
     ? { ...appSummary, level: "maintenance" as const, text: "Maintenance", message: "Scheduled work is underway." }
     : appSummary;
   const appReason = appSummary.level === "online" ? undefined : appSummary.message;
+  const incident = statusIncidentFacts({ level: summary.level, problems: summary.problems, history: historyQuery.data, appReason });
+  const AlertIcon = getIcon("alert-triangle");
+  const admin = isOwnerOrAdminRole(person.role);
 
   return (
     <>
@@ -64,11 +67,20 @@ export function StatusPage({ person }: { person: Roster }) {
           </dl> : null}
         </CardContent>
       </Card> : null}
-      <StatusIncident level={summary.level} problems={summary.problems} history={historyQuery.data} appReason={appReason} />
-      {appsQuery.data ? <StatusApps person={person} apps={apps} behindTheScenes={canSeeParts && healthQuery.data ? <StatusComponents person={person} health={healthQuery.data} maintenance={maintenance} history={historyQuery.data} engineComputer={engineComputerQuery.data} /> : undefined} /> : null}
+      {incident ? <Card>
+        <CardHeader><CardTitle><AlertIcon className={`mr-2 inline size-5 ${incident.amber ? "text-attention-fg" : "text-destructive"}`} aria-hidden="true" />{incident.title}</CardTitle></CardHeader>
+        <CardContent><StatusIncidentBody facts={incident} /></CardContent>
+      </Card> : null}
+      {appsQuery.data ? <StatusApps person={person} apps={apps} behindTheScenes={canSeeParts && healthQuery.data ? <Card>
+        <CardHeader><CardTitle>Parts</CardTitle><StatusLegend /></CardHeader>
+        <CardContent><div className="flex flex-col divide-y divide-border"><StatusPartsBody person={person} health={healthQuery.data} maintenance={maintenance} history={historyQuery.data} engineComputer={engineComputerQuery.data} /></div></CardContent>
+      </Card> : undefined} /> : null}
       </div>
       {canSeeParts && incidentEvents.length ? <><h3 className="mt-4 mb-2 text-sm font-semibold">Recent problems</h3><Timeline events={incidentEvents} visibleCount={incidentEvents.length} animate={false} /></> : null}
-      {boardData || isOwnerOrAdminRole(person.role) ? <div className="mt-4"><StatusMaintenanceCard person={person} windows={boardData?.maintenance ?? []} /></div> : null}
+      {(boardData?.maintenance.length ?? 0) > 0 || admin ? <div className="mt-4"><Card>
+        <CardHeader><CardTitle>Scheduled maintenance</CardTitle></CardHeader>
+        <CardContent><div className="flex flex-col gap-3">{admin ? <div className="flex justify-end"><MaintenanceDialog /></div> : null}<StatusMaintenanceBody admin={admin} windows={boardData?.maintenance ?? []} /></div></CardContent>
+      </Card></div> : null}
     </>
   );
 }

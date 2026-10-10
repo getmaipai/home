@@ -40,7 +40,7 @@ test.each([
 
   try {
     const view = render(
-      <MemoryRouter initialEntries={["/next"]}>
+      <MemoryRouter initialEntries={["/"]}>
         <TooltipProvider>
           <SidebarProvider defaultOpen>
             <SidebarLayout />

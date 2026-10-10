@@ -312,6 +312,30 @@ way `SEARXNG_PAGE_RATE_LIMIT` already is (CLAUDE.md's own Third-party
 services rule) - never shared with SearXNG's own budget, the exact
 class of bug SEARCH-PACE-01's own follow-up just fixed for page reads.
 
+**Reworked by KS-02 (2026-10-09), off switch restored by KS-02-PRIV.** The key
+`search.wikipedia_fallback` (household, boolean, default on) stays declared in
+`searchKeys.ts` as the visible off switch for `wikimedia-live`: a stored
+`false` means the live call is never made, and unset keeps the default. (This is a stopgap: KS-MODE-01's live | offline | mix setting will map a
+stored `false` to `offline`.) (KS-02
+first retired it, which silently re-enabled the call for households that had
+turned it off; PRIVACY.md forbids overriding a stored privacy choice.) The live
+Wikipedia call is now the `wikimedia-live` source, defined once in
+`src/lib/wikimediaLive.ts` (base URL, the `wikipedia` rate-limit bucket).
+It runs only for an adult's search that SearXNG and the hosted provider could
+not answer AND the offline library (tier K) had no match for; a child or teen
+never reaches it. The `wikimedia_live_call` and `wikimedia_live_skipped_k_match`
+counters (band-labelled, closed names) show how often it fires. The model
+chooses where to look with the `scope` argument on `websearch` ("reference",
+"web", or omitted for both), handled by `federatedLookup` in
+`src/lib/retrieval/lookup.ts`: no classifier, no keyword rule, no ladder.
+`scope: reference` never calls the web side; `scope: web` adds `time_range=month`
+when the words name no year and leads with the library article when one
+matches. Library rows are labelled (`kind: "reference"`, source, licence,
+snapshot date) and link to the proxy page `/api/reference/<book>/<path>`
+(`src/routes/reference.ts`), which re-reads the article through the same
+closed per-band list and minor's floor as a search. The text below is the
+history of the fallback as first built.
+
 **The setting, and the real cross-repo cost of adding one.**
 `search.wikipedia_fallback` (household, boolean, default true,
 `searchKeys.ts`) - a real settings key, not the `configurable: false`
@@ -34344,7 +34368,7 @@ writes markers and a record and moves no file.
 | `tts-models` | `voice/tts/` | the TTS engine's Python, packages and model weights, today in `~/.cache/uv` and `~/.cache/huggingface` | 1 to 3 GB | written once, read at engine start |
 | `vision-models` | `vision/models/` | face detection and embedding models served to browsers | tens of MB | written once, read on request |
 | `logs` | `logs/` | the hub's structured logs, rotated | up to the rotation cap | appends |
-| `cache` | `cache/` | package fetch responses | MB | small random writes |
+| `cache` | `cache/` | package fetch responses; knowledge.db (the reference reader's extracted-article cache) | MB | small random writes |
 | `favicons` | `favicons/` | source icons and their index | MB | small random writes |
 | `runtime` | `local-app/` | `engine-pids.json`, the running engines' pids | bytes | rewritten on each engine start |
 | `labels` | `labels/` | weekly turn-label exports from `scripts/bench/labels.ts` | KB to MB | written by an operator's export |
@@ -36183,6 +36207,24 @@ Implemented the hub half of the robot channel against `spec-v0.1.76`. `GET /api/
 Fail-first coverage exercises an unauthenticated upgrade, disconnected command replay and ack, mute state update, device and person settings delivery, time envelope, both heartbeat directions, and connection replacement. The device-session route allowlist was extended only for this exact GET path. Low review completed, with medium scrutiny on that auth allowlist and the command/heartbeat wire shapes.
 
 The final `bash scripts/check.sh` passed: backend 4,732/4,732, scripts 82/82, frontend 1,355/1,355, with typecheck, lint, build, a11y, docs, and standards checks green. Two intermediate runs exposed unrelated timing-sensitive failures (`partialRestore` temporary backup read, then `summaryRefresh` duplicate debounce); each passed alone, and the final sharded gate passed. Full output is in `data-scratch/chat-ab/a47-gate.log`.
+
+## IMG-QUALITY-01a: five tiles, a disc and label veto, and a result line that stops inventing looks (2026-10-10)
+
+Found in the judged live sample after IMG-OFFER-01. Owner decided five tiles; the architect ruled APPROVED (`data-scratch/architect/IMG-QUALITY-01.verdict`).
+
+Five tiles: `GALLERY_VISIBLE` in `answerImages/gallery.ts` is the one constant (5). `select.ts` imports it instead of keeping its own copy, and the lone-extra rule (a set one tile over the row is cut back, so the badge never reads +1) follows it. `ANSWER_IMAGES_MAX_CANDIDATES` (two per tile plus four spare, 14) is the cap `select.ts` and `fetch.ts` share, `PER_SOURCE_SLOTS` is two per tile plus two (12), and `COMMONS_ENOUGH` is the row itself, so the open web still only fills a row Commons cannot. The fetch host rate allowance follows the cap. The spec `image_gallery` props (`maxVisible` is an integer of at least 1) and the kit Element (default 6, clamps to the picture count) take 5 with the +N badge, so no commons change was needed. A turn stored before this change keeps its own stored `visible` (3), so it renders as it did.
+
+Non-photo veto: `relevance.ts` gains `disc_or_label`, a closed vocabulary (disc, vinyl, label, sleeve, album or CD cover, 45 and 78 rpm) read from the file's own title, name, description and visible categories, with the subject's own name and Wikidata description exempt, and not applied to an article's lead image. It is counted on the trace as `dropped_by_relevance.disc_or_label`. It reads nothing the person wrote. The geometry check in `quality.ts` was not added.
+
+Result line: this supersedes the ANSWER-IMG-05b clause that let the model describe the subject "yourself if asked". With it the model invented "white glove and fedora" for a person it had not seen. `showImagesResultLine` (and the package recipe that carries the same text) now says the photos are on their screen, the model has not seen them, it must not say what they show or how the subject looks in them, it answers other questions from what it knows, and it never mentions the photos. The line is the same whatever the pipeline finds. The `show_images` manifest description and `kind` argument are untouched. Consequence for the owner: "what does he look like" is no longer answered from the model's knowledge; the person sees the pictures and the model does not describe them.
+
+## IMG-OFFER-01: `show_images` on for adults, below the recall bar, by owner ruling (2026-10-10)
+
+Owner ruling (Jesse, 2026-10-10, via the question form): turn `show_images` on for adult profiles only, even though the last bench measured recall 80% against the 85% bar (and +1.14 s first text when called alone against +1.0 s). He also accepts incidental strangers in adult picture galleries, so the SearXNG picture sources stay on with no public-figure-only restriction. ANSWER-IMG-05's bars are waived by this ruling; the measured miss stays on record in the ANSWER-IMG-05 section below.
+
+As built: `backend/packages/show_images/manifest.json` carries `offer: {mode: "conditional", gate: "answerImagesAllowed", bench_row: "answer-images", reason: ...}`, and `modelCatalog.ts` is untouched (`tools_offered` is derived from manifests). `answerImagesAllowed` (`answerImages/turn.ts`) now admits an adult alone: a teen is never offered the tool, and a child is not either, even once a parent turned `reference.images` on (that setting no longer reaches the child's tool list). Spoken, glance, temporary, bare and ephemeral turns stay off, and an adult who turned `reference.images` off is not offered it. A forged `show_images` call from a teen or a child still gets the fixed unavailable line, runs no fetch and stores no gallery block (`tool.ts` checks the turn's own flag, not the tool list). The bench dataset rows for the teen and the child with pictures on moved from visual to `n/a` (must not be offered).
+
+Re-run trigger and back-off rule: re-run `backend/scripts/bench/answer-images.ts` on a quiet machine by 2026-11-10 (or at the next chat model or Stack engine change, whichever comes first). If recall or the called-alone first-text cost is worse than the 80% and +1.14 s recorded here, set the manifest offer back to `{"mode":"off","reason":"..."}`; it goes back to mode off if the re-run is worse. A re-run at or above 85% and +1.0 s closes the waiver.
 
 ## ANSWER-IMG-05: the picture bench, and why `show_images` stays off (2026-10-06)
 

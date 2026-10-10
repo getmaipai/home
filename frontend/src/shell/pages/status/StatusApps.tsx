@@ -51,7 +51,7 @@ function AppNeeds({ appId, needs }: { appId: string; needs: StatusAppNeed[] }) {
       <ul className="divide-y divide-border">{working.map((need) => <NeedRow key={`${need.kind}:${need.id}`} need={need} />)}</ul>
     </section> : null}
     {unused.length ? <Collapsible>
-      <CollapsibleTrigger className="flex min-h-12 w-full items-center justify-between gap-3 rounded-md text-left text-sm text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <CollapsibleTrigger render={<Button type="button" variant="ghost" size="sm" />}>
         <span>No recent use: {unused.length} services</span><span aria-hidden="true">⌄</span>
       </CollapsibleTrigger>
       <CollapsibleContent>
@@ -85,8 +85,8 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
   </div>;
 
   const ChevronDown = getIcon("chevron-down");
-  return <Collapsible open={open} onOpenChange={setOpen}>
-    <div className="flex flex-col gap-2 py-3">
+  return <div className="py-3"><Collapsible open={open} onOpenChange={setOpen}>
+    <div className="flex flex-col gap-2">
       <div className="flex min-h-12 flex-wrap items-center gap-3">
         <span className="mr-auto font-medium">{app.name}</span>
         <span className="ml-auto flex max-w-full flex-wrap items-center justify-end gap-2">
@@ -103,7 +103,7 @@ function AppRow({ app, canExpand }: { app: StatusApp; canExpand: boolean }) {
       {summaryContent}
       {details ? <CollapsibleContent id={detailsId} keepMounted>{details}</CollapsibleContent> : null}
     </div>
-  </Collapsible>;
+  </Collapsible></div>;
 }
 
 export function StatusApps({ person, apps, behindTheScenes }: { person: Roster; apps: StatusApp[]; behindTheScenes?: ReactNode }) {
@@ -111,8 +111,10 @@ export function StatusApps({ person, apps, behindTheScenes }: { person: Roster; 
   return <>
     <Card>
       <CardHeader><CardTitle>Apps</CardTitle></CardHeader>
-      <CardContent className="flex flex-col divide-y divide-border">
-        {apps.map((app) => <AppRow key={app.id} app={app} canExpand={canSeeNeeds} />)}
+      <CardContent>
+        <div className="flex flex-col divide-y divide-border">
+          {apps.map((app) => <AppRow key={app.id} app={app} canExpand={canSeeNeeds} />)}
+        </div>
       </CardContent>
     </Card>
     {canSeeNeeds && behindTheScenes ? <section aria-labelledby="behind-scenes-title" className="flex flex-col gap-4">

@@ -1,8 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Alert } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Status } from "@maipai/ui/src/ui/status";
 import { UptimeStrip } from "@maipai/ui/src/ui/uptime-strip";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
@@ -13,7 +11,7 @@ import { api, ApiError, isOwnerOrAdminRole, type EngineComputerStatus as EngineC
 import { dayData, statusStripSummary } from "@/shell/pages/status/statusHistoryFormat";
 import "@/shell/pages/status/statusLegend.css";
 
-interface StatusComponentsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; engineComputer?: EngineComputerStatusData; }
+interface StatusPartsProps { person: Roster; health: HealthStatus; maintenance?: string[]; history?: StatusHistory; engineComputer?: EngineComputerStatusData; }
 type EngineKey = keyof HealthStatus["engines"];
 type StatusPartId = EngineKey | "library" | "hub";
 type EngineState = { label: string; status: "online" | "offline" | "degraded" };
@@ -55,7 +53,13 @@ export function formatUptime(seconds: number): string {
 
 const HEALTH_QUERY_KEY = ["health"];
 
-export function StatusComponents({ person, health: initialHealth, maintenance = [], history, engineComputer }: StatusComponentsProps) {
+/** The "Last 90 days" key under the Parts title. */
+export function StatusLegend() {
+  return <>{/* deliberate type-floor exception: compact status legend */}<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="mr-1">Last 90 days</span>{([["fine", "Fine"], ["slow", "Slow"], ["down", "Down"], ["maintenance", "Maintenance"]] as const).map(([status, label]) => <span key={status} className="inline-flex items-center gap-1.5"><span aria-hidden="true" data-status-legend={status} className="size-2 rounded-sm" />{label}</span>)}</div></>;
+}
+
+/** The rows inside the page's "Parts" card (the page supplies the divided column): data, polling and the restart / start / stop controls. */
+export function StatusPartsBody({ person, health: initialHealth, maintenance = [], history, engineComputer }: StatusPartsProps) {
   const query = useQuery<HealthStatus>({ queryKey: HEALTH_QUERY_KEY, queryFn: () => api.health(), refetchInterval: 15_000, initialData: initialHealth });
   const health = query.data ?? initialHealth;
   const [pendingRole, setPendingRole] = useState<EngineKey | null>(null);
@@ -99,9 +103,7 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
     { ...ENGINE_ROWS.find((row) => row.key === "hub")!, state: { label: "Running", status: "online" as const } },
   ];
 
-  return <Card>
-    <CardHeader><CardTitle>Parts</CardTitle>{/* deliberate type-floor exception: compact status legend */}<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"><span className="mr-1">Last 90 days</span>{([["fine", "Fine"], ["slow", "Slow"], ["down", "Down"], ["maintenance", "Maintenance"]] as const).map(([status, label]) => <span key={status} className="inline-flex items-center gap-1.5"><span aria-hidden="true" data-status-legend={status} className="size-2 rounded-sm" />{label}</span>)}</div></CardHeader>
-    <CardContent className="flex flex-col divide-y divide-border">
+  return <>
       {health.engines.chat.context_message ? <p className="py-2 text-sm text-muted-foreground">{health.engines.chat.context_message}</p> : null}
       {health.engines.chat.context_per_slot ? <p className="py-2 text-sm text-muted-foreground">Chat window: {health.engines.chat.context_per_slot.toLocaleString()} tokens per slot ({health.engines.chat.context_slots} {health.engines.chat.context_slots === 1 ? "slot" : "slots"}).</p> : null}
       {rows.map((row) => {
@@ -119,18 +121,8 @@ export function StatusComponents({ person, health: initialHealth, maintenance = 
           {ENGINE_HEALTH_ROWS.some((engine) => engine.key === row.key) && engineComputer?.configured && engineComputer.state !== "working" && state.status === "offline" ? <p className="pl-8 text-sm text-muted-foreground">This part cannot reach the engine computer: {engineComputer.reason ?? "the connection is unavailable."}</p> : null}
         </div>;
       })}
-    </CardContent>
     <AlertDialog open={pendingRole !== null} onOpenChange={(open) => { if (!open && restartingRole === null) setPendingRole(null); }}>
           <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Restart {ENGINE_HEALTH_ROWS.find((row) => row.key === pendingRole)?.label ?? "part"}?</AlertDialogTitle><AlertDialogDescription>Anything using it will pause for a moment.{pendingRole === "chat" ? " A reply being written right now will be cut off." : ""}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel disabled={restartingRole !== null}>Cancel</AlertDialogCancel><Button variant="destructive" onClick={handleRestart} disabled={restartingRole !== null}>{restartingRole !== null ? "Restarting…" : "Restart"}</Button></AlertDialogFooter></AlertDialogContent>
     </AlertDialog>
-  </Card>;
-}
-
-export function OverallBanner({ summary, health }: { summary: { level: "online" | "degraded" | "offline" | "maintenance"; problems: string[] }; health?: HealthStatus }) {
-  const sentence = summary.level === "online" ? `Everything is running.${health ? ` Up for ${formatUptime(health.uptimeSeconds)}.` : ""}`
-    : summary.level === "degraded" ? "Something is starting up or slow."
-      : summary.level === "maintenance" ? "Some parts are under maintenance."
-        : `${summary.problems.join(", ").replace(/, ([^,]*)$/, " and $1")} ${summary.problems.length === 1 ? "isn't" : "aren't"} running.`;
-  const state = summary.level === "offline" ? "offline" : summary.level;
-  return <Alert className="flex flex-wrap items-center gap-3"><Status status={state}>{summary.level === "online" ? "Online" : summary.level === "offline" ? "Offline" : summary.level === "maintenance" ? "Maintenance" : "Degraded"}</Status><p className="min-w-0 text-base" role="status">{sentence}</p></Alert>;
+  </>;
 }

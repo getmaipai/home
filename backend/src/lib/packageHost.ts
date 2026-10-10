@@ -67,6 +67,9 @@ import * as memory from "@/lib/memory";
 import { deleteAttachmentsForPerson } from "@/lib/attachments";
 import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { WIKIMEDIA_LIVE_RATE_LIMIT, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, wikimediaLiveBaseUrl } from "@/lib/wikimediaLive";
+import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
+import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
@@ -172,8 +175,8 @@ const SEARXNG_PAGE_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
 // rate limiter" - its own key and budget, a different host from SearXNG
 // entirely, sized the identical "a page every few seconds" way
 // SEARXNG_PAGE_RATE_LIMIT already is.
-const WIKIPEDIA_RATE_LIMIT_KEY = "wikipedia";
-const WIKIPEDIA_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
+const WIKIPEDIA_RATE_LIMIT_KEY = WIKIMEDIA_LIVE_RATE_LIMIT_KEY;
+const WIKIPEDIA_RATE_LIMIT = WIKIMEDIA_LIVE_RATE_LIMIT;
 // A review, 2026-09-24, named a real, accepted cost: on a full SearXNG
 // outage, its own 10s timeout plus Wikipedia's two sequential 10s
 // fetches (search, then the summary) can stack to roughly 30s worst
@@ -191,9 +194,8 @@ const WIKIPEDIA_RATE_LIMIT = { capacity: 3, refillPerSecond: 0.5 };
 // lets a test point this at a local fixture instead of the real
 // en.wikipedia.org, never read outside a test (nothing sets it in any
 // real deployment).
-function wikipediaBaseUrl(): string {
-  return process.env.MAIPAI_WIKIPEDIA_BASE_URL ?? "https://en.wikipedia.org";
-}
+// KS-02: the definition moved to wikimediaLive.ts (one place, one budget).
+const wikipediaBaseUrl = wikimediaLiveBaseUrl;
 
 // The recipe schema's own comment on `home_call_service_step`
 // ("security domains are never covered by a wildcard target") named a
@@ -1015,7 +1017,7 @@ export function __resetSearchCacheForTests(): void {
   searchInFlight.clear();
 }
 
-type SearchOptions = { allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number };
+type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number };
 
 export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
   const parentSignal = opts.signal;
@@ -1049,7 +1051,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
   const rotated = rotationPool ? pickSearchEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
   const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
-  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", opts.timeRange ?? "", opts.allowWikipediaFallback === false ? "no-live-fallback" : "", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
   const now = Date.now();
   const cached = searchCache.get(key);
   if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
@@ -1227,7 +1229,7 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
   // outright over a filter that couldn't be built.
   const safeEngines = opts.safeEngines !== undefined ? opts.safeEngines : opts.safeSearchLevel === "strict" || opts.safeSearchLevel === "moderate" ? await safesearchEnginesFor(baseUrl, isImages ? "images" : "general", opts) : null;
   const engines = safeEngines && safeEngines.length > 0 ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
-  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}`;
+  const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json${category}&safesearch=${safesearchLevel}${engines}${opts.timeRange ? `&time_range=${opts.timeRange}` : ""}`;
   if (!consumeSearxngRequestToken()) {
     throw new HostError("rate_limited", "Web search is rate-limited - try again shortly");
   }
@@ -1315,6 +1317,10 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
       // distinction, unchanged) - it just, on its own, has nothing to
       // answer a household member's question from, and Wikipedia is
       // one more real chance to before giving up.
+      if (text === SEARXNG_NO_RESULTS_TEXT && !allowWikipediaFallback && opts.kMatched && opts.speakerBand === "adult") {
+        // KS-02: the library answered, so the live Wikimedia call that would have run is skipped.
+        bumpReferenceCounter("wikimedia_live_skipped_k_match", "adult");
+      }
       if (text === SEARXNG_NO_RESULTS_TEXT && allowWikipediaFallback) {
         const fallback = await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand);
         if (fallback) {
@@ -1508,18 +1514,20 @@ export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand)
   return { ...rest, text, rows, ...(pages && pages.length > 0 ? { pages } : {}), ...(dropped > 0 ? { floor_dropped: dropped } : {}) };
 }
 
-/** SEARCH-FALLBACK-01's own gate: `search.wikipedia_fallback` (default
- * true, `searchKeys.ts`) - a household can turn this off independently
- * of web search itself, though it only ever runs when web search is
- * already configured and already failed or found nothing (this
- * function is only ever called from inside `searxngSearch()`, which
- * itself already refused to run at all if `search.searxng_url` were
- * unset). `null` on any failure, the identical "the caller falls back
- * to what it already had" contract `wikipediaFallback()` itself uses. */
+/** KS-02: the live Wikimedia fallback's gate. Adults only (a child's or teen's
+ * query never leaves for it), and it counts every call. The household
+ * setting `search.wikipedia_fallback` stays as the off switch (false means
+ * never called); `wikimedia-live` is also a disclosed data source of the
+ * websearch package, and lookup()
+ * calls this only when the offline library had no title match. `null` on
+ * any failure, the identical "the caller falls back to what it already had"
+ * contract `wikipediaFallback()` itself uses. */
 async function tryWikipediaFallback(query: string, signal?: AbortSignal, deadlineAt?: number, speakerBand?: "child" | "teen" | "adult"): Promise<SearxngSearchResult | null> {
   if (speakerBand !== "adult") return null;
-  const enabled = getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined;
-  if (enabled === false) return null;
+  // KS-02-PRIV: the household's off switch (`search.wikipedia_fallback`, default true) is honoured again.
+  // STOPGAP: KS-MODE-01 (live | offline | mix) will map a stored false to `offline`.
+  if ((getHouseholdSettingValue("search.wikipedia_fallback") as boolean | undefined) === false) return null;
+  bumpReferenceCounter("wikimedia_live_call", speakerBand);
   return wikipediaFallback(query, signal, deadlineAt);
 }
 
@@ -2125,12 +2133,19 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const safeSearchLevel = resolveSafeSearchLevel(getPersonSettingValue(actor, "search.safe_search"), band);
           // THIN-4H: an adult's query goes to the optional hosted provider when a key is set; null means SearXNG.
           const input = args as { query?: unknown; category?: unknown } | undefined;
-          const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
-          if (hosted) return hosted;
           // THIN-INC row 4 (rule 12, Incognito): a temporary chat's query is not kept in the in-process
           // result cache either, so a later lookup of the same words, by anyone, is a fresh one.
           const temporary = turn?.conversationId !== undefined && isTemporaryConversation(turn.conversationId);
-          return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}) });
+          const webSide = async (ctx: { kMatched: boolean; timeRange: "month" | undefined }) => {
+            const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
+            if (hosted) return hosted;
+            return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { allowWikipediaFallback: false, kMatched: true } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) });
+          };
+          // KS-02: the model's `scope` argument. An image search, or a call with no query, is the
+          // old single path: the library has no pictures and nothing to look up.
+          const scopeArg = (args as { scope?: unknown } | undefined)?.scope;
+          if (typeof input?.query !== "string" || input.query.length === 0 || input.category === "images") return webSide({ kMatched: false, timeRange: undefined });
+          return federatedLookup({ query: input.query, band, scope: parseScope(scopeArg), web: webSide });
         }
         if (id === "searxng" && method === "page.read") {
           const doc = await searxngPageRead(args, runtime.signal);

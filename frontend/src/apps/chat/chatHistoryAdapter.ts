@@ -184,7 +184,7 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length || row.answer_images || row.blocks?.length
+        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.sources?.length || row.blocks?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
@@ -201,9 +201,10 @@ export function rowsToBranchableMessages(
               // at write time), so no additional freshness handling is
               // needed here: `open` is already correct by the time it
               // reaches this adapter.
-              // ANSWER-IMG-04 and GENUI-13c: the stored picture set and answer blocks, each at its own paragraph of
-              // the text (the stored text is split with the spec's paragraph helper), where they were shown live.
-              ...textWithAnswerParts(row.replyText, { blocks: row.blocks, images: row.answer_images, imagesId: `${row.id}-images` }),
+              // GENUI-13c and GENUI-05: the stored answer blocks (a picture gallery included; a turn stored before
+              // GENUI-05 arrives as one), each at its own paragraph of the text (split with the spec's paragraph
+              // helper), where they were shown live.
+              ...textWithAnswerParts(row.replyText, { blocks: row.blocks }),
               // APPROVE-CALM-01: under the reply that asks, as live.
               ...(row.confirm ? [toolCallPart(`${row.id}-confirm`, "confirm", { package_id: row.confirm.package_id, open: row.confirm.open, turn_id: row.id })] : []),
               // PROJECT-PROGRESS-01: conversationHistory.ts's own

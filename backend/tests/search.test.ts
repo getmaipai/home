@@ -90,7 +90,7 @@ describe("GET /api/search: conversations", () => {
     updateConversationTitle(actor, conv.value.id, "Pizza night plans");
     const groups = await search(client, "pizza");
     const conversations = group(groups, "conversation");
-    expect(conversations?.results).toEqual([{ kind: "conversation", id: conv.value.id, title: "Pizza night plans", href: `/next/chat?conversation=${conv.value.id}` }]);
+    expect(conversations?.results).toEqual([{ kind: "conversation", id: conv.value.id, title: "Pizza night plans", href: `/chat?conversation=${conv.value.id}` }]);
   });
 
   test("a temporary chat never appears", async () => {
@@ -119,7 +119,7 @@ describe("GET /api/search: people", () => {
     await client.post("/api/people", { displayName: "Bramble", role: "child" });
     const groups = await search(client, "bram");
     const found = group(groups, "person")?.results.find((r) => r.title === "Bramble");
-    expect(found).toMatchObject({ kind: "person", title: "Bramble", subtitle: "child", href: "/next/people" });
+    expect(found).toMatchObject({ kind: "person", title: "Bramble", subtitle: "child", href: "/people" });
   });
 
   test("a child actor sees the household roster the same way the People page does - the route's own established rule, no narrower filter invented here", async () => {
@@ -136,7 +136,7 @@ describe("GET /api/search: apps", () => {
   test("a word from a bundled package's own display name lists it, opening the Apps page", async () => {
     const { client } = await owner();
     const groups = await search(client, "math");
-    expect(group(groups, "app")?.results).toContainEqual({ kind: "app", id: "math", title: "Math", subtitle: "Calculate a math expression.", href: "/next/apps" });
+    expect(group(groups, "app")?.results).toContainEqual({ kind: "app", id: "math", title: "Math", subtitle: "Calculate a math expression.", href: "/apps" });
   });
 });
 

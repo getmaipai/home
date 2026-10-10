@@ -3,11 +3,16 @@ import { Timeline } from "@maipai/ui/src/elements/timeline";
 import { ApiError, type Roster, type Dashboard } from "@/lib/api";
 import { useDashboard } from "@/shell/useDashboard";
 import { Greeting } from "@/shell/pages/dashboard/Greeting";
-import { PeopleCountCard } from "@/shell/pages/dashboard/PeopleCountCard";
-import { UpdatesCard } from "@/shell/pages/dashboard/UpdatesCard";
-import { RepairsCard } from "@/shell/pages/dashboard/RepairsCard";
+import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { getIcon } from "@maipai/ui/src/icons";
+import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
+import { StatBody, StatLink } from "@/shell/pages/dashboard/StatCard";
+import { UpdatesStat } from "@/shell/pages/dashboard/UpdatesCard";
 import { recentActivityEvents } from "@/shell/pages/dashboard/recentActivityEvents";
 import { useTabItem } from "@/shell/tabIdentity";
+
+const UsersIcon = getIcon("users");
+const WrenchIcon = getIcon("wrench");
 
 /** The dashboard reads one route. Recent activity is presented by the
  * shipped Timeline from the route's existing rows; no extra person data
@@ -41,14 +46,14 @@ export function DashboardPage({ person }: { person: Roster }) {
             </div>
             <div className="grid grid-cols-12 gap-4">
               <div className="lg:col-span-3 col-span-6">
-                <PeopleCountCard count={data.people_count} />
+                <Card><CardContent><StatBody icon={UsersIcon}><NumberTicker value={data.people_count} label="People" /></StatBody></CardContent></Card>
               </div>
               <div className="lg:col-span-3 col-span-6">
-                <UpdatesCard available={data.updates_available} />
+                <StatLink to="/updates"><Card><CardContent><UpdatesStat available={data.updates_available} /></CardContent></Card></StatLink>
               </div>
               {showRepairs && (
                 <div className="lg:col-span-3 col-span-6">
-                  <RepairsCard open={data.repairs_open!} />
+                  <StatLink to="/repairs"><Card><CardContent><StatBody icon={WrenchIcon}><NumberTicker value={data.repairs_open!} label="Repairs" /></StatBody></CardContent></Card></StatLink>
                 </div>
               )}
               <div className="lg:col-span-5 col-span-12">

@@ -128,7 +128,6 @@ export function VoiceCatalogSection({ personId, householdManagement = false }: V
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by name (e.g. vctk, ears, expresso)"
             aria-label="Search the voice catalog"
-            className="w-full"
           />
           {selectError ? <p className="text-base text-[var(--destructive)]">{selectError}</p> : null}
           {search.trim().length > 0 && search.trim().length < MIN_SEARCH_LENGTH ? (

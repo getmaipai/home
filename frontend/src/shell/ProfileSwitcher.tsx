@@ -182,7 +182,7 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut, extraActions, d
               {extraActions ? (
                 <>
                   {extraActions(close)}
-                  <Separator className="my-1" />
+                  <Separator />
                 </>
               ) : null}
               <p className="px-2 py-1 text-sm text-muted-foreground">Switch profile</p>
@@ -206,7 +206,7 @@ export function ProfileSwitcher({ person, onSwitched, onSignOut, extraActions, d
                 ))
               )}
               {error ? <p className="px-2 text-sm text-destructive">{error}</p> : null}
-              <Separator className="my-1" />
+              <Separator />
               {/* "Profile" opens the signed-in person's own profile
                   (owner ruling, "Navigation, corrected," 2026-09-20) -
                   where Memories moved once they left the rail. */}

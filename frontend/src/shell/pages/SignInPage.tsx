@@ -57,11 +57,13 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-accent px-4">
-      <Card className="w-full max-w-md border-none p-6 shadow-lg">
+      <div className="w-full max-w-md">
+      <Card>
         <div className="mx-auto w-fit">
           <FullLogo />
         </div>
-        <CardContent className="flex flex-col gap-4 p-0 pt-4">
+        <CardContent>
+          <div className="flex flex-col gap-4">
           <AsyncState
             data={profilesQuery.data}
             error={profilesQuery.isError}
@@ -77,10 +79,12 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
               profiles.length === 0 ? (
                 <Navigate to="/setup" replace />
               ) : selected ? (
-                <form onSubmit={handleSecretSubmit} className="flex flex-col items-center gap-4">
-                  <Avatar name={selected.display_name} className="size-16 text-xl" />
-                  <h1 className="text-lg font-semibold">{selected.display_name}</h1>
-                  <div className="w-full space-y-1.5">
+                <form onSubmit={handleSecretSubmit} className="flex flex-col gap-4">
+                  <div className="flex flex-col items-center gap-4">
+                    <Avatar name={selected.display_name} className="size-16 text-xl" />
+                    <h1 className="text-lg font-semibold">{selected.display_name}</h1>
+                  </div>
+                  <div className="space-y-1.5">
                     <Label htmlFor="secret" className="text-sm font-normal text-muted-foreground">
                       PIN or password
                     </Label>
@@ -98,10 +102,10 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                     />
                   </div>
                   {secretError ? <p className="text-sm text-destructive">{secretError}</p> : null}
-                  <Button type="submit" size="lg" className="w-full rounded-lg" disabled={busy}>
+                  <Button type="submit" size="lg" disabled={busy}>
                     {busy ? "Signing in…" : "Sign in"}
                   </Button>
-                  <Button type="button" variant="ghost" size="lg" className="w-full rounded-lg" onClick={backToPicker}>
+                  <Button type="button" variant="ghost" size="lg" onClick={backToPicker}>
                     Back
                   </Button>
                 </form>
@@ -126,8 +130,10 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
               )
             }
           </AsyncState>
+          </div>
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }
