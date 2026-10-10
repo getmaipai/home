@@ -20,6 +20,12 @@ export const REFERENCE_COUNTER_NAMES = [
   "ingest_floor_dropped",
   "unavailable",
   "extract_empty",
+  "scope_reference",
+  "scope_web",
+  "scope_both",
+  "k_lead",
+  "wikimedia_live_call",
+  "wikimedia_live_skipped_k_match",
 ] as const;
 
 export type ReferenceCounterName = (typeof REFERENCE_COUNTER_NAMES)[number];

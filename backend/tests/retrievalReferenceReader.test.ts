@@ -139,7 +139,7 @@ describe("numbered sources and the snapshot line", () => {
     expect(out.rows.map((r) => r.n)).toEqual([4, 5]);
     expect(out.text).toContain("[4] ");
     expect(out.text).toContain("[5] ");
-    expect(out.text).toContain("This library copy is from 2026-09-02; anything newer is not in it.");
+    expect(out.text).toContain("This library copy is from 2026-09-02; for anything after that, search with scope web.");
     expect(out.text).toContain("Height: 40 m");
     expect(out.text).not.toMatch(/\[1\]|mw-parser-output|\{\{/);
   });

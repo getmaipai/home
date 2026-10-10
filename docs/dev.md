@@ -312,6 +312,25 @@ way `SEARXNG_PAGE_RATE_LIMIT` already is (CLAUDE.md's own Third-party
 services rule) - never shared with SearXNG's own budget, the exact
 class of bug SEARCH-PACE-01's own follow-up just fixed for page reads.
 
+**Superseded by KS-02 (2026-10-09).** The setting below is retired: the key
+`search.wikipedia_fallback` is gone from `searchKeys.ts`, and the live
+Wikipedia call is now the `wikimedia-live` source, defined once in
+`src/lib/wikimediaLive.ts` (base URL, the `wikipedia` rate-limit bucket).
+It runs only for an adult's search that SearXNG and the hosted provider could
+not answer AND the offline library (tier K) had no match for; a child or teen
+never reaches it. The `wikimedia_live_call` and `wikimedia_live_skipped_k_match`
+counters (band-labelled, closed names) show how often it fires. The model
+chooses where to look with the `scope` argument on `websearch` ("reference",
+"web", or omitted for both), handled by `federatedLookup` in
+`src/lib/retrieval/lookup.ts`: no classifier, no keyword rule, no ladder.
+`scope: reference` never calls the web side; `scope: web` adds `time_range=month`
+when the words name no year and leads with the library article when one
+matches. Library rows are labelled (`kind: "reference"`, source, licence,
+snapshot date) and link to the proxy page `/api/reference/<book>/<path>`
+(`src/routes/reference.ts`), which re-reads the article through the same
+closed per-band list and minor's floor as a search. The text below is the
+history of the fallback as first built.
+
 **The setting, and the real cross-repo cost of adding one.**
 `search.wikipedia_fallback` (household, boolean, default true,
 `searchKeys.ts`) - a real settings key, not the `configurable: false`
