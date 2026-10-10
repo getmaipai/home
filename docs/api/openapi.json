@@ -25668,6 +25668,61 @@
         }
       }
     },
+    "/api/reference/{book}/{path}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "A cited article from the home's offline library",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The article as a static page.",
+            "content": {
+              "text/html": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "That article is not in the library, or is not available to this person."
+          }
+        }
+      }
+    },
     "/api/dashboard": {
       "get": {
         "tags": [

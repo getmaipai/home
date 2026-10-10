@@ -398,16 +398,16 @@ describe("what the model is told about the websearch arguments", () => {
     return def.function as unknown as { description: string; parameters: { properties: Record<string, { description?: string }> } };
   };
 
-  test("the tool description covers dates and news and says the pages are read", () => {
-    const { description } = tool();
-    expect(description).toMatch(/you can search the web/i);
+  test("the tool description covers the library, the web, news and says the pages are read; the scope argument says when to use each", () => {
+    const { description, parameters } = tool();
+    expect(description).toMatch(/offline library/i);
+    expect(description).toMatch(/live web/i);
     expect(description).toMatch(/current events/i);
-    expect(description).toMatch(/anything that may have changed/i);
-    expect(description).toMatch(/you can search the web/i);
-    expect(description).toMatch(/current events/i);
-    expect(description).toMatch(/anything that may have changed/i);
     expect(description).toMatch(/news/i);
     expect(description).toMatch(/read the top pages/i);
+    const scope = parameters.properties.scope!.description ?? "";
+    expect(scope).toMatch(/anything that may have changed/i);
+    expect(scope).toMatch(/offline library/i);
   });
 
   test("a search has no picture category to set: pictures are show_images's own tool (ANSWER-IMG-02)", () => {

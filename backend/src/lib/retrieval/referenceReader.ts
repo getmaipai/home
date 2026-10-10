@@ -274,7 +274,7 @@ function renderRow(row: ReferenceRow): string {
 export function renderReferenceText(rows: readonly ReferenceRow[]): string {
   if (rows.length === 0) return "No article in the library matched.";
   const dates = [...new Set(rows.map((r) => r.snapshotDate).filter((d): d is string => d !== null))].sort();
-  const snapshot = dates.length > 0 ? `\n\nThis library copy is from ${dates[dates.length - 1]}; anything newer is not in it.` : "";
+  const snapshot = dates.length > 0 ? `\n\nThis library copy is from ${dates[dates.length - 1]}; for anything after that, search with scope web.` : "";
   return `${rows.map(renderRow).join("\n\n")}${snapshot}`;
 }
 
@@ -370,6 +370,33 @@ export async function lookupReference(input: ReferenceLookupInput, deps: Referen
       bumpReferenceCounter("unavailable", input.band);
       return NOT_FOUND("unavailable", { unavailableReason: err.reason });
     }
+    throw err;
+  }
+}
+
+/** KS-02: one cited article by book and path, for the proxy route a source
+ * card links to. It goes through the same closed per-band list, the same
+ * extract and cache, and the same release point as a lookup, so a link
+ * cannot reach what a search could not. `null` for anything that is not
+ * readable by this band, not installed, or dropped by the floor. */
+export async function readReferencePage(input: { book: string; path: string; band: AgeBand }, deps: ReferenceReaderDeps = {}): Promise<ReferenceRow | null> {
+  const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
+  if (!baseUrl || input.path.length === 0 || input.path.split("/").includes("..")) return null;
+  const ctx: Ctx = { baseUrl: baseUrl.replace(/\/+$/, ""), fetchImpl: deps.fetch ?? fetch, now: deps.now ?? Date.now, signal: AbortSignal.timeout(TOTAL_DEADLINE_MS) };
+  const db = deps.db === undefined ? sharedKnowledgeDb() : deps.db;
+  try {
+    const installed = await installedBooks(ctx);
+    if (!installed.includes(input.book)) return null;
+    const rb = readableBooks([input.book], input.band).books[0];
+    if (!rb) {
+      bumpReferenceCounter("source_excluded", input.band);
+      return null;
+    }
+    const candidate = await readArticle(ctx, db, rb, { title: input.path, path: input.path, exact: true });
+    if (!candidate) return null;
+    return releaseToBand([candidate], input.band, 1)[0] ?? null;
+  } catch (err) {
+    if (err instanceof Unavailable) return null;
     throw err;
   }
 }

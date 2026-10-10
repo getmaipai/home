@@ -1559,7 +1559,8 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
       // it into a false success; the point of this setup step is a
       // genuinely open issue, not a real live outage.
       setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
-      setHouseholdSettingValue("search.wikipedia_fallback", false);
+      // KS-02: the retired setting is replaced by pointing the live Wikimedia call at a closed port.
+      process.env.MAIPAI_WIKIPEDIA_BASE_URL = "http://127.0.0.1:1";
       const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
       try {
         await host.integration.call("searxng", "search", { query: "marlow" });
@@ -1570,8 +1571,8 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
       expect(listIssues().find((i) => i.source === "websearch" && i.key === "searxng_unreachable")).toBeDefined();
 
       // SearXNG recovers but genuinely finds nothing; Wikipedia helps
-      // now that the fallback is back on (its own real default).
-      setHouseholdSettingValue("search.wikipedia_fallback", true);
+      // now that the live Wikimedia call can reach its fixture again.
+      process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
       const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
       try {
         setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
@@ -1615,36 +1616,6 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
     }
   });
 
-  test("search.wikipedia_fallback=false: never even tries Wikipedia, even though it would have a match", async () => {
-    const wiki = startFakeWikipedia({ hasMatch: true });
-    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
-    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
-    try {
-      const actor = await owner();
-      setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
-      setHouseholdSettingValue("search.wikipedia_fallback", false);
-      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
-      try {
-        await host.integration.call("searxng", "search", { query: "marlow" });
-        throw new Error("should have thrown");
-      } catch (err) {
-        expect((err as HostError).message).toContain("could not reach");
-      }
-      expect(wiki.requests).toHaveLength(0);
-    } finally {
-      // Restored, never deleted (tests/preload.ts's own comment on
-      // why): a delete would erase the safe closed-port default preload
-      // sets for every OTHER test, not just this one.
-      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
-      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
-      wiki.stop();
-    }
-  });
-
-  // Wikimedia's own User-Agent policy (foundation.wikimedia.org/wiki/
-  // Policy:User-Agent_policy, verified 2026-09-24): "<client name>/
-  // <version> (<contact information>)" - a non-compliant request risks
-  // a 403 or silent throttling, the policy's own words.
   test("every Wikipedia request carries a policy-compliant User-Agent", async () => {
     const wiki = startFakeWikipedia({ hasMatch: true });
     const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
@@ -2269,7 +2240,6 @@ describe("SEARCH-BUDGET-01", () => {
   async function setupBudgetSearch(url: string): Promise<void> {
     await owner();
     setHouseholdSettingValue("search.searxng_url", url);
-    setHouseholdSettingValue("search.wikipedia_fallback", true);
     process.env.MAIPAI_WIKIPEDIA_BASE_URL = wikiBase;
   }
 
@@ -2369,10 +2339,9 @@ describe("SEARCH-BUDGET-01", () => {
     expect(fallbackCalls).toBe(0);
   });
 
-  async function searchAs(role: "child" | "teen" | "adult", setting = true) {
+  async function searchAs(role: "child" | "teen" | "adult") {
     const actor = { ...(await owner()), role } as Awaited<ReturnType<typeof owner>>;
     setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
-    setHouseholdSettingValue("search.wikipedia_fallback", setting);
     process.env.MAIPAI_WIKIPEDIA_BASE_URL = wikiBase;
     let fallbackCalls = 0;
     const realFetch = globalThis.fetch.bind(globalThis);
@@ -2406,17 +2375,11 @@ describe("SEARCH-BUDGET-01", () => {
     expect(getFallbackCalls()).toBe(0);
   });
 
-  test("an adult band with Wikipedia fallback enabled calls it and returns sources", async () => {
+  test("an adult band calls it and returns sources", async () => {
     const { host, getFallbackCalls } = await searchAs("adult");
     const result = await host.integration.call("searxng", "search", { query: "adult fallback query" }) as { rows: { title: string }[] };
     expect(result.rows[0]?.title).toBe("Budget result");
     expect(getFallbackCalls()).toBe(2);
-  });
-
-  test("an adult with Wikipedia fallback disabled never calls it", async () => {
-    const { host, getFallbackCalls } = await searchAs("adult", false);
-    await expect(host.integration.call("searxng", "search", { query: "adult disabled query" })).rejects.toBeInstanceOf(HostError);
-    expect(getFallbackCalls()).toBe(0);
   });
 
   test("spoken search keeps its existing 3s first-word shape, tool deadline, and retry shortening", () => {
