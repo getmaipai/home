@@ -2996,8 +2996,9 @@ async function captureRule9PagesReview(browser: Browser, ownerSession: string): 
   const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
   if (!childSession) throw new Error("rule9 review: the child sign-in carried no session cookie");
   const personas: Array<[string, string, Array<[string, string]>]> = [
-    ["admin", ownerSession, [["family", "/people"], ["profile-self", `/people/${sage.id}`], ["profile-child", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"]]],
-    ["child", childSession, [["family", "/people"], ["profile-self", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"]]],
+    ["admin", ownerSession, [["family", "/people"], ["profile-self", `/people/${sage.id}`], ["profile-child", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"], ["engines", "/settings/home/ai"]]],
+    ["child", childSession, [["family", "/people"], ["profile-self", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"]]],
+    ["signed-out", "", [["sign-in", "/sign-in"]]],
   ];
   for (const [who, session, pages] of personas) {
     for (const slug of ["desktop", "phone"] as const) {
@@ -3025,6 +3026,12 @@ async function captureRule9PagesReview(browser: Browser, ownerSession: string): 
             if (state.spinner || state.skeleton || state.alert.length) throw new Error(`rule9 review ${who} ${name} ${slug} ${theme} shows a loading or error state`);
             await settleAnimations(page);
             await page.screenshot({ path: join(outDir, `${who}-${name}-${viewport.width}-${theme}.png`), fullPage: true });
+            if (name === "engines") {
+              // The engines console draws below the section's own cards, inside the settings scroll area.
+              await page.getByRole("button", { name: "Check the connection" }).scrollIntoViewIfNeeded();
+              await settleAnimations(page);
+              await page.screenshot({ path: join(outDir, `${who}-${name}-console-${viewport.width}-${theme}.png`) });
+            }
           }
         } finally {
           await context.close();

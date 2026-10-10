@@ -123,17 +123,17 @@ export function UpdatesPage({ person }: { person: Roster }) {
   return (
     <>
       <div className="mb-4">
-        <CardHeader className="p-0">
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader>
+          <CardTitle><span className="flex items-center gap-2">
             <UpdatesIcon size={16} className="text-muted-foreground" />
             Updates
-          </CardTitle>
+          </span></CardTitle>
         </CardHeader>
       </div>
 
       {!canManage ? (
         <Card>
-          <CardContent className="p-6">
+          <CardContent>
             <p className="text-sm text-muted-foreground">Only an owner or admin can manage updates.</p>
           </CardContent>
         </Card>

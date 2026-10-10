@@ -2,17 +2,18 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { cleanup, render, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { getIcon } from "@maipai/ui/src/icons";
-import { StatCard } from "@/shell/pages/dashboard/StatCard";
+import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
+import { StatBody, StatLink, StatText } from "@/shell/pages/dashboard/StatCard";
 
 afterEach(cleanup);
 
 const UsersIcon = getIcon("users");
 
-describe("StatCard", () => {
+describe("StatBody", () => {
   test("renders numeric values with the shipped NumberTicker and one visible label", () => {
     const view = render(
       <MemoryRouter>
-        <StatCard label="People" value={1234} icon={UsersIcon} />
+        <StatBody icon={UsersIcon}><NumberTicker value={1234} label="People" /></StatBody>
       </MemoryRouter>,
     );
 
@@ -27,7 +28,7 @@ describe("StatCard", () => {
   test("keeps non-numeric value text unchanged", () => {
     const view = render(
       <MemoryRouter>
-        <StatCard label="Updates" value="Up to date" icon={UsersIcon} />
+        <StatBody icon={UsersIcon}><StatText label="Updates" value="Up to date" /></StatBody>
       </MemoryRouter>,
     );
 
@@ -36,10 +37,10 @@ describe("StatCard", () => {
     expect(within(view.container).getByText("Up to date")).toBeTruthy();
   });
 
-  test("preserves the card's title and destination link", () => {
+  test("preserves the tile's title and destination link", () => {
     const view = render(
       <MemoryRouter>
-        <StatCard label="People" value={1234} icon={UsersIcon} to="/people" />
+        <StatLink to="/people"><StatBody icon={UsersIcon}><NumberTicker value={1234} label="People" /></StatBody></StatLink>
       </MemoryRouter>,
     );
 

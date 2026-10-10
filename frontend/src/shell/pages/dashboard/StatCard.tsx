@@ -1,10 +1,8 @@
 import { Link } from "react-router-dom";
 import type { Icon } from "@maipai/ui/src/icons";
-import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
-import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
 
-/** The shared shape `PeopleCountCard.tsx`/`UpdatesCard.tsx`/
- * `RepairsCard.tsx`/`EnginesCard.tsx` all mirror - the vendored KPI-card
+/** The shared shape the dashboard's People, Updates and
+ * Repairs tiles all mirror - the vendored KPI-card
  * shape shared by `@maipai/ui/src/dashboard/components/dashboards/modern/
  * total-orders.tsx`, `total-profit.tsx` and `advertisement-cost.tsx`
  * (all three are the identical Card shell, header row and icon box,
@@ -37,31 +35,37 @@ import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
  * matching the vendored widgets' own dropped "See Statistics" button in
  * spirit without inventing a second, separate link element. People has
  * no `to`: it never lost a rail entry to replace. */
-export function StatCard({ label, value, icon: IconComponent, to }: { label: string; value: React.ReactNode; icon: Icon; to?: string }) {
-  const content = (
-    <CardContent className="flex justify-between flex-row px-6">
-      <div className="flex items-center justify-between w-full">
-        <div className="flex flex-col gap-1">
-          {typeof value === "number" ? (
-            <NumberTicker value={value} label={label} />
-          ) : (
-            <>
-              <p className="text-sm font-normal text-foreground">{label}</p>
-              <h3 className="text-2xl font-semibold">{value}</h3>
-            </>
-          )}
-        </div>
-        <div className="border border-border p-2.5 w-fit rounded-md">
-          <IconComponent size={16} />
-        </div>
+
+/* RULE9-CLEANUP-01f: this file no longer returns a kit `Card`. `StatBody` is the inside of one tile (label, value, icon)
+ * and `StatLink` is the plain `Link` the Updates and Repairs tiles sit in; `DashboardPage` renders the `Card` and
+ * `CardContent` itself, as shipped, so there is no Home wrapper and no className on either. */
+export function StatBody({ children, icon: IconComponent }: { children: React.ReactNode; icon: Icon }) {
+  return (
+    <div className="flex items-center justify-between w-full">
+      <div className="flex flex-col gap-1">{children}</div>
+      <div className="border border-border p-2.5 w-fit rounded-md">
+        <IconComponent size={16} />
       </div>
-    </CardContent>
+    </div>
   );
+}
+
+/** The label and value of a tile whose value is words, not a count (a count uses the shipped `NumberTicker`). */
+export function StatText({ label, value }: { label: string; value: string }) {
+  return (
+    <>
+      <p className="text-sm font-normal text-foreground">{label}</p>
+      <h3 className="text-2xl font-semibold">{value}</h3>
+    </>
+  );
+}
+
+export function StatLink({ to, children }: { to?: string; children: React.ReactNode }) {
   return to ? (
-    <Link to={to} className="block">
-      <Card className="py-6 transition-colors hover:bg-accent">{content}</Card>
+    <Link to={to} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      {children}
     </Link>
   ) : (
-    <Card className="py-6">{content}</Card>
+    <>{children}</>
   );
 }
