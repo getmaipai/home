@@ -485,7 +485,7 @@ describe("ChatPage (SHELL-02's slice 2: the thread list)", () => {
     const view = await searchPage();
     try {
       fireEvent.change(openThreadSearch(view), { target: { value: "garden" } });
-      const column = document.getElementById("next-chat-rail")!;
+      const column = document.getElementById("chat-rail")!;
       expect(within(column).getByRole("button", { name: "Hide conversations" })).toBeTruthy();
       fireEvent.keyDown(window, { key: "b", ctrlKey: true });
       const show = view.getByRole("button", { name: "Show conversations" });
@@ -529,10 +529,10 @@ describe("ChatPage (SHELL-02's slice 2: the thread list)", () => {
     const view = await searchPage();
     try {
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
-      expect(document.getElementById("next-chat-rail")).toHaveAttribute("data-state", "closed");
+      expect(document.getElementById("chat-rail")).toHaveAttribute("data-state", "closed");
       fireEvent.keyDown(view.getByLabelText("Message input"), { key: "k", ctrlKey: true });
       fireEvent.click(await view.findByRole("option", { name: /Search chats/ }));
-      expect(document.getElementById("next-chat-rail")).toHaveAttribute("data-state", "open");
+      expect(document.getElementById("chat-rail")).toHaveAttribute("data-state", "open");
       await waitFor(() => expect(document.activeElement).toBe(view.getByRole("textbox", { name: "Search threads" })));
     } finally { view.restore(); }
   });
@@ -1087,7 +1087,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       await openTimeline(view);
       expect(await view.findByText("weather")).toBeVisible();
       // The conversation, not the history column (whose settings gear is a link).
-      expect(within(document.querySelector<HTMLElement>('[data-slot="next-chat-pane"]')!).queryByRole("link")).toBeNull();
+      expect(within(document.querySelector<HTMLElement>('[data-slot="chat-pane"]')!).queryByRole("link")).toBeNull();
     } finally {
       restore();
     }
@@ -2134,8 +2134,8 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
   // layout, so state is read from `data-state`, `inert` and where the
   // toggle lives; the Chromium review (`--chat-column-review`) measures the
   // pixels and the slide.
-  const column = () => document.getElementById("next-chat-rail")!;
-  const header = () => document.querySelector('[data-slot="next-chat-header"]')!;
+  const column = () => document.getElementById("chat-rail")!;
+  const header = () => document.querySelector('[data-slot="chat-header"]')!;
   const renderChat = () => renderPage(
     <MemoryRouter initialEntries={["/chat"]}>
       <ChatPage person={makePerson()} />
@@ -2150,7 +2150,7 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
       expect(column()).toHaveAttribute("data-state", "open");
       expect(column().hasAttribute("inert")).toBe(false);
       const toggle = view.getByRole("button", { name: "Hide conversations" });
-      expect(toggle).toHaveAttribute("aria-controls", "next-chat-rail");
+      expect(toggle).toHaveAttribute("aria-controls", "chat-rail");
       expect(toggle).toHaveAttribute("aria-expanded", "true");
       expect(column().querySelector('[data-slot="chat-column-header"]')!.contains(toggle)).toBe(true);
       expect(header().querySelector('[data-slot="chat-column-toggle"]')).toBeNull();
@@ -2240,7 +2240,7 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
     }
   });
 
-  const peekNode = () => document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]');
+  const peekNode = () => document.querySelector('[data-slot="chat-rail"][data-state="peek"]');
   const waitForPeek = () => waitFor(() => expect(peekNode() === null).toBe(false));
 
   test("CHAT-SIDEBAR-PEEK-01: resting the pointer on the header's show control opens the peek; leaving closes it; a click still pins", async () => {
@@ -2322,10 +2322,10 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
       fireEvent.pointerEnter(zone);
       fireEvent.pointerLeave(zone);
       await new Promise((resolve) => setTimeout(resolve, 200));
-      expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true);
+      expect(document.querySelector('[data-slot="chat-rail"][data-state="peek"]') === null).toBe(true);
       // Resting on it opens the peek: the same column node, out of flow over the conversation.
       fireEvent.pointerEnter(zone);
-      const peek = await waitFor(() => { const found = document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
+      const peek = await waitFor(() => { const found = document.querySelector('[data-slot="chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
       expect(peek).toBeTruthy();
       expect(peek).toBe(column());
       expect(document.querySelector('[data-slot="aui_thread-list-sidebar-panel"]')?.className).toContain("absolute");
@@ -2334,10 +2334,10 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
       fireEvent.pointerLeave(peek);
       fireEvent.pointerEnter(peek);
       await new Promise((resolve) => setTimeout(resolve, 250));
-      expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(false);
+      expect(document.querySelector('[data-slot="chat-rail"][data-state="peek"]') === null).toBe(false);
       // Leaving for good closes it.
       fireEvent.pointerLeave(peek);
-      await waitFor(() => expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true));
+      await waitFor(() => expect(document.querySelector('[data-slot="chat-rail"][data-state="peek"]') === null).toBe(true));
       expect(column()).toHaveAttribute("data-state", "closed");
     } finally {
       restore();
@@ -2351,16 +2351,16 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
       await view.findByLabelText("Message input");
       fireEvent.click(view.getByRole("button", { name: "Hide conversations" }));
       fireEvent.pointerEnter(document.querySelector('[data-slot="aui_thread-list-sidebar-peek-zone"]')!);
-      const peek = await waitFor(() => { const found = document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
+      const peek = await waitFor(() => { const found = document.querySelector('[data-slot="chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
       within(peek).getByRole("button", { name: "New chat" }).focus();
       fireEvent.keyDown(document, { key: "Escape" });
-      await waitFor(() => expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true));
+      await waitFor(() => expect(document.querySelector('[data-slot="chat-rail"][data-state="peek"]') === null).toBe(true));
       await waitFor(() => expect(document.activeElement).toBe(view.getByRole("button", { name: "Show conversations" })));
 
       fireEvent.pointerEnter(document.querySelector('[data-slot="aui_thread-list-sidebar-peek-zone"]')!);
-      const again = await waitFor(() => { const found = document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
+      const again = await waitFor(() => { const found = document.querySelector('[data-slot="chat-rail"][data-state="peek"]'); expect(found === null).toBe(false); return found as HTMLElement; });
       fireEvent.click(within(again).getByRole("button", { name: "Keep conversations open" }));
-      expect(document.querySelector('[data-slot="next-chat-rail"][data-state="peek"]') === null).toBe(true);
+      expect(document.querySelector('[data-slot="chat-rail"][data-state="peek"]') === null).toBe(true);
       expect(column()).toHaveAttribute("data-state", "open");
     } finally {
       restore();
@@ -2413,7 +2413,7 @@ describe("ChatPage (COLUMN-01: one hide/show control for the history column)", (
 });
 
 describe("ChatPage (PROJECTS-01b: projects in the column)", () => {
-  const column = () => document.getElementById("next-chat-rail")!;
+  const column = () => document.getElementById("chat-rail")!;
   const stubProjects = (folders: Array<{ id: string; name: string; access?: "manage" | "edit" | "use"; icon?: string; color?: string; pinned?: boolean }>, chats: Array<{ id: string; title: string; folder_id: string | null }>) => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -3213,7 +3213,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
       expect(bodies[1]!.thinking).toBe(true);
 
       // A new conversation keeps the active engine default.
-      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New chat" }));
+      fireEvent.click(within(document.getElementById("chat-rail")!).getByRole("button", { name: "New chat" }));
       await waitFor(() => expect(trigger()).toHaveTextContent("Instant"));
     } finally {
       globalThis.fetch = originalFetch;
@@ -3353,7 +3353,7 @@ describe("ChatPage (INCOGNITO-01 session flag wiring)", () => {
       html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
       html.incognito body[class*="style-"] .aui-root.aui-thread-root,
       html.incognito body[class*="style-"] .aui-thread-viewport-footer,
-      html.incognito body[class*="style-"] [data-slot="next-chat-rail"] { background: transparent; }
+      html.incognito body[class*="style-"] [data-slot="chat-rail"] { background: transparent; }
       html.incognito body[class*="style-"] .aui-root.aui-thread-root { --composer-bg: var(--card) !important; }
       .bg-background { background-color: var(--background); }
       .bg-card { background-color: var(--card); }
@@ -3376,7 +3376,7 @@ describe("ChatPage (INCOGNITO-01 session flag wiring)", () => {
       const threadRoot = view.container.querySelector(".aui-root.aui-thread-root.bg-background");
       expect(threadRoot).not.toBeNull();
       const footer = view.container.querySelector(".aui-thread-viewport-footer");
-      const rail = view.container.querySelector('[data-slot="next-chat-rail"]');
+      const rail = view.container.querySelector('[data-slot="chat-rail"]');
       const composer = view.container.querySelector('[data-slot="aui_composer-shell"]');
       expect(backdropRule).toBeDefined();
       expect(backdropRule!.style.position).toBe("fixed");
@@ -3446,7 +3446,7 @@ describe("ChatPage (INCOGNITO-01 session flag wiring)", () => {
       await view.findByLabelText("Message input");
       await sendMessage(view, "a private question");
       await view.findByText("Reply 1.");
-      fireEvent.click(within(document.getElementById("next-chat-rail")!).getByRole("button", { name: "New chat" }));
+      fireEvent.click(within(document.getElementById("chat-rail")!).getByRole("button", { name: "New chat" }));
       await sendMessage(view, "another private question");
       await view.findByText("Reply 2.");
 
@@ -4330,7 +4330,7 @@ describe("ChatPage (HANDSFREE-01(a): read typed replies aloud)", () => {
       await new Promise((resolve) => setTimeout(resolve, 30));
       expect(env.ttsCalls()).toBe(callsAfterDisable);
 
-      fireEvent.click(await within(document.getElementById("next-chat-rail")!).findByRole("button", { name: "New chat" }));
+      fireEvent.click(await within(document.getElementById("chat-rail")!).findByRole("button", { name: "New chat" }));
       await openHeaderMenu(view);
       expect(await view.findByRole("menuitemcheckbox", { name: "Read replies aloud" })).toHaveAttribute("aria-checked", "false");
     } finally {

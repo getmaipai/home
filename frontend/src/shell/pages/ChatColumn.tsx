@@ -10,7 +10,7 @@ import { readRailCollapsePreference, writeRailCollapsePreference } from "@/shell
 // ChatGPT-shaped. One hide/show control, a hover peek (COLUMN-02) that overlays, a width transition
 // whose content never re-wraps, and quiet 36px rows.
 
-export const CHAT_COLUMN_ID = "next-chat-rail";
+export const CHAT_COLUMN_ID = "chat-rail";
 /** Below this width the column starts hidden (a default, never a lock). */
 export const CHAT_COLUMN_AUTO_COLLAPSE_MAX_WIDTH = 1024;
 
@@ -159,7 +159,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
       peekTimerRef.current = null;
       // A row menu is open: look again shortly, so the peek still closes
       // once the menu is gone and the pointer is still outside.
-      if (document.querySelector('[data-slot="next-chat-rail"][data-state="peek"] [aria-expanded="true"][aria-haspopup]')) { schedulePeekClose(); return; }
+      if (document.querySelector('[data-slot="chat-rail"][data-state="peek"] [aria-expanded="true"][aria-haspopup]')) { schedulePeekClose(); return; }
       closePeek();
     }, PEEK_CLOSE_GRACE_MS);
   }, [clearPeekTimer, closePeek]);
@@ -177,7 +177,7 @@ export function useChatColumn({ isDesktop }: { isDesktop: boolean }) {
       if (event.key !== "Escape") return;
       if (event.target instanceof HTMLInputElement && event.target.value !== "") return;
       // An open row menu takes this Escape first.
-      if (document.querySelector('[data-slot="next-chat-rail"][data-state="peek"] [aria-expanded="true"][aria-haspopup]')) return;
+      if (document.querySelector('[data-slot="chat-rail"][data-state="peek"] [aria-expanded="true"][aria-haspopup]')) return;
       closePeek(true);
     };
     document.addEventListener("keydown", onKey, true);

@@ -15,6 +15,6 @@ describe("SHELL-FOLD-01 phone chat header", () => {
     // trigger anywhere; chat draws its own header beside its history.
     const routes = readFileSync(new URL("../Routes.tsx", import.meta.url), "utf8");
     expect(routes).toContain("<FullLayout rail ");
-    expect(source).toContain('data-slot="next-chat-header"');
+    expect(source).toContain('data-slot="chat-header"');
   });
 });

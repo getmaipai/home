@@ -2,15 +2,15 @@
    touch device each icon button's tap area grows to 44px with an invisible
    pseudo-element, so the compact row looks the same. */
 @media (pointer: coarse) {
-  [data-slot="next-chat-pane"] .aui-assistant-action-bar-root button,
-  [data-slot="next-chat-pane"] .aui-user-action-bar-root button,
-  [data-slot="next-chat-pane"] .aui-branch-picker-root button {
+  [data-slot="chat-pane"] .aui-assistant-action-bar-root button,
+  [data-slot="chat-pane"] .aui-user-action-bar-root button,
+  [data-slot="chat-pane"] .aui-branch-picker-root button {
     position: relative;
   }
 
-  [data-slot="next-chat-pane"] .aui-assistant-action-bar-root button::before,
-  [data-slot="next-chat-pane"] .aui-user-action-bar-root button::before,
-  [data-slot="next-chat-pane"] .aui-branch-picker-root button::before {
+  [data-slot="chat-pane"] .aui-assistant-action-bar-root button::before,
+  [data-slot="chat-pane"] .aui-user-action-bar-root button::before,
+  [data-slot="chat-pane"] .aui-branch-picker-root button::before {
     position: absolute;
     top: 50%;
     left: 50%;

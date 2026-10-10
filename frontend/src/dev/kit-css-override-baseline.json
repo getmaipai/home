@@ -1,27 +1,27 @@
 {
   "shell/pages/chatTouchTargets.css": {
-    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button": {
+    "[data-slot=\"chat-pane\"] .aui-assistant-action-bar-root button": {
       "properties": [
         "position"
       ],
       "ed": "ED-030",
       "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button": {
+    "[data-slot=\"chat-pane\"] .aui-user-action-bar-root button": {
       "properties": [
         "position"
       ],
       "ed": "ED-030",
       "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button": {
+    "[data-slot=\"chat-pane\"] .aui-branch-picker-root button": {
       "properties": [
         "position"
       ],
       "ed": "ED-030",
       "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-assistant-action-bar-root button::before": {
+    "[data-slot=\"chat-pane\"] .aui-assistant-action-bar-root button::before": {
       "properties": [
         "left",
         "min-height",
@@ -32,7 +32,7 @@
       "ed": "ED-030",
       "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-user-action-bar-root button::before": {
+    "[data-slot=\"chat-pane\"] .aui-user-action-bar-root button::before": {
       "properties": [
         "left",
         "min-height",
@@ -43,7 +43,7 @@
       "ed": "ED-030",
       "reason": "Kit has no hit-area token (hitArea48 in K03); cleanup item 7."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-branch-picker-root button::before": {
+    "[data-slot=\"chat-pane\"] .aui-branch-picker-root button::before": {
       "properties": [
         "left",
         "min-height",
@@ -98,14 +98,14 @@
       "ed": "ED-032",
       "reason": "NO REASON: to be removed (cleanup item 4, chat surfaces)."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-thread-viewport-footer": {
+    "[data-slot=\"chat-pane\"] .aui-thread-viewport-footer": {
       "properties": [
         "background-color"
       ],
       "ed": "ED-029",
       "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
     },
-    "[data-slot=\"rail-workspace\"]:has([data-slot=\"next-chat-shell\"])": {
+    "[data-slot=\"rail-workspace\"]:has([data-slot=\"chat-shell\"])": {
       "properties": [
         "background",
         "height"
@@ -113,7 +113,7 @@
       "ed": "ED-033",
       "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-root.aui-thread-root": {
+    "[data-slot=\"chat-pane\"] .aui-root.aui-thread-root": {
       "properties": [
         "background-color"
       ],
@@ -127,7 +127,7 @@
       "ed": "ED-033",
       "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
     },
-    "[data-slot=\"next-chat-pane\"] .aui-user-message-content": {
+    "[data-slot=\"chat-pane\"] .aui-user-message-content": {
       "properties": [
         "background",
         "border-radius",
@@ -353,7 +353,7 @@
       "ed": "ED-033",
       "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
     },
-    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"])": {
+    "[data-slot=\"rail-body\"]:has([data-slot=\"chat-shell\"])": {
       "properties": [
         "display",
         "flex-direction",
@@ -371,7 +371,7 @@
       "ed": "ED-033",
       "reason": "Kit has no permanent rail variant (RULES S1); cleanup item 8."
     },
-    "[data-slot=\"rail-body\"]:has([data-slot=\"next-chat-shell\"]) > .container": {
+    "[data-slot=\"rail-body\"]:has([data-slot=\"chat-shell\"]) > .container": {
       "properties": [
         "display",
         "flex",

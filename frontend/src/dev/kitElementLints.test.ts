@@ -20,6 +20,7 @@ import {
   type OverrideBaseline,
   type WrapperBaseline,
 } from "./kitElementLints";
+import { normalizeOldBaseline, renamedEntryProblems, renameStillNeeded, SLOT_RENAMES, type NestedBaseline } from "./baselineRenames";
 
 // ELEMENTS-LINT-02 and ELEMENTS-LINT-03 (RULES.md rule 9, "Kit Elements as
 // they ship"). Same shape as ELEMENTS-LINT-01 (handBuiltChat.test.ts): a
@@ -39,7 +40,7 @@ const readBaseline = <T>(name: string): T => JSON.parse(readFileSync(fileURLToPa
 /** The baseline as `origin/main` had it where this branch left it (the
  * merge-base the gate scopes by), falling back to HEAD, so an addition
  * committed before the gate runs still counts as growth. */
-function baselineAtBase<T>(name: string): T | null {
+function baselineAtBase<T>(name: string, raw = false): T | null {
   const git = (args: string[]) => execFileSync("git", args, { cwd: SRC, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
   let base = "HEAD";
   try {
@@ -50,23 +51,9 @@ function baselineAtBase<T>(name: string): T | null {
   try {
     const out = git(["show", `${base}:frontend/src/dev/${name}`]);
     const baseline = JSON.parse(out) as Record<string, unknown>;
-    // NEXT-RETIRE-01: normalize the merge-base's keys across the git mv
-    // so the shrink-only check compares the same tracked entries at their
-    // new shell paths and symbol names.
-    function normalize(value: unknown): unknown {
-      if (Array.isArray(value)) return value.map(normalize);
-      if (!value || typeof value !== "object") return value;
-      return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, entry]) => {
-        const moved = key
-          .replace(/(^|\/)next\//g, "$1shell/")
-          .replace(/(^|\/)Next([A-Z])/g, "$1$2")
-          .replace(/^Next([A-Z])/, "$1")
-          .replace(/nextPage/g, "page")
-          .replace(/nextChat/g, "chat");
-        return [moved, normalize(entry)];
-      }));
-    }
-    return normalize(baseline) as T;
+    // NEXT-RETIRE-01 git-mv map and NEXT-RETIRE-02E-GUARD slot renames,
+    // old side only, defined once in baselineRenames.ts. `raw` skips them.
+    return (raw ? baseline : normalizeOldBaseline(baseline)) as T;
   } catch {
     return null;
   }
@@ -177,6 +164,19 @@ describe("Home CSS restyling kit parts (ELEMENTS-LINT-02, CSS leg)", () => {
     const headKeys = keys(head);
     const grown = keys(baseline).filter((key) => !headKeys.includes(key));
     expect(grown, "the baseline may only shrink").toEqual([]);
+    expect(keys(baseline).length, "NEXT-RETIRE-02E-GUARD: the count never exceeds the base count").toBeLessThanOrEqual(headKeys.length);
+    const raw = baselineAtBase<NestedBaseline>(CSS_BASELINE, true)!;
+    expect(renamedEntryProblems(raw, baseline as unknown as NestedBaseline)).toEqual([]);
+  });
+
+  test("every rename-map entry is still needed (NEXT-RETIRE-02E-GUARD expiry: delete the entry once origin/main has 02E)", () => {
+    const raws = [OVERRIDE_BASELINE, CSS_BASELINE, WRAPPER_BASELINE].map((n) => baselineAtBase<NestedBaseline>(n, true));
+    if (raws.some((r) => !r)) return;
+    // A scratch repo with empty baselines (the pre-commit hook's own test) has nothing to match.
+    if ((raws as NestedBaseline[]).every((b) => Object.keys(b).length === 0)) return;
+    // The baseline holds keys for pane and shell only; rail and header are listed so a later key cannot hide as a new one.
+    const needed = SLOT_RENAMES.filter((entry) => renameStillNeeded(entry, raws as NestedBaseline[]));
+    expect(needed.length, "no base key uses any renamed slot any more: delete SLOT_RENAMES and baselineRenames' slot step").toBeGreaterThan(0);
   });
 
   test("the scanner flags a seeded kit restyle and leaves tokens and Home's own slots alone", () => {
@@ -234,6 +234,7 @@ describe("Home wrappers around kit Elements (ELEMENTS-LINT-03)", () => {
     const headKeys = wrapperKeys(head);
     const grown = wrapperKeys(baseline).filter((key) => !headKeys.includes(key));
     expect(grown, "the allowlist may only shrink").toEqual([]);
+    expect(wrapperKeys(baseline).length).toBeLessThanOrEqual(headKeys.length);
   });
 
   test("the scanner flags seeded wrappers and leaves a page that only passes data alone", () => {

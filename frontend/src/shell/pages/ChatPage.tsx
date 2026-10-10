@@ -1434,7 +1434,7 @@ export function ChatPage({ person }: { person: Roster }) {
             div into a real flex conduit down to the true available
             height, so this just reads it off that chain instead of
             re-deriving the same number a second, guessable way. */}
-        <div data-slot="next-chat-shell" className="flex h-full flex-col overflow-hidden">
+        <div data-slot="chat-shell" className="flex h-full flex-col overflow-hidden">
           {/* Below lg the column is a sheet, opened from this row. */}
           <div className="flex items-center gap-1 border-b border-border pb-2 lg:hidden">
             <Button variant="ghost" size="icon" aria-label={sheetOpen ? "Hide threads" : "Show threads"} aria-expanded={sheetOpen} aria-controls="next-chat-threads" onClick={() => setSheetOpen((open) => !open)}>
@@ -1457,7 +1457,7 @@ export function ChatPage({ person }: { person: Roster }) {
                 checks; mark this approved density out of the generic hit-area audit. */}
             <div
               id={CHAT_COLUMN_ID}
-              data-slot="next-chat-rail"
+              data-slot="chat-rail"
               data-state={column.peek ? "peek" : column.collapsed ? "closed" : "open"}
               aria-label="Conversations"
               role="region"
@@ -1505,7 +1505,7 @@ export function ChatPage({ person }: { person: Roster }) {
             />
             </div>
             <div
-              data-slot="next-chat-pane"
+              data-slot="chat-pane"
               className="min-w-0 flex-1"
             >
               {/* RAIL-01: the conversation's own header, spanning the
@@ -1517,7 +1517,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   way Claude's is (owner, 2026-10-06): the controls just
                   sit at the top. While the history column is hidden, its
                   show control sits at this header's left edge, in flow. */}
-              <header data-slot="next-chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
+              <header data-slot="chat-header" data-column={column.collapsed ? "closed" : "open"} className={cn("hidden h-13 shrink-0 items-center gap-1 px-5 lg:flex", column.collapsed && "ps-3")}>
                 {column.collapsed ? <TooltipIconButton
                   ref={column.headerToggleRef}
                   tooltip={`Show conversations ${chatColumnShortcutLabel()}`}

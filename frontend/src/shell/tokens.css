@@ -139,7 +139,7 @@ html.incognito body[class*="style-"] [data-slot="sidebar-inner"] a[data-slot="si
 html.incognito body[class*="style-"] [data-slot="sidebar-inset"],
 html.incognito body[class*="style-"] .aui-root.aui-thread-root,
 html.incognito body[class*="style-"] .aui-thread-viewport-footer,
-html.incognito body[class*="style-"] [data-slot="next-chat-rail"] {
+html.incognito body[class*="style-"] [data-slot="chat-rail"] {
   background: transparent;
 }
 
@@ -165,7 +165,7 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
 /* CHAT-COMPOSER-01: ChatThread's shipped wrapper is flex-1, so make its
  * pane a column that gives the assistant-ui Thread the full available
  * height. */
-[data-slot="next-chat-pane"] {
+[data-slot="chat-pane"] {
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -179,7 +179,7 @@ html.incognito body[class*="style-"] .aui-root.aui-thread-root {
  * 2026-10-06, "chat input is still too large"): a 48px row (50 outer with the
  * border), 30px controls, 32px Send, no vertical inset, tighter side insets;
  * three lines are about 140px and the 160px field cap about 210px. */
-[data-slot="next-chat-pane"] {
+[data-slot="chat-pane"] {
   --composer-compact-row-height: 50px;
   --composer-compact-control-size: 30px;
   --composer-compact-send-size: 32px;
@@ -239,17 +239,17 @@ html.dark body {
   }
 }
 
-[data-slot="next-chat-rail"] {
+[data-slot="chat-rail"] {
   background: var(--shell-history);
   border-color: var(--shell-divider);
 }
 /* The chat's whole workspace (header and conversation) is one surface. */
-[data-slot="rail-workspace"]:has([data-slot="next-chat-shell"]) {
+[data-slot="rail-workspace"]:has([data-slot="chat-shell"]) {
   background: var(--shell-main) !important;
 }
-[data-slot="next-chat-header"],
-[data-slot="next-chat-pane"] .aui-root.aui-thread-root,
-[data-slot="next-chat-pane"] .aui-thread-viewport-footer {
+[data-slot="chat-header"],
+[data-slot="chat-pane"] .aui-root.aui-thread-root,
+[data-slot="chat-pane"] .aui-thread-viewport-footer {
   background-color: var(--shell-main);
 }
 /* Other pages sit on --page, so their title bar is a touch apart from it. */
@@ -260,7 +260,7 @@ html.dark body {
 /* COLUMN-01/02: the shipped compact ThreadListSidebar owns rows, search,
  * projects and peek geometry. Home supplies only the history tone and the
  * small title and control row in its empty header slot. */
-[data-slot="next-chat-rail"],
+[data-slot="chat-rail"],
 [data-chat-column-mobile] {
   --sidebar: var(--shell-history);
   --border: var(--shell-divider);
@@ -270,7 +270,7 @@ html.dark body {
 }
 /* COLUMN-02 hover peek: the kit panel overlays the conversation without
  * moving it; the outer wrapper is positioned by ChatPage. */
-[data-slot="next-chat-rail"][data-state="peek"] {
+[data-slot="chat-rail"][data-state="peek"] {
   box-shadow: 8px 0 24px -12px color-mix(in oklab, var(--foreground) 35%, transparent);
   animation: chat-column-peek-in 160ms ease-out;
 }
@@ -279,7 +279,7 @@ html.dark body {
   to { opacity: 1; transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-slot="next-chat-rail"][data-state="peek"] { animation: none; }
+  [data-slot="chat-rail"][data-state="peek"] { animation: none; }
 }
 [data-slot="chat-column-top"] {
   position: relative;
@@ -294,12 +294,12 @@ html.dark body {
   font-size: 15px;
   font-weight: 500;
 }
-[data-slot="next-chat-rail"] [data-slot="chat-column-icon"],
+[data-slot="chat-rail"] [data-slot="chat-column-icon"],
 [data-slot="chat-column-toggle"] {
   color: var(--column-subdued, var(--muted-foreground));
   border-radius: 8px;
 }
-[data-slot="next-chat-rail"] [data-slot="chat-column-icon"]:hover,
+[data-slot="chat-rail"] [data-slot="chat-column-icon"]:hover,
 [data-slot="chat-column-toggle"]:hover {
   color: var(--foreground);
   background-color: color-mix(in oklab, var(--foreground) 6%, transparent);
@@ -308,23 +308,23 @@ html.dark body {
 /* RAIL-01 conversation: assistant text sits on the surface at 15/24;
  * markdown headings at 22, 19 and 17; user messages are compact filled
  * bubbles at most 70% of the column. */
-[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] {
+[data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] {
   font-size: 15px;
   line-height: 24px;
 }
-[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] h1 {
+[data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h1 {
   font-size: 22px;
   line-height: 30px;
 }
-[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] h2 {
+[data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h2 {
   font-size: 19px;
   line-height: 26px;
 }
-[data-slot="next-chat-pane"] [data-slot="aui_assistant-message-content"] h3 {
+[data-slot="chat-pane"] [data-slot="aui_assistant-message-content"] h3 {
   font-size: 17px;
   line-height: 24px;
 }
-[data-slot="next-chat-pane"] .aui-user-message-content {
+[data-slot="chat-pane"] .aui-user-message-content {
   max-width: min(560px, 100%);
   padding: 8px 14px;
   border-radius: 18px;
@@ -646,7 +646,7 @@ header nav a:has(> img[alt="logo"]) {
  * collapses and frees more width than the cap uses - found live,
  * 2026-09-21, "New Thread" sitting ~75px into empty space instead of
  * flush against the rail. `:has()` targets the one page that needs the
- * cap gone (ChatPage.tsx's own `data-slot="next-chat-shell"` marks
+ * cap gone (ChatPage.tsx's own `data-slot="chat-shell"` marks
  * it) without touching the vendored layout file or any other page -
  * the kit wraps and composes, so this reaches through the one surface
  * it already exposes (a CSS class) rather than forking the component
@@ -654,13 +654,13 @@ header nav a:has(> img[alt="logo"]) {
  * `<Footer/>` wrapper, is hidden outright rather than re-capped (see
  * the full-height rule block below) - a full-height chat interface has
  * no room for its trailing slot at all. */
-.container:has([data-slot="next-chat-shell"]) {
+.container:has([data-slot="chat-shell"]) {
   max-width: none;
   margin-inline: 0;
 }
 
 /* CHAT-UI-01 finding 3, the other half (ChatPage.tsx's own
- * `overflow-hidden` on `next-chat-shell` stops the page from growing
+ * `overflow-hidden` on `chat-shell` stops the page from growing
  * taller than the fixed viewport; this stops the browser's own scroll
  * chaining once it's already at that boundary): FullLayout.tsx's
  * Footer sits right below the Outlet, so the page always has a
@@ -671,7 +671,7 @@ header nav a:has(> img[alt="logo"]) {
  * counterpart to reach through (it isn't a component prop or a
  * token), so this is set directly, scoped to the one page it was
  * found on. */
-html:has([data-slot="next-chat-shell"]) {
+html:has([data-slot="chat-shell"]) {
   overscroll-behavior-y: none;
 }
 
@@ -679,18 +679,18 @@ html:has([data-slot="next-chat-shell"]) {
  * on its own under a fixed-height workspace. Chat (and the showcase's
  * thread) fill that body instead: no padding, no width cap, no page
  * scroll; the thread viewport stays the one scroller. */
-[data-slot="rail-workspace"]:has([data-slot="next-chat-shell"]),
+[data-slot="rail-workspace"]:has([data-slot="chat-shell"]),
 [data-slot="rail-workspace"]:has([data-slot="next-chat-showcase-shell"]) {
   height: 100svh;
 }
-[data-slot="rail-body"]:has([data-slot="next-chat-shell"]),
+[data-slot="rail-body"]:has([data-slot="chat-shell"]),
 [data-slot="rail-body"]:has([data-slot="next-chat-showcase-shell"]) {
   display: flex;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
 }
-[data-slot="rail-body"]:has([data-slot="next-chat-shell"]) > .container,
+[data-slot="rail-body"]:has([data-slot="chat-shell"]) > .container,
 [data-slot="rail-body"]:has([data-slot="next-chat-showcase-shell"]) > .container {
   display: flex;
   flex-direction: column;
@@ -700,7 +700,7 @@ html:has([data-slot="next-chat-shell"]) {
   margin: 0;
   padding: 0;
 }
-[data-slot="next-chat-shell"],
+[data-slot="chat-shell"],
 [data-slot="next-chat-showcase-shell"] {
   flex: 1;
   min-height: 0;
