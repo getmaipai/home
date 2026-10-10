@@ -29,9 +29,25 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.search",
     honoured_by: ["home"],
   }),
-  // KS-02: `search.wikipedia_fallback` was retired here. The live Wikimedia call is the
-  // disclosed `wikimedia-live` data source of the websearch package (wikimediaLive.ts),
-  // reached only when the offline library had no title match.
+  // KS-02-PRIV: the off switch for the `wikimedia-live` data source (wikimediaLive.ts).
+  // KS-02 retired this key and silently re-enabled the live call for households that had
+  // stored false; PRIVACY.md says every default-on public read keeps an off switch and a
+  // person's privacy choice is never overridden. The key name is unchanged on purpose, so a
+  // stored value keeps working with no migration, and the commons registry still carries it.
+  // STOPGAP: KS-MODE-01 (live | offline | mix) will map a stored false to `offline`.
+  SettingsKey.parse({
+    key: "search.wikipedia_fallback",
+    scope: "household",
+    selector: "boolean",
+    default: true,
+    // Label and help are byte-identical to the pinned spec (the gate's drift check); sharpening
+    // the words for the library-first order is a commons follow-up (see docs/BACKLOG.md KS-02-PRIV).
+    label: "Ask Wikipedia when web search fails or finds nothing",
+    help: "When your SearXNG instance is down or a search comes back empty, MaiPai asks Wikipedia's own official API instead - covers people, shows, places, products and history. On by default whenever web search is set up; turn it off here if you don't want it.",
+    level: "advanced",
+    lives_in: "household.search",
+    honoured_by: ["home"],
+  }),
   // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): a real per-person
   // level, never left unset - child strict, teen moderate, adult off by
   // default ("default" resolves against the speaker's own band,

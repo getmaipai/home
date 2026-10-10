@@ -3,7 +3,7 @@
 // promises that matter: scope reference sends nothing outbound; a child never
 // reaches an adult-only book through the web tool; a minor's floor holds at the
 // one choke point; the live Wikimedia call happens only when the library had
-// no match; the retired setting is gone.
+// no match; a stored search.wikipedia_fallback=false keeps it from ever running.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
@@ -286,8 +286,34 @@ describe("through the host: integration.call searxng search", () => {
   });
 });
 
-describe("the retired setting", () => {
-  test("search.wikipedia_fallback is no longer a settings key", () => {
-    expect(SEARCH_SETTINGS_KEYS.map((k) => k.key)).not.toContain("search.wikipedia_fallback");
+describe("the wikimedia-live off switch (KS-02-PRIV)", () => {
+  test("search.wikipedia_fallback is a declared, visible household key that defaults on", () => {
+    const key = SEARCH_SETTINGS_KEYS.find((k) => k.key === "search.wikipedia_fallback");
+    expect(key?.scope).toBe("household");
+    expect(key?.selector).toBe("boolean");
+    expect(key?.default).toBe(true);
+  });
+
+  test("a household that stored false never has the live Wikimedia call made for an adult", async () => {
+    startKiwix([book(WIKI, { Juniper_Falls: falls() })]);
+    const web = fakeWeb({ results: [] });
+    const wiki = fakeWiki();
+    setHouseholdSettingValue("search.searxng_url", web.url);
+    setHouseholdSettingValue("search.wikipedia_fallback", false);
+    const host = createHost(await actorAs("adult"), manifest());
+    await host.integration.call("searxng", "search", { query: "Zzyzx Quartz Harbour" });
+    expect(wiki.requests).toEqual([]);
+    expect(referenceCounters()["reference.wikimedia_live_call.adult"]).toBeUndefined();
+  });
+
+  test("with the setting unset the adult's live call is still made when web and library found nothing", async () => {
+    startKiwix([book(WIKI, { Juniper_Falls: falls() })]);
+    const web = fakeWeb({ results: [] });
+    const wiki = fakeWiki();
+    setHouseholdSettingValue("search.searxng_url", web.url);
+    const host = createHost(await actorAs("adult"), manifest());
+    const miss = (await host.integration.call("searxng", "search", { query: "Zzyzx Quartz Harbour" })) as Result;
+    expect(miss.rows[0]!.title).toBe("Live Topic");
+    expect(wiki.requests.length).toBe(2);
   });
 });
