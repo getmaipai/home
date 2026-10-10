@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import { fetchFamilyBots, FamilyPage } from "@/shell/pages/FamilyPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
@@ -241,5 +241,48 @@ describe("FamilyPage", () => {
       expect(fetchMock).toHaveBeenCalledWith(expect.stringContaining("/api/devices"), expect.anything());
       expect(fetchMock).not.toHaveBeenCalledWith(expect.stringContaining("/api/devices/robots"), expect.anything());
     } finally { restore(); }
+  });
+});
+
+// NEXT-RETIRE-02C: the "tab lives in the URL" cases from the retired old-shell
+// apps/people/PeoplePage.test.tsx, restated for the live ?tab= parameter.
+describe("FamilyPage tab lives in the URL", () => {
+  function Location() {
+    const location = useLocation();
+    return <div data-testid="location">{location.pathname + location.search}</div>;
+  }
+
+  function renderWithLocation(path: string) {
+    return renderWithQueryClient(
+      <MemoryRouter initialEntries={[path]}>
+        <Location />
+        <FamilyPage person={makePerson()} />
+      </MemoryRouter>,
+    );
+  }
+
+  test("a stray or unknown ?tab= value falls back to People, not a blank tab", async () => {
+    const restore = mockFamilyFetch([makeRosterEntry()]);
+    try {
+      const view = renderWithLocation("/people?tab=nonsense");
+      await waitFor(() => expect(view.getByRole("tab", { name: /^People/ }).getAttribute("aria-selected")).toBe("true"));
+    } finally {
+      restore();
+    }
+  });
+
+  test("switching tabs updates the URL, and returning to People clears it", async () => {
+    const restore = mockFamilyFetch([makeRosterEntry()]);
+    try {
+      const view = renderWithLocation("/people");
+      fireEvent.mouseDown(await view.findByRole("tab", { name: /^Pets/ }), { button: 0 });
+      fireEvent.click(view.getByRole("tab", { name: /^Pets/ }));
+      await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/people?tab=pets"));
+      fireEvent.mouseDown(view.getByRole("tab", { name: /^People/ }), { button: 0 });
+      fireEvent.click(view.getByRole("tab", { name: /^People/ }));
+      await waitFor(() => expect(view.getByTestId("location").textContent).toBe("/people"));
+    } finally {
+      restore();
+    }
   });
 });

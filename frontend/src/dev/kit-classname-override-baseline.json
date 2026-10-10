@@ -120,15 +120,6 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "apps/notifications/NotificationsPage.tsx": {
-    "Checkbox": {
-      "tokens": [
-        "mt-1"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
   "apps/people/FaceEnrollmentCard.tsx": {
     "CardContent": {
       "tokens": [
@@ -169,47 +160,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "apps/people/PersonProfilePage.tsx": {
-    "TabsContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-4",
-        "py-2"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-wrap",
-        "gap-4",
-        "items-center",
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "Button": {
-      "tokens": [
-        "gap-1.5"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "apps/search/SearchPage.tsx": {
-    "Button": {
-      "tokens": [
-        "gap-2",
-        "justify-start",
-        "w-full"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
   "apps/settings/AddRobotSection.tsx": {
     "Button": {
       "tokens": [
@@ -220,15 +170,6 @@
     }
   },
   "apps/settings/BackupsSection.tsx": {
-    "Button": {
-      "tokens": [
-        "w-fit"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/settings/ChangeSecretSection.tsx": {
     "Button": {
       "tokens": [
         "w-fit"
@@ -1284,39 +1225,6 @@
       "tokens": [
         "px-3",
         "relative"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "shell/PhoneHeaderExtras.tsx": {
-    "Button": {
-      "tokens": [
-        "gap-2",
-        "h-auto",
-        "justify-start",
-        "min-h-12",
-        "px-2"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "shell/ProfileSwitcher.tsx": {
-    "Button": {
-      "tokens": [
-        "gap-2",
-        "h-auto",
-        "justify-start",
-        "min-h-12",
-        "px-2"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    },
-    "Separator": {
-      "tokens": [
-        "my-1"
       ],
       "ed": "ED-039",
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."

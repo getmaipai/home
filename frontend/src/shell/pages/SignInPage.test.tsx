@@ -189,3 +189,108 @@ describe("SignInPage", () => {
     }
   });
 });
+
+// NEXT-RETIRE-02C: PIN edge cases ported from the retired old-shell
+// shell/SignIn.test.tsx. The live SignInPage keeps the same auto-submit rules.
+describe("SignInPage PIN edge cases (ported from the retired SignIn)", () => {
+  async function openPinScreen(onSignedIn: () => void = () => {}) {
+    renderSignIn(onSignedIn);
+    const button = await waitFor(() => {
+      const el = document.body.querySelector("button");
+      if (!el) throw new Error("not yet rendered");
+      return el;
+    });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    return await waitFor(() => {
+      const el = document.body.querySelector('input[type="password"]');
+      if (!el) throw new Error("not yet rendered");
+      return el as HTMLInputElement;
+    });
+  }
+
+  test("typing fewer than 4 digits never auto-submits", async () => {
+    const onSignedIn = mock(() => {});
+    const restore = stubFetch({ "/api/auth/profiles": [makePerson()], "/api/auth/verify-secret": { success: true } });
+    try {
+      const input = await openPinScreen(onSignedIn);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "000" } });
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(onSignedIn).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a longer numeric PIN is never cut off by the 4-digit auto-submit", async () => {
+    const onSignedIn = mock(() => {});
+    const restore = stubFetch({ "/api/auth/profiles": [makePerson()], "/api/auth/verify-secret": () => Response.json({ success: true }) });
+    try {
+      const input = await openPinScreen(onSignedIn);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "123456" } });
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(onSignedIn).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a wrong 4-digit auto-submit doesn't keep re-firing on further keystrokes", async () => {
+    const onSignedIn = mock(() => {});
+    let verifyCalls = 0;
+    const restore = stubFetch({
+      "/api/auth/profiles": [makePerson()],
+      "/api/auth/verify-secret": () => {
+        verifyCalls += 1;
+        return Response.json({ error: "wrong PIN" }, { status: 401 });
+      },
+    });
+    try {
+      const input = await openPinScreen(onSignedIn);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "1234" } });
+      });
+      await waitFor(() => expect(verifyCalls).toBe(1));
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "12345" } });
+      });
+      await new Promise((r) => setTimeout(r, 50));
+      expect(verifyCalls).toBe(1);
+      expect(onSignedIn).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a stale tap-error from a different profile doesn't resurface after a PIN flow", async () => {
+    const restore = stubFetch({
+      "/api/auth/profiles": [makePerson({ id: "person-def456", display_name: "Bramble", hasSecret: false }), makePerson({ display_name: "Jesse" })],
+      "/api/auth/select": () => Response.json({ error: "profile disabled" }, { status: 403 }),
+    });
+    try {
+      renderSignIn();
+      const bramble = await waitFor(() => {
+        const el = Array.from(document.body.querySelectorAll("button")).find((b) => b.textContent?.includes("Bramble"));
+        if (!el) throw new Error("not yet rendered");
+        return el;
+      });
+      await act(async () => {
+        fireEvent.click(bramble);
+      });
+      await waitFor(() => expect(document.body.textContent).toContain("profile disabled"));
+      const jesse = Array.from(document.body.querySelectorAll("button")).find((b) => b.textContent?.includes("Jesse"))!;
+      await act(async () => {
+        fireEvent.click(jesse);
+      });
+      await waitFor(() => expect(document.body.querySelector('input[type="password"]')).not.toBeNull());
+      expect(document.body.textContent).not.toContain("profile disabled");
+    } finally {
+      restore();
+    }
+  });
+});

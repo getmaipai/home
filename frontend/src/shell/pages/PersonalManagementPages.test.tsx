@@ -37,10 +37,15 @@ describe("Next personal management pages", () => {
   test("personal voice sections remain available in Account", async () => {
     const restore = mockApi();
     try {
-      renderWithQueryClient(<VoicesPage person={makePerson()} />);
+      const view = renderWithQueryClient(<VoicesPage person={makePerson()} />);
       await waitFor(() => expect(document.body.textContent).toContain("Cloned voices"));
       expect(document.body.textContent).toContain("Voices");
       expect(document.body.textContent).toContain("More voices");
+      // Ported from the retired old-shell VoicesPage test (NEXT-RETIRE-02C): the page has its own
+      // "Voices" heading, not only its two section headings.
+      expect(view.getByText("Voices", { exact: true })).toBeTruthy();
+      expect(view.getByText("More voices", { exact: true })).toBeTruthy();
+      expect(view.getByText("Cloned voices", { exact: true })).toBeTruthy();
     } finally { restore(); }
   });
 
