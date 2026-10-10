@@ -12,6 +12,10 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { NOTIFICATIONS_QUERY_KEY, NOTIFICATIONS_HISTORY_QUERY_KEY } from "@/shell/NotificationBell";
 import { api, ApiError, type NotificationDeliveryView } from "@/lib/api";
 import { cn, FOCUS_RING } from "@maipai/ui/src/utils";
+import { getIcon } from "@maipai/ui/src/icons";
+
+/** The page's one icon choice; the header title reads it too. */
+export const NotificationsIcon = getIcon("bell");
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 

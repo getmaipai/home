@@ -42,6 +42,7 @@ describe("PageHeaderTitle", () => {
     ["/backups", "Backups", "lucide-archive"],
     ["/users", "Users", "lucide-users"],
     ["/files", "Library", "lucide-folder"],
+    ["/notifications", "Notifications", "lucide-bell"],
   ];
 
   for (const [pathname, label, iconClass] of cases) {
