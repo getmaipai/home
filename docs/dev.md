@@ -36208,6 +36208,14 @@ Fail-first coverage exercises an unauthenticated upgrade, disconnected command r
 
 The final `bash scripts/check.sh` passed: backend 4,732/4,732, scripts 82/82, frontend 1,355/1,355, with typecheck, lint, build, a11y, docs, and standards checks green. Two intermediate runs exposed unrelated timing-sensitive failures (`partialRestore` temporary backup read, then `summaryRefresh` duplicate debounce); each passed alone, and the final sharded gate passed. Full output is in `data-scratch/chat-ab/a47-gate.log`.
 
+## IMG-OFFER-01: `show_images` on for adults, below the recall bar, by owner ruling (2026-10-10)
+
+Owner ruling (Jesse, 2026-10-10, via the question form): turn `show_images` on for adult profiles only, even though the last bench measured recall 80% against the 85% bar (and +1.14 s first text when called alone against +1.0 s). He also accepts incidental strangers in adult picture galleries, so the SearXNG picture sources stay on with no public-figure-only restriction. ANSWER-IMG-05's bars are waived by this ruling; the measured miss stays on record in the ANSWER-IMG-05 section below.
+
+As built: `backend/packages/show_images/manifest.json` carries `offer: {mode: "conditional", gate: "answerImagesAllowed", bench_row: "answer-images", reason: ...}`, and `modelCatalog.ts` is untouched (`tools_offered` is derived from manifests). `answerImagesAllowed` (`answerImages/turn.ts`) now admits an adult alone: a teen is never offered the tool, and a child is not either, even once a parent turned `reference.images` on (that setting no longer reaches the child's tool list). Spoken, glance, temporary, bare and ephemeral turns stay off, and an adult who turned `reference.images` off is not offered it. A forged `show_images` call from a teen or a child still gets the fixed unavailable line, runs no fetch and stores no gallery block (`tool.ts` checks the turn's own flag, not the tool list). The bench dataset rows for the teen and the child with pictures on moved from visual to `n/a` (must not be offered).
+
+Re-run trigger and back-off rule: re-run `backend/scripts/bench/answer-images.ts` on a quiet machine by 2026-11-10 (or at the next chat model or Stack engine change, whichever comes first). If recall or the called-alone first-text cost is worse than the 80% and +1.14 s recorded here, set the manifest offer back to `{"mode":"off","reason":"..."}`; it goes back to mode off if the re-run is worse. A re-run at or above 85% and +1.0 s closes the waiver.
+
 ## ANSWER-IMG-05: the picture bench, and why `show_images` stays off (2026-10-06)
 
 > **Superseded by** the adult image-search ruling recorded in this section: general image search is allowed for adults with the quality filter; minor sources remain unchanged.

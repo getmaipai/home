@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { answerImagesAllowed } from "@/lib/answerImages/turn";
+import { setValue } from "@/lib/settings";
+import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { CATALOG } from "@/lib/modelCatalog";
 import { listInstalledManifests } from "@/lib/plugins";
 import { PACKAGES_DIR } from "@/lib/paths";
@@ -52,16 +57,35 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
     expect(budget.tools_offered).not.toContain("recall");
   });
 
-  test("an earned image gate still cannot offer show_images while its policy is off", () => {
-    const budget = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
-    const withImageGate = withTurnToolGates(budget, true);
+  test("IMG-OFFER-01: show_images is a conditional offer on the answerImagesAllowed gate and the answer-images bench row", () => {
     const showImages = listInstalledManifests().find((manifest) => manifest.id === "show_images");
-    if (showImages?.offer?.mode === "conditional") {
-      expect(withImageGate.tools_offered).toContain("show_images");
-    } else {
-      expect(showImages?.offer).toEqual({ mode: "off", reason: "measured recall below bar" });
-      expect(withImageGate.tools_offered).not.toContain("show_images");
-    }
+    expect(showImages?.offer).toEqual({
+      mode: "conditional",
+      gate: "answerImagesAllowed",
+      bench_row: "answer-images",
+      reason: "owner ruling 2026-10-10: on for adults below the 85% recall bar; re-run later, back off if worse",
+    });
+    expect(toolOfferLabel(showImages!, "enabled")).toBe("not offered: answerImagesAllowed");
+  });
+
+  test("IMG-OFFER-01: offerPassesGate offers show_images only where the turn gate passes, and the turn gate passes an adult alone", () => {
+    const { owner, child } = createBenchPeople();
+    const teen = db.insert(people).values({ ...owner, id: "teen-offer", displayName: "Teen", role: "teen" }).returning().get()!;
+    expect(setValue(owner, `person:${child.id}`, "reference.images", true).ok).toBe(true);
+    const turn = { surfaceClass: "written" as "written" | "spoken", spoken: false, temporary: false, bare: false, ephemeral: false };
+    const offered = (actor: typeof owner, band: "child" | "teen" | "adult", over: Partial<typeof turn> = {}) =>
+      withTurnToolGates(resolveTurnBudget("qwen3-8b-instruct-q4-k-m", band), answerImagesAllowed({ actor, band, ...turn, ...over })).tools_offered;
+    expect([...offered(owner, "adult")].sort()).toEqual([...BASE_TOOL_IDS, "show_images"].sort());
+    // A child's list lacks it, even once a parent turned the child's picture setting on.
+    expect(offered(child, "child")).not.toContain("show_images");
+    expect(offered(teen, "teen")).not.toContain("show_images");
+    // Spoken, temporary, bare and ephemeral adult turns lack it too.
+    expect(offered(owner, "adult", { surfaceClass: "spoken", spoken: true })).not.toContain("show_images");
+    expect(offered(owner, "adult", { temporary: true })).not.toContain("show_images");
+    expect(offered(owner, "adult", { bare: true })).not.toContain("show_images");
+    expect(offered(owner, "adult", { ephemeral: true })).not.toContain("show_images");
+    // The default resolver never offers it (the gate is closed until a turn passes it).
+    expect(resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult").tools_offered).not.toContain("show_images");
   });
 
   test("every catalog chat model declares a cap of at most sixteen that holds its derived set", () => {
