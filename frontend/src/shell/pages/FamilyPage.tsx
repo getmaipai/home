@@ -4,7 +4,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { Icon } from "@maipai/ui/src/icons";
@@ -89,10 +89,10 @@ export function FamilyPage({ person }: { person: Roster }) {
   return (
     <>
     <Tabs value={activeTab} onValueChange={onTabChange}>
-      <TabsList className="h-auto min-h-14 p-1">
-        <TabsTrigger value="people" className="min-h-12 min-w-12">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
-        <TabsTrigger value="pets" className="min-h-12 min-w-12">Pets{petsQuery.data ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
-        {isOwnerOrAdminRole(person.role) ? <TabsTrigger value="bots" className="min-h-12 min-w-12">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger> : null}
+      <TabsList>
+        <TabsTrigger value="people">People{query.data ? <> <Badge>{query.data.length}</Badge></> : null}</TabsTrigger>
+        <TabsTrigger value="pets">Pets{petsQuery.data ? <> <Badge>{petsQuery.data.length}</Badge></> : null}</TabsTrigger>
+        {isOwnerOrAdminRole(person.role) ? <TabsTrigger value="bots">Bots{botsQuery.data ? <> <Badge>{botsQuery.data.length}</Badge></> : null}</TabsTrigger> : null}
       </TabsList>
       <TabsContent value="people">
     <AsyncState

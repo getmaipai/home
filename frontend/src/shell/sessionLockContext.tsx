@@ -57,33 +57,37 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
       {children}
       {locked && person ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background px-4">
-          <Card className="w-full max-w-md border-none p-6 shadow-lg">
-            <CardContent className="flex flex-col items-center gap-4 p-0">
-              <Avatar name={person.display_name} className="size-16 text-xl" />
-              <h1 className="text-lg font-semibold">{person.display_name}</h1>
-              <p className="text-sm text-muted-foreground">Locked after inactivity. Enter your PIN to continue.</p>
-              <form onSubmit={handleUnlock} className="flex w-full flex-col gap-4">
-                <div className="w-full space-y-1.5">
-                  <Label htmlFor="lock-secret" className="text-sm font-normal text-muted-foreground">
-                    PIN or password
-                  </Label>
-                  <Input
-                    id="lock-secret"
-                    type="password"
-                    value={secret}
-                    onChange={(e) => setSecret(e.target.value)}
-                    // eslint-disable-next-line jsx-a11y/no-autofocus
-                    autoFocus
-                    required
-                  />
+          <div className="w-full max-w-md">
+            <Card>
+              <CardContent>
+                <div className="flex flex-col items-center gap-4">
+                  <Avatar name={person.display_name} className="size-16 text-xl" />
+                  <h1 className="text-lg font-semibold">{person.display_name}</h1>
+                  <p className="text-sm text-muted-foreground">Locked after inactivity. Enter your PIN to continue.</p>
+                  <form onSubmit={handleUnlock} className="flex w-full flex-col gap-4">
+                    <div className="w-full space-y-1.5">
+                      <Label htmlFor="lock-secret" className="text-sm font-normal text-muted-foreground">
+                        PIN or password
+                      </Label>
+                      <Input
+                        id="lock-secret"
+                        type="password"
+                        value={secret}
+                        onChange={(e) => setSecret(e.target.value)}
+                        // eslint-disable-next-line jsx-a11y/no-autofocus
+                        autoFocus
+                        required
+                      />
+                    </div>
+                    {error ? <p className="text-sm text-destructive">{error}</p> : null}
+                    <Button type="submit" size="lg" disabled={busy}>
+                      {busy ? "Unlocking…" : "Unlock"}
+                    </Button>
+                  </form>
                 </div>
-                {error ? <p className="text-sm text-destructive">{error}</p> : null}
-                <Button type="submit" size="lg" className="w-full rounded-lg" disabled={busy}>
-                  {busy ? "Unlocking…" : "Unlock"}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       ) : null}
     </SessionLockedContext.Provider>

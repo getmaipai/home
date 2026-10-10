@@ -193,19 +193,21 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
         if (!anchored) pauseTvNavForOverlay(next);
       }}
     >
-      {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : <RadixPopover.Trigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`} className="relative">
-          <BellIcon className="h-5 w-5" aria-hidden />
-          {items.length > 0 ? (
-            // CHAT-CALM-ERRORS-01d (design section 6): the count is red only
-            // when something urgent (an `immediate` item) is waiting; a
-            // Repairs notice or any other item gets a neutral count.
-            <span className={`absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-base leading-none ${items.some((n) => n.level === "immediate") ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"}`}>
-              {items.length}
-            </span>
-          ) : null}
-        </Button>
-      </RadixPopover.Trigger>}
+      {anchored ? <RadixPopover.Anchor className="pointer-events-none absolute inset-0" /> : <div className="relative inline-flex">
+        <RadixPopover.Trigger asChild>
+          <Button variant="ghost" size="icon" aria-label={`Notifications${items.length > 0 ? ` (${items.length} pending)` : ""}`}>
+            <BellIcon className="h-5 w-5" aria-hidden />
+          </Button>
+        </RadixPopover.Trigger>
+        {items.length > 0 ? (
+          // CHAT-CALM-ERRORS-01d (design section 6): the count is red only
+          // when something urgent (an `immediate` item) is waiting; a
+          // Repairs notice or any other item gets a neutral count.
+          <span className={`pointer-events-none absolute right-0.5 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-base leading-none ${items.some((n) => n.level === "immediate") ? "bg-destructive text-destructive-foreground" : "bg-foreground text-background"}`}>
+            {items.length}
+          </span>
+        ) : null}
+      </div>}
       <RadixPopover.Portal>
         <RadixPopover.Content
           aria-label="Notifications"
@@ -239,7 +241,7 @@ export function NotificationBell({ anchored = false, open: controlledOpen, onOpe
                   <Button
                     variant="ghost"
                     onClick={() => dismissMutation.mutate(n.id)}
-                    className="shrink-0 px-3 text-sm text-muted-foreground"
+                    className="shrink-0 text-sm text-muted-foreground"
                   >
                     Dismiss
                   </Button>

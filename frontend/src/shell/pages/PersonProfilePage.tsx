@@ -5,7 +5,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { MediaGrid, type MediaGridItem } from "@maipai/ui/src/primitives/MediaGrid";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@maipai/ui/src/ui/tabs";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -101,10 +101,10 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                 </Dialog>
               ) : null}
               <Tabs value={activeTab} onValueChange={onTabChange}>
-                <TabsList className="h-auto min-h-14 p-1">
-                  <TabsTrigger value="overview" className="min-h-12">Overview</TabsTrigger>
-                  {canViewMemories ? <TabsTrigger value="memories" className="min-h-12">Memories</TabsTrigger> : null}
-                  {showLimits ? <TabsTrigger value="limits" className="min-h-12">Limits</TabsTrigger> : null}
+                <TabsList>
+                  <TabsTrigger value="overview">Overview</TabsTrigger>
+                  {canViewMemories ? <TabsTrigger value="memories">Memories</TabsTrigger> : null}
+                  {showLimits ? <TabsTrigger value="limits">Limits</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">

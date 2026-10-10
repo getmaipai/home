@@ -109,26 +109,6 @@
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
-  "apps/memory/PeopleAndThings.tsx": {
-    "Button": {
-      "tokens": [
-        "h-auto",
-        "p-0",
-        "w-fit"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "apps/notifications/NotificationsPage.tsx": {
-    "Checkbox": {
-      "tokens": [
-        "mt-1"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
   "apps/search/SearchPage.tsx": {
     "Button": {
       "tokens": [
@@ -149,35 +129,6 @@
       ],
       "ed": "ED-037",
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
-  },
-  "apps/setup/SetupWizard.tsx": {
-    "Checkbox": {
-      "tokens": [
-        "mt-0.5"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "dev/ElementsAdoptionPanel.tsx": {
-    "CollapsibleContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-1",
-        "max-h-64"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    },
-    "Button": {
-      "tokens": [
-        "justify-between",
-        "w-full"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
   "shell/pages/ChatPage.tsx": {
@@ -206,97 +157,6 @@
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
   },
-  "shell/pages/CommandsPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/DevicesPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/FamilyPage.tsx": {
-    "TabsList": {
-      "tokens": [
-        "h-auto",
-        "min-h-14",
-        "p-1"
-      ],
-      "ed": "ED-038",
-      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
-    },
-    "TabsTrigger": {
-      "tokens": [
-        "min-h-12",
-        "min-w-12"
-      ],
-      "ed": "ED-038",
-      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
-    }
-  },
-  "shell/pages/PersonProfilePage.tsx": {
-    "TabsList": {
-      "tokens": [
-        "h-auto",
-        "min-h-14",
-        "p-1"
-      ],
-      "ed": "ED-038",
-      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
-    },
-    "TabsTrigger": {
-      "tokens": [
-        "min-h-12"
-      ],
-      "ed": "ED-038",
-      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
-    }
-  },
-  "shell/pages/VoicesPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/pages/status/StatusBoard.tsx": {
     "DialogContent": {
       "tokens": [
@@ -323,16 +183,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/NotificationBell.tsx": {
-    "Button": {
-      "tokens": [
-        "px-3",
-        "relative"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
   "shell/PhoneHeaderExtras.tsx": {
     "Button": {
       "tokens": [
@@ -354,56 +204,6 @@
         "justify-start",
         "min-h-12",
         "px-2"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    },
-    "Separator": {
-      "tokens": [
-        "my-1"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "shell/StatusIndicator.tsx": {
-    "Status": {
-      "tokens": [
-        "gap-1.5",
-        "px-2",
-        "py-1"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "shell/sessionLockContext.tsx": {
-    "Card": {
-      "tokens": [
-        "border-none",
-        "max-w-md",
-        "p-6",
-        "shadow-lg",
-        "w-full"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    },
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-4",
-        "items-center",
-        "p-0"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    },
-    "Button": {
-      "tokens": [
-        "rounded-lg",
-        "w-full"
       ],
       "ed": "ED-039",
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."

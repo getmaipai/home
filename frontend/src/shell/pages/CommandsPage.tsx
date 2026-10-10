@@ -11,8 +11,8 @@ export function CommandsPage({ person }: { person: Roster }) {
   useTabItem("Create command");
   return (
     <div className="flex flex-col gap-4">
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2"><CommandsIcon size={16} className="text-muted-foreground" />Create a command</CardTitle>
+      <CardHeader>
+        <CardTitle><CommandsIcon size={16} className="mr-2 inline text-muted-foreground" />Create a command</CardTitle>
       </CardHeader>
       <CommandsSection person={person} />
     </div>

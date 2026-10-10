@@ -176,7 +176,7 @@ export function NotificationsPage() {
                           checked={selectMode.isSelected(n.id)}
                           onCheckedChange={() => selectMode.toggle(n.id)}
                           aria-label={`Select ${n.text}`}
-                          className="mt-1 shrink-0"
+                          className="shrink-0"
                         />
                       ) : null}
                       <div className="flex min-w-0 flex-1 flex-col gap-1">

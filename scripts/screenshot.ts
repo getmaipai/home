@@ -2979,7 +2979,7 @@ async function captureAdminHomeReview(browser: Browser, ownerSession: string): P
   }
 }
 
-/** RULE9-CLEANUP-01e: the Family, profile, Backups and Privacy pages for the
+/** RULE9-CLEANUP-01e and 01g: the Family, profile, Backups, Privacy, Voices, Devices and Commands pages for the
  * seeded owner and a child, at 1440 and 390 in both themes. Prints what each
  * page drew so a spinner, skeleton, error or sideways scroll is a thrown
  * error, and writes full-page images under data-scratch/ for a person to open. */
@@ -2996,8 +2996,8 @@ async function captureRule9PagesReview(browser: Browser, ownerSession: string): 
   const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
   if (!childSession) throw new Error("rule9 review: the child sign-in carried no session cookie");
   const personas: Array<[string, string, Array<[string, string]>]> = [
-    ["admin", ownerSession, [["family", "/people"], ["profile-self", `/people/${sage.id}`], ["profile-child", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"], ["engines", "/settings/home/ai"]]],
-    ["child", childSession, [["family", "/people"], ["profile-self", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"]]],
+    ["admin", ownerSession, [["family", "/people"], ["profile-self", `/people/${sage.id}`], ["profile-child", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"], ["engines", "/settings/home/ai"], ["voices", "/voices"], ["devices", "/devices"], ["commands", "/commands"]]],
+    ["child", childSession, [["family", "/people"], ["profile-self", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"], ["dashboard", "/"], ["storage", "/storage"], ["updates", "/updates"], ["repairs", "/repairs"], ["users", "/users"], ["voices", "/voices"], ["devices", "/devices"], ["commands", "/commands"]]],
     ["signed-out", "", [["sign-in", "/sign-in"]]],
   ];
   for (const [who, session, pages] of personas) {
