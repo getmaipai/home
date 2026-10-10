@@ -13,8 +13,8 @@ export function VoicesPage({ person }: { person: Roster }) {
   useTabItem("Voices");
   return (
     <div className="flex flex-col gap-4">
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2"><VoicesIcon size={16} className="text-muted-foreground" />Voices</CardTitle>
+      <CardHeader>
+        <CardTitle><VoicesIcon size={16} className="mr-2 inline text-muted-foreground" />Voices</CardTitle>
       </CardHeader>
       <VoiceCatalogSection personId={person.id} />
       <ClonedVoicesSection person={person} />
