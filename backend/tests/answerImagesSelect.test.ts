@@ -193,17 +193,18 @@ describe("ANSWER-IMG-02: sources per subject and band", () => {
   });
 
   test("a lone validated extra is dropped so the badge never reads one; two extras keep a badge of two", async () => {
-    const four: FixtureSubject = { ...TOWER, files: ["a.jpg", "b.jpg", "c.jpg", "d.jpg"], image: "a.jpg" };
-    use([four]);
-    const r4 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
-    expect(r4.set?.items.length).toBe(3);
-    expect(r4.set?.visible).toBe(3);
-    const five: FixtureSubject = { ...TOWER, files: ["a.jpg", "b.jpg", "c.jpg", "d.jpg", "e.jpg"], image: "a.jpg" };
-    use([five]);
-    const r5 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
-    expect(r5.set?.items.length).toBe(5);
-    expect(r5.set?.visible).toBe(3);
-    expect(new Set(srcs(r5.set?.items)).size).toBe(5);
+    const files = (n: number) => Array.from({ length: n }, (_, i) => `p${i}.jpg`);
+    const six: FixtureSubject = { ...TOWER, files: files(6), image: "p0.jpg" };
+    use([six]);
+    const r6 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(r6.set?.items.length).toBe(5);
+    expect(r6.set?.visible).toBe(5);
+    const seven: FixtureSubject = { ...TOWER, files: files(7), image: "p0.jpg" };
+    use([seven]);
+    const r7 = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(r7.set?.items.length).toBe(7);
+    expect(r7.set?.visible).toBe(5);
+    expect(new Set(srcs(r7.set?.items)).size).toBe(7);
   });
 
   // ANSWER-IMG-05, measured on the real network (2026-10-06): the image

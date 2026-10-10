@@ -14,6 +14,7 @@ import type { PersonRow } from "@/types";
 import type { AnswerImageItem, AnswerImageSet } from "@/wire";
 import { fetchAnswerImages, type AnswerImageSource } from "./fetch";
 import { putAnswerImage } from "./cache";
+import { ANSWER_IMAGES_MAX_CANDIDATES, GALLERY_VISIBLE } from "./gallery";
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
 import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, type FetchJson, type WikimediaEntity } from "./wikimedia";
@@ -23,9 +24,7 @@ import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates
  * person, so there are no pictures. */
 const PERSON_KIND = new RegExp(`\\b(${["person", "people", "human", "man", "woman", "men", "women", "guy", "lady", "boy", "girl", "child", "children", "kid", "baby", "teen", "teenager", "adult", "actor", "actress", "singer", "musician", "band", "member", "rapper", "dj", "athlete", "player", "footballer", "cricketer", "golfer", "gymnast", "boxer", "wrestler", "racer", "driver", "coach", "politician", "president", "senator", "mayor", "celebrity", "influencer", "youtuber", "streamer", "tiktoker", "podcaster", "blogger", "vlogger", "author", "writer", "poet", "journalist", "reporter", "presenter", "host", "comedian", "artist", "painter", "photographer", "designer", "model", "dancer", "chef", "cook", "doctor", "nurse", "scientist", "engineer", "lawyer", "teacher", "professor", "student", "pupil", "classmate", "coworker", "colleague", "boss", "employee", "neighbou?r", "friend", "girlfriend", "boyfriend", "partner", "wife", "husband", "spouse", "mom", "mum", "mother", "dad", "father", "parent", "son", "daughter", "brother", "sister", "sibling", "cousin", "aunt", "uncle", "grandma", "grandpa", "grandparent", "relative", "family", "someone", "somebody", "character", "magician", "entrepreneur", "ceo", "founder", "billionaire", "priest", "pastor", "king", "queen", "prince", "princess", "soldier", "officer", "pilot", "astronaut"].join("|")})(s|es)?\\b`, "i");
 
-/** Tiles shown in the row; the rest open from the badge. */
-export const ANSWER_IMAGES_VISIBLE = 3;
-const MAX_CANDIDATES = 12;
+const MAX_CANDIDATES = ANSWER_IMAGES_MAX_CANDIDATES;
 const CAPTION_MAX = 140;
 
 export type AnswerImageDeps = {
@@ -100,12 +99,12 @@ function sizeOfResolution(resolution: string | undefined): { width: number; heig
 
 /** At most this many of the fetch slots from one source, so one source
  * cannot crowd out the other (IMGQ-04). */
-const PER_SOURCE_SLOTS = 8;
+const PER_SOURCE_SLOTS = GALLERY_VISIBLE * 2 + 2;
 /** Commons pictures that make the open web unnecessary (the coordinator's
  * decision on the design's recommended option, 2026-10-06, under the owner's
  * ruling that adults may get general image search: search fills a row only
- * when Commons has fewer than three good ones). */
-const COMMONS_ENOUGH = 3;
+ * when Commons has fewer good ones than the row has tiles). */
+const COMMONS_ENOUGH = GALLERY_VISIBLE;
 
 const trips = (text: string, band: AgeBand): boolean => text.trim().length > 0 && checkSafety(text, { isMinor: band !== "adult" }).flagged;
 
@@ -275,10 +274,10 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     }
     // Fewer than two validated extras: the extras are dropped and there is no
     // badge, so the number never promises a lone extra (section 6, Counts).
-    const shown = items.length > ANSWER_IMAGES_VISIBLE && items.length - ANSWER_IMAGES_VISIBLE < 2 ? items.slice(0, ANSWER_IMAGES_VISIBLE) : items;
+    const shown = items.length > GALLERY_VISIBLE && items.length - GALLERY_VISIBLE < 2 ? items.slice(0, GALLERY_VISIBLE) : items;
     trace.shown = shown.length;
     if (shown.length === 0) return skip("none_survived");
-    return { set: { layout: "row", visible: Math.min(ANSWER_IMAGES_VISIBLE, shown.length), items: shown }, trace };
+    return { set: { layout: "row", visible: Math.min(GALLERY_VISIBLE, shown.length), items: shown }, trace };
   } catch {
     return skip("error");
   }

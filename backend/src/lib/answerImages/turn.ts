@@ -48,13 +48,15 @@ export type AnswerImageTurnState = {
 };
 
 /** Section 4.3's one line, the same whatever the pipeline later finds: no
- * count, no bytes. ANSWER-IMG-05b: short (it is new prompt the answering
- * round must read before its first word: 205 new tokens cost about 0.55 s
- * on the household's 8B under load), and it lets the model describe the
- * subject from what it knows ("what does he look like" was declined under
- * the old "never describe" line) while never mentioning the photos. */
+ * count, no bytes. ANSWER-IMG-05b kept it short (it is new prompt the
+ * answering round must read before its first word). IMG-QUALITY-01a: the
+ * 05b clause that let the model describe the subject "yourself if asked"
+ * made it invent how the person looks in the pictures ("white glove and
+ * fedora"); the model has not seen the photos, so it is told not to say
+ * what they show or how the subject looks in them, and to answer other
+ * questions from what it knows. Never mention the photos stays. */
 export function showImagesResultLine(subject: string): string {
-  return `Photos of ${subject} are on their screen. Answer from what you know, describing ${subject} yourself if asked; never mention the photos.`;
+  return `Photos of ${subject} are on their screen. You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; never mention the photos.`;
 }
 export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer without mentioning photos.";
 

@@ -5722,7 +5722,7 @@ async function captureNextChatAnswerImages(browser: Browser, sessionValue: strin
   const seedSource = `
     import sharp from "sharp";
     import { putAnswerImage } from "./src/lib/answerImages/cache";
-    const scenes = [["#7cb7e8", "#f6c453", "#3f7d4e"], ["#f2a65a", "#ffe08a", "#8a5a44"], ["#2f4a7a", "#e8eef7", "#56606e"], ["#a7d8c9", "#ffffff", "#2e6b5e"], ["#e9c2d4", "#fff4c2", "#6b4a7a"]];
+    const scenes = [["#7cb7e8", "#f6c453", "#3f7d4e"], ["#f2a65a", "#ffe08a", "#8a5a44"], ["#2f4a7a", "#e8eef7", "#56606e"], ["#a7d8c9", "#ffffff", "#2e6b5e"], ["#e9c2d4", "#fff4c2", "#6b4a7a"], ["#c9d6a3", "#fff1b8", "#4f6b3a"], ["#9fb4e0", "#fde4c8", "#3a4b73"]];
     const out = [];
     for (const [i, [sky, sun, land]] of scenes.entries()) {
       const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="900"><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + sky + '"/><stop offset="1" stop-color="#ffffff"/></linearGradient></defs><rect width="1200" height="900" fill="url(#g)"/><circle cx="' + (300 + i * 150) + '" cy="220" r="110" fill="' + sun + '"/><path d="M0 640 Q300 ' + (480 + i * 20) + ' 600 620 T1200 600 V900 H0Z" fill="' + land + '"/><path d="M560 660 L600 260 L640 660 Z" fill="#3b3b44"/><rect x="520" y="640" width="160" height="22" fill="#3b3b44"/></svg>';
@@ -5742,7 +5742,7 @@ async function captureNextChatAnswerImages(browser: Browser, sessionValue: strin
     db.exec("PRAGMA busy_timeout = 5000");
     const turn = db.query("SELECT id FROM conversation_turns WHERE conversation_id = ? ORDER BY created_at DESC LIMIT 1").get(withPictures.id) as { id: string } | null;
     if (!turn) throw new Error("captureNextChatAnswerImages: the scripted turn was not stored");
-    db.prepare("UPDATE conversation_turns SET answer_images = ? WHERE id = ?").run(JSON.stringify({ layout: "row", after_paragraph: 0, visible: 3, items }), turn.id);
+    db.prepare("UPDATE conversation_turns SET answer_images = ? WHERE id = ?").run(JSON.stringify({ layout: "row", after_paragraph: 0, visible: 5, items }), turn.id);
   } finally {
     db.close();
   }

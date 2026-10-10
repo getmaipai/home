@@ -168,7 +168,7 @@ describe("ANSWER-IMG-02: the turn with pictures", () => {
       // The model's tool result: the fixed line, no bytes, no count, no address.
       const phrasing = seen.find(isPhrasing)!;
       const toolMessage = phrasing.messages.find((m) => m.role === "tool")!.content!.toString();
-      expect(toolMessage).toContain("Photos of Eiffel Tower are on their screen. Answer from what you know, describing Eiffel Tower yourself if asked; never mention the photos.");
+      expect(toolMessage).toContain("Photos of Eiffel Tower are on their screen. You have not seen them: do not say what they show or how Eiffel Tower looks in them. Answer other questions from what you know; never mention the photos.");
       // ANSWER-IMG-05b: the answering round after a pictures-only call gets
       // the short instruction, with no search lines.
       const instruction = phrasing.messages.at(-1)!.content!.toString();
@@ -316,12 +316,12 @@ describe("ANSWER-IMG-02: the wire shapes", () => {
 
 describe("GENUI-05: the gallery builder and the turns stored before it", () => {
   test("a lone extra picture is dropped so the badge never reads +1; the caption carries the licence", () => {
-    const four = { visible: 3, items: [ITEM("a"), ITEM("b"), ITEM("c"), ITEM("d")] };
-    expect(galleryProps(four)!.images).toHaveLength(3);
-    const five = { visible: 3, items: [ITEM("a"), ITEM("b"), ITEM("c"), ITEM("d"), ITEM("e")] };
-    const props = galleryProps(five)!;
-    expect(props.images).toHaveLength(5);
-    expect(props.maxVisible).toBe(3);
+    const six = { visible: 5, items: ["a", "b", "c", "d", "e", "f"].map(ITEM) };
+    expect(galleryProps(six)!.images).toHaveLength(5);
+    const seven = { visible: 5, items: ["a", "b", "c", "d", "e", "f", "g"].map(ITEM) };
+    const props = galleryProps(seven)!;
+    expect(props.images).toHaveLength(7);
+    expect(props.maxVisible).toBe(5);
     expect(props.images[0]!.caption).toBe("a tower · CC BY-SA 4.0, Pat");
     expect(galleryProps({ visible: 3, items: [] })).toBeNull();
   });
