@@ -133,41 +133,5 @@
       "ed": "ED-035",
       "reason": "NO REASON: to be removed (cleanup item 6, chat className overrides)."
     }
-  },
-  "shell/pages/status/StatusBoard.tsx": {
-    "DialogContent": {
-      "tokens": [
-        "max-h-screen",
-        "sm:max-w-lg"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "SelectTrigger": {
-      "tokens": [
-        "min-h-12",
-        "w-full"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    },
-    "PopoverContent": {
-      "tokens": [
-        "p-0",
-        "w-auto"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "apps/settings/ModelsSection.tsx": {
-    "Badge": {
-      "tokens": [
-        "bg-[var(--hue-orange)]",
-        "bg-[var(--hue-teal)]"
-      ],
-      "ed": "ED-037",
-      "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
-    }
   }
 }

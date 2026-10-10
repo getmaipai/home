@@ -172,12 +172,12 @@ function FitResult({ headline, detail, verdict, sizedModel }: { headline: string
 
 function FitVerdictBadge({ verdict }: { verdict: "yes" | "slow" | "no" | "unknown" }) {
   const appearance = {
-    yes: { variant: "secondary" as const, className: "bg-[var(--hue-teal)] text-foreground" },
-    slow: { variant: "secondary" as const, className: "bg-[var(--hue-orange)] text-foreground" },
-    no: { variant: "destructive" as const, className: "" },
-    unknown: { variant: "secondary" as const, className: "" },
+    yes: { variant: "secondary" as const, tone: "success" as const },
+    slow: { variant: "secondary" as const, tone: "warning" as const },
+    no: { variant: "destructive" as const, tone: "default" as const },
+    unknown: { variant: "secondary" as const, tone: "default" as const },
   }[verdict];
-  return <Badge data-verdict={verdict} variant={appearance.variant} className={appearance.className}>{fitBadgeWord(verdict)}</Badge>;
+  return <Badge data-verdict={verdict} variant={appearance.variant} tone={appearance.tone}>{fitBadgeWord(verdict)}</Badge>;
 }
 
 function CheckModelCard({ onChecked }: { onChecked: (name: string, response: FitPlanResponse) => void }) {
