@@ -842,74 +842,7 @@
       "reason": "NO REASON: to be removed (cleanup item 9, settings and models)."
     }
   },
-  "shell/pages/status/StatusApps.tsx": {
-    "CollapsibleTrigger": {
-      "tokens": [
-        "flex",
-        "gap-3",
-        "items-center",
-        "justify-between",
-        "min-h-12",
-        "rounded-md",
-        "w-full"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "divide-border",
-        "divide-y",
-        "flex",
-        "flex-col"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusBanner.tsx": {
-    "Badge": {
-      "tokens": [
-        "bg-destructive/10",
-        "bg-primary/10",
-        "border-destructive/30",
-        "border-primary/30"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
   "shell/pages/status/StatusBoard.tsx": {
-    "Alert": {
-      "tokens": [
-        "bg-primary/10",
-        "border-primary/40"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardHeader": {
-      "tokens": [
-        "flex",
-        "flex-row",
-        "flex-wrap",
-        "gap-3",
-        "items-center",
-        "justify-between"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "divide-border",
-        "divide-y",
-        "flex",
-        "flex-col"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
     "DialogContent": {
       "tokens": [
         "max-h-screen",
@@ -930,48 +863,6 @@
       "tokens": [
         "p-0",
         "w-auto"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusComponents.tsx": {
-    "CardContent": {
-      "tokens": [
-        "divide-border",
-        "divide-y",
-        "flex",
-        "flex-col"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "Alert": {
-      "tokens": [
-        "flex",
-        "flex-wrap",
-        "gap-3",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusIncident.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "flex",
-        "flex-row",
-        "gap-3",
-        "items-start",
-        "pb-2"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "pl-11"
       ],
       "ed": "ED-038",
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."

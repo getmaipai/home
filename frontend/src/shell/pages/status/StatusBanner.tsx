@@ -27,7 +27,7 @@ export function StatusBanner({ summary, uptimeSeconds, maintenanceEndsAt, messag
       <h2 className="min-w-0 text-lg font-semibold sm:text-xl">{headline}</h2>
     </div>
     <div className="flex min-h-16 flex-wrap items-center gap-2 px-5 py-4">
-      {summary.level === "offline" || summary.level === "maintenance" ? <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Affected parts">{summary.problems.map((problem) => <Badge key={problem} variant="outline" className={summary.level === "offline" ? "border-destructive/30 bg-destructive/10 text-destructive" : "border-primary/30 bg-primary/10 text-primary"}>{problem}</Badge>)}</div> : null}
+      {summary.level === "offline" || summary.level === "maintenance" ? <div className="flex min-w-0 flex-wrap items-center gap-2" aria-label="Affected parts">{summary.problems.map((problem) => <Badge key={problem} variant={summary.level === "offline" ? "destructive" : "secondary"}>{problem}</Badge>)}</div> : null}
       <p className="min-w-0 text-sm text-foreground">{summary.level === "maintenance" && summary.problems.length ? `${joinNames(summary.problems)}. ` : ""}{body}</p>
     </div>
   </section>;

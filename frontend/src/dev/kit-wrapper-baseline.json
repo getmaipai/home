@@ -211,38 +211,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/status/StatusApps.tsx": {
-    "AppRow": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusBoard.tsx": {
-    "NoteAlert": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "StatusMaintenanceCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusComponents.tsx": {
-    "StatusComponents": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "OverallBanner": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/status/StatusIncident.tsx": {
-    "StatusIncident": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/ThemeToggle.tsx": {
     "ThemeToggle": {
       "ed": "ED-039",
