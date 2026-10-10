@@ -245,7 +245,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(value.answer_images ? { answerImages: value.answer_images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).
@@ -747,14 +747,11 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const source: TurnValue["source"] = state.whoAnswer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     // GENUI-13c: a block still waiting when the answer ends goes after the reply; stamped before the value is built so
     // the stored `blocks` carry where each one sits.
+    // GENUI-05: the picture gallery is one of the turn's blocks, so the picture pipeline settles first (a gallery that
+    // finished late is then placed after the reply with the rest); an answer that is not kept stores no pictures.
+    await settleAnswerImages(state, { keep: !gateOutput?.refused && !state.failedGenerationReply && (gateOutput?.text ?? "").trim().length > 0 });
     settleAnswerBlocks(state, gateOutput?.text ?? "");
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources, contextSegments);
-    // ANSWER-IMG-02: the pictures are stored with an answer the gate let
-    // through, where they were placed (or after the text), never with a
-    // refusal. On a stream, a set placed before a later sentence is refused
-    // was already sent, like the text released before it (never retracted).
-    const answerImages = gateOutput?.refused || state.failedGenerationReply ? undefined : await settleAnswerImages(state, value.reply.text);
-    if (answerImages) value.answer_images = answerImages;
     // 2026-10-03: after a successful tool call the reply is the model's
     // own composition, not a package's canned line. The stats stay on
     // source "plugin" (per-package counts), and routing tier "tool"
@@ -1022,10 +1019,8 @@ function startStream(actor: PersonRow, surface: Surface, text: string, begunValu
     // every live turn return "stream", so a real search on a live chat
     // never carried a tool_call/tool_result at all until this.
     toolEvents: state.toolEvents,
-    // ANSWER-IMG-02: where the picture set landed, read by the wire as it
-    // relays the released text (routes/turn.ts's streamTurnEvents()).
-    answerImages: () => state.answerImages?.placed,
-    // GENUI-13c: the blocks the same placer put in the reply, read by the wire beside the pictures.
+    // GENUI-13c and GENUI-05: the blocks the one placer put in the reply (a picture gallery is one), read by the wire
+    // as it relays the released text (routes/turn.ts's streamTurnEvents()).
     placedBlocks: () => state.placedBlocks ?? [],
     // ENGINEERING gap, named rather than silently worked around: the new
     // path has no equivalent of the old engine file's own bannedPhrasesFor()

@@ -5622,7 +5622,9 @@ async function captureNextChatSentPictures(browser: Browser, sessionValue: strin
   }
 }
 
-/** ANSWER-IMG-04: pictures in a chat answer, the kit image gallery. A real
+/** ANSWER-IMG-04, re-pointed by GENUI-05: pictures in a chat answer, the kit image gallery. This run is the
+ * old-stored-turn proof: the picture set goes into the retired `answer_images` column, as a turn stored before
+ * GENUI-05 has it, and the history path must draw it as the `image_gallery` block it reads as. A real
  * scripted turn is sent in a demo conversation, then this run's throwaway
  * demo database gives that stored turn a picture set whose files sit in the
  * hub's own picture cache (generated here: licence-clean synthetic scenes,
@@ -5728,7 +5730,7 @@ async function captureNextChatAnswerImages(browser: Browser, sessionValue: strin
         await openStoredConversation(page, withoutPictures.id, withoutTitle);
         await page.getByText(SCREENSHOT_CHAT_REPLY, { exact: true }).first().waitFor();
         await settleAnimations(page);
-        const galleries = await page.locator('[data-slot="image-gallery"], [data-slot="answer-images"]').count();
+        const galleries = await page.locator('[data-slot="image-gallery"]').count();
         console.log(`captureNextChatAnswerImages ${evidenceTag} ${slug}/${theme}: no-picture reply has ${galleries} gallery boxes`);
         if (galleries !== 0) throw new Error("captureNextChatAnswerImages: a reply with no pictures reserved a gallery box");
         await page.screenshot({ path: join(outDir, `next-chat-answer-images-${evidenceTag}-none-${viewport.width}-${theme}.png`) });

@@ -78,7 +78,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   // beside a search rather than after it (section 4.3).
   if (state.answerImagesAllowed) {
     const call = input.proposals.find((p) => p.request.tool === SHOW_IMAGES_TOOL_ID && typeof p.request.args.subject === "string" && p.request.args.subject.trim().length > 0);
-    if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "");
+    if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "", call.request.callId);
   }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;

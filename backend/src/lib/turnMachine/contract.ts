@@ -172,7 +172,7 @@ export interface TurnState {
    * and the person's settings); absent when they go as a note instead. */
   pictureParts?: import("@/lib/llm").LlmImagePart[];
   /** ANSWER-IMG-02: the picture pipeline the `show_images` tool started
-   * beside the answer (answerImages/turn.ts), and where its set landed. */
+   * beside the answer (answerImages/turn.ts); its set becomes an `image_gallery` block in `toolEvents` (GENUI-05). */
   answerImages?: import("@/lib/answerImages/turn").AnswerImageTurnState;
   /** GENUI-13c: the answer blocks the placer put in the reply (their events carry `after_paragraph`), in placement
    * order, each with the released-text length it goes after (Infinity: after the whole reply). */

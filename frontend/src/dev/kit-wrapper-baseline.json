@@ -17,12 +17,6 @@
       "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
     }
   },
-  "apps/chat/chatAnswerImages.tsx": {
-    "AnswerImagesDataRender": {
-      "ed": "ED-034",
-      "reason": "NO REASON: to be removed (cleanup item 5, chat wrappers)."
-    }
-  },
   "apps/chat/chatCitationLink.tsx": {
     "ChatCitationLink": {
       "ed": "ED-002",

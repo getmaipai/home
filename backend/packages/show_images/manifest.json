@@ -47,6 +47,7 @@
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
+  "returns_blocks": ["image_gallery"],
   "config": [],
   "data_sources": [
     {
