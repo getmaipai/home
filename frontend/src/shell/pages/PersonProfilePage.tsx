@@ -32,6 +32,8 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   useTabItem("Profile");
   const { id } = useParams<{ id: string }>();
   const [params, setParams] = useSearchParams();
+  const [editOpen, setEditOpen] = useState(false);
+  const queryClient = useQueryClient();
   const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const viewingSelf = id === person.id;
   const canViewMemories = viewingSelf || isOwnerOrAdminRole(person.role);
@@ -53,7 +55,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
 
   return (
     <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4 overflow-y-auto p-4">
-      <CardHeader className="p-0"><CardTitle>Profile</CardTitle></CardHeader>
+      <CardHeader><CardTitle>Profile</CardTitle></CardHeader>
       <AsyncState
         data={rosterQuery.data}
         error={rosterQuery.isError}
@@ -73,31 +75,59 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
             );
           }
           const showLimits = canViewLimits && profile.age_band === "child" && canManagePerson(person.role, person.id, { id: profile.id, role: profile.role });
+          const canEdit = canManagePerson(person.role, person.id, { id: profile.id, role: profile.role });
           return (
             <>
-              <ProfileHeaderCard profile={profile} viewer={person} viewingSelf={viewingSelf} onPersonChange={onPersonChange} />
+              <Card>
+                <CardContent>
+                  <ProfileHeaderBody profile={profile} viewer={person} viewingSelf={viewingSelf} canEdit={canEdit} onEdit={() => setEditOpen(true)} />
+                </CardContent>
+              </Card>
+              {canEdit && !viewingSelf ? (
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                  <DialogContent>
+                    <DialogHeader><DialogTitle>Edit {profile.display_name}&rsquo;s profile</DialogTitle></DialogHeader>
+                    <ProfileForm
+                      key={`${profile.id}-${editOpen}`}
+                      person={profile}
+                      canEdit
+                      layout="dialog"
+                      onSaved={async () => {
+                        await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]);
+                      }}
+                      onCancel={() => setEditOpen(false)}
+                    />
+                  </DialogContent>
+                </Dialog>
+              ) : null}
               <Tabs value={activeTab} onValueChange={onTabChange}>
-              <TabsList className="h-auto min-h-14 p-1">
-                <TabsTrigger value="overview" className="min-h-12">Overview</TabsTrigger>
+                <TabsList className="h-auto min-h-14 p-1">
+                  <TabsTrigger value="overview" className="min-h-12">Overview</TabsTrigger>
                   {canViewMemories ? <TabsTrigger value="memories" className="min-h-12">Memories</TabsTrigger> : null}
                   {showLimits ? <TabsTrigger value="limits" className="min-h-12">Limits</TabsTrigger> : null}
                 </TabsList>
-                <TabsContent value="overview" className="flex flex-col gap-4 py-2">
-                  {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
-                  <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
-                  {viewingSelf ? <FaceStatusRow profile={profile} /> : <FaceEnrollmentCard profile={profile} viewer={person} viewingSelf={false} />}
+                <TabsContent value="overview">
+                  <div className="flex flex-col gap-4 py-2">
+                    {viewingSelf ? null : <p className="text-sm text-muted-foreground">{`${profile.display_name}'s profile in this household.`}</p>}
+                    <SharedMediaSection profile={profile} viewingSelf={viewingSelf} />
+                    {viewingSelf ? <FaceStatusRow profile={profile} /> : <FaceEnrollmentCard profile={profile} viewer={person} viewingSelf={false} />}
+                  </div>
                 </TabsContent>
                 {canViewMemories ? (
-                  <TabsContent value="memories" className="py-2">
-                    {viewingSelf
-                      ? <OwnMemories filterIds={idsFilter(params)} actorIsAdult={person.role === "adult"} />
-                      : <OtherPersonMemories personId={profile.id} personName={profile.display_name} />}
+                  <TabsContent value="memories">
+                    <div className="py-2">
+                      {viewingSelf
+                        ? <OwnMemories filterIds={idsFilter(params)} actorIsAdult={person.role === "adult"} />
+                        : <OtherPersonMemories personId={profile.id} personName={profile.display_name} />}
+                    </div>
                   </TabsContent>
                 ) : null}
                 {showLimits ? (
-                  <TabsContent value="limits" className="flex flex-col gap-4 py-2">
-                    <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
-                    <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
+                  <TabsContent value="limits">
+                    <div className="flex flex-col gap-4 py-2">
+                      <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
+                      <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
+                    </div>
                   </TabsContent>
                 ) : null}
               </Tabs>
@@ -135,55 +165,23 @@ function FaceStatusRow({ profile }: { profile: ProfileEntry }) {
   return <p className="text-sm text-muted-foreground">Face recognition: {query.isLoading ? "Checking" : setUp ? "Set up" : "Not set up yet"}</p>;
 }
 
-/** FACE-02's entry point: reachable from the person's own profile (not a
- * dead-end route nobody can find), gated the same two ways the API
- * itself gates biometric prints - `canManagePerson` (self, or
- * owner/admin) for even seeing enrollment status at all, matching
- * `listBiometricPrints`'s own gate, and the stricter `canEnrollFace` (a
- * child never consents for themself) for the Enroll action itself,
- * matching `createBiometricPrint`'s. Mirrors the profile-edit dialog's
- * own "Use a real photo" admin-approval-required pattern for
- * backend-provided `age_band` (docs/BACKLOG.md's own FACE-02 entry). */
-function ProfileHeaderCard({ profile, viewer, viewingSelf, onPersonChange }: { profile: ProfileEntry; viewer: Roster; viewingSelf: boolean; onPersonChange: () => void | Promise<void> }) {
-  const [editOpen, setEditOpen] = useState(false);
-  const canEdit = canManagePerson(viewer.role, viewer.id, { id: profile.id, role: profile.role });
+/** The inside of the page's profile header card (the page owns the Card and
+ * the edit Dialog). The person's accent shows as the ring on their Avatar,
+ * not on the Card, so no kit Element carries a className override. */
+function ProfileHeaderBody({ profile, viewer, viewingSelf, canEdit, onEdit }: { profile: ProfileEntry; viewer: Roster; viewingSelf: boolean; canEdit: boolean; onEdit: () => void }) {
   const showSelfEdit = viewingSelf && isOwnerOrAdminRole(viewer.role);
   const accentClass = profile.accent ? ACCENT_RING_CLASS[profile.accent] : null;
   return (
-    <Card className={accentClass ? `ring-2 ring-offset-2 ring-offset-background ${accentClass}` : undefined}>
-      <CardContent className="flex flex-wrap items-center gap-4 p-6">
-        <Avatar name={profile.display_name} className={accentClass ? `h-16 w-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "h-16 w-16 text-xl"} />
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <h1 className="truncate text-xl font-semibold">{profile.display_name}</h1>
-          <p className="text-sm text-muted-foreground">{ROLE_LABELS[profile.role]}</p>
-          {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
-        </div>
-        <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
-          {showSelfEdit && canEdit ? <Link to="/settings/account/profile" className="min-h-12 content-center text-sm text-primary underline">Edit profile</Link> : canEdit ? <Button variant="outline" onClick={() => setEditOpen(true)} className="min-h-12 gap-1.5"><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
-        </div>
-      </CardContent>
-      {canEdit && !viewingSelf ? <EditProfileDialog profile={profile} open={editOpen} onOpenChange={setEditOpen} onPersonChange={onPersonChange} /> : null}
-    </Card>
-  );
-}
-
-function EditProfileDialog({ profile, open, onOpenChange, onPersonChange }: { profile: ProfileEntry; open: boolean; onOpenChange: (open: boolean) => void; onPersonChange: () => void | Promise<void> }) {
-  const queryClient = useQueryClient();
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader><DialogTitle>Edit {profile.display_name}&rsquo;s profile</DialogTitle></DialogHeader>
-        <ProfileForm
-          key={`${profile.id}-${open}`}
-          person={profile}
-          canEdit
-          layout="dialog"
-          onSaved={async () => {
-            await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]);
-          }}
-          onCancel={() => onOpenChange(false)}
-        />
-      </DialogContent>
-    </Dialog>
+    <div className="flex flex-wrap items-center gap-4">
+      <Avatar name={profile.display_name} className={accentClass ? `h-16 w-16 text-xl ring-2 ring-offset-2 ring-offset-card ${accentClass}` : "h-16 w-16 text-xl"} />
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <h1 className="truncate text-xl font-semibold">{profile.display_name}</h1>
+        <p className="text-sm text-muted-foreground">{ROLE_LABELS[profile.role]}</p>
+        {profile.bio ? <p className="text-base text-muted-foreground">{profile.bio}</p> : null}
+      </div>
+      <div className="flex basis-full flex-row items-center justify-end gap-4 sm:w-auto sm:basis-auto sm:flex-col sm:items-end sm:gap-2">
+        {showSelfEdit && canEdit ? <Link to="/settings/account/profile" className="min-h-12 content-center text-sm text-primary underline">Edit profile</Link> : canEdit ? <Button variant="outline" size="row" onClick={onEdit}><PencilIcon className="size-4" aria-hidden />Edit</Button> : null}
+      </div>
+    </div>
   );
 }

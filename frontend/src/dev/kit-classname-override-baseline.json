@@ -358,40 +358,6 @@
       "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
     }
   },
-  "shell/pages/BackupsPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "Button": {
-      "tokens": [
-        "min-h-13",
-        "mt-3",
-        "w-fit"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
   "shell/pages/ChatPage.tsx": {
     "Alert": {
       "tokens": [
@@ -483,17 +449,6 @@
     }
   },
   "shell/pages/FamilyPage.tsx": {
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-3",
-        "items-center",
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
     "TabsList": {
       "tokens": [
         "h-auto",
@@ -501,7 +456,7 @@
         "p-1"
       ],
       "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
     },
     "TabsTrigger": {
       "tokens": [
@@ -509,24 +464,10 @@
         "min-w-12"
       ],
       "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
     }
   },
   "shell/pages/PersonProfilePage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
     "TabsList": {
       "tokens": [
         "h-auto",
@@ -534,70 +475,14 @@
         "p-1"
       ],
       "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
     },
     "TabsTrigger": {
       "tokens": [
         "min-h-12"
       ],
       "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "TabsContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-4",
-        "py-2"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-wrap",
-        "gap-4",
-        "items-center",
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "Button": {
-      "tokens": [
-        "gap-1.5",
-        "min-h-12"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "shell/pages/PrivacyPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "border-b",
-        "border-border",
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-5"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
+      "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
     }
   },
   "shell/pages/RepairsPage.tsx": {

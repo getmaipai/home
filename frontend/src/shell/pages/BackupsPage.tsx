@@ -118,16 +118,16 @@ export function BackupsPage({ person }: { person: Roster }) {
 
   return (
     <>
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2">
-          <BackupsIcon size={16} className="text-muted-foreground" />
+      <CardHeader>
+        <CardTitle>
+          <BackupsIcon size={16} className="mr-2 inline text-muted-foreground" />
           Backups
         </CardTitle>
       </CardHeader>
 
       {!canManage ? (
         <Card>
-          <CardContent className="p-6">
+          <CardContent>
             <p className="text-sm text-muted-foreground">Only an owner or admin can manage backups.</p>
           </CardContent>
         </Card>
@@ -144,12 +144,12 @@ export function BackupsPage({ person }: { person: Roster }) {
             <>
               {pendingQuery.data?.pending ? (
                 <Card>
-                  <CardContent className="p-6">
+                  <CardContent>
                     <p className="text-sm font-medium">Ready to restore</p>
                     <p className="text-sm text-muted-foreground">
                       The backup from {backupDate(pendingQuery.data.pending.filename, backups)} will replace everything in MaiPai Home the next time it starts.
                     </p>
-                    {canRestore ? <Button variant="secondary" onClick={handleCancel} disabled={cancelling} className="mt-3">Cancel restore</Button> : null}
+                    {canRestore ? <div className="mt-3"><Button variant="secondary" size="row" onClick={handleCancel} disabled={cancelling}>Cancel restore</Button></div> : null}
                   </CardContent>
                 </Card>
               ) : null}
@@ -178,9 +178,11 @@ export function BackupsPage({ person }: { person: Roster }) {
                   }]} />
                 ) : undefined}
               />
-              <Button variant="secondary" onClick={handleRunBackup} disabled={running} className="w-fit min-h-13">
-                {running ? "Backing up…" : "Back up now"}
-              </Button>
+              <div className="w-fit">
+                <Button variant="secondary" size="row" onClick={handleRunBackup} disabled={running}>
+                  {running ? "Backing up…" : "Back up now"}
+                </Button>
+              </div>
             </>
           )}
         </AsyncState>

@@ -354,6 +354,7 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const adminHomeReview = process.argv.includes("--admin-home-review");
+const rule9PagesReview = process.argv.includes("--rule9-pages-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
 const statusColorsReview = process.argv.includes("--status-colors-review");
@@ -2954,6 +2955,61 @@ async function captureAdminHomeReview(browser: Browser, ownerSession: string): P
             if (headings.length) await page.getByRole("heading", { name: headings[headings.length - 1]! }).scrollIntoViewIfNeeded();
             await settleAnimations(page);
             await page.screenshot({ path: join(outDir, `home-settings-${path.split("/").pop()}-${viewport.width}-${theme}.png`) });
+          }
+        } finally {
+          await context.close();
+        }
+      }
+    }
+  }
+}
+
+/** RULE9-CLEANUP-01e: the Family, profile, Backups and Privacy pages for the
+ * seeded owner and a child, at 1440 and 390 in both themes. Prints what each
+ * page drew so a spinner, skeleton, error or sideways scroll is a thrown
+ * error, and writes full-page images under data-scratch/ for a person to open. */
+async function captureRule9PagesReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "rule9-shots");
+  mkdirSync(outDir, { recursive: true });
+  const people = await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${ownerSession}` } });
+  if (!people.ok) throw new Error(`rule9 review: people lookup failed: ${people.status}`);
+  const roster = (await people.json()) as Array<{ id: string; display_name: string }>;
+  const sage = roster.find((p) => p.display_name === "Sage");
+  const nova = roster.find((p) => p.display_name === "Nova");
+  if (!sage || !nova) throw new Error("rule9 review: the seeded household lacks Sage or Nova");
+  const selected = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: nova.id }) });
+  const childSession = selected.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("rule9 review: the child sign-in carried no session cookie");
+  const personas: Array<[string, string, Array<[string, string]>]> = [
+    ["admin", ownerSession, [["family", "/people"], ["profile-self", `/people/${sage.id}`], ["profile-child", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"]]],
+    ["child", childSession, [["family", "/people"], ["profile-self", `/people/${nova.id}`], ["backups", "/backups"], ["privacy", "/privacy"]]],
+  ];
+  for (const [who, session, pages] of personas) {
+    for (const slug of ["desktop", "phone"] as const) {
+      const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+      for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, session);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          for (const [name, path] of pages) {
+            await page.goto(`${BASE_URL}${path}`);
+            await page.waitForLoadState("networkidle");
+            await page.locator('[data-slot="skeleton"]').first().waitFor({ state: "detached", timeout: 10000 }).catch(() => {});
+            await page.waitForTimeout(500);
+            const state = await page.evaluate(() => ({
+              path: location.pathname,
+              heading: document.querySelector("h1, [data-slot='card-title']")?.textContent?.trim(),
+              spinner: document.querySelectorAll('[role="status"][aria-label*="oading"]').length,
+              skeleton: document.querySelectorAll('[data-slot="skeleton"]').length,
+              alert: [...document.querySelectorAll('[role="alert"]')].map((a) => a.textContent?.trim()),
+              overflow: document.documentElement.scrollWidth > window.innerWidth,
+            }));
+            console.log(`rule9 ${who} ${name} ${slug} ${theme}: ${JSON.stringify(state)}`);
+            if (state.overflow) throw new Error(`rule9 review ${who} ${name} ${slug} ${theme} scrolls sideways`);
+            if (state.spinner || state.skeleton || state.alert.length) throw new Error(`rule9 review ${who} ${name} ${slug} ${theme} shows a loading or error state`);
+            await settleAnimations(page);
+            await page.screenshot({ path: join(outDir, `${who}-${name}-${viewport.width}-${theme}.png`), fullPage: true });
           }
         } finally {
           await context.close();
@@ -10658,6 +10714,12 @@ async function main() {
     if (adminHomeReview) {
       await captureAdminHomeReview(browser, sessionValue);
       console.log("completed named review: --admin-home-review");
+      return;
+    }
+
+    if (rule9PagesReview) {
+      await captureRule9PagesReview(browser, sessionValue);
+      console.log("completed named review: --rule9-pages-review");
       return;
     }
 
