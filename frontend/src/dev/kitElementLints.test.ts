@@ -20,7 +20,7 @@ import {
   type OverrideBaseline,
   type WrapperBaseline,
 } from "./kitElementLints";
-import { normalizeOldBaseline, renamedEntryProblems, renameStillNeeded, SLOT_RENAMES, type NestedBaseline } from "./baselineRenames";
+import { normalizeOldBaseline } from "./baselineRenames";
 
 // ELEMENTS-LINT-02 and ELEMENTS-LINT-03 (RULES.md rule 9, "Kit Elements as
 // they ship"). Same shape as ELEMENTS-LINT-01 (handBuiltChat.test.ts): a
@@ -51,7 +51,7 @@ function baselineAtBase<T>(name: string, raw = false): T | null {
   try {
     const out = git(["show", `${base}:frontend/src/dev/${name}`]);
     const baseline = JSON.parse(out) as Record<string, unknown>;
-    // NEXT-RETIRE-01 git-mv map and NEXT-RETIRE-02E-GUARD slot renames,
+    // NEXT-RETIRE-01 git-mv map,
     // old side only, defined once in baselineRenames.ts. `raw` skips them.
     return (raw ? baseline : normalizeOldBaseline(baseline)) as T;
   } catch {
@@ -165,18 +165,6 @@ describe("Home CSS restyling kit parts (ELEMENTS-LINT-02, CSS leg)", () => {
     const grown = keys(baseline).filter((key) => !headKeys.includes(key));
     expect(grown, "the baseline may only shrink").toEqual([]);
     expect(keys(baseline).length, "NEXT-RETIRE-02E-GUARD: the count never exceeds the base count").toBeLessThanOrEqual(headKeys.length);
-    const raw = baselineAtBase<NestedBaseline>(CSS_BASELINE, true)!;
-    expect(renamedEntryProblems(raw, baseline as unknown as NestedBaseline)).toEqual([]);
-  });
-
-  test("every rename-map entry is still needed (NEXT-RETIRE-02E-GUARD expiry: delete the entry once origin/main has 02E)", () => {
-    const raws = [OVERRIDE_BASELINE, CSS_BASELINE, WRAPPER_BASELINE].map((n) => baselineAtBase<NestedBaseline>(n, true));
-    if (raws.some((r) => !r)) return;
-    // A scratch repo with empty baselines (the pre-commit hook's own test) has nothing to match.
-    if ((raws as NestedBaseline[]).every((b) => Object.keys(b).length === 0)) return;
-    // The baseline holds keys for pane and shell only; rail and header are listed so a later key cannot hide as a new one.
-    const needed = SLOT_RENAMES.filter((entry) => renameStillNeeded(entry, raws as NestedBaseline[]));
-    expect(needed.length, "no base key uses any renamed slot any more: delete SLOT_RENAMES and baselineRenames' slot step").toBeGreaterThan(0);
   });
 
   test("the scanner flags a seeded kit restyle and leaves tokens and Home's own slots alone", () => {
