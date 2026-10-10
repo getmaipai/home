@@ -88,7 +88,7 @@ describe("the answer's pictures (the image_gallery block, kit image gallery)", (
   });
 
   // Focus going back to the tile is checked in a real browser by
-  // `scripts/screenshot.ts --next-chat-answer-images` (happy-dom does not run
+  // `scripts/screenshot.ts --chat-answer-images` (happy-dom does not run
   // the dialog's focus return).
   test("Escape closes the gallery", async () => {
     const { getByRole, queryByRole } = render(<Render data={live(set(3))} />);

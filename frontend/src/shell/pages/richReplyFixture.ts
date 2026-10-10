@@ -2,7 +2,7 @@
 // has to render - fenced code with a language, an unlabelled fence, inline
 // code, inline and block math, a wide table, a task list, nested lists, a
 // link, a quote and a Mermaid diagram. The frontend test and the screenshot
-// scenario (scripts/screenshot.ts --next-chat-rich-review) share it so the
+// scenario (scripts/screenshot.ts --chat-rich-review) share it so the
 // two never drift. Plain data: no imports, so the script can load it too.
 
 export const RICH_REPLY_PROMPT = "Show me a rich reply sample for juniper's homework.";
