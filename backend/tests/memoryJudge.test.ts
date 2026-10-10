@@ -806,10 +806,10 @@ describe("the judge drops its own prompt's examples, placeholders and credential
     d.setDate(d.getDate() === 1 ? 2 : 1);
     return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
   };
-  const shapes = (speaker: string, date: string, otherDay: string) => [
+  const shapes = (speaker: string, date: string, otherDay: string, nextMonthLabel: (d: string) => string) => [
     { text: `${speaker} was in Brazil visiting his wife's family, ${date}`, category: "state" }, // the trip example
     { text: `${speaker} is getting married in <the actual month/year>`, category: "state" }, // the wedding placeholder
-    { text: `${speaker} is getting married in the actual month/year`, category: "state" }, // the placeholder echoed without its brackets
+    { text: `The recycling pickup moves in ${nextMonthLabel(date)}`, category: "fact" }, // the time example copied whole
     { text: `${speaker} dislikes cilantro`, category: "preference" }, // the preference example
     { text: `Rover loves horror movies, ${speaker}'s brother`, category: "relationship" }, // the relationship example
     { text: "The wifi password is Juniper2026", category: "fact" }, // the negative example
@@ -820,7 +820,7 @@ describe("the judge drops its own prompt's examples, placeholders and credential
   test("each example shape, fed as the judge's output for an unrelated turn, is dropped and counted", async () => {
     const { actor } = await owner();
     const turn = makeTurn(actor, "hello", "hi there");
-    const { turnDateFor } = await import("@/lib/memoryJudge");
+    const { turnDateFor, nextMonthLabel } = await import("@/lib/memoryJudge");
     const logs: string[] = [];
     const spy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       logs.push(args.map(String).join(" "));
@@ -829,7 +829,7 @@ describe("the judge drops its own prompt's examples, placeholders and credential
       await withScriptedJudge(
         (schemaName) =>
           schemaName === "memory_extraction"
-            ? { facts: shapes(actor.displayName, turnDateFor(turn.createdAt), sameMonthOtherDay(turn.createdAt)).map((f) => ({ ...f, scope: "person", importance: 0.7 })) }
+            ? { facts: shapes(actor.displayName, turnDateFor(turn.createdAt), sameMonthOtherDay(turn.createdAt), nextMonthLabel).map((f) => ({ ...f, scope: "person", importance: 0.7 })) }
             : undefined,
         () => judgeTurn(turn),
       );
@@ -843,6 +843,59 @@ describe("the judge drops its own prompt's examples, placeholders and credential
     expect(line).toContain('"placeholder":1');
     expect(line).toContain('"credential":1');
     expect(db.select().from(conversationTurns).where(eq(conversationTurns.id, turn.id)).get()!.judgeStatus).toBe("done");
+  });
+
+  test("MEM-EXAMPLE-01: the prompt never shows a sentence that reads as a life fact, and no placeholder is left in it", async () => {
+    const { buildExtractionPrompt } = await import("@/lib/memoryJudge");
+    const prompt = buildExtractionPrompt("Sage", new Date(2026, 8, 13, 12).toISOString());
+    expect(prompt).not.toMatch(/getting married/i);
+    expect(prompt).not.toMatch(/<[a-z][^<>@]{1,79}>/i);
+  });
+
+  test("MEM-EXAMPLE-01: the retired wedding example filled in with a real month, or left as its literal placeholder, is dropped on an unrelated turn and counted", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "I just ordered a new graphics card for the desktop", "Nice, which one?");
+    const logs: string[] = [];
+    const spy = spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+      logs.push(args.map(String).join(" "));
+    });
+    try {
+      await withScriptedJudge(
+        (schemaName) =>
+          schemaName === "memory_extraction"
+            ? {
+                facts: [
+                  { text: `${actor.displayName} is getting married in March 2027`, category: "state", scope: "person", importance: 0.8 },
+                  { text: `${actor.displayName} is getting married in <the actual month/year>`, category: "state", scope: "person", importance: 0.8 },
+                  { text: `<name> is ${actor.displayName}'s wife`, category: "relationship", scope: "person", importance: 0.8 },
+                ],
+              }
+            : undefined,
+        () => judgeTurn(turn),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+    expect(db.select().from(memoryRecords).all()).toEqual([]);
+    const line = logs.find((l) => l.includes("dropped 3 extracted candidate(s)"));
+    expect(line).toBeDefined();
+    expect(line).toContain('"placeholder":2');
+    expect(line).toContain('"ungrounded":1');
+    expect(line).not.toContain("married");
+    expect(line).not.toContain(actor.displayName);
+  });
+
+  test("MEM-EXAMPLE-01: a dated fact the person actually said is kept", async () => {
+    const { actor } = await owner();
+    const turn = makeTurn(actor, "we are getting married in March", "Congratulations!");
+    await withScriptedJudge(
+      (schemaName) =>
+        schemaName === "memory_extraction"
+          ? { facts: [{ text: `${actor.displayName} is getting married in March`, category: "state", scope: "person", importance: 0.8 }] }
+          : undefined,
+      () => judgeTurn(turn),
+    );
+    expect(db.select().from(memoryRecords).all().map((r) => r.text)).toEqual([`${actor.displayName} is getting married in March`]);
   });
 
   test("the same shapes are facts when the person said them: cilantro said, a trip to the in-laws said, the fridge note said", async () => {
@@ -899,7 +952,8 @@ describe("the judge drops its own prompt's examples, placeholders and credential
     expect(rejectPromptEchoes([fact("Sage is getting married in October 2026")], "Sage", date, "our wedding is in October").kept.length).toBe(1);
     expect(rejectPromptEchoes([fact("Sage dislikes cilantro")], "Sage", date, "yep, that's right\nso you still can't stand cilantro?").kept.length).toBe(1);
     // The echoes those shapes could be confused with still go.
-    expect(rejectPromptEchoes([fact("Sage is getting married in the actual month/year")], "Sage", date, "hello\nhi there").dropped.length).toBe(1);
+    expect(rejectPromptEchoes([fact("Sage is getting married in <the actual month/year>")], "Sage", date, "hello\nhi there").dropped.length).toBe(1);
+    expect(rejectPromptEchoes([fact("Sage is getting married in the actual month/year")], "Sage", date, "our wedding is in October").dropped.length).toBe(1);
     expect(rejectPromptEchoes([fact(`Sage was in Brazil, ${date}`)], "Sage", date, "hello\nhi there").dropped.length).toBe(1);
     expect(rejectPromptEchoes([fact(`Sage was in Brazil visiting his wife's family, ${date}`)], "Sage", date, "hello\nhi there").dropped.length).toBe(1);
     // The third review: calendar words are never anchors, so a recurring
