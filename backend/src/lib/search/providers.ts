@@ -6,7 +6,6 @@
 // below is what actually enforces that; this file is just the list).
 import { listConversations } from "@/lib/conversationHistory";
 import { listActivePeople } from "@/lib/access";
-import { listInstalledManifests } from "@/lib/plugins";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { placeSetting, settingHref, settingsViewerFor } from "@/lib/settingsAreas";
 import type { PersonRow } from "@/types";
@@ -89,32 +88,11 @@ const peopleProvider: SearchProvider = {
   },
 };
 
-// Apps by their manifest's own display name - listInstalledManifests()
-// (lib/plugins.ts) is the exact pipeline GET /api/plugins already runs,
-// never a second manifest scan (a review caught an earlier draft
-// re-typing that pipeline inline here).
-const appsProvider: SearchProvider = {
-  kind: "app",
-  heading: "Apps",
-  async search(query) {
-    const normalized = query.trim().toLowerCase();
-    const manifests = listInstalledManifests();
-    return manifests
-      .filter((m) => m.display.toLowerCase().includes(normalized))
-      .slice(0, RESULT_CAP)
-      .map((m) => ({
-        kind: "app",
-        id: m.id,
-        title: m.display,
-        subtitle: m.description,
-        // No per-app detail route exists in the new shell yet (checked
-        // live: Routes.tsx has only the "apps" list route) - opens
-        // the Apps page, the same simplification the people provider
-        // above makes for the identical reason.
-        href: "/apps",
-      }));
-  },
-};
+// No "apps" provider (SEARCH-APPS-LINK-01): the packages that
+// listInstalledManifests() returns are tools the model calls, not pages,
+// and Routes.tsx has no /apps route, so every result linked a dead page.
+// The shell's own Apps results come from the frontend APP_CATALOG, whose
+// destinations are real routes.
 
 // Settings by the registry's own labels - SETTINGS.md's "one
 // definition": reads getRegistry() (spec/settings/keys.json), never a
@@ -150,4 +128,4 @@ const settingsProvider: SearchProvider = {
   },
 };
 
-export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider];
+export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, settingsProvider];
