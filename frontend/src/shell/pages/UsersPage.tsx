@@ -12,17 +12,17 @@ export function UsersPage({ person }: { person: Roster }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <CardHeader className="p-0">
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader>
+        <CardTitle><span className="flex items-center gap-2">
           <UsersIcon size={16} className="text-muted-foreground" />
           Users
-        </CardTitle>
+        </span></CardTitle>
       </CardHeader>
       {canManage ? (
         <UsersSection person={person} />
       ) : (
         <Card>
-          <CardContent className="p-6">
+          <CardContent>
             <p className="text-sm text-muted-foreground">Only an owner or admin can manage users.</p>
           </CardContent>
         </Card>

@@ -125,12 +125,6 @@
       "reason": "Hand-built admin detail popover; tool-error ships with optional counts from ui-v0.5.116; ADOPT-02."
     }
   },
-  "shell/pages/dashboard/StatCard.tsx": {
-    "StatCard": {
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/ThemeToggle.tsx": {
     "ThemeToggle": {
       "ed": "ED-039",

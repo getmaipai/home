@@ -242,34 +242,6 @@
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
     }
   },
-  "shell/pages/EnginesPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "gap-3",
-        "items-center",
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/pages/FamilyPage.tsx": {
     "TabsList": {
       "tokens": [
@@ -307,140 +279,6 @@
       "reason": "Kit TabsList/TabsTrigger have no 48px touch-target variant (a11y touch-target-floor); needs an additive commons variant, separate item."
     }
   },
-  "shell/pages/RepairsPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/SignInPage.tsx": {
-    "Card": {
-      "tokens": [
-        "border-none",
-        "max-w-md",
-        "p-6",
-        "shadow-lg",
-        "w-full"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-col",
-        "gap-4",
-        "p-0",
-        "pt-4"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "Button": {
-      "tokens": [
-        "rounded-lg",
-        "w-full"
-      ],
-      "ed": "ED-039",
-      "reason": "NO REASON: to be removed (cleanup item 11, sweep)."
-    }
-  },
-  "shell/pages/StoragePage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "border-b",
-        "border-border",
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-5"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/UpdatesPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/UsersPage.tsx": {
-    "CardHeader": {
-      "tokens": [
-        "p-0"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardTitle": {
-      "tokens": [
-        "flex",
-        "gap-2",
-        "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "CardContent": {
-      "tokens": [
-        "p-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
   "shell/pages/VoicesPage.tsx": {
     "CardHeader": {
       "tokens": [
@@ -454,26 +292,6 @@
         "flex",
         "gap-2",
         "items-center"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    }
-  },
-  "shell/pages/dashboard/StatCard.tsx": {
-    "CardContent": {
-      "tokens": [
-        "flex",
-        "flex-row",
-        "justify-between",
-        "px-6"
-      ],
-      "ed": "ED-038",
-      "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
-    },
-    "Card": {
-      "tokens": [
-        "hover:bg-accent",
-        "py-6"
       ],
       "ed": "ED-038",
       "reason": "NO REASON: to be removed (cleanup item 10, dashboard and pages)."
