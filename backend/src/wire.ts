@@ -77,8 +77,9 @@ export interface AnswerImageItem {
   source: { title: string; site: string; url: string };
   license?: { short: string; url?: string; artist?: string };
 }
-/** ANSWER-IMG-02: the picture set of one answer, the `images` event's payload
- * and the stored `answer_images`. `after_paragraph` is how many paragraphs of
+/** ANSWER-IMG-02: the picture set of one answer, as the picture pipeline settles it. GENUI-05: it is no longer a
+ * wire or stored shape; the turn carries it as one `image_gallery` block (answerImages/gallery.ts), and a turn stored
+ * before GENUI-05 keeps its set in the `answer_images` column, read as that block. `after_paragraph` is how many paragraphs of
  * released text came before it (0 = before any text); `visible` tiles show
  * and the badge is `items.length - visible` (never 1: a lone extra is dropped). */
 export interface AnswerImageSet { layout: "row"; after_paragraph: number; visible: number; items: AnswerImageItem[] }
@@ -359,8 +360,6 @@ export interface TurnValue {
   media_items?: Media[];
   /** UPLOAD-IMG-01: the user's cleaned local images, represented by store ids. */
   images?: ChatImagePart[];
-  /** ANSWER-IMG-02: the pictures shown with this answer (additive). */
-  answer_images?: AnswerImageSet;
   /** GENUI-02: answer blocks accepted by the host and emitted as block events. */
   blocks?: AnswerBlock[];
   /** RVW-1: which rung answered (lib/ruleNames.ts's Rung), additive on
@@ -491,7 +490,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; answer_images?: AnswerImageSet; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own
@@ -530,9 +529,6 @@ export type TurnStreamEvent =
   | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing" }
   | { type: "spoken_cue"; text: string }
   | { type: "done"; value: TurnValue }
-  /** ANSWER-IMG-02 (rule 9, additive): at most once per turn, at a paragraph
-   * boundary of the released text, never above text already sent. */
-  | ({ type: "images"; turn_id: string } & AnswerImageSet)
   // `code` (step 9, session-a-intelligence.md: "emit error with the
   // catalogue code") is optional and additive: a spec/errors/errors.json
   // code when the failure maps to one (today, only the output-side

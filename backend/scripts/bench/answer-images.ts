@@ -361,11 +361,20 @@ async function turn(arm: Arm, row: Row, rep: number, conversationId: string | nu
       firstTextMs = performance.now() - t0;
     } else {
       for await (const event of streamTurnEvents(result, actor.id, 900, undefined, actor.role === "child" || actor.role === "teen")) {
+        // GENUI-05: the picture set is an `image_gallery` block event now (no `images` event).
+        const raw = event as unknown as { t?: string; block?: { kind?: string; after_paragraph?: number; props?: { maxVisible: number; images: Array<{ id: string; caption?: string; source?: { label: string } }> } } };
+        if (raw.t === "block" && raw.block?.kind === "image_gallery" && raw.block.props) {
+          imagesEvent = {
+            visible: raw.block.props.maxVisible,
+            after_paragraph: raw.block.after_paragraph ?? 0,
+            items: raw.block.props.images.map((i) => ({ id: i.id, caption: i.caption ?? "", source: { site: i.source?.label ?? "" } })),
+          };
+          continue;
+        }
         if (event.type === "delta") {
           reply += event.text;
           if (firstTextMs === null && event.text.trim()) firstTextMs = performance.now() - t0;
-        } else if (event.type === "images") imagesEvent = event;
-        else if (event.type === "done") {
+        } else if (event.type === "done") {
           if (!reply.trim()) reply = event.value.reply.text;
           if (firstTextMs === null && reply.trim()) firstTextMs = performance.now() - t0;
         } else if (event.type === "error") error = `${event.code ?? "error"}: ${event.error}`;

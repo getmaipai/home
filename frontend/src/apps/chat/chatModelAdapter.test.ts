@@ -5,6 +5,7 @@ import { createChatModelAdapter, stripThinking, type ChatModelAdapterDeps } from
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { SHOWCASE_BLOCKS } from "@maipai/home-backend/src/lib/uiFixtureBlocks";
+import { galleryBlockFor } from "@maipai/home-backend/src/lib/answerImages/gallery";
 import { createLocalImageAttachmentAdapter, clearStagedImageAttachments } from "@/apps/chat/localImageAttachmentAdapter";
 import { FakeAudioContext, fakeWavBody } from "../../../tests/fakeAudioContext";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
@@ -510,14 +511,15 @@ describe("createChatModelAdapter streaming", () => {
   // looking for a tag the wire never carries (rule 9: no client-side parsing).
   test("ANSWER-IMG-04: the picture set lands after the text already shown, and the reply keeps that order when done", async () => {
     const pid = `ai_${"1".padStart(32, "0")}`;
-    const set = { layout: "row", after_paragraph: 1, visible: 1, items: [{ id: pid, src: `/api/answer-image/${pid}?v=tile`, full: `/api/answer-image/${pid}?v=full`, width: 640, height: 480, alt: "a tower", caption: "a tower", source: { title: "Tower", site: "commons.wikimedia.org", url: "https://commons.wikimedia.org/wiki/File:Tower.jpg" } }] };
+    const item = { id: pid, src: `/api/answer-image/${pid}?v=tile`, full: `/api/answer-image/${pid}?v=full`, width: 640, height: 480, alt: "a tower", caption: "a tower", source: { title: "Tower", site: "commons.wikimedia.org", url: "https://commons.wikimedia.org/wiki/File:Tower.jpg" } };
+    const gallery = { ...galleryBlockFor({ visible: 1, items: [item] }, "Eiffel Tower", "show_images test", "1:0:testnode")!, after_paragraph: 1 };
     const env = stubEnvironment(
       ndjsonStream([
         { type: "turn_meta", conversation_id: "c1", turn_id: "t1" },
         { type: "delta", text: "The tower is tall.\n\n" },
-        { type: "images", turn_id: "t1", ...set },
+        { t: "block", call_id: "call-img", block: gallery },
         { type: "delta", text: "It is in Paris." },
-        { type: "done", value: { reply: { text: "The tower is tall.\n\nIt is in Paris." }, source: "model", safety: SAFETY, turn_id: "t1", answer_images: set } },
+        { type: "done", value: { reply: { text: "The tower is tall.\n\nIt is in Paris." }, source: "model", safety: SAFETY, turn_id: "t1", blocks: [gallery] } },
       ]),
     );
     try {
@@ -525,9 +527,9 @@ describe("createChatModelAdapter streaming", () => {
       expect(error).toBeUndefined();
       const shapes = yields.filter((y) => y.content).map((y) => y.content!.map((p) => p.type === "text" ? `text:${p.text}` : p.type === "data" ? `data:${(p as { name: string }).name}` : p.type));
       // Every yield after the set arrives keeps the earlier text first, unmoved.
-      expect(shapes).toContainEqual(["text:The tower is tall.", "data:answer-images"]);
-      expect(shapes.at(-1)).toEqual(["text:The tower is tall.", "data:answer-images", "text:It is in Paris."]);
-      const firstWithData = shapes.findIndex((s) => s.includes("data:answer-images"));
+      expect(shapes).toContainEqual(["text:The tower is tall.", "data:answer_block"]);
+      expect(shapes.at(-1)).toEqual(["text:The tower is tall.", "data:answer_block", "text:It is in Paris."]);
+      const firstWithData = shapes.findIndex((s) => s.includes("data:answer_block"));
       for (const shape of shapes.slice(firstWithData)) expect(shape[0]).toBe("text:The tower is tall.");
     } finally {
       env.restore();

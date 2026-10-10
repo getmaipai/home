@@ -13,7 +13,7 @@ import { textWithAnswerParts } from "@/apps/chat/chatAnswerBlocks";
 import { toolCallPart } from "@/apps/chat/chatToolCallPart";
 import { sourceMessageParts } from "@/apps/chat/chatSources";
 import type { TurnWithMedia } from "@/apps/chat/chatCitations";
-import type { AnswerImageSet, CrisisSupport } from "@maipai/home-backend/src/wire";
+import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
@@ -285,9 +285,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // there is no separate sequence field on these events.
       const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error"; failureKind?: string; sites?: { host: string; url: string }[] }>();
       let failedTool = false;
-      // ANSWER-IMG-04: the hub's picture set, once its `images` event arrives;
-      // the reply text is split at its paragraph boundary around it.
-      let answerImages: AnswerImageSet | undefined;
       // GENUI-03b: the answer blocks streamed so far, in arrival (tool-call)
       // order; the hub already validated them (GENUI-02).
       const streamedBlocks: unknown[] = [];
@@ -319,8 +316,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // opposite of sources' "compact card under the reply."
         const timeline = toolTimelinePart(resumeTurnId);
         if (timeline) parts.push(timeline);
-        // GENUI-13c: blocks and the picture set sit at their own paragraph of the text so far, as the hub placed them.
-        if (visible || answerImages || streamedBlocks.length) parts.push(...textWithAnswerParts(visible, { blocks: streamedBlocks, images: answerImages, imagesId: `${resumeTurnId ?? "live"}-images` }).filter((part) => part.type !== "text" || part.text));
+        // GENUI-13c and GENUI-05: blocks (a picture gallery included) sit at their own paragraph of the text so far, as the hub placed them.
+        if (visible || streamedBlocks.length) parts.push(...textWithAnswerParts(visible, { blocks: streamedBlocks }).filter((part) => part.type !== "text" || part.text));
         return parts;
       }
 
@@ -664,9 +661,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // this never adds a part in the running app until the
                 // backend half lands.
                 ...(timelinePart ? [timelinePart] : []),
-                // GENUI-03b and GENUI-13c: the answer blocks and the picture set, each at its paragraph of the reply,
+                // GENUI-03b, GENUI-13c and GENUI-05: the answer blocks (a picture gallery included), each at its paragraph of the reply,
                 // where they sat while streaming (the stored turn's own blocks when none streamed, as on a resume).
-                ...textWithAnswerParts(finalText, { blocks: streamedBlocks.length ? streamedBlocks : event.value.blocks, images: event.value.answer_images ?? answerImages, imagesId: `${event.value.turn_id}-images` }),
+                ...textWithAnswerParts(finalText, { blocks: streamedBlocks.length ? streamedBlocks : event.value.blocks }),
                 // APPROVE-CALM-01 (owner's Row-Bot reference, 2026-10-06): the
                 // approval card sits UNDER the reply that asks, the way the
                 // reference reads ("...so it waits for your approval", then
@@ -715,13 +712,6 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 },
               },
             };
-          } else if (event.type === "images") {
-            // ANSWER-IMG-04: the hub's picture set (additive, rule 9), placed
-            // at the end of the text received so far, so nothing above it
-            // moves; resent on a resume, so it is idempotent.
-            answerImages = { layout: event.layout, after_paragraph: event.after_paragraph, visible: event.visible, items: event.items };
-            yield { content: buildContent() };
-            continue;
           } else if (event.type === "reasoning") {
             // SHELL-02: rendered by the reasoning Element (thread.aui.tsx)
             // via buildContent() above - REASONING-01 left this discarded

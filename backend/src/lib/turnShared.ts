@@ -586,11 +586,6 @@ export type TurnStreamResult =
        * tool round's single synchronous machine transition and strictly
        * before the phrasing round's first delta. */
       toolEvents?: ToolStreamEvent[];
-      /** ANSWER-IMG-02: the answer's picture set once placed, and the
-       * released-text length it goes after (Infinity: after the whole
-       * reply). Undefined for a turn with no pictures and every other
-       * producer. */
-      answerImages?: () => { set: import("@/wire").AnswerImageSet; offset: number } | undefined;
       /** GENUI-13c: the answer blocks placed so far, each with its `after_paragraph` stamped and the released-text
        * length it goes after (Infinity: after the whole reply). Undefined for every other producer. */
       placedBlocks?: () => import("@/lib/answerImages/turn").PlacedBlock[];

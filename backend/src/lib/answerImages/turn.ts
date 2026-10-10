@@ -1,13 +1,16 @@
 // ANSWER-IMG-02: `show_images` inside a turn (design: data-scratch/research/
 // chat-images-in-answers.md sections 4.3 and 5). The tool answers the model
 // at once, so the phrasing round never waits on a picture fetch; the picture
-// pipeline runs beside the answer; the set is placed at the first paragraph
+// pipeline runs beside the answer. GENUI-05: when the pipeline settles, its
+// set becomes one `image_gallery` answer block (gallery.ts) that goes through
+// the same block filter as every package's blocks (manifest allowlist, spec
+// check, hub picture address, age band, output floor) and joins the turn's
+// block events; the one placer below then puts it at the first paragraph
 // boundary of the released text after it is ready (before any text when it
 // is ready in time), or after the text when the answer ends first. Nothing
 // is placed above text already released, and nothing is reserved on
 // speculation, so nothing on screen moves. A failed or empty fetch places
 // nothing and the answer is whole (rule 6).
-import type { AnswerImageSet } from "@/wire";
 import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 import { atParagraphBoundary, paragraphCount, paragraphCut } from "@maipai/spec/interpreters/ts/paragraphs.js";
 import type { AgeBand } from "@/lib/ageBand";
@@ -17,6 +20,9 @@ import type { TurnState } from "@/lib/turnMachine/contract";
 import { getPersonSettingSource, getPersonSettingValue } from "@/lib/settings";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
+import { blockEventsFor } from "@/lib/turnMachine/blockEvents";
+import { nextHlc } from "@/lib/hlc";
+import { galleryBlockFor } from "./gallery";
 import { selectAnswerImages, type AnswerImageSelection, type AnswerImageTrace } from "./select";
 
 /** The model-facing tool name; the bundled package `backend/packages/show_images`
@@ -31,13 +37,14 @@ const ANSWER_IMAGES_FINISH_MS = 1_000;
 
 export type AnswerImageTurnState = {
   subject: string;
+  /** The `show_images` call this pipeline answers (the block event carries it). */
+  callId: string;
   /** Set once the pipeline settles: the set, or null for no pictures. */
   result?: AnswerImageSelection["set"];
   trace?: AnswerImageTrace;
   done: Promise<void>;
-  /** Where the set landed, once placed; `offset` is the released-text
-   * length it sits after (Infinity: after the whole answer). */
-  placed?: { set: AnswerImageSet; offset: number };
+  /** The accepted `image_gallery` block event, once built; it is also in the turn's tool events. */
+  block?: Extract<ToolStreamEvent, { t: "block" }>;
 };
 
 /** Section 4.3's one line, the same whatever the pipeline later finds: no
@@ -70,11 +77,11 @@ export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; su
 
 /** Starts the pipeline for this turn's first `show_images` call; a second
  * call in the same turn reuses the first. */
-export function startAnswerImages(state: TurnState, subject: string, kind = ""): AnswerImageTurnState {
+export function startAnswerImages(state: TurnState, subject: string, kind = "", callId = ""): AnswerImageTurnState {
   if (state.answerImages) return state.answerImages;
   const roster = state.context.filter((c) => c.source === "roster").map((c) => c.text);
   const band = state.planBasis?.band ?? state.plan.age_band;
-  const entry: AnswerImageTurnState = { subject, done: Promise.resolve() };
+  const entry: AnswerImageTurnState = { subject, callId, done: Promise.resolve() };
   let timer: ReturnType<typeof setTimeout> | undefined;
   const budget = new Promise<AnswerImageSelection>((resolve) => {
     timer = setTimeout(() => resolve({ set: null, trace: { subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
@@ -86,9 +93,22 @@ export function startAnswerImages(state: TurnState, subject: string, kind = ""):
       clearTimeout(timer);
       entry.result = selection.set;
       entry.trace = selection.trace;
+      addGalleryBlock(state, entry);
     });
   state.answerImages = entry;
   return entry;
+}
+
+/** The settled set as an `image_gallery` block event on the turn, through the one block filter. A set the filter
+ * refuses (age band, output floor, a picture address that is not the hub's) leaves no block and the answer whole. */
+function addGalleryBlock(state: TurnState, entry: AnswerImageTurnState): void {
+  if (!entry.result) return;
+  const raw = galleryBlockFor(entry.result, entry.subject, `show_images call ${entry.callId || "0"} in turn ${state.turnId}`, nextHlc());
+  if (!raw) return;
+  const [event] = blockEventsFor(state, SHOW_IMAGES_TOOL_ID, entry.callId, [raw], state.toolEvents);
+  if (!event || event.t !== "block") return;
+  entry.block = event;
+  state.toolEvents.push(event);
 }
 
 /** A block placed in the reply: its stream event with `after_paragraph` stamped, and the released-text length it
@@ -111,13 +131,13 @@ function stampBlock(state: TurnState, event: Extract<ToolStreamEvent, { t: "bloc
   (state.placedBlocks ??= []).push({ event: stamped, offset });
 }
 
-/** The one placer for anything ready to show in the reply, a picture set or an answer block (GENUI-13c; it grew out
- * of the pictures-only placer of ANSWER-IMG-02). Feeds released text through and places what is ready at the first
+/** The one placer for anything ready to show in the reply, an answer block of any kind, a picture gallery included
+ * (GENUI-13c; it grew out of the pictures-only placer of ANSWER-IMG-02, and GENUI-05 retired the separate picture path). Feeds released text through and places what is ready at the first
  * paragraph boundary after it became ready: before any text when it was ready in time, never above text already
  * released, never inside a code fence. `release` gets the text unchanged (a piece may be split at its paragraph
  * break, never altered), so the stored reply is still the concatenation of everything released (rule 9). Paragraphs
  * are counted and split by the spec's one helper, the same one every client uses. A visual that is not ready when
- * the answer ends is placed after the reply by `settleAnswerImages` and `settleAnswerBlocks`. */
+ * the answer ends is placed after the reply by `settleAnswerBlocks`. */
 export class AnswerImagePlacer {
   private released = "";
   constructor(private readonly state: TurnState, private readonly release: (text: string) => void) {}
@@ -142,13 +162,8 @@ export class AnswerImagePlacer {
     if (cut < text.length) this.forward(text.slice(cut));
   }
 
-  private imagesReady(): AnswerImageTurnState | undefined {
-    const entry = this.state.answerImages;
-    return entry?.result && !entry.placed ? entry : undefined;
-  }
-
   private anythingReady(): boolean {
-    return this.imagesReady() !== undefined || pendingBlocks(this.state).length > 0;
+    return pendingBlocks(this.state).length > 0;
   }
 
   private forward(text: string): void {
@@ -156,13 +171,10 @@ export class AnswerImagePlacer {
     this.release(text);
   }
 
-  /** Blocks first, then pictures: the same order they had when blocks all went ahead of the text. */
   private placeReady(): void {
     const afterParagraph = paragraphCount(this.released);
     const offset = this.released.length;
     for (const event of pendingBlocks(this.state)) stampBlock(this.state, event, afterParagraph, offset);
-    const entry = this.imagesReady();
-    if (entry) entry.placed = { set: { ...entry.result!, after_paragraph: afterParagraph }, offset };
   }
 }
 
@@ -173,18 +185,20 @@ export function settleAnswerBlocks(state: TurnState, replyText: string): void {
   for (const event of pendingBlocks(state)) stampBlock(state, event, afterParagraph, Number.POSITIVE_INFINITY);
 }
 
-/** Waits for the pipeline (bounded by its own budget) and returns the set
- * that goes with the stored reply: where it was placed mid-stream, or after
- * the whole answer when the answer finished first. Records the drop counts
- * on the call's own trace detail (admin-only), never in the model's view. */
-export async function settleAnswerImages(state: TurnState, replyText: string): Promise<AnswerImageSet | undefined> {
+/** Waits for the picture pipeline (bounded by its own budget) before the turn's value is built, so a gallery that
+ * finished late is among the turn's blocks to be placed after the reply. Records the drop counts on the call's own
+ * trace detail (admin-only), never in the model's view. A gallery not yet placed is removed when the answer is not
+ * kept (a refusal, a failed generation, an empty reply): pictures are never stored with those. Call before
+ * `settleAnswerBlocks`. */
+export async function settleAnswerImages(state: TurnState, input: { keep: boolean }): Promise<void> {
   const entry = state.answerImages;
-  if (!entry) return undefined;
+  if (!entry) return;
   await entry.done;
   const call = state.outcomes.find((o) => o.packageId === SHOW_IMAGES_TOOL_ID && o.status === "succeeded");
   if (call && entry.trace) call.detail = JSON.stringify(entry.trace);
-  if (entry.placed) return entry.placed.set;
-  if (!entry.result || replyText.trim().length === 0) return undefined;
-  entry.placed = { set: { ...entry.result, after_paragraph: paragraphCount(replyText) }, offset: Number.POSITIVE_INFINITY };
-  return entry.placed.set;
+  const block = entry.block;
+  if (input.keep || !block) return;
+  // A gallery already placed (streamed with a paragraph) holds a stamped copy in the event list, so match by id.
+  state.toolEvents = state.toolEvents.filter((e) => !(e.t === "block" && e.block.id === block.block.id));
+  if (state.placedBlocks) state.placedBlocks = state.placedBlocks.filter((p) => p.event.block.id !== block.block.id);
 }
