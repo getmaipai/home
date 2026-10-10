@@ -1017,7 +1017,7 @@ export function __resetSearchCacheForTests(): void {
   searchInFlight.clear();
 }
 
-type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number };
+type SearchOptions = { kMatched?: boolean; timeRange?: "month"; allowWikipediaFallback?: boolean; safeSearchLevel?: SafeSearchLevel; bypassCache?: boolean; minorBand?: MinorBand; speakerBand?: "child" | "teen" | "adult"; signal?: AbortSignal; deadlineAt?: number; fallbackSignal?: AbortSignal; fallbackDeadlineAt?: number; supplementary?: boolean };
 
 export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
   const parentSignal = opts.signal;
@@ -1086,7 +1086,15 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
       const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && opts.speakerBand === "adult" && next.length > 0 ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand) : null;
       return fallback ?? result;
     }
-    const second = await searxngSearchUncached(args, { ...opts, safeEngines: [...more, ...wikipedia] });
+    // SEARCH-HEALTH-02: a failed top-up never fails an answer that already has
+    // rows, and a supplementary request records no service sample.
+    let second: SearxngSearchResult;
+    try {
+      second = await searxngSearchUncached(args, { ...opts, safeEngines: [...more, ...wikipedia], supplementary: true });
+    } catch (err) {
+      if (err instanceof HostError && (err.code === "search_unavailable" || err.code === "network_unreachable") && opts.fallbackSignal?.aborted !== true) return result;
+      throw err;
+    }
     const rows = dedupeRows([...result.rows, ...second.rows]);
     return { text: [result.text, second.text].filter((value) => value !== SEARXNG_NO_RESULTS_TEXT).join("\n"), rows };
   };
@@ -1303,7 +1311,15 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
       for (const name of unresponsiveNames) searxngBenchedUntil.set(name, Date.now() + SEARXNG_ENGINE_BENCH_MS);
       recordEngineHealth(opts.safeEngines, value, unresponsiveNames);
       const unresponsiveEngines = unresponsiveNames.length > 0;
-      void recordServiceOutcome("searxng", { ok: !unresponsiveEngines, error: unresponsiveEngines ? new Error("captcha or service access wall") : undefined });
+      // SEARCH-HEALTH-02: one suspended upstream engine among several is
+      // routine and says nothing about whether search works; the service
+      // sample is an access wall only when nothing usable came back (the
+      // same SEARXNG_NO_RESULTS_TEXT signal, results and infoboxes both)
+      // (rows returned means usable, even if every asked engine listed
+      // as unresponsive). Engine-level
+      // bench and health tracking above stay per engine, unchanged.
+      const accessWall = unresponsiveEngines && text === SEARXNG_NO_RESULTS_TEXT;
+      if (!opts.supplementary) void recordServiceOutcome("searxng", { ok: !accessWall, error: accessWall ? new Error("captcha or service access wall") : undefined });
       if (text === SEARXNG_NO_RESULTS_TEXT && unresponsiveEngines) {
         // THIN-1D: this message is the stored outcome's raw detail (read by
         // the admin indicator, THIN-1E). It never reaches the model or a
@@ -1339,6 +1355,11 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
     }
   } catch (err) {
     if (err instanceof HostError && err.code === "rate_limited") throw err;
+    // SEARCH-HEALTH-02: our own cancelled turn or spent turn budget is not a
+    // SearXNG failure: no sample, no issue, like rate_limited.
+    const ownAbort = (opts.fallbackSignal?.aborted === true || (opts.fallbackDeadlineAt !== undefined && Date.now() >= opts.fallbackDeadlineAt - 50)) && /abort|timed out|timeout|deadline/i.test(`${(err as Error)?.name ?? ""} ${(err as Error)?.message ?? ""}`);
+    if (ownAbort) throw err;
+    if (opts.supplementary) throw err;
     if (err instanceof HostError && err.code === "search_unavailable") {
       await recordSearchHealth({
         kind: "degraded",
