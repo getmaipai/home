@@ -8,7 +8,7 @@
 // same underlying reason (something about this load is broken, try once
 // more), so a single permanently broken deploy can only ever cost three
 // reload cycles total, never three per guard.
-// - A deploy lands while a tab has the old shell cached: the next lazy
+// - A deploy lands while a tab has the previous build cached: the next lazy
 //   `import()` 404s. Vite's own runtime fires `vite:preloadError` for
 //   exactly this (https://vite.dev/guide/build.html#load-error-handling);
 //   reload to pick up the new shell.

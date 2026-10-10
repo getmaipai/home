@@ -10,12 +10,11 @@
  * kit's own `dashboard/css/globals.css` carries the real `@import
  * "tailwindcss"` now (its own header comment, and tokens.css's, have
  * why - two separate roots in one build silently broke every `sm:`/
- * `md:`/`lg:`/`xl:` responsive variant on every /next page). Imported
+ * `md:`/`lg:`/`xl:` responsive variant on every shell page). Imported
  * first, so its `@theme`/`:root`/`.dark` land before this file's own
  * `@import`ed tokens.css and Home's own overrides below, which both
- * still need to win the cascade. `/next`'s own `Routes.tsx` used to
- * import `globals.css` a second time as its own lazy chunk - that
- * import is gone; this is the only place it's ever loaded now. */
+ * still need to win the cascade. This is the only place `globals.css`
+ * is loaded. */
 @import "@maipai/ui/src/dashboard/css/globals.css";
 @import "@maipai/ui/src/tokens.css";
 
@@ -640,7 +639,7 @@ header nav a:has(> img[alt="logo"]) {
 }
 
 /* CHAT-UI-01 finding 2: FullLayout.tsx's own `.container` (globals.css's
- * `@utility container { max-w-[1367px] mx-auto }`) wraps every /next
+ * `@utility container { max-w-[1367px] mx-auto }`) wraps every shell
  * page's <Outlet/>, a fixed cap that's fine for a form or a table but
  * leaves an ugly, ever-growing dead gutter on /chat once the rail
  * collapses and frees more width than the cap uses - found live,

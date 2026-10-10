@@ -440,7 +440,7 @@ describe("postProjectResult(): completion posts to the thread and notifies", () 
     expect(rows[0]!.body).toContain("story");
     expect(triggerSpy).toHaveBeenCalledWith("project.failed", expect.objectContaining({ title: "a bedtime story" }), expect.anything());
     // Matches ProjectToolRender's own live `failed` render exactly
-    // (NextChatPage.tsx) - the live and the reloaded text never disagree.
+    // (ChatPage.tsx) - the live and the reloaded text never disagree.
     expect(replyTextFor(turnId)).toBe(`A bedtime story didn't finish: the "story" step's model call failed: the chat engine is not responding`);
 
     completeSpy.mockRestore();

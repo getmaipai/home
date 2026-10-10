@@ -58,7 +58,7 @@ export function canManagePeople(actorRole: Role): boolean {
 // matches routes/people.ts's own check exactly. Shares the real
 // definition (backend/src/wire.ts's isOwnerOrAdminRole) with
 // backend/src/lib/access.ts's isOwnerOrAdmin and with
-// SettingsPage.tsx's backups gate, rather than a third hand-copy of the
+// the settings backups gate, rather than a third hand-copy of the
 // same expression (a code review, 2026-09-04, found exactly that).
 export function requiresSecret(role: Role): boolean {
   return isOwnerOrAdminRole(role);

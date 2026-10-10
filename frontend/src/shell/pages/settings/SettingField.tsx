@@ -26,13 +26,10 @@ import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
  * exception: `person` WITH `range.multiple: true` renders
  * PersonMultiSelect, this file's own new control (see its header) -
  * the kit's `SettingField.tsx` still has no such case, an accepted gap
- * of the same shape SHELL-05's own duplication paragraph already names
- * (the old shell shows "Not supported in this hub version yet" for this
- * one key until it retires, same as it already does for the other
- * selectors this file just listed). A named, accepted duplication
+ * of the same shape SHELL-05's own duplication paragraph already names.
+ * A named, accepted duplication
  * (docs/plans/shell-on-shadcndashboard-2026-09-21.md's own SHELL-05 gap
- * paragraph): the field logic itself lives in two places until the old
- * shell retires and this becomes the only one. */
+ * paragraph): the field logic lives in two places. */
 const SECRETS_WITH_DEDICATED_FLOWS = new Set(["voice.hf_token"]);
 
 interface SettingFieldProps {

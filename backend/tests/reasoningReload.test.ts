@@ -1,5 +1,5 @@
 // REASONING-04 (safety ruling, 2026-09-22, found from a real screenshot
-// after a page refresh on /next/chat: the reply rendered as plain text
+// after a page refresh on /chat: the reply rendered as plain text
 // beginning "<think>Okay, so the user is asking..."): a prose reply's
 // own think block travels intact in TurnValue.reply.text by the
 // pipeline's contract (wellFormed.ts's own header), and REASONING-01/03

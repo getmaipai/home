@@ -16,7 +16,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
  * reads it back out. Plain data and callbacks, never JSX or a component
  * reference - a data context is exactly what the shipped slot's own
  * ComponentType shape doesn't provide for itself, and the alternative
- * (hoisting the whole assistant-ui runtime provider above every /next
+ * (hoisting the whole assistant-ui runtime provider above every shell
  * page just so the header can reach it) would mount a chat runtime on
  * pages that have nothing to do with chat. */
 export interface ChatHeaderData {
@@ -35,7 +35,7 @@ const ChatHeaderDataContext = createContext<{
 
 // One page (ChatPage) writes, one component (ChatHeaderBar) reads -
 // a plain useState here is exactly what that needs; RoutesInner
-// wraps every /next page, but only a chat page ever calls the setter
+// wraps every shell page, but only a chat page ever calls the setter
 // below, so a non-chat page's own render is never touched by this.
 export function ChatHeaderDataProvider({ children }: { children: ReactNode }) {
   const [data, setData] = useState<ChatHeaderData | null>(null);

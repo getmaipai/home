@@ -22,7 +22,7 @@ interface UsePinAutoSubmitOptions {
  * At most one auto-fire per distinct `secret` value per `selected` value -
  * tracked by the exact string already tried, not a plain boolean, and the
  * fire happens before the caller's `onSubmit` even runs, not just on a
- * later failure. A real bug caught live in SignIn.tsx's own test, before
+ * later failure. A real bug caught live in the sign-in test, before
  * this was a shared hook: a version that only disabled itself on failure
  * kept firing forever on success, because `secret` was never cleared and
  * `busy` cycled back to `false` once the request resolved - normally
@@ -36,10 +36,7 @@ interface UsePinAutoSubmitOptions {
  * one wrong PIN was tried, silently downgrading every retry to a manual
  * tap with no visible explanation.
  *
- * Extracted from SignIn.tsx and ProfileSwitcher.tsx (docs/plans/wave-2.md
- * step 0 leftover: ProfileSwitcher's own header called this shared hook a
- * "real follow-up... not done here" when it duplicated the logic in small
- * form rather than risk a refactor under a session's time budget). Callers
+ * Callers
  * must still put their own submit handler above every conditional early
  * `return` in the component body - this hook does not change React's
  * rules of hooks for its caller. */
@@ -56,8 +53,8 @@ export function usePinAutoSubmit({ secret, selected, busy, onSubmit }: UsePinAut
     if (!/^\d{4}$/.test(secret)) return;
     lastTriedRef.current = secret;
     onSubmit();
-    // onSubmit is intentionally excluded: SignIn.tsx and ProfileSwitcher.tsx
-    // both pass a fresh closure every render, and including it would fire
+    // onSubmit is intentionally excluded: callers
+    // pass a fresh closure every render, and including it would fire
     // this effect (and, via lastTriedRef, do nothing) on every keystroke
     // instead of only when secret/selected/busy actually change.
     // eslint-disable-next-line react-hooks/exhaustive-deps

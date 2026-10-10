@@ -272,7 +272,7 @@ turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async
   }
   // REASONING-03 (safety ruling, 2026-09-22): a minor's turn never even
   // asks the model to think, belt and braces alongside the composer's
-  // own control being hidden for a minor (NextChatPage.tsx) - a client
+  // own control being hidden for a minor (ChatPage.tsx) - a client
   // can be edited, so `body.thinking` is never trusted for a minor
   // regardless of what it claims. Reasoning is a disclosure surface
   // built for typed chat's own Reasoning Element - never sent on a

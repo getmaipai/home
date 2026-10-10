@@ -2542,7 +2542,7 @@ describe("GET /api/conversations/:id/turns (step 3: memory_ids, since)", () => {
     }
   });
 
-  // getmaipai/home#130: the weather/almanac card on /next/chat
+  // getmaipai/home#130: the weather/almanac card on /chat
   // disappeared after a reload because `structured_part` was computed
   // fresh on every live `done` event (the retired turn engine's logTurnSafely())
   // but never written to the row - in these exact words, a turn with a

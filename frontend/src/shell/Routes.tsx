@@ -232,10 +232,9 @@ function SignedOutRoutes({ onSignedIn }: { onSignedIn: () => void }) {
       <Route path="sign-in" element={<BlankLayout />}>
         <Route index element={<SignInPage onSignedIn={onSignedIn} />} />
       </Route>
-      {/* Any other /* path while signed out (including bare
-          the preview route lands on the sign-in screen, not a blank no-match -
-          the same "nothing renders before someone is signed in"
-          posture the old shell's own SignIn.tsx documents. */}
+      {/* Any other path while signed out lands on the sign-in
+          screen, not a blank no-match: nothing renders before someone is
+          signed in. */}
       <Route path="*" element={<Navigate to="/sign-in" replace />} />
     </RouterRoutes>
   );

@@ -396,7 +396,7 @@ export interface TurnValue {
    * `projectForOutcomes()`), never its title/steps/state, which live on
    * the project record itself and reach the client by polling
    * GET /api/projects/:id (the `JobProgress` reserved tool-call part,
-   * NextChatPage.tsx), the same "name it, don't inline it" shape
+   * ChatPage.tsx), the same "name it, don't inline it" shape
    * `artifact` above already uses for a version a client fetches
    * separately. */
   project?: { id: string };
@@ -775,7 +775,7 @@ export interface RoutingStats {
 // that function takes a full PersonRow (an "@/types" dependency this file
 // can't have), so this is the underlying string check, shared for real
 // with a frontend client instead of being hand-copied a third time. A
-// code review (2026-09-04) found frontend/src/apps/settings/SettingsPage.tsx
+// code review (2026-09-04) found a settings page
 // had grown its own inline `role === "owner" || role === "admin"` on top
 // of frontend/src/apps/people/roles.ts's requiresSecret doing the
 // identical check for an unrelated reason - both now call this.

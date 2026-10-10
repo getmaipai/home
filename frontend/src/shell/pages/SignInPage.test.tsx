@@ -190,8 +190,8 @@ describe("SignInPage", () => {
   });
 });
 
-// NEXT-RETIRE-02C: PIN edge cases ported from the retired old-shell
-// shell/SignIn.test.tsx. The live SignInPage keeps the same auto-submit rules.
+// NEXT-RETIRE-02C: PIN edge cases ported from the retired
+// sign-in test. The live SignInPage keeps the same auto-submit rules.
 describe("SignInPage PIN edge cases (ported from the retired SignIn)", () => {
   async function openPinScreen(onSignedIn: () => void = () => {}) {
     renderSignIn(onSignedIn);

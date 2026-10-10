@@ -50,7 +50,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
   // NOTIFY-SHARE-02: SettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
-  // render (every call site: SettingsPage.tsx renders a person's
+  // render (every call site renders a person's
   // own settings only, never someone else's), so it's parsed here once
   // rather than threading a second prop through every call site.
   const selfPersonId = scope === "person" ? scopeValue.slice("person:".length) : undefined;
@@ -176,11 +176,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
               ) : (
                 <Card
                   key={group.id}
-                  // The old shell's own SettingsPage.tsx names a scroll
-                  // target the identical way ("settings-<group id>") -
-                  // matched here rather than invented, so a test can
-                  // stub scrollIntoView and assert on `this.id` the same
-                  // way that page's own test already does.
+                  // Scroll target named "settings-<group id>", so a test
+                  // can stub scrollIntoView and assert on `this.id`.
                   id={`settings-${group.id}`}
                   ref={(el) => {
                     if (el) groupRefs.current.set(group.id, el);
