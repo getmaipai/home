@@ -36637,3 +36637,11 @@ Tests: `backend/tests/turnMachine/contextDates.test.ts`.
 - Known gap: the installed mini book has no pictures; pictures still come from Commons.
 
 Tests: `backend/tests/answerImagesLibrary.test.ts`.
+
+## STATUS-REASON-01: Chat status names the optional part that is down
+
+`appReason` (backend `lib/statusApps.ts`) no longer says "has outside services with no recent use": a service in state `unknown` never makes an app degraded, so it was never the cause. A degraded app with no required failure now names the optional part: `Chat is working, but <Part> isn't running.` (engine down), `... is still starting.` (engine degraded), `... isn't reachable.` (service down; a search service still matches `isSearchLimitedChat`). Rate-limited services keep their own sentence.
+
+Under the chat input, `useChatComposerNotice` shows a line when chat is ready and the Chat status app is degraded for any reason: search keeps "Searches may be limited right now."; owners and admins see the status reason plus the "Open Repairs" link; everyone else sees "Some chat features may be limited right now." with no part names. It renders through the existing kit composer notice slot.
+
+Tests: `backend/src/lib/statusApps.test.ts`, `frontend/src/apps/chat/useChatComposerNotice.test.tsx`.

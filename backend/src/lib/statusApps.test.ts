@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { appResponse, buildAppHistory, componentForNeed, deriveAppState, unionRequiredDowntime, type StatusApp } from "@/lib/statusApps";
+import { appReason, appResponse,buildAppHistory, componentForNeed, deriveAppState, unionRequiredDowntime, type StatusApp } from "@/lib/statusApps";
 import { __resetInternetProbeForTests, classifyInternetFailures, probeInternet } from "@/lib/internetProbe";
 
 describe("app status derivation", () => {
@@ -96,4 +96,27 @@ test("probe runs both injected endpoints and uses three consecutive combined fai
   expect(await probeInternet(settings, failedDns)).toBe("degraded");
   expect(await probeInternet(settings, failedDns)).toBe("down");
   expect([dnsCalls, tcpCalls]).toEqual([4, 4]);
+});
+
+describe("appReason (STATUS-REASON-01)", () => {
+  const chat = { id: "chat", name: "Chat", purpose: "x" };
+  const base = { kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "x", required: true, state: "operational" };
+  const need = (o: Record<string, unknown>) => ({ ...base, ...o });
+  const reason = (needs: unknown[]) => appReason(chat as never, "degraded", needs as never);
+  test("optional engine down names the part", () => {
+    expect(reason([base, need({ id: "memory", name: "Memory", required: false, state: "down" })])).toBe("Chat is working, but Memory isn't running.");
+  });
+  test("optional engine starting names the part", () => {
+    expect(reason([base, need({ id: "voice", name: "Voice", required: false, state: "degraded" })])).toBe("Chat is working, but Voice is still starting.");
+  });
+  test("optional service down says not reachable and stays search-limited", () => {
+    const text = reason([base, need({ kind: "service", id: "s", name: "Household web search", required: false, state: "down" })]);
+    expect(text).toBe("Chat is working, but Household web search isn't reachable.");
+    expect(/search/i.test(text ?? "")).toBe(true);
+  });
+  test("an unknown service is never a reason", () => {
+    const text = reason([base, need({ kind: "service", id: "s", name: "Weather", required: false, state: "unknown" }), need({ id: "memory", name: "Memory", required: false, state: "down" })]);
+    expect(text).toBe("Chat is working, but Memory isn't running.");
+    expect(text).not.toContain("no recent use");
+  });
 });

@@ -48,8 +48,17 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
   const health = useHealthQuery().data?.engines?.chat;
   const notice = health?.notice;
   const apps = useStatusApps().data;
-  if (chatAvailability(health) === "ready" && Array.isArray(apps) && apps.some(isSearchLimitedChat)) {
-    return { text: "Searches may be limited right now.", repairsLink: null };
+  if (chatAvailability(health) === "ready" && Array.isArray(apps)) {
+    if (apps.some(isSearchLimitedChat)) return { text: "Searches may be limited right now.", repairsLink: null };
+    // STATUS-REASON-01: chat answers, but one of its optional parts is not
+    // fully up. Owners and admins read the status reason and get the Repairs
+    // link; everyone else gets the plain line with no part names.
+    const degraded = apps.find((app) => app.state === "degraded" && (app.id === "chat" || app.name.toLocaleLowerCase() === "chat"));
+    if (degraded) {
+      return isOwnerOrAdminRole(person.role)
+        ? { text: degraded.reason ?? "Chat is working, but some parts aren't fully running.", repairsLink: "Open Repairs" }
+        : { text: "Some chat features may be limited right now.", repairsLink: null };
+    }
   }
   if (!notice || chatAvailability(health) === "ready") return null;
   const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : person.age_band === "adult" ? notice.adult : null;

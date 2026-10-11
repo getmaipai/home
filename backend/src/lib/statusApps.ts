@@ -212,9 +212,14 @@ export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed 
   if (!failed && needs.some((need) => need.required && need.state === "degraded")) return `${app.name} is starting up.`;
   const limited = needs.find((need) => need.kind === "service" && need.state === "degraded");
   if (limited) return `${limited.name} is limiting requests from this home for a while.`;
-  if (needs.some((need) => need.kind === "service" && need.state === "unknown")) return `${app.name} has outside services with no recent use.`;
   if (failed?.kind === "service") return `${app.name} isn't working: ${failed.name} isn't reachable.`;
   if (failed?.id === "hub") return `${app.name} isn't working: MaiPai Home isn't running.`;
   if (failed) return `${app.name} isn't working: MaiPai's AI isn't running.`;
+  // An optional part is the cause (the app itself still works). "unknown"
+  // never degrades an app, so it is not a reason.
+  const optionalDown = needs.find((need) => !need.required && need.state === "down");
+  if (optionalDown) return `${app.name} is working, but ${optionalDown.name} ${optionalDown.kind === "service" ? "isn't reachable" : "isn't running"}.`;
+  const optionalStarting = needs.find((need) => !need.required && need.state === "degraded");
+  if (optionalStarting) return `${app.name} is working, but ${optionalStarting.name} is still starting.`;
   return `${app.name}'s optional features may be unavailable.`;
 }
