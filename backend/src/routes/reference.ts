@@ -10,8 +10,12 @@ import { requireAuth } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { readReferencePage } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
+import { licenceLabel } from "@/lib/retrieval/referenceSources";
 
 export const referenceRoutes = apiRouter();
+
+// The one licence label map lives in referenceSources.ts (no lib-to-route import); re-exported here.
+export { LICENCE_LABELS, licenceLabel } from "@/lib/retrieval/referenceSources";
 
 const getRoute = createRoute({
   method: "get",
@@ -37,7 +41,7 @@ function esc(s: string): string {
 }
 
 export function renderReferencePage(row: ReferenceRow): string {
-  const licence = row.licence === "public-domain" ? "Public domain" : "CC BY-SA 4.0";
+  const licence = licenceLabel(row.licence);
   const body = row.disambiguation
     ? `<p>Several articles share this name:</p><ul>${row.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>`
     : `${row.lead

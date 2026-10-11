@@ -24,7 +24,7 @@
 // turn's counter and, with the second call spent, composes without a
 // model call: the direct reply when an outcome has one, else the fixed
 // fallback.
-import { outcomeText, sourcesFromRows, type DocumentOutcome, type ToolExecutionOutcome } from "@/lib/turnContext";
+import { outcomeText, referenceFields, sourcesFromRows, type DocumentOutcome, type ToolExecutionOutcome } from "@/lib/turnContext";
 import type { LlmMessage } from "@/lib/llm";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { ToolCallWire } from "@maipai/spec/llm/ts/types.js";
@@ -355,8 +355,27 @@ function sourceFor(sourceList: readonly Source[], raw: RecordData, fallback = 0)
   return sourceList.find((source) => url !== null && source.url === url) ?? sourceList[fallback] ?? null;
 }
 
-function sourceFromOutcome(outcome: Succeeded): Source | null {
+/** Exported for tests (KS-02F-BE). */
+export function sourceFromOutcome(outcome: Succeeded): Source | null {
   const source = outcome.source;
+  if (source && source.kind === "reference" && source.title.trim()) {
+    const ref = referenceFields(source);
+    if (!ref) return null;
+    return {
+      id: `src-${randomSuffix(10)}`,
+      kind: "reference",
+      title: source.title.trim(),
+      url: ref.url,
+      site: ref.site,
+      snippet: source.snippet ?? null,
+      source: outcome.packageId,
+      created_at: outcome.at ?? new Date().toISOString(),
+      hlc: nextHlc(),
+      ...(ref.licence ? { licence: ref.licence } : {}),
+      ...(ref.snapshot_date ? { snapshot_date: ref.snapshot_date } : {}),
+      local_path: ref.url,
+    };
+  }
   if (!source || source.kind !== "web" || !source.title.trim() || !source.url || !/^https?:\/\//i.test(source.url)) return null;
   try {
     const url = new URL(source.url);
