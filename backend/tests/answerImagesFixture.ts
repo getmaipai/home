@@ -79,6 +79,12 @@ export function fixtureWorld(subjects: FixtureSubject[], opts: { searchRows?: (q
     }
     if (url.hostname === "www.wikidata.org" && action === "wbgetentities") {
       const ids = (url.searchParams.get("ids") ?? "").split("|");
+      // KS-02C: the library names the page, so Wikidata is asked for its item by enwiki title.
+      const wantedTitle = url.searchParams.get("titles")?.toLowerCase();
+      if (wantedTitle !== undefined) {
+        const t = subjects.find((x) => x.enwiki !== null && (x.enwiki ?? x.label).toLowerCase() === wantedTitle);
+        return { entities: t ? { [t.id]: { type: "item", id: t.id } } : { "-1": { site: "enwiki", title: wantedTitle, missing: "" } } };
+      }
       const s = ids.map((id) => byId.get(id)).find((x) => x !== undefined);
       if (!s) return { entities: {} };
       const claims: Record<string, unknown[]> = { P31: [{ mainsnak: { datavalue: { value: { id: s.human ? "Q5" : s.film ? "Q11424" : "Q811979" } } } }] };

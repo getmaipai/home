@@ -196,6 +196,36 @@ async function suggest(ctx: Ctx, book: string, term: string): Promise<Hit | null
   return first;
 }
 
+/** The one title resolver (KS-02C): the first readable book of each source
+ * that title-matches `term`, in the band's reading order, at most `maxRows`.
+ * `exactOnly` keeps a hit only when its title is the term itself (what a
+ * picture lookup needs: a near title is a different subject). lookup() and
+ * show_images' Wikipedia leg both resolve through this, so a title is
+ * matched one way. A book that fails is skipped and reported. */
+async function pickByTitle(ctx: Ctx, books: readonly ReadableBook[], term: string, opts: { maxRows: number; band: AgeBand; exactOnly?: boolean }): Promise<{ picks: Array<{ rb: ReadableBook; hit: Hit }>; suggestFailure: ReferenceUnavailableReason | null }> {
+  const picks: Array<{ rb: ReadableBook; hit: Hit }> = [];
+  const seenSources = new Set<string>();
+  let suggestFailure: ReferenceUnavailableReason | null = null;
+  for (const rb of books) {
+    if (picks.length >= opts.maxRows) break;
+    if (seenSources.has(rb.source.id)) continue;
+    let hit: Hit | null;
+    try {
+      hit = await suggest(ctx, rb.book, term);
+    } catch (err) {
+      if (!(err instanceof Unavailable)) throw err;
+      suggestFailure = err.reason; // one unreadable book does not fail the others
+      continue;
+    }
+    if (!hit || (opts.exactOnly && !hit.exact)) continue;
+    seenSources.add(rb.source.id);
+    picks.push({ rb, hit });
+    // A picture lookup counts its own hit (image_k_hit), not a search match.
+    if (!opts.exactOnly) bumpReferenceCounter("title_match", opts.band);
+  }
+  return { picks, suggestFailure };
+}
+
 async function fullText(ctx: Ctx, book: string, pattern: string): Promise<Hit | null> {
   const items = await listingCached(ctx, `f|${book}|${pattern}`, async () => {
     bumpReferenceCounter("search");
@@ -309,25 +339,7 @@ export async function lookupReference(input: ReferenceLookupInput, deps: Referen
 
     // One source, one row: the first readable book of each source that
     // title-matches, in the band's reading order.
-    const picks: Array<{ rb: ReadableBook; hit: Hit }> = [];
-    const seenSources = new Set<string>();
-    let suggestFailure: ReferenceUnavailableReason | null = null;
-    for (const rb of books) {
-      if (picks.length >= maxRows) break;
-      if (seenSources.has(rb.source.id)) continue;
-      let hit: Hit | null;
-      try {
-        hit = await suggest(ctx, rb.book, query);
-      } catch (err) {
-        if (!(err instanceof Unavailable)) throw err;
-        suggestFailure = err.reason; // one unreadable book does not fail the others
-        continue;
-      }
-      if (!hit) continue;
-      seenSources.add(rb.source.id);
-      picks.push({ rb, hit });
-      bumpReferenceCounter("title_match", input.band);
-    }
+    const { picks, suggestFailure } = await pickByTitle(ctx, books, query, { maxRows, band: input.band });
     if (picks.length === 0) {
       for (const rb of books.slice(0, 2)) {
         const hit = await fullText(ctx, rb.book, query);
@@ -419,6 +431,35 @@ export async function readReferencePage(input: { book: string; path: string; ban
     const candidate = await readArticle(ctx, db, rb, { title: input.path, path: input.path, exact: true });
     if (!candidate) return null;
     return releaseToBand([candidate], input.band, 1)[0] ?? null;
+  } catch (err) {
+    if (err instanceof Unavailable) return null;
+    throw err;
+  }
+}
+
+/** KS-02C: show_images' Wikipedia title/lead leg, read from the library. The
+ * exact title `title` in the band's installed Wikipedia (English or Simple
+ * English, never another source), through the same closed per-band list, the
+ * same extract cache and the one release point as a lookup. `null` on any
+ * miss (no library, no such title, floor dropped it, a book that fails): the
+ * caller then goes online as it did before, so a failed read never fails the
+ * answer. A disambiguation page comes back as a row with `disambiguation`
+ * set; nothing here chooses an option. */
+export async function resolveReferenceTitle(input: { title: string; band: AgeBand }, deps: ReferenceReaderDeps = {}): Promise<ReferenceRow | null> {
+  const term = input.title.trim();
+  const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
+  if (!baseUrl || term.length === 0) return null;
+  const ctx: Ctx = { baseUrl: baseUrl.replace(/\/+$/, ""), fetchImpl: deps.fetch ?? fetch, now: deps.now ?? Date.now, signal: AbortSignal.timeout(TOTAL_DEADLINE_MS) };
+  const db = deps.db === undefined ? sharedKnowledgeDb() : deps.db;
+  try {
+    const { books, excluded } = readableBooks(await installedBooks(ctx), input.band);
+    if (excluded > 0) bumpReferenceCounter("source_excluded", input.band, excluded);
+    const wikipedia = books.filter((b) => b.source.id.startsWith("wikipedia-"));
+    const { picks } = await pickByTitle(ctx, wikipedia, term, { maxRows: 1, band: input.band, exactOnly: true });
+    const pick = picks[0];
+    if (!pick) return null;
+    const candidate = await readArticle(ctx, db, pick.rb, pick.hit);
+    return candidate ? (releaseToBand([candidate], input.band, 1)[0] ?? null) : null;
   } catch (err) {
     if (err instanceof Unavailable) return null;
     throw err;

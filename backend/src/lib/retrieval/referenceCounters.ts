@@ -30,6 +30,10 @@ export const REFERENCE_COUNTER_NAMES = [
   "mode_blocked_offline",
   "mode_mix_library_hit",
   "mode_mix_live_fallthrough",
+  // KS-02C: show_images read the library for the subject's Wikipedia page.
+  "image_k_hit",
+  "image_k_miss",
+  "image_wikipedia_calls_saved",
 ] as const;
 
 export type ReferenceCounterName = (typeof REFERENCE_COUNTER_NAMES)[number];

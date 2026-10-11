@@ -36586,3 +36586,15 @@ Landed 2026-10-10. The `clock` context item (`backend/src/lib/turnMachine/nodes/
 - Replaced sentence, verbatim: "The model's training knowledge may be older than today."
 
 Tests: `backend/tests/turnMachine/contextDates.test.ts`.
+
+## KS-02C: show_images reads the library first
+
+`show_images` R1 (`answerImages/wikimedia.ts`, `resolveWikimediaSubject`) asks the installed library for the subject's Wikipedia page before going online. The one title resolver is `resolveReferenceTitle` in `retrieval/referenceReader.ts`; it shares `pickByTitle` with `lookupReference`, so a title is matched one way. It reads only the Wikipedia books (English or Simple English) on the asker's band list, requires an exact title, and releases the row through the one floor choke point (`releaseToBand`).
+
+- A hit replaces the Wikipedia call: a disambiguation page needs no call (it stays ambiguous unless the model's kind names a sense), an article needs one small Wikidata call for its item. The article's lead is the teen's `pageExtract`.
+- A miss, a floor drop or an unreachable library falls through to the online Wikipedia call unchanged.
+- Every live Wikimedia call here (Wikipedia, Wikidata, Commons) first asks `wikimediaLiveBlocked(band)`, which reads `effectiveMode("wikimedia", band)`; `offline` blocks them and the selection skips with `offline`. A minor takes the adult's value, so this only restricts. This closes KS-02-PRIV follow-up (c) for `show_images`.
+- Counters: `image_k_hit` and `image_wikipedia_calls_saved` (name and band only).
+- Known gap: the installed mini book has no pictures; pictures still come from Commons.
+
+Tests: `backend/tests/answerImagesLibrary.test.ts`.

@@ -17,7 +17,8 @@ import { putAnswerImage } from "./cache";
 import { ANSWER_IMAGES_MAX_CANDIDATES, GALLERY_VISIBLE, type ShownPictures } from "./gallery";
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
-import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, type FetchJson, type WikimediaEntity } from "./wikimedia";
+import { resolveReferenceTitle } from "@/lib/retrieval/referenceReader";
+import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, type FetchJson, type LibraryPage, type WikimediaEntity } from "./wikimedia";
 
 /** Kinds the model uses for a person (its own `kind` argument, never the
  * person's message): with no Wikipedia article such a name may be a private
@@ -29,6 +30,8 @@ const CAPTION_MAX = 140;
 
 export type AnswerImageDeps = {
   fetchJson?: FetchJson;
+  /** Tests script the library (a fakeKiwix) instead of the Home sidecar. */
+  library?: (subject: string, band: AgeBand) => Promise<LibraryPage | null>;
   imageSearch?: (query: string, actor: PersonRow, band: AgeBand) => Promise<SearxngImageRow[]>;
   fetchOptions?: Parameters<typeof fetchAnswerImages>[1];
   now?: () => Date;
@@ -39,7 +42,7 @@ let testDeps: AnswerImageDeps = {};
 export function __setAnswerImageDepsForTests(deps: AnswerImageDeps | null): void { testDeps = deps ?? {}; }
 
 /** Why a call produced no pictures, counted on the trace (a rule has a counter). */
-export type AnswerImageSkip = "empty_subject" | "household_name" | "floor_subject" | "no_article" | "ambiguous" | "minor_subject" | "no_candidates" | "none_survived" | "error";
+export type AnswerImageSkip = "empty_subject" | "household_name" | "floor_subject" | "no_article" | "ambiguous" | "minor_subject" | "no_candidates" | "none_survived" | "offline" | "error";
 
 export type AnswerImageTrace = {
   subject: string;
@@ -139,7 +142,12 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
   const now = deps.now ?? (() => new Date());
   try {
     const kind = (input.kind ?? "").trim().slice(0, 80);
-    const resolved = await resolveWikimediaSubject(subject, fetchJson, kind);
+    // KS-02C: tier K (the installed library) names the Wikipedia page first.
+    const library = deps.library ?? (async (title: string, band: AgeBand): Promise<LibraryPage | null> => {
+      const row = await resolveReferenceTitle({ title, band });
+      return row ? { title: row.title, disambiguation: row.disambiguation, lead: row.lead } : null;
+    });
+    const resolved = await resolveWikimediaSubject(subject, fetchJson, kind, { band: input.band, library: (title) => library(title, input.band) });
     // Owner ruling 11 (2026-10-06): an adult asking about a thing with no
     // Wikipedia article gets open-web pictures under the same rules. People
     // (a name with no article may be a private person), anything the model
@@ -165,7 +173,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
         allowed = extract !== null && extract.trim().length > 0 && !trips(extract, "teen");
       }
       if (!allowed) return [];
-      const found = await wikimediaCandidates(entity, fetchJson, { leadOnly: entity.human && entity.birthDate === undefined }).catch(() => []);
+      const found = await wikimediaCandidates(entity, fetchJson, { leadOnly: entity.human && entity.birthDate === undefined, band: input.band }).catch(() => []);
       return found.map((c): Candidate => ({ ...c, source: "wikimedia", ...(isNonPhotoFile(entity, c) ? { nonPhoto: true } : {}) }));
     };
     // SearXNG images (source 4): never for a person (it returns look-alikes

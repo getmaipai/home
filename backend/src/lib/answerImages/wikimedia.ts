@@ -6,7 +6,10 @@
 // keeps its own copy of the Wikidata search inside its Deno sandbox: a
 // sandboxed package cannot import hub modules, and its checked-in copy is
 // pinned to the catalog's hash (bundled-provenance.json).
+import type { AgeBand } from "@/lib/ageBand";
 import { tryConsume } from "@/lib/rateLimiter";
+import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
+import { effectiveMode } from "@/lib/retrieval/sourceMode";
 import { ANSWER_IMAGE_USER_AGENT } from "./fetch";
 
 export type WikimediaEntity = {
@@ -151,7 +154,30 @@ export function kindScore(kind: string, description: string): number {
 }
 
 /** Why a subject resolves to nothing (counted on the trace). */
-export type ResolveSkip = "no_article" | "ambiguous" | "error";
+export type ResolveSkip = "no_article" | "ambiguous" | "error" | "offline";
+
+/** KS-02C: the search source mode's gate for every live Wikimedia call here
+ * (Wikipedia, Wikidata, Commons). `offline` blocks them (counted). A minor's
+ * mode is `closed` in the table, but show_images already offers a minor only
+ * what an adult may have, so a minor takes the adult's value: this can only
+ * restrict, never widen (rule 0). */
+export function wikimediaLiveBlocked(band: AgeBand): boolean {
+  const mode = effectiveMode("wikimedia", band);
+  const capped = mode === "closed" ? effectiveMode("wikimedia", "adult") : mode;
+  if (capped !== "offline") return false;
+  bumpReferenceCounter("mode_blocked_offline", band);
+  return true;
+}
+
+/** The subject's Wikipedia page as the library knows it (a row of
+ * `resolveReferenceTitle`, reduced to what R1 reads). */
+export type LibraryPage = { title: string; disambiguation: boolean; lead: string };
+export type ResolveOptions = {
+  /** Set by show_images: gates the live calls by the source mode and band. */
+  band?: AgeBand;
+  /** Tier K first for the Wikipedia title/lead leg; null or a throw is a miss. */
+  library?: (subject: string) => Promise<LibraryPage | null>;
+};
 
 type Sense = { id: string; label: string; description: string };
 
@@ -166,9 +192,37 @@ type Sense = { id: string; label: string; description: string };
  * with no sense fitting the kind is ambiguous: no pictures (owner,
  * 2026-10-06: only when the conversation makes the meaning clear). Never
  * more than 3 Wikimedia calls here. */
-export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJson, kind = ""): Promise<{ entity: WikimediaEntity } | { skipped: ResolveSkip; nothingByName?: boolean }> {
+export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJson, kind = "", opts: ResolveOptions = {}): Promise<{ entity: WikimediaEntity } | { skipped: ResolveSkip; nothingByName?: boolean }> {
+  if (opts.band && wikimediaLiveBlocked(opts.band)) return { skipped: "offline" };
+  // KS-02C: the library names the page first. A hit replaces the Wikipedia
+  // call (a disambiguation page needs no call at all; an article needs one
+  // small Wikidata call for its item, so the Wikipedia host is not asked); a
+  // miss, or a hit whose item Wikidata cannot give, is today's online path.
+  type PageResult = { query?: { pages?: Record<string, { title?: string; missing?: unknown; pageprops?: { wikibase_item?: string; disambiguation?: unknown }; extract?: unknown }> } } | null;
+  const onlinePage = (): Promise<PageResult> => fetchJson(`${WP}?action=query&titles=${encodeURIComponent(subject)}&redirects=1&prop=pageprops%7Cextracts&ppprop=wikibase_item%7Cdisambiguation&exintro=1&explaintext=1&format=json`).catch(() => null) as Promise<PageResult>;
+  const libraryPage = async (): Promise<PageResult> => {
+    const page = (await opts.library?.(subject).catch(() => null)) ?? null;
+    if (!page) return null;
+    if (page.disambiguation) return { query: { pages: { "1": { title: page.title, pageprops: { disambiguation: "" } } } } };
+    const found = await fetchJson(`${WD}?action=wbgetentities&sites=enwiki&normalize=1&titles=${encodeURIComponent(page.title)}&props=info&format=json`).catch(() => null) as { entities?: Record<string, { id?: string; missing?: unknown }> } | null;
+    const item = Object.values(found?.entities ?? {}).find((e) => e.missing === undefined && /^Q\d+$/.test(e.id ?? ""))?.id;
+    return item ? { query: { pages: { "1": { title: page.title, pageprops: { wikibase_item: item }, extract: page.lead } } } } : null;
+  };
+  const pageFromLibrary = async (): Promise<PageResult> => {
+    if (!opts.library) return onlinePage();
+    const fromLibrary = await libraryPage();
+    if (fromLibrary) {
+      if (opts.band) {
+        bumpReferenceCounter("image_k_hit", opts.band);
+        bumpReferenceCounter("image_wikipedia_calls_saved", opts.band);
+      }
+      return fromLibrary;
+    }
+    if (opts.band) bumpReferenceCounter("image_k_miss", opts.band);
+    return onlinePage();
+  };
   const [pageResult, searchResult] = await Promise.all([
-    fetchJson(`${WP}?action=query&titles=${encodeURIComponent(subject)}&redirects=1&prop=pageprops%7Cextracts&ppprop=wikibase_item%7Cdisambiguation&exintro=1&explaintext=1&format=json`).catch(() => null) as Promise<{ query?: { pages?: Record<string, { title?: string; missing?: unknown; pageprops?: { wikibase_item?: string; disambiguation?: unknown }; extract?: unknown }> } } | null>,
+    pageFromLibrary(),
     fetchJson(`${WD}?action=wbsearchentities&search=${encodeURIComponent(subject)}&language=en&type=item&format=json&limit=10`).catch(() => null) as Promise<{ search?: Array<{ id?: string; label?: string; description?: string }> } | null>,
   ]);
   // Either lookup failing is an error, never "no article": nothing may be
@@ -328,7 +382,8 @@ const IMAGEINFO = "prop=imageinfo%7Ccategories&clshow=%21hidden&cllimit=max&iipr
  * pictures curated into its Commons category (P373), lead first. One Commons
  * call: the category when there is one (the lead is normally a member),
  * otherwise the lead file itself. */
-export async function wikimediaCandidates(entity: WikimediaEntity, fetchJson: FetchJson, opts: { leadOnly?: boolean } = {}): Promise<WikimediaCandidate[]> {
+export async function wikimediaCandidates(entity: WikimediaEntity, fetchJson: FetchJson, opts: { leadOnly?: boolean; band?: AgeBand } = {}): Promise<WikimediaCandidate[]> {
+  if (opts.band && wikimediaLiveBlocked(opts.band)) return [];
   const useCategory = !opts.leadOnly && entity.commonsCategory;
   if (!useCategory && !entity.image) return [];
   const url = useCategory
