@@ -4,7 +4,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { registerSidecar } from "@/lib/sidecars";
+import { __resetSidecarsForTests, registerSidecar } from "@/lib/sidecars";
 import { KIWIX_SIDECAR_ID } from "@/lib/kiwixSidecar";
 import { __resetReferenceCountersForTests } from "@/lib/retrieval/referenceCounters";
 import { __resetReferenceReaderCachesForTests, readReferencePage } from "@/lib/retrieval/referenceReader";
@@ -39,6 +39,8 @@ beforeEach(() => {
 afterEach(() => {
   kiwix?.stop();
   kiwix = null;
+  // The kiwix sidecar stays registered (and health-polled) after its fake stops; later files in the same process then write status events.
+  __resetSidecarsForTests();
 });
 
 async function owner(): Promise<TestClient> {

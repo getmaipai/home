@@ -104,12 +104,13 @@ describe("the composer's outcome source", () => {
 describe("minors get only tier-K reference Sources", () => {
   for (const band of ["child", "teen"] as const) {
     test(`a ${band} turn emits reference Sources only and no wikimedia-live Source`, async () => {
-      let kMatchedSeen: boolean | null = null;
+      let webCalled = false;
       const out = await federatedLookup(
-        { query: "Juniper Falls", band, scope: "both", web: async (ctx) => { kMatchedSeen = ctx.kMatched; return { text: "", rows: [] }; } },
+        { query: "Juniper Falls", band, scope: "both", web: async () => { webCalled = true; return { text: "", rows: [] }; } },
         { lookupReference: async () => ({ outcome: "answered", rows: [row()], text: "[1] Simple English Wikipedia" }) as never },
       );
-      expect(kMatchedSeen as unknown).toBe(true);
+      // KS-MODE-01: in the default mix mode a library hit answers an unscoped ask at home, so the live side is never called.
+      expect(webCalled).toBe(false);
       const sources = sourcesFromRows(out.rows);
       expect(sources.length).toBeGreaterThan(0);
       for (const s of sources) {
