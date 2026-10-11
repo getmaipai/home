@@ -823,6 +823,10 @@ async function wikipediaFallback(query: string, signal?: AbortSignal, deadlineAt
   if (!summary) return null;
   const rawExtract = typeof summary.extract === "string" ? summary.extract.trim() : "";
   if (!rawExtract) return null;
+  // Ported from the retired `knowledge` package (KS-02B, #92): a
+  // disambiguation page ("X may refer to...") is a miss, not an answer, so
+  // the turn goes on without a source rather than quoting a list of senses.
+  if (summary.type === "disambiguation") return null;
   const title = typeof summary.title === "string" && summary.title.length > 0 ? summary.title : top.key;
   const contentUrls = summary.content_urls as { desktop?: { page?: unknown } } | undefined;
   const pageUrl = typeof contentUrls?.desktop?.page === "string" ? contentUrls.desktop.page : `${base}/wiki/${encodeURIComponent(top.key)}`;

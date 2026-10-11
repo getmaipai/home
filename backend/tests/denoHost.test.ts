@@ -24,7 +24,7 @@ beforeEach(() => {
   resetDb();
   __resetDenoHostForTests();
   __resetPackageCacheForTests();
-  __clearPackageCacheDirForTests("knowledge");
+  __clearPackageCacheDirForTests("news");
 });
 
 afterEach(() => {
@@ -64,25 +64,26 @@ function unwrap(result: CallTier1Result): PluginResult {
   return result.value;
 }
 
-function knowledgeManifest() {
-  const result = loadManifestOnly("knowledge");
-  if (!result.ok) throw new Error(`knowledge package failed to load: ${result.error}`);
+// KS-02B: these sandbox tests used the retired `knowledge` package as their
+// Tier 1 fixture; `news` is the same shape (one host.fetch, a cache-seeded
+// response, a manifest fallback_reply), so every assertion is unchanged.
+function newsManifest() {
+  const result = loadManifestOnly("news");
+  if (!result.ok) throw new Error(`news package failed to load: ${result.error}`);
   return result.value;
 }
 
-const WIKIPEDIA_SEATTLE_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/Seattle";
+const NEWS_FEED_URL = "https://feeds.npr.org/1001/rss.xml";
+const SEATTLE_HEADLINE = "Seattle is a seaport city on the West Coast of the United States";
+const rssWith = (title: string) => `<rss><channel><item><title>${title}</title></item></channel></rss>`;
 
 describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
   test("the real Deno sandbox answers end to end, from a cache-seeded response - no live network needed", async () => {
-    const manifest = knowledgeManifest();
-    await cachedFetch("knowledge", manifest.cache, WIKIPEDIA_SEATTLE_URL, undefined, async () => ({
-      title: "Seattle",
-      extract: "Seattle is a seaport city on the West Coast of the United States.",
-      type: "standard",
-    }));
+    const manifest = newsManifest();
+    await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith(SEATTLE_HEADLINE));
     const actor = await owner();
-    const result = await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
-    expect(unwrap(result).reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
+    const result = await callTier1Handle("news", manifest, actor, {});
+    expect(unwrap(result).reply?.text).toBe(`Top headlines: ${SEATTLE_HEADLINE}.`);
   }, 15_000);
 
   // A code review (2026-09-06) caught a real race: two concurrent calls
@@ -94,28 +95,24 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
   // exact same moment and checking only one real `deno` child for this
   // package ever exists afterward.
   test("two concurrent calls for the same cold package share one process, not two", async () => {
-    const manifest = knowledgeManifest();
-    await cachedFetch("knowledge", manifest.cache, WIKIPEDIA_SEATTLE_URL, undefined, async () => ({
-      title: "Seattle",
-      extract: "Seattle is a seaport city on the West Coast of the United States.",
-      type: "standard",
-    }));
+    const manifest = newsManifest();
+    await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith(SEATTLE_HEADLINE));
     const actor = await owner();
     const [first, second] = await Promise.all([
-      callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" }),
-      callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" }),
+      callTier1Handle("news", manifest, actor, {}),
+      callTier1Handle("news", manifest, actor, {}),
     ]);
-    expect(unwrap(first).reply?.text).toBe("Seattle: Seattle is a seaport city on the West Coast of the United States.");
+    expect(unwrap(first).reply?.text).toBe(`Top headlines: ${SEATTLE_HEADLINE}.`);
     expect(unwrap(second).reply?.text).toBe(unwrap(first).reply?.text);
 
     // Scoped to THIS test run's own processes (CHAT-22): the host passes
     // `--allow-write=<this run's MAIPAI_DATA_DIR>/...` on every deno
     // command line, so filtering on that path counts only children of
-    // this suite. A bare `pgrep -f knowledge/handler.ts` counted every
-    // knowledge handler on the machine, and failed whenever a hub
+    // this suite. A bare `pgrep -f news/handler.ts` counted every
+    // news handler on the machine, and failed whenever a hub
     // backend (the household's own, or another session's) had answered
-    // a knowledge query.
-    const psOutput = await new Response(Bun.spawn(["pgrep", "-fl", "knowledge/handler.ts"], { stdout: "pipe" }).stdout).text();
+    // a news query.
+    const psOutput = await new Response(Bun.spawn(["pgrep", "-fl", "news/handler.ts"], { stdout: "pipe" }).stdout).text();
     const ownDataDir = process.env.MAIPAI_DATA_DIR!;
     const pids = psOutput.split("\n").filter((line) => line.includes(`--allow-write=${ownDataDir}/`));
     expect(pids.length).toBe(1);
@@ -129,55 +126,48 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
   // turn lock: one caller's actor is "current" at a time, and a second
   // caller queues behind the first rather than racing it.
   test("two concurrent callers with different actors never see each other's actor mid-flight", async () => {
-    const manifest = knowledgeManifest();
-    await cachedFetch("knowledge", manifest.cache, WIKIPEDIA_SEATTLE_URL, undefined, async () => ({
-      title: "Seattle",
-      extract: "Seattle is a seaport city on the West Coast of the United States.",
-      type: "standard",
-    }));
+    const manifest = newsManifest();
+    await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith(SEATTLE_HEADLINE));
     const { ownerRow, childRow } = await ownerAndChildRows();
 
     // Warms the real Deno process first, outside the timed part of this
     // test - a cold `deno run` spawn + MCP connect can itself take longer
     // than the delay below, which would make the timing assertions below
     // meaningless.
-    await callTier1Handle("knowledge", manifest, ownerRow, { topic: "Seattle" });
+    await callTier1Handle("news", manifest, ownerRow, {});
 
     __setTestFetchDelayMsForTests(300);
-    const first = callTier1Handle("knowledge", manifest, ownerRow, { topic: "Seattle" });
+    const first = callTier1Handle("news", manifest, ownerRow, {});
     await sleep(50); // let the owner's call actually start and take the lock
-    expect(__testCurrentActorId("knowledge")).toBe(ownerRow.id);
+    expect(__testCurrentActorId("news")).toBe(ownerRow.id);
 
-    const second = callTier1Handle("knowledge", manifest, childRow, { topic: "Seattle" });
+    const second = callTier1Handle("news", manifest, childRow, {});
     await sleep(50); // still well inside the owner's 300ms delay
-    expect(__testCurrentActorId("knowledge")).toBe(ownerRow.id); // NOT clobbered by the queued second call
+    expect(__testCurrentActorId("news")).toBe(ownerRow.id); // NOT clobbered by the queued second call
 
     const [firstResult, secondResult] = await Promise.all([first, second]);
     expect(unwrap(firstResult).reply?.text).toContain("Seattle");
     expect(unwrap(secondResult).reply?.text).toContain("Seattle");
-    expect(__testCurrentActorId("knowledge")).toBe(childRow.id);
+    expect(__testCurrentActorId("news")).toBe(childRow.id);
   }, 15_000);
 
   test("a slow handle() past timeout_ms faults and answers with the manifest's own fallback_reply", async () => {
-    const manifest = { ...knowledgeManifest(), timeout_ms: 200 };
+    const manifest = { ...newsManifest(), timeout_ms: 200 };
     __setTestFetchDelayMsForTests(2000); // well past timeout_ms, well under the test's own timeout
-    await cachedFetch("knowledge", manifest.cache, WIKIPEDIA_SEATTLE_URL, undefined, async () => ({
-      title: "Seattle",
-      extract: "irrelevant - the delay means this is never reached in time",
-    }));
+    await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith("irrelevant - the delay means this is never reached in time"));
     const actor = await owner();
-    const result = await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
+    const result = await callTier1Handle("news", manifest, actor, {});
     expect(unwrap(result).reply?.text).toBe(manifest.fallback_reply!.text);
   }, 15_000);
 
   test("three consecutive timeouts disable the package for the rest of this boot and raise a Repairs issue", async () => {
-    const manifest = { ...knowledgeManifest(), timeout_ms: 200 };
+    const manifest = { ...newsManifest(), timeout_ms: 200 };
     __setTestFetchDelayMsForTests(2000);
     const actor = await owner();
     for (let i = 0; i < 3; i++) {
-      await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
+      await callTier1Handle("news", manifest, actor, {});
     }
-    const issue = listIssues().find((i) => i.source === "packages.deno" && i.key === "knowledge");
+    const issue = listIssues().find((i) => i.source === "packages.deno" && i.key === "news");
     expect(issue).toBeDefined();
     expect(issue?.severity).toBe("error");
 
@@ -185,11 +175,8 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
     // fallback_reply - disabled for the rest of this boot means exactly
     // that, not "until the next call happens to succeed."
     __setTestFetchDelayMsForTests(null);
-    await cachedFetch("knowledge", manifest.cache, WIKIPEDIA_SEATTLE_URL, undefined, async () => ({
-      title: "Seattle",
-      extract: "should never be reached - the package is disabled",
-    }));
-    const result = await callTier1Handle("knowledge", manifest, actor, { topic: "Seattle" });
+    await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith("should never be reached - the package is disabled"));
+    const result = await callTier1Handle("news", manifest, actor, {});
     expect(unwrap(result).reply?.text).toBe(manifest.fallback_reply!.text);
   }, 30_000);
 });

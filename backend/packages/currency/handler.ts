@@ -17,7 +17,7 @@
 // pretending "convert 5 dollars to euros" works.
 //
 // See almanac-date/handler.ts's own header for why this is Tier 1; see
-// knowledge/handler.ts's own header for why this file has no import
+// news/handler.ts's own header for why this file has no import
 // from anywhere outside its own directory and duplicates the
 // host/fetch wire shape rather than sharing it.
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";

@@ -1336,9 +1336,10 @@ export const ACTION_FAMILIES: readonly ActionFamily[] = [
     // not a web lookup.
     exclude: /\b(?:in|through) (?:your|my|the) (?:notes|memory|memories|history)\b/i,
     onQuestion: true,
-    // #92: a Tier 0 knowledge miss rides on the turn as a failed outcome,
-    // so a lookup claim after it narrates "That lookup didn't work."
-    packages: ["websearch", "knowledge"],
+    // A failed `websearch` outcome (any scope, `reference` included) rides
+    // on the turn, so a lookup claim after it narrates "That lookup
+    // didn't work." (KS-02B retired the old `knowledge` package.)
+    packages: ["websearch"],
     none: "I didn't look that up.",
     failed: "That lookup didn't work.",
     note: "[Nothing was looked up.]",

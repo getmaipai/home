@@ -1589,7 +1589,7 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
 // servers only, per the coordinator's own instruction - no live
 // acceptance tonight (SearXNG suspended, no real queries).
 describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
-  function startFakeWikipedia(opts: { hasMatch: boolean; requireUserAgent?: string }): { url: string; stop: () => void; requests: { path: string; userAgent: string | null }[] } {
+  function startFakeWikipedia(opts: { hasMatch: boolean; requireUserAgent?: string; disambiguation?: boolean }): { url: string; stop: () => void; requests: { path: string; userAgent: string | null }[] } {
     const requests: { path: string; userAgent: string | null }[] = [];
     const server = Bun.serve({ hostname: "127.0.0.1", port: 0,
       fetch: (req) => {
@@ -1602,6 +1602,7 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
         if (url.pathname.startsWith("/api/rest_v1/page/summary/")) {
           return Response.json({
             title: "Marlow (topic)",
+            ...(opts.disambiguation ? { type: "disambiguation" } : {}),
             extract: "Marlow is a roster-safe example topic used in MaiPai's own tests.",
             content_urls: { desktop: { page: "https://en.wikipedia.org/wiki/Marlow_(topic)" } },
           });
@@ -1656,6 +1657,26 @@ describe("Wikipedia fallback (SEARCH-FALLBACK-01)", () => {
       // Restored, never deleted (tests/preload.ts's own comment on
       // why): a delete would erase the safe closed-port default preload
       // sets for every OTHER test, not just this one.
+      if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+      else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
+      wiki.stop();
+      server.stop(true);
+    }
+  });
+
+  // Ported from the retired knowledge package (KS-02B, #92).
+  test("a Wikipedia disambiguation page is a miss, never quoted as the answer", async () => {
+    const wiki = startFakeWikipedia({ hasMatch: true, disambiguation: true });
+    const previousWikipediaBaseUrl = process.env.MAIPAI_WIKIPEDIA_BASE_URL;
+    process.env.MAIPAI_WIKIPEDIA_BASE_URL = wiki.url;
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ results: [], infoboxes: [] }) });
+    try {
+      const actor = await owner();
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      const host = createHost(actor, manifest({ permissions: ["integration:searxng"] }));
+      const result = (await host.integration.call("searxng", "search", { query: "marlow" })) as { rows: { title: string }[] };
+      expect(result.rows).toHaveLength(0);
+    } finally {
       if (previousWikipediaBaseUrl === undefined) delete process.env.MAIPAI_WIKIPEDIA_BASE_URL;
       else process.env.MAIPAI_WIKIPEDIA_BASE_URL = previousWikipediaBaseUrl;
       wiki.stop();

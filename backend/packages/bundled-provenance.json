@@ -1,18 +1,8 @@
 {
-  "define": {
-    "sha256": "4a3ae365e151137374ecf4a0a04fb8fc0f1a33401bbfca9f34fd69aaa1a8ccb1",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
-    "catalog_path": "plugins/utilities/define"
-  },
   "joke": {
     "sha256": "12ad2f0a107dbe90d6ade5a062995df009236464dee278766183c5a4fe2834a2",
     "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/fun/joke"
-  },
-  "knowledge": {
-    "sha256": "dcb3b18b0b306414f06d9fc707142f9716af0d79c07dcdefb6005f238ce91b77",
-    "source_commit": "b87669052780fc7f91d27491df6bcb13fe015150",
-    "catalog_path": "plugins/info/knowledge"
   },
   "media-lookup": {
     "sha256": "7abfa6653c77a02c67a66ca1ae1a8202e64b888f38f7e49d460722d7179fc88e",

@@ -337,6 +337,45 @@ snapshot date) and link to the proxy page `/api/reference/<book>/<path>`
 closed per-band list and minor's floor as a search. The text below is the
 history of the fallback as first built.
 
+**KS-02B (2026-10-11): the `knowledge` and `define` packages are retired.**
+Home stops bundling both; the `getmaipai/catalog` copies and the bot's `define`
+(platforms `home` + `bot`) are untouched. The port list (chat rule 12, written
+before the delete):
+
+- `knowledge` (Wikipedia summary by topic): replaced by tier K plus
+  `wikimedia-live` under `websearch`. OPENER-01 had already stopped its
+  question-word patterns firing, so it ran only as a model tool call or a
+  direct package run. One piece of hard-won logic was not covered and is
+  ported: a disambiguation page is a miss, not an answer (#92). The Wikipedia
+  fallback in `packageHost.ts` now returns nothing for
+  `type: "disambiguation"`, with a test. Its privacy row (`en.wikipedia.org`)
+  goes with the package; the `websearch` rows stay.
+- `define` (dictionaryapi.dev): replaced by `websearch` with `scope: "reference"`
+  only where a Wiktionary book is installed. Neither `wiktionary_en_simple` nor
+  `wiktionary_en_all` is installed by default until KS-08 and KS-09, so until
+  then a word question goes to web search. This is a stated regression: the
+  lookup is slower and less exact than the one-call dictionary. Its spec-sheet
+  definition card is retired with it, but the `define` id stays in
+  `SPEC_SHEET_READY` so stored messages with a `define` part still draw (the
+  frontend binding and `ChatThread.test.tsx` are unchanged).
+- Guard: the lookup claim family names `websearch` only; a failed `websearch`
+  outcome (any scope) narrates "That lookup didn't work." (test in
+  `guards.test.ts`).
+- Installed state: nothing of a household's is deleted. A copy installed from
+  the store stays in the data directory and keeps running; per-person settings,
+  disable flags and incognito rows are inert rows that no code reads once the
+  bundled copy is gone, so they are left in place, not migrated.
+- Fixtures: the Tier 1 sandbox tests (`denoHost.test.ts`,
+  `packageFallbackBoundary.test.ts`, the CHAT-02 outlet test in
+  `chatTurn.test.ts`) now use the bundled `news` package, which has the same
+  shape (one `host.fetch`, a cache-seeded response, a `fallback_reply`).
+  `commands.test.ts`'s failed-outcome tests use `convert`. The bundled-define
+  manifest test became a "no longer bundled" test. The pinned spec
+  `tool-call-corpus.json` still has a row expecting `define`; the two bench
+  scripts that read it skip that row until `commons` drops it (spec first).
+- `NEVER_FIRES_WILDCARDS` keeps `knowledge:tell me about *` so an old store
+  copy stays gated.
+
 **The setting, and the real cross-repo cost of adding one.**
 `search.wikipedia_fallback` (household, boolean, default true,
 `searchKeys.ts`) - a real settings key, not the `configurable: false`

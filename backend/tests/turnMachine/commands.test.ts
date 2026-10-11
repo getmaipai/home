@@ -149,30 +149,29 @@ describe("commandsNode: a computed wildcard fires only when the package's own re
 // the reply (an MCP error string, a Wikipedia URL, once verbatim) and
 // `String(result.status)` as the error code, discarding the plugin
 // runner's own typed `code`. `runPlugin` is spied (the same pattern
-// chatTurn.test.ts's own `#92`/knowledge-miss tests use) since a
-// household turn matching knowledge's own opener needs a directive
-// classification forced (`signalOverride`) to reach the pattern loop
-// at all under OPENER-01's own gate - the failure handling itself is
+// chatTurn.test.ts's own `#92` tests use); KS-02B re-pointed these from the
+// retired knowledge package to convert, whose opener also needs a directive
+// classification (forced here with `signalOverride`) under OPENER-01's own gate - the failure handling itself is
 // what's under test here, independent of whether a real utterance
 // would classify that way.
 describe("commandsNode: a failed pattern outcome continues the turn, never the raw error (COMMAND-FAIL-01)", () => {
-  test('a "not_found" failure (the Wikipedia 404 fixture) reaches the model: matched is false, never the raw error text', async () => {
+  test('a "not_found" failure (an upstream 404 fixture) reaches the model: matched is false, never the raw error text', async () => {
     const plugins = await import("@/lib/plugins");
     const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({
       ok: false as const,
       status: 502 as const,
-      error: "MCP error -32000: fetch failed: 404 https://en.wikipedia.org/api/rest_v1/page/summary/Technical_benchmarking",
+      error: "MCP error -32000: fetch failed: 404 https://upstream.example.com/api/some_page",
       code: "not_found",
       fallback_reply: { reply: { text: "Sorry, I'm having trouble looking that up right now." }, actions: [] },
     }));
     try {
-      const questionSignal: TurnSignal = { ...classifyTurnSignal({ text: "what is technical benchmarking", ageBand: "adult", commandOpeners: OPENERS }), primary_act: "directive" };
-      const state = stateFor(people.owner, "what is technical benchmarking", { signalOverride: questionSignal });
-      const { output } = await commandsNode(state, { utterance: "what is technical benchmarking" }, NODE_SIGNAL);
+      const questionSignal: TurnSignal = { ...classifyTurnSignal({ text: "convert 5 miles to km", ageBand: "adult", commandOpeners: OPENERS }), primary_act: "directive" };
+      const state = stateFor(people.owner, "convert 5 miles to km", { signalOverride: questionSignal });
+      const { output } = await commandsNode(state, { utterance: "convert 5 miles to km" }, NODE_SIGNAL);
       expect(output.matched).toBe(false);
       expect(state.outcomes).toHaveLength(1);
       expect(state.outcomes[0]?.status).toBe("failed");
-      expect(state.outcomes[0]?.packageId).toBe("knowledge");
+      expect(state.outcomes[0]?.packageId).toBe("convert");
       expect(state.outcomes[0]?.errorCode).toBe("not_found");
       expect(state.outcomes[0]?.userMessage).toContain("MCP error");
     } finally {
@@ -185,13 +184,13 @@ describe("commandsNode: a failed pattern outcome continues the turn, never the r
     const spy = spyOn(plugins, "runPlugin").mockImplementation(async () => ({
       ok: false as const,
       status: 400 as const,
-      error: "knowledge's inputs failed validation: topic is required",
+      error: "convert's inputs failed validation: expression is required",
       code: "invalid_input",
     }));
     try {
-      const questionSignal: TurnSignal = { ...classifyTurnSignal({ text: "what is technical benchmarking", ageBand: "adult", commandOpeners: OPENERS }), primary_act: "directive" };
-      const state = stateFor(people.owner, "what is technical benchmarking", { signalOverride: questionSignal });
-      const { output } = await commandsNode(state, { utterance: "what is technical benchmarking" }, NODE_SIGNAL);
+      const questionSignal: TurnSignal = { ...classifyTurnSignal({ text: "convert 5 miles to km", ageBand: "adult", commandOpeners: OPENERS }), primary_act: "directive" };
+      const state = stateFor(people.owner, "convert 5 miles to km", { signalOverride: questionSignal });
+      const { output } = await commandsNode(state, { utterance: "convert 5 miles to km" }, NODE_SIGNAL);
       expect(output.matched).toBe(false);
       expect(state.outcomes[0]?.errorCode).toBe("invalid_input");
       expect(state.outcomes[0]?.errorCode).not.toBe("400");

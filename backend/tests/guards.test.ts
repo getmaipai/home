@@ -797,6 +797,14 @@ describe("action-claim families, the fourth review's cases", () => {
     expect(guardReply("Boil the water, then set a timer for ten minutes.", ctx({ utterance: "start the pasta", shape: "command" })).reason).toBeNull();
   });
 
+  // KS-02B: the old `knowledge` package no longer rides a failed outcome; a
+  // word or fact question is `websearch` with `scope: "reference"`, so the
+  // lookup family reads a failed websearch outcome (any scope) alone.
+  test("a lookup claim after a failed websearch (scope reference included) narrates the failure; a failed retired knowledge id no longer counts", () => {
+    expect(guardReply("I looked that up: ephemeral means short-lived.", ctx({ utterance: "what does ephemeral mean", outcomes: failed("websearch") })).reply).toBe("That lookup didn't work.");
+    expect(guardReply("I looked that up: ephemeral means short-lived.", ctx({ utterance: "what does ephemeral mean", outcomes: failed("knowledge") })).reply).not.toBe("That lookup didn't work.");
+  });
+
   test("a lookup in every first-person form needs the websearch outcome", () => {
     for (const reply of ["I've looked it up and it opens at nine.", "I just looked it up: it opens at nine.", "Okay, I've looked it up: nine."]) {
       expect(guardReply(reply, ctx({ utterance: "when does the pool open" })).reason).toBe("unsupported_action");

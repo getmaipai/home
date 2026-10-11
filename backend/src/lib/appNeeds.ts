@@ -32,7 +32,6 @@ const BUILT_IN_PLUGIN_SERVICES: Record<string, AppNeed[]> = {
     { kind: "service", id: "www.wikidata.org", name: "Wikidata", purpose: "Find films and television shows", required: false },
     { kind: "service", id: "en.wikipedia.org", name: "Wikipedia", purpose: "Summarize media details", required: false },
   ],
-  knowledge: [{ kind: "service", id: "en.wikipedia.org", name: "Wikipedia", purpose: "Look up requested background facts", required: false }],
   "almanac-onthisday": [{ kind: "service", id: "en.wikipedia.org", name: "Wikipedia", purpose: "Read events for this date", required: false }],
   weather: [
     { kind: "service", id: "api.open-meteo.com", name: "Open-Meteo", purpose: "Get weather forecasts", required: false },

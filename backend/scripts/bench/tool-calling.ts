@@ -59,9 +59,13 @@ interface ToolCallCorpusRow {
   target?: "computed";
 }
 
-const corpus: ToolCallCorpusRow[] = JSON.parse(
+// KS-02B retired the `define` package; the pinned spec corpus still has a
+// row that expects it, so rows naming a retired tool are skipped here until
+// commons drops them (a spec-first change).
+const RETIRED_TOOLS = new Set(["define", "knowledge"]);
+const corpus: ToolCallCorpusRow[] = (JSON.parse(
   readFileSync(join(SPEC_DIR, "llm", "tool-call-corpus.json"), "utf-8"),
-);
+) as ToolCallCorpusRow[]).filter((row) => !row.expect_calls.some((c) => RETIRED_TOOLS.has(c)));
 
 // The bundled packages the corpus names, loaded from their own real
 // manifests rather than hand-copied here - a code review (2026-09-07)
@@ -72,7 +76,7 @@ const corpus: ToolCallCorpusRow[] = JSON.parse(
 // file's own header comment already promised not to do. SIGNAL-02 added
 // math/convert/almanac-time/almanac-date so the corpus's six computed
 // rows have their expected tool on offer in the fixed pass too.
-const TOOLS: ToolSpec[] = ["remember", "recall", "define", "trivia", "math", "convert", "almanac-time", "almanac-date"].map((id) => {
+const TOOLS: ToolSpec[] = ["remember", "recall", "trivia", "math", "convert", "almanac-time", "almanac-date"].map((id) => {
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) throw new Error(`bundled package ${id} failed to load: ${loaded.error}`);
   return { id, description: loaded.value.description, args: loaded.value.args };

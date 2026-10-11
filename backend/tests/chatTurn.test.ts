@@ -621,8 +621,8 @@ describe("CHAT-01: one turn context shared by generation and the guards", () => 
 // own text does; the streaming gate also judges the reply as a whole at
 // each boundary; parent notifications fire once per turn and category.
 describe("CHAT-02: one output safety boundary", () => {
-  const UNSAFE_EXTRACT = "Seattle is a seaport city. Here is how to make a pipe bomb at home, step by step.";
-  const SEATTLE_URL = "https://en.wikipedia.org/api/rest_v1/page/summary/Seattle";
+  const UNSAFE_HEADLINE = "Seattle is a seaport city. Here is how to make a pipe bomb at home, step by step.";
+  const NEWS_FEED_URL = "https://feeds.npr.org/1001/rss.xml";
 
   async function ownerAndChild(): Promise<{ ownerRow: PersonRow; childRow: PersonRow }> {
     const client = new TestClient();
@@ -634,13 +634,13 @@ describe("CHAT-02: one output safety boundary", () => {
     return { ownerRow, childRow };
   }
 
-  async function seedUnsafeKnowledge() {
+  async function seedUnsafeNews() {
     __resetDenoHostForTests();
     __resetPackageCacheForTests();
-    __clearPackageCacheDirForTests("knowledge");
-    const manifest = loadManifestOnly("knowledge");
+    __clearPackageCacheDirForTests("news");
+    const manifest = loadManifestOnly("news");
     if (!manifest.ok) throw new Error(manifest.error);
-    await cachedFetch("knowledge", manifest.value.cache, SEATTLE_URL, undefined, async () => ({ title: "Seattle", extract: UNSAFE_EXTRACT, type: "standard" }));
+    await cachedFetch("news", manifest.value.cache, NEWS_FEED_URL, undefined, async () => `<rss><channel><item><title>${UNSAFE_HEADLINE}</title></item></channel></rss>`);
   }
 
   async function settledNotifications(row: PersonRow) {
@@ -750,14 +750,14 @@ describe("CHAT-02: one output safety boundary", () => {
   });
 
   test(
-    "the two outlets outside a chat turn meet the same boundary: a direct package run and a dashboard widget never return the unsafe extract",
+    "the two outlets outside a chat turn meet the same boundary: a direct package run and a dashboard widget never return the unsafe headline",
     async () => {
       const { childRow } = await ownerAndChild();
-      await seedUnsafeKnowledge();
+      await seedUnsafeNews();
       try {
         const childClient = new TestClient();
         await childClient.post("/api/auth/select", { personId: childRow.id });
-        const res = await childClient.post("/api/plugins/knowledge/run", { topic: "Seattle" });
+        const res = await childClient.post("/api/plugins/news/run", {});
         expect(res.status).toBe(200);
         const body = (await res.json()) as { reply?: { text: string }; data?: unknown };
         expect(body.reply?.text ?? "").not.toContain("pipe bomb");
@@ -2927,7 +2927,7 @@ describe("CHAT-04: acknowledgments pass, action claims need their outcome, opene
 // memory and "what is two plus two" reaches the model.
 describe("#92: a lookup miss falls through to the model, and a literal pattern yields on a household subject", () => {
 
-  test("runTurnNext(): 'what is Pippa allergic to' never reaches the knowledge package; the model answers with the household's memory in context", async () => {
+  test("runTurnNext(): 'what is Pippa allergic to' runs no package at all; the model answers with the household's memory in context", async () => {
     const { client, actor } = await owner();
     // Pippa on the roster: the household list is what the yield reads.
     const added = await client.post("/api/people", { displayName: "Pippa", role: "child" });
@@ -2950,7 +2950,7 @@ describe("#92: a lookup miss falls through to the model, and a literal pattern y
       const result = await runTurnNext(actor, "chat", "what is Pippa allergic to");
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(spy.mock.calls.map((c) => c[0])).not.toContain("knowledge");
+      expect(spy.mock.calls.map((c) => c[0])).toEqual([]);
       expect(result.value.source).toBe("model");
       expect(context).toContain("Pippa is allergic to peanuts");
     } finally {

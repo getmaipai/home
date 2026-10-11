@@ -24,9 +24,7 @@ import { hashPackageDir, isDirectory, type BundledProvenance } from "../backend/
 // once a package has actually moved to catalog and cleared bronze there
 // (docs/dev.md's own review note names which ones haven't yet).
 const BUNDLED: { id: string; catalogPath: string }[] = [
-  { id: "define", catalogPath: "plugins/utilities/define" },
   { id: "joke", catalogPath: "plugins/fun/joke" },
-  { id: "knowledge", catalogPath: "plugins/info/knowledge" },
   { id: "media-lookup", catalogPath: "plugins/info/media-lookup" },
   { id: "trivia", catalogPath: "plugins/fun/trivia" },
   { id: "weather", catalogPath: "plugins/utilities/weather" },

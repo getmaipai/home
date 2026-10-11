@@ -763,10 +763,11 @@ const INVERSE_MISS_ROWS: readonly ToolSourceRow[] = [
 
 function loadToolCorpusPositiveRows(): ToolSourceRow[] {
   const raw = JSON.parse(readFileSync(join(SPEC_DIR, "llm", "tool-call-corpus.json"), "utf-8")) as { utterance: string; expect_calls: string[] }[];
-  return raw.filter((r) => r.expect_calls.length > 0).map((r, i) => ({ id: `corpus-${i}`, ...r }));
+  // KS-02B: the pinned spec corpus still names the retired `define` tool.
+  return raw.filter((r) => r.expect_calls.length > 0 && !r.expect_calls.some((c) => c === "define" || c === "knowledge")).map((r, i) => ({ id: `corpus-${i}`, ...r }));
 }
 
-const TOOL_SPEC_IDS = ["remember", "recall", "define", "trivia", "math", "convert", "almanac-time", "almanac-date", "websearch"] as const;
+const TOOL_SPEC_IDS = ["remember", "recall", "trivia", "math", "convert", "almanac-time", "almanac-date", "websearch"] as const;
 
 /** One JSON object per line, a trailing newline only when there's at
  * least one row - the exact shape both the full corpus file and its

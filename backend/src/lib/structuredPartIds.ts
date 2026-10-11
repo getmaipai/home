@@ -8,6 +8,9 @@ export const SPEC_SHEET_READY = new Set([
   "music",
   "currency",
   "convert",
+  // KS-02B: the `define` package is retired (a word question is now
+  // `websearch` with `scope: "reference"`), but old stored messages carry
+  // a `define` spec-sheet part and the frontend binding still draws it.
   "define",
   "math",
 ] as const);

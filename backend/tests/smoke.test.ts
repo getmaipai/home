@@ -19,7 +19,7 @@ describe("runSmoke, recipe_fixture kind", () => {
   });
 
   test("every D-owned bundled plugin's own smoke fixture passes", async () => {
-    for (const id of ["define", "joke", "trivia"]) {
+    for (const id of ["joke", "trivia"]) {
       const result = await runSmoke(id);
       expect(result.ok).toBe(true);
     }
@@ -115,7 +115,7 @@ describe("a package with no smoke entry declared yet", () => {
 describe("runAllSmokeTests", () => {
   test("runs every bundled package and counts only real failures", async () => {
     const { ran, failed } = await runAllSmokeTests();
-    expect(ran).toBeGreaterThanOrEqual(7); // define, joke, trivia, weather, storytime-style, remember, recall at minimum
+    expect(ran).toBeGreaterThanOrEqual(7); // joke, trivia, weather, storytime-style, remember, recall at minimum
     expect(failed).toBe(0);
   });
 });

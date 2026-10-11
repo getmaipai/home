@@ -79,26 +79,14 @@ describe("the bundled weather package", () => {
   });
 });
 
-// The second real plugin built on host.fetch (2026-09-05). Same posture as
-// the weather package's own test: no automated test here calls the real
-// dictionaryapi.dev (bun:test stays deterministic and offline); the
-// recipe's own step logic has its own dedicated conformance fixture
-// (spec/fixtures/recipes/define-word.json). Live-verified manually
-// against the real API - including a real, live-observed transient
-// outage (two consecutive 15s timeouts, recovered less than a minute
-// later) that surfaced as the ordinary, graceful "That didn't work -
-// sorry" plugin-error phrasing rather than a crash or a hang, real
-// confirmation that host.fetch's timeout and error handling work under
-// a genuine failure, not just a synthetic test one.
-describe("the bundled define package", () => {
-  test("is discoverable and its manifest + recipe validate against spec's schemas", () => {
-    expect(listPackageIds()).toContain("define");
-    const loaded = loadPackage("define");
-    expect(loaded.ok).toBe(true);
-    if (!loaded.ok) return;
-    expect(loaded.value.manifest.id).toBe("define");
-    expect(loaded.value.manifest.permissions).toContain("net:api.dictionaryapi.dev");
-    expect(loaded.value.recipe.steps.length).toBeGreaterThan(0);
+// KS-02B: the `define` and `knowledge` packages are retired (a word or fact
+// question is now `websearch` with a scope, answered from tier K). Their
+// bundled directories must stay gone so a refresh or a stray merge cannot
+// quietly bring a second lookup path back.
+describe("the retired define and knowledge packages", () => {
+  test("are no longer bundled", () => {
+    expect(listPackageIds()).not.toContain("define");
+    expect(listPackageIds()).not.toContain("knowledge");
   });
 });
 
@@ -145,7 +133,7 @@ describe("the bundled trivia package", () => {
 
 // The first package to hand a household member's own free-typed text
 // straight to the `compute` step (step 7) rather than a package's own
-// hardcoded template - unlike weather/define/joke/trivia above, no
+// hardcoded template - unlike weather/joke/trivia above, no
 // network call to avoid, so this one runs for real, deterministically
 // and offline, in every test run rather than only being conformance-
 // fixture-covered.

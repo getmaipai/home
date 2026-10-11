@@ -2,9 +2,12 @@
 // syndication (the "prefer the front door" standard: this is the feed
 // NPR's own apps and readers already pull, not a scrape of their site),
 // no API key. See almanac-date/handler.ts's own header for why this is
-// Tier 1; see knowledge/handler.ts's own header for why this file has
-// no import from anywhere outside its own directory and duplicates the
-// host/fetch wire shape rather than sharing it.
+// Tier 1; this file has no import from anywhere outside its own directory (a Tier 1
+// package's Deno process can only read its own directory, `--allow-read` in
+// lib/denoHost.ts, so nothing under backend/src/lib is reachable from here)
+// and duplicates the host/fetch wire shape rather than sharing it: two
+// independent implementations agreeing on a contract, the way MCP itself is
+// built.
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.30.0/server/stdio.js";
 import { z } from "npm:zod@4.6.5";

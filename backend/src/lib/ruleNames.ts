@@ -25,7 +25,7 @@ export const RUNGS: readonly Rung[] = ["typed_source", "search", "model_knowledg
 /** The packages whose answer is a typed record read from a source. An
  * action package (lights, a timer, the list) answers nothing about the
  * world, so its turn is `none`. */
-const TYPED_SOURCE_PACKAGES: ReadonlySet<string> = new Set(["knowledge", "media-lookup", "weather", "news", "sports", "currency", "define", "convert", "math", "trivia"]);
+const TYPED_SOURCE_PACKAGES: ReadonlySet<string> = new Set(["media-lookup", "weather", "news", "sports", "currency", "convert", "math", "trivia"]);
 
 export function isTypedSourcePackage(packageId: string): boolean {
   return TYPED_SOURCE_PACKAGES.has(packageId) || packageId.startsWith("almanac");

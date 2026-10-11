@@ -11,7 +11,7 @@
 // always the same. Matches joke/trivia's own zero-arg shape.
 //
 // This file has NO import from anywhere outside its own directory - see
-// knowledge/handler.ts's own header for why.
+// news/handler.ts's own header for why.
 import { McpServer } from "npm:@modelcontextprotocol/sdk@1.30.0/server/mcp.js";
 import { StdioServerTransport } from "npm:@modelcontextprotocol/sdk@1.30.0/server/stdio.js";
 import { z } from "npm:zod@4.6.5";

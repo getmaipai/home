@@ -268,7 +268,7 @@ export function describeExpectation(e: TurnExpectation): string {
 }
 
 /** The lookup packages whose run counts as "looked it up" (C2). */
-export const LOOKUP_PACKAGES = new Set(["websearch", "knowledge"]);
+export const LOOKUP_PACKAGES = new Set(["websearch"]);
 const RETIRED = new Set(["superseded", "archived"]);
 
 export function scoreTurn(conversation: BenchConversation, turnIndex: number, turn: BenchTurn, observed: TurnObserved): TurnScore {

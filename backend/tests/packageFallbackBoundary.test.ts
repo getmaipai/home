@@ -2,7 +2,7 @@
 // package text too, and reaches a person through the direct package run
 // and the dashboard widget; both meet the same output boundary as a
 // successful answer. Proven with the real Tier 1 sandbox: a store-
-// installed copy of the knowledge package (written into the test's own
+// installed copy of the news package (written into the test's own
 // data directory, never the bundled tree) whose manifest grants no net
 // permission, so host.fetch refuses, the handler reports a typed
 // upstream error, and runPlugin() returns a 502 with the manifest's own
@@ -39,21 +39,21 @@ afterEach(() => {
   __resetPackageCachesForTests();
 });
 
-/** Installs the fixture: the bundled knowledge package copied under the
+/** Installs the fixture: the bundled news package copied under the
  * test's data directory with no net permission, an unsafe speech
  * fallback, and one widget, activated through a package_installs row. */
 function installFixture(): void {
-  const dir = installedPackageVersionDir("knowledge", VERSION);
+  const dir = installedPackageVersionDir("news", VERSION);
   mkdirSync(dir, { recursive: true });
-  cpSync(join(PACKAGES_DIR, "knowledge"), dir, { recursive: true });
+  cpSync(join(PACKAGES_DIR, "news"), dir, { recursive: true });
   const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8")) as Record<string, unknown>;
   manifest.version = VERSION;
   manifest.permissions = []; // host.fetch refuses: the handler reports a typed upstream error
   manifest.fallback_reply = { text: SAFE_TEXT, speech: UNSAFE_SPEECH };
-  manifest.contributes = { widgets: [{ id: "fact", title: "Fact", size: "card", refresh_s: 3600, inputs: { topic: "Seattle" } }] };
+  manifest.contributes = { widgets: [{ id: "fact", title: "Fact", size: "card", refresh_s: 3600, inputs: {} }] };
   writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest, null, 2));
   db.insert(packageInstalls)
-    .values({ packageId: "knowledge", version: VERSION, previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: new Date().toISOString() })
+    .values({ packageId: "news", version: VERSION, previousVersion: null, channel: "stable", sourceCommit: "test", permissions: "[]", installedAt: new Date().toISOString() })
     .run();
   __resetPackageCachesForTests();
 }
@@ -75,7 +75,7 @@ describe("#86: a package's failure fallback meets the output boundary", () => {
     async () => {
       installFixture();
       const { client } = await child();
-      const res = await client.post("/api/plugins/knowledge/run", { topic: "Seattle" });
+      const res = await client.post("/api/plugins/news/run", {});
       expect(res.status).toBe(502);
       const body = (await res.json()) as { error: string; fallback_reply?: { reply?: { text: string; speech?: string } } };
       expect(body.fallback_reply?.reply?.text).toBe(REFUSAL_FIRST[0]);
@@ -89,7 +89,7 @@ describe("#86: a package's failure fallback meets the output boundary", () => {
     async () => {
       installFixture();
       const { row } = await child();
-      const data = await getWidgetData(row, "knowledge", "fact");
+      const data = await getWidgetData(row, "news", "fact");
       expect(data.ok).toBe(true);
       if (!data.ok) return;
       expect(data.value.degraded).toBe(true);
