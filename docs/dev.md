@@ -36681,3 +36681,43 @@ Findings and fixes:
 - **Chat crash.** Root cause: `getDeviceSettingsScope()` called `crypto.randomUUID()` while Chat rendered; undefined on plain http. New `frontend/src/lib/randomUuid.ts` falls back to `crypto.getRandomValues`; used there and for the photo turn id in `chatModelAdapter.ts`. Test `frontend/src/lib/randomUuid.test.ts` (fails without the fix). Also, the composer's voice and add-menu engine queries called owner-only `GET /api/engines` for every adult, a 403 console error on each Chat load; they now run only under `AdminContext` (tests in `composerVoiceControls.test.tsx`).
 - **Left rail on a phone.** Still a permanent 56 px icon rail at 390; RULES.md S1 wants a drawer below 640. Recorded as BACKLOG MOBILE-RAIL-01 with capture `data-scratch/mobile-smoke/rail-390.png`; not redesigned here.
 - **Search shown degraded.** Not a current outage: from this Mac the SearXNG instance answers the canary query "Earth" with 28 results (Brave listed as suspended, which is routine). The hub's status events show `service:searxng` flipping to degraded at the hourly canary minute and back, and a `searxng_unreachable` Repairs item opened 2026-09-22 (timeout) is still unresolved, so the hub's own probes were failing while it was reachable from here; that points at the hub host's reachability or allowlist, to be re-checked after the hub restarts with the allowlist, not at the derivation. One derivation was wrong and is fixed: `appReason` said "is limiting requests from this home" for any degraded service, including two timeouts in a row. It now says that only for a 429 or access wall (`last_error_class`), otherwise "isn't answering reliably right now". Tests in `backend/src/lib/statusApps.test.ts`.
+
+### THIN-Q3 results: shorter tool descriptions measured, not shipped (2026-10-11)
+
+Build: the ten base tools with every description and parameter text shortened (nine manifests plus the `start_project` text in `backend/src/lib/projects/tool.ts`), same order, same set. Websearch kept its recency meaning ("news, prices and current events" in the top line, the scope text and the expression text). Engine: the Stack's one chat model (Huihui-Qwen3.5-9B-abliterated Q4_K_M, llama.cpp b10797, thinking off), the same engine as the KS-BENCH-01 baseline, reached through the remote Stack tunnel; load under 3 throughout, no gate running. Builds were toggled by patch and alternated to spread drift.
+
+Tools block (ten tools, registered project types included, wire form):
+
+| | Before | After | Change |
+|---|---|---|---|
+| Characters | 3,703 | 2,634 | -29% |
+| Tokens (prompt-token difference) | 1,193 | 968 | -19% |
+| Real arm B request prompt tokens | 1,668 | 1,448 to 1,463 | -12% |
+
+About 220 tokens are the chat template's fixed tools preamble, so the 40 percent token bar is not reachable by text alone. Stripping schema keywords (minLength, search_text, additionalProperties) would add about 75 tokens of savings, roughly -25% in total; that is schema, not description text, and was not done.
+
+CHAT-AB-01 explanation, long-form and formatting (arms A2 and B, three items, 4 alternating pairs per round, two rounds). Arm B reply words, median:
+
+| Round | Before | After | Paired difference (95% CI) |
+|---|---|---|---|
+| 1 | 322 | 258 | -104 (-224 to +16) |
+| 2 | 372 | 277 | -59 (-165 to +48) |
+
+Every interval includes zero. A2 control words: -13 (-64 to +38). B first text, pooled: +203 ms (-212 to +617) in round 1, +186 ms (-1,026 to +1,398) in round 2; the one consistent signal is the knowledge item, about -181 ms (-226 to -138). A2 first text is flat near 176 ms. Cache state: round 1 before had 4 cold and 8 warm B rows, after 5 cold and 7 warm; round 2 before 7 cold and 5 warm, after 4 cold and 8 warm, so cold-versus-warm mix moves the first-text numbers more than the build does.
+
+KS-BENCH-01 plain arm, adult, 3 reps, paired by row, against clean HEAD (baseline today is 45.6 recency, not the recorded 26.7: engine run-to-run drift is large):
+
+| | Before | After | Paired (95% CI) |
+|---|---|---|---|
+| Recency pass | 45.6 | 34.4 | -11.1 (-27.6 to +5.4) |
+| Recency, tuning split | 48.6 | 29.2 | -19.4 (-37.3 to -1.6) |
+| Recency, held-out split | 33.3 | 55.6 | +22.2 (-13.9 to +58.3) |
+| Stable pass | 85.6 | 91.1 | +5.6 (-2.5 to +13.6) |
+| no_tool false-search | 1.1% | 3.3% | |
+| Other-tool calls on recency rows | 18.9% | 10.0% | |
+
+A first, shorter websearch wording scored 40.0 on recency and was reworded to the above; both rounds are in the same direction (recency lower). Child fixture search queries: 0 in both builds.
+
+Evidence recall (architect condition), CHAT-AB-01 fresh group, arm B, 3 reps, fixture search: time-sensitive rows with search evidence 30 of 90 after and 30 of 90 before; searches fired on time-sensitive rows 35 versus 33; on timeless and hard-negative rows 6 versus 3 of 90. Recall is unchanged; false searches rise slightly (small counts).
+
+Verdict: not shipped, working tree reverted. The 40 percent token bar is not met (-19% block, -12% request), reply words and first text show no significant gain, recency pass is lower (significantly on the tuning split), and false searches ticked up. This agrees with THIN-Q3-a: the cost is offering tools at all, not their wording. Only the other-tool-on-recency rate fell. Reopening needs a different lever (schema trimming, or THIN-2F's dynamic set, which needs its own rule check).
