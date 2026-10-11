@@ -376,6 +376,31 @@ before the delete):
 - `NEVER_FIRES_WILDCARDS` keeps `knowledge:tell me about *` so an old store
   copy stays gated.
 
+**DEFINE-FALLBACK-01 (2026-10-11): the stated word-question regression above gets an optional, off-by-default fix.**
+Household setting `search.dictionary_fallback` (boolean, default false, declared in
+`commons` at spec-v0.1.117; pin bumped here) lets an adult's `scope: "reference"`
+ask for one word fall back to Wiktionary's REST definition endpoint
+(`en.wiktionary.org/api/rest_v1/page/definition/<word>`) when no installed
+Wiktionary book answered. Supersedes: the "a word question goes to web search"
+half of the KS-02B regression paragraph, only for households that switch it on;
+for every other household that paragraph stands unchanged.
+
+- Gate, in one place: `dictionaryFallbackAllowed(band)` in
+  `lib/retrieval/sourceMode.ts`. True only for an adult, with the setting on, and
+  with the Wikimedia source not `offline` or `closed` (rules 0 and 6a: the age
+  gate outranks everything, a minor never reaches it in any mode).
+- Fetch: `lib/retrieval/dictionaryFallback.ts`, through the existing
+  `wikimediaFetchJson` choke point (Home's User-Agent, no cookies, per-host pace,
+  1.5 second timeout). One headword only (a letter-only token, apostrophe and
+  hyphen allowed, at most 40 characters; a phrase is never sent), tried only when
+  no row of the library's result came from a `wiktionary_*` book. Results are
+  cached in memory for a day (200 words); a 429 or any 5xx stops all word lookups
+  for 15 minutes. Any failure returns the library's result unchanged (rule 6).
+- Counters (names plus age band, never the word, rule 6a): `dictionary_live_call`,
+  `_hit`, `_cache_hit`, `_backoff`, `_failed`. Privacy row: `wiktionary-live` on the
+  `websearch` manifest (0.3.2), `opt_in: true`.
+- Tests: `backend/tests/dictionaryFallback.test.ts`.
+
 **The setting, and the real cross-repo cost of adding one.**
 `search.wikipedia_fallback` (household, boolean, default true,
 `searchKeys.ts`) - a real settings key, not the `configurable: false`

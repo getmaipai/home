@@ -21,7 +21,8 @@ import type { AgeBand } from "@/lib/ageBand";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { lookupReference, type ReferenceLookup, type ReferenceReaderDeps } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
-import { effectiveMode, refuseWeb } from "@/lib/retrieval/sourceMode";
+import { effectiveMode, refuseWeb, dictionaryFallbackAllowed } from "@/lib/retrieval/sourceMode";
+import { dictionaryLookup, headwordOf, WIKTIONARY_LABEL, type DictionaryDeps } from "@/lib/retrieval/dictionaryFallback";
 
 export type SearchScope = "reference" | "web" | "both";
 
@@ -88,6 +89,7 @@ export interface FederatedInput<R extends LookupResultShape> {
 export interface FederatedDeps {
   reference?: ReferenceReaderDeps;
   lookupReference?: typeof lookupReference;
+  dictionary?: DictionaryDeps;
 }
 
 export async function federatedLookup<R extends LookupResultShape>(input: FederatedInput<R>, deps: FederatedDeps = {}): Promise<LookupResultShape> {
@@ -97,7 +99,7 @@ export async function federatedLookup<R extends LookupResultShape>(input: Federa
   const kRows = ref.rows.map(referenceToLookupRow);
   const kPages = ref.rows.map(referenceToPage).filter((p): p is LookupPage => p !== null);
   const kOnly = { text: ref.text, rows: kRows, ...(kPages.length > 0 ? { pages: kPages } : {}) };
-  if (input.scope === "reference") return kOnly;
+  if (input.scope === "reference") return withDictionaryFallback(input, ref, kOnly, kRows, kPages, deps.dictionary);
 
   const kMatched = ref.rows.length > 0;
   const webMode = effectiveMode("web", input.band);
@@ -128,4 +130,18 @@ export async function federatedLookup<R extends LookupResultShape>(input: Federa
   const text = webRows.length > 0 || webText.trim().length > 0 ? `${ref.text}\n\nWeb results:\n${webText}` : ref.text;
   const pages = [...kPages, ...(webPages ?? [])];
   return { ...rest, text, rows: [...kRows, ...webRows], ...(pages.length > 0 ? { pages } : {}) };
+}
+
+/** DEFINE-FALLBACK-01: a `scope: reference` ask for one word that the installed dictionary did not
+ * answer may go to Wiktionary, when the household switched that on (sourceMode.ts holds the gate).
+ * Any miss or failure returns the library's own result unchanged (rule 6). */
+async function withDictionaryFallback(input: { query: string; band: AgeBand }, ref: ReferenceLookup, kOnly: LookupResultShape, kRows: LookupRow[], kPages: LookupPage[], deps?: DictionaryDeps): Promise<LookupResultShape> {
+  const word = headwordOf(input.query);
+  if (!word || !dictionaryFallbackAllowed(input.band)) return kOnly;
+  if (ref.rows.some((row) => row.book.startsWith("wiktionary_"))) return kOnly;
+  const entry = await dictionaryLookup(word, input.band, deps);
+  if (!entry) return kOnly;
+  const row: LookupRow = { title: entry.title, url: entry.url, snippet: entry.text.slice(0, SNIPPET_MAX), source_label: WIKTIONARY_LABEL, licence: "cc-by-sa-4.0", snapshot_date: null };
+  const live = `${WIKTIONARY_LABEL}, ${entry.title}:\n${entry.text}`;
+  return { text: ref.rows.length === 0 ? live : `${ref.text}\n\n${live}`, rows: [...kRows, row], pages: [...kPages, { url: entry.url, title: entry.title, text: entry.text }] };
 }

@@ -64,6 +64,16 @@ What leaves your house when MaiPai asks Wikipedia: the words of the search go to
 
 If you turned off **Ask Wikipedia when web search fails or finds nothing** in an earlier version, MaiPai keeps that choice. Your Wikipedia source is set to **Library only**, and nothing else changes.
 
+## Looking up a word online
+
+**Look up words online** is off until an adult switches it on. Open **Settings**, then **Search**, then **Search sources**.
+
+When it is on and an adult asks what one word means, MaiPai checks your offline dictionary first. If the dictionary has no entry for that word, MaiPai asks Wiktionary, an online dictionary. MaiPai only does this for a single word, never for a phrase.
+
+What leaves your house: the one word goes to Wiktionary, which the Wikimedia Foundation runs. Wiktionary also sees your home's internet address, like any website you visit. Nothing else is sent.
+
+Children and teens never use it. It also stays off when your search sources are set to **Library only**. If Wiktionary does not answer, MaiPai answers from your library and does not try again for a while.
+
 ## Kids and safe search
 
 MaiPai picks the safe search level for each person. It uses strict for kids, moderate for teens, and off for adults. An adult can change it for anyone on their profile. SearXNG's own setting only affects other apps.

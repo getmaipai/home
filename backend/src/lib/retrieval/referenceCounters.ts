@@ -34,6 +34,12 @@ export const REFERENCE_COUNTER_NAMES = [
   "image_k_hit",
   "image_k_miss",
   "image_wikipedia_calls_saved",
+  // DEFINE-FALLBACK-01: the optional live Wiktionary word lookup. Names only, plus the age band.
+  "dictionary_live_call",
+  "dictionary_live_hit",
+  "dictionary_live_cache_hit",
+  "dictionary_live_backoff",
+  "dictionary_live_failed",
 ] as const;
 
 export type ReferenceCounterName = (typeof REFERENCE_COUNTER_NAMES)[number];

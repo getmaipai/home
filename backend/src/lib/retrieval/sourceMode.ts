@@ -108,3 +108,20 @@ export function wikimediaGate(band: AgeBand): WikimediaGate {
 export function wikimediaAllowedAfterK(band: AgeBand): boolean {
   return effectiveMode("wikimedia", band) === "live";
 }
+
+export const DICTIONARY_FALLBACK_KEY = "search.dictionary_fallback";
+
+/** DEFINE-FALLBACK-01: whether a single-word Wiktionary lookup may run for this band.
+ * True only when the household switched `search.dictionary_fallback` on (default off),
+ * the person is an adult (the age gate outranks everything, rule 0), and the live
+ * Wikimedia source is not `offline` or `closed` for them. */
+export function dictionaryFallbackAllowed(band: AgeBand): boolean {
+  if (band !== "adult") return false;
+  const mode = effectiveMode("wikimedia", band);
+  if (mode === "offline" || mode === "closed") return false;
+  try {
+    return getHouseholdSettingValue(DICTIONARY_FALLBACK_KEY) === true;
+  } catch {
+    return false;
+  }
+}

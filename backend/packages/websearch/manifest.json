@@ -1,6 +1,6 @@
 {
   "id": "websearch",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
@@ -93,6 +93,15 @@
       "what": "the search query, nothing else",
       "who": "the Wikimedia Foundation",
       "opt_in": false,
+      "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
+    },
+    {
+      "id": "wiktionary-live",
+      "destination": "Wiktionary's own official API (en.wiktionary.org)",
+      "when": "an adult asks the meaning of one word, the home's offline library has no dictionary entry for it, and the household turned on Look up words online (Settings, Search sources; the setting is search.dictionary_fallback, off by default)",
+      "what": "the one word, nothing else",
+      "who": "the Wikimedia Foundation",
+      "opt_in": true,
       "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
     }
   ],

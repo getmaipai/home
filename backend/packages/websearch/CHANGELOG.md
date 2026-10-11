@@ -2,6 +2,17 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.2] - 2026-10-11
+
+### Added
+
+- Look up words online (DEFINE-FALLBACK-01, `search.dictionary_fallback`, off
+  by default): when an adult asks the meaning of one word and the offline
+  library has no dictionary entry for it, Home may ask Wiktionary. Only the
+  one word is sent, never for a child or teen, never in Library only mode, and
+  a failure leaves the answer to the library. Disclosed as the
+  `wiktionary-live` privacy row.
+
 ## [0.3.1] - 2026-10-10
 
 ### Added
