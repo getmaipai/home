@@ -10,6 +10,7 @@ import { requireAuth } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { readReferencePage } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
+import { licenceLabel } from "@/lib/retrieval/referenceSources";
 
 export const referenceRoutes = apiRouter();
 
@@ -37,7 +38,7 @@ function esc(s: string): string {
 }
 
 export function renderReferencePage(row: ReferenceRow): string {
-  const licence = row.licence === "public-domain" ? "Public domain" : "CC BY-SA 4.0";
+  const licence = licenceLabel(row.licence);
   const body = row.disambiguation
     ? `<p>Several articles share this name:</p><ul>${row.options.map((o) => `<li>${esc(o)}</li>`).join("")}</ul>`
     : `${row.lead

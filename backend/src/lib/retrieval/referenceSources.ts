@@ -11,6 +11,21 @@
 // which is what kiwix-serve puts in /content/<id>). That is matching a
 // file name the host installed, not reading anything a person wrote.
 import type { AgeBand } from "@/lib/ageBand";
+import type { Source } from "@maipai/spec/gen/ts/source.js";
+
+/** The one licence-enum-to-label map (KS-02F-BE): the article page footer, the
+ * model's source line and the chat's source card all read it. Keyed by the
+ * spec's whole enum, so a new value fails the type check here. */
+export const LICENCE_LABELS: Record<NonNullable<Source["licence"]>, string> = {
+  "cc-by-sa-4.0": "CC BY-SA 4.0",
+  cc0: "CC0",
+  "public-domain": "Public domain",
+  publisher: "Publisher's licence",
+};
+
+export function licenceLabel(licence: NonNullable<Source["licence"]>): string {
+  return LICENCE_LABELS[licence];
+}
 
 export type ReferenceLicence = "cc-by-sa-4.0" | "public-domain";
 
@@ -93,4 +108,30 @@ export function readableBooks(installed: readonly string[], band: AgeBand): { bo
     }
   }
   return { books, excluded: installed.length - books.length };
+}
+
+/** KS-02F-BE: the article's canonical public page, the spec Source.url of a
+ * reference Source (an absolute url; the Home proxy path goes in local_path).
+ * One closed map, keyed by source id. A source with no public page template
+ * (Factbook, MedlinePlus, Stack Exchange) returns null and emits no reference
+ * Source; nothing is invented. */
+const CANONICAL_HOSTS: Readonly<Record<string, (book: string) => string | null>> = {
+  "wikipedia-en": () => "en.wikipedia.org",
+  "wikipedia-simple": () => "simple.wikipedia.org",
+  "wiktionary-en": () => "en.wiktionary.org",
+  "wiktionary-simple": () => "simple.wiktionary.org",
+  wikivoyage: () => "en.wikivoyage.org",
+  wikibooks: () => "en.wikibooks.org",
+  vikidia: (book) => {
+    const lang = /^vikidia_([a-z]{2,3})(?:_|$)/.exec(book)?.[1];
+    return lang ? `${lang}.vikidia.org` : null;
+  },
+};
+
+export function canonicalPageUrl(book: string, path: string): string | null {
+  const source = sourceForBook(book);
+  const host = source ? CANONICAL_HOSTS[source.id]?.(book) : null;
+  const article = path.replace(/^A\//, "");
+  if (!host || !article) return null;
+  return `https://${host}/wiki/${article.split("/").map(encodeURIComponent).join("/")}`;
 }
