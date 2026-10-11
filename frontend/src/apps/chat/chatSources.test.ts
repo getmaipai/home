@@ -10,6 +10,37 @@ describe("chatSources", () => {
     ] as never);
     expect(parts).toEqual([{ type: "source", sourceType: "url", id: "src-aaaaaa", url: "https://example.com/a", title: "A page" }]);
   });
+  const reference = {
+    id: "src-moon1",
+    kind: "reference",
+    title: "Moon",
+    url: "https://en.wikipedia.org/wiki/Moon",
+    local_path: "/api/reference/wikipedia_en_all/A/Moon",
+    site: "Wikipedia",
+    licence: "cc-by-sa-4.0",
+    snapshot_date: "2026-09-01",
+  };
+  test("a library source opens its Home proxy path, never the public url", () => {
+    const [part] = sourceMessageParts([reference] as never);
+    expect(part).toMatchObject({ type: "source", sourceType: "url", url: "/api/reference/wikipedia_en_all/A/Moon" });
+    const [source] = sourcesFromMessage(msg([part]));
+    expect(source?.url).toBe("/api/reference/wikipedia_en_all/A/Moon");
+    expect(JSON.stringify(source)).not.toContain("https://en.wikipedia.org/wiki/Moon");
+  });
+  test("a library source shows the public host and the licence line from the backend label map", () => {
+    const [source] = sourcesFromMessage(msg(sourceMessageParts([reference] as never)));
+    expect(source).toEqual({ domain: "en.wikipedia.org", title: "Moon", url: "/api/reference/wikipedia_en_all/A/Moon", detail: "CC BY-SA 4.0, snapshot 2026-09-01" });
+  });
+  test("every licence value gets a label and a library source without a snapshot shows the label alone", () => {
+    for (const [licence, label] of [["cc0", "CC0"], ["public-domain", "Public domain"], ["publisher", "Publisher's licence"]]) {
+      const [source] = sourcesFromMessage(msg(sourceMessageParts([{ ...reference, licence, snapshot_date: undefined }] as never)));
+      expect(source?.detail).toBe(label);
+    }
+  });
+  test("a web source is unchanged even if it carries a licence", () => {
+    const [part] = sourceMessageParts([{ id: "src-w", kind: "web", title: "A", url: "https://example.com/a", site: "example.com", licence: "cc0" }] as never);
+    expect(part).toEqual({ type: "source", sourceType: "url", id: "src-w", url: "https://example.com/a", title: "A" });
+  });
   test("sourceMessageParts returns an empty list for undefined", () => {
     expect(sourceMessageParts(undefined)).toEqual([]);
   });

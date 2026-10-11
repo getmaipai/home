@@ -168,6 +168,7 @@ const chatStatsReview = process.argv.includes("--chat-stats-review");
 const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
 const canvasPaneReview = process.argv.includes("--canvas-pane-review");
 const chatToolsRowReview = process.argv.includes("--chat-tools-row-review");
+const librarySourcesReview = process.argv.includes("--library-sources-review");
 const specSheetsReview = process.argv.includes("--spec-sheets-review");
 const chatResearchReview = process.argv.includes("--chat-research-review");
 // spec.md "Acceptance for an implementation": the three states with no
@@ -320,7 +321,7 @@ const chatNoticeDegradedReview = process.argv.includes("--chat-notice-degraded-r
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || chatNoticeDegradedReview || notificationsReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || librarySourcesReview || chatNoticeDegradedReview || notificationsReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -7384,6 +7385,69 @@ async function captureChatToolsRowReview(browser: Browser, sessionValue: string)
   }
 }
 
+/** KS-02F: the Sources footer for a library page (kind "reference": a Home
+ * proxy path, a licence and a snapshot date) beside a web source, at desktop
+ * and phone in both themes. A loaded row, like captureChatSourcesMemoryAttachment. */
+async function captureLibrarySourcesReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "library-sources");
+  mkdirSync(outDir, { recursive: true });
+  const conversationId = "conv-library123";
+  const turnId = "turn-library123";
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route(`**/api/conversations/${conversationId}`, (route) => route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            id: conversationId, person: "person-library123", surface: "chat", mode: "chat", companion_id: null, title: "The Moon",
+            status: "open", summary: null, summary_through_turn: null, source: "hub", hlc: "1788000000000:0:example",
+            created_at: "2026-09-16T00:00:00.000Z", updated_at: "2026-09-16T00:00:00.000Z",
+          }),
+        }));
+        await page.route(`**/api/conversations/${conversationId}/turns`, (route) => route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify([{
+            id: turnId, conversationId, userText: "How far away is the Moon?",
+            replyText: "The Moon is about 384,400 km from Earth on average [1].",
+            source: "model", pluginId: null, commandId: null, safetyFlagged: false, safetyAction: "allow", minorSpeaker: false,
+            createdAt: "2026-09-16T00:00:00.000Z", judgeStatus: "done", judgeAttempts: 1, outcomes: null, document: null, memory_ids: [],
+            sources: [
+              {
+                id: "src-library123", kind: "reference", title: "Moon", url: "https://en.wikipedia.org/wiki/Moon",
+                local_path: "/api/reference/wikipedia_en_all/A/Moon", site: "Wikipedia", licence: "cc-by-sa-4.0", snapshot_date: "2026-09-01",
+                snippet: "The Moon is Earth's only natural satellite.", source: turnId, created_at: "2026-09-16T00:00:00.000Z", hlc: "1788000000000:0:example",
+              },
+              {
+                id: "src-web123", kind: "web", title: "Greenway Trail guide", url: "https://example.com/greenway", site: "example.com",
+                snippet: "A short, family-friendly loop.", source: turnId, created_at: "2026-09-16T00:00:00.000Z", hlc: "1788000000000:0:example",
+              },
+            ],
+            media: null, media_items: [], stats: null,
+          }]),
+        }));
+        await page.goto(`${BASE_URL}/chat?conversation=${conversationId}`);
+        await page.getByText("The Moon is about 384,400 km", { exact: false }).waitFor({ timeout: 15000 });
+        await page.getByRole("button", { name: "2 Sources", exact: true }).click();
+        await page.getByText("CC BY-SA 4.0", { exact: false }).first().waitFor();
+        await settleAnimations(page);
+        const filename = `library-sources-${viewport.width}-${theme}.png`;
+        const path = join(outDir, filename);
+        await page.screenshot({ path, fullPage: true });
+        dedicatedScreenshots.push({ file: filename, route: "chat-library-sources", viewport: slug, theme });
+        console.log(`Wrote ${path}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** UI-1 (gap matrix A3): one reply carrying code, math, a wide table, a task
  * list, a link and a diagram (richReplyFixture.ts, shared with the frontend
  * test), captured at desktop and phone, light and dark. Fails when any
@@ -9979,6 +10043,12 @@ async function main() {
     if (!a11yOnly && canvasPaneReview) {
       await captureCanvasPaneReview(browser, sessionValue);
       console.log("completed named review: --canvas-pane-review");
+      return;
+    }
+
+    if (!a11yOnly && librarySourcesReview) {
+      await captureLibrarySourcesReview(browser, sessionValue);
+      console.log("completed named review: --library-sources-review");
       return;
     }
 
