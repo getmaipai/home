@@ -120,3 +120,29 @@ describe("appReason (STATUS-REASON-01)", () => {
     expect(text).not.toContain("no recent use");
   });
 });
+
+describe("appReason names the real cause of a degraded service (MOBILE-LIVE-01)", () => {
+  const chat = { id: "chat", name: "Chat", needs: [] };
+  const search = { kind: "service", id: "searxng", name: "Household web search", purpose: "Search", required: false, state: "degraded" };
+  const base = { kind: "engine", id: "chat", name: "MaiPai's AI", purpose: "Answer", required: true, state: "operational" };
+
+  test("two timeouts in a row do not claim the service is limiting requests", async () => {
+    const { __resetServiceHealthForTests, recordServiceOutcome } = await import("@/lib/serviceHealth");
+    __resetServiceHealthForTests();
+    const t = Date.now();
+    await recordServiceOutcome("searxng", { ok: false, error: new Error("timed out") }, new Date(t - 2000));
+    await recordServiceOutcome("searxng", { ok: false, error: new Error("timed out") }, new Date(t - 1000));
+    const text = appReason(chat as never, "degraded", [base, search] as never);
+    expect(text).not.toContain("limiting requests");
+    expect(text).toContain("Household web search isn't answering reliably");
+    __resetServiceHealthForTests();
+  });
+
+  test("a 429 still says the service is limiting requests", async () => {
+    const { __resetServiceHealthForTests, recordServiceOutcome } = await import("@/lib/serviceHealth");
+    __resetServiceHealthForTests();
+    await recordServiceOutcome("searxng", { ok: false, status: 429 }, new Date());
+    expect(appReason(chat as never, "degraded", [base, search] as never)).toBe("Household web search is limiting requests from this home for a while.");
+    __resetServiceHealthForTests();
+  });
+});

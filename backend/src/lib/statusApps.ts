@@ -1,7 +1,7 @@
 export type AppNeed = { kind: "engine" | "service" | "internet"; id: string; name: string; purpose: string; required: boolean };
 export type AppState = "operational" | "degraded" | "down" | "waiting_for_internet";
 export type NeedState = "operational" | "degraded" | "down" | "waiting" | "unknown";
-import { serviceState } from "@/lib/serviceHealth";
+import { serviceDetail, serviceState } from "@/lib/serviceHealth";
 import { serviceComponent } from "@/lib/serviceComponent";
 import { roleHealth, STACK_REFUSAL_KEY } from "@/lib/roleHealth";
 import { stackOfflineSeverity } from "@/lib/stackEngine";
@@ -211,7 +211,15 @@ export function appReason(app: StatusApp, state: AppState, needs: Array<AppNeed 
   if (failed?.kind === "engine") return `${app.name} isn't working: MaiPai's AI isn't running.`;
   if (!failed && needs.some((need) => need.required && need.state === "degraded")) return `${app.name} is starting up.`;
   const limited = needs.find((need) => need.kind === "service" && need.state === "degraded");
-  if (limited) return `${limited.name} is limiting requests from this home for a while.`;
+  if (limited) {
+    // MOBILE-LIVE-01: "degraded" also means two failed calls in a row (a
+    // timeout, a server error), not only a block. Say "limiting requests"
+    // only when the service actually pushed back (429 or an access wall).
+    const errorClass = serviceDetail(componentForNeed(limited)).last_error_class;
+    return errorClass === "http_429" || errorClass === "access_wall"
+      ? `${limited.name} is limiting requests from this home for a while.`
+      : `${limited.name} isn't answering reliably right now. It is checked again every few minutes.`;
+  }
   if (failed?.kind === "service") return `${app.name} isn't working: ${failed.name} isn't reachable.`;
   if (failed?.id === "hub") return `${app.name} isn't working: MaiPai Home isn't running.`;
   if (failed) return `${app.name} isn't working: MaiPai's AI isn't running.`;

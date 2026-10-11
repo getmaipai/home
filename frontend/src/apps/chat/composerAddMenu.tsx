@@ -31,6 +31,7 @@ import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { getIcon } from "@maipai/ui/src/icons";
 import { cn } from "@maipai/ui/src/utils";
 import { kindStyle } from "@/apps/library/appPresentation";
+import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { readyRole } from "@/apps/chat/engineRoles";
 import { api, type EnginesOverview, type InstalledPackage } from "@/lib/api";
 
@@ -262,7 +263,9 @@ export function ComposerAddMenu() {
   useAttachmentAddErrorToast(photoAccess.settingAllowed, photoAccess.modelCanReadPictures);
   const breakpoint = useBreakpoint();
   const directAttachment = breakpoint.atLeast(640) && photosAllowed;
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: !directAttachment });
+  // GET /api/engines is owner/admin only (a 403 console error for anyone else).
+  const isAdmin = useContext(AdminContext);
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: !directAttachment && isAdmin });
   const close = () => setOpen(false);
   if (directAttachment) {
     return (

@@ -30,6 +30,12 @@ function makePerson(overrides: Partial<Roster> = {}): Roster {
   } as Roster;
 }
 
+function buttonByText(pattern: RegExp): HTMLButtonElement {
+  const el = Array.from(document.body.querySelectorAll("button")).find((b) => pattern.test(b.textContent ?? ""));
+  if (!el) throw new Error(`no button matching ${pattern}`);
+  return el as HTMLButtonElement;
+}
+
 function stubFetch(byPath: Record<string, unknown | (() => Response)>) {
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
@@ -87,7 +93,7 @@ describe("SignInPage", () => {
     }
   });
 
-  test("tapping a profile with a secret shows the PIN/password prompt, not an immediate sign-in", async () => {
+  test("tapping a profile with a secret shows the numeric PIN keypad, not an immediate sign-in", async () => {
     const onSignedIn = mock(() => {});
     const restore = stubFetch({ "/api/auth/profiles": [makePerson({ hasSecret: true })] });
     try {
@@ -100,7 +106,7 @@ describe("SignInPage", () => {
       await act(async () => {
         fireEvent.click(button);
       });
-      await waitFor(() => expect(document.body.querySelector('input[type="password"]')).not.toBeNull());
+      await waitFor(() => expect(document.body.querySelector('input[data-input-otp]')).not.toBeNull());
       expect(onSignedIn).not.toHaveBeenCalled();
     } finally {
       restore();
@@ -121,7 +127,7 @@ describe("SignInPage", () => {
         fireEvent.click(button);
       });
       const input = await waitFor(() => {
-        const el = document.body.querySelector('input[type="password"]');
+        const el = document.body.querySelector('input[data-input-otp]');
         if (!el) throw new Error("not yet rendered");
         return el as HTMLInputElement;
       });
@@ -151,7 +157,7 @@ describe("SignInPage", () => {
         fireEvent.click(sageButton);
       });
       const input = await waitFor(() => {
-        const el = document.body.querySelector('input[type="password"]');
+        const el = document.body.querySelector('input[data-input-otp]');
         if (!el) throw new Error("not yet rendered");
         return el as HTMLInputElement;
       });
@@ -161,6 +167,8 @@ describe("SignInPage", () => {
       await waitFor(() => expect(document.body.textContent).toContain("Invalid PIN or password"));
       expect(document.body.textContent).toContain("Sage");
       expect(document.body.textContent).toContain("Back");
+      // A person whose secret is longer than 4 characters is told where to go.
+      expect(document.body.textContent).toContain('Tap "Use a password instead"');
       expect(onSignedIn).not.toHaveBeenCalled();
     } finally {
       restore();
@@ -204,7 +212,7 @@ describe("SignInPage PIN edge cases (ported from the retired SignIn)", () => {
       fireEvent.click(button);
     });
     return await waitFor(() => {
-      const el = document.body.querySelector('input[type="password"]');
+      const el = document.body.querySelector('input[data-input-otp]');
       if (!el) throw new Error("not yet rendered");
       return el as HTMLInputElement;
     });
@@ -225,11 +233,15 @@ describe("SignInPage PIN edge cases (ported from the retired SignIn)", () => {
     }
   });
 
-  test("a longer numeric PIN is never cut off by the 4-digit auto-submit", async () => {
+  test("a longer numeric PIN, entered through the password field, is never cut off by the 4-digit auto-submit", async () => {
     const onSignedIn = mock(() => {});
     const restore = stubFetch({ "/api/auth/profiles": [makePerson()], "/api/auth/verify-secret": () => Response.json({ success: true }) });
     try {
-      const input = await openPinScreen(onSignedIn);
+      await openPinScreen(onSignedIn);
+      await act(async () => {
+        fireEvent.click(buttonByText(/use a password instead/i));
+      });
+      const input = document.body.querySelector('input[type="password"]') as HTMLInputElement;
       await act(async () => {
         fireEvent.change(input, { target: { value: "123456" } });
       });
@@ -287,9 +299,77 @@ describe("SignInPage PIN edge cases (ported from the retired SignIn)", () => {
       await act(async () => {
         fireEvent.click(jesse);
       });
-      await waitFor(() => expect(document.body.querySelector('input[type="password"]')).not.toBeNull());
+      await waitFor(() => expect(document.body.querySelector('input[data-input-otp]')).not.toBeNull());
       expect(document.body.textContent).not.toContain("profile disabled");
     } finally {
+      restore();
+    }
+  });
+});
+
+// MOBILE-LIVE-01 (found on a phone, 2026-10-11): after picking a profile the
+// credential step was a plain text box, so a phone showed the full keyboard.
+describe("SignInPage credential step is a numeric keypad (MOBILE-LIVE-01)", () => {
+  async function openCredentialStep(restoreOverrides: Record<string, unknown> = {}) {
+    const restore = stubFetch({ "/api/auth/profiles": [makePerson()], "/api/auth/verify-secret": { success: true }, ...restoreOverrides });
+    const onSignedIn = mock(() => {});
+    renderSignIn(onSignedIn);
+    const button = await waitFor(() => {
+      const el = document.body.querySelector("button");
+      if (!el) throw new Error("not yet rendered");
+      return el;
+    });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    await waitFor(() => expect(document.body.querySelector("input[data-input-otp]")).not.toBeNull());
+    return { restore, onSignedIn };
+  }
+
+  test("the field is a numeric, four-slot PIN entry, with no text or password box", async () => {
+    const { restore } = await openCredentialStep();
+    try {
+      const otp = document.body.querySelector("input[data-input-otp]") as HTMLInputElement;
+      expect(otp.getAttribute("inputmode")).toBe("numeric");
+      expect(document.body.querySelectorAll('[data-slot="input-otp-slot"]').length).toBe(4);
+      expect(document.body.querySelector('input[type="password"]')).toBeNull();
+      expect(document.body.querySelector('input[type="text"]:not([data-input-otp])')).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("'Use a password instead' reaches a password field and signs in, and 'Use a PIN instead' returns to the keypad", async () => {
+    let sent: { secret?: string } = {};
+    const { restore, onSignedIn } = await openCredentialStep({
+      "/api/auth/verify-secret": () => Response.json({ success: true }),
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/api/auth/verify-secret")) sent = JSON.parse(String(init?.body ?? "{}"));
+      return originalFetch(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      await act(async () => {
+        fireEvent.click(buttonByText(/use a password instead/i));
+      });
+      const field = document.body.querySelector('input[type="password"]') as HTMLInputElement;
+      expect(field).not.toBeNull();
+      expect(document.body.querySelector("input[data-input-otp]")).toBeNull();
+      await act(async () => {
+        fireEvent.change(field, { target: { value: "correct horse battery" } });
+      });
+      await act(async () => {
+        fireEvent.click(buttonByText(/^sign in$/i));
+      });
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(sent.secret).toBe("correct horse battery");
+      await act(async () => {
+        fireEvent.click(buttonByText(/use a pin instead/i));
+      });
+      expect(document.body.querySelector("input[data-input-otp]")).not.toBeNull();
+    } finally {
+      globalThis.fetch = originalFetch;
       restore();
     }
   });

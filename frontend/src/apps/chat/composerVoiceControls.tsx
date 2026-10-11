@@ -15,10 +15,12 @@
 // glyph, matching ChatGPT's own voice-entry affordance. Opens the real
 // live voice session (VOICE-LIVE-02, `liveVoiceSession.tsx`, already
 // landed) through `voiceSessionContext.tsx`'s `open`/`setOpen`.
+import { useContext } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { readyRole } from "@/apps/chat/engineRoles";
+import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
 import { api, type EnginesOverview } from "@/lib/api";
 
@@ -54,7 +56,11 @@ function WaveformButton({ onClick, engineDown }: { onClick: () => void; engineDo
  * absent, not disabled, the same posture Create image and the composer
  * Attach's other role-gated rows already take. */
 export function ComposerVoiceControls({ disabled = false, engineDown }: { disabled?: boolean; engineDown?: string | undefined }) {
-  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines() });
+  // GET /api/engines is owner/admin only: asking as anyone else is a 403 the
+  // browser prints as a console error on every Chat visit (found by the
+  // MOBILE-LIVE-01 phone smoke), and the answer was never usable.
+  const isAdmin = useContext(AdminContext);
+  const enginesQuery = useQuery<EnginesOverview>({ queryKey: ["engines"], queryFn: () => api.engines(), enabled: isAdmin });
   const overview = enginesQuery.data;
   // VOICE-LIVE-02: `null` here (no VoiceSessionProvider in this tree)
   // means this component was mounted somewhere other than ChatPage's

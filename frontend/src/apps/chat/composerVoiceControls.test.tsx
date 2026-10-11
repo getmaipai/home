@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
+import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 
@@ -40,7 +41,7 @@ describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd,
   test("absent when the overview reports no roles at all", async () => {
     const restore = stubEngines([]);
     try {
-      const view = renderWithQueryClient(<ComposerVoiceControls />);
+      const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);
       await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
       expect(view.queryByLabelText("Start a voice conversation")).toBeNull();
     } finally {
@@ -54,7 +55,7 @@ describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd,
       { id: "tts", state: "loaded" },
     ]);
     try {
-      const view = renderWithQueryClient(<ComposerVoiceControls />);
+      const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);
       await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
       expect(view.queryByLabelText("Start a voice conversation")).toBeNull();
     } finally {
@@ -68,12 +69,27 @@ describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd,
       { id: "tts", state: "ready" },
     ]);
     try {
-      const view = renderWithQueryClient(<ComposerVoiceControls />);
+      const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);
       const waveform = await view.findByLabelText("Start a voice conversation");
       expect(waveform).toBeTruthy();
       // No chevron, no voice/microphone menu left on the composer -
       // VOICE-LIVE-03b moved both into Settings.
       expect(view.queryByLabelText("Choose a voice")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+});
+
+// MOBILE-LIVE-01: GET /api/engines is owner/admin only. Asked as an adult it
+// is a 403 that the browser prints as a console error on every Chat visit.
+describe("ComposerVoiceControls for someone who is not an owner or admin", () => {
+  test("never asks the admin-only engines route", async () => {
+    const restore = stubEngines([]);
+    try {
+      renderWithQueryClient(<ComposerVoiceControls />);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(globalThis.fetch).not.toHaveBeenCalled();
     } finally {
       restore();
     }

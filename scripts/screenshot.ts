@@ -25,6 +25,14 @@
 // - `bun run screenshots --files-review`: Files only, seeded with the six
 //   spec kinds in the browser request layer and captured at desktop/phone
 //   in both themes. The same browser fixture is used by --a11y-only.
+// - `bun run screenshots --mobile-smoke` (MOBILE-LIVE-01): the phone smoke
+//   walk in scripts/mobileSmoke.ts. 390x844, touch, phone user agent, over
+//   the machine's LAN address (plain http, a non-secure context, exactly
+//   like a phone on the tailnet), signs in with a PIN and with an owner
+//   password, taps every main-menu item and Chat, and fails on any console
+//   error, page exception or sideways scroll. PNGs land in
+//   data-scratch/mobile-smoke/ (override: MAIPAI_MOBILE_SMOKE_DIR; host
+//   override: MAIPAI_MOBILE_SMOKE_HOST). Demo household only.
 //
 // "far" (TV) is a user-agent, not a viewport (frontend/src/kit/
 // useSurface.ts's own TV_USER_AGENT) - the far entry below sets one.
@@ -65,6 +73,7 @@ import { reserveFreePort } from "../backend/tests/fixtures/reserveFreePort";
 import { startScreenshotStack } from "./screenshotStack";
 import { waitForAnimationSettle } from "./animationSettle";
 import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/shell/pages/richReplyFixture";
+import { runMobileSmoke } from "./mobileSmoke";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
 // getmaipai/home#114: each backend asks Bun.serve() to bind port 0 atomically and reports
@@ -83,6 +92,9 @@ const useWebkit = process.argv.includes("--webkit");
 // rule), Playwright's own firefox channel.
 const useFirefox = process.argv.includes("--firefox") || process.env.BROWSER?.toLowerCase() === "firefox";
 const chatIncognitoAudit = process.argv.includes("--chat-incognito-audit");
+// MOBILE-LIVE-01: `bun run screenshots --mobile-smoke` - sign in and walk
+// every main-menu item at 390x844 with touch; see scripts/mobileSmoke.ts.
+const mobileSmoke = process.argv.includes("--mobile-smoke");
 
 // backend/ and frontend/ pin the same @maipai/spec tag, so backend's
 // package.json is as good a source as either for the worktree this
@@ -586,7 +598,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg)) {
+  if (chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg)) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -9588,7 +9600,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
+  const screenshotStack = chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -9605,7 +9617,7 @@ async function main() {
       cmd: ["bun", "run", "src/index.ts"],
       cwd: join(ROOT, "backend"),
       // This matrix never calls speech; all speech requests go to the Stack.
-      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || Boolean(elementsWave2Arg) ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
+      env: { ...process.env, MAIPAI_TEST_ALLOW_MULTIPLE_HUBS: "1", MAIPAI_MDNS: "off", PORT: "0", MAIPAI_DATA_DIR: DATA_DIR, MAIPAI_KIWIX_PORT: String(screenshotKiwixPort), MAIPAI_WYOMING_PORT: "0", ...(!chatIncognitoAudit ? { MAIPAI_SCREENSHOT_TEST_WYOMING_BIND_FAILURE: "1" } : {}), MAIPAI_LLAMA_SERVER_URL: chatModel.url, ...(chatArtifactCapture || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) ? { MAIPAI_EMBED_SERVER_URL: chatModel.url } : {}) },
       stdout: "pipe",
       stderr: "inherit",
     });
@@ -9676,6 +9688,21 @@ async function main() {
       throw error;
     }
     browser = launchedBrowser;
+    if (mobileSmoke) {
+      const pinPerson = await fetch(`${BASE_URL}/api/people`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
+        body: JSON.stringify({ displayName: "Riff", role: "adult", secret: "2468" }),
+      });
+      if (!pinPerson.ok) throw new Error(`seed PIN person failed: ${pinPerson.status} ${await pinPerson.text()}`);
+      const outDir = process.env.MAIPAI_MOBILE_SMOKE_DIR ?? join(ROOT, "data-scratch", "mobile-smoke");
+      const result = await runMobileSmoke({ browser, baseUrl: BASE_URL, outDir, ownerName: "Sage", ownerSecret: "correcthorsebattery", pinName: "Riff", pin: "2468" });
+      console.log(`mobile-smoke: ${result.captures.length} captures in ${outDir}`);
+      for (const finding of result.findings) console.error(`mobile-smoke FAIL [${finding.step}] ${finding.kind}: ${finding.detail}`);
+      if (result.findings.length > 0) throw new Error(`mobile-smoke: ${result.findings.length} finding(s)`);
+      console.log("completed named review: --mobile-smoke");
+      return;
+    }
     if (traceReview) {
       await captureTurnTraceReview(browser, sessionValue);
       console.log("completed named review: --trace-review");

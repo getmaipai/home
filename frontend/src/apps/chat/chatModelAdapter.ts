@@ -17,6 +17,7 @@ import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
+import { randomUuid } from "@/lib/randomUuid";
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -335,7 +336,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         if (conversationId) await deps.resumeConversationIfClosed?.(conversationId);
         const temporary = deps.consumeTemporary?.();
         const imageParts: { id: string; name: string; width: number; height: number; media_type: string }[] = [];
-        const photoTurnId = imageAttached ? `turn-${crypto.randomUUID().replaceAll("-", "").toLowerCase()}` : undefined;
+        const photoTurnId = imageAttached ? `turn-${randomUuid().replaceAll("-", "").toLowerCase()}` : undefined;
         if (imageAttached && lastMessage?.role === "user") {
           const photos = newPictures;
           if (photos.length > MAX_CHAT_IMAGES) throw new Error(CHAT_IMAGE_REFUSAL);
