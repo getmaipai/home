@@ -374,6 +374,30 @@ export async function lookupReference(input: ReferenceLookupInput, deps: Referen
   }
 }
 
+/** KS-02E: the snapshot date of the installed Wikipedia the asker's band
+ * may read (the first readable Wikipedia book in the band's reading order),
+ * for the prefix's date lines. `null` when the library is not running, no
+ * Wikipedia is installed for this band, or the date cannot be read: the
+ * caller then prints no snapshot text. The book list and the date are both
+ * cached; never throws. */
+export async function librarySnapshotDate(band: AgeBand, deps: ReferenceReaderDeps = {}): Promise<string | null> {
+  const baseUrl = deps.baseUrl === undefined ? kiwixBaseUrl() : deps.baseUrl;
+  if (!baseUrl) return null;
+  const ctx: Ctx = {
+    baseUrl: baseUrl.replace(/\/+$/, ""),
+    fetchImpl: deps.fetch ?? fetch,
+    now: deps.now ?? Date.now,
+    signal: AbortSignal.timeout(TOTAL_DEADLINE_MS),
+  };
+  try {
+    const { books } = readableBooks(await installedBooks(ctx), band);
+    const wiki = books.find((b) => b.source.id === "wikipedia-en" || b.source.id === "wikipedia-simple");
+    return wiki ? await snapshotDate(ctx, wiki.book) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** KS-02: one cited article by book and path, for the proxy route a source
  * card links to. It goes through the same closed per-band list, the same
  * extract and cache, and the same release point as a lookup, so a link

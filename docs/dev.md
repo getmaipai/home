@@ -36576,3 +36576,13 @@ Copy this section into that engine computer's private homelab page, then fill in
 - Remove this Home pairing: `sudo maipai-engine unpair`.
 
 The installed helper supports `pair`, `unpair`, `update`, `status`, and `doctor`.
+
+## KS-02E: the prefix's three date lines
+
+Landed 2026-10-10. The `clock` context item (`backend/src/lib/turnMachine/nodes/context.ts`, `datesText`) now reads: "Today is {date and time}. Your training ends around {model_cutoff}. The home library's Wikipedia snapshot is {zim_date}." plus one guidance sentence ("Your own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training."). It is data only: no answer-length text and no voice text, disclosure stays `child_ok`, and a spoken turn gets the identical line.
+
+- The cutoff comes from the selected chat model's catalog record (`model_cutoff`, `chatModelCutoff()`); no record sets it today, and a null cutoff prints no cutoff sentence.
+- The snapshot date comes from `librarySnapshotDate(band)` in `retrieval/referenceReader.ts` (the first Wikipedia book the asker's band may read, its `meta/Date`); no installed library, or an unreadable date, prints no snapshot sentence.
+- Replaced sentence, verbatim: "The model's training knowledge may be older than today."
+
+Tests: `backend/tests/turnMachine/contextDates.test.ts`.
