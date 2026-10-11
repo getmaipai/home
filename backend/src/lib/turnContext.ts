@@ -22,7 +22,7 @@ import { shapeOf } from "@/lib/turnSignal";
 import type { SubjectRef } from "@/lib/unknownNames";
 import { bannedPhrasesFor } from "@/lib/replyConstraints";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
-import { LICENCE_LABELS } from "@/lib/retrieval/referenceSources";
+import { LICENCE_LABELS, canonicalPageUrl } from "@/lib/retrieval/referenceSources";
 import { nextHlc } from "@/lib/hlc";
 import type { SpeakerEvidence, PresentPerson } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
@@ -115,21 +115,33 @@ function isIsoDate(value: string): boolean {
   return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }
 
-/** A relative url is accepted only as a library page: /api/reference/<book>/<path>. */
+/** The Home proxy path of a library page: /api/reference/<book>/<one or more path segments>. */
 export function isReferenceUrl(url: unknown): url is string {
   if (typeof url !== "string" || !url.startsWith(REFERENCE_PREFIX)) return false;
   const parts = url.slice(REFERENCE_PREFIX.length).split("/");
-  return parts.length === 2 && parts.every((part) => part.length > 0 && part.trim() === part && ![...part].some((ch) => ch === "?" || ch === "#" || ch === " " || ch === "\t" || ch === "\n"));
+  if (parts.length < 2) return false;
+  return parts.every((part) => {
+    if (part.length === 0 || part.trim() !== part || part === "..") return false;
+    if ([...part].some((ch) => ch === "?" || ch === "#" || ch === " " || ch === "\t" || ch === "\n")) return false;
+    try { return decodeURIComponent(part) !== ".."; } catch { return false; }
+  });
 }
 
-/** The reference fields of a lookup row or outcome source, or null when it is not one. */
-export function referenceFields(raw: { url?: unknown; kind?: unknown; source_label?: unknown; site?: unknown; licence?: unknown; snapshot_date?: unknown }): { url: string; site: string; licence?: NonNullable<Source["licence"]>; snapshot_date?: string } | null {
-  if (raw.kind !== "reference" || !isReferenceUrl(raw.url)) return null;
+/** The reference fields of a lookup row or outcome source, or null when it is not one
+ * or its book has no public page template. `url` is the canonical public page,
+ * `local_path` the Home proxy path (a retained outcome source already carries it). */
+export function referenceFields(raw: { url?: unknown; local_path?: unknown; kind?: unknown; source_label?: unknown; site?: unknown; licence?: unknown; snapshot_date?: unknown }): { url: string; local_path: string; site: string; licence?: NonNullable<Source["licence"]>; snapshot_date?: string } | null {
+  const proxy = isReferenceUrl(raw.local_path) ? raw.local_path : raw.url;
+  if (raw.kind !== "reference" || !isReferenceUrl(proxy)) return null;
+  const [book, ...rest] = proxy.slice(REFERENCE_PREFIX.length).split("/");
+  let url: string | null;
+  try { url = canonicalPageUrl(decodeURIComponent(book!), rest.map(decodeURIComponent).join("/")); } catch { return null; }
+  if (!url) return null;
   const label = typeof raw.source_label === "string" && raw.source_label.trim() ? raw.source_label.trim() : typeof raw.site === "string" && raw.site.trim() ? raw.site.trim() : null;
   if (!label) return null;
   const licence = typeof raw.licence === "string" && Object.hasOwn(LICENCE_LABELS, raw.licence) ? (raw.licence as NonNullable<Source["licence"]>) : undefined;
   const snapshot = typeof raw.snapshot_date === "string" && isIsoDate(raw.snapshot_date) ? raw.snapshot_date : undefined;
-  return { url: raw.url, site: label, ...(licence ? { licence } : {}), ...(snapshot ? { snapshot_date: snapshot } : {}) };
+  return { url, local_path: proxy, site: label, ...(licence ? { licence } : {}), ...(snapshot ? { snapshot_date: snapshot } : {}) };
 }
 
 /** CHAT-16 K3: fixed provenance questions are answered from retained outcomes. */
@@ -284,7 +296,7 @@ export function sourcesFromRows(rows: unknown): Source[] {
     if ((raw as any).kind === "reference") {
       const ref = referenceFields(raw as any);
       if (!ref || !(raw as any).title.trim()) return [];
-      return [{ id: `src-${Math.random().toString(36).slice(2, 12)}`, kind: "reference", title: (raw as any).title.trim(), url: ref.url, site: ref.site, snippet: typeof (raw as any).snippet === "string" ? (raw as any).snippet : null, source: "websearch", created_at: new Date().toISOString(), hlc: nextHlc(), ...(ref.licence ? { licence: ref.licence } : {}), ...(ref.snapshot_date ? { snapshot_date: ref.snapshot_date } : {}), local_path: ref.url }];
+      return [{ id: `src-${Math.random().toString(36).slice(2, 12)}`, kind: "reference", title: (raw as any).title.trim(), url: ref.url, site: ref.site, snippet: typeof (raw as any).snippet === "string" ? (raw as any).snippet : null, source: "websearch", created_at: new Date().toISOString(), hlc: nextHlc(), ...(ref.licence ? { licence: ref.licence } : {}), ...(ref.snapshot_date ? { snapshot_date: ref.snapshot_date } : {}), local_path: ref.local_path }];
     }
     try { const u = new URL((raw as any).url); if (u.protocol !== "http:" && u.protocol !== "https:") return []; u.username = ""; u.password = ""; u.hash = ""; const now = new Date().toISOString(); return [{ id: `src-${Math.random().toString(36).slice(2, 12)}`, kind: "web", title: (raw as any).title, url: u.toString(), site: u.hostname.replace(/^www\./, ""), snippet: typeof (raw as any).snippet === "string" ? (raw as any).snippet : null, source: "websearch", created_at: now, hlc: nextHlc() }]; } catch { return []; }
   });
@@ -296,7 +308,7 @@ function sourceFromResult(result: PluginResult): OutcomeSource | undefined {
     const title = typeof c.title === "string" && c.title.trim() ? c.title.trim() : null;
     if (!title) continue;
     const ref = c.kind === "reference" ? referenceFields(c) : null;
-    if (ref) return { kind: "reference", title, url: ref.url, site: ref.site, snippet: typeof c.snippet === "string" ? c.snippet : null, ...(ref.licence ? { licence: ref.licence } : {}), ...(ref.snapshot_date ? { snapshot_date: ref.snapshot_date } : {}), local_path: ref.url };
+    if (ref) return { kind: "reference", title, url: ref.url, site: ref.site, snippet: typeof c.snippet === "string" ? c.snippet : null, ...(ref.licence ? { licence: ref.licence } : {}), ...(ref.snapshot_date ? { snapshot_date: ref.snapshot_date } : {}), local_path: ref.local_path };
     const url = typeof c.url === "string" && /^https?:\/\//.test(c.url) ? c.url : undefined;
     let site = typeof c.site === "string" && c.site.trim() ? c.site.trim() : undefined;
     if (!site && url) {

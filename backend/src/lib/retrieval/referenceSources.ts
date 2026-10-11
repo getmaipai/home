@@ -109,3 +109,29 @@ export function readableBooks(installed: readonly string[], band: AgeBand): { bo
   }
   return { books, excluded: installed.length - books.length };
 }
+
+/** KS-02F-BE: the article's canonical public page, the spec Source.url of a
+ * reference Source (an absolute url; the Home proxy path goes in local_path).
+ * One closed map, keyed by source id. A source with no public page template
+ * (Factbook, MedlinePlus, Stack Exchange) returns null and emits no reference
+ * Source; nothing is invented. */
+const CANONICAL_HOSTS: Readonly<Record<string, (book: string) => string | null>> = {
+  "wikipedia-en": () => "en.wikipedia.org",
+  "wikipedia-simple": () => "simple.wikipedia.org",
+  "wiktionary-en": () => "en.wiktionary.org",
+  "wiktionary-simple": () => "simple.wiktionary.org",
+  wikivoyage: () => "en.wikivoyage.org",
+  wikibooks: () => "en.wikibooks.org",
+  vikidia: (book) => {
+    const lang = /^vikidia_([a-z]{2,3})(?:_|$)/.exec(book)?.[1];
+    return lang ? `${lang}.vikidia.org` : null;
+  },
+};
+
+export function canonicalPageUrl(book: string, path: string): string | null {
+  const source = sourceForBook(book);
+  const host = source ? CANONICAL_HOSTS[source.id]?.(book) : null;
+  const article = path.replace(/^A\//, "");
+  if (!host || !article) return null;
+  return `https://${host}/wiki/${article.split("/").map(encodeURIComponent).join("/")}`;
+}

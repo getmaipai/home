@@ -373,7 +373,7 @@ export function sourceFromOutcome(outcome: Succeeded): Source | null {
       hlc: nextHlc(),
       ...(ref.licence ? { licence: ref.licence } : {}),
       ...(ref.snapshot_date ? { snapshot_date: ref.snapshot_date } : {}),
-      local_path: ref.url,
+      local_path: ref.local_path,
     };
   }
   if (!source || source.kind !== "web" || !source.title.trim() || !source.url || !/^https?:\/\//i.test(source.url)) return null;
