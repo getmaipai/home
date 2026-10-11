@@ -14,9 +14,6 @@ import { licenceLabel } from "@/lib/retrieval/referenceSources";
 
 export const referenceRoutes = apiRouter();
 
-// The one licence label map lives in referenceSources.ts (no lib-to-route import); re-exported here.
-export { LICENCE_LABELS, licenceLabel } from "@/lib/retrieval/referenceSources";
-
 const getRoute = createRoute({
   method: "get",
   path: "/{book}/{path}",

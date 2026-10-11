@@ -135,7 +135,12 @@ export function referenceFields(raw: { url?: unknown; local_path?: unknown; kind
   if (raw.kind !== "reference" || !isReferenceUrl(proxy)) return null;
   const [book, ...rest] = proxy.slice(REFERENCE_PREFIX.length).split("/");
   let url: string | null;
-  try { url = canonicalPageUrl(decodeURIComponent(book!), rest.map(decodeURIComponent).join("/")); } catch { return null; }
+  try {
+    const segments = rest.map(decodeURIComponent);
+    // A decoded "/" or "." would change which page the canonical url names.
+    if (segments.some((s) => s.includes("/") || s === ".")) return null;
+    url = canonicalPageUrl(decodeURIComponent(book!), segments.join("/"));
+  } catch { return null; }
   if (!url) return null;
   const label = typeof raw.source_label === "string" && raw.source_label.trim() ? raw.source_label.trim() : typeof raw.site === "string" && raw.site.trim() ? raw.site.trim() : null;
   if (!label) return null;

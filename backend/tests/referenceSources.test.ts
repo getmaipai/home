@@ -4,7 +4,7 @@ import { describe, expect, test } from "bun:test";
 import { Source as SourceSchema } from "@maipai/spec/gen/ts/source.js";
 import { federatedLookup, referenceToLookupRow, referenceUrl } from "@/lib/retrieval/lookup";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
-import { LICENCE_LABELS, licenceLabel } from "@/routes/reference";
+import { LICENCE_LABELS, licenceLabel } from "@/lib/retrieval/referenceSources";
 import { outcomeOf, sourcesFromRows } from "@/lib/turnContext";
 import { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import { canonicalPageUrl } from "@/lib/retrieval/referenceSources";
@@ -122,3 +122,10 @@ describe("minors get only tier-K reference Sources", () => {
   }
 });
 
+
+describe("KS-02F-BE review fix: encoded slash in a title", () => {
+  test("a percent-encoded slash emits no reference Source instead of a different page", () => {
+    const rows = [{ kind: "reference", title: "AC/DC", url: `/api/reference/${BOOK}/A/AC%2FDC`, source_label: "Wikipedia" }];
+    expect(sourcesFromRows(rows)).toEqual([]);
+  });
+});

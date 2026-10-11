@@ -17,10 +17,9 @@ import type { AgeBand } from "@/lib/ageBand";
 import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
 import { extractArticle } from "@/lib/retrieval/extractArticle";
 import { sharedKnowledgeDb, type KnowledgeDb } from "@/lib/retrieval/knowledgeDb";
-import { licenceLabel } from "@/lib/retrieval/referenceSources";
 import { articleFloorText, releaseToBand, tripsMinorFloor, type ReferenceRow, type ReleaseCandidate } from "@/lib/retrieval/minorFloor";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
-import { readableBooks, type ReadableBook } from "@/lib/retrieval/referenceSources";
+import { licenceLabel, readableBooks, type ReadableBook } from "@/lib/retrieval/referenceSources";
 
 export const REFERENCE_MAX_ROWS = 3;
 const REQUEST_TIMEOUT_MS = 2500;
@@ -262,7 +261,7 @@ function neutraliseMarkers(text: string): string {
 }
 
 function renderRow(row: ReferenceRow): string {
-  const licence = licenceLabel(row.licence);
+  const licence = row.licence === "public-domain" ? "public domain" : licenceLabel(row.licence);
   const when = row.snapshotDate ? `offline copy, ${row.snapshotDate}` : "offline copy";
   const head = `[${row.n}] ${row.sourceLabel} (${when}), ${licence}: ${row.title}`;
   if (row.disambiguation) {
