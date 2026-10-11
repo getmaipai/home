@@ -35,6 +35,8 @@ import type { Node, ContextItem, TurnState } from "../contract";
 import { picturesAttachedNote, picturesNotReadNote } from "@/lib/chatImageNote";
 import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@/lib/chatPictures";
 import type { LlmImagePart } from "@/lib/llm";
+import { CATALOG } from "@/lib/modelCatalog";
+import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
  * below which a match never becomes a context item, a pinned record
@@ -97,6 +99,35 @@ export interface ContextOutput {
   promptLimit?: TurnState["promptLimit"];
   /** VISION-02c: this turn's pictures as picture parts (TurnState.pictureParts). */
   pictureParts?: LlmImagePart[];
+}
+
+/** KS-02E: the household's chat model's `model_cutoff` from its catalog
+ * record, or null when the record has none (or no record). */
+export function chatModelCutoff(): string | null {
+  let id: string | undefined;
+  try {
+    id = getHouseholdSettingValue("chat.model_id") as string | undefined;
+  } catch {
+    return null;
+  }
+  const cutoff = id ? CATALOG.find((m) => m.role === "chat" && m.id === id)?.model_cutoff : undefined;
+  // The spec schema already guarantees a YYYY-MM-DD date string.
+  return typeof cutoff === "string" && cutoff.length >= 10 ? cutoff : null;
+}
+
+/** KS-02E (KNOWLEDGE-SEARCH-DESIGN 3.2): the prefix's date lines. Facts plus
+ * one guidance sentence; an unknown cutoff or snapshot prints nothing. */
+export function datesText(input: { now: Date; locale: string; modelCutoff: string | null; librarySnapshot: string | null }): string {
+  const fmt = (iso: string): string | null => {
+    const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+    return Number.isNaN(d.getTime()) ? null : d.toLocaleDateString(input.locale, { dateStyle: "long", timeZone: "UTC" });
+  };
+  const facts = [`Today is ${input.now.toLocaleString(input.locale, { dateStyle: "full", timeStyle: "short" })}.`];
+  const cutoff = input.modelCutoff ? fmt(input.modelCutoff) : null;
+  if (cutoff) facts.push(`Your training ends around ${cutoff}.`);
+  const snapshot = input.librarySnapshot ? fmt(input.librarySnapshot) : null;
+  if (snapshot) facts.push(`The home library's Wikipedia snapshot is ${snapshot}.`);
+  return `${facts.join(" ")}\nYour own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training.`;
 }
 
 let windowItemSeq = 0;
@@ -339,7 +370,12 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // "computed, not recalled" rule (RULES-AND-LEARNED-COMPONENTS.md).
   const locale = (getHouseholdSettingValue("household.locale") as string | undefined) ?? "en-US";
   const now = new Date();
-  items.push({ id: "clock", text: `${now.toLocaleString(locale, { dateStyle: "full", timeStyle: "short" })}\nThe model's training knowledge may be older than today.`, source: "clock", subjects: [], disclosure: "child_ok" });
+  // KS-02E: three dated facts and one guidance sentence (KNOWLEDGE-SEARCH-
+  // DESIGN 3.2), data only: no answer-length text, no voice text. The cutoff
+  // and the snapshot print nothing when unknown. Replaces the one sentence
+  // that stood here: "The model's training knowledge may be older than today."
+  const snapshot = await librarySnapshotDate(turnAgeBand(state.surface, state.actor, state.speakerEvidence, now));
+  items.push({ id: "clock", text: datesText({ now, locale, modelCutoff: chatModelCutoff(), librarySnapshot: snapshot }), source: "clock", subjects: [], disclosure: "child_ok" });
 
   // The roster: who this household has, so "he"/"she"/a name resolves
   // against real people without a pronoun-guessing rule. One item per

@@ -94,10 +94,12 @@ describe("contextNode: PROJECTS-P2 stable project instructions", () => {
 });
 
 describe("contextNode: CONTEXT-RECALL-01, recall like the old path, tier-floor gated", () => {
-  test("the live clock line tells the model its training knowledge may be old", async () => {
+  test("the live clock line carries today's date and the guidance sentence (KS-02E replaced the old one-line warning)", async () => {
     const { output } = await contextNode(stateFor(people.owner), { utterance: "hi" }, SIGNAL);
     const clock = output.items.find((item) => item.id === "clock");
-    expect(clock?.text).toContain("The model's training knowledge may be older than today.");
+    expect(clock?.text).toContain("Today is ");
+    expect(clock?.text).toContain("the web is for anything that may have changed since your training.");
+    expect(clock?.text).not.toContain("The model's training knowledge may be older than today.");
   });
 
   test("a small-talk utterance with a seeded unrelated memory produces a context with no memory item", async () => {
