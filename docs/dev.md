@@ -36812,3 +36812,12 @@ Verdict: not shipped, working tree reverted. The 40 percent token bar is not met
 - Wayback: `lib/retrieval/wayback.ts`. Gate: never a child, `search.wayback_fallback` on, `effectiveMode("web", band, temporary)` not offline or closed (no second switch), the cited address allowed for the band. One availability request to `archive.org/wayback/available`; only when it names a capture, one fetch of `web.archive.org/web/<timestamp>id_/<url>`, built here from a 14-digit timestamp (the response's own address is never followed) and checked against the band's blocked-site lists. Both requests use the page fetch, so the SSRF guard and the page pace apply. The page title is suffixed "(Wayback Machine copy of <host>, <date>)". A failure returns the original 404 path (rule 6).
 - Counters (names plus band): `fetch_hit`, `fetch_miss`, `wayback_calls` (availability requests), `wayback_served`. Privacy row: `wayback` on the `websearch` manifest (0.3.3).
 - Tests: `backend/tests/fetchCache.test.ts`.
+
+## SETTINGS-LAYERS-01a to 01d (2026-10-12)
+
+- Resolver and gate: `lib/settingsLayers.ts`. Every per-person write goes through `changeOverrides` (union lists) or the override-key setters; the People routes add no rules of their own.
+- Privacy rule, kept from the 2026-09-30 ruling: an admin sees and changes only entries an admin set on a teen's overrides. A teen's own entries are never in the admin view, and a tick or row reset on one is a quiet no-op (`hiddenOwnChoice`), so a refusal cannot reveal it. A child's page shows everything.
+- The locked adult-site list (`blp-porn`) cannot be unticked or allowed by any override; proven by unit test, not yet by a live route call.
+- Row reset (`resetBlocklistRow`) drops the entry directly, so it works after the global defaults come to hold the same category.
+- Not yet: SafeSearch on the resolver (01f), band-named keys (01e), `page_text_cleaning` has no consumer, custom sites are not in the People section.
+- Pins: spec-v0.1.128, ui-v0.5.198 (OptionMatrix uses the 48px kit Checkbox; commons 120ff26).

@@ -51,6 +51,20 @@ Design: [settings redesign plan](plans/settings-redesign-2026-09-30.md).
 - [x] **S6: Household shell: six grouped sections with the existing cards and link cards** (committed, live check pending): Household grouped.
 - [x] **S7: Screenshot review, fixes, and dead code review** (committed, live check pending): the Settings and Status polish pass is complete. See `docs/dev.md`.
 
+## Settings layers (owner, 2026-10-12)
+
+Three layers: user overrides over global defaults over user defaults (Kids, Teens, Adults). Union lists merge with add/remove rows; override keys replace.
+
+- [x] SETTINGS-LAYERS-01a (S): layers, merge kinds, band scope and `set_by` on settings; pins spec-v0.1.128 (ff4327df).
+- [x] SETTINGS-LAYERS-01b (M): the resolver and the one write gate for per-person list overrides (29678422).
+- [x] SETTINGS-LAYERS-01c (M): per-person site blocks, web sources and list downloads on the resolver (a8f55df6).
+- [x] SETTINGS-LAYERS-01d (M): the People page blocked-sites section, `/api/people/:id/site-blocks` routes, OptionMatrix on the 48px checkbox, pins ui-v0.5.198 (6a512b19).
+- [ ] SETTINGS-LAYERS-01e (M): migrate the band-named household keys (`search.blocklists.teen` and kin) to `band:<band>` scope rows.
+- [ ] SETTINGS-LAYERS-01f (M): SafeSearch on the resolver; retire `assertCanSetSafeSearch`.
+- [ ] SETTINGS-LAYERS-01g (M): per-person app permissions on the resolver.
+- [ ] SETTINGS-LAYERS-01h (M): the house rules prompt: a global-defaults text added to every chat, never overriding a hard line.
+- [ ] SETTINGS-LAYERS-01i (S): custom sites on the People section; a consumer for `page_text_cleaning`; click-test the 01d section on a phone viewport.
+
 ## Settings and copy polish
 
 - [x] **SETTINGS-SAVE-01: show save results for profile edits and settings** (S, 2026-10-07): the profile form marks drafts, warns before route or page exit, confirms a save, reports errors, and removes the inactive photo switch. Registry settings keep their immediate apply behavior and show a saved status after success. Remaining explicit-save forms are inventoried in the H1 report.
