@@ -28,8 +28,8 @@ STACK_REPO="getmaipai/stack"
 # commit, not a tag - bumped by whoever cuts a Home release, to whatever
 # stack commit that release is meant to carry (docs/dev.md's own "What
 # Home's release carries" paragraph). Today's value adds vision URL
-# binding to the Stack supervisor.
-STACK_TAG="60b887c5704bd94bc742254cce48e4d34b1fd035"
+# binding to the Stack supervisor and runs the embed role on the processor (STACK-EMBED-02).
+STACK_TAG="414ae1b51d89a248baa4086209bd991076a3f2ff"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.95 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
