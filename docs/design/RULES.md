@@ -293,6 +293,9 @@ and no setting reaches them. Web search runs without a parent's approval when th
     cites the fresh set's held-out split with a recorded search stand-in,
     at least 3 repeats and paired 95% intervals. A single run of 30 items
     is a regression check, not evidence for a rate.
+    This is measured at the person's default, ease.reading_level =
+    standard. A level the person or an admin chose is a setting, not a
+    regression, and carries its own readability and accuracy rows.
 14. **Companion voice is a per-request mechanism, never prompt prose.**
     Voice adapters are chosen per request and keyed by base model; the
     rules above are compatible with a companion chosen per turn.
@@ -334,6 +337,10 @@ S1. **The main navigation is permanent.** The column that lists the apps
     never lives inside it. On a phone the drawer holds the selected app's
     own sections below the apps; that is the only place app content meets
     the main navigation, and it never holds another app's.
+    The rail is 56 px at the standard target size. When the person's
+    resolved ease.targets is large, its width follows the kit
+    target-minimum token, still icons only, still never expanding, and
+    S3's test runs at that width too.
 S2. **Each app area emulates its native app.** Everything to the right of
     the rail looks and feels like the app it copies, with that app's own
     layout intact: chat is ChatGPT's layout, including its own history
