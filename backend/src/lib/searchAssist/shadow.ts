@@ -14,6 +14,7 @@ import { searchAssistEligibility, cappedSearchAssistMode, type MinorEligibility,
 import { loadSearchAssistWeights, type LoadedWeights, type WeightsResult } from "./weights";
 import { buildFeatures, scoreHead } from "./score";
 import { bumpSearchAssistCounter } from "./counters";
+import { stackEmbedModel, __setStackEmbedModelReaderForTests } from "./embedIdentity";
 
 const TOOL = "websearch";
 const MISSING_RETRY_MS = 60_000;
@@ -33,6 +34,7 @@ async function weightsFor(expected: { model?: string; dims?: number }): Promise<
 export function __setSearchAssistLoaderForTests(fn: typeof loadSearchAssistWeights | null): void {
   loader = fn ?? loadSearchAssistWeights;
   cache = null;
+  __setStackEmbedModelReaderForTests(null);
 }
 
 function readMode(): SearchAssistMode {
@@ -42,8 +44,10 @@ function readMode(): SearchAssistMode {
 
 const record = (mode: SearchAssistMode, over: Partial<SearchAssistStats>): SearchAssistStats => ({ mode, eligible: false, bucket: "none", p_rounded: null, action: "none", ...over });
 
-function sameSpace(manifest: LoadedWeights, v: { space: string; dims: number; preprocess: string }): boolean {
-  return v.space === manifest.embed.model && v.dims === manifest.embed.dims && v.preprocess === manifest.embed.preprocess;
+// The vector's `space` is the Stack's role alias ("embed"), not a model, so the
+// model is checked against the Stack's reported embed model file (stackModel).
+function sameSpace(manifest: LoadedWeights, stackModel: string, v: { dims: number; preprocess: string }): boolean {
+  return manifest.embed.model === stackModel && v.dims === manifest.embed.dims && v.preprocess === manifest.embed.preprocess;
 }
 
 /** `recallVector` is the raw recall embedding when the turn made one. */
@@ -65,13 +69,20 @@ export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnS
       return record(mode, { off_reason: reason });
     }
     eligible = true;
-    const weights = await weightsFor(recallVector ? { model: recallVector.space, dims: recallVector.dims } : {});
+    // The real model file the Stack's embed role runs. Unknown (Stack
+    // unreachable or too old to say) fails open without a Repairs row.
+    const stackModel = await stackEmbedModel();
+    if (!stackModel) {
+      bumpSearchAssistCounter("error");
+      return record(mode, { eligible: true, off_reason: "error" });
+    }
+    const weights = await weightsFor({ model: stackModel, ...(recallVector ? { dims: recallVector.dims } : {}) });
     if ("missing" in weights) {
       const reason = weights.missing === "embed_mismatch" ? "embed_mismatch" : "weights_missing";
       bumpSearchAssistCounter(reason);
       return record(mode, { eligible: true, off_reason: reason });
     }
-    let vector: QueryVector | undefined = recallVector && weights.embed.prefix === "" && sameSpace(weights, recallVector) ? recallVector : undefined;
+    let vector: QueryVector | undefined = recallVector && weights.embed.prefix === "" && sameSpace(weights, stackModel, recallVector) ? recallVector : undefined;
     if (!vector && minor) {
       // A minor's turn never pays for a fallback embed: no usable recall vector is not scored.
       bumpSearchAssistCounter("skipped_band", bandKey);
@@ -92,7 +103,7 @@ export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnS
       const v = result.value.vectors[0]!;
       vector = { vector: Float32Array.from(v), space: result.value.model, dims: v.length, preprocess: result.value.preprocess };
     }
-    if (!sameSpace(weights, vector)) {
+    if (!sameSpace(weights, stackModel, vector)) {
       bumpSearchAssistCounter("embed_mismatch");
       return record(mode, { eligible: true, off_reason: "embed_mismatch" });
     }

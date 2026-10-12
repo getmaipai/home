@@ -7,6 +7,9 @@ import { createStackClient, type StackClient } from "@/lib/stack/client";
 import { __enableDefaultStackClientForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { startStubLlmServer } from "@maipai/spec/llm/ts/stubServer.js";
 
+/** The scripted embed role's model file, as the real Stack reports it in identity.actual. */
+export const SCRIPTED_EMBED_FILE = "scripted-embed.Q4_K_M.gguf";
+
 export type StackFixtureHandler = (req: Request) => Response | Promise<Response>;
 
 export interface StackFixture {
@@ -119,7 +122,7 @@ export function startDefaultScriptedStack(): StackFixture {
     "POST /v1/audio/transcriptions": async () => Response.json({ text: "the scripted transcription" }, { headers: IDENTITY_HEADERS }),
     "POST /v1/audio/speech": async () => new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } }),
     "POST /v1/images/generations": async () => Response.json({ created: 1, job: "scripted-image", data: [] }, { status: 202, headers: IDENTITY_HEADERS }),
-    "GET /stack/v1/roles": async () => Response.json({ roles: ["chat", "embed", "judge", "stt", "tts"].map((id) => ({ id, state: { state: "ready", since: "scripted-test" }, reason: null })) }),
+    "GET /stack/v1/roles": async () => Response.json({ roles: ["chat", "embed", "judge", "stt", "tts"].map((id) => ({ id, state: { state: "ready", since: "scripted-test" }, reason: null, ...(id === "embed" ? { identity: { ok: true, expected: SCRIPTED_EMBED_FILE, actual: SCRIPTED_EMBED_FILE, reason: null } } : {}) })) }),
     "GET /stack/v1/health": async () => Response.json({ health: [] }),
     "*": async (req) => {
       const { pathname } = new URL(req.url);

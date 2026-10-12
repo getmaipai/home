@@ -327,6 +327,8 @@ SEARCH-DDGS-01 (below). Images, videos, hosted search and page reads are outside
 
 **ROUTER-BUILD-01g (2026-10-12): released weights pinned.** `SEARCH_ASSIST_PIN` points at the `search-assist-weights-v1` release asset (sha256 `0f592c19...b0ede`); the gate scores the 120 frozen held-out raw vectors (`gate-rows-held.json`) through the shipped head (`weights-shipped.json`) against RAW-01 floors.
 
+**ROUTER-BUILD-01h (2026-10-12): the embed identity is the Stack's model file.** The Stack names its embed role `embed` and stamps that alias on every embeddings response, so a vector's `space` is not a model. `searchAssist/embedIdentity.ts` reads `identity.actual` for the `embed` role from `GET /stack/v1/roles` (the .gguf file the embed process runs), and the shadow step passes that, minus `.gguf`, to the weights loader as the expected model. A Stack that swaps its embed model is still `embed_mismatch`; a Stack that cannot say fails open as `error`.
+
 **SEARCH-SOURCES-01b (2026-10-12): blend follow-ups.** `runWebSources` gives each source 8 s (`SOURCE_TIMEOUT_MS`) before going on without it; the blend key is `normalizeUrlKey(url)` (host lowercased, `www.`, fragment, trailing slash, default port and `utm_*`/`fbclid`/`gclid` dropped, http and https equal) while the shown row keeps its own url; `textOf` clips title and snippet to 300 characters like the SearXNG-only text. The single-source default path is unchanged.
 
 **SEARCH-DDGS-01 (2026-10-12): the ddgs source.** `src/lib/retrieval/ddgsSource.ts` fills the ddgs slot. The

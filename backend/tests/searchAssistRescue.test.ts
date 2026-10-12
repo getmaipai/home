@@ -11,7 +11,8 @@ import { conversationTurns, people as peopleTable } from "@/db/schema";
 import * as llm from "@/lib/llm";
 import { embedQueryForRecall } from "@/lib/memory";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { useDefaultScriptedStack } from "./stackFixture";
+import { useDefaultScriptedStack, SCRIPTED_EMBED_FILE } from "./stackFixture";
+import { embedModelFromFile } from "@/lib/searchAssist/embedIdentity";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
@@ -36,7 +37,7 @@ async function manifestForStubSpace(threshold: number): Promise<SearchAssistMani
   if (!q) throw new Error("the scripted embedder is unavailable");
   const row = (seed: number) => Array.from({ length: q.dims }, (_, i) => Math.sin(seed + i) * 0.3);
   return {
-    embed: { model: q.space, dims: q.dims, preprocess: q.preprocess, prefix: "" },
+    embed: { model: embedModelFromFile(SCRIPTED_EMBED_FILE)!, dims: q.dims, preprocess: q.preprocess, prefix: "" },
     features: "alone",
     classes: ["no_tool", "recency", "stable"],
     coef: [row(1), row(2), row(3)],

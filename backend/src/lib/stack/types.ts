@@ -138,6 +138,10 @@ export interface RoleInfo extends ChatRoleContext {
     reason: string | null;
     stale: boolean;
   };
+  /** The model file the role's process was started on (`actual`) against the
+   * one the Stack pinned (`expected`); for the embed role both are the .gguf
+   * file name. Absent on an older Stack. */
+  identity?: { ok: boolean; expected: string | null; actual: string | null; reason: string | null };
   /** Models the Stack can select for a chat request. Present on the chat
    * role response; absent when Home itself is the source of role state. */
   models?: Array<{ id: string; name: string }>;

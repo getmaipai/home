@@ -10,7 +10,8 @@ import { conversationTurns, people as peopleTable } from "@/db/schema";
 import * as llm from "@/lib/llm";
 import { embedQueryForRecall } from "@/lib/memory";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { useDefaultScriptedStack } from "./stackFixture";
+import { useDefaultScriptedStack, SCRIPTED_EMBED_FILE } from "./stackFixture";
+import { embedModelFromFile, stackEmbedModel, __setStackEmbedModelReaderForTests } from "@/lib/searchAssist/embedIdentity";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
@@ -33,7 +34,7 @@ async function manifestForStubSpace(): Promise<SearchAssistManifest> {
   if (!q) throw new Error("the scripted embedder is unavailable");
   const row = (seed: number) => Array.from({ length: q.dims }, (_, i) => Math.sin(seed + i) * 0.3);
   return {
-    embed: { model: q.space, dims: q.dims, preprocess: q.preprocess, prefix: "" },
+    embed: { model: embedModelFromFile(SCRIPTED_EMBED_FILE)!, dims: q.dims, preprocess: q.preprocess, prefix: "" },
     features: "alone",
     classes: ["no_tool", "recency", "stable"],
     coef: [row(1), row(2), row(3)],
@@ -135,6 +136,43 @@ describe("runSearchAssistShadow", () => {
     const out = await runSearchAssistShadow(eligibilityState(people.owner), UTTERANCE, undefined);
     expect(embedSpy).toHaveBeenCalledTimes(1);
     expect(typeof out.p_rounded).toBe("number");
+  });
+
+  // ROUTER-BUILD-01h: the Stack names the embed role "embed" on every response; the model is the file its embed process runs.
+  test("the role alias on a vector never decides the model: the Stack's reported file does", async () => {
+    const q = await embedQueryForRecall("x");
+    expect(q!.space).toBe("embed");
+    const m = await manifestForStubSpace();
+    expect(m.embed.model).toBe(embedModelFromFile(SCRIPTED_EMBED_FILE)!);
+    let asked: { model?: string } | undefined;
+    __setSearchAssistLoaderForTests(async ({ expected } = {}) => { asked = expected; return m; });
+    const ok = await runSearchAssistShadow(eligibilityState(people.owner), UTTERANCE, q);
+    expect(asked?.model).toBe("scripted-embed.Q4_K_M");
+    expect(ok.off_reason).toBeUndefined();
+    expect(typeof ok.p_rounded).toBe("number");
+  });
+
+  test("a Stack that swaps its embed model is embed_mismatch even though the alias is unchanged", async () => {
+    const m = await manifestForStubSpace();
+    __setSearchAssistLoaderForTests(async () => m);
+    __setStackEmbedModelReaderForTests(async () => "some-newer-embedder.Q8_0");
+    const out = await runSearchAssistShadow(eligibilityState(people.owner), UTTERANCE, await embedQueryForRecall("x"));
+    expect(out.off_reason).toBe("embed_mismatch");
+    expect(searchAssistCounters()["search_assist.embed_mismatch"]).toBe(1);
+  });
+
+  test("a Stack that cannot name its embed model fails open as error, without a mismatch", async () => {
+    __setStackEmbedModelReaderForTests(async () => null);
+    expect(await stackEmbedModel()).toBeNull();
+    const out = await runSearchAssistShadow(eligibilityState(people.owner), UTTERANCE, await embedQueryForRecall("x"));
+    expect(out.off_reason).toBe("error");
+    expect(out.eligible).toBe(true);
+    expect(searchAssistCounters()["search_assist.embed_mismatch"] ?? 0).toBe(0);
+  });
+
+  test("embedModelFromFile drops the .gguf extension only", () => {
+    expect(embedModelFromFile("nomic-embed-text-v1.5.Q4_K_M.gguf")).toBe("nomic-embed-text-v1.5.Q4_K_M");
+    expect(embedModelFromFile(".gguf")).toBeNull();
   });
 
   test("missing weights, a mismatched space and a throw each fail open with a named reason", async () => {

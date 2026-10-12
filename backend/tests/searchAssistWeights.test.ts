@@ -6,7 +6,9 @@ import { copyFileSync, existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { listIssues } from "@/lib/issues";
-import { loadSearchAssistWeights, type WeightsPin } from "@/lib/searchAssist/weights";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { loadSearchAssistWeights, SEARCH_ASSIST_PIN, type WeightsPin } from "@/lib/searchAssist/weights";
 import { resetDb } from "./reset-db";
 
 const FIXTURE = new URL("../src/lib/searchAssist/__fixtures__/weights.json", import.meta.url).pathname;
@@ -78,6 +80,16 @@ describe("search assist weights loader", () => {
     const sha = (await Bun.CryptoHasher.hash("sha256", "{ not json", "hex")) as string;
     const r = await loadSearchAssistWeights({ dir, pin: pin(sha), expected: EXPECTED, download: noDownload });
     expect(r).toEqual({ missing: "weights_checksum" });
+  });
+
+  test("the shipped pin's sha256 is the bytes of the weights-shipped.json fixture, and that file loads for the real model", async () => {
+    const shipped = new URL("../src/lib/searchAssist/__fixtures__/weights-shipped.json", import.meta.url).pathname;
+    expect(createHash("sha256").update(readFileSync(shipped)).digest("hex")).toBe(SEARCH_ASSIST_PIN!.sha256);
+    copyFileSync(shipped, join(dir, SEARCH_ASSIST_PIN!.file));
+    const live = { model: "nomic-embed-text-v1.5.Q4_K_M", dims: 768 };
+    expect("missing" in (await loadSearchAssistWeights({ dir, expected: live, download: noDownload }))).toBe(false);
+    // The Stack's role alias is not the model: it is rejected.
+    expect(await loadSearchAssistWeights({ dir, expected: { ...live, model: "embed" }, download: noDownload })).toEqual({ missing: "embed_mismatch" });
   });
 
   test("wrong dims, wrong preprocess, wrong model and wrong prefix are each embed_mismatch", async () => {

@@ -18,7 +18,7 @@ import "../../../scripts/runTemp";
 //   assist_shadow / assist_rescue (01k) plain with chat.search_assist shadow or rescue; the Stack's embed role is forwarded
 //           (MAIPAI_SR_EMBED_URL) so a minor's turn has a recall vector. assist_rescue needs a checkout where
 //           MINOR_RESCUE_ENABLED is true (a bench-only edit, never committed); the harness refuses otherwise.
-//           MAIPAI_SR_WEIGHTS=<manifest.json> supplies the head before the signed release (ROUTER-BUILD-01f).
+//           MAIPAI_SR_WEIGHTS=<manifest.json> overrides the pinned head with a locally trained one (ROUTER-BUILD-01f); unset, the arm uses the real pin.
 //   desc    (arm 1) plain plus one sentence on the websearch description (first round).
 //   cutoff  (arm 2) plain plus the loki-doki e0d8c75e knowledge-cutoff block on the system message.
 // Teen rows (01k) run once per gate grain (--grains sentence,arrival; sets chat.teen_gate_grain); a child is always sentence.
@@ -414,17 +414,8 @@ if (ARMS.some((a) => a === "assist_shadow" || a === "assist_rescue") && !process
   console.error("search-recency-02 refused: the assist arms need MAIPAI_SR_EMBED_URL (the Stack's address, for its embed role); a minor's turn is scored only with a recall vector.");
   process.exit(2);
 }
-// ROUTER-BUILD-01f: assist_rescue is the production arm (the real turnNext path with chat.search_assist = rescue). Until the
-// signed weights release exists the production pin is empty and the loader reports weights_missing, so the arm would run as a
-// plain turn. MAIPAI_SR_WEIGHTS=<manifest.json> hands the arm a locally trained manifest (same parser as the loader); the app
-// never reads this variable. The run record names the manifest's bench_record so a result is traceable to the head it used.
-if (process.env.MAIPAI_SR_WEIGHTS && ARMS.some((a) => a === "assist_shadow" || a === "assist_rescue")) {
-  const { readBenchManifest } = await import("./searchAssistGate");
-  const { __setSearchAssistLoaderForTests } = await import("@/lib/searchAssist/shadow");
-  const manifest = readBenchManifest(process.env.MAIPAI_SR_WEIGHTS);
-  __setSearchAssistLoaderForTests(async () => manifest);
-  console.log(`[search-recency-02] assist weights from ${process.env.MAIPAI_SR_WEIGHTS} (${manifest.bench_record})`);
-}
+// ROUTER-BUILD-01f: assist_rescue is the production arm (the real turnNext path with chat.search_assist = rescue) and uses the pinned
+// weights. MAIPAI_SR_WEIGHTS=<manifest.json> (applied in main(), after startBench) swaps in a locally trained manifest; the app never reads it.
 if (ARMS.includes("assist_rescue") && [...BANDS].some((b) => b === "child" || b === "teen")) {
   const { MINOR_RESCUE_ENABLED } = await import("@/lib/searchAssist/eligible");
   if (!MINOR_RESCUE_ENABLED) {
@@ -498,6 +489,14 @@ async function failureShape(): Promise<string> {
 
 async function main(): Promise<void> {
   await setup.startBench();
+  // Loaded after startBench: these imports reach the data dir, which a bench setup requires to be empty.
+  if (process.env.MAIPAI_SR_WEIGHTS && ARMS.some((a) => a === "assist_shadow" || a === "assist_rescue")) {
+    const { readBenchManifest } = await import("./searchAssistGate");
+    const { __setSearchAssistLoaderForTests } = await import("@/lib/searchAssist/shadow");
+    const manifest = readBenchManifest(process.env.MAIPAI_SR_WEIGHTS);
+    __setSearchAssistLoaderForTests(async () => manifest);
+    console.log(`[search-recency-02] assist weights from ${process.env.MAIPAI_SR_WEIGHTS} (${manifest.bench_record})`);
+  }
   setHouseholdSettingValue("chat.model_id", process.env.MAIPAI_REPLAY_MODEL_ID ?? "qwen3-8b-instruct-q4-k-m");
   const set = setHouseholdSettingValue("search.searxng_url", fixtureSearch.url);
   if (!set.ok) throw new Error(`could not point search at the fixture: ${set.error}`);
