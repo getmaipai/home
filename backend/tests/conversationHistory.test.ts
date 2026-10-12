@@ -1435,7 +1435,10 @@ describe("buildConversationWindow() (step 3)", () => {
     const latestSearch = { ...search, callId: "web-2", args: { expression: "Brazil election" }, sources: [{ ...search.sources[0]!, id: "src-b", title: "Most recent result", snippet: "Snippet marker must not be replayed" }] };
     logTurn(actor, "chat", "who is leading", { reply: { text: "The latest result names the candidates." }, source: "plugin", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-history-latest" }, { outcomes: [latestSearch] });
     const before = await buildConversationWindow(conv.value);
-    expect(before.messages.filter((m) => m.tool_calls?.length).map((m) => m.tool_calls?.[0]?.id)).toEqual(["web-2"]);
+    // CHAT-LATE-SYSTEM-01: the older search stays as a native call whose result is cleared; only the newest keeps its titles.
+    expect(before.messages.filter((m) => m.tool_calls?.length).map((m) => m.tool_calls?.[0]?.id)).toEqual(["web-1", "web-2"]);
+    expect(before.messages.find((m) => m.role === "tool" && m.tool_call_id === "web-1")?.content).toBe('{"results_cleared":true,"source_count":1}');
+    expect(before.messages.some((m) => m.role === "tool" && m.tool_call_id === "web-1" && m.content.includes("Official result"))).toBe(false);
     expect(before.messages.some((m) => m.content.includes("Most recent result"))).toBe(true);
     expect(before.messages.some((m) => m.content.includes("Snippet marker must not be replayed"))).toBe(false);
     logTurn(actor, "chat", "who won", { reply: { text: "I need the race." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-search-followup" });
@@ -1456,10 +1459,9 @@ describe("buildConversationWindow() (step 3)", () => {
     }
     // THIN-3C: a budget the turns fit but the turns and the replay do not.
     const turnsOnly = await countTokens((await buildConversationWindow(conv.value, { historyBudgetTokens: 1_000_000 })).messages.filter((m) => !m.tool_calls && m.role !== "tool"));
-    const window = await buildConversationWindow(conv.value, { historyBudgetTokens: turnsOnly! + 10 });
+    const window = await buildConversationWindow(conv.value, { historyBudgetTokens: turnsOnly! + 200 });
     expect(window.messages.some((m) => m.content.includes("old search question"))).toBe(true);
-    expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "old-web"))).toBe(false);
-    expect(window.messages.some((m) => m.role === "tool" && m.tool_call_id === "old-web")).toBe(false);
+    expect(window.messages.some((m) => m.role === "tool" && m.content.includes("Result 0"))).toBe(false);
   });
 
   test.each([
@@ -1492,25 +1494,25 @@ describe("buildConversationWindow() (step 3)", () => {
     const assistantLines = window.messages.filter((m) => m.role === "assistant").map((m) => m.content);
     expect(window.messages.some((m) => m.tool_calls?.some((call) => call.id === "guarded-web"))).toBe(false);
     expect(assistantLines).toEqual(["A clownfish looking for his son."]);
-    expect(window.messages.some((m) => m.role === "system" && m.content === "[No reply was given to this.]")).toBe(true);
+    expect(window.messages.some((m) => m.role === "user" && m.content.endsWith("\n[No reply was given to this.]"))).toBe(true);
     expect(window.messages.some((m) => m.content.includes("nobody's told me"))).toBe(false);
     // A replaced line that carries a fact the next turn needs becomes a typed note, in nobody's voice.
     logTurn(actor, "chat", "add milk to the list", { reply: { text: "I haven't added anything to your list." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-narrated" }, { guardReasons: ["unsupported_action"] });
     const again = await buildConversationWindow(conv.value);
-    expect(again.messages.some((m) => m.role === "system" && m.content === "[Nothing was added to the list.]")).toBe(true);
+    expect(again.messages.some((m) => m.role === "user" && m.content.endsWith("\n" + "[Nothing was added to the list.]"))).toBe(true);
     expect(again.messages.filter((m) => m.role === "assistant").map((m) => m.content)).toEqual(["A clownfish looking for his son."]);
     // The streaming path can store a spoken sentence beside the honesty
     // line (a later sentence tripped a non-cuttable guard): the spoken
     // sentence is quoted, the line is not (a review).
     logTurn(actor, "chat", "what kind of film is it", { reply: { text: "It's a Pixar film. I don't know, sorry." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-partial" }, { guardReasons: ["example_parrot"] });
     const partial = await buildConversationWindow(conv.value);
-    expect(partial.messages.some((m) => m.role === "system" && m.content === '[The reply given was: "It\'s a Pixar film."]')).toBe(true);
+    expect(partial.messages.some((m) => m.role === "user" && m.content.endsWith("\n" + '[The reply given was: "It\'s a Pixar film."]'))).toBe(true);
     expect(partial.messages.some((m) => m.content.includes("I don't know, sorry"))).toBe(false);
     // A save-family pending line renders a waiting note in the family's own
     // words, not a "nothing saved" note (a review).
     logTurn(actor, "chat", "remember this recipe", { reply: { text: "That save is waiting on your confirmation." }, source: "model", safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-pending" }, { guardReasons: ["unsupported_action"] });
     const pending = await buildConversationWindow(conv.value);
-    expect(pending.messages.some((m) => m.role === "system" && m.content === "[The save is waiting on your confirmation.]")).toBe(true);
+    expect(pending.messages.some((m) => m.role === "user" && m.content.endsWith("\n" + "[The save is waiting on your confirmation.]"))).toBe(true);
     expect(pending.messages.some((m) => m.content.includes("No memory was saved"))).toBe(false);
   });
 
@@ -1594,7 +1596,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
     const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Playing jazz now.")).toBe(false);
-    const note = window.messages.find((m) => m.role === "system" && m.content.includes("Playing jazz now."));
+    const note = window.messages.find((m) => m.role === "user" && m.content.includes("Playing jazz now."));
     expect(note).toBeDefined();
     expect(note!.content).toContain("Music"); // music/manifest.json's own `display`, not the bare id "music"
   });
@@ -1619,7 +1621,7 @@ describe("buildConversationWindow() (step 3)", () => {
     });
 
     const window = await buildConversationWindow(conv.value);
-    const note = window.messages.find((m) => m.role === "system" && m.content.includes("answered:"));
+    const note = window.messages.find((m) => m.role === "user" && m.content.includes("answered:"));
     expect(note).toBeDefined();
     expect(note!.content).not.toContain("currency+weather");
     expect(note!.content).toContain("Currency"); // currency/manifest.json's own `display`
@@ -1682,7 +1684,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
     const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Sorry, I couldn't do that.")).toBe(false);
-    const note = window.messages.find((m) => m.role === "system" && m.content.includes("could not answer"));
+    const note = window.messages.find((m) => m.role === "user" && m.content.includes("could not answer"));
     expect(note).toBeDefined();
   });
 
@@ -1700,7 +1702,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
     const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant")).toBe(false);
-    expect(window.messages.some((m) => m.role === "system" && m.content.includes("safety rules declined"))).toBe(true);
+    expect(window.messages.some((m) => m.role === "user" && m.content.includes("safety rules declined"))).toBe(true);
   });
 
   // CHAT-15: the row keeps a bounded outcome: a result's actions never
@@ -1746,7 +1748,7 @@ describe("buildConversationWindow() (step 3)", () => {
       turn_id: "turn-4b-forget",
     });
     const window = await buildConversationWindow(conv.value);
-    const note = window.messages.find((m) => m.role === "system" && m.content.includes("asked to forget"));
+    const note = window.messages.find((m) => m.role === "user" && m.content.includes("asked to forget"));
     expect(note?.content).toContain("Forgotten: Marlow's birthday is in June.");
     expect(window.messages.some((m) => m.content.includes("unknown"))).toBe(false);
   });
@@ -1768,7 +1770,7 @@ describe("buildConversationWindow() (step 3)", () => {
 
     const window = await buildConversationWindow(conv.value);
     expect(window.messages.some((m) => m.role === "assistant" && m.content === "Locking up now.")).toBe(false);
-    expect(window.messages.some((m) => m.role === "system" && m.content.includes("good night house"))).toBe(true);
+    expect(window.messages.some((m) => m.role === "user" && m.content.includes("good night house"))).toBe(true);
   });
 
   test("a model turn still enters the window as assistant, unchanged", async () => {

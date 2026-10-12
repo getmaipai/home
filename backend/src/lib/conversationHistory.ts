@@ -134,6 +134,7 @@ import { TurnSignal as TurnSignalSchema, type TurnSignal } from "@maipai/spec/ge
 import { ReplyPlan as ReplyPlanSchema, type ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
 import { SubjectRef as SubjectRefSchema } from "@maipai/spec/gen/ts/subject-ref.js";
 import type { SubjectRef } from "@/lib/unknownNames";
+import { foldedBlock, FOLDED_NOTE_LABEL } from "@/lib/systemFold";
 export type { ConversationTurnRow } from "@/wire";
 
 export function turnOwnerId(turnId: string): string | null {
@@ -2221,20 +2222,23 @@ function withPicturesNote(text: string, images: readonly ChatImagePart[]): strin
 }
 
 function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
-  return [
-    // UPLOAD-IMG-02: an earlier message's pictures stay a known, unseen
-    // fact in the window (chatImageNote.ts), so a follow-up never reads as
-    // if the picture had been described. VISION-02c: a picture the model
-    // was shown on its turn is named as shown then and not again (its own
-    // reply on that turn holds what it saw); the picture itself goes to the
-    // model only on the turn it was sent.
-    { role: "user", content: redactCredentials(withPicturesNote(t.userText, storedImages(t.images))) },
-    (t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")) && t.guardReason
-      ? { role: "system", content: guardedTurnNote(t) }
-      : t.source === "model" || (t.source === "plugin" && t.routingTier === "tool")
-        ? { role: "assistant", content: redactCredentials(t.replyText) }
-        : { role: "system", content: nonModelWindowNote(t) },
-  ];
+  // UPLOAD-IMG-02: an earlier message's pictures stay a known, unseen
+  // fact in the window (chatImageNote.ts), so a follow-up never reads as
+  // if the picture had been described. VISION-02c: a picture the model
+  // was shown on its turn is named as shown then and not again (its own
+  // reply on that turn holds what it saw); the picture itself goes to the
+  // model only on the turn it was sent.
+  const userText = redactCredentials(withPicturesNote(t.userText, storedImages(t.images)));
+  const modelTurn = t.source === "model" || (t.source === "plugin" && t.routingTier === "tool");
+  // CHAT-LATE-SYSTEM-01: the engine's chat template accepts a system
+  // message only first. A note about what happened on this turn (a guard
+  // replaced the reply, a package or command answered) is attached to the
+  // turn it describes: the person's message, under the note label, never
+  // the assistant's words (item 1b, Fix B3) and never a mid-history system
+  // message.
+  if (modelTurn && !t.guardReason) return [{ role: "user", content: userText }, { role: "assistant", content: redactCredentials(t.replyText) }];
+  const note = modelTurn ? guardedTurnNote(t) : nonModelWindowNote(t);
+  return [{ role: "user", content: `${userText}\n\n${foldedBlock(note)}` }];
 }
 
 function searchReplayMessages(outcomes: readonly ToolExecutionOutcome[]): LlmMessage[] {
@@ -2442,19 +2446,23 @@ export function windowPreview(conversation: Conversation, opts: { supersedes?: s
 /** THIN-3F step 1 (rule 4: "old tool results are cleared first"): only a
  * search in the newest REPLAY_RECENT_TURNS turns is replayed (titles and
  * links, never page text); an older search turn keeps its answer and a
- * one-line note of what was searched (searchStubNote). */
+ * one-line note of what was searched (searchStubMessages). */
 const REPLAY_RECENT_TURNS = 2;
 function recentReplayTurn(liveRows: readonly ConversationTurnRow[]): ConversationTurnRow | undefined {
   return liveRows.slice(-REPLAY_RECENT_TURNS).reverse().find((turn) => replaySearchOutcomes(turn).length > 0);
 }
 
-function searchStubNote(t: ConversationTurnRow): LlmMessage | null {
+/** An older search turn's search, kept as the engine's own tool-call and
+ * tool-result pair with the results cleared (CHAT-LATE-SYSTEM-01: not a
+ * system note, which the chat template refuses mid-history). */
+function searchStubMessages(t: ConversationTurnRow): LlmMessage[] {
   const outcome = replaySearchOutcomes(t)[0];
-  if (!outcome) return null;
+  if (!outcome) return [];
   const expression = (outcome.args as { expression?: unknown } | undefined)?.expression;
   const sources = sourcesFromRows(outcome.sources ?? []).length;
-  const what = typeof expression === "string" && expression.trim() ? ` for "${redactCredentials(expression.trim())}"` : "";
-  return { role: "system", content: `[Searched the web${what}: ${sources} source${sources === 1 ? "" : "s"}.]` };
+  const args = typeof expression === "string" && expression.trim() ? { expression: redactCredentials(expression.trim()) } : {};
+  const assistant = toolCallAssistantMessage([{ ...outcome, args }]);
+  return [assistant, { role: "tool", tool_call_id: outcome.callId, content: JSON.stringify({ results_cleared: true, source_count: sources }) }];
 }
 
 function renderTurns(turns: readonly ConversationTurnRow[], replayTurn: ConversationTurnRow | undefined, withReplay: boolean): LlmMessage[] {
@@ -2481,8 +2489,7 @@ function renderTurns(turns: readonly ConversationTurnRow[], replayTurn: Conversa
     messages.push(turnMessages[0]!);
     if (replay.length > 0 && t.id === replayTurn?.id) messages.push(...replay);
     else {
-      const stub = searchStubNote(t);
-      if (stub) messages.push(stub);
+      messages.push(...searchStubMessages(t));
     }
     messages.push(...turnMessages.slice(1));
   }
@@ -2758,7 +2765,7 @@ function foldsIntoSummary(r: ConversationTurnRow): boolean {
 function foldTranscript(block: readonly ConversationTurnRow[]): string {
   return block
     .filter(foldsIntoSummary)
-    .map((t) => turnTextMessages(t).map((m) => `${m.role === "user" ? "Person" : m.role === "assistant" ? "Assistant" : "Note"}: ${m.content}`).join("\n"))
+    .map((t) => turnTextMessages(t).map((m) => `${m.role === "user" ? "Person" : m.role === "assistant" ? "Assistant" : "Note"}: ${m.content.replace(`\n\n${FOLDED_NOTE_LABEL}\n`, "\nNote: ")}`).join("\n"))
     .join("\n\n");
 }
 

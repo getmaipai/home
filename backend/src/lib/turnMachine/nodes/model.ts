@@ -4,6 +4,7 @@
 // decides whether a turn needs a search or a tool; no signal field, word
 // rule or list does), streamed so the wire's own `reasoning`/`delta` events
 // come from the same call turnNext.ts forwards to the client.
+import { foldedBlock } from "@/lib/systemFold";
 import { startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
@@ -1143,8 +1144,9 @@ export function withoutPictures(messages: readonly LlmMessage[], images: readonl
     const { images: sent, ...rest } = message;
     const ids = new Set(sent.map((part) => part.id));
     const named = images.filter((image) => ids.has(image.id));
-    out.push({ role: "system", content: `[attached] ${picturesNotReadNote(named.length > 0 ? named : sent.map((part) => ({ id: part.id, name: part.name, width: 1, height: 1, media_type: "image/jpeg" })), pictureFailureWords(kind))}` });
-    out.push(rest);
+    // CHAT-LATE-SYSTEM-01: the note rides on the message the pictures were on
+    // (the chat template accepts a system message only first).
+    out.push({ ...rest, content: `${foldedBlock(`[attached] ${picturesNotReadNote(named.length > 0 ? named : sent.map((part) => ({ id: part.id, name: part.name, width: 1, height: 1, media_type: "image/jpeg" })), pictureFailureWords(kind))}`)}\n\n${rest.content}` });
   }
   return out;
 }

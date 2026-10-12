@@ -15,6 +15,7 @@ import { createHash } from "node:crypto";
 import { isStackRoleEnabled, getStackClient } from "@/lib/stackEngine";
 import { getChatClient } from "@/lib/llmSupervisor";
 import { toToolDefinition, type LlmMessage, type ToolSpec } from "@/lib/llm";
+import { foldLateSystemMessages } from "@/lib/systemFold";
 import { formatEngineIdentity } from "@/lib/engineIdentity";
 
 const COUNT_CACHE_MAX = 4000;
@@ -77,7 +78,20 @@ export async function countTokens(input: readonly LlmMessage[], opts: { tools?: 
   return counted === null ? null : counted + reserved;
 }
 
-async function countTextTokens(messages: readonly LlmMessage[], opts: { tools?: readonly ToolSpec[]; signal?: AbortSignal }): Promise<number | null> {
+async function countTextTokens(raw: readonly LlmMessage[], opts: { tools?: readonly ToolSpec[]; signal?: AbortSignal }): Promise<number | null> {
+  // CHAT-LATE-SYSTEM-01: count exactly what is sent (one system message,
+  // first). The engine's template also refuses a list with no user message
+  // ("No user query found"), so a count-only call (never a send) adds an
+  // empty one; it is counted net of its own template cost.
+  const folded = foldLateSystemMessages(raw);
+  if (!folded.some((m) => m.role === "user")) {
+    // Net of the empty user message's own template cost, so lone-note counts
+    // (context.ts adds items one by one) do not drift upward.
+    const withUser = await countTextTokens([...folded, { role: "user", content: "" }], opts);
+    const baseline = await countTextTokens([{ role: "user", content: "" }], opts);
+    return withUser === null || baseline === null ? null : Math.max(0, withUser - baseline);
+  }
+  const messages: readonly LlmMessage[] = folded;
   const key = cacheKey(messages, opts.tools);
   const cached = cache.get(key);
   if (cached !== undefined) {

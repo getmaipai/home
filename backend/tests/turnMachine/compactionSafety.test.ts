@@ -224,8 +224,10 @@ describe("the rolling summary's safety (THIN-3F)", () => {
     expect(recent.messages.some((m) => m.tool_calls?.some((call) => call.id === "web-old"))).toBe(true);
     seed(owner, conv.value.id, 2, "turn-after");
     const later = await buildConversationWindow(fresh.value);
-    expect(later.messages.some((m) => m.tool_calls?.length || m.role === "tool")).toBe(false);
-    expect(later.messages.some((m) => m.role === "system" && m.content === '[Searched the web for "tomato spacing": 2 sources.]')).toBe(true);
+    // CHAT-LATE-SYSTEM-01: the old search stays as a native call with its results cleared.
+    expect(later.messages.some((m) => m.tool_calls?.some((call) => call.function.arguments === JSON.stringify({ expression: "tomato spacing" })))).toBe(true);
+    expect(later.messages.find((m) => m.role === "tool" && m.tool_call_id === "web-old")?.content).toBe('{"results_cleared":true,"source_count":2}');
+    expect(later.messages.some((m) => m.role === "system")).toBe(false);
     expect(later.messages.some((m) => m.content === "About two feet apart.")).toBe(true);
     expect(JSON.stringify(later.messages)).not.toContain("Page text that must never be replayed");
   });

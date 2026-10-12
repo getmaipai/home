@@ -44,6 +44,11 @@ const ONLY = process.env.MAIPAI_SMOKE_ONLY ? process.env.MAIPAI_SMOKE_ONLY.split
 const TURNS: TurnSpec[] = [
   { id: "adult-search", person: "adult", text: "when is the new avengers movie coming out" },
   { id: "adult-followup", person: "adult", text: "and is robert downey in it", followUp: true, expectSearch: true },
+  // CHAT-LATE-SYSTEM-01: a turn that really searched, then a follow-up whose
+  // window holds that search; the engine's template refuses a mid-history
+  // system message, so this pair is the live check that none is sent.
+  { id: "adult-search-asked", person: "adult", text: "search the web for the current weather forecast in Lisbon" },
+  { id: "adult-search-after", person: "adult", text: "thanks, and which day looks warmest", followUp: true },
   { id: "adult-long", person: "adult", text: "explain in detail how a heat pump works", minWords: 150 },
   { id: "child-plain", person: "child", text: "why is the sky blue", maxWords: 120 },
   { id: "adult-spoken", person: "adult", text: "tell me one fun fact about octopuses", spoken: true, maxWords: 80 },

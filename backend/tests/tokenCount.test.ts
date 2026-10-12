@@ -127,7 +127,9 @@ describe("the window's counts (THIN-3B)", () => {
     expect(sent).toContain("[credential redacted]");
     // The guard's own line never reaches the count; its note does.
     expect(sent).not.toContain("nobody's told me");
-    expect(counted.some((body) => body.messages?.some((m) => m.role === "system" && m.content.startsWith("[")))).toBe(true);
+    // CHAT-LATE-SYSTEM-01: the note is counted as it is sent, folded into
+    // the user message it follows under the note label.
+    expect(counted.some((body) => body.messages?.some((m) => m.role === "user" && m.content.includes("Note for you, not written by the person:\n[")))).toBe(true);
   });
 
   test("a count that fails leaves the named minimum window (the newest eight turns after the anchor), logged", async () => {

@@ -13,6 +13,7 @@
 // request's shape (a batch of plain strings) have nothing in common, so
 // forcing embed through validate()'s chat-shaped checks would be the
 // wrong kind of code reuse, not real sharing.
+import { foldLateSystemMessages } from "@/lib/systemFold";
 import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
 import { LlmClientError, type ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
@@ -403,7 +404,8 @@ function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
   return {
     offering,
     body: {
-      messages: messages.map(toWireMessage),
+      // CHAT-LATE-SYSTEM-01: at most one system message, first.
+      messages: foldLateSystemMessages(messages).map(toWireMessage),
       ...rest,
       ...chatSamplingFor(rest),
       ...seedFields(),

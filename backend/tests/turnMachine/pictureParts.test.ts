@@ -216,10 +216,12 @@ describe("VISION-02c: picture parts for a chat model that reads pictures", () =>
     const out = withoutPictures(messages, [{ id: "file-aaaaaaa1", name: "a.jpg", width: 1, height: 1, media_type: "image/jpeg" }], "context_too_large");
     expect(messagesCarryPictures(out)).toBe(false);
     expect(out[0]).toEqual(messages[0]);
-    expect(out[1]!.role).toBe("system");
+    expect(out).toHaveLength(2);
+    expect(out[1]!.role).toBe("user");
     expect(out[1]!.content).toContain("a.jpg");
     expect(out[1]!.content).toContain("it did not fit in the conversation");
-    expect(out[2]).toEqual({ role: "user", content: "hi" });
+    expect(out[1]!.content.endsWith("\n\nhi")).toBe(true);
+    expect(out.some((m, i) => i > 0 && m.role === "system")).toBe(false);
   });
 
   test("the capability follows the Stack's chat row: picture input declared, a bound on picture tokens, the role up", async () => {
