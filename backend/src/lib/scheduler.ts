@@ -44,6 +44,7 @@ import { trigger, deliverHeldNotifications } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
 import { reconcileFileStore } from "@/lib/storage/usage";
 import { checkForUpdates } from "@/lib/updates";
+import { runListSync } from "@/lib/blocklists/listSync";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepStackStorage } from "@/lib/stackUpdates";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -255,6 +256,11 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // reconcileFileStore()).
   "storage.reconcile_files": () => {
     reconcileFileStore();
+  },
+  // MINOR-SEARCH-01e-4: blocked-site lists. Hourly tick; the job itself keeps the daily (or hourly until the
+  // first load) schedule and the back-off, and makes no connection when no list is in use.
+  "lists.sync": async () => {
+    await runListSync();
   },
   "updates.check": async () => {
     await checkForUpdates();

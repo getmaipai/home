@@ -34439,6 +34439,7 @@ writes markers and a record and moves no file.
 | `engines` | `engines/` | `llama-server` builds for Home chat | hundreds of MB | written once, executed |
 | `sidecars` | `sidecars/` | `kiwix-tools` binaries | tens of MB | written once, executed |
 | `reference` | `reference/` | offline reference archives (ZIM files) and `library.xml` | 1 GB to over 100 GB | written once, random reads during search |
+| `block-lists` | `lists/` | checksum-verified blocked-site list files (`<id>/<sha256>.txt`) and `state.json` (MINOR-SEARCH-01e-4) | tens of MB | written a few times a month, read once at start |
 | `wakeword-models` | `voice/wakewords/` | wake-word feature models and detectors | MB | written once, read at start |
 | `stt-models` | `voice/stt/` | Silero VAD for utterance endpointing | about 2 MB | written once, read at start |
 | `tts-models` | `voice/tts/` | the TTS engine's Python, packages and model weights, today in `~/.cache/uv` and `~/.cache/huggingface` | 1 to 3 GB | written once, read at engine start |
@@ -34468,6 +34469,7 @@ marker does not match. "Move" is how (c) moves it.
 | `engines` | downloads again | none | `exec` | the same as `models` | online, or download again | exclude |
 | `sidecars` | downloads again | none | `exec` | reference search unavailable | online, or download again | exclude |
 | `reference` | downloads again, possibly 100 GB | none | `large-files` | reference search unavailable | online, or download again | library (listed, not copied) |
+| `block-lists` | downloads again from the signed list index | none | none | a child's and a teen's web search stays off until every list their profile uses has loaded once | online, or download again | exclude |
 | `wakeword-models` | downloads again | none | none | wake word off; typed chat and push-to-talk work | online, or download again | exclude |
 | `stt-models` | downloads again | none | none | live utterance endpointing uses RMS fallback; typed chat works | online, or download again | exclude |
 | `tts-models` | downloads again | none | `exec`, `symlinks` | spoken replies off; replies arrive as text | online, or download again | exclude |

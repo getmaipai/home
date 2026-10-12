@@ -135,6 +135,9 @@ export const wakewordDir = classDir("wakeword-models");
 // Downloaded face detection and embedding models, served to browser clients.
 export const visionDir = classDir("vision-models");
 
+// MINOR-SEARCH-01e-4: the synced blocked-site lists (verified files plus sync state).
+export const blockListsDir = classDir("block-lists");
+
 // Silero VAD for utterance endpointing in the Home streaming path.
 // Transcription models are owned and downloaded by the Stack.
 export const sttDir = classDir("stt-models");

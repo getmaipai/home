@@ -19,12 +19,22 @@ import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
 import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
+import { LIST_INDEX_URL, LIST_SOURCE_HOST } from "@/lib/blocklists/listIndex";
+import { neededListIds } from "@/lib/blocklists/listSync";
 import { telegramConfigured } from "@/lib/telegramChannel";
 import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
+
+function blockListsInUse(): boolean {
+  try {
+    return neededListIds(new Date()).length > 0;
+  } catch {
+    return false;
+  }
+}
 
 /** The host a URL actually reaches, so a row can never name a different
  * service from the one the code connects to. */
@@ -67,6 +77,7 @@ export function platformConnections(): PrivacyConnection[] {
   // Catalog entries marked `implemented: false` are recorded decisions
   // with no pinned download at all; nothing can fetch them, so nothing
   // about them belongs in a table of connections that really happen.
+  const listsInUse = blockListsInUse();
   const wakewordHosts = hostsOf(WAKEWORD_ALL_ASSETS.map((a) => a.url));
   const visionHosts = hostsOf(VISION_ALL_ASSETS.map((a) => a.url));
   const robotAssetHosts = hostsOf(ROBOT_ASSETS.map((asset) => asset.source_url));
@@ -138,6 +149,16 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:update-check", "api.github.com", {
       when: "automatically, at most once a day",
       what: "a request for this project's latest release information, and, only when a MaiPai robot is paired, a second request for MaiPai Bot's latest release information, plus your home's internet address. No name or device ID goes with either. Nothing anyone in the house said, asked, or saved.",
+    }),
+    // MINOR-SEARCH-01e-4: the blocked-site lists. Listed only while a list is in use (a home with no child, teen
+    // or adult list on reaches nothing and the table says so by omission). Two public static files, no MaiPai server.
+    row("platform:block-list-index", listsInUse ? hostOf(LIST_INDEX_URL) : null, {
+      when: "automatically, about once a day, while a child, teen or adult blocked-site list is turned on under Household, Search",
+      what: "a request for the small signed file that names the current blocked-site lists, plus your home's internet address. No name or device ID goes with it. Nothing anyone in the house said, asked, or saved.",
+    }),
+    row("platform:block-lists", listsInUse ? LIST_SOURCE_HOST : null, {
+      when: "when the signed index names a newer copy of a blocked-site list your household uses, about once a month",
+      what: "a request for the public list file, plus your home's internet address. No name or device ID goes with it. Nothing anyone in the house said, asked, or saved.",
     }),
     row("platform:internet-probe", `DNS resolver (${internetProbeDns}) and ${internetProbeAddress}:${internetProbePort}`, {
       when: internetProbeOn ? "automatically, once a minute; turn it off under Household, General" : "not while the internet check is turned off under Household, General",
