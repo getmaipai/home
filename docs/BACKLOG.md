@@ -4712,11 +4712,12 @@ alongside the first sourced skill, not before it.
       Candidate to bench alongside LTX and Wan (research 2026-10-12, notes in
       `data-scratch/research/FREEVIDEO-01.md`): FlashML-org/FreeVideo (Apache-2.0
       runner, weight streaming and int8 to run MiniMax H3 in about 8 GB VRAM).
-      Unmeasured claims, Nvidia-first, Mac only as a preview, no content filter, and
-      the MiniMax H3 licence bars use in the US, EU, UK and South Korea, so the
-      licence territory decides it before any bench. Bench only on a discrete
-      8 GB Nvidia card, source read for network calls first, and any weight
-      download needs the owner's yes.
+      Unmeasured claims, Nvidia-first, Mac only as a preview, no content filter.
+      Open for the owner to weigh after the bench: the MiniMax H3 licence
+      territory (it excludes the US, EU, UK and South Korea). The licence does
+      not stop the evaluation; we bench it, then the owner decides. Bench on a
+      discrete 8 GB Nvidia card, source read for network calls first, and any
+      weight download needs the owner's yes.
 
 ## Advanced tool calling (Tier 2)
 
