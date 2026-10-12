@@ -1,6 +1,6 @@
 {
   "id": "feeds-children",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "module",
   "category": "Info",
   "display": "Kids' news feeds",
@@ -29,15 +29,6 @@
       "retention": "unknown, see the publisher's own policy"
     },
     {
-      "id": "feed-www-dogonews-com",
-      "destination": "DOGOnews's own public news feed (www.dogonews.com)",
-      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
-      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
-      "who": "DOGOnews",
-      "opt_in": true,
-      "retention": "unknown, see the publisher's own policy"
-    },
-    {
       "id": "feed-www-snexplores-org",
       "destination": "Science News Explores's own public news feed (www.snexplores.org)",
       "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
@@ -49,7 +40,6 @@
   ],
   "permissions": [
     "net:feeds.bbci.co.uk",
-    "net:www.dogonews.com",
     "net:www.snexplores.org"
   ],
   "notifications": [],

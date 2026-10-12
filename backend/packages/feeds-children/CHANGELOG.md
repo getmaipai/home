@@ -2,6 +2,12 @@
 
 All notable changes to the Kids' news feeds package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.1.1] - 2026-10-12
+
+### Removed
+
+- DOGOnews: its feed address returns 404 and the site's real feed needs a sign-in, so it cannot be fetched.
+
 ## [0.1.0] - 2026-10-12
 
 ### Added

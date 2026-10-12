@@ -5,7 +5,7 @@ The list of news feeds behind the "Kids' news" choice on the News shelf.
 
 ## What it gives you
 
-Headlines from: CBBC Newsround, Science News Explores, DOGOnews.
+Headlines from: CBBC Newsround, Science News Explores.
 
 It adds no questions to ask. It only feeds the News shelf, and the News
 shelf feeds the "what's the news" answer.
