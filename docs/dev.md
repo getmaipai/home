@@ -343,6 +343,8 @@ Rows join the blend before `attachSearchPages`, so the adult always-block list a
 SearXNG rows. Results are not cached. The `platform:ddgs-search` privacy row shows while the sidecar is set up
 and DuckDuckGo is picked. Quiet-mode state is in memory, so a hub restart clears it (SEARCH-DDGS-01c would persist it). Stack installing and supervising the sidecar is STACK-DDGS-01 (hub first).
 
+**DDGS-LIVE-01 (2026-10-12): wiring it on a source checkout.** The hub has no env file; `scripts/app.sh` starts it with the caller's environment, so on the machine that runs the sidecar start the hub as `MAIPAI_DDGS_URL=http://127.0.0.1:8793 bun restart` (and the sidecar from `scripts/ddgs-sidecar` with its `.venv`). Do not put the variable in `backend/.env`, which is not git-ignored. Pick the source with the household value `search.web_sources` set to `["searxng","ddgs"]` (Settings, Search; or `setHouseholdSettingValue` from a script when no session is at hand). Known gap: `changeWebSources` (the per-person override) refuses a person whose role is `owner` because it tests `role !== "adult"`, and no route calls it yet; the household value is the working path. Live check on 2026-10-12: one query returned 8 SearXNG rows and 7 ddgs rows, blended to 15, with the sidecar answering in about 1 s.
+
 **KS-05a (2026-10-12): the news shelf store and poller.** Code is in `backend/src/lib/shelf/`. Feeds live in
 `hub.db` (`feeds` table, migration 0096, schema version 53, HLC-stamped, validated through the spec `Feed` shape);
 items live in `knowledge.db` beside the retrieval cache (`shelf_item` plus a `shelf_item_feed` link table,
