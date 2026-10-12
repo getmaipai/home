@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Button } from "@maipai/ui/src/ui/button";
 import { ItemDescription } from "@maipai/ui/src/dashboard/components/ui/item";
+import { OptionMultiSelect } from "@maipai/ui/src/settings/OptionMultiSelect";
 import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 
@@ -148,6 +149,17 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     );
   } else if (def.selector === "boolean") {
     control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+  } else if (def.selector === "select" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
+    control = (
+      <OptionMultiSelect
+        value={(resolved.value as string[] | undefined) ?? []}
+        options={(def.range as { options?: string[] }).options ?? []}
+        labels={(def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels}
+        onValueChange={onChange}
+        disabled={disabled}
+        ariaLabel={def.label}
+      />
+    );
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
     const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;

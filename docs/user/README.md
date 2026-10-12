@@ -17,4 +17,5 @@ day the hub arrives; the rest are for when you need them.
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.
 - [Privacy](privacy.md): see exactly what, if anything, leaves your house.
 - [Set up web search](web-search.md): connect MaiPai to your own SearXNG search server, use it away from home, and fix it if it stops.
+- [Blocked sites](blocked-sites.md): see which lists of bad sites web search checks, and choose them.
 - [Fix a problem](fix-a-problem.md): what to check first when something is not working right.

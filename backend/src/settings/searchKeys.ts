@@ -24,6 +24,13 @@ function specFieldOrder(entry: SettingsKey): SettingsKey {
   return { ...rest, ...(copy !== undefined ? { copy } : {}) } as SettingsKey;
 }
 
+/** spec-v0.1.122 lists `copy` before `level` in the blocklist entries; the generated registry compares
+ * the serialized text, so field order counts. */
+function blocklistFieldOrder(entry: SettingsKey): SettingsKey {
+  const { copy, level, secret, lives_in, honoured_by, ...rest } = entry as SettingsKey & { copy?: unknown };
+  return { ...rest, copy, level, secret, lives_in, honoured_by } as SettingsKey;
+}
+
 export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "search.searxng_url",
@@ -114,5 +121,143 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
               "off": "Answers only from the offline library."
           }
       }
+  })),
+  // MINOR-SEARCH-01e-6: the synced blocklists, declared once in commons (spec/settings/keys.json).
+  blocklistFieldOrder(SettingsKey.parse({
+      "key": "search.blocklists.child",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+          "options": [
+              "blp-gambling",
+              "blp-scam",
+              "blp-phishing",
+              "blp-malware",
+              "blp-drugs"
+          ],
+          "multiple": true
+      },
+      "default": [
+          "blp-gambling",
+          "blp-scam",
+          "blp-phishing",
+          "blp-malware",
+          "blp-drugs"
+      ],
+      "label": "Blocked sites with child controls",
+      "help": "Which lists of blocked sites are checked when MaiPai searches the web for people using child controls. Adult sites are always blocked for child and teen controls and are not listed here. Home downloads each list once and keeps it up to date. Web search for child controls starts once every list checked here has been downloaded. Only an admin can change this.",
+      "copy": {
+          "does": "Chooses which lists of blocked sites are checked when the web is searched.",
+          "options": {
+              "blp-gambling": "Blocks betting, casino and lottery sites.",
+              "blp-scam": "Blocks sites known for fake offers, fake shops and fraud.",
+              "blp-phishing": "Blocks sites that pretend to be a bank or an account page to steal a login.",
+              "blp-malware": "Blocks sites known for spreading viruses and harmful downloads.",
+              "blp-drugs": "Blocks sites that sell or promote illegal drugs."
+          },
+          "option_labels": {
+              "blp-gambling": "Gambling sites",
+              "blp-scam": "Scam sites",
+              "blp-phishing": "Phishing sites",
+              "blp-malware": "Malware sites",
+              "blp-drugs": "Drug sites"
+          }
+      },
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.search",
+      "honoured_by": [
+          "home"
+      ]
+  })),
+  blocklistFieldOrder(SettingsKey.parse({
+      "key": "search.blocklists.teen",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+          "options": [
+              "blp-gambling",
+              "blp-scam",
+              "blp-phishing",
+              "blp-malware",
+              "blp-drugs"
+          ],
+          "multiple": true
+      },
+      "default": [
+          "blp-gambling",
+          "blp-scam",
+          "blp-phishing",
+          "blp-malware"
+      ],
+      "label": "Blocked sites with teen controls",
+      "help": "Which lists of blocked sites are checked when MaiPai searches the web for people using teen controls. Adult sites are always blocked for child and teen controls and are not listed here. Web search for teen controls starts once every list checked here has been downloaded. Only an admin can change this. It does not show anyone what a teen searched for or which sites were blocked.",
+      "copy": {
+          "does": "Chooses which lists of blocked sites are checked when the web is searched.",
+          "options": {
+              "blp-gambling": "Blocks betting, casino and lottery sites.",
+              "blp-scam": "Blocks sites known for fake offers, fake shops and fraud.",
+              "blp-phishing": "Blocks sites that pretend to be a bank or an account page to steal a login.",
+              "blp-malware": "Blocks sites known for spreading viruses and harmful downloads.",
+              "blp-drugs": "Blocks sites that sell or promote illegal drugs."
+          },
+          "option_labels": {
+              "blp-gambling": "Gambling sites",
+              "blp-scam": "Scam sites",
+              "blp-phishing": "Phishing sites",
+              "blp-malware": "Malware sites",
+              "blp-drugs": "Drug sites"
+          }
+      },
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.search",
+      "honoured_by": [
+          "home"
+      ]
+  })),
+  blocklistFieldOrder(SettingsKey.parse({
+      "key": "search.blocklists.adult",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+          "options": [
+              "blp-porn",
+              "blp-gambling",
+              "blp-scam",
+              "blp-phishing",
+              "blp-malware",
+              "blp-drugs"
+          ],
+          "multiple": true
+      },
+      "default": [],
+      "label": "Blocked sites with adult controls",
+      "help": "Lists of blocked sites to check when MaiPai searches the web for adults. None are checked unless you pick them. Scam, phishing and malware lists are a good start for a household that wants that protection. Only an admin can change this.",
+      "copy": {
+          "does": "Chooses which lists of blocked sites are checked when the web is searched.",
+          "options": {
+              "blp-porn": "Blocks sites made only for grown-ups.",
+              "blp-gambling": "Blocks betting, casino and lottery sites.",
+              "blp-scam": "Blocks sites known for fake offers, fake shops and fraud.",
+              "blp-phishing": "Blocks sites that pretend to be a bank or an account page to steal a login.",
+              "blp-malware": "Blocks sites known for spreading viruses and harmful downloads.",
+              "blp-drugs": "Blocks sites that sell or promote illegal drugs."
+          },
+          "option_labels": {
+              "blp-porn": "Adult sites",
+              "blp-gambling": "Gambling sites",
+              "blp-scam": "Scam sites",
+              "blp-phishing": "Phishing sites",
+              "blp-malware": "Malware sites",
+              "blp-drugs": "Drug sites"
+          }
+      },
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.search",
+      "honoured_by": [
+          "home"
+      ]
   })),
 ];

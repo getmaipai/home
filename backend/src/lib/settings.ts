@@ -11,11 +11,13 @@ import { calledAdminForOwnSettings } from "@/lib/relationships";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
 import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
+import { BLOCKLIST_KEYS } from "@/lib/blocklists/policy";
+import { blocklistStatusNote } from "@/lib/blocklists/status";
 import { describeSetting } from "@maipai/spec/interpreters/ts/describeSetting.js";
 import type { PersonRow } from "@/types";
 import { newEntityId } from "@/lib/id";
@@ -265,6 +267,8 @@ export function resolveForResponse(
       personName: subject?.displayName,
     },
   );
+  const blocklistBand = (Object.keys(BLOCKLIST_KEYS) as AgeBand[]).find((band) => BLOCKLIST_KEYS[band] === keyDef.key);
+  if (blocklistBand) description.state = blocklistStatusNote(blocklistBand);
   const base = { key: keyDef.key, source, label: keyDef.label, help: keyDef.help, level: keyDef.level, secret: keyDef.secret, ...description };
   if (!keyDef.secret) return { ...base, value };
   return { ...base, value: null, isSet: source !== "default" };
