@@ -254,6 +254,12 @@ function saveDelta(personId: string, key: string, delta: Delta): void {
   else writeLayerRow(personId, key, JSON.stringify(delta));
 }
 
+/** A household adult for the self-edit rules: the owner and an admin are adults too (WEBSOURCES-OWNER-01).
+ * Child and teen are never adults here, so every minor protection below is unchanged. */
+function isAdultRole(role: string): boolean {
+  return role === "adult" || role === "owner" || role === "admin";
+}
+
 /** Who a write is, to the gate. */
 function writer(actor: PersonRow, targetId: string, targetRole: string): { by: string; kind: "self" | "admin" } | { error: string } {
   if (actor.id === targetId) return { by: SELF, kind: "self" };
@@ -313,7 +319,7 @@ export function changeOverrides(actor: PersonRow, targetId: string, key: string,
   // anything the person set themself on a teen's or an adult's overrides.
   const mayTouch = (entry: DeltaEntry): string | null => {
     if (w.kind === "self") {
-      if (entry.set_by !== SELF && role !== "adult") return "An owner or admin set that. Only they can change it.";
+      if (entry.set_by !== SELF && !isAdultRole(role)) return "An owner or admin set that. Only they can change it.";
       return null;
     }
     if (entry.set_by === SELF && role !== "child") return "That is the person's own choice. Only they can change it.";
@@ -383,7 +389,7 @@ export function backToUserDefaults(actor: PersonRow, targetId: string, keys: rea
     // and an adult clears everything on their own row. A teen never clears what an admin set.
     const mayClear = (e: DeltaEntry): boolean => {
       if (w.kind === "admin") return e.set_by !== SELF || role === "child";
-      return e.set_by === SELF || role === "adult";
+      return e.set_by === SELF || isAdultRole(role);
     };
     const keep = { add: delta.add.filter((e) => !mayClear(e)), remove: delta.remove.filter((e) => !mayClear(e)) };
     cleared += delta.add.length + delta.remove.length - keep.add.length - keep.remove.length;
@@ -397,14 +403,14 @@ export function backToUserDefaults(actor: PersonRow, targetId: string, keys: rea
 
 const SOURCES_KEY = "search.web_sources";
 
-/** Set (an array of source ids) or clear (null) a person's own web search sources. An adult sets their own;
+/** Set (an array of source ids) or clear (null) a person's own web search sources. An adult, the owner or an admin sets their own;
  * an owner or admin sets a child's or a teen's; a child or teen never sets their own. The row is stamped with
  * who set it, and an admin never reads or touches an adult's. */
 export function changeWebSources(actor: PersonRow, targetId: string, value: readonly string[] | null): SettingsOpResult<{ sources: string[] | null }> {
   const role = getPersonRole(targetId);
   if (!role) return deny("That person could not be found. Pick someone from the People page.");
   const self = actor.id === targetId;
-  if (self && role !== "adult") return deny("A household owner or admin picks the web search sources for a child or teen. Ask one of them to open the person's page.");
+  if (self && !isAdultRole(role)) return deny("A household owner or admin picks the web search sources for a child or teen. Ask one of them to open the person's page.");
   if (!self && !(isOwnerOrAdmin(actor) && (role === "child" || role === "teen"))) return deny("Only the person, or a household owner or admin for a child or teen, can change this. Ask one of them.");
   if (value === null) {
     deleteLayerRow(targetId, SOURCES_KEY);
@@ -487,7 +493,7 @@ export function resetBlocklistRow(actor: PersonRow, targetId: string, item: stri
   if (!delta) return deny("This person's saved site settings could not be read, so Home will not change them. Use Back to the age group's settings on their page to reset them, then try again.");
   // Same reach as backToUserDefaults. An entry out of reach is left alone and answered like "nothing to
   // reset", so an admin cannot tell a teen made a private choice.
-  const mayClear = (e: DeltaEntry): boolean => (w.kind === "admin" ? e.set_by !== SELF || role === "child" : e.set_by === SELF || role === "adult");
+  const mayClear = (e: DeltaEntry): boolean => (w.kind === "admin" ? e.set_by !== SELF || role === "child" : e.set_by === SELF || isAdultRole(role));
   const keep = {
     add: delta.add.filter((e) => e.item !== item || !mayClear(e)),
     remove: delta.remove.filter((e) => e.item !== item || !mayClear(e)),

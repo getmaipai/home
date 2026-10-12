@@ -189,4 +189,22 @@ describe("web search sources as a user override", () => {
     expect(changeWebSources(marlow, marlow.id, null).ok).toBe(true);
     expect(webSourcesFor("adult", false, owner.id)).toEqual(["searxng"]);
   });
+
+  test("WEBSOURCES-OWNER-01: the owner picks their own sources; a child and a teen still cannot", () => {
+    db.update(people).set({ role: "child" }).where(eq(people.id, marlow.id)).run();
+    const child = db.select().from(people).where(eq(people.id, marlow.id)).get()!;
+    expect(owner.role).toBe("owner");
+    expect(changeWebSources(owner, owner.id, ["searxng", "ddgs"]).ok).toBe(true);
+    expect(changeWebSources(owner, owner.id, null).ok).toBe(true);
+    expect(changeWebSources(child, child.id, ["searxng", "ddgs"]).ok).toBe(false);
+    expect(changeWebSources(willow, willow.id, ["searxng", "ddgs"]).ok).toBe(false);
+    expect(webSourcesFor("child", false, child.id)).toEqual(["searxng"]);
+    expect(webSourcesFor("teen", false, willow.id)).toEqual(["searxng"]);
+  });
+
+  test("WEBSOURCES-OWNER-01: an admin may set their own", () => {
+    db.update(people).set({ role: "admin" }).where(eq(people.id, marlow.id)).run();
+    const admin = db.select().from(people).where(eq(people.id, marlow.id)).get()!;
+    expect(changeWebSources(admin, admin.id, ["searxng", "ddgs"]).ok).toBe(true);
+  });
 });
