@@ -2249,3 +2249,37 @@ describe("CUR-01: an exact re-assertion is not a second record", () => {
     expect(rows.map((r) => r.person).sort()).toEqual([actor.id, child.id].sort());
   });
 });
+
+describe("MEMORY-FIX-01: judge grounding and prompt fixes", () => {
+  const fact = (text: string) => ({ text, category: "fact" as const, scope: "person" as const, importance: 0.5, valid_from: null, valid_to: null, subject: null, relation: null });
+  async function ground(text: string, said: string) {
+    const { rejectUngrounded, turnDateFor } = await import("@/lib/memoryJudge");
+    const date = turnDateFor(new Date(2026, 9, 11, 12).toISOString());
+    return rejectUngrounded([fact(text)], "Sage", date, said);
+  }
+
+  test("a spoken number word grounds its digits and a restated clock time (j13: ten vs 10:00 AM)", async () => {
+    expect((await ground("Rover needs a long walk before 10:00 AM", "My dog Rover needs a long walk before ten")).kept.length).toBe(1);
+    expect((await ground("Rover needs a long walk before 10", "My dog Rover needs a long walk before ten")).kept.length).toBe(1);
+    expect((await ground("Rover needs a long walk before 12:00 AM", "My dog Rover needs a long walk before ten")).dropped.length).toBe(1);
+  });
+
+  test("a weekday the speaker said grounds the full dated span written for it (j18)", async () => {
+    expect((await ground("Sage's students have a chemistry exam on Friday, October 16, 2026", "My students have their chemistry exam on Friday")).kept.length).toBe(1);
+    expect((await ground("Sage's students have a chemistry exam on Friday, October 16, 2026", "My students have their chemistry exam")).dropped.length).toBe(1);
+    expect((await ground("Sage's students have a chemistry exam on Friday, October 16, 2026", "My students have their chemistry exam on Monday")).dropped.length).toBe(1);
+  });
+
+  test("a quoted title and its article do not fail grounding (j23)", async () => {
+    expect((await ground("Sage loves the film 'The Marsh Lantern'", "I love the Marsh Lantern film")).kept.length).toBe(1);
+    expect((await ground("Sage's favourite film is 'The Marsh Lantern'", "I love the Marsh Lantern film")).kept.length).toBe(1);
+    expect((await ground("Sage loves the film 'The Hollow Crown'", "I love the Marsh Lantern film")).dropped.length).toBe(1);
+  });
+
+  test("the extraction prompt keeps a stated relationship in the text and refuses commands as facts (j11, j12, j27)", async () => {
+    const { buildExtractionPrompt } = await import("@/lib/memoryJudge");
+    const prompt = buildExtractionPrompt("Sage", new Date(2026, 9, 11, 12).toISOString());
+    expect(prompt).toContain("keep that relationship in the fact text");
+    expect(prompt).toContain("Requests or commands to the assistant");
+  });
+});

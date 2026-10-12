@@ -324,9 +324,9 @@ export function buildExtractionPrompt(speakerName: string, turnTimestamp: string
 
 SOURCE RULE - extract ONLY facts ${speakerName} asserted or explicitly confirmed. The Assistant's own statements are context, never a source: if the Assistant guessed something and ${speakerName} didn't confirm it, do NOT store it.
 
-TIME RULE - this exchange happened on ${turnDate}. Resolve relative time into absolute terms in the fact text: "The recycling pickup moves to next month" said on ${turnDate} becomes "${timeExampleText(turnDate)}". Never store a bare "next week" or "yesterday" - those rot.
+TIME RULE - this exchange happened on ${turnDate}. Resolve relative time into absolute terms in the fact text: "The recycling pickup moves to next month" said on ${turnDate} becomes "${timeExampleText(turnDate)}". Never store a bare "next week" or "yesterday" - those rot. A clock time or weekday ${speakerName} gave ("before ten", "on Friday") stays as spoken.
 
-POSSESSIVE RULE - every "my"/"her"/"his" in what ${speakerName} says refers to ${speakerName}. Resolve it to ${speakerName}'s own name in the fact text, from ${speakerName}'s point of view: "my neighbor Quill" becomes "${possessiveExampleText(speakerName)}", never a guess about whose relative someone is. Keep every other name exactly as stated - never blur a named person into "someone".
+POSSESSIVE RULE - every "my"/"her"/"his" in what ${speakerName} says refers to ${speakerName}. Resolve it to ${speakerName}'s own name in the fact text, from ${speakerName}'s point of view: "my neighbor Quill" becomes "${possessiveExampleText(speakerName)}", never a guess about whose relative someone is. When ${speakerName} states how a person relates to them, keep that relationship in the fact text and name ${speakerName} in it ("my cousin Iris lives in Lisbon" becomes "${speakerName}'s cousin Iris lives in Lisbon"), not only in the relation field. Keep every other name exactly as stated - never blur a named person into "someone".
 
 STATE AND TRIP RULE - an ongoing situation ("stressed about a deadline", "recovering from surgery") is category "state". Where ${speakerName} IS during a trip ("I'm in Brazil for two weeks") is also category "state", written in the PAST tense with the actual dates: "${speakerName} was in Brazil, ${turnDate}" with valid_to set to when it ends if stated. Never write a trip as still-current: an undated present-tense whereabouts would have this AI treating someone as abroad long after they came home.
 
@@ -337,6 +337,7 @@ CRITICAL - do NOT extract:
 - One-moment moods and feelings ("I'm tired today")
 - Trivia or facts about the world that reveal nothing about ${speakerName}
 - Trivially-true or contentless observations ("${speakerName} said hi")
+- Requests or commands to the assistant ("add oat milk to the list", "set a timer"): those are actions to carry out, not facts about ${speakerName}
 
 SUBJECT AND RELATION - when a fact is about a named person, pet, place, organization or thing, set "subject" to that name and kind (the person the fact is about, never ${speakerName} for ${speakerName}'s own preferences; null when the fact is about ${speakerName} alone or about the world). When ${speakerName}'s own sentence states how a named person or thing relates to ${speakerName} ("my coworker ...", "my sister ...", "our dog ..." followed by the name), set "relation" with the vocabulary type read from ${speakerName}'s side (${speakerName} is the "from" end: ${RELATION_PHRASE_GUIDE}), the name, and "stated": true; "stated": false only when you worked the relation out from context rather than ${speakerName} saying it. Null when there is none.
 
@@ -437,14 +438,41 @@ function normalizeRelation(raw: unknown): ExtractedFact["relation"] {
 /** Content words with possessives folded ("Sage's" is "sage"), so the
  * speaker's name is skipped in every form it takes. */
 function contentWords(text: string): Set<string> {
-  return new Set([...tokenize(text.replace(/[<>]/g, " "))].map((w) => w.replace(/'s$|'$/, "")));
+  return new Set([...tokenize(text.replace(/[<>]/g, " "))].map((w) => w.replace(/^'+/, "").replace(/'s$|'+$/, "")).filter((w) => w.length > 0));
+}
+
+const NUMBER_WORDS: Record<string, string> = {
+  zero: "0", one: "1", two: "2", three: "3", four: "4", five: "5", six: "6", seven: "7", eight: "8", nine: "9", ten: "10",
+  eleven: "11", twelve: "12", thirteen: "13", fourteen: "14", fifteen: "15", sixteen: "16", seventeen: "17", eighteen: "18",
+  nineteen: "19", twenty: "20", thirty: "30", forty: "40", fifty: "50",
+};
+const NUMBER_WORD_RE = new RegExp(`\\b(${Object.keys(NUMBER_WORDS).join("|")})\\b`, "gi");
+
+/** Grounding compares number words and digits as the same number ("ten"
+ * and "10"), and a clock time as its hour ("10:00 AM" is "10"). */
+function normalizeNumbers(text: string): string {
+  return text
+    .replace(/\b(\d{1,2}):\d{2}\s*(?:am|pm|a\.m\.|p\.m\.)?/gi, "$1")
+    .replace(NUMBER_WORD_RE, (w) => NUMBER_WORDS[w.toLowerCase()]!);
+}
+
+const WEEKDAYS = "monday|tuesday|wednesday|thursday|friday|saturday|sunday";
+const MONTHS = "january|february|march|april|may|june|july|august|september|october|november|december";
+const DATED_WEEKDAY_RE = new RegExp(`\\b(${WEEKDAYS}),?\\s+(?:${MONTHS})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?`, "gi");
+
+/** The TIME RULE has the model write "Friday, October 16, 2026" for a
+ * spoken "Friday". When the speaker said that weekday, the dated span is
+ * the weekday resolved, so it is grounded as the weekday alone. */
+function collapseDatedWeekdays(text: string, userWords: Set<string>): string {
+  return text.replace(DATED_WEEKDAY_RE, (span, day: string) => (userWords.has(day.toLowerCase()) ? day : span));
 }
 
 /** Capitalized words that are not sentence-initial (case-insensitive). */
 function properNounsIn(text: string): string[] {
   return [...text.matchAll(/\b[A-Z][a-z]+\b/g)]
     .filter((match) => match.index !== 0 && !/[.!?] $/.test(text.slice(0, match.index)))
-    .map((match) => match[0]!.toLowerCase());
+    .map((match) => match[0]!.toLowerCase())
+    .filter((noun) => tokenize(noun).size > 0);
 }
 
 // Words the prompt's rules put into any fact of the shape, never a sign
@@ -559,10 +587,13 @@ export function rejectUngrounded(
   confirmedAssistantText?: string | null,
 ): { kept: ExtractedFact[]; dropped: { fact: ExtractedFact; reason: "ungrounded" }[] } {
   const skip = new Set([...contentWords(speakerName), ...contentWords(turnDate), ...PRONOUNS, ...CALENDAR]);
-  const said = contentWords(confirmedAssistantText ? `${userText}\n${confirmedAssistantText}` : userText);
+  const saidText = normalizeNumbers(confirmedAssistantText ? `${userText}\n${confirmedAssistantText}` : userText);
+  // tokenize() drops one-character words, so a spoken "two" (now "2") is added back as a digit.
+  const said = new Set([...contentWords(saidText), ...(saidText.match(/\d+/g) ?? [])]);
   const kept: ExtractedFact[] = [];
   const dropped: { fact: ExtractedFact; reason: "ungrounded" }[] = [];
-  for (const fact of facts) {
+  for (const original of facts) {
+    const fact = { ...original, text: normalizeNumbers(collapseDatedWeekdays(original.text, said)) };
     const words = contentWords(fact.text);
     const content = [...words].filter((w) => !skip.has(w));
     const shared = content.filter((w) => said.has(w)).length;
@@ -579,10 +610,10 @@ export function rejectUngrounded(
         return isInCopiedTurnDate || skip.has(m[0]!) || said.has(m[0]!);
       });
     if (!grounded) {
-      dropped.push({ fact, reason: "ungrounded" });
+      dropped.push({ fact: original, reason: "ungrounded" });
       continue;
     }
-    kept.push(fact);
+    kept.push(original);
   }
   return { kept, dropped };
 }
