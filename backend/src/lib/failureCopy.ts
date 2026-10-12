@@ -201,7 +201,25 @@ export const CRISIS_SUPPORT_ACTIONS: ReadonlyArray<{ label: string; href: string
   { label: "Chat with 988", href: "https://988lifeline.org/chat/" },
 ];
 
-/** The support block for a turn whose `crisis_resources` is set. */
-export function crisisSupportFor(crisisResources: string | undefined): { title: string; text: string; actions: Array<{ label: string; href: string }> } | undefined {
-  return crisisResources ? { title: CRISIS_SUPPORT_TITLE, text: crisisResources, actions: CRISIS_SUPPORT_ACTIONS.map((action) => ({ ...action })) } : undefined;
+/** MINOR-TOPICS-01d: the one line a child's support block adds. The 988 line
+ * and the links are unchanged for every band; this only goes first. */
+export const CHILD_CRISIS_LINE = "Tell a grown-up you trust right now.";
+
+/** MINOR-TOPICS-01d: a child-abuse help line per region, added for a child's
+ * block only. The region is the household's; an unknown region gets none
+ * (988 and the trusted-grown-up line still show). 988 is the shipped US line
+ * and the household has no region setting yet, so the region defaults to US. */
+export const CHILD_HELP_LINES: Readonly<Record<string, { label: string; href: string }>> = {
+  US: { label: "If someone is hurting you: Childhelp, 1-800-422-4453", href: "tel:18004224453" },
+};
+
+/** The support block for a turn whose `crisis_resources` is set. For a child
+ * the text opens with the trusted-grown-up line; `crisis_resources` itself
+ * (the wire field) is the same for every band. */
+export function crisisSupportFor(crisisResources: string | undefined, band: "adult" | "teen" | "child", region = "US"): { title: string; text: string; actions: Array<{ label: string; href: string }> } | undefined {
+  if (!crisisResources) return undefined;
+  const actions = CRISIS_SUPPORT_ACTIONS.map((action) => ({ ...action }));
+  if (band !== "child") return { title: CRISIS_SUPPORT_TITLE, text: crisisResources, actions };
+  const help = CHILD_HELP_LINES[region];
+  return { title: CRISIS_SUPPORT_TITLE, text: `${CHILD_CRISIS_LINE} ${crisisResources}`, actions: help ? [...actions, { ...help }] : actions };
 }

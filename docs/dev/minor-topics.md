@@ -31,3 +31,11 @@ spec-v0.1.123 shortened the sentences without changing instructions: child 256, 
 floor (child 1,000, teen 1,100); the live bench (01g) re-measures with the default model's tokenizer. The longest
 reachable block (every adjustable family on its longest stance, ten 40-character story names) is bounded at 2,000
 characters for a child and 1,250 for a teen.
+
+## Crisis path (MINOR-TOPICS-01d)
+
+Nothing here weakens the self-harm path. `detectSelfHarm`, the crisis overlay and the text-free parent alert take no topic input, and the fixed `feelings` support stance and `people` protect stance are in every rendered block.
+
+- `crisisSupportFor(resources, band, region)` in `backend/src/lib/failureCopy.ts` builds the support block a client draws. For a child the text opens with `CHILD_CRISIS_LINE` ("Tell a grown-up you trust right now.") and, for a known region, one child-abuse help line is added to the links (`CHILD_HELP_LINES`, US: Childhelp). The wire field `crisis_resources` and the 988 text are the same for every band. A teen's and an adult's block is unchanged.
+- The turn result, the streamed safety refusal and the conversation history rebuild all pass the speaker's band, so a reloaded conversation shows the same block the live reply did for the person reading it (a child reloading sees the child line; a parent reading it sees the adult block, as with links).
+- `backend/tests/topicCrisis.test.ts` renders the block for every reachable combination of a band's settings (child 16, teen 4, each with and without story names) and asserts the support sentence, 988, the emergency number, the people line and the hard lines; a stale or tampered setting still yields the full block; self-harm stays `allow_with_resources` for both bands on input and output; the support block shape per band.

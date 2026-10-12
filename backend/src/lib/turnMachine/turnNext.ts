@@ -173,7 +173,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
       : {}),
     crisis_resources: crisisResources,
     // SAFETY-NOTICE-01: the same resources as a client draws them.
-    ...(crisisResources ? { crisis_support: crisisSupportFor(crisisResources) } : {}),
+    ...(crisisResources ? { crisis_support: crisisSupportFor(crisisResources, valueBand) } : {}),
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.

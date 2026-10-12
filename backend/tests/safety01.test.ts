@@ -373,6 +373,10 @@ describe("SAFETY-NOTICE-01: the refusal line per band and the crisis support blo
     const childEnd = await terminalFor(childClient, PLAIN_CUT);
     expect(childEnd.error).toBe(SAFETY_REFUSAL_COPY.child);
     const childCrisis = await terminalFor(childClient, SELF_HARM_CUT);
-    expect((childCrisis.crisis_support as { text: string } | undefined)?.text).toBe(CRISIS_LINE);
+    // MINOR-TOPICS-01d: the wire field is unchanged; a child's block opens with the grown-up line.
+    expect(childCrisis.crisis_resources).toBe(CRISIS_LINE);
+    expect((childCrisis.crisis_support as { text: string } | undefined)?.text).toBe(`Tell a grown-up you trust right now. ${CRISIS_LINE}`);
+    const teenCrisis = await terminalFor(teenClient, SELF_HARM_CUT);
+    expect((teenCrisis.crisis_support as { text: string } | undefined)?.text).toBe(CRISIS_LINE);
   });
 });

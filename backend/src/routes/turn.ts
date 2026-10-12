@@ -705,7 +705,7 @@ export async function* streamTurnEvents(
     // SAFETY-NOTICE-01: the person reads one plain sentence in their band's
     // words (failureCopy.ts), never the gate's internal message, and the
     // crisis resources ride with it as a support block a client can draw.
-    if (safetyRefusal) yield { type: "error", error: safetyRefusalLine(speakerBand), code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources, crisis_support: crisisSupportFor(refused.crisis_resources) } : {}) };
+    if (safetyRefusal) yield { type: "error", error: safetyRefusalLine(speakerBand), code: "safety_refused", ...(refused?.crisis_resources ? { crisis_resources: refused.crisis_resources, crisis_support: crisisSupportFor(refused.crisis_resources, speakerBand) } : {}) };
     else if (err instanceof StreamUnavailable) yield { type: "error", error: err.message, code: err.code, ...(err.detail ? { detail: err.detail } : {}) };
     else yield { type: "error", error: (err as Error).message };
     // Still finalize (and so still log) whatever text actually streamed
