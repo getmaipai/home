@@ -4229,6 +4229,46 @@
                         },
                         "description": "Selector-specific: min/max for number, a duration unit, an option list for select, and so on. Shape depends on selector."
                       },
+                      "layers": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "band",
+                            "household",
+                            "person"
+                          ]
+                        },
+                        "minItems": 1,
+                        "description": "SETTINGS-LAYERS-01. The scopes a row of this key may be stored at, lowest to highest precedence: band = user defaults (Kids, Teens, Adults), household = global defaults, person = user overrides. Absent means the key is stored at its own scope only and nothing is layered."
+                      },
+                      "merge": {
+                        "type": "string",
+                        "enum": [
+                          "override",
+                          "union"
+                        ],
+                        "description": "How layers combine. override: the most specific layer that has a value wins. union: a list key; each layer adds entries and a more specific layer may remove an entry it can see, and each entry carries who set it (spec/schemas/settings-delta.schema.json). Absent means override."
+                      },
+                      "user_defaults_keys": {
+                        "type": "object",
+                        "properties": {
+                          "child": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+                          },
+                          "teen": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+                          },
+                          "adult": {
+                            "type": "string",
+                            "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
+                          }
+                        },
+                        "additionalProperties": false,
+                        "description": "Transitional. Where the user defaults for each audience are stored today, as band-named household keys, until they move to band:<name> rows. Each named key must exist."
+                      },
                       "default": {
                         "nullable": true
                       },

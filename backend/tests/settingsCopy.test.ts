@@ -85,8 +85,10 @@ describe("settings guard agreement metadata", () => {
 
       const expectedDefaults = {
         child: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "child")
-          : key.key === "chat.photo_uploads" || key.key === "reference.images" ? false : key.default,
-        teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "teen") : key.default,
+          : key.key === "chat.photo_uploads" || key.key === "reference.images" ? false
+          : key.key === "search.page_text_cleaning" ? true : key.default,
+        teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "teen")
+          : key.key === "search.page_text_cleaning" ? true : key.default,
         adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "adult") : key.default,
       };
       expect(key.band_default, `${key.key} band default`).toEqual(expectedDefaults);

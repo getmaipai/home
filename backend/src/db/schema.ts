@@ -311,6 +311,10 @@ export const settingsValues = sqliteTable(
     value: text("value").notNull(),
     hlc: text("hlc").notNull(),
     source: text("source").notNull(),
+    // SETTINGS-LAYERS-01: who wrote a user-override row (`self`, `system` or an admin's id).
+    // Null on every row written before layers existed. List keys keep this per entry inside the
+    // value instead (spec SettingsDelta).
+    setBy: text("set_by"),
     updatedAt: text("updated_at").notNull(),
   },
   (table) => [primaryKey({ columns: [table.scope, table.key] })],

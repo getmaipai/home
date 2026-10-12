@@ -1,0 +1,1 @@
+ALTER TABLE `settings_values` ADD `set_by` text;

@@ -533,6 +533,20 @@ function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newVal
   return { ok: true, value: true };
 }
 
+/** SETTINGS-LAYERS-01a: `search.page_text_cleaning` is a guardian-held key for a child and a teen
+ * (a minor never turns the check off for themselves); an adult changes their own, and an owner or
+ * admin sets a child's or a teen's. 01b replaces this with the one layered write gate. */
+function assertCanSetPageTextCleaning(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  const targetRole = getPersonRole(targetId);
+  if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
+  if (actor.id === targetId) {
+    if (targetRole !== "child" && targetRole !== "teen") return { ok: true, value: true };
+    return { ok: false, status: 403, error: "A household owner or admin changes the page text check for a child or teen. Ask one of them to open your page." };
+  }
+  if (isOwnerOrAdmin(actor) && (targetRole === "child" || targetRole === "teen")) return { ok: true, value: true };
+  return { ok: false, status: 403, error: "Only a household owner or admin changes this for a child or teen, and only an adult changes their own." };
+}
+
 export function setValue(
   actor: PersonRow,
   scope: string,
@@ -563,6 +577,8 @@ export function setValue(
           ? assertCanSetPhotoUploads(actor, parsed.id!)
         : key === "reference.images" && parsed.kind === "person"
           ? assertCanSetAnswerPictures(actor, parsed.id!)
+        : key === "search.page_text_cleaning" && parsed.kind === "person"
+          ? assertCanSetPageTextCleaning(actor, parsed.id!)
         : key.startsWith("topics.") && parsed.kind === "person"
           ? assertCanSetChildTopic(actor, parsed.id!)
         : key === PERSON_STORAGE_CAP_KEY
@@ -801,6 +817,8 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   const auth = key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
     ? assertCanAccessWakewordDeviceSetting(actor)
+    : key === "search.page_text_cleaning" && parsed.kind === "person"
+      ? assertCanSetPageTextCleaning(actor, parsed.id!)
     : key.startsWith("topics.") && parsed.kind === "person"
       ? assertCanSetChildTopic(actor, parsed.id!)
       : assertCanAccessScope(actor, parsed, "write");

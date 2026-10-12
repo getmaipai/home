@@ -61,6 +61,8 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     scope: "person",
     selector: "select",
     range: { options: ["default", "off", "moderate", "strict"] },
+    layers: ["band", "household", "person"],
+    merge: "override",
     default: "default",
     label: "Safe search level",
     help: "How strictly web search filters results for you. \"Default\" follows your age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. A teen can make theirs stricter but never lower than moderate. An adult can change their own.",
