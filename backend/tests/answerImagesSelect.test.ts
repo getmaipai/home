@@ -342,3 +342,24 @@ describe("ANSWER-IMG-02 and GENUI-05: the picture gallery is placed at a paragra
     expect(out).toEqual(["One.\n\nTwo."]);
   });
 });
+
+// IMGQ-07 A4: the row's five tiles are a ceiling, not a fill target (judged sample 2026-10-12: slots 4 and 5 held
+// most of the junk, e.g. "The location near Kilauea, Hawaii." filed under Jurassic Park).
+describe("IMGQ-07: weak pictures do not fill the last tiles", () => {
+  const files = ["Eiffel Tower a.jpg", "Eiffel Tower b.jpg", "Eiffel Tower c.jpg", "Eiffel Tower d.jpg", "Eiffel Tower e.jpg"];
+  test("a fourth and fifth picture whose description is a list with the subject in its middle are left out", async () => {
+    use([{ ...TOWER, files, image: "Eiffel Tower a.jpg", fileDescriptions: { "Eiffel Tower d.jpg": "Home delivery of cooked foods machine, rice, noodles, Eiffel Tower, soup", "Eiffel Tower e.jpg": "Phones, tablets, laptops, mugs, the Eiffel Tower, etc." } }]);
+    const { set, trace } = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(set?.items.length).toBe(3);
+    expect(set?.visible).toBe(3);
+    expect(trace.dropped_weak).toBe(2);
+  });
+
+  test("the first three pictures are never dropped as weak, and strong ones still fill five tiles", async () => {
+    use([{ ...TOWER, files, image: "Eiffel Tower a.jpg", fileDescriptions: { "Eiffel Tower b.jpg": "Phones, tablets, laptops, mugs, the Eiffel Tower, etc.", "Eiffel Tower c.jpg": "Home delivery of cooked foods machine, rice, noodles, Eiffel Tower, soup" } }]);
+    const weakFirst = await selectAnswerImages({ subject: "Eiffel Tower", actor: people.owner, band: "adult", roster: [] });
+    expect(weakFirst.set?.items.length).toBe(5);
+    expect(weakFirst.set?.visible).toBe(5);
+    expect(weakFirst.trace.dropped_weak).toBeUndefined();
+  });
+});

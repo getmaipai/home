@@ -39,6 +39,7 @@ checklist (`docs/dev.md`); no release has been cut yet.
   stopped, without altering the original.
 
 ### Changed
+- Pictures in answers: a picture of a film, product or website must name it in its title or description, off-topic Commons pictures (wall details, parody signs, courtyards, factory workers, a person holding a product) are skipped, and the gallery no longer pads with weak pictures to reach five. MaiPai also offers pictures more often when asked who or what something is.
 - The OpenAPI document was regenerated to cover the routes added since the
   last release, including the commands and privacy routes.
 - The default package set gained the missing package README, changelog, and

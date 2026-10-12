@@ -12,7 +12,7 @@ import type { AnswerImageSet } from "../../wire";
 
 /** The package that produces the block (the model-facing tool and the block's `producer`). */
 export const SHOW_IMAGES_PRODUCER = "show_images";
-/** Tiles in the row; the rest open from the badge. The one definition: select.ts imports it, and the candidate
+/** The most tiles in the row (a ceiling, not a fill target: IMGQ-07 shows fewer when the rest are weak); the rest open from the badge. The one definition: select.ts imports it, and the candidate
  * counts there scale from it (IMG-QUALITY-01a, owner ruling: five tiles). */
 export const GALLERY_VISIBLE = 5;
 /** Candidates fetched per call (select.ts picks them, fetch.ts caps on it): about two per tile plus four spare, since

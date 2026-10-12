@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Show Pictures",
-  "description": "Show photos whenever someone asks about or mentions a famous person, place, film, show, game, animal, car or product.",
+  "description": "Show photos when someone asks who or what a famous person, place, film, game, animal, car or product is.",
   "offer": {"mode":"conditional","gate":"answerImagesAllowed","bench_row":"answer-images","reason":"owner ruling 2026-10-10: on for adults below the 85% recall bar; re-run later, back off if worse"},
   "author": "MaiPai",
   "license": "AGPL-3.0",
@@ -28,7 +28,7 @@
       "subject": {
         "type": "string",
         "minLength": 1,
-        "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them."
+        "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Always call this when they ask \"who is\" or \"what is\" a well-known person or thing (for example \"who is Tom Hanks\", \"what is Star Trek\") or ask what something looks like, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them."
       },
       "subjects": {
         "type": "array",

@@ -48,6 +48,8 @@ export type FixtureSubject = {
   /** File names in the Commons category; each is served as a distinct photo. */
   files?: string[];
   description?: string;
+  /** IMGQ-07: a file's own Commons description when it is not `<label> photo <file>`. */
+  fileDescriptions?: Record<string, string>;
   /** Wikidata P31 for a film (Q11424): pictures from the open web lead. */
   film?: boolean;
 };
@@ -99,7 +101,7 @@ export function fixtureWorld(subjects: FixtureSubject[], opts: { searchRows?: (q
       const files = category ? s?.files ?? [] : s?.image ? [s.image] : [];
       const pages = Object.fromEntries(files.map((f, i) => [String(-1 - i), {
         title: `File:${f}`,
-        imageinfo: [{ thumburl: pictureUrl(fileSeed.get(f) ?? 1), url: pictureUrl(fileSeed.get(f) ?? 1), descriptionurl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(f)}`, mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by-sa/4.0" }, Artist: { value: "<a href=\"x\">Iris</a>" }, ImageDescription: { value: `${s?.label} photo ${f}` } } }],
+        imageinfo: [{ thumburl: pictureUrl(fileSeed.get(f) ?? 1), url: pictureUrl(fileSeed.get(f) ?? 1), descriptionurl: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(f)}`, mime: "image/jpeg", extmetadata: { LicenseShortName: { value: "CC BY-SA 4.0" }, LicenseUrl: { value: "https://creativecommons.org/licenses/by-sa/4.0" }, Artist: { value: "<a href=\"x\">Iris</a>" }, ImageDescription: { value: s?.fileDescriptions?.[f] ?? `${s?.label} photo ${f}` } } }],
       }]));
       return { query: { pages } };
     }

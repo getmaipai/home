@@ -49,7 +49,7 @@ const engineActivity = createEngineActivity();
 type Label = "V" | "N" | "either" | "n/a";
 type PersonKey = "owner" | "teen" | "childOff" | "childOn";
 type Arm = "OFF" | "ON";
-interface Row { id: string; label: Label; person: PersonKey; text: string; setup?: string; subject?: string; spoken?: boolean; zeroPictures?: boolean }
+interface Row { id: string; split?: "held_out"; label: Label; person: PersonKey; text: string; setup?: string; subject?: string; spoken?: boolean; zeroPictures?: boolean }
 
 const STACK_URL = (process.env.MAIPAI_SMOKE_STACK_URL ?? "http://127.0.0.1:8770").replace(/\/$/, "");
 const OUT = process.env.MAIPAI_IMG05_OUT ?? join(process.cwd(), "..", "data-scratch", "chat-ab", "img05");
@@ -59,6 +59,12 @@ const arg = (name: string): string | null => {
   return at < 0 ? null : (process.argv[at + 1] ?? null);
 };
 const REPEATS = Math.max(1, Number(arg("--repeats") ?? 5) || 5);
+// IMGQ-07: rows marked "held_out" were written after the wording they test and are scored apart; --split dev|held_out picks one.
+const SPLIT = arg("--split");
+if (SPLIT !== null && SPLIT !== "dev" && SPLIT !== "held_out") {
+  console.error(`--split takes dev or held_out, got "${SPLIT}". Run again with --split dev or --split held_out.`);
+  process.exit(2);
+}
 const ONLY = arg("--only") ? new Set(arg("--only")!.split(",")) : null;
 const ARMS = (arg("--arms") ?? "OFF,ON").split(",") as Arm[];
 const CONVERSATION = process.argv.includes("--conversation");
@@ -453,7 +459,7 @@ function save(): void {
   writeFileSync(join(OUT, "results.json"), JSON.stringify({ environment: environment(), runs, conversationRuns }, null, 2));
 }
 
-const rows = (dataset.rows as Row[]).filter((r) => !ONLY || ONLY.has(r.id));
+const rows = (dataset.rows as Row[]).filter((r) => (!ONLY || ONLY.has(r.id)) && (!SPLIT || (SPLIT === "held_out") === (r.split === "held_out")));
 try {
   if (!CONVERSATION_ONLY) {
     for (let rep = 1; rep <= REPEATS && !blockSignal && !searchStopped; rep++) {

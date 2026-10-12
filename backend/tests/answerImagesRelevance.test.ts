@@ -270,3 +270,57 @@ describe("IMG-QUALITY-01a: the disc and label veto", () => {
     expect(judgeRelevance(commons("Vinyl Records stack", "A stack of vinyl records in a shop", { categories: ["Vinyl Records"] }), records)).not.toBe("disc_or_label");
   });
 });
+
+// IMGQ-07: the judged sample of 2026-10-12 (data-scratch/chat-ab/imgq-05-2026-10-12/sample/judging.json, 43 subjects,
+// every tile opened by eye). The captions and file names below are the real rows of the tiles judged wrong.
+describe("IMGQ-07: off-focus, not-named and private-person rows from the judged sample", () => {
+  const withKind = (names: string[], kind: string, extra: Partial<RelevanceContext> = {}): RelevanceContext => ({ ...thing(names), kind, ...extra });
+
+  test("A1: a franchise, product or site row must name the subject in its title or description", () => {
+    const machu = withKind(["Machu Picchu"], "ruins");
+    expect(judgeRelevance(commons("Trail at the old citadel", "Stone terraces above the river", { categories: ["Machu Picchu"] }), machu)).toBe("subject_not_named");
+    expect(judgeRelevance(commons("Machu Picchu terraces", "Stone terraces", { categories: ["Machu Picchu"] }), machu)).toBeNull();
+    // the article's own lead image is exempt; a thing with no kind is judged as before.
+    expect(judgeRelevance(commons("Trail at the old citadel", "", { lead: true }), machu)).toBeNull();
+    expect(judgeRelevance(commons("Trail at the old citadel", "Stone terraces above the river", { categories: ["Machu Picchu"] }), thing(["Machu Picchu"]))).toBe("one_signal");
+  });
+
+  test("A1 reaches a franchise through the entity's media flag", () => {
+    const jurassic = withKind(["Jurassic Park"], "", { media: true });
+    expect(judgeRelevance(commons("Kilauea pasture 02", "The location near Kilauea, Hawaii.", { categories: ["Jurassic Park"] }), jurassic)).toBe("subject_not_named");
+  });
+
+  test("A2: the Covid Wars cinema marquee parody is dropped from Star Wars", () => {
+    const starwars = withKind(["Star Wars"], "film", { media: true });
+    expect(judgeRelevance(commons("Covid Wars - Episode 3 - A New Hope - Gartenbaukino", "Gartenbaukino. Dort wo normalerweise das aktuelle Kinoprogramm verkundet wird, stand wahrend der Coronavirus Star Wars", { categories: ["Star Wars"] }), starwars)).toBe("off_focus:parody");
+  });
+
+  test("A2: factory workers assembling an iPhone are dropped", () => {
+    const iphone = withKind(["iPhone"], "phone");
+    expect(judgeRelevance(commons("Barisan pemasangan pembuatan iPhone oleh Tata Electronics di India", "Tata Electronics berusahasama dengan Winstron untuk memasang iPhone di India.", { categories: ["iPhone"] }), iphone)).toBe("off_focus:factory_workers");
+  });
+
+  test("A2: a brick wall detail and a courtyard are dropped from a site by their Commons category", () => {
+    const taj = withKind(["Taj Mahal"], "mausoleum");
+    expect(judgeRelevance(commons("Taj Mahal", "", { categories: ["Taj Mahal", "Brick wall details"] }), taj)).toBe("off_focus:wall_detail");
+    expect(judgeRelevance(commons("Taj Mahal", "", { categories: ["Taj Mahal", "Courtyards in India"] }), taj)).toBe("off_focus:courtyard");
+    expect(judgeRelevance(commons("Taj Mahal at dawn", "The Taj Mahal at dawn", { categories: ["Taj Mahal"] }), taj)).toBeNull();
+    // a subject whose own name holds the word is exempt.
+    const wall = withKind(["Great Wall of China"], "wall");
+    expect(judgeRelevance(commons("Great Wall of China wall details", "", { categories: ["Great Wall of China", "Wall details"] }), wall)).toBeNull();
+  });
+
+  test("A3: a product row of a named private person using the product is dropped", () => {
+    const kindle = withKind(["Amazon Kindle", "Kindle"], "e-reader");
+    expect(judgeRelevance(commons("Aileen and the CTLE Kindle 2 (3974596562)", "On Thursday, October 1, CTLE Instructional Technology and Enrichment Specialist Aileen McHale taught a workshop on the Kindle", { categories: ["Kindle 2"] }), kindle)).toBe("private_person");
+    expect(judgeRelevance(commons("Kindle 7th gen", "A Kindle 7th gen on a table", { categories: ["Kindle"] }), kindle)).toBeNull();
+    // the same words about a thing that is not a product are not this rule.
+    expect(judgeRelevance(commons("Kindle in a workshop", "A Kindle", { categories: ["Kindle"] }), thing(["Kindle"]))).toBeNull();
+  });
+
+  test("A3: conference panels of private people filed under a franchise are dropped (Stranger Things, NMD 2018 and MEGACON)", () => {
+    const stranger = withKind(["Stranger Things"], "TV series", { media: true });
+    expect(judgeRelevance(commons("Stranger things - NMD 2018 (40059456050)", "Nordiske Mediedager 2018", { categories: ["Stranger Things"] }), stranger)).toBe("caption:mediedager");
+    expect(judgeRelevance(commons("MEGACON 2024 Stranger Things Q&A panel - 2", "Actors at MEGACON Orlando speaking at a \"Stranger Things\" Q&A panel", { categories: ["Stranger Things"] }), stranger)).toBe("caption:megacon");
+  });
+});

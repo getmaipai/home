@@ -71,6 +71,10 @@ export type RelevanceContext = {
   /** The subject's own Wikidata description ("smart speaker"): a word it
    * holds is the subject itself, never an object that replaces it. */
   description?: string;
+  /** IMGQ-07: what the model said the thing is ("e-reader", "ruins"), and whether Wikidata calls it a film, show,
+   * game or franchise. They decide only which extra checks apply to a non-person subject. */
+  kind?: string;
+  media?: boolean;
 };
 
 /** Image-search accuracy study (data-scratch/research/
@@ -114,7 +118,7 @@ const PERSONAL_HOSTS = [
 
 /** Words a caption uses for a person's own snapshot, a fan's costume or
  * build, or a meet-up crowd. Word-boundary matches on the normalised text. */
-const PERSONAL_WORDS = /\b(cosplay|cosplayer|cosplayers|cosplaying|costume|costumes|costumed|fan art|fanart|fanmade|selfie|selfies|me with|my|mine|our|myself|wedding|birthday|meetup|convention|comic con|comiket|lego)\b|コスプレ|コミックマーケット/;
+const PERSONAL_WORDS = /\b(cosplay|cosplayer|cosplayers|cosplaying|costume|costumes|costumed|fan art|fanart|fanmade|selfie|selfies|me with|my|mine|our|myself|wedding|birthday|meetup|convention|megacon|mediedager|comic con|comiket|lego)\b|コスプレ|コミックマーケット/;
 
 /** Words a caption uses when the picture is of people. For a thing (not a
  * person) such a picture is a photo of someone with the thing, often a
@@ -141,6 +145,28 @@ const OBJECT_WORDS = /\b(tickets?|stubs?|histograms?|charts?|signage|speakers?|h
  * A word the subject's own name or Wikidata description holds is exempt (a record label, an album). A lead image
  * is the article's own choice and is not judged by it. */
 const DISC_WORDS = /\b(vinyl|white labels?|record labels?|record sleeves?|picture sleeves?|record discs?|album covers?|cd covers?|compact discs?|45 rpm|78 rpm)\b/
+
+/** IMGQ-07 (judged sample 2026-10-12): the kinds the extra checks apply to. A product is something sold or made
+ * ("e-reader", "game console", "phone"), a site is a place or building, a franchise is a film, show or game
+ * (also any subject Wikidata marks as media). Read from the model's own `kind` word, a closed list. */
+const PRODUCT_KIND = /\b(phones?|smartphones?|consoles?|e-?readers?|tablets?|laptops?|computers?|devices?|gadgets?|products?|appliances?|headphones?|earbuds?|watch(?:es)?|speakers?|cameras?|toys?|brands?)\b/i;
+const SITE_KIND = /\b(ruins?|towers?|bridges?|temples?|parks?|buildings?|mausoleums?|skyscrapers?|canyons?|landmarks?|monuments?|castles?|palaces?|sites?|cathedrals?|churches|mosques?|pyramids?|museums?|stadiums?|mountains?|waterfalls?|lakes?|islands?)\b/i;
+const FRANCHISE_KIND = /\b(films?|movies?|series|shows?|franchises?|video games?|games?|cartoons?|anime|sitcoms?)\b/i;
+
+/** IMGQ-07 A2: a closed vocabulary of the off-focus files the judged sample showed in a subject's category while
+ * naming it (a brick wall detail, a parody cinema marquee, a courtyard, factory workers assembling the product).
+ * Read from the file's title, name, description and visible categories, outside the subject's own name; a
+ * subject whose own name or Wikidata description holds the word is exempt. Each reason is its own counter. */
+const OFF_FOCUS: ReadonlyArray<[reason: string, re: RegExp]> = [
+  ["wall_detail", /\b(wall details?|brick walls?|wall textures?|drain ?pipes?|downspouts?)\b/],
+  ["parody", /\b(parody|parodies|covid wars|marquees?|kinoprogramm)\b/],
+  ["courtyard", /\bcourtyards?\b/],
+  ["factory_workers", /\b(factory|factories|factory workers?|assembly lines?|production lines?|pemasangan|pembuatan)\b/],
+];
+
+/** IMGQ-07 A3: for a product, a picture of a named person using it or teaching with it is a private person's
+ * photo whatever the caption's other words (the Kindle 2 workshop). Closed list of activity words. */
+const PERSON_WITH_PRODUCT = /\b(taught|teaches|teaching|workshop|workshops|specialist|instructor|presenter|presenting|demonstrates|demonstrating|holding|holds|poses|posing)\b/;
 
 /** A place named by its distance from the subject: the picture is of what
  * is opposite it, not of it. */
@@ -297,10 +323,22 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
     return null;
   }
   const words = `${c.title} ${c.objectName ?? ""} ${c.description}`;
+  // IMGQ-07 A1: for a franchise, a product or a site the file's own title, name or description must say the
+  // subject's name (the category alone put a station, a pasture and a parody under their subjects).
+  const kind = ctx.kind ?? "";
+  const isProduct = !subjectIsPerson && PRODUCT_KIND.test(kind);
+  const mustName = !subjectIsPerson && (ctx.media === true || isProduct || SITE_KIND.test(kind) || FRANCHISE_KIND.test(kind));
+  if (mustName && !namesSubject(words, names)) return "subject_not_named";
   // The subject's own name never counts against it ("My Little Pony",
   // "LEGO Batman", "Windows user interface").
   const said = withoutNames(normalizeForMatch(words), names);
   const path = c.source === "search" ? withoutNames(normalizeForMatch(pathWords(c.page)), names) : "";
+  const offFocus = OFF_FOCUS.find(([, re]) => {
+    const hit = firstUnexempt(re, said, own) ?? visible.map((cat) => firstUnexempt(re, cat, own)).find((w) => w !== null) ?? null;
+    return hit !== null && !names.some((n) => ` ${n} `.includes(` ${hit} `) || n.split(" ").includes((hit.split(" ")[0] ?? "").replace(/s$/, "")));
+  });
+  if (offFocus && !subjectIsPerson) return `off_focus:${offFocus[0]}`;
+  if (isProduct && firstUnexempt(PERSON_WITH_PRODUCT, said, own)) return "private_person";
   const screen = firstWord(SCREENSHOT_WORDS, said);
   if (screen) return `caption:${screen}`;
   const disc = firstUnexempt(DISC_WORDS, said, own) ?? visible.map((cat) => firstUnexempt(DISC_WORDS, cat, own)).find((w) => w !== null) ?? null;
@@ -350,4 +388,22 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   if (signals === 0) return "no_subject_match";
   if (signals < 2) return "one_signal";
   return null;
+}
+
+/** IMGQ-07 A4: a candidate that passed every rule above but whose own description is a list of things with the
+ * subject somewhere in the middle of it ("Home delivery of cooked foods machine, ramen, sushi, soba, udon",
+ * "Smartphones, PCs, a Kindle, memory sticks etc."): at least three commas and the subject's first mention after
+ * the second comma. The row keeps its first three pictures whatever their evidence; a weak one after that is left
+ * out instead of filling a tile (five tiles are a ceiling, not a target). Deliberately narrow: the offline replay
+ * of the judged sample showed the broader "description never names the subject" shape cost far more right tiles
+ * than wrong ones. A hashtag list is the uploader's tags, not a list of things, and is exempt. Open-web rows are
+ * scored by the engine weights above and are never weak here; a lead image is the article's own choice. */
+export function isWeakEvidence(c: Pick<RelevanceInput, "source" | "lead" | "description">, ctx: Pick<RelevanceContext, "names">): "description_list" | null {
+  if (c.lead || c.source !== "wikimedia") return null;
+  const description = c.description.trim();
+  if (!description || description.includes("#")) return null;
+  const parts = description.split(",");
+  if (parts.length < 4) return null;
+  const first = parts.findIndex((part) => namesSubject(part, ctx.names));
+  return first >= 2 ? "description_list" : null;
 }

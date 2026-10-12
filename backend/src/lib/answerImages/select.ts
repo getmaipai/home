@@ -17,7 +17,7 @@ import { fetchAnswerImages, type AnswerImageSource } from "./fetch";
 import { putAnswerImage } from "./cache";
 import { ANSWER_IMAGES_MAX_CANDIDATES, GALLERY_VISIBLE, type ShownPictures } from "./gallery";
 import { warmGeometry } from "@/lib/imageSimilarity";
-import { judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
+import { isWeakEvidence, judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
 import { resolveReferenceTitle } from "@/lib/retrieval/referenceReader";
 import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, type FetchJson, type LibraryPage, type WikimediaEntity } from "./wikimedia";
 
@@ -56,6 +56,8 @@ export type AnswerImageTrace = {
   skipped?: AnswerImageSkip;
   sources?: { wikimedia: number; searxng: number };
   dropped_by_floor?: number;
+  /** IMGQ-07 A4: pictures after the first three left out for thin evidence (the five tiles are a ceiling). */
+  dropped_weak?: number;
   /** MINOR-SEARCH-01e-5: pictures left out because their host or page is on a blocked-site list. */
   dropped_by_blocklist?: number;
   /** ANSWER-IMG-05b, IMGQ-04: left out before any fetch as not of the
@@ -207,7 +209,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     // the result's metadata, not a safety floor).
     const names = subjectNames([subject, entity.label], [...(entity.aliases ?? []), ...(entity.otherLabels ?? [])]);
     const searchNames = subjectNames([subject, entity.label], entity.aliases ?? []);
-    const context = { names, searchNames, ...(entity.otherSenseWords ? { otherSenseWords: entity.otherSenseWords } : {}), subjectIsPerson: entity.human, ...(entity.description ? { description: entity.description } : {}), band: input.band, ...(entity.commonsCategory ? { commonsCategory: entity.commonsCategory } : {}), ...(entity.officialSite ? { officialSite: entity.officialSite } : {}) };
+    const context = { names, searchNames, ...(kind ? { kind } : {}), ...(entity.media ? { media: true } : {}), ...(entity.otherSenseWords ? { otherSenseWords: entity.otherSenseWords } : {}), subjectIsPerson: entity.human, ...(entity.description ? { description: entity.description } : {}), band: input.band, ...(entity.commonsCategory ? { commonsCategory: entity.commonsCategory } : {}), ...(entity.officialSite ? { officialSite: entity.officialSite } : {}) };
     let droppedByFloor = 0;
     let droppedByBlocklist = 0;
     const droppedByRelevance: Record<RelevanceDrop, number> = {};
@@ -276,6 +278,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       validated = fromLead;
     }
     const items: AnswerImageItem[] = [];
+    const weakIds = new Set<string>();
     const ids = new Set<string>();
     for (const image of validated) {
       const c = kept[Number(image.id.slice(1))]!;
@@ -283,6 +286,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       if (ids.has(id)) continue;
       ids.add(id);
       if (hasShown && shown!.ids.has(id)) { excludedShown++; continue; }
+      if (isWeakEvidence(c, context)) weakIds.add(id);
       const size = await sharp(image.full).metadata();
       const site = hostOf(c.page);
       const caption = clip(c.description || c.title, CAPTION_MAX);
@@ -303,7 +307,12 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     traceExcluded();
     // Fewer than two new pictures on a "show more": no gallery, the answer stays whole (rule 6).
     if (hasShown && items.length < 2) return skip("none_survived");
-    const shownItems = items.length > GALLERY_VISIBLE && items.length - GALLERY_VISIBLE < 2 ? items.slice(0, GALLERY_VISIBLE) : items;
+    const CORE_TILES = 3;
+    // IMGQ-07 A4: the first CORE_TILES pictures stay whatever their evidence; after them a weak picture is left
+    // out, so a row has fewer than GALLERY_VISIBLE tiles when the rest are thin (the count is a ceiling).
+    const solid = items.filter((item, i) => i < CORE_TILES || !weakIds.has(item.id));
+    if (solid.length < items.length) trace.dropped_weak = items.length - solid.length;
+    const shownItems = solid.length > GALLERY_VISIBLE && solid.length - GALLERY_VISIBLE < 2 ? solid.slice(0, GALLERY_VISIBLE) : solid;
     trace.shown = shownItems.length;
     if (shownItems.length === 0) return skip("none_survived");
     return { set: { layout: "row", visible: Math.min(GALLERY_VISIBLE, shownItems.length), items: shownItems }, trace };
