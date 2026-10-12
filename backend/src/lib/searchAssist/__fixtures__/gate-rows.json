@@ -1,0 +1,228 @@
+{
+ "note": "Frozen 2-dimensional vectors scored against weights.json (the fixture head). Vectors and persona-safe ids only, no utterances. The real held-out set is added with the signed weights release.",
+ "rows": [
+  {
+   "id": "recency-alfred-0",
+   "category": "recency",
+   "alone": [
+    0.6216,
+    0.7833
+   ]
+  },
+  {
+   "id": "recency-astro-1",
+   "category": "recency",
+   "alone": [
+    0.5403,
+    0.8415
+   ]
+  },
+  {
+   "id": "recency-atlas-2",
+   "category": "recency",
+   "alone": [
+    0.4536,
+    0.8912
+   ]
+  },
+  {
+   "id": "recency-bramble-3",
+   "category": "recency",
+   "alone": [
+    0.3624,
+    0.932
+   ]
+  },
+  {
+   "id": "recency-bruno-4",
+   "category": "recency",
+   "alone": [
+    0.2675,
+    0.9636
+   ]
+  },
+  {
+   "id": "recency-clover-5",
+   "category": "recency",
+   "alone": [
+    0.17,
+    0.9854
+   ]
+  },
+  {
+   "id": "recency-cosmo-6",
+   "category": "recency",
+   "alone": [
+    0.6967,
+    0.7174
+   ]
+  },
+  {
+   "id": "recency-daisy-7",
+   "category": "recency",
+   "alone": [
+    0.0707,
+    0.9975
+   ]
+  },
+  {
+   "id": "stable-ember-8",
+   "category": "stable",
+   "alone": [
+    0.9801,
+    -0.1987
+   ]
+  },
+  {
+   "id": "stable-indigo-9",
+   "category": "stable",
+   "alone": [
+    0.9211,
+    -0.3894
+   ]
+  },
+  {
+   "id": "stable-iris-10",
+   "category": "stable",
+   "alone": [
+    0.8253,
+    -0.5646
+   ]
+  },
+  {
+   "id": "stable-juniper-11",
+   "category": "stable",
+   "alone": [
+    0.995,
+    -0.0998
+   ]
+  },
+  {
+   "id": "stable-lucia-12",
+   "category": "stable",
+   "alone": [
+    0.6967,
+    -0.7174
+   ]
+  },
+  {
+   "id": "stable-marlow-13",
+   "category": "stable",
+   "alone": [
+    0.995,
+    0.0998
+   ]
+  },
+  {
+   "id": "no_tool-marsh-14",
+   "category": "no_tool",
+   "alone": [
+    0.9553,
+    -0.2955
+   ]
+  },
+  {
+   "id": "no_tool-mopey-15",
+   "category": "no_tool",
+   "alone": [
+    0.8776,
+    -0.4794
+   ]
+  },
+  {
+   "id": "no_tool-nadia-16",
+   "category": "no_tool",
+   "alone": [
+    0.7648,
+    -0.6442
+   ]
+  },
+  {
+   "id": "no_tool-nova-17",
+   "category": "no_tool",
+   "alone": [
+    1.0,
+    0.0
+   ]
+  },
+  {
+   "id": "no_tool-oliver-18",
+   "category": "no_tool",
+   "alone": [
+    0.6216,
+    -0.7833
+   ]
+  },
+  {
+   "id": "no_tool-pippa-19",
+   "category": "no_tool",
+   "alone": [
+    0.9801,
+    0.1987
+   ]
+  },
+  {
+   "id": "recency-sage-20",
+   "category": "recency",
+   "alone": [
+    0.8253,
+    0.5646
+   ]
+  },
+  {
+   "id": "recency-serena-21",
+   "category": "recency",
+   "alone": [
+    0.7648,
+    0.6442
+   ]
+  },
+  {
+   "id": "no_tool-sprout-22",
+   "category": "no_tool",
+   "alone": [
+    0.6216,
+    0.7833
+   ]
+  },
+  {
+   "id": "followup-tempo-23",
+   "category": "no_tool",
+   "followUp": true,
+   "alone": [
+    0.8776,
+    -0.4794
+   ],
+   "pair": [
+    0.6967,
+    0.7174
+   ]
+  },
+  {
+   "id": "followup-velvet-24",
+   "category": "no_tool",
+   "followUp": true,
+   "alone": [
+    0.9553,
+    -0.2955
+   ],
+   "pair": [
+    0.3624,
+    0.932
+   ]
+  },
+  {
+   "id": "followup-willow-25",
+   "category": "no_tool",
+   "followUp": true,
+   "alone": [
+    0.8776,
+    0.4794
+   ],
+   "pair": [
+    0.8776,
+    -0.4794
+   ]
+  }
+ ]
+}

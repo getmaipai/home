@@ -323,6 +323,8 @@ minor reaches SearXNG only. A failed source contributes nothing; only if all fai
 A write of `[]`, or of only an unbuilt source, is a 400 that names the fix. The ddgs searcher is
 SEARCH-DDGS-01 (below). Images, videos, hosted search and page reads are outside the chooser.
 
+**ROUTER-BUILD-01f (2026-10-12): the search assist gate.** `tests/searchAssistGate.test.ts` freezes held-out embedding vectors (vectors and persona ids only, never utterances), scores them with the manifest through the shipped `score.ts`, and fails when recall or a false-search rate crosses its floor (`floorMisses`, with a stated tolerance). Until the signed weights release the set is a 2-dimensional stand-in scored by the fixture head, which proves the arithmetic and the wiring, not quality. The production bench arm is the existing `assist_rescue` arm of `search-recency-02.ts` (it drives the real `turnNext` path); `MAIPAI_SR_WEIGHTS` lets it run a locally trained manifest before the pin exists. Still needing the release: the pin in `weights.ts`, the real 768-dimension held-out vectors, RAW-01's floors as a second gate set, and one recorded bench run (ROUTER-BUILD-01g).
+
 **SEARCH-SOURCES-01b (2026-10-12): blend follow-ups.** `runWebSources` gives each source 8 s (`SOURCE_TIMEOUT_MS`) before going on without it; the blend key is `normalizeUrlKey(url)` (host lowercased, `www.`, fragment, trailing slash, default port and `utm_*`/`fbclid`/`gclid` dropped, http and https equal) while the shown row keeps its own url; `textOf` clips title and snippet to 300 characters like the SearXNG-only text. The single-source default path is unchanged.
 
 **SEARCH-DDGS-01 (2026-10-12): the ddgs source.** `src/lib/retrieval/ddgsSource.ts` fills the ddgs slot. The

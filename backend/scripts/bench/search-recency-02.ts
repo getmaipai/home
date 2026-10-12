@@ -18,6 +18,7 @@ import "../../../scripts/runTemp";
 //   assist_shadow / assist_rescue (01k) plain with chat.search_assist shadow or rescue; the Stack's embed role is forwarded
 //           (MAIPAI_SR_EMBED_URL) so a minor's turn has a recall vector. assist_rescue needs a checkout where
 //           MINOR_RESCUE_ENABLED is true (a bench-only edit, never committed); the harness refuses otherwise.
+//           MAIPAI_SR_WEIGHTS=<manifest.json> supplies the head before the signed release (ROUTER-BUILD-01f).
 //   desc    (arm 1) plain plus one sentence on the websearch description (first round).
 //   cutoff  (arm 2) plain plus the loki-doki e0d8c75e knowledge-cutoff block on the system message.
 // Teen rows (01k) run once per gate grain (--grains sentence,arrival; sets chat.teen_gate_grain); a child is always sentence.
@@ -412,6 +413,17 @@ process.env.MAIPAI_EMBED_URL = process.env.MAIPAI_LLAMA_SERVER_URL;
 if (ARMS.some((a) => a === "assist_shadow" || a === "assist_rescue") && !process.env.MAIPAI_SR_EMBED_URL) {
   console.error("search-recency-02 refused: the assist arms need MAIPAI_SR_EMBED_URL (the Stack's address, for its embed role); a minor's turn is scored only with a recall vector.");
   process.exit(2);
+}
+// ROUTER-BUILD-01f: assist_rescue is the production arm (the real turnNext path with chat.search_assist = rescue). Until the
+// signed weights release exists the production pin is empty and the loader reports weights_missing, so the arm would run as a
+// plain turn. MAIPAI_SR_WEIGHTS=<manifest.json> hands the arm a locally trained manifest (same parser as the loader); the app
+// never reads this variable. The run record names the manifest's bench_record so a result is traceable to the head it used.
+if (process.env.MAIPAI_SR_WEIGHTS && ARMS.some((a) => a === "assist_shadow" || a === "assist_rescue")) {
+  const { readBenchManifest } = await import("./searchAssistGate");
+  const { __setSearchAssistLoaderForTests } = await import("@/lib/searchAssist/shadow");
+  const manifest = readBenchManifest(process.env.MAIPAI_SR_WEIGHTS);
+  __setSearchAssistLoaderForTests(async () => manifest);
+  console.log(`[search-recency-02] assist weights from ${process.env.MAIPAI_SR_WEIGHTS} (${manifest.bench_record})`);
 }
 if (ARMS.includes("assist_rescue") && [...BANDS].some((b) => b === "child" || b === "teen")) {
   const { MINOR_RESCUE_ENABLED } = await import("@/lib/searchAssist/eligible");
