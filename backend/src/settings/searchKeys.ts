@@ -17,6 +17,13 @@
 // SearXNG's default JSON API needs no key or token.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
+/** spec-v0.1.120 lists `copy` after `honoured_by` in these two entries (the generated registry compares
+ * the serialized text, so field order counts). Follow the spec's order until a spec tag normalises it. */
+function specFieldOrder(entry: SettingsKey): SettingsKey {
+  const { copy, ...rest } = entry as SettingsKey & { copy?: unknown };
+  return { ...rest, ...(copy !== undefined ? { copy } : {}) } as SettingsKey;
+}
+
 export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
     key: "search.searxng_url",
@@ -55,7 +62,7 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   // MINOR-SEARCH-01c: declared once in commons (spec/settings/keys.json), mirrored here for the registry.
-  SettingsKey.parse({
+  specFieldOrder(SettingsKey.parse({
       "key": "search.web.child_mode",
       "scope": "household",
       "selector": "select",
@@ -80,9 +87,9 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
               "off": "Answers only from the offline library."
           }
       }
-  }),
+  })),
   // MINOR-SEARCH-01c: declared once in commons (spec/settings/keys.json), mirrored here for the registry.
-  SettingsKey.parse({
+  specFieldOrder(SettingsKey.parse({
       "key": "search.web.teen_mode",
       "scope": "household",
       "selector": "select",
@@ -107,5 +114,5 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
               "off": "Answers only from the offline library."
           }
       }
-  }),
+  })),
 ];
