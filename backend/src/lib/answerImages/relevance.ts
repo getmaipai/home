@@ -48,6 +48,9 @@ export type RelevanceInput = {
   format?: string;
   /** Wikidata names this file as the subject's logo, flag, map and so on. */
   nonPhoto?: boolean;
+  /** IMGQ-10: Commons structured data says the file depicts the subject (P180). It stands in for the category
+   * signal in the agree count and nothing else: it never skips a veto or a naming rule. */
+  depicts?: boolean;
   /** Open-web rows: the search engines that returned it. */
   engines?: readonly string[];
 };
@@ -172,7 +175,10 @@ const PERSON_WITH_PRODUCT = /\b(taught|teaches|teaching|workshop|workshops|speci
  * is opposite it, not of it. */
 const MILITARY_WORDS = /\b(sgt|sergeant|squadron|airman|petty officer|air force)\b/;
 const OCCUPIES_SITE = /\boccup(?:y|ies|ied)\s+the\s+(?:location|site|spot|grounds?|land)\s+of\s+(?:the\s+)?(.*)$/;
-const NEAR_PREPOSITIONS = ["opposite", "near", "nearby", "next to", "beside", "behind", "outside", "across from", "facing", "overlooking", "close to", "adjacent to", "view from", "seen from", "taken from"];
+const NEAR_PREPOSITIONS = ["opposite", "near", "nearby", "next to", "beside", "behind", "outside", "across from", "facing", "overlooking", "close to", "adjacent to", "view from", "seen from", "taken from", "in front of", "past"];
+/** IMGQ-10: "Champ de Mars from the Eiffel Tower" is a view from the subject, not of it. A thing only: a
+ * person is quoted ("a letter from Einstein"). */
+const THING_NEAR_PREPOSITIONS = ["from"];
 
 /** Words a caption uses for a screen capture, not a photo. */
 const SCREENSHOT_WORDS = /\b(screenshot|screenshots|screen shot|screen capture|screencap|virtual desktop|desktop pet|application window|user interface|taskbar)\b|скриншот|スクリーンショット/;
@@ -185,7 +191,17 @@ const SCREENSHOT_WORDS = /\b(screenshot|screenshots|screen shot|screen capture|s
 const CATEGORY_STEMS = ["cosplay", "cosplayers", "costumes", "fan art", "selfies", "screenshots", "scans", "diagrams", "maps of", "logos", "icons", "charts", "signatures", "documents", "drawings", "sketches", "comics", "memes", "collages", "montages", "people at", "tourists", "visitors", "audiences", "crowds", "conventions", "comiket", "wikimedians", "users", "flags of", "coats of arms"];
 /** Category stems for a thing's pictures of people with it (a person's own
  * pictures are filed under such categories as a matter of course). */
-const THING_PEOPLE_STEMS = ["people with", "people in", "standing people", "sitting people"];
+const THING_PEOPLE_STEMS = ["people with", "people in", "standing people", "sitting people", "standing men", "standing women", "sitting men", "sitting women"];
+
+/** IMGQ-10: words that put a minor in the frame, read from the file's description and visible categories (the
+ * judged sample's Obama family photo sat in "Malia Obama in 2011"). A closed list, one counter per word
+ * (`minor:<word>`); a word the subject's own name or description holds is exempt. Only ever removes. */
+const MINOR_WORDS = /\b(child|children|kid|kids|boy|boys|girl|girls|baby|babies|toddler|toddlers|teen|teens|teenager|teenagers|daughter|daughters|son|sons|pupil|pupils|schoolchildren|schoolboy|schoolgirl)\b/;
+
+/** IMGQ-10: a Commons category of the form "<Name Name> in <year or place>" is a person's (or a landmark's) own
+ * category. On a person's picture, one that does not name the subject says another person is in the frame
+ * ("Michelle Obama in 2011" beside "Barack Obama in Brazil"). Read from the category's own shape, no list. */
+const NAME_IN_CATEGORY = /^(\p{Lu}[\p{L}'.-]+(?: \p{Lu}[\p{L}'.-]+)+) in (?:\d{4}|[\p{Lu}])/u;
 const PEOPLE_STEMS = new Set(["people at", "tourists", "visitors", "audiences", "crowds", "conventions", "cosplayers", "selfies"]);
 
 /** Picture kinds that are not a still photo. */
@@ -375,11 +391,19 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
     const serving = firstUnexempt(MILITARY_WORDS, said, own);
     if (serving) return `namesake:${serving}`;
   }
+  const minor = !subjectIsPerson ? null : firstUnexempt(MINOR_WORDS, said, own) ?? visible.map((cat) => firstUnexempt(MINOR_WORDS, cat, own)).find((w) => w !== null) ?? null;
+  if (minor) return `minor:${minor}`;
+  // A surname alone ("Obama") also names Michelle Obama: the full name is what tells the two apart.
+  const fullNames = names.some((n) => n.includes(" ")) ? names.filter((n) => n.includes(" ")) : names;
+  if (subjectIsPerson && (c.categories ?? []).some((cat) => {
+    const m = NAME_IN_CATEGORY.exec(cat);
+    return m !== null && !namesSubject(m[1]!, fullNames);
+  })) return "category_person";
   const object = firstUnexempt(OBJECT_WORDS, said, own);
   if (object) return `object:${object}`;
   if (c.source === "wikimedia") {
     const hay = normalizeForMatch(words);
-    const near = NEAR_PREPOSITIONS.find((prep) => names.some((n) => hay.includes(` ${prep} ${n} `) || hay.includes(` ${prep} the ${n} `)));
+    const near = [...NEAR_PREPOSITIONS, ...(subjectIsPerson ? [] : THING_NEAR_PREPOSITIONS)].find((prep) => names.some((n) => hay.includes(` ${prep} ${n} `) || hay.includes(` ${prep} the ${n} `)));
     if (near) return `near:${near}`;
     // A building that now stands where the subject's old ground was.
     const onSite = OCCUPIES_SITE.exec(hay)?.[1];
@@ -401,7 +425,9 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
     const inCategory = c.categories === undefined || c.categories.length === 0
       ? true
       : c.categories.some((cat) => (category !== null && normalizeForMatch(cat).trim() === category) || namesSubject(cat, names));
-    if (inCategory) signals++;
+    // IMGQ-10: structured data stands in for the category only when the file's own title or name also says the
+    // subject (a photo "taken with an iPhone" depicts one without being of it).
+    if (inCategory || (c.depicts === true && namesSubject(`${c.title} ${c.objectName ?? ""}`, names))) signals++;
     if (namesSubject(words, names)) signals++;
   } else {
     // Study R3 to R5 (replacing the path signal, which the study found adds

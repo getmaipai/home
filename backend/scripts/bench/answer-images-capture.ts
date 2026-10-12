@@ -7,6 +7,9 @@
 // and no engine is involved (unlike answer-images-sample.ts, which this does not
 // replace: that one scores a judged sheet).
 //
+// IMGQ-10: the depicts search (haswbstatement:P180=<Qid>, Commons structured data) goes through the same
+// `fetchJson` tap, so a fresh capture holds it; an older capture is topped up by answer-images-replay.ts --topup.
+//
 // A person's pace (docs/THIRD-PARTY-SERVICES.md): subjects one at a time with a
 // pause between them; a 429, or a 403 from a Wikimedia host, stops the run.
 //

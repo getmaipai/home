@@ -7,13 +7,14 @@ import sharp from "sharp";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
-import { __setAnswerImageDepsForTests, selectAnswerImages } from "@/lib/answerImages/select";
+import { __setAnswerImageDepsForTests, mergeDepicts, selectAnswerImages } from "@/lib/answerImages/select";
+import { __resetDepictsForTests, depictsUrl, wikimediaDepicts } from "@/lib/answerImages/wikimedia";
 import { isWeakEvidence, judgeRelevance, namesSubject, subjectNames, type RelevanceContext, type RelevanceInput } from "@/lib/answerImages/relevance";
 import { filterAnswerImages } from "@/lib/answerImages/quality";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { fixtureWorld, pictureUrl, syntheticPhoto, type FixtureSubject } from "./answerImagesFixture";
 
-type Extra = Partial<Pick<RelevanceInput, "objectName" | "categories" | "restrictions" | "width" | "format" | "nonPhoto" | "lead" | "engines">>;
+type Extra = Partial<Pick<RelevanceInput, "objectName" | "categories" | "restrictions" | "width" | "format" | "nonPhoto" | "lead" | "engines" | "depicts">>;
 const commons = (title: string, description = "", extra: Extra = {}): RelevanceInput => ({ source: "wikimedia", lead: false, title, description, page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(title)}.jpg`, image: `https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/${encodeURIComponent(title)}.jpg/1280px-x.jpg`, ...extra });
 const search = (title: string, page: string, image: string, extra: Extra = {}): RelevanceInput => ({ source: "search", lead: false, title, description: "", page, image, ...extra });
 const thing = (names: string[], commonsCategory?: string, band: RelevanceContext["band"] = "adult"): RelevanceContext => ({ names: subjectNames(names), subjectIsPerson: false, band, ...(commonsCategory ? { commonsCategory } : {}) });
@@ -374,5 +375,116 @@ describe("IMGQ-08: a tagged file is not a picture of what it is tagged with", ()
   test("Ramen: a delivery-machine description listing five foods with the subject second counts as a weak list", () => {
     expect(isWeakEvidence(commons("Demaeki", "Home delivery of cooked foods machine, ramen, sushi, soba, udon", { categories: ["Blue Honda Super Cub", "Ramen"] }), { names: subjectNames(["Ramen"]) })).toBe("description_list");
     expect(isWeakEvidence(commons("Ramen bowl", "Tonkotsu ramen, with egg, nori, scallion"), { names: subjectNames(["Ramen"]) })).toBeNull();
+  });
+});
+
+// IMGQ-10: Commons structured data (P180 "depicts") orders and recalls; it never exempts. Rows are the captured
+// Commons answers of the judged sample and held-out split (2026-10-12).
+describe("IMGQ-10: depicts is a signal behind the vetoes, never an exemption", () => {
+  const obama = person(["Barack Obama", "Obama"], "Barack Obama");
+
+  test("the Obama family photo in Rio (daughters in the description, 'Malia Obama in 2011' in its categories) is dropped even when depicts names Obama", () => {
+    const row = commons("Obama family in mist in Rio de Janeiro", "United States President Barack Obama, First Lady Michelle Obama, and daughters Sasha and Malia in the mist", { depicts: true, categories: ["Barack Obama in Brazil, March 19-21 2011", "Cristo Redentor in 2011", "Malia Obama in 2011", "Michelle Obama in 2011"] });
+    expect(judgeRelevance(row, obama)).toBe("minor:daughters");
+  });
+
+  test("a person's file filed under another named person's own category is dropped, a file in the subject's own is not", () => {
+    const other = commons("Obama with a visitor", "Barack Obama at a reception", { depicts: true, categories: ["Barack Obama in 2011", "Michelle Obama in 2011"] });
+    expect(judgeRelevance(other, obama)).toBe("category_person");
+    const own = commons("Obama Portrait 2006", "Barack Obama delivers a speech at the University of Southern California", { depicts: true, categories: ["Barack Obama in California", "Portraits of Barack Obama"] });
+    expect(judgeRelevance(own, obama)).toBeNull();
+  });
+
+  test("depicts never skips the PNG veto, the naming rules or the crowded-category rule", () => {
+    const tower = thing(["Eiffel Tower"], "Eiffel Tower");
+    expect(judgeRelevance({ ...commons("Eiffel diagram", "Eiffel Tower", { depicts: true, categories: ["Eiffel Tower"] }), page: "https://commons.wikimedia.org/wiki/File:Eiffel_diagram.png" }, tower)).toBe("png_not_photo");
+    const phone: RelevanceContext = { ...thing(["iPhone"], "IPhone"), kind: "phone" };
+    expect(judgeRelevance(commons("Avions à l'aéroport de Madrid 2015", "", { depicts: true, categories: ["Aeropuerto de Madrid-Barajas T4S", "Runways of Adolfo Suárez Madrid-Barajas Airport"] }), phone)).toBe("subject_not_named");
+  });
+
+  test("an airport photo 'taken with an iPhone 6' depicts the phone as its camera: the title must say the subject too", () => {
+    const phone: RelevanceContext = { ...thing(["iPhone"], "IPhone"), kind: "phone" };
+    const row = commons("Avions à l'aéroport de Madrid 2015", "This photograph was taken with an iPhone 6", { depicts: true, categories: ["Aeropuerto de Madrid-Barajas T4S", "Runways of Adolfo Suárez Madrid-Barajas Airport"] });
+    expect(judgeRelevance(row, phone)).toBe("one_signal");
+  });
+
+  test("a file whose title names the subject and sits in no naming category counts depicts as its second signal", () => {
+    const notre = thing(["Notre-Dame de Paris", "Notre Dame"], "Notre-Dame de Paris");
+    const cats = ["2014 photographs of Paris", "Front views of statues"];
+    const row = commons("Paris, Notre Dame -- 2014 -- 1458-65", "Sculptures of the kings of Judea at the west front of Notre-Dame, Paris", { categories: cats });
+    expect(judgeRelevance(row, notre)).toBe("one_signal");
+    expect(judgeRelevance({ ...row, depicts: true }, notre)).toBeNull();
+  });
+
+  test("a view from the subject is not of it, for a thing and not for a person ('Champ de Mars from the Eiffel Tower')", () => {
+    const tower = thing(["Eiffel Tower"], "Eiffel Tower");
+    expect(judgeRelevance(commons("Champ de Mars from the Eiffel Tower - July 2006 edit", "A two segment panorama of Champ de Mars from the Eiffel Tower", { depicts: true, categories: ["Champ-de-Mars from the third floor of the Eiffel Tower"] }), tower)).toBe("near:from");
+    expect(judgeRelevance(commons("Letter", "A letter from Albert Einstein to the president", { categories: ["Albert Einstein"] }), person(["Albert Einstein"], "Albert Einstein"))).toBeNull();
+  });
+
+  test("fighter jets 'in front of Mount Fuji' are not the subject", () => {
+    const fuji = thing(["Mount Fuji", "Fuji"], "Mount Fuji");
+    expect(judgeRelevance(commons("CVW-5 Apr2007", "Aircraft assigned to Carrier Air Wing Five perform a formation flight in front of Mount Fuji, Japan", { depicts: true, categories: ["2007 in aviation in Japan"] }), fuji)).toBe("near:in front of");
+  });
+
+  test("standing men in a thing's categories mark a picture of people ('Wearing Pikachu')", () => {
+    const pikachu = thing(["Pikachu"], "Pikachu");
+    expect(judgeRelevance(commons("Wearing Pikachu (31651470496)", "Wearing Pikachu", { depicts: true, categories: ["College Library, Helen C. White Hall", "Men wearing blue jeans", "Standing men seen from behind in the United States"] }), pikachu)).toBe("category:standing men");
+  });
+});
+
+describe("IMGQ-10: the depicts search is merged behind the lead and fails soft", () => {
+  const file = (n: string, extra: { lead?: boolean; depicts?: boolean } = {}) => ({ url: `https://upload.example.com/${n}.jpg`, page: `https://commons.wikimedia.org/wiki/File:${n}.jpg`, title: n, description: "", lead: false, ...extra });
+  const pages = (names: string[]) => ({ query: { pages: Object.fromEntries(names.map((n, i) => [String(i), { title: `File:${n}.jpg`, index: names.length - i, imageinfo: [{ mime: "image/jpeg", url: `https://upload.example.com/${n}.jpg`, descriptionurl: `https://commons.wikimedia.org/wiki/File:${n}.jpg`, width: 900 }] }])) } });
+  beforeEach(() => __resetDepictsForTests());
+
+  test("the lead stays first, depicts files follow in search order, the rest of the category after", () => {
+    const merged = mergeDepicts([file("lead", { lead: true }), file("c1"), file("c2")], [file("c2", { depicts: true }), file("d1", { depicts: true })]);
+    expect(merged.map((m) => m.title)).toEqual(["lead", "c2", "d1", "c1"]);
+    expect(merged.find((m) => m.title === "c2")?.depicts).toBe(true);
+    expect(merged.find((m) => m.title === "c1")?.depicts).toBeUndefined();
+  });
+
+  test("a lead that depicts also names the subject carries the depicts mark", () => {
+    const merged = mergeDepicts([file("lead", { lead: true })], [file("lead", { depicts: true, lead: true })]);
+    expect(merged).toHaveLength(1);
+    expect(merged[0]?.depicts).toBe(true);
+  });
+
+  test("an empty depicts answer leaves the category answer as it was", () => {
+    const category = [file("lead", { lead: true }), file("c1")];
+    expect(mergeDepicts(category, [])).toEqual(category);
+  });
+
+  test("one search per item, cached; the request is the structured-data search on the item's Q-id", async () => {
+    const urls: string[] = [];
+    const fetchJson = async (url: string) => { urls.push(url); return pages(["a", "b"]); };
+    const first = await wikimediaDepicts({ id: "Q243", image: undefined }, fetchJson, { now: 1000 });
+    const again = await wikimediaDepicts({ id: "Q243", image: undefined }, fetchJson, { now: 2000 });
+    expect(first.map((f) => f.title)).toEqual(["b", "a"]);
+    expect(first.every((f) => f.depicts === true)).toBe(true);
+    expect(again).toEqual(first);
+    expect(urls).toEqual([depictsUrl("Q243")]);
+    expect(decodeURIComponent(urls[0]!)).toContain("haswbstatement:P180=Q243");
+  });
+
+  test("an id that is not a Wikidata item asks nothing", async () => {
+    let calls = 0;
+    expect(await wikimediaDepicts({ id: "commons:Foo", image: undefined }, async () => { calls++; return {}; })).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
+  test("the first failure (a 429) returns no files, never throws, and keeps the search quiet for 15 minutes", async () => {
+    let calls = 0;
+    const failing = async () => { calls++; throw new Error("HTTP 429"); };
+    expect(await wikimediaDepicts({ id: "Q1", image: undefined }, failing, { now: 0 })).toEqual([]);
+    expect(await wikimediaDepicts({ id: "Q2", image: undefined }, failing, { now: 60_000 })).toEqual([]);
+    expect(calls).toBe(1);
+    expect(await wikimediaDepicts({ id: "Q2", image: undefined }, async () => pages(["z"]), { now: 16 * 60_000 })).toHaveLength(1);
+  });
+
+  test("the local pace running out is not the service pushing back and does not start the quiet window", async () => {
+    await wikimediaDepicts({ id: "Q3", image: undefined }, async () => { throw new Error("paced: wait"); }, { now: 0 });
+    expect(await wikimediaDepicts({ id: "Q4", image: undefined }, async () => pages(["y"]), { now: 1000 })).toHaveLength(1);
   });
 });

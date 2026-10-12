@@ -7,6 +7,12 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Added
+- Pictures under an answer: for an adult, Commons structured data ("depicts") now brings in
+  more pictures of the subject and puts them first, behind the same checks as every other
+  picture. Photos with children in them, and photos filed under another person's own
+  Commons category, are left out of a person's row.
+
 ### Fixed
 - Pictures under an answer: a screenshot, signature or diagram saved as a PNG,
   a file whose name was mangled by a bulk rename, and a photo of something

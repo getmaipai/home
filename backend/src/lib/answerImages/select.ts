@@ -19,7 +19,7 @@ import { ANSWER_IMAGES_MAX_CANDIDATES, GALLERY_VISIBLE, type ShownPictures } fro
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { isWeakEvidence, judgeRelevance, searchScore, subjectNames, type RelevanceDrop } from "./relevance";
 import { resolveReferenceTitle } from "@/lib/retrieval/referenceReader";
-import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaFetchJson, type FetchJson, type LibraryPage, type WikimediaEntity } from "./wikimedia";
+import { isNonPhotoFile, isUnder18, resolveWikimediaSubject, wikimediaCandidates, wikimediaDepicts, wikimediaFetchJson, type FetchJson, type LibraryPage, type WikimediaEntity } from "./wikimedia";
 
 /** Kinds the model uses for a person (its own `kind` argument, never the
  * person's message): with no Wikipedia article such a name may be a private
@@ -97,6 +97,8 @@ type Candidate = {
   width?: number;
   format?: string;
   nonPhoto?: boolean;
+  /** IMGQ-10: Commons structured data says the file depicts the subject. */
+  depicts?: boolean;
   /** Open-web rows: the engines that returned it, and its stated short side. */
   engines?: string[];
   shortSide?: number;
@@ -106,6 +108,21 @@ type Candidate = {
 function sizeOfResolution(resolution: string | undefined): { width: number; height: number } | undefined {
   const m = resolution ? /^\s*(\d{1,5})\s*[x×]\s*(\d{1,5})\s*$/i.exec(resolution) : null;
   return m ? { width: Number(m[1]), height: Number(m[2]) } : undefined;
+}
+
+/** IMGQ-10: the category's files and the depicts search's files as one list, each file once. Order: the lead
+ * image, then the files that depict the subject (the search's own order), then the other category files. A
+ * category file the search also returned is marked as depicting. Only the order and the mark change; no file is
+ * exempt from anything because of it. */
+export function mergeDepicts<T extends { page: string; lead: boolean; depicts?: boolean }>(category: readonly T[], depicting: readonly T[]): T[] {
+  if (depicting.length === 0) return [...category];
+  const byPage = new Map(category.map((c) => [c.page, c]));
+  const marked = depicting.map((d) => ({ ...(byPage.get(d.page) ?? d), depicts: true }));
+  const taken = new Set(marked.map((m) => m.page));
+  const leadKeys = new Set(marked.map((m) => m.page));
+  const lead = [...category.filter((c) => c.lead).map((c) => (leadKeys.has(c.page) ? { ...c, depicts: true } : c)), ...marked.filter((m) => m.lead && !byPage.has(m.page))];
+  const leadPages = new Set(lead.map((l) => l.page));
+  return [...lead, ...marked.filter((m) => !leadPages.has(m.page)), ...category.filter((c) => !leadPages.has(c.page) && !taken.has(c.page))];
 }
 
 /** At most this many of the fetch slots from one source, so one source
@@ -178,8 +195,14 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
         allowed = extract !== null && extract.trim().length > 0 && !trips(extract, "teen");
       }
       if (!allowed) return [];
-      const found = await wikimediaCandidates(entity, fetchJson, { leadOnly: entity.human && entity.birthDate === undefined, band: input.band }).catch(() => []);
-      return found.map((c): Candidate => ({ ...c, source: "wikimedia", ...(isNonPhotoFile(entity, c) ? { nonPhoto: true } : {}) }));
+      const leadOnly = entity.human && entity.birthDate === undefined;
+      // IMGQ-10: beside the category call, one Commons structured-data search for files that depict the subject's
+      // item (adults only; a failure is today's answer). Depicts orders and adds recall; it never exempts a file.
+      const [found, depicting] = await Promise.all([
+        wikimediaCandidates(entity, fetchJson, { leadOnly, band: input.band }).catch(() => []),
+        input.band === "adult" && !leadOnly ? wikimediaDepicts(entity, fetchJson, { band: input.band }) : Promise.resolve([]),
+      ]);
+      return mergeDepicts(found, depicting).map((c): Candidate => ({ ...c, source: "wikimedia", ...(isNonPhotoFile(entity, c) ? { nonPhoto: true } : {}) }));
     };
     // SearXNG images (source 4): never for a person (it returns look-alikes
     // and strangers); a minor only through safe-search-capable engines. Asked
@@ -247,7 +270,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       if (trips(`${c.title}. ${c.description}`, input.band)) { droppedByFloor++; continue; }
       // MINOR-SEARCH-01e-5: a picture hosted on, or taken from a page on, a blocked site is never shown.
       if (!urlAllowedFor(input.band, c.url, input.actor.id) || (c.page && !urlAllowedFor(input.band, c.page, input.actor.id))) { droppedByBlocklist++; continue; }
-      const off = judgeRelevance({ source: c.source, lead: c.lead, title: c.title, description: c.description, page: c.page, image: c.url, ...(c.objectName ? { objectName: c.objectName } : {}), ...(c.categories ? { categories: c.categories } : {}), ...(c.restrictions ? { restrictions: c.restrictions } : {}), ...(c.width !== undefined ? { width: c.width } : {}), ...(c.format ? { format: c.format } : {}), ...(c.nonPhoto ? { nonPhoto: true } : {}), ...(c.engines ? { engines: c.engines } : {}) }, context);
+      const off = judgeRelevance({ source: c.source, lead: c.lead, title: c.title, description: c.description, page: c.page, image: c.url, ...(c.objectName ? { objectName: c.objectName } : {}), ...(c.categories ? { categories: c.categories } : {}), ...(c.restrictions ? { restrictions: c.restrictions } : {}), ...(c.width !== undefined ? { width: c.width } : {}), ...(c.format ? { format: c.format } : {}), ...(c.nonPhoto ? { nonPhoto: true } : {}), ...(c.depicts ? { depicts: true } : {}), ...(c.engines ? { engines: c.engines } : {}) }, context);
       if (off) { droppedByRelevance[off] = (droppedByRelevance[off] ?? 0) + 1; continue; }
       if (perSource[c.source] >= PER_SOURCE_SLOTS) continue;
       perSource[c.source]++;

@@ -64,6 +64,9 @@ export type WikimediaCandidate = {
   restrictions?: string[];
   /** The original's width, when Commons states it. */
   width?: number;
+  /** IMGQ-10: Commons structured data says the file depicts the subject (P180). A signal for ordering and
+   * recall only; every naming rule and veto still judges the file. */
+  depicts?: boolean;
 };
 
 export type FetchJson = (url: string) => Promise<unknown>;
@@ -399,4 +402,43 @@ export async function wikimediaCandidates(entity: WikimediaEntity, fetchJson: Fe
     lead.push({ url: `https://commons.wikimedia.org/wiki/Special:FilePath/${encodeURIComponent(name)}?width=1280`, page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(name)}`, title: entity.image.replace(/\.[a-z0-9]+$/i, ""), description: "", lead: true });
   }
   return [...lead, ...found.filter((c) => !c.lead)];
+}
+
+/** IMGQ-10: the Commons structured-data search for files whose depicts statement (P180) is the subject's Wikidata
+ * item. The item is the one the resolver already chose; this is one extra search beside the category call. */
+export function depictsUrl(qid: string): string {
+  return `${COMMONS}?action=query&generator=search&gsrsearch=${encodeURIComponent(`haswbstatement:P180=${qid}`)}&gsrnamespace=6&gsrlimit=20&${IMAGEINFO}`;
+}
+
+const DEPICTS_CACHE_MS = 6 * 60 * 60_000;
+const DEPICTS_CACHE_MAX = 200;
+/** After the first error or refusal the structured-data search stays quiet this long (back off on the first signal). */
+const DEPICTS_QUIET_MS = 15 * 60_000;
+const depictsCache = new Map<string, { at: number; files: WikimediaCandidate[] }>();
+let depictsQuietUntil = 0;
+export function __resetDepictsForTests(): void { depictsCache.clear(); depictsQuietUntil = 0; }
+
+/** Files Commons structured data says depict the subject, in the search's own relevance order. Never throws: a
+ * failure (a 429 included) is no files and keeps this search quiet for 15 minutes, so the answer is today's
+ * category-only answer. Cached per item for six hours. Goes through the caller's paced fetch (the Wikimedia
+ * choke point, Home's User-Agent). */
+export async function wikimediaDepicts(entity: Pick<WikimediaEntity, "id" | "image">, fetchJson: FetchJson, opts: { band?: AgeBand; now?: number } = {}): Promise<WikimediaCandidate[]> {
+  if (!/^Q\d+$/.test(entity.id)) return [];
+  if (opts.band && wikimediaLiveBlocked(opts.band)) return [];
+  const now = opts.now ?? Date.now();
+  const cached = depictsCache.get(entity.id);
+  if (cached && now - cached.at < DEPICTS_CACHE_MS) return cached.files;
+  if (now < depictsQuietUntil) return [];
+  try {
+    const result = await fetchJson(depictsUrl(entity.id)) as { query?: { pages?: Record<string, ImageInfoPage & { index?: number }> } };
+    const pages = Object.values(result.query?.pages ?? {}).sort((a, b) => (a.index ?? 0) - (b.index ?? 0));
+    const files = pages.map((page) => candidateFromPage(page, entity.image)).filter((c): c is WikimediaCandidate => c !== null).map((c) => ({ ...c, depicts: true }));
+    if (depictsCache.size >= DEPICTS_CACHE_MAX) depictsCache.delete(depictsCache.keys().next().value as string);
+    depictsCache.set(entity.id, { at: now, files });
+    return files;
+  } catch (error) {
+    // The local pace running out is not the service pushing back.
+    if (!String((error as Error)?.message ?? "").startsWith("paced:")) depictsQuietUntil = now + DEPICTS_QUIET_MS;
+    return [];
+  }
 }
