@@ -13,6 +13,9 @@ checklist (`docs/dev.md`); no release has been cut yet.
   else that is only tagged with the subject no longer show up as pictures of it.
 
 ### Added
+- Search assist bench: a search the assist makes on the model's behalf now counts
+  as a search when the bench scores a run, and a small report compares recency
+  recall with and without it. Measurement only; the assist stays off.
 - The composer and streaming: replies now stream into the chat as they are
   generated instead of arriving all at once, and an interrupted stream resumes
   where it left off instead of losing what it already said.

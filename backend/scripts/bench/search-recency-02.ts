@@ -39,7 +39,7 @@ import { zeroToleranceChecks, rescueReport, webGainReport, holdReport, latencyTa
 import { foldLateSystemMessages, addCutoffBlockBody, addDescriptionSentenceBody, forceWebsearchBody, pairedInterval, parseRouterAnswer, ROUTER_INSTRUCTION } from "./searchRecency02Score";
 import { startFixtureSearch } from "./fixtureSearch";
 import { refuseIfGateRunning } from "./liveHubQuiet";
-import { callShapes, judge, scopeUse, stripScopeFromBody, type CategoryRule, type ToolCall } from "./ksBenchScore";
+import { callShapes, judge, rescoreRecorded, scopeUse, stripScopeFromBody, wasRescued, type CategoryRule, type ToolCall } from "./ksBenchScore";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { startRecordingProxy, type RecordedRequest } from "./recordingProxy";
 
@@ -64,6 +64,8 @@ interface RunRecord {
   laterCalls: ToolCall[];
   shapes: string[]; pass: boolean | null; forbidden: boolean | null;
   searches: number; scoped: number; engineRequests: number; fixtureQueries: number;
+  /** 01i: the hub, not the model, made this turn's search (search assist rescue). Counted in `searches`, shaped `rescued_search`. */
+  rescued?: boolean;
 }
 
 // ROUTER-LIVE-06 (bench-only): MAIPAI_SR_DATASET=<path> swaps the row set for one dataset file (rows marked held-out).
@@ -118,7 +120,7 @@ function summarize(runs: RunRecord[], env: unknown) {
             forbiddenPct: pct(rs.filter((r) => r.forbidden).length, rs.length),
             searchedPct: pct(rs.filter((r) => r.searches > 0).length, rs.length),
             medianTotalMs: median(rs.map((r) => r.totalMs)),
-            shapes: { no_tool: count("no_tool"), other_tool: count("other_tool"), scope_reference: count("scope_reference"), scope_web: count("scope_web"), scope_omitted: count("scope_omitted"), scope_reference_only: count("scope_reference_only") },
+            shapes: { no_tool: count("no_tool"), other_tool: count("other_tool"), scope_reference: count("scope_reference"), scope_web: count("scope_web"), scope_omitted: count("scope_omitted"), scope_reference_only: count("scope_reference_only"), rescued_search: count("rescued_search") },
           };
         }
       }
@@ -270,6 +272,8 @@ if (process.argv.includes("--ceiling")) {
 
 if (process.argv.includes("--summarize")) {
   const saved = JSON.parse(readFileSync(RESULTS, "utf-8")) as { environment: unknown; runs: RunRecord[] };
+  // 01i: older results (01g, 01h) have no `rescued`; score them again so a rescued search counts, no engine needed.
+  saved.runs = saved.runs.map((r) => (r.arm === "assist_rescue" ? rescoreRecorded(r, rules) : r));
   const s = summarize(saved.runs, saved.environment);
   writeFileSync(join(OUT_DIR, "summary.json"), JSON.stringify(s, null, 2));
   writeFileSync(join(OUT_DIR, "summary.md"), renderSummary(s));
@@ -612,15 +616,17 @@ async function main(): Promise<void> {
           const first = answering.find((q) => q.tools.length > 0) ?? null;
           const firstCalls: ToolCall[] = (first?.toolCalls ?? []).map((c) => ({ name: c.name, arguments: c.arguments }));
           const laterCalls: ToolCall[] = answering.filter((q) => q !== first).flatMap((q) => q.toolCalls.map((c) => ({ name: c.name, arguments: c.arguments })));
-          const shapes = callShapes(firstCalls, laterCalls);
+          // 01i: a search the hub ran itself (assist rescue) is a search; only the rescue arm can have one.
+          const rescued = arm === "assist_rescue" && !turn.error && wasRescued(firstCalls, laterCalls, fixtureSearch.queries.length - queriesBefore);
+          const shapes = callShapes(firstCalls, laterCalls, rescued);
           const verdict = turn.error || !rules[row.category] ? null : judge(shapes, rules[row.category]!);
-          const use = scopeUse([...firstCalls, ...laterCalls]);
+          const use = scopeUse([...firstCalls, ...laterCalls], rescued ? 1 : 0);
           runs.push({
             ...base, ...blank, routerAnswer: answer, diagMs: arm === "router" && adultForced ? diagMs : null, forced: state.forcedLast,
             reply: turn.error ? "" : turn.reply, words: turn.error ? 0 : words(turn.reply), firstWordMs: turn.firstWordMs === null ? null : turn.firstWordMs + diagMs, totalMs: turn.totalMs + diagMs, error: turn.error, mode,
             firstRound: first ? { calls: firstCalls, toolChoice: first.toolChoice == null ? null : typeof first.toolChoice === "string" ? first.toolChoice : JSON.stringify(first.toolChoice), promptTokens: first.promptTokens ?? null, cachedTokens: first.cachedTokens ?? null, toolsOffered: first.tools.length, scopeInSchema: !state.strippedLast, latencyMs: first.latencyMs ?? null } : null,
             wire: requests.map((q) => ({ tools: q.tools.length, toolChoice: q.toolChoice ?? null, rf: !!q.responseFormat, calls: q.toolCalls.map((c) => c.name), completed: q.completed, aborted: q.aborted, text: (q.responseText ?? "").slice(0, 200) })),
-            laterCalls, shapes: [...shapes], pass: verdict?.pass ?? null, forbidden: verdict?.forbidden ?? null, searches: use.searches, scoped: use.scoped, engineRequests: requests.length, fixtureQueries: fixtureSearch.queries.length - queriesBefore,
+            laterCalls, shapes: [...shapes], pass: verdict?.pass ?? null, forbidden: verdict?.forbidden ?? null, searches: use.searches, rescued, scoped: use.scoped, engineRequests: requests.length, fixtureQueries: fixtureSearch.queries.length - queriesBefore,
             engineSearches: fixtureSearch.queries.slice(queriesBefore).map((q) => ({ query: q.query, safesearch: q.safesearch ?? null })),
             reasoningChars: turn.reasoningChars,
             safetyTripped: row.band === "child" || row.band === "teen" ? [turn.reply, ...answering.map((q) => q.responseText ?? "")].some((t) => t !== "" && checkSafety(t, { isMinor: true }).flagged) : undefined,

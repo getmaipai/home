@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import ks1 from "./datasets/ks-bench-01.json";
-import { callShapes, judge, scopeOf, scopeUse, stripScopeFromBody, type CategoryRule } from "./ksBenchScore";
+import { callShapes, judge, rescoreRecorded, scopeOf, scopeUse, stripScopeFromBody, wasRescued, type CategoryRule, type RecordedRun } from "./ksBenchScore";
 
 const call = (args: Record<string, unknown>, name = "websearch") => ({ name, arguments: JSON.stringify(args) });
 const rules = ks1.arms as Record<string, CategoryRule>;
@@ -52,5 +52,45 @@ describe("KS-BENCH-01 scorer", () => {
     expect(parsed.tools[0].function.parameters.required).toEqual(["expression"]);
     expect(Object.keys(parsed.tools[1].function.parameters.properties)).toEqual(["scope"]);
     expect(stripScopeFromBody("{}")).toEqual({ body: "{}", stripped: false });
+  });
+});
+
+// ROUTER-BUILD-01i. The run shapes below are the ones in data-scratch/chat-ab/router-build-01h/results.json
+// (assist_rescue arm): a rescued turn has an empty first round, one backend query, and a final round with
+// tool_choice "none"; the hub's forced call is never in the model's output.
+describe("rescued search is a search (ROUTER-BUILD-01i)", () => {
+  const run = (over: Partial<RecordedRun>): RecordedRun => ({ category: "recency", error: null, firstRound: { calls: [] }, laterCalls: [], fixtureQueries: 1, shapes: ["no_tool"], pass: false, forbidden: false, searches: 0, ...over });
+
+  test("an empty first round plus a backend query is a rescue, and passes recency", () => {
+    expect(wasRescued([], [], 1)).toBe(true);
+    const r = rescoreRecorded(run({}), rules);
+    expect(r).toMatchObject({ rescued: true, shapes: ["rescued_search"], pass: true, forbidden: false, searches: 1 });
+  });
+  test("an empty first round with no backend query stays no_tool", () => {
+    expect(wasRescued([], [], 0)).toBe(false);
+    expect(rescoreRecorded(run({ fixtureQueries: 0 }), rules)).toMatchObject({ rescued: false, shapes: ["no_tool"], pass: false, searches: 0 });
+  });
+  test("another tool that queried the backend is not a rescue", () => {
+    const weather = [{ name: "weather", arguments: "{}" }];
+    expect(wasRescued(weather, [], 2)).toBe(false);
+    expect(rescoreRecorded(run({ firstRound: { calls: weather }, shapes: ["other_tool"], fixtureQueries: 2 }), rules)).toMatchObject({ rescued: false, shapes: ["other_tool"], searches: 0 });
+  });
+  test("a model websearch in a later round is the model's own search, not a rescue", () => {
+    expect(wasRescued([], [call({ expression: "news" })], 1)).toBe(false);
+  });
+  test("a rescue on a no_tool row is forbidden and on a stable row is a miss", () => {
+    expect(rescoreRecorded(run({ category: "no_tool" }), rules)).toMatchObject({ rescued: true, pass: false, forbidden: true, searches: 1 });
+    expect(rescoreRecorded(run({ category: "stable" }), rules)).toMatchObject({ rescued: true, pass: false, forbidden: false, searches: 1 });
+  });
+  test("a run that already carries the field, or has no first round, is returned unchanged", () => {
+    const done = run({ rescued: false });
+    expect(rescoreRecorded(done, rules)).toBe(done);
+    const none = run({ firstRound: null });
+    expect(rescoreRecorded(none, rules)).toBe(none);
+  });
+  test("scopeUse counts a rescued search and callShapes agrees", () => {
+    expect(scopeUse([], 1)).toEqual({ searches: 1, scoped: 0 });
+    expect([...callShapes([], [], true)]).toEqual(["rescued_search"]);
+    expect([...callShapes([], [], false)]).toEqual(["no_tool"]);
   });
 });

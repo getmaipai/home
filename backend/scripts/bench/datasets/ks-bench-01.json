@@ -14,7 +14,8 @@
     "recency": {
       "acceptable": [
         "scope_web",
-        "scope_omitted"
+        "scope_omitted",
+        "rescued_search"
       ],
       "forbidden": [
         "scope_reference_only"
@@ -27,7 +28,8 @@
       "forbidden": [
         "scope_web",
         "scope_reference",
-        "scope_omitted"
+        "scope_omitted",
+        "rescued_search"
       ]
     }
   },
