@@ -3893,7 +3893,7 @@
     "band": "child",
     "provenance": "person",
     "context": "normal",
-    "result": "ask_parent"
+    "result": "allow"
   },
   {
     "id": "integration:<id>",
@@ -3901,7 +3901,7 @@
     "band": "child",
     "provenance": "person",
     "context": "temporary",
-    "result": "deny:needs_parent_unavailable"
+    "result": "allow"
   },
   {
     "id": "integration:<id>",
@@ -3941,7 +3941,7 @@
     "band": "teen",
     "provenance": "person",
     "context": "normal",
-    "result": "ask_parent"
+    "result": "allow"
   },
   {
     "id": "integration:<id>",
@@ -3949,7 +3949,7 @@
     "band": "teen",
     "provenance": "person",
     "context": "temporary",
-    "result": "deny:needs_parent_unavailable"
+    "result": "allow"
   },
   {
     "id": "integration:<id>",
@@ -4026,6 +4026,204 @@
   {
     "id": "integration:<id>",
     "capability": "integration:searxng",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:<id>",
+    "parameters": {
+      "integration:<id>": "searxng"
+    },
     "band": "adult",
     "provenance": "untrusted",
     "context": "crisis",
@@ -9077,7 +9275,7 @@
     "band": "child",
     "provenance": "person",
     "context": "normal",
-    "result": "ask_parent"
+    "result": "deny:never_for_band"
   },
   {
     "id": "search.household_subject",
@@ -9085,7 +9283,7 @@
     "band": "child",
     "provenance": "person",
     "context": "temporary",
-    "result": "deny:needs_parent_unavailable"
+    "result": "deny:never_for_band"
   },
   {
     "id": "search.household_subject",
@@ -9101,7 +9299,7 @@
     "band": "child",
     "provenance": "untrusted",
     "context": "normal",
-    "result": "ask_parent"
+    "result": "deny:never_for_band"
   },
   {
     "id": "search.household_subject",
@@ -9109,7 +9307,7 @@
     "band": "child",
     "provenance": "untrusted",
     "context": "temporary",
-    "result": "deny:needs_parent_unavailable"
+    "result": "deny:never_for_band"
   },
   {
     "id": "search.household_subject",

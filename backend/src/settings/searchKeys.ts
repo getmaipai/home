@@ -37,9 +37,9 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
   // level, never left unset - child strict, teen moderate, adult off by
   // default ("default" resolves against the speaker's own band,
   // safeSearch.ts's resolveSafeSearchLevel()). The write rule this key
-  // needs (an adult may change their own; only an adult may change a
-  // child's or teen's; a child or teen can never loosen their own below
-  // their band default) lives in settings.ts's assertCanSetSafeSearch(),
+  // needs lives in settings.ts's assertCanSetSafeSearch(): the help text
+  // states the intended rule (MINOR-SEARCH-01a); MINOR-SEARCH-01c aligns the
+  // write path with it. It is
   // not in this declaration - no field here carries a writer rule, the
   // same as every other settings key in this repo.
   SettingsKey.parse({
@@ -49,7 +49,7 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     range: { options: ["default", "off", "moderate", "strict"] },
     default: "default",
     label: "Safe search level",
-    help: "How strictly web search filters results for you. \"Default\" follows your age: strict for a child, moderate for a teen, off for an adult. An adult can change their own; only an adult can change a child's or teen's, and a child or teen can never loosen their own below their default.",
+    help: "How strictly web search filters results for you. \"Default\" follows your age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. A teen can make theirs stricter but never lower than moderate. An adult can change their own.",
     level: "basic",
     lives_in: "person.search",
     honoured_by: ["home"],

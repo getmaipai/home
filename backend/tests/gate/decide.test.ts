@@ -24,8 +24,8 @@ describe("GATE-01 band matrix", () => {
     expect(decide(request("teen", ["unregistered.capability"])).kind).toBe("ask_parent");
     expect(decide(request("adult", ["unregistered.capability"])).kind).toBe("ask_self");
   });
-  test("child family-name search and teen lock action require a parent; child lock is denied", () => {
-    expect(decide(request("child", ["search.household_subject"])).kind).toBe("ask_parent");
+  test("child family-name search and child lock are denied; teen lock action requires a parent", () => {
+    expect(decide(request("child", ["search.household_subject"]))).toMatchObject({ kind: "deny", reason: "never_for_band" });
     expect(decide(request("teen", ["home:lock"], { consequential: true })).kind).toBe("ask_parent");
     expect(decide(request("child", ["home:lock"], { consequential: true }))).toMatchObject({ kind: "deny", reason: "never_for_band" });
   });
@@ -34,7 +34,10 @@ describe("GATE-01 band matrix", () => {
   });
   test("parameterized policy and policy_ref both resolve from the Commons vocab", () => {
     expect(decide(request("child", ["home:light"])).kind).toBe("allow");
-    expect(decide(request("child", ["integration:searxng"])).kind).toBe("ask_parent");
+    expect(decide(request("child", ["integration:searxng"])).kind).toBe("allow");
+    expect(decide(request("teen", ["integration:searxng"])).kind).toBe("allow");
+    expect(decide(request("child", ["integration:homeassistant"])).kind).toBe("ask_parent");
+    expect(decide(request("teen", ["integration:homeassistant"])).kind).toBe("ask_parent");
     expect(decide(request("adult", ["integration:searxng"])).kind).toBe("allow");
   });
   test("hard refusals precede capability policies", () => {

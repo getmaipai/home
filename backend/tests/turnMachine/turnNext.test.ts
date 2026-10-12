@@ -777,7 +777,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     } finally { entry.turn_budget = original; __resetProjectTypesForTests(); }
   });
 
-  test("PARENT-ASK-01a: a child's family-name search is refused without claiming a parent was asked", async () => {
+  test("PARENT-ASK-01a: a child's family-name search is refused (never for a child) without claiming a parent was asked", async () => {
     const entry = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!;
     const original = entry.turn_budget;
     entry.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "websearch"] };
@@ -785,7 +785,8 @@ describe("turnNext.ts: consent and confirmation", () => {
       const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+      // MINOR-SEARCH-01a: the spec now says never for a child; the dedicated copy is MINOR-SEARCH-01b.
+      expect(result.value.reply.text).not.toContain("parent");
       expect(result.value.confirm).toBeUndefined();
       expect(getPendingAsk(result.value.conversation_id)).toBeNull();
     } finally { entry.turn_budget = original; }
@@ -2275,7 +2276,7 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
     }
   });
 
-  test("PARENT-ASK-01a: a child's and a teen's ordinary web searches wait for a parent", async () => {
+  test("MINOR-SEARCH-01a: a child's and a teen's ordinary web searches no longer wait for a parent", async () => {
     const ask = (actor: typeof people.owner) =>
       withStub(
         { calls: downCalls, reply: () => "unused" },
@@ -2283,14 +2284,14 @@ describe("turnNext.ts: SEARCH-EMPTY-01, search down vs. search found nothing are
       );
     const child = await ask(people.child);
     if (!child.ok || child.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(child.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+    expect(child.value.reply.text).not.toContain("needs a parent");
     expect(child.value.confirm).toBeUndefined();
 
     db.update(people_).set({ role: "teen" }).where(eq(people_.id, people.child.id)).run();
     const teenActor = db.select().from(people_).where(eq(people_.id, people.child.id)).get()!;
     const teen = await ask(teenActor);
     if (!teen.ok || teen.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(teen.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+    expect(teen.value.reply.text).not.toContain("needs a parent");
     expect(teen.value.confirm).toBeUndefined();
   });
 
