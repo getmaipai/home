@@ -6,7 +6,7 @@ export interface SearchFixture {
   prompt: string;
   fixture?: { as_of: string; title: string; content: string; url?: string };
 }
-export interface FixtureQuery { query: string; status: number; rows: number; fixtureId: string | null; }
+export interface FixtureQuery { query: string; status: number; rows: number; fixtureId: string | null; /** The safesearch level the hub sent (MINOR-SEARCH-01k), null when absent. */ safesearch?: number | null; }
 export interface FixtureSearch { url: string; queries: FixtureQuery[]; pagesFetched: string[]; stop(): void; }
 
 const terms = (value: string) => new Set(value.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((word) => word.length > 2));
@@ -31,13 +31,15 @@ export function startFixtureSearch(fixtures: readonly SearchFixture[], mode: "fi
       return new Response(`<!doctype html><title>${fixture.title}</title><main>${fixture.content}<p>As of ${fixture.as_of}.</p></main>`, { headers: { "content-type": "text/html; charset=utf-8" } });
     }
     const query = url.searchParams.get("q") ?? "";
+    const ss = url.searchParams.get("safesearch");
+    const safesearch = ss === null || ss === "" || Number.isNaN(Number(ss)) ? null : Number(ss);
     if (mode === "down") {
-      queries.push({ query, status: 503, rows: 0, fixtureId: null });
+      queries.push({ query, status: 503, rows: 0, fixtureId: null, safesearch });
       return new Response("fixture search unavailable", { status: 503 });
     }
     const item = chooseFixture(query, fixtures);
     if (!item) {
-      queries.push({ query, status: 200, rows: 0, fixtureId: null });
+      queries.push({ query, status: 200, rows: 0, fixtureId: null, safesearch });
       return Response.json({ query, number_of_results: 0, results: [], unresponsive_engines: [] });
     }
     const fixture = item.fixture ?? {
@@ -52,7 +54,7 @@ export function startFixtureSearch(fixtures: readonly SearchFixture[], mode: "fi
       engine: "maipai-bench-fixture", engines: ["maipai-bench-fixture"], score: 1,
       publishedDate: fixture.as_of,
     };
-    queries.push({ query, status: 200, rows: 1, fixtureId: item.id });
+    queries.push({ query, status: 200, rows: 1, fixtureId: item.id, safesearch });
     // Full text is included in the search row; no page URL is fetched.
     return Response.json({ query, number_of_results: 1, results: [row], unresponsive_engines: [] });
   }});

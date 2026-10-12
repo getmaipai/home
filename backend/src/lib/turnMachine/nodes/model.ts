@@ -31,6 +31,7 @@ import type { ChatImagePart } from "@/wire";
 import { turnAgeBand } from "../speaker";
 import { searchAssistEligibility, MINOR_RESCUE_ENABLED } from "@/lib/searchAssist/eligible";
 import { bumpSearchAssistCounter } from "@/lib/searchAssist/counters";
+import { minorSearchGate } from "@/lib/searchAssist/minorGate";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
  * function can't tell apart by its own outcome code alone - a pre-stream
@@ -1080,11 +1081,16 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 export function searchAssistMayHold(state: TurnState, tools: readonly ToolSpec[]): boolean {
   try {
     // MINOR-SEARCH-01i: a child or teen never reaches the rescue branch (checked here, before the shadow record is read).
-    if (turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()) !== "adult" && !MINOR_RESCUE_ENABLED) return false;
+    const minor = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()) !== "adult";
+    if (minor && !MINOR_RESCUE_ENABLED) return false;
     const sa = state.searchAssist;
     if (!sa || sa.mode !== "rescue" || sa.bucket !== "over" || !sa.eligible) return false;
     if (!tools.some((t) => t.id === "websearch")) return false;
-    return searchAssistEligibility(state, "rescue", { modelToolCalls: 0 }).rescuable;
+    // MINOR-SEARCH-01k: behind the constant above, a minor's hold re-checks what the shadow step
+    // checked (gate dry run and web on for the band, fresh now) and takes the recall vector flag from the
+    // record (a score exists only when a vector was embedded). Unreachable while false.
+    const ctx = minor ? { modelToolCalls: 0, minor: { ...minorSearchGate(state, state.temporary === true), recallVector: sa.p_rounded !== null } } : { modelToolCalls: 0 };
+    return searchAssistEligibility(state, "rescue", ctx).rescuable;
   } catch {
     return false;
   }

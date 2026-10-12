@@ -26,7 +26,7 @@ describe("SEARCH-FRESH-01 fixture search", () => {
     expect(response.status).toBe(200);
     expect(body.results[0]?.content).toContain("Rain Saturday.");
     expect(body.results[0]?.content).toContain("As of 2026-10-08");
-    expect(fixture.queries).toEqual([{ query: "weather Chicago this weekend", status: 200, rows: 1, fixtureId: "ts-1" }]);
+    expect(fixture.queries).toEqual([{ query: "weather Chicago this weekend", status: 200, rows: 1, fixtureId: "ts-1", safesearch: null }]);
   });
   test("the down fixture returns 503 without contacting an upstream", async () => {
     const fixture = startFixtureSearch([{ id: "down-1", prompt: "current weather", fixture: { as_of: "2026-10-08", title: "fixture", content: "fixture" } }], "down");

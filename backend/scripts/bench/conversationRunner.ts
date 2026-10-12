@@ -112,21 +112,30 @@ export { startRecordingProxy, type RecordingProxy, type RecordedRequest } from "
 export interface BenchPeople {
   owner: PersonRow;
   child: PersonRow;
+  /** Only when a bench asked for one (addBenchTeen, MINOR-SEARCH-01k). */
+  teen?: PersonRow;
 }
 
 /** The bench's own two people, inserted the way the memory bench does. */
-export function createBenchPeople(): BenchPeople {
+function insertBenchPerson(displayName: string, role: string): PersonRow {
   const nowIso = new Date().toISOString();
-  const insert = (displayName: string, role: string): PersonRow => {
-    const id = newPersonId();
-    sqlite
-      .query("INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, ?, ?, ?, 'bench', 0, ?, ?, ?)")
-      .run(id, displayName, role, randomSuffix(12), nowIso, nowIso, nextHlc());
-    const row = db.select().from(people).where(eq(people.id, id)).get();
-    if (!row) throw new Error(`failed to create the bench person ${displayName}`);
-    return row;
-  };
-  return { owner: insert("Sage", "owner"), child: insert("Bramble", "child") };
+  const id = newPersonId();
+  sqlite
+    .query("INSERT INTO people (id, display_name, role, avatar_seed, source, local_only, created_at, updated_at, hlc) VALUES (?, ?, ?, ?, 'bench', 0, ?, ?, ?)")
+    .run(id, displayName, role, randomSuffix(12), nowIso, nowIso, nextHlc());
+  const row = db.select().from(people).where(eq(people.id, id)).get();
+  if (!row) throw new Error(`failed to create the bench person ${displayName}`);
+  return row;
+}
+
+export function createBenchPeople(): BenchPeople {
+  return { owner: insertBenchPerson("Sage", "owner"), child: insertBenchPerson("Bramble", "child") };
+}
+
+/** A teen for benches that run the teen band (MINOR-SEARCH-01k); cleaned up by cleanupBenchPeople. */
+export function addBenchTeen(peopleRows: BenchPeople): PersonRow {
+  peopleRows.teen = insertBenchPerson("Clover", "teen");
+  return peopleRows.teen;
 }
 
 // ==== The fake Home Assistant (E2, A4) ====
@@ -927,7 +936,7 @@ function cleanupBenchPeopleStrict(peopleRows: BenchPeople): void {
     sqlite.query("DELETE FROM entities WHERE id = ?").run(id);
   }
   seededEntityIds.clear();
-  for (const person of [peopleRows.owner, peopleRows.child]) {
+  for (const person of [peopleRows.owner, peopleRows.child, ...(peopleRows.teen ? [peopleRows.teen] : [])]) {
     // The judge's own registry rows (step 3a): the person's entities,
     // their own person entity, and every edge touching either.
     sqlite.query("DELETE FROM relationships WHERE person = ? OR from_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?) OR to_id IN (SELECT id FROM entities WHERE person = ? OR account_person_id = ?)").run(person.id, person.id, person.id, person.id, person.id);
@@ -961,7 +970,7 @@ export function backdateBenchRows(peopleRows: BenchPeople, days: number, turnIds
       for (const r of rows) update.run(back(r.v), r.id);
     }
   }
-  for (const person of [peopleRows.owner, peopleRows.child]) {
+  for (const person of [peopleRows.owner, peopleRows.child, ...(peopleRows.teen ? [peopleRows.teen] : [])]) {
     for (const [table, owner, column] of [
       ["conversation_turns", "person_id", "created_at"],
       ["conversations", "person_id", "created_at"],

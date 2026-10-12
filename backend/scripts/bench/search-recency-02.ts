@@ -14,31 +14,48 @@ import "../../../scripts/runTemp";
 //   classifier (SEARCH-RECENCY-05) per-turn decision from a trained embedding classifier (precomputed per row id in
 //           MAIPAI_SR_DECISIONS, a JSON of {id: "SEARCH"|"NO_SEARCH"}); on SEARCH the websearch call is forced with the
 //           router's emulation, on NO_SEARCH the plain turn runs unchanged. Child rows are forced too: the scope gate stays outside.
+//   weboff  (MINOR-SEARCH-01k) plain with the household's child and teen web switches off: the "minor web off" baseline.
+//   assist_shadow / assist_rescue (01k) plain with chat.search_assist shadow or rescue; the Stack's embed role is forwarded
+//           (MAIPAI_SR_EMBED_URL) so a minor's turn has a recall vector. assist_rescue needs a checkout where
+//           MINOR_RESCUE_ENABLED is true (a bench-only edit, never committed); the harness refuses otherwise.
 //   desc    (arm 1) plain plus one sentence on the websearch description (first round).
 //   cutoff  (arm 2) plain plus the loki-doki e0d8c75e knowledge-cutoff block on the system message.
+// Teen rows (01k) run once per gate grain (--grains sentence,arrival; sets chat.teen_gate_grain); a child is always sentence.
 // Child and spoken rows always run the plain turn (router and forcing apply to adult rows only).
 // Prior turns of a follow-up row run through the hub in the same conversation as a plain turn.
 //
 //   MAIPAI_LLAMA_SERVER_URL=http://127.0.0.1:8771 MAIPAI_KS_OUT=<dir> \
 //   bun run scripts/bench/search-recency-02.ts [--arms diag,router,always,plain] [--reps 3]
-//        [--bands adult,child] [--only id,id] [--limit N] [--fresh]
+//        [--bands adult,child,teen] [--grains sentence,arrival] [--only id,id] [--limit N] [--fresh]
 //   bun run scripts/bench/search-recency-02.ts --summarize
+//   MAIPAI_SR_DATASET=<a.json>,<b.json> runs the rows of several dataset files (held-out by each row's own split).
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import dataset from "./datasets/ks-bench-01.json";
 import followups from "./datasets/search-recency-02-followups.json";
+import { zeroToleranceChecks, rescueReport, webGainReport, holdReport, latencyTable, ceilingReport, flipVerdict, type ScoredRun, type StaticEvidence, type CheckId } from "./minorSearchScore";
 import { foldLateSystemMessages, addCutoffBlockBody, addDescriptionSentenceBody, forceWebsearchBody, pairedInterval, parseRouterAnswer, ROUTER_INSTRUCTION } from "./searchRecency02Score";
 import { startFixtureSearch } from "./fixtureSearch";
 import { refuseIfGateRunning } from "./liveHubQuiet";
 import { callShapes, judge, scopeUse, stripScopeFromBody, type CategoryRule, type ToolCall } from "./ksBenchScore";
+import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { startRecordingProxy, type RecordedRequest } from "./recordingProxy";
 
-type Arm = "diag" | "router" | "always" | "plain" | "desc" | "cutoff" | "classifier";
-type Band = "adult" | "child" | "spoken";
-interface Row { id: string; band: Band; category: "stable" | "recency" | "no_tool"; prompt: string; heldOut: boolean; followUp?: boolean; priorUser?: string; priorAssistant?: string }
+type Arm = "diag" | "router" | "always" | "plain" | "desc" | "cutoff" | "classifier" | "weboff" | "assist_shadow" | "assist_rescue";
+type Band = "adult" | "child" | "teen" | "spoken";
+type Grain = "sentence" | "arrival";
+const ALL_ARMS: Arm[] = ["diag", "router", "always", "plain", "desc", "cutoff", "classifier", "weboff", "assist_shadow", "assist_rescue"];
+const BANDS_ALL: Band[] = ["adult", "child", "teen", "spoken"];
+// KS-BENCH-01 categories plus the minor sets' (01d, 01j).
+const CATEGORIES = ["stable", "recency", "no_tool", "household_name", "unsafe_near_miss", "crisis", "pii_query", "ceiling"] as const;
+interface Row { id: string; band: Band; category: string; prompt: string; heldOut: boolean; followUp?: boolean; priorUser?: string; priorAssistant?: string; hit?: string }
 interface RunRecord {
   arm: Arm; row: string; band: Band; category: Row["category"]; heldOut: boolean; followUp: boolean; rep: number; prompt: string;
+  /** 01k: the teen gate grain this run used (a child is sentence, adult and spoken null). */
+  grain?: Grain | null; hit?: string | null;
+  /** 01k: what the search stand-in received, reasoning that reached the stream, checkSafety on the reply. */
+  engineSearches?: { query: string; safesearch: number | null }[]; reasoningChars?: number; safetyTripped?: boolean;
   routerAnswer: string | null; diagMs: number | null; forced: boolean; wire?: unknown[];
   reply: string; words: number; firstWordMs: number | null; totalMs: number; error: string | null;
   mode: string | null;
@@ -49,9 +66,17 @@ interface RunRecord {
 }
 
 // ROUTER-LIVE-06 (bench-only): MAIPAI_SR_DATASET=<path> swaps the row set for one dataset file (rows marked held-out).
+// 01k: a comma list loads several files; a row's own `split` decides held-out (default held-out, as before).
 const rows: Row[] = process.env.MAIPAI_SR_DATASET
-  ? (JSON.parse(readFileSync(process.env.MAIPAI_SR_DATASET, "utf-8")).rows as Row[]).map((r) => ({ ...r, heldOut: true }))
+  ? process.env.MAIPAI_SR_DATASET.split(",").map((f) => f.trim()).filter(Boolean).flatMap((f) => (JSON.parse(readFileSync(f, "utf-8")).rows as (Row & { split?: string })[]).map((r) => ({ ...r, heldOut: r.split === undefined ? true : r.split === "heldout" })))
   : [...(dataset.rows as Row[]), ...(followups.rows as Row[])];
+{
+  const seen = new Set<string>();
+  for (const r of rows) {
+    if (seen.has(r.id)) throw new Error(`duplicate row id ${r.id} across the dataset files; rename one so a resume key and a row rate stay unique`);
+    seen.add(r.id);
+  }
+}
 const rules = dataset.arms as Record<string, CategoryRule>;
 const argOf = (name: string): string | null => {
   const at = process.argv.indexOf(name);
@@ -74,14 +99,14 @@ const SLICES = ["all", "heldout", "tuning", "followup"] as const;
 const sliceOf = (r: RunRecord): string[] => (r.followUp ? ["followup"] : ["all", r.heldOut ? "heldout" : "tuning"]);
 
 function summarize(runs: RunRecord[], env: unknown) {
-  const present = (["plain", "router", "always", "desc", "cutoff", "classifier"] as Arm[]).filter((a) => runs.some((r) => r.arm === a));
+  const present = (["plain", "router", "always", "desc", "cutoff", "classifier", "weboff", "assist_shadow", "assist_rescue"] as Arm[]).filter((a) => runs.some((r) => r.arm === a));
   const slice = (arm: Arm, pred: (r: RunRecord) => boolean) => runs.filter((r) => r.arm === arm && r.error === null && pred(r));
   const cellPred = (band: Band, category: string, sl: string) => (r: RunRecord) => r.band === band && r.category === category && sliceOf(r).includes(sl);
   const byCategory: Record<string, unknown> = {};
   for (const arm of present) {
     const out: Record<string, unknown> = {};
-    for (const band of ["adult", "child", "spoken"] as Band[]) {
-      for (const category of ["stable", "recency", "no_tool"] as const) {
+    for (const band of BANDS_ALL) {
+      for (const category of CATEGORIES) {
         for (const sl of SLICES) {
           const rs = slice(arm, cellPred(band, category, sl));
           if (rs.length === 0) continue;
@@ -134,8 +159,8 @@ function summarize(runs: RunRecord[], env: unknown) {
     for (const arm of present.filter((a) => a !== "plain")) {
       const out: Record<string, unknown> = {};
       const outS: Record<string, unknown> = {};
-      for (const band of ["adult", "child", "spoken"] as Band[]) {
-        for (const category of ["stable", "recency", "no_tool"] as const) {
+      for (const band of BANDS_ALL) {
+        for (const category of CATEGORIES) {
           for (const sl of SLICES) {
             const pred = cellPred(band, category, sl);
             const iv = pairedInterval(rates(arm, pred, (r) => !!r.pass), rates("plain", pred, (r) => !!r.pass));
@@ -152,8 +177,8 @@ function summarize(runs: RunRecord[], env: unknown) {
   // Arm 0: the SEARCH / NO_SEARCH diagnostic.
   const diagRuns = runs.filter((r) => r.arm === "diag" && r.error === null);
   const diag: Record<string, unknown> = {};
-  for (const band of ["adult", "child", "spoken"] as Band[]) {
-    for (const category of ["stable", "recency", "no_tool"] as const) {
+  for (const band of BANDS_ALL) {
+    for (const category of CATEGORIES) {
       for (const sl of SLICES) {
         const rs = diagRuns.filter(cellPred(band, category, sl));
         if (rs.length === 0) continue;
@@ -164,6 +189,46 @@ function summarize(runs: RunRecord[], env: unknown) {
     }
   }
   return { environment: env, perArm, byCategory, pairedVsPlain, pairedSearchedVsPlain, diag };
+}
+
+// ==== 01k: the minor report (zero-tolerance checks, rule 13 measures, flip verdict) ====
+
+const HOUSEHOLD_NAMES = ["sage", "bramble", "clover", ...("alfred astro atlas bruno cosmo daisy ember indigo iris juniper lucia marlow marsh mopey nadia nova oliver pippa quill raven riff rivet rover serena sprout tempo velvet vincent willow".split(" "))];
+
+function minorReport(runs: RunRecord[], staticEvidence: Partial<Record<CheckId, StaticEvidence>>) {
+  const scored = runs as unknown as ScoredRun[];
+  const checks = zeroToleranceChecks(scored, { householdNames: HOUSEHOLD_NAMES, static: staticEvidence });
+  const rescue = (["child", "teen"] as const).map((b) => rescueReport(scored, b));
+  const webGain = (["child", "teen"] as const).map((b) => webGainReport(scored, b));
+  const holds = [holdReport(scored, "child", "sentence"), holdReport(scored, "teen", "sentence"), holdReport(scored, "teen", "arrival")];
+  return { checks, rescue, webGain, holds, latency: latencyTable(scored), flip: flipVerdict(checks, rescue) };
+}
+
+function renderMinorReport(m: ReturnType<typeof minorReport>): string {
+  const iv = (x: { interval: { n: number; meanDiffPct: number; lowPct: number; highPct: number } | null; status: string }) => (x.interval ? `${x.interval.meanDiffPct} [${x.interval.lowPct}, ${x.interval.highPct}] over ${x.interval.n} rows` : x.status);
+  const lines = ["# MINOR-SEARCH-01k minor report", "", `Rescue flip verdict: **${m.flip.flip ? "PASS on the pre-registered criteria (check the Hold and Ceiling tables before proposing the flip)" : "NOT MET"}**`, ...m.flip.reasons.map((r) => `- ${r}`), "", "## Zero-tolerance checks", "", "| Check | Evidence | n | Result | Failures |", "|---|---|---:|---|---|"];
+  for (const c of m.checks) lines.push(`| ${c.id} | ${c.evidence} | ${c.n} | ${c.status} | ${c.failures.slice(0, 5).join(", ")} |`);
+  lines.push("", "## Paired 95% intervals (points, held-out rows, 3+ repeats)", "", "| Measure | Result |", "|---|---|");
+  for (const r of m.rescue) lines.push(`| ${r.recall.name} | ${iv(r.recall)} |`, `| ${r.falseFire.name} | ${iv(r.falseFire)} (adult ${r.adultFalseFirePct ?? "n/a"}) |`);
+  for (const w of m.webGain) lines.push(`| ${w.name} | ${iv(w)} |`);
+  lines.push("", "## Non-rescued turn latency and hold (rescue minus shadow, ms)", "", "| Band | Grain | pairs | median | p95 | median <= 50 | hold <= 250 |", "|---|---|---:|---:|---:|---|---|");
+  for (const h of m.holds) lines.push(`| ${h.band} | ${h.grain ?? "-"} | ${h.pairs} | ${h.medianDeltaMs ?? "-"} | ${h.p95DeltaMs ?? "-"} | ${h.medianWithin50} | ${h.holdWithin250 ?? "n/a"} |`);
+  lines.push("", "## First-word latency", "", "| Arm | Band | Grain | n | p50 | p95 |", "|---|---|---|---:|---:|---:|");
+  for (const l of m.latency) lines.push(`| ${l.arm} | ${l.band} | ${l.grain ?? "-"} | ${l.n} | ${l.p50 === null ? "-" : Math.round(l.p50)} | ${l.p95 === null ? "-" : Math.round(l.p95)} |`);
+  return lines.join("\n") + "\n";
+}
+
+/** Writes minor-report.json/md beside the results; static-evidence.json (optional) carries the five static checks. */
+function writeMinorReport(runs: RunRecord[]): void {
+  if (!runs.some((r) => r.band === "child" || r.band === "teen")) return;
+  const evFile = join(OUT_DIR, "static-evidence.json");
+  const staticEvidence = existsSync(evFile) ? (JSON.parse(readFileSync(evFile, "utf-8")) as Partial<Record<CheckId, StaticEvidence>>) : {};
+  const m = minorReport(runs, staticEvidence);
+  writeFileSync(join(OUT_DIR, "minor-report.json"), JSON.stringify(m, null, 2));
+  writeFileSync(join(OUT_DIR, "minor-report.md"), renderMinorReport(m));
+  // The 120-answer human-labelled ceiling sample per band: rows to label, wired run vs the pre-01d run.
+  const sample = runs.filter((r) => r.category === "ceiling" && r.error === null && r.rep === 1 && (r.band === "child" || r.band === "teen")).map((r) => ({ id: `${r.arm}|${r.row}|${r.grain ?? ""}`, band: r.band, prompt: r.prompt, reply: r.reply, violatesCeiling: null as boolean | null }));
+  writeFileSync(join(OUT_DIR, "ceiling-sample-to-label.json"), JSON.stringify(sample, null, 2));
 }
 
 function renderSummary(s: ReturnType<typeof summarize>): string {
@@ -189,12 +254,26 @@ function save(runs: RunRecord[], env: unknown): void {
   writeFileSync(RESULTS, JSON.stringify({ environment: env, runs }, null, 2));
 }
 
+// 01k: bun run scripts/bench/search-recency-02.ts --ceiling <wired-labelled.json> <unwired-labelled.json>
+// Each file is a ceiling-sample-to-label.json with violatesCeiling filled in by a person (a model judge is a trend line only).
+if (process.argv.includes("--ceiling")) {
+  const at = process.argv.indexOf("--ceiling");
+  const load = (f: string | undefined, band: string): Map<string, boolean> => {
+    if (!f) throw new Error("--ceiling needs two files: the wired run's labels, then the unwired run's labels");
+    const items = JSON.parse(readFileSync(f, "utf-8")) as { id: string; band: string; violatesCeiling: boolean | null }[];
+    return new Map(items.filter((i) => i.band === band && i.violatesCeiling !== null).map((i) => [i.id, i.violatesCeiling as boolean] as const));
+  };
+  for (const band of ["child", "teen"] as const) console.log(JSON.stringify(ceilingReport(band, load(process.argv[at + 1], band), load(process.argv[at + 2], band))));
+  process.exit(0);
+}
+
 if (process.argv.includes("--summarize")) {
   const saved = JSON.parse(readFileSync(RESULTS, "utf-8")) as { environment: unknown; runs: RunRecord[] };
   const s = summarize(saved.runs, saved.environment);
   writeFileSync(join(OUT_DIR, "summary.json"), JSON.stringify(s, null, 2));
   writeFileSync(join(OUT_DIR, "summary.md"), renderSummary(s));
-  console.log(`wrote summary.json and summary.md in ${OUT_DIR}`);
+  writeMinorReport(saved.runs);
+  console.log(`wrote summary.json and summary.md (and minor-report.* when minor rows ran) in ${OUT_DIR}`);
   process.exit(0);
 }
 
@@ -208,10 +287,13 @@ if (!chatUrl) {
 }
 const classifierDecisions: Record<string, string> = process.env.MAIPAI_SR_DECISIONS ? JSON.parse(readFileSync(process.env.MAIPAI_SR_DECISIONS, "utf-8")) : {};
 const ARMS = ((argOf("--arms") ?? "diag,router,always,plain").split(",").map((s) => s.trim()).filter(Boolean)) as Arm[];
-for (const a of ARMS) if (!["diag", "router", "always", "plain", "desc", "cutoff", "classifier"].includes(a)) throw new Error(`--arms: unknown arm ${a}`);
+for (const a of ARMS) if (!ALL_ARMS.includes(a)) throw new Error(`--arms: unknown arm ${a}; known: ${ALL_ARMS.join(", ")}`);
+const GRAINS = (argOf("--grains") ?? "sentence").split(",").map((g) => g.trim()).filter(Boolean) as Grain[];
+for (const g of GRAINS) if (g !== "sentence" && g !== "arrival") throw new Error(`--grains: ${g} is not sentence or arrival`);
 const REPS = Math.max(1, Number(argOf("--reps") ?? 3));
 if (!Number.isFinite(REPS)) throw new Error("--reps must be a number, for example --reps 3");
 const BANDS = new Set((argOf("--bands") ?? "adult,child").split(",").map((s) => s.trim()));
+for (const b of BANDS) if (!BANDS_ALL.includes(b as Band)) throw new Error(`--bands: unknown band ${b}; known: ${BANDS_ALL.join(", ")}`);
 const ONLY = argOf("--only") ? new Set(argOf("--only")!.split(",").map((s) => s.trim())) : null;
 const LIMIT = argOf("--limit") ? Number(argOf("--limit")) : Infinity;
 if (Number.isNaN(LIMIT)) throw new Error("--limit must be a number, for example --limit 10");
@@ -294,6 +376,11 @@ const standIn = Bun.serve({
     if (req.method === "GET" && path === "/healthz") return Response.json({ ok: true, version: "search-recency-02-stand-in", uptimeSeconds: 0 });
     if (req.method === "GET" && path === "/health") return Response.json({ status: "ok" });
     if (req.method === "GET" && path === "/stack/v1/roles") return Response.json({ roles: [roleRow("chat", "chat"), roleRow("judge", "chat"), roleRow("embed", "embeddings")] });
+    if (req.method === "POST" && path === "/v1/embeddings" && process.env.MAIPAI_SR_EMBED_URL) {
+      // 01k: the assist arms need a recall vector; forward to the real Stack embed role.
+      const up = await fetch(`${process.env.MAIPAI_SR_EMBED_URL.replace(/\/$/, "")}/v1/embeddings`, { method: "POST", headers: { "content-type": "application/json" }, body: await req.text(), signal: req.signal });
+      return new Response(up.body, { status: up.status, headers: { "content-type": up.headers.get("content-type") ?? "application/json", ...engineHeaders } });
+    }
     if (req.method === "POST" && path === "/v1/embeddings") return Response.json({ error: "No engine is ready for role 'embed'.", role: "embed", state: "offline", offline_reason: "bench: embed is offline on the remote Stack" }, { status: 503, headers: engineHeaders });
     if (req.method === "POST" && path === "/v1/chat/completions") {
       let bodyText = await req.text();
@@ -322,6 +409,18 @@ const standIn = Bun.serve({
 process.env.MAIPAI_LLAMA_SERVER_URL = standIn.url.toString().replace(/\/$/, "");
 process.env.MAIPAI_EMBED_URL = process.env.MAIPAI_LLAMA_SERVER_URL;
 
+if (ARMS.some((a) => a === "assist_shadow" || a === "assist_rescue") && !process.env.MAIPAI_SR_EMBED_URL) {
+  console.error("search-recency-02 refused: the assist arms need MAIPAI_SR_EMBED_URL (the Stack's address, for its embed role); a minor's turn is scored only with a recall vector.");
+  process.exit(2);
+}
+if (ARMS.includes("assist_rescue") && [...BANDS].some((b) => b === "child" || b === "teen")) {
+  const { MINOR_RESCUE_ENABLED } = await import("@/lib/searchAssist/eligible");
+  if (!MINOR_RESCUE_ENABLED) {
+    console.error("search-recency-02 refused: assist_rescue for child or teen rows needs MINOR_RESCUE_ENABLED = true in backend/src/lib/searchAssist/eligible.ts. Set it only in a throwaway bench checkout, never commit it; the flip is a separate reviewed change.");
+    process.exit(2);
+  }
+}
+
 const setup = await import("./setup");
 const runner = await import("./conversationRunner");
 const { CHAT_SAMPLING } = await import("@/lib/llm");
@@ -329,31 +428,34 @@ const { setHouseholdSettingValue } = await import("@/lib/settings");
 const { effectiveMode } = await import("@/lib/retrieval/sourceMode");
 
 /** One turn the way routes/turn.ts streams it, inside an existing conversation. */
-async function streamTurnIn(actor: { id: string; role?: string }, conversationId: string, text: string, spoken: boolean): Promise<{ reply: string; error: string | null; firstWordMs: number | null; totalMs: number }> {
+async function streamTurnIn(actor: { id: string; role?: string }, conversationId: string, text: string, spoken: boolean): Promise<{ reply: string; error: string | null; firstWordMs: number | null; totalMs: number; reasoningChars: number }> {
   const { runTurnNextStream } = await import("@/lib/turnMachine/turnNext");
   const { streamTurnEvents } = await import("@/routes/turn");
   const t0 = performance.now();
   const at = () => performance.now() - t0;
   let reply = "";
   let firstWordMs: number | null = null;
+  let reasoningChars = 0;
   try {
     const result = await runTurnNextStream(actor as never, "chat", text, { conversationId, spoken, thinking: false });
-    if (!result.ok) return { reply: "", error: result.error, firstWordMs, totalMs: at() };
-    if (result.kind === "immediate") return { reply: result.value.reply.text, error: null, firstWordMs: at(), totalMs: at() };
+    if (!result.ok) return { reply: "", error: result.error, firstWordMs, totalMs: at(), reasoningChars };
+    if (result.kind === "immediate") return { reply: result.value.reply.text, error: null, firstWordMs: at(), totalMs: at(), reasoningChars };
     for await (const event of streamTurnEvents(result, actor.id, 900, undefined, true)) {
-      if (event.type === "delta") {
+      if (event.type === "reasoning") {
+        reasoningChars += event.text.length;
+      } else if (event.type === "delta") {
         reply += event.text;
         if (firstWordMs === null && event.text.trim()) firstWordMs = at();
       } else if (event.type === "done") {
         if (reply.trim() === "") reply = event.value.reply.text;
         if (firstWordMs === null && reply.trim()) firstWordMs = at();
       } else if (event.type === "error") {
-        return { reply, error: JSON.stringify(event).slice(0, 300), firstWordMs, totalMs: at() };
+        return { reply, error: JSON.stringify(event).slice(0, 300), firstWordMs, totalMs: at(), reasoningChars };
       }
     }
-    return { reply, error: null, firstWordMs, totalMs: at() };
+    return { reply, error: null, firstWordMs, totalMs: at(), reasoningChars };
   } catch (err) {
-    return { reply, error: (err as Error).message, firstWordMs, totalMs: at() };
+    return { reply, error: (err as Error).message, firstWordMs, totalMs: at(), reasoningChars };
   }
 }
 
@@ -388,6 +490,7 @@ async function main(): Promise<void> {
   const set = setHouseholdSettingValue("search.searxng_url", fixtureSearch.url);
   if (!set.ok) throw new Error(`could not point search at the fixture: ${set.error}`);
   const people = runner.createBenchPeople();
+  if ([...BANDS].includes("teen")) runner.addBenchTeen(people);
 
   const env = {
     date: new Date().toISOString(),
@@ -411,7 +514,10 @@ async function main(): Promise<void> {
 
   let runs: RunRecord[] = [];
   if (existsSync(RESULTS) && !process.argv.includes("--fresh")) runs = (JSON.parse(readFileSync(RESULTS, "utf-8")) as { runs: RunRecord[] }).runs;
-  const done = new Set(runs.map((r) => `${r.arm}|${r.row}|${r.rep}`));
+  const done = new Set(runs.map((r) => `${r.arm}|${r.row}|${r.rep}|${r.grain ?? "-"}`));
+  // 01k: a teen row runs once per gate grain; a child is always per sentence; adult and spoken have no grain.
+  const grainsFor = (row: Row): (Grain | null)[] => (row.band === "teen" ? GRAINS : row.band === "child" ? ["sentence"] : [null]);
+  const work = selected.flatMap((row) => grainsFor(row).map((grain) => ({ row, grain })));
   let consecutiveErrors = 0;
 
   const { createConversation } = await import("@/lib/conversationHistory");
@@ -422,17 +528,29 @@ async function main(): Promise<void> {
       state.stripScope = arm !== "diag";
       state.desc = arm === "desc";
       state.cutoff = arm === "cutoff";
-      for (const row of selected) {
-        if (done.has(`${arm}|${row.id}|${rep}`)) continue;
-        console.log(`[search-recency-02] rep ${rep}/${REPS} ${arm} ${row.id}`);
-        const base = { arm, row: row.id, band: row.band, category: row.category, heldOut: row.heldOut, followUp: !!row.followUp, rep, prompt: row.prompt };
+      // 01k: the minor web switches and the search assist mode are the arm's, set explicitly so a previous arm never leaks.
+      const webSwitch = arm === "weboff" ? "off" : "on";
+      for (const key of ["search.web.child_mode", "search.web.teen_mode"] as const) {
+        const w = setHouseholdSettingValue(key, webSwitch);
+        if (!w.ok) throw new Error(`could not set ${key}: ${w.error}`);
+      }
+      const sa = setHouseholdSettingValue("chat.search_assist", arm === "assist_rescue" ? "rescue" : arm === "assist_shadow" ? "shadow" : "off");
+      if (!sa.ok) throw new Error(`could not set chat.search_assist: ${sa.error}`);
+      for (const { row, grain } of work) {
+        if (done.has(`${arm}|${row.id}|${rep}|${grain ?? "-"}`)) continue;
+        console.log(`[search-recency-02] rep ${rep}/${REPS} ${arm} ${row.id}${grain ? ` (${grain})` : ""}`);
+        if (grain && row.band === "teen") {
+          const g = setHouseholdSettingValue("chat.teen_gate_grain", grain);
+          if (!g.ok) throw new Error(`could not set chat.teen_gate_grain: ${g.error}`);
+        }
+        const base = { arm, row: row.id, band: row.band, category: row.category, heldOut: row.heldOut, followUp: !!row.followUp, rep, prompt: row.prompt, grain, hit: row.hit ?? null };
         const blank = { routerAnswer: null as string | null, diagMs: null as number | null, forced: false };
         if (arm === "diag") {
           const r = await routerQuestion(row.priorUser ? { user: row.priorUser, assistant: row.priorAssistant ?? "" } : null, row.prompt);
           runs.push({ ...base, routerAnswer: r.answer ?? (r.error ? null : `UNPARSED:${r.raw.slice(0, 30)}`), diagMs: r.ms, forced: false, reply: r.raw, words: 0, firstWordMs: null, totalMs: r.ms, error: r.error, mode: null, firstRound: null, laterCalls: [], shapes: [], pass: null, forbidden: null, searches: 0, scoped: 0, engineRequests: 1, fixtureQueries: 0 });
           consecutiveErrors = r.error ? consecutiveErrors + 1 : 0;
         } else {
-          const actor = row.band === "child" ? people.child : people.owner;
+          const actor = row.band === "child" ? people.child : row.band === "teen" ? people.teen! : people.owner;
           const adultForced = row.band === "adult" && (arm === "router" || arm === "always");
           state.force = false;
           const created = createConversation(actor as never, { surface: "chat" });
@@ -441,7 +559,7 @@ async function main(): Promise<void> {
           let priorReply = "";
           let priorError: string | null = null;
           if (row.priorUser) {
-            const pr = await Promise.race([streamTurnIn(actor, created.value.id, row.priorUser, false), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("hung: no end of prior turn in 420 s")), 420_000))]).catch((err: Error) => ({ reply: "", error: err.message, firstWordMs: null as number | null, totalMs: 0 }));
+            const pr = await Promise.race([streamTurnIn(actor, created.value.id, row.priorUser, false), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("hung: no end of prior turn in 420 s")), 420_000))]).catch((err: Error) => ({ reply: "", error: err.message, firstWordMs: null as number | null, totalMs: 0, reasoningChars: 0 }));
             priorReply = pr.reply;
             priorError = pr.error;
           }
@@ -465,8 +583,8 @@ async function main(): Promise<void> {
           state.forcedLast = false;
           const queriesBefore = fixtureSearch.queries.length;
           const turn = priorError
-            ? { reply: "", error: `prior turn failed: ${priorError}`, firstWordMs: null as number | null, totalMs: 0 }
-            : await Promise.race([streamTurnIn(actor, created.value.id, row.prompt, row.band === "spoken"), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("hung: no end of turn in 420 s")), 420_000))]).catch((err: Error) => ({ reply: "", error: err.message, firstWordMs: null as number | null, totalMs: 420_000 }));
+            ? { reply: "", error: `prior turn failed: ${priorError}`, firstWordMs: null as number | null, totalMs: 0, reasoningChars: 0 }
+            : await Promise.race([streamTurnIn(actor, created.value.id, row.prompt, row.band === "spoken"), new Promise<never>((_, reject) => setTimeout(() => reject(new Error("hung: no end of turn in 420 s")), 420_000))]).catch((err: Error) => ({ reply: "", error: err.message, firstWordMs: null as number | null, totalMs: 420_000, reasoningChars: 0 }));
           state.force = false;
           await proxy.settled().catch(() => {});
           const requests: RecordedRequest[] = proxy.requests.map((q) => ({ ...q }));
@@ -475,7 +593,7 @@ async function main(): Promise<void> {
           const firstCalls: ToolCall[] = (first?.toolCalls ?? []).map((c) => ({ name: c.name, arguments: c.arguments }));
           const laterCalls: ToolCall[] = answering.filter((q) => q !== first).flatMap((q) => q.toolCalls.map((c) => ({ name: c.name, arguments: c.arguments })));
           const shapes = callShapes(firstCalls, laterCalls);
-          const verdict = turn.error ? null : judge(shapes, rules[row.category]!);
+          const verdict = turn.error || !rules[row.category] ? null : judge(shapes, rules[row.category]!);
           const use = scopeUse([...firstCalls, ...laterCalls]);
           runs.push({
             ...base, ...blank, routerAnswer: answer, diagMs: arm === "router" && adultForced ? diagMs : null, forced: state.forcedLast,
@@ -483,6 +601,9 @@ async function main(): Promise<void> {
             firstRound: first ? { calls: firstCalls, toolChoice: first.toolChoice == null ? null : typeof first.toolChoice === "string" ? first.toolChoice : JSON.stringify(first.toolChoice), promptTokens: first.promptTokens ?? null, cachedTokens: first.cachedTokens ?? null, toolsOffered: first.tools.length, scopeInSchema: !state.strippedLast, latencyMs: first.latencyMs ?? null } : null,
             wire: requests.map((q) => ({ tools: q.tools.length, toolChoice: q.toolChoice ?? null, rf: !!q.responseFormat, calls: q.toolCalls.map((c) => c.name), completed: q.completed, aborted: q.aborted, text: (q.responseText ?? "").slice(0, 200) })),
             laterCalls, shapes: [...shapes], pass: verdict?.pass ?? null, forbidden: verdict?.forbidden ?? null, searches: use.searches, scoped: use.scoped, engineRequests: requests.length, fixtureQueries: fixtureSearch.queries.length - queriesBefore,
+            engineSearches: fixtureSearch.queries.slice(queriesBefore).map((q) => ({ query: q.query, safesearch: q.safesearch ?? null })),
+            reasoningChars: turn.reasoningChars,
+            safetyTripped: row.band === "child" || row.band === "teen" ? [turn.reply, ...answering.map((q) => q.responseText ?? "")].some((t) => t !== "" && checkSafety(t, { isMinor: true }).flagged) : undefined,
           });
           consecutiveErrors = turn.error ? consecutiveErrors + 1 : 0;
         }
@@ -497,6 +618,7 @@ async function main(): Promise<void> {
   const s = summarize(runs, env);
   writeFileSync(join(OUT_DIR, "summary.json"), JSON.stringify(s, null, 2));
   writeFileSync(join(OUT_DIR, "summary.md"), renderSummary(s));
+  writeMinorReport(runs);
   runner.cleanupBenchPeople(people);
   setup.finishBench({ executed: runs.length, engine: `${env.engineBuild} (${env.modelFile})` });
 }

@@ -4,6 +4,7 @@
 // turn's own stored record claims an eligible, over-threshold rescue.
 import { describe, expect, test } from "bun:test";
 import { searchAssistMayHold } from "@/lib/turnMachine/nodes/model";
+import { MINOR_RESCUE_ENABLED, searchAssistEligibility } from "@/lib/searchAssist/eligible";
 
 const tools = [{ id: "websearch" }] as never;
 
@@ -29,6 +30,20 @@ describe("the rescue branch in model.ts", () => {
 
   test("no minor turn may hold, whatever its stored search assist record says", () => {
     for (const state of [turn("child"), turn("teen"), turn("adult", "2012-01-01"), turn("adult", "2016-05-05")]) {
+      expect(searchAssistMayHold(state, tools)).toBe(false);
+    }
+  });
+
+  // MINOR-SEARCH-01k: the minor context is wired in behind the constant; while it is false nothing differs.
+  test("the minor rescue constant is still false (a flip is a separate reviewed change)", () => {
+    expect(MINOR_RESCUE_ENABLED).toBe(false);
+  });
+
+  test("a minor with every fact in place is scored but not rescuable while the constant is false", () => {
+    for (const role of ["child", "teen"]) {
+      const state = turn(role) as never;
+      const out = searchAssistEligibility(state, "rescue", { modelToolCalls: 0, minor: { gateAllows: true, webOn: true, recallVector: true } });
+      expect(out.rescuable).toBe(false);
       expect(searchAssistMayHold(state, tools)).toBe(false);
     }
   });
