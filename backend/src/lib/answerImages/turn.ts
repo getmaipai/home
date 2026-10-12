@@ -57,7 +57,7 @@ export type AnswerImageTurnState = {
  * what they show or how the subject looks in them, and to answer other
  * questions from what it knows. Never mention the photos stays. */
 export function showImagesResultLine(subject: string): string {
-  return `Photos of ${subject} are on their screen. You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; never mention the photos.`;
+  return `Photos of ${subject} are on their screen. You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; never mention the photos. Do not call show_images again or write its subject or kind in your reply.`;
 }
 export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer without mentioning photos.";
 

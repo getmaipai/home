@@ -95,4 +95,9 @@ describe("KS-02E: the prefix's three date lines", () => {
     expect(text).not.toContain("training ends");
     expect(text).not.toContain("snapshot");
   });
+
+  test("IMG-REPLY-LEAK-01: the date line says it is reference only, not to be stated unasked", () => {
+    const text = datesText({ now: new Date("2026-10-10T12:00:00Z"), locale: "en-US", modelCutoff: null, librarySnapshot: null });
+    expect(text).toContain("The date and time are for your reference only: do not state them unless the person asks.");
+  });
 });

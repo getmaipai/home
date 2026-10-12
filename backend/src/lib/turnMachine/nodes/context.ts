@@ -127,7 +127,7 @@ export function datesText(input: { now: Date; locale: string; modelCutoff: strin
   if (cutoff) facts.push(`Your training ends around ${cutoff}.`);
   const snapshot = input.librarySnapshot ? fmt(input.librarySnapshot) : null;
   if (snapshot) facts.push(`The home library's Wikipedia snapshot is ${snapshot}.`);
-  return `${facts.join(" ")}\nYour own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training.`;
+  return `${facts.join(" ")}\nYour own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training. The date and time are for your reference only: do not state them unless the person asks.`;
 }
 
 let windowItemSeq = 0;
