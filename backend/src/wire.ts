@@ -91,7 +91,8 @@ export interface SearchAssistStats {
   eligible: boolean;
   bucket: "over" | "mid" | "low" | "none";
   p_rounded: number | null;
-  action: "none";
+  /** none: shadow only. rescued: the assist added the search. declined_*: it was armed and stood down. */
+  action: "none" | "rescued" | "declined_tool_call" | "declined_text_kept";
   off_reason?: string;
 }
 

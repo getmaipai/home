@@ -28,6 +28,8 @@ import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
 import { pictureFailureWords, picturesNotReadNote } from "@/lib/chatImageNote";
 import type { ChatImagePart } from "@/wire";
+import { searchAssistEligibility } from "@/lib/searchAssist/eligible";
+import { bumpSearchAssistCounter } from "@/lib/searchAssist/counters";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
  * function can't tell apart by its own outcome code alone - a pre-stream
@@ -130,7 +132,7 @@ export type ModelOutput =
   // whether a LATER policy refusal of exactly this call should retry
   // via the raw utterance (queryWriterFallback) instead of the generic
   // honesty line every other refusal gets.
-  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string; queryWriterUsed?: boolean }
+  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string; queryWriterUsed?: boolean; /** ROUTER-BUILD-01e: the search assist added this call. */ searchAssistRescued?: boolean }
   // DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
   // finished at all (the model node's own deadline, a dead engine) -
   // distinct from `text` with an empty string, which `answerInputFrom()`
@@ -200,6 +202,10 @@ interface GenerationAttempt {
   reasoning: string | undefined;
   toolCalls: ToolCall[] | undefined;
   thinking: boolean;
+  /** ROUTER-BUILD-01e: how an armed search-assist hold ended (absent when not armed). */
+  hold?: "rescue" | "tool_call" | "text_kept";
+  /** The rescue came from the budget running out, not from the round ending. */
+  holdAtBudget?: boolean;
 }
 // GENFAIL-01: `message` is the engine's own diagnostic text (llm.ts's
 // caught error, or startCompleteStream()'s own `started.error`) -
@@ -226,11 +232,30 @@ function boundedGenerationError(message: string | undefined): string | undefined
   return message === undefined ? undefined : message.slice(0, MAX_GENERATION_ERROR_CHARS);
 }
 
+/** ROUTER-BUILD-01e: the longest an armed round holds whitespace-only content
+ * before it flushes and stands down (fail open). */
+export const SEARCH_ASSIST_HOLD_LIMIT_MS = 250;
+/** ROUTER-BUILD-01e: the rescue budget. Once plain text has started on an armed
+ * round, the model gets this long to make its own tool call; the rescue waits
+ * for the end of generation or this budget, whichever is first. Set from the
+ * p95 (5661 ms, n=73, 9B chat model) of the first-round latency of plain/router
+ * arm runs that wrote text and then called websearch, in data-scratch/chat-ab
+ * (router-live-06, search-recency-02, -05). That latency includes prefill and
+ * reasoning, so it is an upper bound on first-visible-character to call; the
+ * traces carry no per-piece times and cap text at 200 characters, so a tighter
+ * figure needs a new capture. A call the model would have made after this
+ * budget is cancelled (counter rescued_at_budget). */
+export const SEARCH_ASSIST_RESCUE_BUDGET_MS = 5700;
+let holdClock: () => number = () => Date.now();
+export function __setSearchAssistHoldClockForTests(fn: (() => number) | null): void {
+  holdClock = fn ?? (() => Date.now());
+}
+
 /** One real model call: builds the tools block for this attempt, runs
  * it through the streaming client (COR-7's own signal support), and
  * drains it manually so the generator's return value (the tool calls)
  * survives - `for await...of` would discard it. */
-async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, nodeAbort: AbortSignal): Promise<GenerationResult> {
+async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, nodeAbort: AbortSignal, arm = false): Promise<GenerationResult> {
   // DEADLINE-02: first-token and stall timers on the whole generation,
   // from the request on (a pre-stream wait is the first-token wait).
   // THIN-DL-02: a transient failure before anything reached the person is
@@ -246,7 +271,7 @@ async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools:
     const watchdog = streamWatchdog(nodeAbort, firstTokenMs, state.budget.deadlines_ms.stall_ms);
     let result: GenerationResult;
     try {
-      result = await runWatchedGeneration(state, messages, tools, tool_choice, thinking, maxTokens, reason, watchdog.signal, watchdog.beat);
+      result = await runWatchedGeneration(state, messages, tools, tool_choice, thinking, maxTokens, reason, watchdog.signal, watchdog.beat, arm);
     } finally {
       watchdog.clear();
     }
@@ -277,7 +302,7 @@ function generationFailureKind(facts: StackFailureFacts | null, message: string 
   return facts?.state ? stackRefusalKind(facts.state, facts.offline_reason) : classifyGenerationFailure(message).kind;
 }
 
-async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal, beat: () => void): Promise<GenerationResult> {
+async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal, beat: () => void, arm = false): Promise<GenerationResult> {
   // STREAM-NEXT-01 (b): `state.streamGate` is undefined for every caller
   // but turnNext.ts's own runTurnNextStream(), so this is a no-op
   // everywhere else. reset() clears whatever a PRIOR, now-abandoned
@@ -291,7 +316,14 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   // non-chat surface, an unidentified speaker) asks the engine for none and
   // the engine client drops whatever comes back anyway, so it is never held,
   // checked or stored here.
-  const started = await startCompleteStreamPieces("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens, dropReasoning: !state.reasoning.emit }, signal);
+  // ROUTER-BUILD-01e: an armed round gets its own abort, linked to the
+  // watchdog's, so a rescue stops this stream without aborting the node.
+  const roundAbort = arm ? new AbortController() : undefined;
+  if (roundAbort) {
+    if (signal.aborted) roundAbort.abort(signal.reason);
+    else signal.addEventListener("abort", () => roundAbort.abort(signal.reason), { once: true });
+  }
+  const started = await startCompleteStreamPieces("chat", messages, { model: state.modelId, tools: tools.length > 0 ? tools : undefined, tool_choice, thinking, max_tokens: maxTokens, dropReasoning: !state.reasoning.emit }, roundAbort?.signal ?? signal);
   if (!started.ok) {
     // GENFAIL-01 (dev.md "generation_failed is never blind again"): a
     // failed attempt used to leave no generation record at all (the
@@ -335,6 +367,16 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   // unaffected - this split exists only to keep a think block's own
   // content out of what the gate can release mid-stream.
   const thinkSplit = gate ? newThinkSplitState() : undefined;
+  const feed = (text: string) => {
+    if (gate && thinkSplit) for (const span of feedThinkSplit(thinkSplit, text)) if (!span.reasoning) gate.push(span.text);
+  };
+  // ROUTER-BUILD-01e (rule 1, search assist rescue): while armed, content
+  // pieces only append to `held` (no gate push, no per-piece scan); reasoning
+  // is never held (rule 2). The one decision is taken on the first visible
+  // character. Whitespace held past the limit is flushed (fail open).
+  const hold = arm ? { phase: "armed" as "armed" | "text" | "envelope" | "off", held: "", since: 0 } : undefined;
+  let rescued = false;
+  let rescuedAtBudget = false;
   try {
     for (;;) {
       const step = await started.pieces.next();
@@ -352,9 +394,48 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
         continue;
       }
       raw += step.value.text;
-      if (gate && thinkSplit) {
-        for (const span of feedThinkSplit(thinkSplit, step.value.text)) if (!span.reasoning) gate.push(span.text);
+      if (hold && hold.phase === "text") {
+        // Plain text is being held; the model still has until the budget to call a tool.
+        hold.held += step.value.text;
+        if (holdClock() - hold.since < SEARCH_ASSIST_RESCUE_BUDGET_MS) continue;
+        rescued = true;
+        rescuedAtBudget = true;
+        break;
       }
+      if (hold && hold.phase === "armed") {
+        hold.held += step.value.text;
+        const first = hold.held.trimStart()[0];
+        if (first === undefined) {
+          const now = holdClock();
+          if (hold.since === 0) hold.since = now;
+          if (now - hold.since <= SEARCH_ASSIST_HOLD_LIMIT_MS) continue;
+          hold.phase = "off";
+        } else if (first === "{") {
+          // An envelope: the gate's own envelope hold keeps it unreleased; it is a
+          // rescue only if it ends as text with no call.
+          hold.phase = "envelope";
+        } else if (first === "<") {
+          // A tag, which may be a think block: left to the normal path.
+          hold.phase = "off";
+        } else {
+          // Plain text: keep holding (no gate push, no scan) until a call, the end, or the budget.
+          hold.phase = "text";
+          hold.since = holdClock();
+          continue;
+        }
+        feed(hold.held);
+        hold.held = "";
+        continue;
+      }
+      feed(step.value.text);
+    }
+    if (rescued) {
+      try {
+        roundAbort?.abort();
+      } catch {
+        // an abort never fails the turn
+      }
+      void started.pieces.return(undefined).catch(() => undefined);
     }
   } catch (err) {
     // GENFAIL-01: the same gap as the pre-stream branch above, mid-
@@ -370,13 +451,20 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     const failedAtMs = Date.now();
     const facts = err instanceof StackStreamError ? err.facts : null;
     state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
-    return { ok: false, code: "generation_failed", message, released: raw.length > 0 || (state.reasoning.emit && nativeReasoning.length > 0) };
+    return { ok: false, code: "generation_failed", message, released: raw.length - (hold?.held.length ?? 0) > 0 || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 
-  if (gate && thinkSplit) {
+  if (!rescued && gate && thinkSplit) {
+    // The round ended: whatever is still held goes to the gate unless it is a rescue (below).
+    if (hold && hold.held && !(hold.phase === "text" && !toolCalls?.length)) feed(hold.held);
     for (const span of flushThinkSplit(thinkSplit)) if (!span.reasoning) gate.push(span.text);
   }
   gate?.endReasoning();
+
+  if (rescued) {
+    state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: null, envelopeParsed: false });
+    return { ok: true, text: "", reasoning: nativeReasoning || undefined, toolCalls: undefined, thinking, hold: "rescue", ...(rescuedAtBudget ? { holdAtBudget: true } : {}) };
+  }
 
   const visible = visibleText(raw);
   // ENGINE-CONTRACT-03 (dev.md "U6 rerun ruling" (a)): a generation the
@@ -415,7 +503,14 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
   // later read of the trace needs to tell apart from a real query.
   const websearchRawArgs = toolCalls?.find((c) => c.tool === "websearch")?.rawArgs ?? null;
   state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, toolCallRawArgs: websearchRawArgs, envelopeParsed });
-  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking };
+  // ROUTER-BUILD-01e: how the hold ended. The model's own call always wins.
+  let heldEnd: GenerationAttempt["hold"];
+  if (hold) {
+    if (toolCalls && toolCalls.length > 0) heldEnd = "tool_call";
+    else if (hold.phase === "text" || (hold.phase === "envelope" && visible.trim().length > 0)) heldEnd = "rescue";
+    else heldEnd = "text_kept";
+  }
+  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking, ...(heldEnd ? { hold: heldEnd } : {}) };
 }
 
 /** ENGINE-CONTRACT-02's builder row, shared by every path that reaches
@@ -801,7 +896,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // record and the empty-reply retry all see the effective flag.
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal);
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, !isPhrasingRound && !input.retry && toolsAllowed && searchAssistMayHold(state, tools));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
   // keep cutting until the request fits or the prompt carries no search
@@ -867,6 +962,12 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) {
     attempt = { ...attempt, toolCalls: undefined };
     phrasingToolCallDiscarded = true;
+  }
+
+  // ROUTER-BUILD-01e: an armed round ended; record it on the turn's stats.
+  if (attempt.hold === "rescue") return rescueSearch(state, messages, input.utterance, state.reasoning.emit ? attempt.reasoning : undefined, signal, attempt.holdAtBudget === true);
+  if (attempt.hold === "tool_call" || attempt.hold === "text_kept") {
+    if (state.searchAssist) state.searchAssist = { ...state.searchAssist, action: attempt.hold === "tool_call" ? "declined_tool_call" : "declined_text_kept" };
   }
 
   // State table, `model`'s own exits: "no visible text: one
@@ -970,6 +1071,39 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   gate?.finish();
   return { outcome: { ok: true }, output: { kind: "text", text: attempt.text + ask.append, thinking: attempt.thinking, reasoning } };
 };
+
+/** ROUTER-BUILD-01e: whether this round may hold for a rescue. Everything the
+ * 01c eligibility decides (adult band, written, not spoken, not anonymous,
+ * websearch offered, round 1), plus the shadow step's own over-threshold
+ * result in rescue mode. Fails closed: any throw means no hold. */
+function searchAssistMayHold(state: TurnState, tools: readonly ToolSpec[]): boolean {
+  try {
+    const sa = state.searchAssist;
+    if (!sa || sa.mode !== "rescue" || sa.bucket !== "over" || !sa.eligible) return false;
+    if (!tools.some((t) => t.id === "websearch")) return false;
+    return searchAssistEligibility(state, "rescue", { modelToolCalls: 0 }).rescuable;
+  } catch {
+    return false;
+  }
+}
+
+/** ROUTER-BUILD-01e: round 1 answered in plain text on a turn the assist is
+ * sure needs a search and nothing reached the person: the engine's query
+ * writer writes the query and the call goes to the policy node like any call. */
+async function rescueSearch(state: TurnState, messages: LlmMessage[], utterance: string, reasoning: string | undefined, signal: AbortSignal, atBudget = false): Promise<{ outcome: NodeOutcome; output: ModelOutput }> {
+  state.streamGate?.reset();
+  const recovered = await recoveredMissingCall(state, messages, utterance, [], reasoning, signal);
+  // A failed or empty query writer is not a rescue: its outcome passes through unchanged.
+  if (recovered.output.kind !== "tool_calls" || !recovered.output.queryWriterUsed) return recovered;
+  try {
+    bumpSearchAssistCounter("rescued");
+    if (atBudget) bumpSearchAssistCounter("rescued_at_budget");
+  } catch {
+    // counters never fail a turn
+  }
+  if (state.searchAssist) state.searchAssist = { ...state.searchAssist, action: "rescued" };
+  return { outcome: signal.aborted ? recovered.outcome : { ok: true }, output: { ...recovered.output, searchAssistRescued: true } };
+}
 
 /** VISION-02c: whether a failure may be the picture's: not an engine
  * that is down, stopped, out of memory or busy (the same request without

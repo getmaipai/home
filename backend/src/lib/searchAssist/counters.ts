@@ -9,6 +9,7 @@ export const SEARCH_ASSIST_COUNTER_NAMES = [
   "scored",
   "over_threshold",
   "rescued",
+  "rescued_at_budget",
   "skipped_band",
   "skipped_surface",
   "off",
