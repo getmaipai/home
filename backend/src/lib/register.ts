@@ -221,10 +221,15 @@ function planLineAbout(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surfac
   const emotion = signal.expressed_emotion === "neutral" ? "neutral" : signal.expressed_emotion;
   const required = Object.entries(plan.moves).filter(([, value]) => value === "required").map(([move]) => move.replace("_", " "));
   const forbidden = Object.entries(plan.moves).filter(([, value]) => value === "forbidden").map(([move]) => move);
-  const length = surfaceClass === "written" ? "as complete as you would answer with no persona at all, then in the companion's voice" : `${plan.max_sentences === 1 ? "one" : "one or two"} sentence${plan.max_sentences === 1 ? "" : "s"}`;
+  const length = `${plan.max_sentences === 1 ? "one" : "one or two"} sentence${plan.max_sentences === 1 ? "" : "s"}`;
   const requirements = required.length ? required.join(", ") : "no required move";
   const bans = [forbidden.includes("ask_back") || required.includes("care") ? "no question" : "", forbidden.includes("point") ? "no tasks" : "", plan.playfulness === "forbidden" ? "no playfulness" : ""].filter(Boolean).join(", ");
   const lead = required.includes("care") ? "acknowledge the feeling first" : requirements;
+  // PERSONA-LEAK-01: on the written class the length rule is its own sentence.
+  // As a bare fragment inside the comma list the model echoed it as reply text.
+  if (surfaceClass === "written") {
+    return `${act} about ${about}, ${emotion}, ${signal.emotion_intensity}: ${lead}, ${bans || "no unnecessary follow-up"}. Length: answer as completely as you would with no persona at all, then add the companion's voice.`;
+  }
   return `${act} about ${about}, ${emotion}, ${signal.emotion_intensity}: ${lead}, ${length}, ${bans || "no unnecessary follow-up"}.`;
 }
 

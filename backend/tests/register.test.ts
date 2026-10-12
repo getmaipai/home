@@ -117,7 +117,19 @@ describe("planFor", () => {
       const signal = base("inform");
       const line = planLine(planFor(input(signal, { surfaceClass: "written" })), signal, "written");
       expect(line).not.toContain("sentence");
-      expect(line).toContain("as complete as you would answer with no persona at all, then in the companion's voice");
+      expect(line).toContain("answer as completely as you would with no persona at all, then add the companion's voice");
+    });
+    test("PERSONA-LEAK-01: the written length rule is its own instruction sentence, not a fragment in the plan list", () => {
+      // ks1-adult-stable-01 leaked "To say so, as complete as you would answer with no
+      // persona at all..." because the length clause sat as a bare fragment between
+      // list items and the model echoed it as reply text.
+      const signal = base("question");
+      const line = planLine(planFor(input(signal, { surfaceClass: "written" })), signal, "written");
+      expect(line).not.toContain("as complete as you would answer");
+      const [head = "", tail = ""] = line.split(". ");
+      expect(head).not.toContain("persona");
+      expect(tail).toContain("persona at all");
+      expect(tail.startsWith("Length: ")).toBe(true);
     });
   });
 
