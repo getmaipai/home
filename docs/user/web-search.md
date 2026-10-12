@@ -90,6 +90,12 @@ What leaves your house: the one word goes to Wiktionary, which the Wikimedia Fou
 
 Children and teens never use it. It also stays off when your search sources are set to **Library only**. If Wiktionary does not answer, MaiPai answers from your library and does not try again for a while.
 
+## Saved pages and missing pages
+
+MaiPai keeps a saved copy of the web pages it reads, so a page it read in the last week is not fetched again (a news site's page is kept for a day). The copies stay on this computer. Open **Settings**, then **Search**, and use **Search fetch cache limit (GB)** to set how much disk space they may use. When the limit is reached, the pages used least recently go first. Setting it to 0 turns saving off. A temporary chat never saves or reuses a page.
+
+When a page that a search found has been taken down, MaiPai can show the Internet Archive's Wayback Machine copy instead and says that it is a copy, with its date. This is on by default. Turn it off with **Use archived pages when a source is missing** in **Settings**, then **Search**. Only the address of the missing page goes to the Internet Archive, which sees your home's internet address too. Children never get this, and it stays off when your search sources are set to **Library only**. Teens' copies pass the same safety check as any other page.
+
 ## Kids and safe search
 
 MaiPai picks the safe search level for each person. It uses strict for kids, moderate for teens, and off for adults. An adult can change it for anyone on their profile. SearXNG's own setting only affects other apps.

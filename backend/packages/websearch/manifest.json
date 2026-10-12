@@ -1,6 +1,6 @@
 {
   "id": "websearch",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Web Search",
@@ -103,6 +103,15 @@
       "who": "the Wikimedia Foundation",
       "opt_in": true,
       "retention": "controlled entirely by the Wikimedia Foundation; see their own privacy policy"
+    },
+    {
+      "id": "wayback",
+      "destination": "the Internet Archive's Wayback Machine (archive.org and web.archive.org)",
+      "when": "a page a search found now answers not found, the person is a teen or an adult, and the household has not turned off Use archived pages when a source is missing (Settings, Search; the setting is search.wayback_fallback, on by default); never for a child, and never in Library only mode; a temporary chat still asks the Archive, it only saves nothing",
+      "what": "the address of the missing page, nothing else; if the Archive has a copy, one more request for that copy",
+      "who": "the Internet Archive",
+      "opt_in": false,
+      "retention": "controlled entirely by the Internet Archive; see their own privacy policy"
     }
   ],
   "permissions": [

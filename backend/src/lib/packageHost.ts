@@ -70,6 +70,9 @@ import * as settings from "@/lib/settings";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { WIKIMEDIA_LIVE_RATE_LIMIT, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, wikimediaLiveBaseUrl } from "@/lib/wikimediaLive";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
+import { fetchCacheForRead, ttlSecondsFor } from "@/lib/retrieval/fetchCache";
+import { fetchCacheKey } from "@/lib/retrieval/fetchCache";
+import { waybackCopy } from "@/lib/retrieval/wayback";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
@@ -1047,7 +1050,7 @@ export async function searxngSearch(args: unknown, opts: SearchOptions = {}): Pr
 }
 
 async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {}): Promise<SearxngSearchResult> {
-  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand, opts.fallbackSignal);
+  if (opts.bypassCache) return attachSearchPages(await searxngSearchUncached(args, opts), args, opts.minorBand, opts.fallbackSignal, true);
   const input = args as { query?: unknown; category?: unknown; read_page?: unknown } | undefined;
   const query = input?.query;
   if (typeof query !== "string" || query.length === 0) return searxngSearchUncached(args, opts);
@@ -1473,7 +1476,7 @@ export function __setSearchPagesBudgetForTests(ms: number | null): void {
  * pages are requested one at a time, at most one per site, at most
  * SEARCH_PAGES_MAX requests in all (a failed one still counts), and only
  * the ones that finish inside the step's time budget are kept. */
-async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand, signal?: AbortSignal): Promise<SearxngSearchResult> {
+async function attachSearchPages(found: SearxngSearchResult, args: unknown, minorBand?: MinorBand, signal?: AbortSignal, temporary = false): Promise<SearxngSearchResult> {
   const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
   const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : SEARCH_PAGES_MAX;
   const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : SEARCH_PAGE_TEXT_CHARS;
@@ -1509,7 +1512,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     if (remaining <= 0) break;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const read = searxngPageRead({ url: row.url! }, signal, minorBand);
+      const read = searxngPageRead({ url: row.url! }, signal, minorBand, { temporary });
       read.catch(() => {}); // an abandoned read that fails later is not an unhandled rejection
       const doc = await Promise.race([
         read,
@@ -1767,7 +1770,19 @@ export function parseReadablePage(html: string, url: string): PageReadResult {
  * compatible with this AGPL-3.0 package. Cheerio plus an HTML-to-text
  * helper was rejected because it would leave article extraction as a
  * second parser surface. */
-export async function searxngPageRead(args: unknown, signal?: AbortSignal, minorBand?: MinorBand): Promise<PageReadResult> {
+export interface PageReadOptions {
+  /** A temporary chat: the fetch cache is neither read nor written (KS-07). */
+  temporary?: boolean;
+}
+
+let pageFetchForTests: ((url: string) => Promise<AttemptResult>) | null = null;
+
+/** Test seam: replace the network fetch under searxngPageRead (the SSRF guard blocks a local fake server). */
+export function __setPageFetchForTests(fetcher: ((url: string) => Promise<AttemptResult>) | null): void {
+  pageFetchForTests = fetcher;
+}
+
+export async function searxngPageRead(args: unknown, signal?: AbortSignal, minorBand?: MinorBand, opts: PageReadOptions = {}): Promise<PageReadResult> {
   const url = (args as { url?: unknown } | undefined)?.url;
   if (typeof url !== "string" || url.length === 0) throw new HostError("invalid_input", "page.read needs a string \"url\" argument");
   let parsedUrl: URL;
@@ -1777,15 +1792,59 @@ export async function searxngPageRead(args: unknown, signal?: AbortSignal, minor
     throw new HostError("invalid_input", "page.read needs a valid URL");
   }
   if (pageReaderForTests) return pageReaderForTests(url);
+  const band: AgeBand = minorBand ?? "adult";
+  const temporary = opts.temporary === true;
+  // KS-07: the band's blocked-site check runs before the cache is consulted, so a cached body is never served
+  // for an address the asker's band may not open.
+  if (!urlAllowedFor(band, url)) throw new HostError("network_unreachable", "That page isn't available.");
+  const fetchOne = pageFetchForTests ?? ((target: string) => pageFetch(target, true, signal, minorBand));
+  const cache = fetchCacheForRead(temporary);
+  if (cache) {
+    let hit: ReturnType<typeof cache.get> = null;
+    try {
+      hit = cache.get(fetchCacheKey(band, url), "page");
+    } catch {
+      hit = null; // the cache is disposable: a locked or full file means a fresh fetch
+    }
+    if (hit) {
+      bumpReferenceCounter("fetch_hit", band);
+      return parseReadablePage(hit.body, url);
+    }
+    bumpReferenceCounter("fetch_miss", band);
+  }
   const origin = parsedUrl.origin;
-  const robotsResult = await pageFetch(`${origin}/robots.txt`, false, signal);
+  const robotsResult = await (pageFetchForTests ? pageFetchForTests(`${origin}/robots.txt`) : pageFetch(`${origin}/robots.txt`, false, signal));
   if (!robotsResult.ok && robotsResult.status !== 404) pageFailure(robotsResult, `${origin}/robots.txt`);
   if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
     throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);
   }
-  const result = await pageFetch(url, true, signal, minorBand);
-  if (!result.ok) pageFailure(result, url);
+  const result = await fetchOne(url);
+  if (!result.ok) {
+    // KS-07: a cited page that is gone (404) may be answered from the Internet Archive's copy, for a teen or an
+    // adult only, with the household's switch on; the caller's floor runs on whatever comes back.
+    if (result.status === 404) {
+      const copy = await waybackCopy(url, band, temporary, {
+        cache,
+        fetchText: async (target) => {
+          // The Archive requests spend no page-rate tokens: only the cited page counts against the pace.
+          const response = await (pageFetchForTests ? pageFetchForTests(target) : pageFetch(target, false, signal, minorBand));
+          return { ok: response.ok && typeof response.value === "string", status: response.status, text: typeof response.value === "string" ? response.value : undefined };
+        },
+      });
+      if (copy) {
+        const page = parseReadablePage(copy.html, url);
+        bumpReferenceCounter("wayback_served", band);
+        return { ...page, title: `${page.title} (Wayback Machine copy of ${parsedUrl.hostname}, ${copy.captured})`.slice(0, 400) };
+      }
+    }
+    pageFailure(result, url);
+  }
   if (typeof result.value !== "string") throw new HostError("network_unreachable", `The site did not return readable HTML for ${url}.`);
+  try {
+    cache?.put({ url: fetchCacheKey(band, url), kind: "page", status: 200, contentType: "text/html", robotsOk: true, body: result.value, ttlS: ttlSecondsFor("page", url) });
+  } catch {
+    // the cache is disposable: a failed write never fails the read
+  }
   return parseReadablePage(result.value, url);
 }
 
@@ -2234,7 +2293,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
               if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
               return search({ args: rowsOnly, band, signal: runtime.signal, deadlineAt: runtime.deadlineAt, role: actor.role });
             }));
-            return attachSearchPages(blended, args, band === "adult" ? undefined : band, runtime.signal);
+            return attachSearchPages(blended, args, band === "adult" ? undefined : band, runtime.signal, temporary);
           };
           // KS-02: the model's `scope` argument. An image search, or a call with no query, is the
           // old single path: the library has no pictures and nothing to look up.
@@ -2257,7 +2316,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const readUrl = (args as { url?: unknown } | undefined)?.url;
           const blockedRead = (): HostError => new HostError("network_unreachable", "That page isn't available.");
           if (typeof readUrl === "string" && !urlAllowedFor(readBand, readUrl)) throw blockedRead();
-          const doc = await searxngPageRead(args, runtime.signal, readBand === "adult" ? undefined : readBand);
+          const doc = await searxngPageRead(args, runtime.signal, readBand === "adult" ? undefined : readBand, { temporary: readTemporary });
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
           if (speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {

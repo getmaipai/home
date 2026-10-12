@@ -287,6 +287,8 @@ ensureCoreJob("people.apply_age_band_changes", "every:1d");
 // expiry and size-cap mechanics.
 ensureCoreJob("favicons.sweep", "every:1d");
 ensureCoreJob("answer_images.sweep", "every:1d");
+// KS-07: the search fetch cache (lib/retrieval/fetchCache.ts), same daily cadence.
+ensureCoreJob("fetch_cache.sweep", "every:1d");
 
 // A code review (2026-09-06) found the "Renew now" Repairs fix silently
 // broken across a restart: registerRenewFixHandler() was only ever

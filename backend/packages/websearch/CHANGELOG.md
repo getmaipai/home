@@ -2,6 +2,20 @@
 
 All notable changes to the Web Search package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.3] - 2026-10-12
+
+### Added
+
+- A saved copy of the pages a search reads (KS-07, `search.fetch_cache_gb`): a
+  page read twice within 7 days (24 hours for a news site) is not fetched
+  again. The cache is trimmed daily to the size the household sets, a temporary
+  chat never reads or writes it, and the blocked-site check and the safety
+  floor still run every time a page is shown.
+- Archived copy of a missing page (KS-07, `search.wayback_fallback`, on by
+  default): when a page a search found now answers not found, a teen or an
+  adult is shown the Internet Archive's copy, labelled as one. Never for a
+  child. Disclosed as the `wayback` privacy row.
+
 ## [0.3.2] - 2026-10-11
 
 ### Added

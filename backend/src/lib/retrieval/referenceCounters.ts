@@ -40,6 +40,11 @@ export const REFERENCE_COUNTER_NAMES = [
   "dictionary_live_cache_hit",
   "dictionary_live_backoff",
   "dictionary_live_failed",
+  // KS-07: the fetch cache and the Wayback dead-link fallback. Names only, plus the age band.
+  "fetch_hit",
+  "fetch_miss",
+  "wayback_calls",
+  "wayback_served",
 ] as const;
 
 export type ReferenceCounterName = (typeof REFERENCE_COUNTER_NAMES)[number];

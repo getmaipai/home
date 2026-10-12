@@ -50,6 +50,7 @@ import { stackUpdatesEnabled, checkStackUpdates, runStackReadinessCheck, sweepSt
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { sweepFavicons } from "@/lib/favicons";
 import { sweepAnswerImages } from "@/lib/answerImages/cache";
+import { sweepFetchCache } from "@/lib/retrieval/fetchCache";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -337,6 +338,11 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   },
   "answer_images.sweep": () => {
     sweepAnswerImages();
+  },
+  // KS-07: the search fetch cache in knowledge.db - expired rows go, then the least recently used until it
+  // fits search.fetch_cache_gb.
+  "fetch_cache.sweep": () => {
+    sweepFetchCache();
   },
   // Step 8: reminders/timers (packageHost.ts's `reminders.set`/
   // `timers.set`, scheduled via scheduleCoreJob above) fire by raising
