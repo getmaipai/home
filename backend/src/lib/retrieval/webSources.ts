@@ -119,7 +119,28 @@ export function validateWebSources(key: string, value: unknown): string | null {
   return null;
 }
 
-const rowKey = (row: WebRow): string => row.url ?? `${row.title}\u001f${row.snippet ?? ""}`;
+const TRACKING_PARAM = /^(utm_|fbclid$|gclid$|mc_eid$|igshid$)/i;
+
+/** The blend's identity for a URL: the same page reached through two engines compares equal even when
+ * one wrote http, www., a trailing slash, a fragment or a tracking parameter. Only the key uses this;
+ * the row that is shown keeps its own url. A string that is not a URL is its own key. */
+export function normalizeUrlKey(raw: string): string {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return raw;
+  }
+  if (url.protocol !== "http:" && url.protocol !== "https:") return raw;
+  const host = url.hostname.toLowerCase().replace(/^www\./, "");
+  const port = url.port && url.port !== "80" && url.port !== "443" ? `:${url.port}` : "";
+  const path = url.pathname.length > 1 ? url.pathname.replace(/\/+$/, "") : "";
+  const kept = [...url.searchParams.entries()].filter(([name]) => !TRACKING_PARAM.test(name));
+  const query = kept.length > 0 ? `?${kept.sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)).map(([k, v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join("&")}` : "";
+  return `${host}${port}${path}${query}`;
+}
+
+const rowKey = (row: WebRow): string => (row.url ? normalizeUrlKey(row.url) : `${row.title}\u001f${row.snippet ?? ""}`);
 
 /** Reciprocal-rank fusion (k 60) of several sources' rows, one entry per URL. A URL two sources
  * return ranks above rows only one returned; ties follow the order of `lists`, then rank. */
@@ -131,14 +152,33 @@ export function blendWebRows(lists: WebRow[][]): WebRow[] {
 export const NO_SOURCE_FOR_BAND_TEXT = "No web search source is available for this profile. An adult can pick SearXNG under Settings, Search, Web search sources.";
 export const WEB_NO_RESULTS_TEXT = "No web search results were found.";
 
+/** The same per-field cap the SearXNG-only text applies (packageHost.ts SEARXNG_FIELD_MAX_CHARS). */
+const TEXT_FIELD_MAX_CHARS = 300;
+const clip = (value: string): string => (value.length > TEXT_FIELD_MAX_CHARS ? `${value.slice(0, TEXT_FIELD_MAX_CHARS)}...` : value);
+
 function textOf(rows: WebRow[]): string {
   if (rows.length === 0) return WEB_NO_RESULTS_TEXT;
-  return rows.map((row, i) => `${i + 1}. ${row.title}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n");
+  return rows.map((row, i) => `${i + 1}. ${clip(row.title)}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${clip(row.snippet)}` : ""}`).join("\n");
+}
+
+/** How long one source may take before the blend goes on without it. */
+export const SOURCE_TIMEOUT_MS = 8000;
+let sourceTimeoutMs = SOURCE_TIMEOUT_MS;
+export function __setSourceTimeoutForTests(ms: number | null): void {
+  sourceTimeoutMs = ms ?? SOURCE_TIMEOUT_MS;
+}
+
+function withTimeout<T>(run: Promise<T>): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const late = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error("web source timed out")), sourceTimeoutMs);
+  });
+  return Promise.race([run, late]).finally(() => clearTimeout(timer));
 }
 
 /** Run every picked source at once and blend what answers. `searches` is in the stored order. */
 export async function runWebSources(searches: WebSourceSearch[]): Promise<WebRows> {
-  const settled = await Promise.allSettled(searches.map((search) => search()));
+  const settled = await Promise.allSettled(searches.map((search) => withTimeout(search())));
   const answered = settled.flatMap((entry) => (entry.status === "fulfilled" ? [entry.value] : []));
   if (answered.length === 0) {
     const first = settled.find((entry): entry is PromiseRejectedResult => entry.status === "rejected");

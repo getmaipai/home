@@ -17,7 +17,9 @@ import {
   UNBUILT_ONLY_NOTE,
   WEB_SOURCES_KEY,
   __setWebSourceForTests,
+  __setSourceTimeoutForTests,
   blendWebRows,
+  normalizeUrlKey,
   runWebSources,
   validateWebSources,
   webSourcesFor,
@@ -231,5 +233,45 @@ describe("the blend through the host", () => {
     const out = await search("child", ["https://a.example/"]);
     expect(called).toBe(0);
     expect(out.rows.map((r) => r.url)).not.toContain("https://c.example/");
+  });
+});
+
+describe("SEARCH-SOURCES-01b blend follow-ups", () => {
+  afterEach(() => __setSourceTimeoutForTests(null));
+
+  test("the same page from two engines is one row even when scheme, www, slash, fragment or tracking differ", () => {
+    const a = row("https://example.com/wiki/Marlow?utm_source=x#top");
+    const b = row("http://www.EXAMPLE.com/wiki/Marlow/");
+    expect(normalizeUrlKey(a.url!)).toBe(normalizeUrlKey(b.url!));
+    const blended = blendWebRows([[a, row("https://example.org/a")], [b]]);
+    expect(blended.map((r) => r.url)).toEqual([a.url, "https://example.org/a"]);
+  });
+
+  test("different paths or real query parameters stay different pages", () => {
+    expect(normalizeUrlKey("https://example.com/a?id=1")).not.toBe(normalizeUrlKey("https://example.com/a?id=2"));
+    expect(normalizeUrlKey("https://example.com/a")).not.toBe(normalizeUrlKey("https://example.com/b"));
+    expect(normalizeUrlKey("https://example.com/a?a=1&b=2")).toBe(normalizeUrlKey("https://example.com/a?b=2&a=1"));
+    expect(normalizeUrlKey("not a url")).toBe("not a url");
+  });
+
+  test("a source that is too slow is left out and the others still answer", async () => {
+    __setSourceTimeoutForTests(30);
+    const slow = () => new Promise<ReturnType<typeof ok>>((resolve) => setTimeout(() => resolve(ok([row("https://example.com/slow")])), 500));
+    const out = await runWebSources([() => Promise.resolve(ok([row("https://example.com/fast")])), slow]);
+    expect(out.rows.map((r) => r.url)).toEqual(["https://example.com/fast"]);
+  });
+
+  test("when every source is too slow the first timeout stands as the error", async () => {
+    __setSourceTimeoutForTests(20);
+    const slow = () => new Promise<ReturnType<typeof ok>>(() => {});
+    await expect(runWebSources([slow, slow])).rejects.toThrow("timed out");
+  });
+
+  test("blended text caps a long title or infobox snippet at 300 characters like the SearXNG-only text", async () => {
+    const long = "w".repeat(900);
+    const out = await runWebSources([() => Promise.resolve(ok([{ title: "Japan", url: "https://example.com/j", snippet: long }]))]);
+    expect(out.text).toContain(`${"w".repeat(300)}...`);
+    expect(out.text).not.toContain("w".repeat(301));
+    expect(out.rows[0]!.snippet).toBe(long);
   });
 });

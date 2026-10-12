@@ -323,6 +323,8 @@ minor reaches SearXNG only. A failed source contributes nothing; only if all fai
 A write of `[]`, or of only an unbuilt source, is a 400 that names the fix. The ddgs searcher is
 SEARCH-DDGS-01 (below). Images, videos, hosted search and page reads are outside the chooser.
 
+**SEARCH-SOURCES-01b (2026-10-12): blend follow-ups.** `runWebSources` gives each source 8 s (`SOURCE_TIMEOUT_MS`) before going on without it; the blend key is `normalizeUrlKey(url)` (host lowercased, `www.`, fragment, trailing slash, default port and `utm_*`/`fbclid`/`gclid` dropped, http and https equal) while the shown row keeps its own url; `textOf` clips title and snippet to 300 characters like the SearXNG-only text. The single-source default path is unchanged.
+
 **SEARCH-DDGS-01 (2026-10-12): the ddgs source.** `src/lib/retrieval/ddgsSource.ts` fills the ddgs slot. The
 maintained `ddgs` library runs in a local sidecar (`scripts/ddgs-sidecar/server.py`, pinned in its
 `requirements.txt`, binds 127.0.0.1) that owns the one fixed browser identity: no proxy, no rotation. Home
