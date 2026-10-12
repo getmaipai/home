@@ -274,7 +274,7 @@ async function main(): Promise<void> {
       MAIPAI_EMBED_URL: "",
     },
     stdout: "pipe",
-    stderr: "ignore",
+    stderr: process.env.MAIPAI_SMOKE_HUB_STDERR === "inherit" ? "inherit" : "ignore",
   });
   let port = 0;
   let results: { spec: TurnSpec; seen: TurnObservation; verdict: TurnVerdict; retried: boolean }[] = [];

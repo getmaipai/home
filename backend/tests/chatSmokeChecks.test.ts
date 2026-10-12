@@ -10,6 +10,9 @@ describe("chat smoke checks", () => {
     expect(isStaticFailureLine("  I can't think right now.  ")).toBe(true);
     expect(isStaticFailureLine("I can't think right now. I've told the grown-ups.")).toBe(true);
     expect(isStaticFailureLine("The sky looks blue because of scattering.")).toBe(false);
+    // HUB-SMOKE-01: the visible failure copy is a failure, not a short answer.
+    expect(isStaticFailureLine("Something went wrong while writing that. Send it again, or check Repairs.")).toBe(true);
+    expect(isStaticFailureLine("Something went wrong. Try asking again.")).toBe(true);
   });
 
   test("a reply that opens with a package's 'answered:' wrapper is caught", () => {
@@ -23,6 +26,7 @@ describe("chat smoke checks", () => {
     expect(judgeTurn(spec(), seen({ reply: "  " })).verdict).toBe("FAIL");
     expect(judgeTurn(spec(), seen({ failure: "unavailable" })).verdict).toBe("FAIL");
     expect(judgeTurn(spec(), seen({ reply: "Sorry, I couldn't do that." })).verdict).toBe("FAIL");
+    expect(judgeTurn(spec(), seen({ reply: "Something went wrong while writing that. Send it again, or check Repairs." })).verdict).toBe("FAIL");
     expect(judgeTurn(spec(), seen()).verdict).toBe("PASS");
   });
 

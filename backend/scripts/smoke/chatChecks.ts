@@ -3,11 +3,20 @@
 // anything. Checks are deliberately simple: a person reads the replies;
 // this only catches the failures a reply can show on its face.
 
+import { FAILURE_COPY } from "../../src/lib/failureCopy";
+
 /** Sentences Home must never show as an answer: the stored fallbacks of a
  * failed compose (composer.ts COMPOSE_FAILURE_LINE, replyVariation.ts) and
  * the offline companion line (stackEngine.ts OFFLINE_COMPANION_LINE, which
  * the spoken variant extends with a trailing sentence). */
-export const STATIC_FAILURE_LINES = ["Sorry, I couldn't do that.", "I can't think right now."] as const;
+export const STATIC_FAILURE_LINES: readonly string[] = [
+  "Sorry, I couldn't do that.",
+  "I can't think right now.",
+  // HUB-SMOKE-01: the visible failure line of every kind and band
+  // (failureCopy.ts, the one table); a turn that ends in one of these
+  // failed, however the stream closed.
+  ...Object.values(FAILURE_COPY).flatMap((copy) => [copy.adult, copy.minor, ...(copy.adultAway ? [copy.adultAway] : [])]),
+];
 
 export function isStaticFailureLine(text: string): boolean {
   const trimmed = text.trim();
