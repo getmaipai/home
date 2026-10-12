@@ -376,7 +376,16 @@ const standIn = Bun.serve({
     const path = new URL(req.url).pathname;
     if (req.method === "GET" && path === "/healthz") return Response.json({ ok: true, version: "search-recency-02-stand-in", uptimeSeconds: 0 });
     if (req.method === "GET" && path === "/health") return Response.json({ status: "ok" });
-    if (req.method === "GET" && path === "/stack/v1/roles") return Response.json({ roles: [roleRow("chat", "chat"), roleRow("judge", "chat"), roleRow("embed", "embeddings")] });
+    if (req.method === "GET" && path === "/stack/v1/roles") {
+      // 01h: the assist compares its weights with the embed model file the real Stack runs (identity.actual), so a forwarded embed role carries the real Stack's identity.
+      let embedRow: Record<string, unknown> = roleRow("embed", "embeddings");
+      if (process.env.MAIPAI_SR_EMBED_URL) {
+        const real = (await fetch(`${process.env.MAIPAI_SR_EMBED_URL.replace(/\/$/, "")}/stack/v1/roles`).then((r) => r.json()).catch(() => null)) as { roles?: Array<{ id: string; identity?: unknown }> } | null;
+        const identity = real?.roles?.find((r) => r.id === "embed")?.identity;
+        if (identity) embedRow = { ...embedRow, identity };
+      }
+      return Response.json({ roles: [roleRow("chat", "chat"), roleRow("judge", "chat"), embedRow] });
+    }
     if (req.method === "POST" && path === "/v1/embeddings" && process.env.MAIPAI_SR_EMBED_URL) {
       // 01k: the assist arms need a recall vector; forward to the real Stack embed role.
       const up = await fetch(`${process.env.MAIPAI_SR_EMBED_URL.replace(/\/$/, "")}/v1/embeddings`, { method: "POST", headers: { "content-type": "application/json" }, body: await req.text(), signal: req.signal });
