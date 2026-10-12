@@ -1,5 +1,5 @@
 import { assertEquals } from "jsr:@std/assert@1";
-import { summarizeHeadlines } from "./handler.ts";
+import { candidateHeadlines, summarizeHeadlines } from "./handler.ts";
 
 const SAMPLE_RSS = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0"><channel>
@@ -39,4 +39,11 @@ Deno.test("reads a malformed (non-string) response as not found, not a throw", (
 Deno.test("reads an empty string as not found", () => {
   const result = summarizeHeadlines("");
   assertEquals(result.text, "I couldn't find any news headlines right now.");
+});
+
+Deno.test("candidateHeadlines returns up to eight titles so the host can floor them for a minor", () => {
+  const items = Array.from({ length: 10 }, (_, i) => `<item><title>Story ${i + 1}</title></item>`).join("");
+  const titles = candidateHeadlines(`<rss><channel><title>NPR News</title>${items}</channel></rss>`);
+  assertEquals(titles.length, 8);
+  assertEquals(titles[0], "Story 1");
 });

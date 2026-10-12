@@ -38,7 +38,7 @@ function decodeXmlEntities(raw: string): string {
     .replace(/&apos;/g, "'");
 }
 
-export function summarizeHeadlines(xml: unknown, count = 3): Reply {
+function headlineTitles(xml: unknown, count: number): string[] {
   const titles: string[] = [];
   if (typeof xml === "string") {
     const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
@@ -50,6 +50,19 @@ export function summarizeHeadlines(xml: unknown, count = 3): Reply {
       if (titles.length >= count) break;
     }
   }
+  return titles;
+}
+
+// The host reads these to apply a minor's per-headline safety floor (MINOR-SEARCH-01g)
+// and then picks the top three that pass; an adult's reply text is the first three as before.
+export const CANDIDATE_HEADLINES = 8;
+
+export function candidateHeadlines(xml: unknown): string[] {
+  return headlineTitles(xml, CANDIDATE_HEADLINES);
+}
+
+export function summarizeHeadlines(xml: unknown, count = 3): Reply {
+  const titles = headlineTitles(xml, count);
   if (titles.length === 0) {
     const text = "I couldn't find any news headlines right now.";
     return { text, speech: text };
@@ -80,7 +93,7 @@ if (import.meta.main) {
       try {
         const data = await hostFetch(extra, "https://feeds.npr.org/1001/rss.xml");
         const reply = summarizeHeadlines(data);
-        return { content: [{ type: "text", text: JSON.stringify({ reply, actions: [] }) }] };
+        return { content: [{ type: "text", text: JSON.stringify({ reply, data: { headlines: candidateHeadlines(data) }, actions: [] }) }] };
       } catch (err) {
         const error = { code: "network_unreachable", message: err instanceof Error ? err.message : String(err) };
         return { content: [{ type: "text", text: JSON.stringify({ error }) }] };

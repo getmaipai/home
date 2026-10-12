@@ -24,6 +24,8 @@ import { ComputeError } from "@maipai/spec/interpreters/ts/compute.js";
 import { createHost } from "@/lib/packageHost";
 import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/lib/packageBlocks";
 import { callTier1Handle } from "@/lib/denoHost";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { registerProjectType } from "@/lib/projects/projectTypes";
 import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
@@ -548,6 +550,8 @@ export async function runPlugin(
     if (!result.ok) {
       return { ok: false, status: 502, error: result.message, code: result.code, fallback_reply: result.fallback };
     }
+    // MINOR-SEARCH-01g: the news headlines pass the minor floor one by one; a child gets them through the model.
+    if (id === "news") return { ok: true, value: applyNewsMinorFloor(result.value, speakerAgeBand(actor, new Date())) };
     return { ok: true, value: result.value };
   }
 

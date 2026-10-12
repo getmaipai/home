@@ -2,6 +2,12 @@
 
 All notable changes to the News package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [Unreleased]
+
+### Changed
+
+- The handler also returns up to eight candidate headlines as data, so the host can check each one against the minor safety floor before a child or teen sees any.
+
 ## [0.1.0] - 2026-09-06
 
 ### Added
