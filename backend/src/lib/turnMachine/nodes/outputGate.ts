@@ -26,6 +26,7 @@ import { assessReply, repairReply, repairTail } from "@/lib/wellFormed";
 import { evaluateReply, evaluateSafety, forOutput } from "@/lib/safety";
 import type { AgeBand } from "@/lib/ageBand";
 import { turnAgeBand } from "../speaker";
+import { stripLinksForChild } from "@/lib/childLinks";
 import { surfaceClassOf } from "@/lib/surfaceClass";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import type { Surface } from "@/lib/turnShared";
@@ -373,10 +374,16 @@ export class StreamGate {
         this.onRefuse(whole);
         return;
       }
-      this.delivered += rawSpan;
+      const shown = this.shownText(rawSpan);
+      this.delivered += shown;
       this.checked += rawSpan;
-      this.release(rawSpan);
+      this.release(shown);
     }
+  }
+
+  /** MINOR-SEARCH-01m: a child's released text carries no link (closed formats); the safety checks above ran on the raw text. */
+  private shownText(span: string): string {
+    return this.band === "child" ? stripLinksForChild(span) : span;
   }
 
   /** THIN-5C, arrival grain: the unreleased part of `pending` is checked
@@ -487,9 +494,10 @@ export class StreamGate {
         return;
       }
       const repaired = repairTail(this.delivered, this.pending);
-      this.delivered += repaired;
+      const shown = this.shownText(repaired);
+      this.delivered += shown;
       this.checked += repaired;
-      this.release(repaired);
+      this.release(shown);
     } finally {
       this.onDone();
     }
@@ -618,8 +626,10 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
   }
 
-  const repaired = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
-  const evaluation = evaluateReply({ text: repaired, speech: input.reply.speech }, band);
+  const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
+  const repaired = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
+  const evaluation = evaluateReply({ text: repairedRaw, speech: input.reply.speech }, band);
+  const speechOut = band === "child" && input.reply.speech ? stripLinksForChild(input.reply.speech) : input.reply.speech;
   // SAFETY-NOTIFY-NEXT-01: the immediate (non-streamed) path's own whole-
   // reply boundary - the identical call the old engine file's own
   // applyOutputBoundary() makes right after its own equivalent
@@ -652,5 +662,5 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   }
 
   const reasoning ={ emitted: reasoningOut !== undefined, withheld_for: withheldFor };
-  return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning } };
+  return { outcome: { ok: true }, output: { refused: false, text: repaired, speech: speechOut, sources: input.reply.sources, reasoningOut, reasoning } };
 };

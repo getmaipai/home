@@ -47,6 +47,7 @@ import { TurnArtifact, type TurnArtifact as TurnArtifactValue } from "@maipai/sp
 import { newConversationTurnId, newConversationId, newOpenQuestionId } from "@/lib/id";
 import { canAccessPerson, canHaveTemporaryChat } from "@/lib/access";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
+import { stripLinksForChild, sourcesForBand } from "@/lib/childLinks";
 import { visibleText, extractReasoningText } from "@/lib/wellFormed";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { complete, type LlmMessage, completeBackground } from "@/lib/llm";
@@ -1934,6 +1935,9 @@ export function listConversationTurns(
   // own header on it).
   const projectByTurn = projectsByTurn(rows.map((r) => r.id));
 
+  // MINOR-SEARCH-01m: a child reads no link in a reply and no page address in a source, old rows included (the stored row is untouched).
+  const bandOut = speakerAgeBand(actor, new Date());
+  const forBand = (text: string) => (bandOut === "child" ? stripLinksForChild(text) : text);
   return { ok: true, value: rows.map((r) => {
     const { media: rawMedia, reasoning: _reasoning, structuredPart, confirm, outcomes: rawOutcomes, images: rawImages, answerImages: rawAnswerImages, blocks: rawBlocks, ...row } = r;
     // Named once, read by both fields below (a code review's own
@@ -1958,7 +1962,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksFor(r, rawBlocks, rawAnswerImages), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksFor(r, rawBlocks, rawAnswerImages), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2892,6 +2896,8 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
   // that used to prove "an owner may read a child's stored reasoning"
   // is retired with this fix (conversationHistory.test.ts).
   const dropReasoningForActor = speakerAgeBand(actor, new Date()) !== "adult";
+  const bandOut = speakerAgeBand(actor, new Date());
+  const forBand = (text: string) => (bandOut === "child" ? stripLinksForChild(text) : text);
   const readsErrorDetail = canReadErrorDetail(actor);
   // APPROVE-CARD-01: the same read-time derivation listConversationTurns()
   // above uses, adapted for this flat, cross-conversation list - one
@@ -2910,7 +2916,7 @@ export function list(actor: PersonRow, personId?: string): ConversationTurnWithM
     // getmaipai/home#130: no age gate, same call listConversationTurns()
     // above makes - the card is the reply itself. APPROVE-CARD-01's
     // confirm gets the same treatment.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: visibleText(r.replyText), sources: r.sources ? JSON.parse(r.sources) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksFor(r, rawBlocks, rawAnswerImages), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksFor(r, rawBlocks, rawAnswerImages), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(structuredPart ? { structured_part: JSON.parse(structuredPart) as StructuredPart } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAskForConversation(r.conversationId)?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   });
 }
 

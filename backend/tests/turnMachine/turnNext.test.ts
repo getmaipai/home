@@ -3944,7 +3944,8 @@ describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the 
     const result = await withStub({ reply: () => reply }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe(reply);
+    // MINOR-SEARCH-01m: a robot speaker nobody recognised is read as a child, so the written text carries no address.
+    expect(result.value.reply.text).toBe("Fold it in half. See for the rest.");
     // tests/chatTurn.test.ts's own fixture: the first sentence with
     // its own stop, and never a URL.
     expect(result.value.reply.speech).toBe("Fold it in half.");
@@ -3959,7 +3960,7 @@ describe("turnNext.ts: THIN-0J, server-side speech text for spoken turns on the 
     const result = await withStub({ reply: () => reply }, () => runTurnNext(people.owner, "robot", "how do I make a paper airplane"));
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-    expect(result.value.reply.text).toBe(reply);
+    expect(result.value.reply.text).toBe("It is 72°F at 10:04 am. See for the rest."); // MINOR-SEARCH-01m: child band, no address
     expect(result.value.reply.speech).toBe("It is seventy-two degrees Fahrenheit at ten oh four in the morning.");
   });
 
