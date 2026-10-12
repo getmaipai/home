@@ -12,8 +12,7 @@
 // dedupe are one step. A source that fails contributes nothing; only when every
 // picked source fails does the first one's error stand (rule 6).
 import type { AgeBand } from "@/lib/ageBand";
-import { getHouseholdSettingValue, readLayerRow } from "@/lib/settings";
-import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { effectiveMode, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
 import { ddgsConfigured, ddgsSearch } from "@/lib/retrieval/ddgsSource";
@@ -83,18 +82,9 @@ function knownSources(raw: unknown): WebSourceId[] {
   return [...new Set(list)];
 }
 
-/** SETTINGS-LAYERS-01c: a person's own pick (a user override, stored in their `person:<id>` row) replaces the
- * household's global default for them; an unreadable or empty override reads as no override. */
-function storedSources(personId: string | null | undefined = currentBlockViewer()): WebSourceId[] {
-  if (personId) {
-    try {
-      const text = readLayerRow(personId, WEB_SOURCES_KEY);
-      const own = text === undefined ? [] : knownSources(JSON.parse(text));
-      if (own.length > 0) return own;
-    } catch {
-      // fall through to the household's pick
-    }
-  }
+/** WEBSOURCES-HOUSEHOLD-01: the household's pick (`search.web_sources`, an owner or admin sets it), read the same for
+ * every person. There is no per-person pick; an unset, malformed or empty value is the default. */
+function storedSources(): WebSourceId[] {
   let raw: unknown;
   try {
     raw = getHouseholdSettingValue(WEB_SOURCES_KEY);
@@ -117,8 +107,8 @@ function modeSourceOf(id: WebSourceId): ModeSource {
 /** The sources that may answer this band's web search: the stored list, minus unbuilt sources,
  * minus any whose mode is closed or offline for the band. A child or teen reaches SearXNG only,
  * and only when the household picked it. */
-export function webSourcesFor(band: AgeBand, temporary = false, personId?: string | null): WebSourceId[] {
-  return storedSources(personId).filter((id) => {
+export function webSourcesFor(band: AgeBand, temporary = false): WebSourceId[] {
+  return storedSources().filter((id) => {
     if (!isBuilt(id)) return false;
     const mode = effectiveMode(modeSourceOf(id), band, temporary);
     return mode !== "closed" && mode !== "offline";

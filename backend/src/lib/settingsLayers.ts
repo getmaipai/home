@@ -37,7 +37,6 @@ import {
   writeLayerRow,
   type SettingsOpResult,
 } from "@/lib/settings";
-import { validateWebSources, WEB_SOURCE_IDS } from "@/lib/retrieval/webSources";
 import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
 import type { PersonRow } from "@/types";
 
@@ -396,34 +395,6 @@ export function backToUserDefaults(actor: PersonRow, targetId: string, keys: rea
     saveDelta(targetId, key, keep);
   }
   return { ok: true, value: { cleared } };
-}
-
-// ---------------------------------------------------------------------------------------------------------
-// Override-kind keys on a household-scope key (`search.web_sources`): the person's pick replaces the global default.
-
-const SOURCES_KEY = "search.web_sources";
-
-/** Set (an array of source ids) or clear (null) a person's own web search sources. An adult, the owner or an admin sets their own;
- * an owner or admin sets a child's or a teen's; a child or teen never sets their own. The row is stamped with
- * who set it, and an admin never reads or touches an adult's. */
-export function changeWebSources(actor: PersonRow, targetId: string, value: readonly string[] | null): SettingsOpResult<{ sources: string[] | null }> {
-  const role = getPersonRole(targetId);
-  if (!role) return deny("That person could not be found. Pick someone from the People page.");
-  const self = actor.id === targetId;
-  if (self && !isAdultRole(role)) return deny("A household owner or admin picks the web search sources for a child or teen. Ask one of them to open the person's page.");
-  if (!self && !(isOwnerOrAdmin(actor) && (role === "child" || role === "teen"))) return deny("Only the person, or a household owner or admin for a child or teen, can change this. Ask one of them.");
-  if (value === null) {
-    deleteLayerRow(targetId, SOURCES_KEY);
-    return { ok: true, value: { sources: null } };
-  }
-  const list = [...new Set(value)];
-  const refusal = validateWebSources(SOURCES_KEY, list);
-  if (refusal) return { ok: false, status: 400, error: refusal };
-  if (list.some((id) => !(WEB_SOURCE_IDS as readonly string[]).includes(id))) {
-    return { ok: false, status: 400, error: `Pick sources from: ${WEB_SOURCE_IDS.join(", ")}.` };
-  }
-  writeLayerRow(targetId, SOURCES_KEY, JSON.stringify(list), self ? SELF : actor.id);
-  return { ok: true, value: { sources: list } };
 }
 
 // ---------------------------------------------------------------------------------------------------------

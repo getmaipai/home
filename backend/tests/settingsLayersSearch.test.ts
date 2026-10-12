@@ -21,8 +21,8 @@ import { runAsBlockViewer } from "@/lib/blocklists/blockViewer";
 import { createHost, __setPageReaderForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __resetSearxngEnginesCacheForTests, type PageReadResult } from "@/lib/packageHost";
 import { __setAnswerImageDepsForTests, selectAnswerImages } from "@/lib/answerImages/select";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { setHouseholdSettingValue } from "@/lib/settings";
-import { changeOverrides, changeWebSources } from "@/lib/settingsLayers";
+import { setHouseholdSettingValue, setValue, writeLayerRow } from "@/lib/settings";
+import { changeOverrides } from "@/lib/settingsLayers";
 import { neededListIds } from "@/lib/blocklists/listSync";
 import { listsReadyForBand } from "@/lib/blocklists/listStore";
 import { minorSearchGate } from "@/lib/searchAssist/minorGate";
@@ -160,9 +160,9 @@ describe("a person's own block reaches web search, page reads and pictures", () 
     expect(urlAllowedFor("teen", "https://fine.example.org/")).toBe(true);
   });
 
-  test("the minor search gate reads the person's own web sources", () => {
-    expect(changeWebSources(owner, willow.id, ["searxng"]).ok).toBe(true);
-    expect(webSourcesFor("teen", false, willow.id)).toEqual(["searxng"]);
+  test("the minor search gate reads the household's web sources", () => {
+    setHouseholdSettingValue("search.web_sources", ["searxng"]);
+    expect(webSourcesFor("teen")).toEqual(["searxng"]);
     expect(typeof minorSearchGate).toBe("function");
   });
 
@@ -178,33 +178,30 @@ describe("a person's own block reaches web search, page reads and pictures", () 
   });
 });
 
-describe("web search sources as a user override", () => {
-  test("an adult picks their own; a teen cannot; an admin sets a teen's; the global default is untouched", () => {
-    expect(webSourcesFor("adult", false, marlow.id)).toEqual(["searxng"]);
-    expect(changeWebSources(willow, willow.id, ["searxng"]).ok).toBe(false);
-    expect(changeWebSources(owner, willow.id, ["searxng"]).ok).toBe(true);
-    expect(changeWebSources(owner, marlow.id, ["searxng"]).ok).toBe(false);
-    expect(changeWebSources(marlow, marlow.id, ["nope"]).ok).toBe(false);
-    expect(changeWebSources(marlow, marlow.id, ["searxng"]).ok).toBe(true);
-    expect(changeWebSources(marlow, marlow.id, null).ok).toBe(true);
-    expect(webSourcesFor("adult", false, owner.id)).toEqual(["searxng"]);
+describe("WEBSOURCES-HOUSEHOLD-01: web search sources are one household value", () => {
+  test("the household value drives results for every person; a person-scope write is refused", () => {
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
+    setHouseholdSettingValue("search.web_sources", ["searxng"]);
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
+    expect(webSourcesFor("teen")).toEqual(["searxng"]);
+    expect(webSourcesFor("child")).toEqual(["searxng"]);
+    expect(setValue(marlow, `person:${marlow.id}`, "search.web_sources", ["searxng"]).ok).toBe(false);
+    expect(setValue(owner, `person:${marlow.id}`, "search.web_sources", ["searxng"]).ok).toBe(false);
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
   });
 
-  test("WEBSOURCES-OWNER-01: the owner picks their own sources; a child and a teen still cannot", () => {
-    db.update(people).set({ role: "child" }).where(eq(people.id, marlow.id)).run();
-    const child = db.select().from(people).where(eq(people.id, marlow.id)).get()!;
-    expect(owner.role).toBe("owner");
-    expect(changeWebSources(owner, owner.id, ["searxng", "ddgs"]).ok).toBe(true);
-    expect(changeWebSources(owner, owner.id, null).ok).toBe(true);
-    expect(changeWebSources(child, child.id, ["searxng", "ddgs"]).ok).toBe(false);
-    expect(changeWebSources(willow, willow.id, ["searxng", "ddgs"]).ok).toBe(false);
-    expect(webSourcesFor("child", false, child.id)).toEqual(["searxng"]);
-    expect(webSourcesFor("teen", false, willow.id)).toEqual(["searxng"]);
+  test("a leftover person-scope row for the key is ignored", () => {
+    setHouseholdSettingValue("search.web_sources", ["searxng"]);
+    writeLayerRow(marlow.id, "search.web_sources", JSON.stringify(["ddgs"]));
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
   });
 
-  test("WEBSOURCES-OWNER-01: an admin may set their own", () => {
+  test("a non-admin cannot change the household value; the owner and an admin can", () => {
+    expect(setValue(marlow, "household", "search.web_sources", ["searxng"]).ok).toBe(false);
+    expect(setValue(willow, "household", "search.web_sources", ["searxng"]).ok).toBe(false);
+    expect(setValue(owner, "household", "search.web_sources", ["searxng"]).ok).toBe(true);
     db.update(people).set({ role: "admin" }).where(eq(people.id, marlow.id)).run();
     const admin = db.select().from(people).where(eq(people.id, marlow.id)).get()!;
-    expect(changeWebSources(admin, admin.id, ["searxng", "ddgs"]).ok).toBe(true);
+    expect(setValue(admin, "household", "search.web_sources", ["searxng"]).ok).toBe(true);
   });
 });

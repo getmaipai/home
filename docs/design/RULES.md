@@ -26,7 +26,9 @@ a spoken turn is shaped. Where a rule below would do either, this rule
 wins. A child's or teen's search is protected by what it may fetch and show, not by refusing to search. The
 SafeSearch level, the sources a kid or teen gets and the cleaning of fetched page text are user defaults (owner's
 ruling, 2026-10-12): an admin may override them in either direction, globally (global defaults) or for one person (a
-user override), and the kid or teen never can. Precedence is user overrides > global defaults > user defaults. The
+user override), and the kid or teen never can. Precedence is user overrides > global defaults > user defaults. Except web
+sources (`search.web_sources`), which are one household setting only an admin sets, with no per-person override
+([record](../plans/web-sources-household-2026-10-12.md)). The
 adult-site host list (locked on for every kid and teen, a custom allow never lifts it) and the output gate stay fixed
 and no setting reaches them. Web search runs without a parent's approval when the household has it on for their controls.
 
