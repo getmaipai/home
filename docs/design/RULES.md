@@ -36,9 +36,7 @@ wins.
    consent, temporary mode, crisis, the household-name gate, a minor's
    safesearch). An explicit request never reaches a tool the person's
    role or the household's settings do not allow. A learned or embedding
-   signal about search need may run in shadow, logged as a number with no
-   text; it changes no turn until a held-out bench row shows a paired gain
-   and this rule is amended again. What stays deterministic: the safety
+   signal about search need runs in shadow, logged as a number with no text, and changes no turn, with one exception. On an adult written turn the person may search, when the model returns text with no tool call and the score is above the recorded threshold, the engine's query writer writes the query and the call passes the same policy checks as a model call. It never cancels a model call. It never applies to a child, a teen, a spoken turn, or the safety, consent, privacy or credentials paths, and an admin setting can switch it off. What stays deterministic: the safety
    floor on input and output, the credential catch, consent words, the
    household-name gate on search arguments, the crisis, temporary-mode
    and grounding refusals, and exact commands, forget among them. The
