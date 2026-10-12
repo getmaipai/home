@@ -153,9 +153,10 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
     case "select": {
       const options = range?.options as unknown[] | undefined;
       if (range?.multiple === true) {
+        const labels = (keyDef.copy as { option_labels?: Record<string, string> } | undefined)?.option_labels;
         // SEARCH-SOURCES-01: a multi-select stores a list of the declared options, each at most once.
         if (!Array.isArray(value) || value.some((entry) => !options?.includes(entry))) {
-          return { ok: false, status: 400, error: `must be a list of ${JSON.stringify(options ?? [])}` };
+          return { ok: false, status: 400, error: `Pick one or more of: ${(options ?? []).map((o) => (labels?.[String(o)] ?? String(o))).join(", ")}.` };
         }
         if (new Set(value).size !== value.length) return { ok: false, status: 400, error: "each option can be picked once" };
         break;

@@ -63,6 +63,11 @@ describe("validateWebSources", () => {
     expect(setHouseholdSettingValue(WEB_SOURCES_KEY, "searxng").ok).toBe(false);
     expect(setHouseholdSettingValue(WEB_SOURCES_KEY, ["searxng", "ddgs"]).ok).toBe(true);
   });
+  test("a non-list value is refused with the fix named, in the spec's option labels", () => {
+    const result = setHouseholdSettingValue(WEB_SOURCES_KEY, "searxng");
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toBe("Pick one or more of: SearXNG, DuckDuckGo.");
+  });
 });
 
 describe("webSourcesFor, the band gate", () => {
