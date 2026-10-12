@@ -53,6 +53,7 @@ import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
+import { PARENT_REQUIRED_LINE } from "./nodes/answer";
 import { AnswerImagePlacer, answerImagesAllowed, settleAnswerBlocks, settleAnswerImages } from "@/lib/answerImages/turn";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import type { GateDecision } from "@/lib/gate/types";
@@ -448,7 +449,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     setPendingAsk(conversation.id, null);
     if (opts.ask_answer || AFFIRMATIVE_RE.test(text)) {
       if (pendingAskDecision?.kind === "ask_parent") {
-        return { ok: false, result: { ok: false, status: 403, code: "parent_required", error: "This needs a parent to decide. I haven't asked one." } };
+        return { ok: false, result: { ok: false, status: 403, code: "parent_required", error: PARENT_REQUIRED_LINE } };
       }
       const error = pendingAskDecision?.kind === "deny" && pendingAskDecision.reason === "crisis_state"
         ? "Let's stay with this for now. I'm here."

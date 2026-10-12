@@ -782,11 +782,11 @@ describe("turnNext.ts: consent and confirmation", () => {
     const original = entry.turn_budget;
     entry.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "websearch"] };
     try {
-      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Jesse Torres news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Jesse Torres news"));
+      const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "websearch") ? [{ id: "search", name: "websearch", args: JSON.stringify({ expression: "Sage news" }) }] : undefined, reply: () => "unused" }, () => runTurnNext(people.child, "chat", "search the web for Sage news"));
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      // MINOR-SEARCH-01a: the spec now says never for a child; the dedicated copy is MINOR-SEARCH-01b.
-      expect(result.value.reply.text).not.toContain("parent");
+      // MINOR-SEARCH-01b: never for a child, with its own line (what happened, what to do).
+      expect(result.value.reply.text).toBe("I don't search the web for people in our family. I can tell you what I already know, or you can ask a grown-up at home.");
       expect(result.value.confirm).toBeUndefined();
       expect(getPendingAsk(result.value.conversation_id)).toBeNull();
     } finally { entry.turn_budget = original; }
@@ -801,7 +801,7 @@ describe("turnNext.ts: consent and confirmation", () => {
       const result = await withStub({ calls: (request) => request.tools?.some((t) => t.function.name === "lock-doors") ? [{ id: "lock", name: "lock-doors", args: "{}" }] : undefined, reply: () => "unused" }, () => runTurnNext(actor, "chat", "lock the doors"));
       expect(result.ok).toBe(true);
       if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
-      expect(result.value.reply.text).toBe("This needs a parent to decide. I haven't asked one.");
+      expect(result.value.reply.text).toBe("That needs a grown-up at home to decide. Ask one of them, or ask me something else.");
       expect(result.value.confirm).toBeUndefined();
       expect(getPendingAsk(result.value.conversation_id)).toBeNull();
       expect(result.value.plugin_id).toBeUndefined();
@@ -828,7 +828,7 @@ describe("turnNext.ts: consent and confirmation", () => {
     const result = await runTurnNext(actor, "chat", "yes", { conversationId: conversation.value.id, ask_answer: { turn_id: "legacy-lock-card", approved: true } });
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error("expected the refusal");
-    expect(result).toMatchObject({ ok: false, status: 403, code: "parent_required", error: "This needs a parent to decide. I haven't asked one." });
+    expect(result).toMatchObject({ ok: false, status: 403, code: "parent_required", error: "That needs a grown-up at home to decide. Ask one of them, or ask me something else." });
     expect(getPendingAsk(conversation.value.id)).toBeNull();
   });
 

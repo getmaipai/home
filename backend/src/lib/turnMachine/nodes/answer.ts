@@ -76,8 +76,12 @@ export interface AnswerOutput {
  * thing entirely during the live incident this fixes. `unknown_tool`
  * (no such package, the ordinary case of a model inventing a tool
  * name) keeps the honesty line - GROUND-01's ruling stands. */
+export const PARENT_REQUIRED_LINE = "That needs a grown-up at home to decide. Ask one of them, or ask me something else.";
+export const HOUSEHOLD_SUBJECT_NEVER_LINE = "I don't search the web for people in our family. I can tell you what I already know, or you can ask a grown-up at home.";
+
 function policyRefusalLine(reason: PolicyRefusedReason): string {
-  if (reason === "parent_required") return "This needs a parent to decide. I haven't asked one.";
+  if (reason === "parent_required") return PARENT_REQUIRED_LINE;
+  if (reason === "household_subject_never") return HOUSEHOLD_SUBJECT_NEVER_LINE;
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
   if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't use anyone's memories.";

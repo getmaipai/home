@@ -22,7 +22,7 @@ function fixtures(id: string): Array<{ capability: string; parameters?: Record<s
   else if (id === "net:<host>") values = ["net:api.open-meteo.com"];
   else if (id === "actions:<kind>") values = ["actions:lights"];
   else if (id === "home:<domain>") values = ["home:unknown", ...Object.keys(row?.policy?.by_parameter ?? {}).map((value) => `home:${value}`)];
-  else if (id === "integration:<id>") values = ["integration:searxng"];
+  else if (id === "integration:<id>") values = ["integration:searxng", "integration:homeassistant"];
   else if (id === "files:<path>") values = ["files:/tmp/example"];
   else if (id === "use:<package>") values = ["use:storybook"];
   else values = [id.replace(/<[^>]+>/g, "fixture")];

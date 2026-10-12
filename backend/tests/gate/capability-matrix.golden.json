@@ -4033,6 +4033,150 @@
   },
   {
     "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "child",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_parent"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "child",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:needs_parent_unavailable"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "child",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "child",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "teen",
+    "provenance": "person",
+    "context": "normal",
+    "result": "ask_parent"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "teen",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "deny:needs_parent_unavailable"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "teen",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "deny:tainted_action"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "teen",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "adult",
+    "provenance": "person",
+    "context": "normal",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "adult",
+    "provenance": "person",
+    "context": "temporary",
+    "result": "allow"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "adult",
+    "provenance": "person",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "normal",
+    "result": "ask_self"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "temporary",
+    "result": "ask_self"
+  },
+  {
+    "id": "integration:<id>",
+    "capability": "integration:homeassistant",
+    "band": "adult",
+    "provenance": "untrusted",
+    "context": "crisis",
+    "result": "deny:crisis_state"
+  },
+  {
+    "id": "integration:<id>",
     "capability": "integration:<id>",
     "parameters": {
       "integration:<id>": "searxng"
