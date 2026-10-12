@@ -14,6 +14,12 @@ import "../../../scripts/runTemp";
 //   classifier (SEARCH-RECENCY-05) per-turn decision from a trained embedding classifier (precomputed per row id in
 //           MAIPAI_SR_DECISIONS, a JSON of {id: "SEARCH"|"NO_SEARCH"}); on SEARCH the websearch call is forced with the
 //           router's emulation, on NO_SEARCH the plain turn runs unchanged. Child rows are forced too: the scope gate stays outside.
+//   decider (ROUTER-BUILD-03) adult written rows: MAIPAI_SR_DECIDER=B|D picks the decider. B asks the engine SEARCH/NO_SEARCH with
+//           prompt variant MAIPAI_SR_B_VARIANT (1 to 3, default 2); D reads P(recency) per row id from MAIPAI_SR_CSCORES (JSON) against
+//           MAIPAI_SR_D_LOW and MAIPAI_SR_D_HIGH and asks B inside the band. SEARCH forces the websearch call exactly as the classifier arm
+//           does. Bench-only caveat: the decision is taken up front, before the model's own round, not at the rescue position, so it is
+//           an upper bound on recall and an overstatement of latency; the stage 1 replay is the exact-in-expectation measure. Child,
+//           teen and spoken rows run the plain turn and the decider never activates (a fail-open, counted by `decider activations`).
 //   weboff  (MINOR-SEARCH-01k) plain with the household's child and teen web switches off: the "minor web off" baseline.
 //   assist_shadow / assist_rescue (01k) plain with chat.search_assist shadow or rescue; the Stack's embed role is forwarded
 //           (MAIPAI_SR_EMBED_URL) so a minor's turn has a recall vector. assist_rescue needs a checkout where
@@ -42,11 +48,12 @@ import { refuseIfGateRunning } from "./liveHubQuiet";
 import { callShapes, judge, rescoreRecorded, scopeUse, stripScopeFromBody, wasRescued, type CategoryRule, type ToolCall } from "./ksBenchScore";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { startRecordingProxy, type RecordedRequest } from "./recordingProxy";
+import { decide, type DeciderArm, type PromptVariant } from "./routerBuild02Decider";
 
-type Arm = "diag" | "router" | "always" | "plain" | "desc" | "cutoff" | "classifier" | "weboff" | "assist_shadow" | "assist_rescue";
+type Arm = "diag" | "router" | "always" | "plain" | "desc" | "cutoff" | "classifier" | "decider" | "weboff" | "assist_shadow" | "assist_rescue";
 type Band = "adult" | "child" | "teen" | "spoken";
 type Grain = "sentence" | "arrival";
-const ALL_ARMS: Arm[] = ["diag", "router", "always", "plain", "desc", "cutoff", "classifier", "weboff", "assist_shadow", "assist_rescue"];
+const ALL_ARMS: Arm[] = ["diag", "router", "always", "plain", "desc", "cutoff", "classifier", "decider", "weboff", "assist_shadow", "assist_rescue"];
 const BANDS_ALL: Band[] = ["adult", "child", "teen", "spoken"];
 // KS-BENCH-01 categories plus the minor sets' (01d, 01j).
 const CATEGORIES = ["stable", "recency", "no_tool", "household_name", "unsafe_near_miss", "crisis", "pii_query", "ceiling"] as const;
@@ -102,7 +109,7 @@ const SLICES = ["all", "heldout", "tuning", "followup"] as const;
 const sliceOf = (r: RunRecord): string[] => (r.followUp ? ["followup"] : ["all", r.heldOut ? "heldout" : "tuning"]);
 
 function summarize(runs: RunRecord[], env: unknown) {
-  const present = (["plain", "router", "always", "desc", "cutoff", "classifier", "weboff", "assist_shadow", "assist_rescue"] as Arm[]).filter((a) => runs.some((r) => r.arm === a));
+  const present = (["plain", "router", "always", "desc", "cutoff", "classifier", "decider", "weboff", "assist_shadow", "assist_rescue"] as Arm[]).filter((a) => runs.some((r) => r.arm === a));
   const slice = (arm: Arm, pred: (r: RunRecord) => boolean) => runs.filter((r) => r.arm === arm && r.error === null && pred(r));
   const cellPred = (band: Band, category: string, sl: string) => (r: RunRecord) => r.band === band && r.category === category && sliceOf(r).includes(sl);
   const byCategory: Record<string, unknown> = {};
@@ -597,6 +604,23 @@ async function main(): Promise<void> {
           } else if (adultForced) {
             state.force = true;
           }
+          if (arm === "decider") {
+            const kind = (process.env.MAIPAI_SR_DECIDER ?? "") as DeciderArm;
+            if (kind !== "B" && kind !== "D") throw new Error("the decider arm needs MAIPAI_SR_DECIDER=B or D");
+            const cScores = process.env.MAIPAI_SR_CSCORES ? (JSON.parse(readFileSync(process.env.MAIPAI_SR_CSCORES, "utf-8")) as Record<string, number>) : {};
+            const num = (name: string): number | undefined => { const v = process.env[name]; return v === undefined || v === "" || !Number.isFinite(Number(v)) ? undefined : Number(v); };
+            const dLow = num("MAIPAI_SR_D_LOW"), dHigh = num("MAIPAI_SR_D_HIGH");
+            if (kind === "D" && (dLow === undefined || dHigh === undefined)) throw new Error("decider D needs numbers in MAIPAI_SR_D_LOW and MAIPAI_SR_D_HIGH, for example 0.35 and 0.8 from the frozen PREREG.json.");
+            const bVariant = (num("MAIPAI_SR_B_VARIANT") ?? 2) as PromptVariant;
+            const d = await decide(
+              { band: row.band, spoken: row.band === "spoken", modelToolCalls: 0, text: row.prompt, prior: row.priorUser ? { user: row.priorUser, assistant: priorReply || row.priorAssistant || "" } : null },
+              { arm: kind, score: cScores[row.id] ?? null, low: dLow, high: dHigh, variant: bVariant,
+                ask: async (messages, signal) => { const res = await fetch(`${chatUrl}/v1/chat/completions`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ model: "chat", messages, max_tokens: 3, temperature: 0, stream: false, chat_template_kwargs: { enable_thinking: false } }), signal }); if (!res.ok) throw new Error(`HTTP ${res.status}`); return ((await res.json()) as { choices?: { message?: { content?: string } }[] }).choices?.[0]?.message?.content ?? ""; } },
+            );
+            answer = d.activated ? `${d.decision}:${d.reason}` : null;
+            diagMs = d.ms ?? 0;
+            state.force = d.decision === "SEARCH";
+          }
           if (arm === "classifier") {
             answer = classifierDecisions[row.id] ?? null;
             if (answer === null) throw new Error(`no classifier decision for ${row.id}`);
@@ -622,7 +646,7 @@ async function main(): Promise<void> {
           const verdict = turn.error || !rules[row.category] ? null : judge(shapes, rules[row.category]!);
           const use = scopeUse([...firstCalls, ...laterCalls], rescued ? 1 : 0);
           runs.push({
-            ...base, ...blank, routerAnswer: answer, diagMs: arm === "router" && adultForced ? diagMs : null, forced: state.forcedLast,
+            ...base, ...blank, routerAnswer: answer, diagMs: (arm === "router" && adultForced) || arm === "decider" ? diagMs : null, forced: state.forcedLast,
             reply: turn.error ? "" : turn.reply, words: turn.error ? 0 : words(turn.reply), firstWordMs: turn.firstWordMs === null ? null : turn.firstWordMs + diagMs, totalMs: turn.totalMs + diagMs, error: turn.error, mode,
             firstRound: first ? { calls: firstCalls, toolChoice: first.toolChoice == null ? null : typeof first.toolChoice === "string" ? first.toolChoice : JSON.stringify(first.toolChoice), promptTokens: first.promptTokens ?? null, cachedTokens: first.cachedTokens ?? null, toolsOffered: first.tools.length, scopeInSchema: !state.strippedLast, latencyMs: first.latencyMs ?? null } : null,
             wire: requests.map((q) => ({ tools: q.tools.length, toolChoice: q.toolChoice ?? null, rf: !!q.responseFormat, calls: q.toolCalls.map((c) => c.name), completed: q.completed, aborted: q.aborted, text: (q.responseText ?? "").slice(0, 200) })),
