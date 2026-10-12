@@ -11,7 +11,8 @@ import { blocklistIds } from "@/lib/blocklists/policy";
 export const LIST_INDEX_URL = "https://github.com/getmaipai/catalog/releases/latest/download/list-index.json";
 /** The only host a list file may come from; the catalog guard and this check both refuse any other. */
 export const LIST_SOURCE_HOST = "raw.githubusercontent.com";
-export const LIST_MAX_BYTES = 64 * 1024 * 1024;
+/** 128 MiB: the malware list is about 72 MB (owner-approved 2026-10-12). Twin of the other repo's constant. */
+export const LIST_MAX_BYTES = 128 * 1024 * 1024;
 export const LIST_MAX_ENTRIES = 2_000_000;
 /** The index is a few KB; anything bigger is not the index. */
 export const LIST_INDEX_MAX_BYTES = 1024 * 1024;

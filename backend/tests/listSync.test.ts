@@ -104,6 +104,11 @@ describe("verifyListIndex", () => {
     const res = verifyListIndex(envelope([bad]), { keys: [key.publicKeyPem], now: NOW.getTime() });
     expect(res.ok).toBe(false);
   });
+  test("a pin of the 72 MB malware size is accepted and one over 128 MiB is refused", () => {
+    const opts = { keys: [key.publicKeyPem], now: NOW.getTime() };
+    expect(verifyListIndex(envelope([{ ...pin, bytes: 72_161_681 }]), opts).ok).toBe(true);
+    expect(verifyListIndex(envelope([{ ...pin, bytes: 128 * 1024 * 1024 + 1 }]), opts).ok).toBe(false);
+  });
   test("a pin from another host is refused", () => {
     const bad = { ...pin, source_url: `https://evil.example.com/x/y/${COMMIT}/blp-porn.txt` };
     expect(verifyListIndex(envelope([bad]), { keys: [key.publicKeyPem], now: NOW.getTime() }).ok).toBe(false);
