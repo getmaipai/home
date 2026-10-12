@@ -62,6 +62,16 @@ export const CONTENT_CEILINGS: Readonly<Record<AgeBand, ContentCeiling>> = {
       privacy: "off",
     },
     floor: FLOOR,
+    topics: {
+      bodies: { stance: "redirect", allowed: ["redirect", "gentle"], fixed: false },
+      health: { stance: "gentle", allowed: ["gentle", "redirect"], fixed: false },
+      feelings: { stance: "support", allowed: ["support"], fixed: true },
+      risk: { stance: "gentle", allowed: ["gentle", "redirect"], fixed: false },
+      violence: { stance: "gentle", allowed: ["gentle", "redirect"], fixed: false },
+      people: { stance: "protect", allowed: ["protect"], fixed: true },
+      beliefs: { stance: "neutral", allowed: ["neutral"], fixed: true },
+    },
+    family_stories: { default: "keep", names: ["Santa Claus", "the Tooth Fairy", "the Easter Bunny"] },
     hlc: "0:0:builtin",
   },
   teen: {
@@ -77,6 +87,15 @@ export const CONTENT_CEILINGS: Readonly<Record<AgeBand, ContentCeiling>> = {
       privacy: "public",
     },
     floor: FLOOR,
+    topics: {
+      bodies: { stance: "informative", allowed: ["informative", "redirect"], fixed: false },
+      health: { stance: "informative", allowed: ["informative"], fixed: true },
+      feelings: { stance: "support", allowed: ["support"], fixed: true },
+      risk: { stance: "informative", allowed: ["informative", "redirect"], fixed: false },
+      violence: { stance: "informative", allowed: ["informative"], fixed: true },
+      people: { stance: "protect", allowed: ["protect"], fixed: true },
+      beliefs: { stance: "neutral", allowed: ["neutral"], fixed: true },
+    },
     hlc: "0:0:builtin",
   },
   adult: {
@@ -108,6 +127,15 @@ export const CONTENT_CEILINGS: Readonly<Record<AgeBand, ContentCeiling>> = {
 Object.freeze(FLOOR);
 for (const ceiling of Object.values(CONTENT_CEILINGS)) {
   Object.freeze(ceiling.dials);
+  for (const family of Object.values(ceiling.topics ?? {}) as { allowed: string[] }[]) {
+    Object.freeze(family.allowed);
+    Object.freeze(family);
+  }
+  if (ceiling.topics) Object.freeze(ceiling.topics);
+  if (ceiling.family_stories) {
+    Object.freeze(ceiling.family_stories.names);
+    Object.freeze(ceiling.family_stories);
+  }
   Object.freeze(ceiling);
 }
 Object.freeze(CONTENT_CEILINGS);
