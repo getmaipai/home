@@ -121,6 +121,17 @@ const ROSTER: PersonRosterEntry[] = [
   member("person-clover", "Clover", "teen"),
 ];
 
+const SITE_BLOCKS = {
+  band: "child",
+  label: "Child + 1 change",
+  resetLabel: "Back to Child",
+  rows: [{ id: "blp-porn", label: "Adult sites", does: "Blocks adult sites." }, { id: "blp-drugs", label: "Drug sites", does: "Blocks drug sites." }],
+  defaults: ["blp-porn"],
+  mine: ["blp-porn", "blp-drugs"],
+  locked: ["blp-porn"],
+  setBy: { "blp-drugs": "Set by Sage" },
+};
+
 const NO_FILES_PREVIEW = { files: { purged: { files: 0, bytes: 0 }, keptForHousehold: { files: 0, bytes: 0 } }, export: { allowed: true, url: null } };
 
 function stubApi(over: { batchOutcomes?: Array<{ id: string; deleted: boolean; reason?: string }>; preview?: unknown } = {}) {
@@ -146,6 +157,9 @@ function stubApi(over: { batchOutcomes?: Array<{ id: string; deleted: boolean; r
     if (method === "PATCH") {
       return Promise.resolve(new Response(JSON.stringify(ROSTER[1]), { status: 200 }));
     }
+    if (url.includes("/site-blocks")) {
+      return Promise.resolve(new Response(JSON.stringify(SITE_BLOCKS), { status: 200 }));
+    }
     if (url.includes("/api/people")) {
       return Promise.resolve(new Response(JSON.stringify(ROSTER), { status: 200 }));
     }
@@ -163,6 +177,23 @@ function stubApi(over: { batchOutcomes?: Array<{ id: string; deleted: boolean; r
 // Moved verbatim from the retired old-shell apps/settings/UsersPage.test.tsx
 // (NEXT-RETIRE-02C), which itself came from the older PeoplePage.test.tsx.
 // The behavior didn't change, only where it lives.
+describe("blocked sites by person", () => {
+  test("shows the label, who set a row, and sends a reset for that row only", async () => {
+    const { calls, restore } = stubApi();
+    try {
+      const { findByText, findByRole } = renderUsersPage(actor("owner"));
+      expect(await findByText(/Child \+ 1 change/)).toBeInTheDocument();
+      expect(await findByText("Set by Sage")).toBeInTheDocument();
+      fireEvent.click(await findByRole("button", { name: "Back to Child" }));
+      await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url.includes("/site-blocks/reset"))).toBe(true));
+      const reset = calls.find((c) => c.url.includes("/site-blocks/reset"))!;
+      expect(JSON.parse(reset.body ?? "{}")).toEqual({ id: "blp-drugs" });
+    } finally {
+      restore();
+    }
+  });
+});
+
 describe("removing a person", () => {
   // Deleting a person erases their memories, conversations, settings and
   // recordings. It is the most destructive action in the product, so

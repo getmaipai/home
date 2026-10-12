@@ -13,6 +13,8 @@ import { canManage, checkRoleChange, commitPersonUpdate, deletePerson, deletePeo
 import { requiresCredential, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { effectivePermissions } from "@/lib/permissions";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { blocklistIds } from "@/lib/blocklists/policy";
+import { backToUserDefaults, changeOverrides, resetBlocklistRow, hiddenOwnChoice, siteBlocksView } from "@/lib/settingsLayers";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { setValue, getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
 import { isOwnerOrAdmin, canAccessPerson } from "@/lib/access";
@@ -628,4 +630,89 @@ peopleRoutes.openapi(permissionsRoute, (c) => {
     return c.json({ error: `${actor.role} cannot see a ${target.role} profile's permissions` }, 403);
   }
   return c.json(effectivePermissions(id), 200);
+});
+
+// SETTINGS-LAYERS-01d: a person's site-block categories as layers (global defaults column, user overrides
+// column). The viewer only ever reads what settingsLayers lets them read; a teen's own choices never reach
+// an admin's screen. Every write goes through the one write gate in lib/settingsLayers.ts.
+const SiteBlocksSchema = z.object({
+  band: z.enum(["child", "teen", "adult"]),
+  label: z.string(),
+  resetLabel: z.string(),
+  rows: z.array(z.object({ id: z.string(), label: z.string(), does: z.string() })),
+  defaults: z.array(z.string()),
+  mine: z.array(z.string()),
+  locked: z.array(z.string()),
+  setBy: z.record(z.string(), z.string()),
+});
+
+const siteBlocksGetRoute = createRoute({
+  method: "get",
+  path: "/{id}/site-blocks",
+  tags: ["People"],
+  summary: "A person's blocked-site categories: the defaults and their overrides",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id") },
+  responses: {
+    200: { content: { "application/json": { schema: SiteBlocksSchema } }, description: "The two columns, the label and who set each override." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not allowed to see this person's site blocks" }),
+  },
+});
+peopleRoutes.openapi(siteBlocksGetRoute, (c) => {
+  const { id } = c.req.valid("param");
+  const out = siteBlocksView(c.get("person"), id);
+  return out.ok ? c.json(out.value, 200) : c.json({ error: out.error }, 403);
+});
+
+const siteBlocksPutRoute = createRoute({
+  method: "put",
+  path: "/{id}/site-blocks",
+  tags: ["People"],
+  summary: "Tick or untick one blocked-site category in a person's overrides",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id"),
+    body: { content: { "application/json": { schema: z.object({ id: z.string(), checked: z.boolean() }) } }, required: true },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: SiteBlocksSchema } }, description: "The person's view after the change." },
+    ...errorResponses({ 400: "Not a known category", 401: "Not signed in", 403: "Not allowed to change this" }),
+  },
+});
+peopleRoutes.openapi(siteBlocksPutRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const { id: item, checked } = c.req.valid("json");
+  if (!blocklistIds().includes(item)) return c.json({ error: "That is not a blocked-site category. Pick one from the list on this page." }, 400);
+  if (!hiddenOwnChoice(actor, id, item)) {
+    const res = changeOverrides(actor, id, "search.blocklists", checked ? { add: [item] } : { remove: [item] });
+    if (!res.ok) return c.json({ error: res.error }, res.status === 400 ? 400 : 403);
+  }
+  const view = siteBlocksView(actor, id);
+  return view.ok ? c.json(view.value, 200) : c.json({ error: view.error }, 403);
+});
+
+const siteBlocksResetRoute = createRoute({
+  method: "post",
+  path: "/{id}/site-blocks/reset",
+  tags: ["People"],
+  summary: "Put one category, or all of them, back to the age group's setting",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id"),
+    body: { content: { "application/json": { schema: z.object({ id: z.string().optional() }) } }, required: true },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: SiteBlocksSchema } }, description: "The person's view after the reset." },
+    ...errorResponses({ 400: "Not a known category", 401: "Not signed in", 403: "Not allowed to change this" }),
+  },
+});
+peopleRoutes.openapi(siteBlocksResetRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const { id: item } = c.req.valid("json");
+  const res = item ? resetBlocklistRow(actor, id, item) : backToUserDefaults(actor, id, []);
+  if (!res.ok) return c.json({ error: res.error }, res.status === 400 ? 400 : 403);
+  const view = siteBlocksView(actor, id);
+  return view.ok ? c.json(view.value, 200) : c.json({ error: view.error }, 403);
 });

@@ -10,6 +10,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
+import { SiteBlocksSection } from "./SiteBlocksSection";
 import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles, requiresSecret } from "@/apps/people/roles";
 
@@ -378,6 +379,12 @@ export function UsersSection({ person }: UsersSectionProps) {
         </Section>
         )}
       </AsyncState>
+
+      {roster ? (
+        <SiteBlocksSection
+          roster={roster.filter((p) => (p.role === "child" || p.role === "teen") && p.id !== person.id)}
+        />
+      ) : null}
 
       <Section heading="Add someone">
         <form onSubmit={handleAdd} className="flex max-w-sm flex-col gap-3">

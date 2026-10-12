@@ -90,6 +90,17 @@ import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 // (withSessionLock()) - visible to every signed-in household member the
 // same as role already is, editable only by owner/admin (routes/
 // people.ts's own pre-check, settings.ts's assertCanSetSessionLock()).
+export interface SiteBlocksView {
+  band: "child" | "teen" | "adult";
+  label: string;
+  resetLabel: string;
+  rows: Array<{ id: string; label: string; does: string }>;
+  defaults: string[];
+  mine: string[];
+  locked: string[];
+  setBy: Record<string, string>;
+}
+
 export type PersonRosterEntry = Omit<Person, "birthdate"> & {
   sessionLockRequired: boolean;
   sessionLockTimeoutMinutes: number;
@@ -886,6 +897,12 @@ export const api = {
       body: JSON.stringify({ scope, key }),
     }),
   people: () => request<PersonRosterEntry[]>("/api/people"),
+  // SETTINGS-LAYERS-01d: a person's blocked-site categories as two columns (global defaults, user overrides).
+  siteBlocks: (id: string) => request<SiteBlocksView>(`/api/people/${encodeURIComponent(id)}/site-blocks`),
+  setSiteBlock: (id: string, item: string, checked: boolean) =>
+    request<SiteBlocksView>(`/api/people/${encodeURIComponent(id)}/site-blocks`, { method: "PUT", body: JSON.stringify({ id: item, checked }) }),
+  resetSiteBlocks: (id: string, item?: string) =>
+    request<SiteBlocksView>(`/api/people/${encodeURIComponent(id)}/site-blocks/reset`, { method: "POST", body: JSON.stringify(item ? { id: item } : {}) }),
   // GET /api/dashboard (SHELL-01): every signed-in person's own
   // household glanceable state; repairs_open/engines are additive
   // fields present only for owner/admin (absent, not null/zero, for

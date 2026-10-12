@@ -26,7 +26,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { getPersonRole, isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
-import { blocklistIds, defaultListIds, lockedListIds } from "@/lib/blocklists/policy";
+import { BLOCKLIST_POLICY, blocklistIds, defaultListIds, lockedListIds } from "@/lib/blocklists/policy";
 import { parseHostEntries } from "@/lib/blocklists/customHosts";
 import { checkHost } from "@/lib/blocklists/hostLists";
 import { nextHlc } from "@/lib/hlc";
@@ -418,4 +418,90 @@ export function changeWebSources(actor: PersonRow, targetId: string, value: read
   }
   writeLayerRow(targetId, SOURCES_KEY, JSON.stringify(list), self ? SELF : actor.id);
   return { ok: true, value: { sources: list } };
+}
+
+// ---------------------------------------------------------------------------------------------------------
+// The People page view of a person's site-block categories (SETTINGS-LAYERS-01d)
+
+const BLOCKLISTS_KEY = "search.blocklists";
+const BAND_NAME: Record<AgeBand, string> = { child: "Child", teen: "Teen", adult: "Adult" };
+
+export interface SiteBlocksView {
+  band: AgeBand;
+  /** "Teen + 3 changes", or "Teen" when the person has none the viewer may see. */
+  label: string;
+  resetLabel: string;
+  rows: { id: string; label: string; does: string }[];
+  /** Ticked in the global defaults column (user defaults plus global defaults), read-only. */
+  defaults: string[];
+  /** Ticked in the user overrides column, as far as the viewer may see. */
+  mine: string[];
+  locked: string[];
+  /** Row id to a plain line saying who set that row's override. */
+  setBy: Record<string, string>;
+}
+
+/** What `viewer` may see of a person's site-block categories. A teen's own choices are never in it for an
+ * admin: the column is the defaults plus only the entries the viewer may read. */
+export function siteBlocksView(viewer: PersonRow, targetId: string): SettingsOpResult<SiteBlocksView> {
+  const seen = readOverrides(viewer, targetId, BLOCKLISTS_KEY);
+  if (!seen.ok) return seen;
+  const band = bandOfPerson(targetId);
+  const known = new Set(blocklistIds());
+  const defaults = [...new Set([...userDefaultItems(BLOCKLISTS_KEY, band), ...globalDefaultItems(BLOCKLISTS_KEY)])].filter((id) => known.has(id));
+  const mine = new Set(defaults);
+  const setBy: Record<string, string> = {};
+  const who = (entry: DeltaEntry): string => {
+    if (entry.set_by === SELF) return `Set by ${personById(targetId)?.displayName ?? "them"}`;
+    return `Set by ${personById(entry.set_by)?.displayName ?? "an owner or admin"}`;
+  };
+  for (const e of seen.value.remove) { mine.delete(e.item); setBy[e.item] = who(e); }
+  for (const e of seen.value.add) { if (known.has(e.item)) { mine.add(e.item); setBy[e.item] = who(e); } }
+  for (const id of lockedListIds(band)) mine.add(id);
+  const changes = visibleOverrideCount(viewer, targetId, [BLOCKLISTS_KEY]);
+  const name = BAND_NAME[band];
+  return {
+    ok: true,
+    value: {
+      band,
+      label: changes > 0 ? `${name} + ${changes} ${changes === 1 ? "change" : "changes"}` : name,
+      resetLabel: `Back to ${name}`,
+      rows: BLOCKLIST_POLICY.lists.map((r) => ({ id: r.id, label: r.label, does: r.does })),
+      defaults: defaults.concat(lockedListIds(band).filter((id) => !defaults.includes(id))),
+      mine: [...mine],
+      locked: lockedListIds(band),
+      setBy,
+    },
+  };
+}
+
+/** Put one category back to the age group's (and household's) setting: drop the override on that row. */
+export function resetBlocklistRow(actor: PersonRow, targetId: string, item: string): SettingsOpResult<UnionResult> {
+  const role = getPersonRole(targetId);
+  if (!role) return deny("That person could not be found. Pick someone from the People page.");
+  const w = writer(actor, targetId, role);
+  if ("error" in w) return deny(w.error);
+  if (w.kind === "self" && role === "child") return deny("A household owner or admin changes site blocks for a child. Ask one of them to open your page.");
+  const band = bandOfPerson(targetId);
+  const delta = readDeltaForWrite(targetId, BLOCKLISTS_KEY);
+  if (!delta) return deny("This person's saved site settings could not be read, so Home will not change them. Use Back to the age group's settings on their page to reset them, then try again.");
+  // Same reach as backToUserDefaults. An entry out of reach is left alone and answered like "nothing to
+  // reset", so an admin cannot tell a teen made a private choice.
+  const mayClear = (e: DeltaEntry): boolean => (w.kind === "admin" ? e.set_by !== SELF || role === "child" : e.set_by === SELF || role === "adult");
+  const keep = {
+    add: delta.add.filter((e) => e.item !== item || !mayClear(e)),
+    remove: delta.remove.filter((e) => e.item !== item || !mayClear(e)),
+  };
+  if (keep.add.length !== delta.add.length || keep.remove.length !== delta.remove.length) saveDelta(targetId, BLOCKLISTS_KEY, keep);
+  return { ok: true, value: resolveUnion(BLOCKLISTS_KEY, { band, personId: targetId }) };
+}
+
+/** True when `item` on a teen's or adult's overrides is the person's own choice and `actor` is an admin:
+ * the admin gets a quiet no-op, never a refusal that would reveal it. */
+export function hiddenOwnChoice(actor: PersonRow, targetId: string, item: string): boolean {
+  const role = getPersonRole(targetId);
+  if (!role || role === "child" || actor.id === targetId) return false;
+  const delta = readDeltaForWrite(targetId, BLOCKLISTS_KEY);
+  if (!delta) return false;
+  return [...delta.add, ...delta.remove].some((e) => e.item === item && e.set_by === SELF);
 }
