@@ -9,6 +9,7 @@ import { publishSettingsChanged } from "@/lib/deviceCommands";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 import { validateWebSources } from "@/lib/retrieval/webSources";
+import { validateCustomHosts } from "@/lib/blocklists/customHosts";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
 import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY, refreshConfiguredEngineLink } from "@/lib/remoteStackSettings";
 
@@ -108,6 +109,8 @@ settingsRoutes.openapi(putRoute, async (c) => {
     if (refusal) return c.json({ error: refusal }, 400);
     const sourcesRefusal = validateWebSources(body.key, body.value);
     if (sourcesRefusal) return c.json({ error: sourcesRefusal }, 400);
+    const hostsRefusal = validateCustomHosts(body.key, body.value);
+    if (hostsRefusal) return c.json({ error: hostsRefusal }, 400);
   }
   const result = setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {

@@ -12,7 +12,8 @@
 import { domainToASCII } from "node:url";
 import { getDomain } from "tldts";
 import type { AgeBand } from "@/lib/ageBand";
-import { blocklistIds, enabledListIds } from "@/lib/blocklists/policy";
+import { blocklistIds, enabledListIds, lockedListIds } from "@/lib/blocklists/policy";
+import { customHostRules, hostInSet } from "@/lib/blocklists/customHosts";
 import { listsReadyForBand, listsReadyOverride, parseStoredFile, readState } from "@/lib/blocklists/listStore";
 
 export const LISTS_NOT_READY = "lists-not-ready";
@@ -150,13 +151,32 @@ export function probeNames(host: string): string[] {
   return names;
 }
 
-/** Which of the band's enabled lists name this host. Returns the list id, `LISTS_NOT_READY` when an enabled list
- * is not loaded (the caller fails closed), or null when no enabled list names it or there is no host to check. */
+export const CUSTOM_DENY = "custom-deny";
+
+/** True when a band has anything to check: an enabled list or a custom entry. */
+export function siteBlocksActive(band: AgeBand): boolean {
+  if (enabledListIds(band).length > 0) return true;
+  const rules = customHostRules(band);
+  return rules.deny.size > 0;
+}
+
+/** A short text that changes whenever a band's lists or custom entries change (a search cache key part). */
+export function siteBlockSignature(band: AgeBand): string {
+  const rules = customHostRules(band);
+  return `${enabledListIds(band).join("+")}|${[...rules.deny].sort().join("+")}|${[...rules.allow].sort().join("+")}`;
+}
+
+/** Why this host may not be shown to the band: `custom-deny` (a custom always-block entry, which wins over every
+ * allow), a blocked-site list id, `LISTS_NOT_READY` when an enabled list is not loaded (the caller fails closed),
+ * or null. A custom allow lifts a hit only when every list naming the host is unlocked for the band, so it can
+ * never unblock a locked list (the adult-site list stays locked for child and teen controls). */
 export function checkHost(band: AgeBand, input: string | null | undefined): string | null {
+  const host = normalizeHost(input);
+  const rules = customHostRules(band);
+  if (host && hostInSet(host, rules.deny)) return CUSTOM_DENY;
   const enabled = enabledListIds(band);
   if (enabled.length === 0) return null;
   if (!listsReadyForBand(band)) return LISTS_NOT_READY;
-  const host = normalizeHost(input);
   if (!host) return null;
   let index: HostIndex;
   try {
@@ -173,23 +193,30 @@ export function checkHost(band: AgeBand, input: string | null | undefined): stri
     }
     mask |= 1 << bit;
   }
-  for (const name of probeNames(host)) {
-    const hit = bitsAt(index, hashHost(name)) & mask;
-    if (hit === 0) continue;
-    for (const id of enabled) {
-      const bit = index.bitOf.get(id);
-      if (bit !== undefined && hit & (1 << bit)) return id;
-    }
+  let hitBits = 0;
+  for (const name of probeNames(host)) hitBits |= bitsAt(index, hashHost(name)) & mask;
+  if (hitBits === 0) return null;
+  const hits = enabled.filter((id) => {
+    const bit = index.bitOf.get(id);
+    return bit !== undefined && (hitBits & (1 << bit)) !== 0;
+  });
+  if (hits.length === 0) return null;
+  const locked = new Set(lockedListIds(band));
+  if (rules.allow.size > 0 && hostInSet(host, rules.allow) && hits.every((id) => !locked.has(id))) {
+    bumpCounter(`blocklist.allowed.custom.${band}`);
+    return null;
   }
-  return null;
+  return hits[0]!;
 }
 
 // Drop counters: list id and band and a count, nothing that names a site.
 const drops = new Map<string, number>();
-export function bumpListDrop(listId: string, band: AgeBand, by = 1): void {
+function bumpCounter(key: string, by = 1): void {
   if (by <= 0) return;
-  const key = `blocklist.dropped.${listId}.${band}`;
   drops.set(key, (drops.get(key) ?? 0) + by);
+}
+export function bumpListDrop(listId: string, band: AgeBand, by = 1): void {
+  bumpCounter(`blocklist.dropped.${listId}.${band}`, by);
 }
 export function listDropCounters(): Record<string, number> {
   return Object.fromEntries(drops);
@@ -209,6 +236,8 @@ export function urlAllowedFor(band: AgeBand, url: string | null | undefined): bo
   }
   const verdict = checkHost(band, url);
   if (verdict === null) return true;
+  // A grown-up's band is never held: lists still loading let the page through (a custom deny still applies).
+  if (verdict === LISTS_NOT_READY && band === "adult") return true;
   bumpListDrop(verdict, band);
   return false;
 }

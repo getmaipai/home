@@ -52,7 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
-import { urlAllowedFor } from "@/lib/blocklists/hostLists";
+import { siteBlockSignature, siteBlocksActive, urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { isPrivacyFlaggedSearchEngine } from "@/lib/searchEngines";
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -1063,7 +1063,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
   // wikipedia engine joins the top-up or retry, and only when the first request
   // came back thin (fewer than 3 rows, a row count, no wording read).
   const requestEngines = rotated;
-  const keyFor = (tier: "primary" | "widened"): string => [tier, baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", opts.timeRange ?? "", opts.allowWikipediaFallback === false ? "no-live-fallback" : "", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  const keyFor = (tier: "primary" | "widened"): string => [tier, baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", siteBlockSignature(opts.minorBand ?? "adult"), opts.timeRange ?? "", opts.allowWikipediaFallback === false ? "no-live-fallback" : "", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
   const key = keyFor("primary");
   const widenedKey = keyFor("widened");
   const now = Date.now();
@@ -1477,7 +1477,8 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   const input = args as { category?: unknown; read_page?: unknown; spoken?: unknown } | undefined;
   const pagesMax = wantsSpoken(input) ? SEARCH_PAGES_MAX_SPOKEN : SEARCH_PAGES_MAX;
   const pageChars = wantsSpoken(input) ? SEARCH_PAGE_TEXT_CHARS_SPOKEN : SEARCH_PAGE_TEXT_CHARS;
-  const result = minorBand ? floorSearchResult({ ...found, rows: dedupeRows(found.rows) }, minorBand) : { ...found, rows: dedupeRows(found.rows) };
+  const deduped = { ...found, rows: dedupeRows(found.rows) };
+  const result = minorBand ? floorSearchResult(deduped, minorBand) : dropBlockedSites(deduped);
   if (!wantsPages(input) || input?.category === "images" || input?.category === "videos") return result;
   const hosts = new Set<string>();
   const candidates: SearxngRow[] = [];
@@ -1528,7 +1529,21 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
   }
   if (pages.length === 0) return result;
   const withPages = { ...result, ...(first ? { page: first } : {}), pages };
-  return minorBand ? floorSearchResult(withPages, minorBand) : withPages;
+  return minorBand ? floorSearchResult(withPages, minorBand) : dropBlockedSites(withPages);
+}
+
+/** MINOR-SEARCH-01e-8: a grown-up's results drop only what the household's always-block list names (and any
+ * adult list the household turned on). Lists still loading never hold an adult, so this fails open for them. */
+function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
+  if (!siteBlocksActive("adult")) return result;
+  const rows = result.rows.filter((row) => urlAllowedFor("adult", row.url));
+  const pages = result.pages?.filter((page) => urlAllowedFor("adult", page.url));
+  const pageOk = !result.page || urlAllowedFor("adult", (result.page as { url?: string }).url);
+  const dropped = (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
+  if (dropped === 0 && pageOk) return result;
+  const { page: _page, pages: _pages, ...rest } = result;
+  const text = rows.length === result.rows.length ? result.text : rows.length === 0 ? SEARXNG_NO_RESULTS_TEXT : rows.map((row, i) => `${i + 1}. ${row.title}${row.url ? ` (${row.url})` : ""}${row.snippet ? ` - ${row.snippet}` : ""}`).join("\n");
+  return { ...rest, text, rows, ...(pageOk && result.page ? { page: result.page } : {}), ...(pages && pages.length > 0 ? { pages } : {}), ...(dropped > 0 ? { floor_dropped: (result.floor_dropped ?? 0) + dropped } : {}) };
 }
 
 /** THIN-4C (docs/design/RULES.md rules 0 and 7): everything fetched for a
@@ -1661,9 +1676,10 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
   try {
     const fetchOptions = { method: "GET", headers: { accept: "text/html,application/xhtml+xml" }, signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS) };
     let response: Response;
-    if (!minorBand) {
+    if (!minorBand && !siteBlocksActive("adult")) {
       response = await guardedFetch(url, { ...fetchOptions, redirect: "follow", maxRedirects: MAX_FETCH_REDIRECTS });
     } else {
+      const hopBand = minorBand ?? "adult";
       // MINOR-SEARCH-01e-5: a child or teen's page follows each redirect by hand so a hop onto a blocked site is
       // refused before it is fetched, not discovered afterwards.
       let current = url;
@@ -1673,7 +1689,7 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
         if (!location) break;
         if (hop >= MAX_FETCH_REDIRECTS) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} redirected too many times`) };
         current = new URL(location, current).toString();
-        if (!urlAllowedFor(minorBand, current)) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", "That page isn't available.") };
+        if (!urlAllowedFor(hopBand, current)) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", "That page isn't available.") };
         await validatePublicPageUrl(current);
       }
     }
@@ -2240,7 +2256,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // MINOR-SEARCH-01e-5: a blocked site is not fetched for a child or teen (each redirect hop is checked in pageFetch).
           const readUrl = (args as { url?: unknown } | undefined)?.url;
           const blockedRead = (): HostError => new HostError("network_unreachable", "That page isn't available.");
-          if (readBand !== "adult" && typeof readUrl === "string" && !urlAllowedFor(readBand, readUrl)) throw blockedRead();
+          if (typeof readUrl === "string" && !urlAllowedFor(readBand, readUrl)) throw blockedRead();
           const doc = await searxngPageRead(args, runtime.signal, readBand === "adult" ? undefined : readBand);
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
