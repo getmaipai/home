@@ -1,4 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "@/lib/api";
+import { easeRowExtras, type EaseValue } from "@/shell/easeRows";
 import { Item, ItemActions, ItemContent, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { getIcon } from "@maipai/ui/src/icons";
 import { SettingsRenderer } from "@maipai/ui/src/settings/SettingsRenderer";
@@ -44,24 +47,33 @@ function SettingsFold({ label, startOpen, children }: { label: string; startOpen
   );
 }
 
+/** The Ease of use card: the kit renderer plus summary, lock and way-back data computed from the same values it reads. */
+function EaseCardRenderer({ viewingSelf, ...rest }: { viewingSelf: boolean } & Omit<ComponentProps<typeof SettingsRenderer>, "rowExtras">) {
+  const queryClient = useQueryClient();
+  const values = useQuery({ queryKey: ["settings-values", rest.scopeValue], queryFn: () => api.settingsValues(rest.scopeValue) });
+  const resetKeys = (keys: string[]) =>
+    // A failed reset leaves the summary line on screen (the refetch shows the truth); it never throws unhandled.
+    void Promise.allSettled(keys.map((key) => api.resetSetting(rest.scopeValue, key))).then(() => queryClient.invalidateQueries({ queryKey: ["settings-values", rest.scopeValue] }));
+  return <SettingsRenderer {...rest} rowExtras={easeRowExtras((values.data ?? []) as EaseValue[], viewingSelf, resetKeys)} />;
+}
+
 function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps) {
   const group = card.group!;
   const scope = card.scope!;
   const title = props.section.id === "voice" && group === "person.voice" ? "Speaking voice" : card.label;
   const allowed = minorVisibleSettingKeys(viewer.band);
-  const renderer = (
-    <SettingsRenderer
-      scope={scope}
-      scopeValue={scopeValueFor(scope, props.person.id)}
-      honouredBy="home"
-      only={[group]}
-      includeKeys={allowed ? [...allowed] : undefined}
-      titleOverrides={{ [group]: title }}
-      beforeChange={beforeSettingChange}
-      focusKey={props.focusKey}
-      matrix={card.matrix}
-    />
-  );
+  const rendererProps = {
+    scope,
+    scopeValue: scopeValueFor(scope, props.person.id),
+    honouredBy: "home",
+    only: [group],
+    includeKeys: allowed ? [...allowed] : undefined,
+    titleOverrides: { [group]: title },
+    beforeChange: beforeSettingChange,
+    focusKey: props.focusKey,
+    matrix: card.matrix,
+  };
+  const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
   return (

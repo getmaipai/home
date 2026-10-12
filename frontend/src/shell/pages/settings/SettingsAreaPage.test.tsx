@@ -255,7 +255,7 @@ describe("the rail on a settings route (RULES S3)", () => {
     test(`the main navigation renders on /settings/chat at ${width}px`, async () => {
       const view = open(makePerson("adult"), width === 1440 ? "/settings/chat/general" : "/settings/chat", {}, width);
       const rail = view.getByRole("navigation", { name: "Primary navigation" });
-      expect(rail.className).toContain("w-14");
+      expect(rail.className).toContain("w-[var(--rail-width,56px)]");
       for (const label of ["Home", "Chat", "Library", "Family"]) await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
       expect(view.getByRole("button", { name: /Open profile menu for Adult/ })).toBeTruthy();
       await waitFor(() => expect(column(view)).toBeTruthy());

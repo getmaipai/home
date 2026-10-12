@@ -13,13 +13,13 @@ not change what is safe or allowed for anyone.
 
 1. Open **Settings**, then **Appearance**.
 2. Find the **Ease of use** card.
-3. Pick one of the four styles in the box called **Ease of use**:
+3. Pick one of the four styles in the box called **Comfort style**:
    - **Standard** is MaiPai as it comes.
    - **Comfortable** has bigger words and more room.
    - **Large** has bigger words, bigger buttons and stronger contrast.
    - **Simple** has bigger words and buttons, calm colors and helpers.
 
-Your choice shows right away.
+Your choice shows right away. Under it you see a line such as "Large + 2 changes" when you changed single settings on top, and **Back to Large** puts them back. If an admin set one of your settings, it is greyed out and says so; ask them to change it.
 
 ## Change one thing
 

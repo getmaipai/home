@@ -59,8 +59,9 @@ describe("chat shell layout", () => {
     test(`the app rail renders at ${width}px with every destination's accessible name`, async () => {
       const view = renderChat(width);
       const rail = view.getByRole("navigation", { name: "Primary navigation" });
-      expect(rail.className).toContain("w-14");
-      expect(rail.className).toContain("max-w-14");
+      // The rail is 56px at Standard targets and widens through --rail-width at Large (ui-v0.5.200).
+      expect(rail.className).toContain("w-[var(--rail-width,56px)]");
+      expect(rail.className).toContain("max-w-[var(--rail-width,56px)]");
       for (const label of railLabels) {
         await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
       }
