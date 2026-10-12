@@ -384,6 +384,14 @@ contributes its `data_sources` rows to the privacy page; before this the NPR row
 rules above all apply), builds the same `Top headlines:` reply and hands it to `applyNewsMinorFloor`. No live
 fetch happens on that path. An empty shelf answers with a plain "nothing saved yet" line; no list ticked for the asker says so and points to
 Settings, News shelf. With the shelf off, or its store unable to open, the old live NPR path is unchanged. Tests that exercise the live handler's failure and cache paths set the shelf off.
+Module packages (`kind: "module"`) are smoke-tested by loading the manifest alone (`smoke.ts`), and the bronze
+routing-example check skips `feeds-*` ids, since nobody can ask for a feed list.
+
+**KS-05c (2026-10-12): the admin settings and the user page.** The admin controls are drawn by the settings registry
+from the spec: the `News shelf` matrix card in the Search area (rows are the lists in `spec/news/feed-lists.json`,
+columns Kids, Teens and Adults write `news.lists.<band>`; a dash is a list not offered to that type), and the advanced
+rows `news.shelf.enabled`, `news.poll_interval_s`, `news.retention_days` and `news.feeds.<band>`. Home adds no
+component. `docs/user/news-shelf.md` is the plain-words page for it.
 
 **Reworked by KS-02 (2026-10-09); the off switch is now the source mode (KS-MODE-01, 2026-10-10).**
 `search.wikipedia_fallback` is retired. The household value `search.source_mode`

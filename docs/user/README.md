@@ -18,5 +18,6 @@ day the hub arrives; the rest are for when you need them.
 - [Privacy](privacy.md): see exactly what, if anything, leaves your house.
 - [Set up web search](web-search.md): connect MaiPai to your own SearXNG search server, use it away from home, and fix it if it stops.
 - [Blocked sites](blocked-sites.md): see which lists of bad sites web search checks, and choose them.
+- [The news shelf](news-shelf.md): how MaiPai keeps recent headlines for the news answer, and how to choose which lists each person sees.
 - [Sensitive subjects](sensitive-subjects.md): choose how MaiPai talks with a child about bodies, health, risk and violence.
 - [Fix a problem](fix-a-problem.md): what to check first when something is not working right.
