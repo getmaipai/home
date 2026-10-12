@@ -2177,7 +2177,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             if (hosted) return hosted;
             const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
             // SEARCH-SOURCES-01: several picked sources run at once and blend by rank; one source (the default) is the old path unchanged.
-            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band);
+            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary);
             if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
             if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(args, searxOpts);
             const rowsOnly = { ...(args as object), read_page: false };
@@ -2194,15 +2194,16 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const scopeArg = (args as { scope?: unknown } | undefined)?.scope;
           if (typeof input?.query !== "string" || input.query.length === 0 || input.category === "images") {
             // KS-MODE-01: with web search switched off for the household, an image or bare search is a policy refusal.
-            if (webSideOff(band)) return { text: refuseWeb(band), rows: [] };
+            if (webSideOff(band, temporary)) return { text: refuseWeb(band, temporary), rows: [] };
             return webSide({ kMatched: false, timeRange: undefined });
           }
-          return federatedLookup({ query: input.query, band, scope: parseScope(scopeArg), web: webSide });
+          return federatedLookup({ query: input.query, band, scope: parseScope(scopeArg), temporary, web: webSide });
         }
         if (id === "searxng" && method === "page.read") {
           // KS-MODE-01: `search.source_mode.web = offline` turns page reads off with web search.
           const readBand = speakerAgeBand(actor, new Date());
-          if (webSideOff(readBand)) throw new HostError("permission_denied", refuseWeb(readBand));
+          const readTemporary = turn?.conversationId !== undefined && isTemporaryConversation(turn.conversationId);
+          if (webSideOff(readBand, readTemporary)) throw new HostError("permission_denied", refuseWeb(readBand, readTemporary));
           const doc = await searxngPageRead(args, runtime.signal);
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.

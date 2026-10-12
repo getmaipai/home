@@ -296,7 +296,7 @@ describe("PUT /api/settings for tts.voice_id (the registry's first real person-s
 
 // SEARCH-SAFE-01 (Jesse's own ruling, 2026-09-24): search.safe_search
 // needs a write rule no other key has - an adult may change their own;
-// only an adult may reach a CHILD OR TEEN's level (tts.voice_id's own
+// MINOR-SEARCH-01c: an admin reaches a CHILD's level (strict or default only) and never a TEEN's (tts.voice_id's own
 // admin-on-child case above is the child half; a teen is new ground,
 // since assertCanAccessScope's generic person-scope gate deliberately
 // stops at child, access.ts's own documented privacy boundary); a
@@ -324,16 +324,23 @@ describe("PUT /api/settings for search.safe_search (a wider AND narrower person-
     expect(put.status).toBe(200);
   });
 
-  for (const role of ["child", "teen"] as const) {
-    test(`an owner/admin can set a ${role}'s level, including loosening it`, async () => {
-      const { owner, personId } = await ownerAndMinor(role);
-      const put = await owner.request("/api/settings", {
-        method: "PUT",
-        body: { scope: `person:${personId}`, key: "search.safe_search", value: "off" },
-      });
-      expect(put.status).toBe(200);
-    });
+  test("an owner/admin can set a child's level to strict or default, never looser", async () => {
+    const { owner, personId } = await ownerAndMinor("child");
+    for (const [value, status] of [["strict", 200], ["default", 200], ["moderate", 403], ["off", 403]] as const) {
+      const put = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${personId}`, key: "search.safe_search", value } });
+      expect(put.status).toBe(status);
+    }
+  });
 
+  test("an owner/admin can never reach a teen's own level (the teen-private ruling)", async () => {
+    const { owner, personId } = await ownerAndMinor("teen");
+    for (const value of ["strict", "default", "moderate", "off"]) {
+      const put = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${personId}`, key: "search.safe_search", value } });
+      expect(put.status).toBe(403);
+    }
+  });
+
+  for (const role of ["child", "teen"] as const) {
     test(`a ${role} can tighten their own level (never a loosening, always allowed)`, async () => {
       const { client, personId } = await ownerAndMinor(role);
       const put = await client.request("/api/settings", {

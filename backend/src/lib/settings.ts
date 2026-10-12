@@ -474,13 +474,19 @@ function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newVal
   if (!targetIsSelf) {
     if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "cannot access another person's settings" };
     const targetRole = getPersonRole(targetPersonId);
-    if (targetRole !== "child" && targetRole !== "teen") {
-      return { ok: false, status: 403, error: "only a child's or teen's safe search level can be changed by another person" };
+    // MINOR-SEARCH-01c, the 2026-09-30 teen-private ruling: an admin reaches a
+    // child's own settings and never a teen's.
+    if (targetRole === "teen") {
+      return { ok: false, status: 403, error: "A teen's safe search level is private to the teen, so an admin can't change it. The household-wide switch for teens is Settings, Search, Web search with teen controls." };
     }
-    // An adult setting a minor's level on their behalf: any level,
-    // including one looser than the minor's own band default - that is
-    // the adult's call to make, the rule below only binds the minor's
-    // OWN write.
+    if (targetRole !== "child") {
+      return { ok: false, status: 403, error: "An adult's safe search level is their own to change. Ask them to open Settings, Search on their own account." };
+    }
+    // A child's level is always strict: an admin may keep it at "default" or
+    // set "strict", never looser.
+    if (newValue === "off" || newValue === "moderate") {
+      return { ok: false, status: 403, error: "A child's safe search is always strict, so it can't be set lower. Leave it on Default or Strict." };
+    }
     return { ok: true, value: true };
   }
   if (isOwnerOrAdmin(actor)) return { ok: true, value: true };
@@ -492,7 +498,7 @@ function assertCanSetSafeSearch(actor: PersonRow, targetPersonId: string, newVal
   if (newValue !== "off" && newValue !== "moderate" && newValue !== "strict") return { ok: true, value: true };
   const ownDefault = safeSearchDefaultFor(speakerAgeBand(actor, new Date()));
   if (safeSearchStrictness(newValue as SafeSearchLevel) < safeSearchStrictness(ownDefault)) {
-    return { ok: false, status: 403, error: "you can't loosen your own safe search level below your own default" };
+    return { ok: false, status: 403, error: "Safe search can't go lower than the level for your age. Pick Default or a stricter level." };
   }
   return { ok: true, value: true };
 }

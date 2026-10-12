@@ -86,11 +86,11 @@ function modeSourceOf(id: WebSourceId): ModeSource {
 /** The sources that may answer this band's web search: the stored list, minus unbuilt sources,
  * minus any whose mode is closed or offline for the band. A child or teen reaches SearXNG only,
  * and only when the household picked it. */
-export function webSourcesFor(band: AgeBand): WebSourceId[] {
+export function webSourcesFor(band: AgeBand, temporary = false): WebSourceId[] {
   const built = new Set(REGISTRY.filter((source) => source.built).map((source) => source.id));
   return storedSources().filter((id) => {
     if (!built.has(id)) return false;
-    const mode = effectiveMode(modeSourceOf(id), band);
+    const mode = effectiveMode(modeSourceOf(id), band, temporary);
     return mode !== "closed" && mode !== "offline";
   });
 }

@@ -6,11 +6,11 @@ import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSe
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
-import { setHouseholdSettingValue, setValue } from "@/lib/settings";
+import { invalidateScopeCache, setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { db } from "@/db";
-import { people, memoryRecords, scheduledJobs, lists } from "@/db/schema";
+import { people, memoryRecords, scheduledJobs, lists, settingsValues } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { remember } from "@/lib/memory";
@@ -1093,8 +1093,10 @@ describe("integration.call searxng (session-d-packages-and-store.md step 7, the 
         .values({ id: childId, displayName: "Bramble", role: "child", avatarSeed: childId, source: "hub", createdAt: now, updatedAt: now, hlc: "1700000000000:2:testfix" })
         .run();
       const childRow = db.select().from(people).where(eq(people.id, childId)).get()!;
-      const setResult = setValue(owningAdult, `person:${childRow.id}`, "search.safe_search", "moderate");
-      expect(setResult.ok).toBe(true);
+      // MINOR-SEARCH-01c: the write path now refuses this, so seed the stored value an older hub may hold.
+      expect(setValue(owningAdult, `person:${childRow.id}`, "search.safe_search", "moderate").ok).toBe(false);
+      db.insert(settingsValues).values({ scope: `person:${childRow.id}`, key: "search.safe_search", value: JSON.stringify("moderate"), hlc: "1700000000000:3:testfix", source: "user", updatedAt: now }).run();
+      invalidateScopeCache(`person:${childRow.id}`);
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       const host = createHost(childRow, manifest({ permissions: ["integration:searxng"] }));
       await host.integration.call("searxng", "search", { query: "is it going to rain" });

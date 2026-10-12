@@ -54,4 +54,58 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.search",
     honoured_by: ["home"],
   }),
+  // MINOR-SEARCH-01c: declared once in commons (spec/settings/keys.json), mirrored here for the registry.
+  SettingsKey.parse({
+      "key": "search.web.child_mode",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+          "options": [
+              "on",
+              "off"
+          ]
+      },
+      "default": "on",
+      "label": "Web search with child controls",
+      "help": "When this is on, MaiPai can look things up on the web for people using child controls. Results go through SafeSearch at its strictest, adult sites are blocked, and links are hidden. When it is off, answers come only from the offline library. Only an admin can change this, and a child's searches show in that child's own chats.",
+      "level": "basic",
+      "lives_in": "household.search",
+      "honoured_by": [
+          "home"
+      ],
+      "copy": {
+          "does": "Lets answers look things up online, or keeps them to the offline library.",
+          "options": {
+              "on": "Looks things up online, with the safeguards described above.",
+              "off": "Answers only from the offline library."
+          }
+      }
+  }),
+  // MINOR-SEARCH-01c: declared once in commons (spec/settings/keys.json), mirrored here for the registry.
+  SettingsKey.parse({
+      "key": "search.web.teen_mode",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+          "options": [
+              "on",
+              "off"
+          ]
+      },
+      "default": "on",
+      "label": "Web search with teen controls",
+      "help": "When this is on, MaiPai can look things up on the web for people using teen controls. Results go through SafeSearch at moderate or stricter, and adult sites are blocked. When it is off, answers come only from the offline library. Only an admin can change this. It does not show anyone what a teen searched for.",
+      "level": "basic",
+      "lives_in": "household.search",
+      "honoured_by": [
+          "home"
+      ],
+      "copy": {
+          "does": "Lets answers look things up online, or keeps them to the offline library.",
+          "options": {
+              "on": "Looks things up online, with the safeguards described above.",
+              "off": "Answers only from the offline library."
+          }
+      }
+  }),
 ];

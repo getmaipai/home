@@ -81,6 +81,8 @@ export interface FederatedInput<R extends LookupResultShape> {
   query: string;
   band: AgeBand;
   scope: SearchScope;
+  /** True in a temporary chat (a child's web side is offline there). */
+  temporary?: boolean;
   /** Runs the live web side. `kMatched` tells it the library already answered,
    *  so the live Wikimedia fallback must stay quiet. */
   web: (ctx: { kMatched: boolean; timeRange: "month" | undefined }) => Promise<R>;
@@ -102,10 +104,10 @@ export async function federatedLookup<R extends LookupResultShape>(input: Federa
   if (input.scope === "reference") return withDictionaryFallback(input, ref, kOnly, kRows, kPages, deps.dictionary);
 
   const kMatched = ref.rows.length > 0;
-  const webMode = effectiveMode("web", input.band);
+  const webMode = effectiveMode("web", input.band, input.temporary === true);
   if (webMode === "offline" || webMode === "closed") {
     // The household turned web search off: a policy refusal with the library's result, not a tool failure (rule 6).
-    return { ...kOnly, text: `${ref.text}\n\n${refuseWeb(input.band)}` };
+    return { ...kOnly, text: `${ref.text}\n\n${refuseWeb(input.band, input.temporary === true)}` };
   }
   if (webMode === "mix" && input.scope === "both" && kMatched) {
     // Library first: it answered, so an unscoped ask stays at home. `scope: web` still goes online.

@@ -45,6 +45,13 @@ export const DEFAULT_SOURCE_MODE: SourceMode = "mix";
 export const WEB_OFF_NOTE =
   "Web search is turned off in this household's search settings, so only the offline library was searched. An adult can change this in Settings under Search sources.";
 
+export const CHILD_WEB_OFF_NOTE =
+  "Web search is off for child controls in this home, so only the offline library was searched. A grown-up with an admin account can turn it on in Settings, Search.";
+export const TEEN_WEB_OFF_NOTE =
+  "Web search is off for teen controls in this home, so only the offline library was searched. An admin can turn it on in Settings, Search.";
+export const CHILD_TEMPORARY_WEB_OFF_NOTE =
+  "Web search isn't used in a temporary chat for child controls, so only the offline library was searched. Start a regular chat to look things up online.";
+
 function asMode(value: unknown): SourceMode | null {
   return value === "live" || value === "offline" || value === "mix" ? value : null;
 }
@@ -65,10 +72,27 @@ function overrideMode(source: "wikimedia" | "web"): SourceMode | null {
   }
 }
 
-/** The mode in force for one source and one age band. */
-export function effectiveMode(source: ModeSource, band: AgeBand): EffectiveMode {
+export const BAND_WEB_KEYS = { child: "search.web.child_mode", teen: "search.web.teen_mode" } as const;
+
+/** MINOR-SEARCH-01c: why a minor's web side is off, if it is. A child's temporary chat has no
+ * saved record a parent can open, so the web side is offline there; a teen's temporary chat may
+ * search (the 2026-09-30 teen-private ruling). Otherwise the household's band switch decides. */
+function bandWebOffCause(band: AgeBand, temporary: boolean): "child_temporary" | "switch_off" | null {
+  if (band === "adult") return null;
+  if (band === "child" && temporary) return "child_temporary";
+  try {
+    return getHouseholdSettingValue(BAND_WEB_KEYS[band]) === "off" ? "switch_off" : null;
+  } catch {
+    // A child-protection switch that cannot be read fails closed.
+    return "switch_off";
+  }
+}
+
+/** The mode in force for one source and one age band. `temporary` is true in a temporary chat. */
+export function effectiveMode(source: ModeSource, band: AgeBand, temporary = false): EffectiveMode {
   if (source !== "web" && band !== "adult") return "closed";
   if (source === "wikimedia") return overrideMode("wikimedia") ?? householdMode();
+  if (bandWebOffCause(band, temporary)) return "offline";
   // Web, page reads and the hosted provider share the web override. A household
   // value of `offline` is the narrow reading: those stay on, as today (`live`).
   const override = overrideMode("web");
@@ -78,14 +102,17 @@ export function effectiveMode(source: ModeSource, band: AgeBand): EffectiveMode 
 }
 
 /** True when the web side (search, page reads, hosted) is switched off for this band. */
-export function webSideOff(band: AgeBand): boolean {
-  const mode = effectiveMode("web", band);
+export function webSideOff(band: AgeBand, temporary = false): boolean {
+  const mode = effectiveMode("web", band, temporary);
   return mode === "offline" || mode === "closed";
 }
 
 /** Counts and returns the policy refusal text for a web call the household turned off. */
-export function refuseWeb(band: AgeBand): string {
+export function refuseWeb(band: AgeBand, temporary = false): string {
   bumpReferenceCounter("mode_blocked_offline", band);
+  const cause = bandWebOffCause(band, temporary);
+  if (cause === "child_temporary") return CHILD_TEMPORARY_WEB_OFF_NOTE;
+  if (cause === "switch_off") return band === "teen" ? TEEN_WEB_OFF_NOTE : CHILD_WEB_OFF_NOTE;
   return WEB_OFF_NOTE;
 }
 
