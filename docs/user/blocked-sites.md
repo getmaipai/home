@@ -28,6 +28,15 @@ Each row also shows a line like "Updated 3 days ago, 4 lists, about 1.1 million 
 
 MaiPai downloads each list once, then checks for a newer one about once a day. Web search for child and teen controls stays off until every list checked for them has downloaded. If your home has no internet at first start, answers come from the offline library until it does. When a list is still loading, the answer says it could not look online yet. Nothing else breaks.
 
+## Your own block and allow lists
+
+Under the same Search settings you can type your own sites, separated by commas, like example.com. A site you list also covers its pages and subdomains.
+
+- **Always block these sites** hides a site from web search. Use the household row for everyone, or a row for child, teen or adult accounts to block it for that group only. A group's row adds to the household row, it never replaces it. A site you block is always blocked. Nothing overrides it.
+- **Allow these sites** lets web search show a site that one of the optional lists blocks, such as a gambling or scam list. It never lets through an adult site for child or teen controls, and it never lets through a site you blocked yourself.
+
+Only an admin can change these rows. They are the same for everyone in the group.
+
 ## Where the lists come from
 
 The lists come from [The Block List Project](https://github.com/blocklistproject/Lists), a volunteer project that shares its lists under the Unlicense, which lets anyone use them. MaiPai does not copy the lists or host them. Your hub downloads each one straight from the project's page on GitHub, and checks that the file is the exact one MaiPai's signed catalog lists before using it. Nothing about you or your searches is sent in that download.

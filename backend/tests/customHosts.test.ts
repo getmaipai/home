@@ -6,7 +6,7 @@ import { resetDb } from "./reset-db";
 import { blockListsDir } from "@/lib/paths";
 import { blocklistIds, lockedListIds } from "@/lib/blocklists/policy";
 import { __setListsReadyForTests, emptyState, listFilePath, readState, writeState } from "@/lib/blocklists/listStore";
-import { __resetHostIndexForTests, __resetListDropCountersForTests, checkHost, CUSTOM_DENY, LISTS_NOT_READY, listDropCounters, urlAllowedFor } from "@/lib/blocklists/hostLists";
+import { __resetHostIndexForTests, __resetListDropCountersForTests, checkHost, CUSTOM_DENY, LISTS_NOT_READY, listDropCounters, siteBlockSignature, urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { parseHostEntries, validateCustomHosts } from "@/lib/blocklists/customHosts";
 import { setHouseholdSettingValue } from "@/lib/settings";
 
@@ -23,7 +23,7 @@ function put(id: string, text: string): void {
 function loadAll(text: Record<string, string>): void {
   for (const id of blocklistIds()) put(id, text[id] ?? "placeholder.invalid\n");
 }
-function set(key: "search.hosts.deny" | "search.hosts.allow", value: string): void {
+function set(key: string, value: string): void {
   const r = setHouseholdSettingValue(key, value);
   expect(r.ok).toBe(true);
 }
@@ -97,5 +97,50 @@ describe("custom deny and allow", () => {
     expect(urlAllowedFor("adult", "https://anything.example.com/")).toBe(true);
     expect(urlAllowedFor("adult", "https://blocked.example.com/")).toBe(false);
     expect(checkHost("child", "https://anything.example.com/")).toBe(LISTS_NOT_READY);
+  });
+});
+
+describe("per-band custom hosts", () => {
+  test("a band's deny applies to that band only, on top of the household's", () => {
+    loadAll({});
+    set("search.hosts.child.deny", "kids-no.example.com");
+    set("search.hosts.deny", "house-no.example.com");
+    expect(checkHost("child", "https://kids-no.example.com/")).toBe(CUSTOM_DENY);
+    expect(checkHost("teen", "https://kids-no.example.com/")).toBeNull();
+    expect(checkHost("adult", "https://kids-no.example.com/")).toBeNull();
+    for (const band of ["child", "teen", "adult"] as const) expect(checkHost(band, "https://house-no.example.com/")).toBe(CUSTOM_DENY);
+  });
+
+  test("a band's allow lifts an unlocked-list hit for that band only", () => {
+    loadAll({ [UNLOCKED]: "mixed-use.example.com\n" });
+    set("search.hosts.teen.allow", "mixed-use.example.com");
+    expect(checkHost("teen", "https://mixed-use.example.com/")).toBeNull();
+    expect(checkHost("child", "https://mixed-use.example.com/")).toBe(UNLOCKED);
+  });
+
+  test("a band's allow never lifts a locked list, and the band's deny beats the household's allow", () => {
+    loadAll({ [LOCKED]: "adult-site.example.com\n" });
+    set("search.hosts.child.allow", "adult-site.example.com");
+    set("search.hosts.teen.allow", "adult-site.example.com");
+    expect(checkHost("child", "https://adult-site.example.com/")).toBe(LOCKED);
+    expect(checkHost("teen", "https://adult-site.example.com/")).toBe(LOCKED);
+    set("search.hosts.allow", "x.example.com");
+    set("search.hosts.adult.deny", "x.example.com");
+    expect(checkHost("adult", "https://x.example.com/")).toBe(CUSTOM_DENY);
+  });
+
+  test("the band keys are validated like the household keys", () => {
+    expect(validateCustomHosts("search.hosts.adult.deny", "nodot")).toContain("nodot");
+    expect(validateCustomHosts("search.hosts.teen.allow", "ok.example.com")).toBeNull();
+  });
+
+  test("clearing a band key leaves the household list alone, a band deny holds while lists load, and the cache signature differs per band", () => {
+    set("search.hosts.deny", "house-no.example.com");
+    set("search.hosts.child.deny", "kids-no.example.com");
+    expect(checkHost("child", "https://kids-no.example.com/")).toBe(CUSTOM_DENY);
+    expect(siteBlockSignature("child")).not.toBe(siteBlockSignature("teen"));
+    set("search.hosts.child.deny", "");
+    expect(checkHost("child", "https://kids-no.example.com/")).toBe(LISTS_NOT_READY);
+    expect(checkHost("child", "https://house-no.example.com/")).toBe(CUSTOM_DENY);
   });
 });

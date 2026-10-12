@@ -1,4 +1,5 @@
-// MINOR-SEARCH-01e-8: the household's own always-block and allow host lists (Jesse's decision, 2026-10-12).
+// MINOR-SEARCH-01e-8 and 01e-9: the household's own always-block and allow host lists, plus each band's own
+// (child, teen, adult), merged by `customHostRules`: a band's effective list is the household's plus its own (Jesse's decision, 2026-10-12).
 // Two rules, both non-negotiable, enforced in hostLists.ts `checkHost`:
 //   1. a custom deny is always honoured, for every band, and wins over any allow;
 //   2. a custom allow can never unblock a host on a list locked for the band (the adult-site list stays locked
@@ -12,6 +13,9 @@ import { normalizeHost } from "@/lib/blocklists/hostLists";
 export const HOSTS_DENY_KEY = "search.hosts.deny";
 export const HOSTS_ALLOW_KEY = "search.hosts.allow";
 export const MAX_CUSTOM_HOSTS = 500;
+
+const BAND_KEY = /^search\.hosts\.(child|teen|adult)\.(deny|allow)$/;
+const bandKey = (band: AgeBand, kind: "deny" | "allow"): string => `search.hosts.${band}.${kind}`;
 
 const HOST_SHAPE = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
 
@@ -30,7 +34,7 @@ export function parseHostEntries(raw: unknown): string[] {
 
 /** Settings write check: names the entry that is wrong and what to type instead. */
 export function validateCustomHosts(key: string, value: unknown): string | null {
-  if (key !== HOSTS_DENY_KEY && key !== HOSTS_ALLOW_KEY) return null;
+  if (key !== HOSTS_DENY_KEY && key !== HOSTS_ALLOW_KEY && !BAND_KEY.test(key)) return null;
   if (value === null) return null;
   if (typeof value !== "string") return "Type site names separated by commas, like example.com, news.example.org.";
   const pieces = value.split(/[\s,;]+/).filter((piece) => piece !== "");
@@ -47,6 +51,7 @@ export interface CustomHostRules {
   allow: Set<string>;
 }
 
+const merged = new WeakMap<Set<string>, WeakMap<Set<string>, Set<string>>>();
 const parsed = new Map<string, Set<string>>();
 function setFor(raw: unknown): Set<string> {
   const text = typeof raw === "string" ? raw : "";
@@ -67,9 +72,21 @@ function read(key: string): Set<string> {
   }
 }
 
-/** The custom lists that count for a band: the household's today (01e-9 adds the band's own beside them). */
-export function customHostRules(_band: AgeBand): CustomHostRules {
-  return { deny: read(HOSTS_DENY_KEY), allow: read(HOSTS_ALLOW_KEY) };
+/** The custom lists that count for a band: the household's plus the band's own (MINOR-SEARCH-01e-9). */
+export function customHostRules(band: AgeBand): CustomHostRules {
+  const merge = (household: Set<string>, own: Set<string>): Set<string> => {
+    if (own.size === 0) return household;
+    if (household.size === 0) return own;
+    let byOwn = merged.get(household);
+    if (!byOwn) merged.set(household, (byOwn = new WeakMap()));
+    let both = byOwn.get(own);
+    if (!both) byOwn.set(own, (both = new Set([...household, ...own])));
+    return both;
+  };
+  return {
+    deny: merge(read(HOSTS_DENY_KEY), read(bandKey(band, "deny"))),
+    allow: merge(read(HOSTS_ALLOW_KEY), read(bandKey(band, "allow"))),
+  };
 }
 
 /** True when the host, or any parent of it, is in the set. */
