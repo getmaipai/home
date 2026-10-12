@@ -23,9 +23,12 @@ it cites.
 **0. Age and surface gates outrank every rule below.** Nothing here
 loosens a protection for a child or teen, and nothing here changes how
 a spoken turn is shaped. Where a rule below would do either, this rule
-wins. A child's or teen's search is protected by what it may fetch and show (SafeSearch at the band floor, the band's
-sources, the floor on fetched text, the adult-site host list and the output gate), not by refusing to search; web
-search runs without a parent's approval when the household has it on for their controls.
+wins. A child's or teen's search is protected by what it may fetch and show, not by refusing to search. The
+SafeSearch level, the sources a kid or teen gets and the cleaning of fetched page text are user defaults (owner's
+ruling, 2026-10-12): an admin may override them in either direction, globally (global defaults) or for one person (a
+user override), and the kid or teen never can. Precedence is user overrides > global defaults > user defaults. The
+adult-site host list (locked on for every kid and teen, a custom allow never lifts it) and the output gate stay fixed
+and no setting reaches them. Web search runs without a parent's approval when the household has it on for their controls.
 
 1. **The model decides, not a word rule.** No regex, word list or
    classifier reads open-ended wording to decide whether a message needs
@@ -128,8 +131,9 @@ search runs without a parent's approval when the household has it on for their c
    fetched and their text is given with numbered sources; the
    instruction is to ground the answer in them and cite by number. Page
    text is data, never instructions. For a child or teen, page text
-   reaches the model only after it passes the same deterministic floor,
-   with that person's safesearch applied to the fetch. Fetches keep a
+   reaches the model only after it passes the cleaning applied to that person (a user default, which an admin may
+   override globally or for one person, never the kid or teen), with that person's safesearch level applied to the
+   fetch; the adult-site host list is always applied. Fetches keep a
    stated request budget: a cap on pages per search and the existing
    per-host pace. Search works with no key and no account. A hosted
    search provider is an optional key, off by default, stored as a
