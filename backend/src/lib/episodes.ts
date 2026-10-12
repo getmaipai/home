@@ -15,6 +15,7 @@ import type { ConversationTurnRow } from "@/wire";
 import type { PersonRow } from "@/types";
 import { asksWhatHubSaid, asksAboutEarlierTalk } from "@/lib/recallShapes";
 import { isBareSocialTurn, stripAckLead } from "@/lib/guards";
+import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
 export { asksWhatHubSaid, asksAboutEarlierTalk };
 
 /** getmaipai/home#78: whether a turn's reply text is something MaiPai
@@ -265,7 +266,6 @@ export function contentTerms(text: string): string[] {
   return [...new Set((text.toLowerCase().match(/[\p{L}\p{N}']+/gu) ?? []).flatMap((t) => t.split("'")))].filter((t) => t.length > 1 && !STOPWORDS.has(t));
 }
 
-const RRF_K = 60;
 /** getmaipai/home#79: how many of a person's newest embedded episodes the
  * vector half reads and scores per turn (or, for a dated question, up to
  * this many inside its window). 2,000 is about a thousand turns, or a
@@ -529,18 +529,10 @@ export function recallEpisodes(actor: PersonRow, query: string, queryVector: Que
   });
 
   // Reciprocal rank fusion, then one match per turn (its best side).
-  const fused = new Map<string, { row: CandidateRow; score: number }>();
-  const add = (list: CandidateRow[]) =>
-    list.forEach((row, rank) => {
-      const prev = fused.get(row.id);
-      const score = (prev?.score ?? 0) + 1 / (RRF_K + rank + 1);
-      fused.set(row.id, { row, score });
-    });
-  add(lexicalSurvivors);
-  add(vector);
+  const fused = reciprocalRankFusion([lexicalSurvivors, vector], (row) => row.id).map((entry) => ({ row: entry.last, score: entry.score }));
 
   const byTurn = new Map<string, { row: CandidateRow; score: number }>();
-  for (const entry of [...fused.values()].sort((a, b) => b.score - a.score)) {
+  for (const entry of fused) {
     const held = byTurn.get(entry.row.turnId);
     if (!held || held.score < entry.score) byTurn.set(entry.row.turnId, entry);
   }

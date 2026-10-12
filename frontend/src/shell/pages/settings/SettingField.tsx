@@ -7,6 +7,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
 import { Button } from "@maipai/ui/src/ui/button";
 import { ItemDescription } from "@maipai/ui/src/dashboard/components/ui/item";
+import {
+  Combobox,
+  ComboboxChip,
+  ComboboxChips,
+  ComboboxChipsInput,
+  ComboboxContent,
+  ComboboxItem,
+  ComboboxList,
+} from "@maipai/ui/src/dashboard/components/ui/combobox";
 import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 
@@ -148,6 +157,26 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     );
   } else if (def.selector === "boolean") {
     control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+  } else if (def.selector === "select" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
+    // SEARCH-SOURCES-01: a select with `range.multiple` is the kit's chips Combobox; option names come
+    // from the spec's `copy.option_labels` (read here, never hand-written), falling back to the id.
+    const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
+    const labels = (def.copy as { option_labels?: Record<string, string> } | undefined)?.option_labels ?? {};
+    const getLabel = (id: string) => labels[id] ?? titleCaseOption(id);
+    const picked = Array.isArray(resolved.value) ? (resolved.value as string[]) : [];
+    control = (
+      <Combobox items={options} multiple value={picked} onValueChange={onChange} itemToStringLabel={getLabel} disabled={disabled}>
+        <ComboboxChips aria-label={def.label}>
+          {picked.map((id) => (
+            <ComboboxChip key={id}>{getLabel(id)}</ComboboxChip>
+          ))}
+          <ComboboxChipsInput />
+        </ComboboxChips>
+        <ComboboxContent>
+          <ComboboxList>{(id: string) => <ComboboxItem key={id} value={id}>{getLabel(id)}</ComboboxItem>}</ComboboxList>
+        </ComboboxContent>
+      </Combobox>
+    );
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
     const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;

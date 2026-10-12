@@ -152,6 +152,14 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       break;
     case "select": {
       const options = range?.options as unknown[] | undefined;
+      if (range?.multiple === true) {
+        // SEARCH-SOURCES-01: a multi-select stores a list of the declared options, each at most once.
+        if (!Array.isArray(value) || value.some((entry) => !options?.includes(entry))) {
+          return { ok: false, status: 400, error: `must be a list of ${JSON.stringify(options ?? [])}` };
+        }
+        if (new Set(value).size !== value.length) return { ok: false, status: 400, error: "each option can be picked once" };
+        break;
+      }
       if (!options || !options.includes(value)) {
         return { ok: false, status: 400, error: `must be one of ${JSON.stringify(options ?? [])}` };
       }

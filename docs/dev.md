@@ -312,6 +312,17 @@ way `SEARXNG_PAGE_RATE_LIMIT` already is (CLAUDE.md's own Third-party
 services rule) - never shared with SearXNG's own budget, the exact
 class of bug SEARCH-PACE-01's own follow-up just fixed for page reads.
 
+**SEARCH-SOURCES-01 (2026-10-11): which web backends answer.** The household value
+`search.web_sources` (select + `multiple`, `searxng | ddgs`, default `["searxng"]`, labels in the spec's
+`copy.option_labels`) is interpreted in one place, `src/lib/retrieval/webSources.ts`
+(`webSourcesFor(band)`, `validateWebSources`, `blendWebRows`, `runWebSources`). Several picked sources run
+at once and fuse by reciprocal rank (k 60, `src/lib/retrieval/rrf.ts`, shared with `episodes.ts`) keyed the
+way `dedupeRows` keys rows, so fusion and URL dedupe are one step; page reading then runs once on the blended
+rows (`attachSearchPages`). Each source is gated by `effectiveMode` as a `ModeSource` (`web`, `ddgs`), so a
+minor reaches SearXNG only. A failed source contributes nothing; only if all fail does the first error stand.
+A write of `[]`, or of only an unbuilt source, is a 400 that names the fix. The ddgs slot is empty until
+SEARCH-DDGS-01 registers a searcher. Images, videos, hosted search and page reads are outside the chooser.
+
 **Reworked by KS-02 (2026-10-09); the off switch is now the source mode (KS-MODE-01, 2026-10-10).**
 `search.wikipedia_fallback` is retired. The household value `search.source_mode`
 (`live | offline | mix`, default `mix`) and the overrides

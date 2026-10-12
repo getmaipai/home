@@ -37,3 +37,25 @@ test("renders does, state, and reason as kit descriptions without a wrapper", ()
   ]);
   expect(descriptions).toHaveLength(3);
 });
+
+test("a multiple select shows the spec's option labels as chips", () => {
+  const setting = {
+    def: SettingsKey.parse({
+      key: "search.web_sources",
+      scope: "household",
+      selector: "select",
+      range: { options: ["searxng", "ddgs"], multiple: true },
+      default: ["searxng"],
+      label: "Web search sources",
+      level: "advanced",
+      lives_in: "household.search",
+      honoured_by: ["home"],
+      copy: { does: "Picks which search engines answer a web search.", option_labels: { searxng: "SearXNG", ddgs: "DuckDuckGo" } },
+    }),
+    resolved: { key: "search.web_sources", value: ["searxng", "ddgs"], source: "default", label: "Web search sources", level: "advanced", secret: false },
+  } as unknown as MergedSetting;
+  const { container } = render(<SettingField setting={setting} onChange={async () => true} onReset={() => {}} />);
+  const chips = [...container.querySelectorAll('[data-slot="combobox-chip"]')].map((chip) => chip.textContent);
+  expect(chips.join("|")).toContain("SearXNG");
+  expect(chips.join("|")).toContain("DuckDuckGo");
+});

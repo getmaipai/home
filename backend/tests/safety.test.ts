@@ -45,6 +45,8 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
     case "media":
       return "stress-test-value";
     case "select":
+      // SEARCH-SOURCES-01: a multiple select takes a list; every option is its most permissive value.
+      if ((key.range as { multiple?: boolean } | undefined)?.multiple) return [...(key.range?.options ?? [])];
       return key.range?.options?.at(-1) ?? key.default;
     case "text":
       return key.default === "" ? "stress-test-value" : `${key.default}-stressed`;

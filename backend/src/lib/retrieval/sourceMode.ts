@@ -28,7 +28,9 @@ import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 
 export const SOURCE_MODES = ["live", "offline", "mix"] as const;
 export type SourceMode = (typeof SOURCE_MODES)[number];
-export type ModeSource = "wikimedia" | "web" | "hosted";
+/** SEARCH-SOURCES-01: `ddgs` is a web backend the household may pick (webSources.ts). It is closed for a
+ * child or teen like every non-`web` source, and follows the web override for an adult. */
+export type ModeSource = "wikimedia" | "web" | "hosted" | "ddgs";
 /** `closed`: the source is never reachable for this band, whatever the setting. */
 export type EffectiveMode = SourceMode | "closed";
 

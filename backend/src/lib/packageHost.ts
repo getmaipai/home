@@ -70,6 +70,7 @@ import { getHouseholdSettingValue } from "@/lib/settings";
 import { WIKIMEDIA_LIVE_RATE_LIMIT, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, wikimediaLiveBaseUrl } from "@/lib/wikimediaLive";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
+import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
@@ -2174,7 +2175,19 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const webSide = async (ctx: { kMatched: boolean; timeRange: "month" | undefined }) => {
             const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
             if (hosted) return hosted;
-            return searxngSearch(args, { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) });
+            const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
+            // SEARCH-SOURCES-01: several picked sources run at once and blend by rank; one source (the default) is the old path unchanged.
+            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band);
+            if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
+            if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(args, searxOpts);
+            const rowsOnly = { ...(args as object), read_page: false };
+            const blended = await runWebSources(sources.map((id) => (): Promise<WebRows> => {
+              if (id === "searxng") return searxngSearch(rowsOnly, searxOpts);
+              const search = webSourceSearch(id);
+              if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
+              return search({ args: rowsOnly, band, signal: runtime.signal, deadlineAt: runtime.deadlineAt });
+            }));
+            return attachSearchPages(blended, args, band === "adult" ? undefined : band, runtime.signal);
           };
           // KS-02: the model's `scope` argument. An image search, or a call with no query, is the
           // old single path: the library has no pictures and nothing to look up.

@@ -64,6 +64,12 @@ What leaves your house when MaiPai asks Wikipedia: the words of the search go to
 
 If you turned off **Ask Wikipedia when web search fails or finds nothing** in an earlier version, MaiPai keeps that choice. Your Wikipedia source is set to **Library only**, and nothing else changes.
 
+## Choosing which search engines answer
+
+Open **Settings**, then **Search**, then **Web search sources** (an advanced option). SearXNG is picked by default. When you pick more than one source, MaiPai asks them all at once and merges the answers into one list. A page that two sources both find moves to the top, and the same page never appears twice. If one source fails, the others still answer.
+
+You must keep at least one source picked. To turn web search off, set **Web searches** to **Library only** instead. DuckDuckGo is listed but does not answer yet, so keep SearXNG picked until a later update adds it. Children and teens only ever use SearXNG.
+
 ## Looking up a word online
 
 **Look up words online** is off until an adult switches it on. Open **Settings**, then **Search**, then **Search sources**.
