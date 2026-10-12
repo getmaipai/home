@@ -15,7 +15,8 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { tryConsume } from "@/lib/rateLimiter";
 import { downloadUrl, sha256OfFile } from "@/lib/modelDownload";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
-import { webSideOff } from "@/lib/retrieval/sourceMode";
+import { warmHostIndex } from "@/lib/blocklists/hostLists";
+import { bandSwitchOff } from "@/lib/retrieval/sourceMode";
 import type { PersonRow } from "@/types";
 import type { SignedEnvelope } from "@/lib/storeIndex";
 import { enabledListIds } from "@/lib/blocklists/policy";
@@ -54,7 +55,7 @@ export function bandsInUse(now: Date): AgeBand[] {
   const rows = db.select().from(people).where(isNull(people.deletedAt)).all() as PersonRow[];
   const bands = new Set<AgeBand>();
   for (const row of rows) bands.add(speakerAgeBand(row, now));
-  return [...bands].filter((band) => !webSideOff(band));
+  return [...bands].filter((band) => !bandSwitchOff(band));
 }
 
 /** The list ids the household needs loaded right now. */
@@ -188,6 +189,7 @@ export async function runListSync(opts: ListSyncOptions = {}): Promise<ListSyncO
   state.lastGoodAt = now.toISOString();
   state.nextCheckAt = new Date(now.getTime() + (missing.length === 0 ? DAY_MS : HOUR_MS)).toISOString();
   writeState(state);
+  warmHostIndex();
   if (missing.length === 0) resolveIssue(LIST_SYNC_ISSUE_SOURCE, ISSUE_KEY);
   else
     void raiseIssue({

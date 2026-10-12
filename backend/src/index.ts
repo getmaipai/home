@@ -4,6 +4,7 @@
 import { instanceLock } from "@/lib/bootGuard";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
+import { warmHostIndex } from "@/lib/blocklists/hostLists";
 import { reverifyStoredLists } from "@/lib/blocklists/listStore";
 import { runPlugin, registerAllPackageNotificationTypes, registerAllPackageProjectTypes, runDueWarmJobs } from "@/lib/plugins";
 import { cleanupStaleSnapshots } from "@/lib/backup";
@@ -154,7 +155,7 @@ ensureCoreJob("websearch.check_searxng_health", "every:15m");
 ensureCoreJob("updates.check", "every:1d");
 // MINOR-SEARCH-01e-4: blocked-site lists; see lists.sync in lib/scheduler.ts.
 ensureCoreJob("lists.sync", "every:1h");
-void reverifyStoredLists().catch((err) => console.warn("blocked-site list re-check failed:", err));
+void reverifyStoredLists().then(() => warmHostIndex()).catch((err) => console.warn("blocked-site list re-check failed:", err));
 // HOME-STACK-05: same daily cadence as the app's own check above - the
 // job itself is a no-op when engines.stack.url is empty or the
 // household hasn't turned stack.updates.enabled on.

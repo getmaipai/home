@@ -52,6 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
+import { urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { isPrivacyFlaggedSearchEngine } from "@/lib/searchEngines";
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { HostError, redactSecrets } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -1506,7 +1507,7 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
     if (remaining <= 0) break;
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const read = searxngPageRead({ url: row.url! }, signal);
+      const read = searxngPageRead({ url: row.url! }, signal, minorBand);
       read.catch(() => {}); // an abandoned read that fails later is not an unhandled rejection
       const doc = await Promise.race([
         read,
@@ -1541,10 +1542,22 @@ async function attachSearchPages(found: SearxngSearchResult, args: unknown, mino
  * fetched, not about what the person said. */
 export type MinorBand = "child" | "teen";
 
-export function floorSearchResult(result: SearxngSearchResult, _band: MinorBand): SearxngSearchResult {
+export function floorSearchResult(result: SearxngSearchResult, band: MinorBand): SearxngSearchResult {
   const trips = (text: string): boolean => checkSafety(text, { isMinor: true }).flagged;
-  const rows = result.rows.filter((row) => !trips(`${row.title}. ${row.snippet ?? ""}`));
-  const pages = result.pages?.filter((page) => !trips(`${page.title}. ${page.text}`));
+  // MINOR-SEARCH-01e-5: a row or page on a blocked site is dropped; a blocked image or thumbnail address is
+  // stripped from a row that is otherwise fine. Counted by list id (hostLists.ts), never by site.
+  const rows = result.rows
+    .filter((row) => !trips(`${row.title}. ${row.snippet ?? ""}`) && urlAllowedFor(band, row.url))
+    .map((row) => {
+      const imageOk = !row.image || urlAllowedFor(band, row.image);
+      const thumbOk = !row.thumbnail || urlAllowedFor(band, row.thumbnail);
+      if (imageOk && thumbOk) return row;
+      const kept = { ...row };
+      if (!imageOk) delete kept.image;
+      if (!thumbOk) delete kept.thumbnail;
+      return kept;
+    });
+  const pages = result.pages?.filter((page) => !trips(`${page.title}. ${page.text}`) && urlAllowedFor(band, page.url));
   const dropped = (result.floor_dropped ?? 0) + (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
   // A minor never gets the whole-document `page` (up to 32,000 characters,
   // of which only the excerpt in `pages` is checked); only the checked
@@ -1638,20 +1651,31 @@ function robotsAllows(robots: string, target: URL): boolean {
   return allowed;
 }
 
-async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSignal): Promise<AttemptResult> {
+async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSignal, minorBand?: MinorBand): Promise<AttemptResult> {
   // The pace counts pages, not the robots.txt check that goes with each
   // one (THIN-4A: with both counted, a three-page search spent six
   // tokens of a three-token burst and read one page).
   if (countsAgainstPace && !tryConsume(SEARXNG_PAGE_RATE_LIMIT_KEY, SEARXNG_PAGE_RATE_LIMIT)) throw new HostError("rate_limited", "Web pages are rate-limited - try again shortly");
   await validatePublicPageUrl(url);
   try {
-    const response = await guardedFetch(url, {
-      method: "GET",
-      headers: { accept: "text/html,application/xhtml+xml" },
-      signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS),
-      redirect: "follow",
-      maxRedirects: MAX_FETCH_REDIRECTS,
-    });
+    const fetchOptions = { method: "GET", headers: { accept: "text/html,application/xhtml+xml" }, signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS) };
+    let response: Response;
+    if (!minorBand) {
+      response = await guardedFetch(url, { ...fetchOptions, redirect: "follow", maxRedirects: MAX_FETCH_REDIRECTS });
+    } else {
+      // MINOR-SEARCH-01e-5: a child or teen's page follows each redirect by hand so a hop onto a blocked site is
+      // refused before it is fetched, not discovered afterwards.
+      let current = url;
+      for (let hop = 0; ; hop++) {
+        response = await guardedFetch(current, { ...fetchOptions, redirect: "manual" });
+        const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+        if (!location) break;
+        if (hop >= MAX_FETCH_REDIRECTS) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} redirected too many times`) };
+        current = new URL(location, current).toString();
+        if (!urlAllowedFor(minorBand, current)) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", "That page isn't available.") };
+        await validatePublicPageUrl(current);
+      }
+    }
     if (!response.ok) return { ok: false, status: response.status, error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`) };
     const text = await response.text();
     if (new TextEncoder().encode(text).byteLength > FETCH_MAX_RESPONSE_BYTES) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`) };
@@ -1726,7 +1750,7 @@ export function parseReadablePage(html: string, url: string): PageReadResult {
  * compatible with this AGPL-3.0 package. Cheerio plus an HTML-to-text
  * helper was rejected because it would leave article extraction as a
  * second parser surface. */
-export async function searxngPageRead(args: unknown, signal?: AbortSignal): Promise<PageReadResult> {
+export async function searxngPageRead(args: unknown, signal?: AbortSignal, minorBand?: MinorBand): Promise<PageReadResult> {
   const url = (args as { url?: unknown } | undefined)?.url;
   if (typeof url !== "string" || url.length === 0) throw new HostError("invalid_input", "page.read needs a string \"url\" argument");
   let parsedUrl: URL;
@@ -1742,7 +1766,7 @@ export async function searxngPageRead(args: unknown, signal?: AbortSignal): Prom
   if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
     throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);
   }
-  const result = await pageFetch(url, true, signal);
+  const result = await pageFetch(url, true, signal, minorBand);
   if (!result.ok) pageFailure(result, url);
   if (typeof result.value !== "string") throw new HostError("network_unreachable", `The site did not return readable HTML for ${url}.`);
   return parseReadablePage(result.value, url);
@@ -2212,7 +2236,11 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           if (webSideOff(readBand, readTemporary)) throw new HostError("permission_denied", refuseWeb(readBand, readTemporary));
           // MINOR-SEARCH-01f: an address carrying an email, phone or id number is not fetched for a minor.
           if (readBand !== "adult" && closedFormatHit(JSON.stringify(args ?? {}))) throw new HostError("invalid_input", MINOR_QUERY_PERSONAL_NOTE);
-          const doc = await searxngPageRead(args, runtime.signal);
+          // MINOR-SEARCH-01e-5: a blocked site is not fetched for a child or teen (each redirect hop is checked in pageFetch).
+          const readUrl = (args as { url?: unknown } | undefined)?.url;
+          const blockedRead = (): HostError => new HostError("network_unreachable", "That page isn't available.");
+          if (readBand !== "adult" && typeof readUrl === "string" && !urlAllowedFor(readBand, readUrl)) throw blockedRead();
+          const doc = await searxngPageRead(args, runtime.signal, readBand === "adult" ? undefined : readBand);
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
           if (speakerAgeBand(actor, new Date()) !== "adult" && checkSafety(`${doc.title}. ${doc.text}`, { isMinor: true }).flagged) {

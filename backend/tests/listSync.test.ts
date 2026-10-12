@@ -9,7 +9,7 @@ import { makeKeyPair, sign, type KeyPair } from "./support/tufFixtures";
 import { blockListsDir } from "@/lib/paths";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __setListTrustKeysForTests, verifyListIndex, type ListIndexMetadata, type ListPin } from "@/lib/blocklists/listIndex";
-import { isListLoaded, listFilePath, listsReadyForBand, readState, reverifyStoredLists, writeState } from "@/lib/blocklists/listStore";
+import { __setListsReadyForTests, isListLoaded, listFilePath, listsReadyForBand, readState, reverifyStoredLists, writeState } from "@/lib/blocklists/listStore";
 import { neededListIds, runListSync } from "@/lib/blocklists/listSync";
 import { listIssues } from "@/lib/issues";
 
@@ -60,6 +60,7 @@ const PORN = "example-porn.test.com\nsecond-porn.test.com\n";
 
 let realFetch: typeof fetch;
 beforeEach(() => {
+  __setListsReadyForTests(null);
   resetDb();
   rmSync(blockListsDir, { recursive: true, force: true });
   __resetRateLimiterForTests();

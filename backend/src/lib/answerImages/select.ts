@@ -5,6 +5,7 @@
 // which sources may be asked, the floor reads the subject and every caption,
 // and ANSWER-IMG-00/01's filter and proxy decide what is a real picture.
 // No word rule, no learned component, no face comparison anywhere.
+import { urlAllowedFor } from "@/lib/blocklists/hostLists";
 import sharp from "sharp";
 import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { speakerNamedAny } from "@/lib/subjects";
@@ -55,6 +56,8 @@ export type AnswerImageTrace = {
   skipped?: AnswerImageSkip;
   sources?: { wikimedia: number; searxng: number };
   dropped_by_floor?: number;
+  /** MINOR-SEARCH-01e-5: pictures left out because their host or page is on a blocked-site list. */
+  dropped_by_blocklist?: number;
   /** ANSWER-IMG-05b, IMGQ-04: left out before any fetch as not of the
    * subject, or not a media picture, by reason key. */
   dropped_by_relevance?: Record<RelevanceDrop, number>;
@@ -206,6 +209,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
     const searchNames = subjectNames([subject, entity.label], entity.aliases ?? []);
     const context = { names, searchNames, ...(entity.otherSenseWords ? { otherSenseWords: entity.otherSenseWords } : {}), subjectIsPerson: entity.human, ...(entity.description ? { description: entity.description } : {}), band: input.band, ...(entity.commonsCategory ? { commonsCategory: entity.commonsCategory } : {}), ...(entity.officialSite ? { officialSite: entity.officialSite } : {}) };
     let droppedByFloor = 0;
+    let droppedByBlocklist = 0;
     const droppedByRelevance: Record<RelevanceDrop, number> = {};
     const seen = new Set<string>();
     const kept: Candidate[] = [];
@@ -239,6 +243,8 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       if (seen.has(c.url)) continue;
       seen.add(c.url);
       if (trips(`${c.title}. ${c.description}`, input.band)) { droppedByFloor++; continue; }
+      // MINOR-SEARCH-01e-5: a picture hosted on, or taken from a page on, a blocked site is never shown.
+      if (!urlAllowedFor(input.band, c.url) || (c.page && !urlAllowedFor(input.band, c.page))) { droppedByBlocklist++; continue; }
       const off = judgeRelevance({ source: c.source, lead: c.lead, title: c.title, description: c.description, page: c.page, image: c.url, ...(c.objectName ? { objectName: c.objectName } : {}), ...(c.categories ? { categories: c.categories } : {}), ...(c.restrictions ? { restrictions: c.restrictions } : {}), ...(c.width !== undefined ? { width: c.width } : {}), ...(c.format ? { format: c.format } : {}), ...(c.nonPhoto ? { nonPhoto: true } : {}), ...(c.engines ? { engines: c.engines } : {}) }, context);
       if (off) { droppedByRelevance[off] = (droppedByRelevance[off] ?? 0) + 1; continue; }
       if (perSource[c.source] >= PER_SOURCE_SLOTS) continue;
@@ -247,6 +253,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       if (kept.length >= MAX_CANDIDATES) break;
     }
     if (droppedByFloor > 0) trace.dropped_by_floor = droppedByFloor;
+    if (droppedByBlocklist > 0) trace.dropped_by_blocklist = droppedByBlocklist;
     if (Object.keys(droppedByRelevance).length > 0) trace.dropped_by_relevance = droppedByRelevance;
     if (searchSkipped > 0) trace.search_held_back = searchSkipped;
     const traceExcluded = (): void => { if (excludedShown > 0) trace.excluded_already_shown = excludedShown; };

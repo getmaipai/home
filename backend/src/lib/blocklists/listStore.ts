@@ -6,7 +6,7 @@
 //
 // A list file is trusted only while its bytes hash to the sha256 in its name AND in the state; boot re-hashes
 // (`reverifyStoredLists`). The previous good copy stays for rollback; anything older is removed after a swap.
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseHostList, type HostListFormat, type HostListParse } from "@maipai/spec/interpreters/ts/hostList.js";
 import { blockListsDir } from "@/lib/paths";
@@ -54,12 +54,20 @@ export function listFilePath(id: string, sha256: string): string {
   return join(blockListsDir, id, `${sha256}.txt`);
 }
 
+// The parsed state is kept until the file's size or modified time changes, so a search that checks dozens of
+// links does not read and parse it for each one. Every caller still gets its own copy.
+let stateCache: { key: string; raw: Partial<ListSyncState> } | null = null;
+
 export function readState(): ListSyncState {
   try {
-    const raw = JSON.parse(readFileSync(statePath(), "utf-8")) as Partial<ListSyncState>;
-    if (raw && raw.version === 1 && raw.lists && typeof raw.lists === "object") return { ...emptyState(), ...raw, lists: { ...raw.lists } } as ListSyncState;
+    const st = statSync(statePath());
+    const key = `${st.size}:${st.mtimeMs}`;
+    if (!stateCache || stateCache.key !== key) stateCache = { key, raw: JSON.parse(readFileSync(statePath(), "utf-8")) as Partial<ListSyncState> };
+    const raw = stateCache.raw;
+    if (raw && raw.version === 1 && raw.lists && typeof raw.lists === "object") return { ...emptyState(), ...structuredClone(raw), } as ListSyncState;
   } catch {
     // missing or unreadable: start empty. Files are re-hashed against the pins on the next sync.
+    stateCache = null;
   }
   return emptyState();
 }
@@ -69,6 +77,7 @@ export function writeState(state: ListSyncState): void {
   const tmp = `${statePath()}.tmp`;
   writeFileSync(tmp, JSON.stringify(state, null, 2));
   renameSync(tmp, statePath());
+  stateCache = null;
 }
 
 /** Removes every file in a list's folder except those named in `keep` (checksums). */
@@ -105,9 +114,21 @@ export function isListLoaded(id: string): boolean {
   return Boolean(entry) && currentFileExists(id, entry!);
 }
 
+let readyOverride: boolean | null = null;
+/** Tests only: true pretends every enabled list loaded (the matcher then skips lists that are absent), so the many
+ * tests that exercise search without a synced list are unchanged; the list tests set null to get the real gate. */
+export function __setListsReadyForTests(value: boolean | null): void {
+  if (process.env.MAIPAI_TEST_ALLOW_MULTIPLE_HUBS !== "1") throw new Error("__setListsReadyForTests is for tests only");
+  readyOverride = value;
+}
+export function listsReadyOverride(): boolean | null {
+  return readyOverride;
+}
+
 /** Every list enabled for the band has loaded at least once: the gate a child or teen's web search waits on
  * (design section 3, "offline and first boot"). An adult band with no list enabled is always ready. */
 export function listsReadyForBand(band: AgeBand): boolean {
+  if (readyOverride === true) return true;
   const loaded = readState().lists;
   return enabledListIds(band).every((id) => Boolean(loaded[id]) && currentFileExists(id, loaded[id]!));
 }

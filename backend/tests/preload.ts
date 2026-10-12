@@ -81,7 +81,10 @@ __setDefaultStackClientForTests(defaultScriptedStack.client);
 // so that class of leak fails the offending test by name instead. The
 // snapshot is taken inside this call, after every assignment above.
 installTestIsolationGuard();
-beforeEach(() => {
+beforeEach(async () => {
+  // MINOR-SEARCH-01e-5: tests that are not about the blocked-site lists run as if every enabled list had loaded.
+  // Imported here, not at the top, so paths.ts reads MAIPAI_DATA_DIR after this file has set it.
+  (await import("@/lib/blocklists/listStore")).__setListsReadyForTests(true);
   __setDefaultStackClientForTests(defaultScriptedStack.client);
 });
 
