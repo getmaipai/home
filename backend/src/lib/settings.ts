@@ -837,6 +837,35 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default", responseContext(actor, responseSubject(actor, parsed), parsed.kind)) };
 }
 
+/** SETTINGS-LAYERS-01b: raw access to a user-overrides row of a layered list key (a
+ * `person:<id>` row of a household-scope union key). Only lib/settingsLayers.ts calls these, behind its
+ * one write gate; they check nothing themselves. The value is the JSON text of a SettingsDelta. */
+export function readLayerRow(personId: string, key: string): string | undefined {
+  return db.select({ value: settingsValues.value }).from(settingsValues)
+    .where(and(eq(settingsValues.scope, `person:${personId}`), eq(settingsValues.key, key))).get()?.value;
+}
+
+export function writeLayerRow(personId: string, key: string, jsonText: string): void {
+  const scope = `person:${personId}`;
+  const hlc = nextHlc();
+  const now = new Date().toISOString();
+  const existing = db.select({ hlc: settingsValues.hlc }).from(settingsValues)
+    .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).get();
+  if (existing) {
+    db.update(settingsValues).set({ value: jsonText, hlc, source: "user", updatedAt: now })
+      .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
+  } else {
+    db.insert(settingsValues).values({ scope, key, value: jsonText, hlc, source: "user", updatedAt: now }).run();
+  }
+  settingsCache.delete(settingsCacheKey(scope, key));
+}
+
+export function deleteLayerRow(personId: string, key: string): void {
+  const scope = `person:${personId}`;
+  db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
+  settingsCache.delete(settingsCacheKey(scope, key));
+}
+
 /** Clears every stored value at `key`, across every scope, whose stored
  * JSON text contains `valueContains` - for cross-cutting cleanup when
  * something a setting referenced was deleted out from under it (a code

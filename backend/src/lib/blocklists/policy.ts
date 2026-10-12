@@ -31,7 +31,7 @@ export function lockedListIds(band: AgeBand): string[] {
   return BLOCKLIST_POLICY.lists.filter((row) => row.locked_for.includes(band)).map((row) => row.id);
 }
 
-function defaultListIds(band: AgeBand): string[] {
+export function defaultListIds(band: AgeBand): string[] {
   return BLOCKLIST_POLICY.lists.filter((row) => row.default_for.includes(band)).map((row) => row.id);
 }
 
