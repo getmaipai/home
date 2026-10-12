@@ -8,7 +8,7 @@ import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
 import { __setAnswerImageDepsForTests, selectAnswerImages } from "@/lib/answerImages/select";
-import { judgeRelevance, namesSubject, subjectNames, type RelevanceContext, type RelevanceInput } from "@/lib/answerImages/relevance";
+import { isWeakEvidence, judgeRelevance, namesSubject, subjectNames, type RelevanceContext, type RelevanceInput } from "@/lib/answerImages/relevance";
 import { filterAnswerImages } from "@/lib/answerImages/quality";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { fixtureWorld, pictureUrl, syntheticPhoto, type FixtureSubject } from "./answerImagesFixture";
@@ -322,5 +322,57 @@ describe("IMGQ-07: off-focus, not-named and private-person rows from the judged 
     const stranger = withKind(["Stranger Things"], "TV series", { media: true });
     expect(judgeRelevance(commons("Stranger things - NMD 2018 (40059456050)", "Nordiske Mediedager 2018", { categories: ["Stranger Things"] }), stranger)).toBe("caption:mediedager");
     expect(judgeRelevance(commons("MEGACON 2024 Stranger Things Q&A panel - 2", "Actors at MEGACON Orlando speaking at a \"Stranger Things\" Q&A panel", { categories: ["Stranger Things"] }), stranger)).toBe("caption:megacon");
+  });
+});
+
+// IMGQ-08: the exact Commons rows (title, description, categories, read live on 2026-10-12 into
+// data-scratch/chat-ab/imgq-08-2026-10-12) behind the 7 wrong-subject questions the IMGQ-07 replay left, and the held-out rows.
+describe("IMGQ-08: a tagged file is not a picture of what it is tagged with", () => {
+  const png = (title: string, description: string, categories: string[]): RelevanceInput => ({ ...commons(title, description, { categories }), page: `https://commons.wikimedia.org/wiki/File:${encodeURIComponent(title)}.png` });
+  const withKind = (names: string[], kind: string): RelevanceContext => ({ ...thing(names), kind });
+
+  test("a Commons PNG that is not the lead (Serena Williams' signature, the Kindle font menu, a Michael Jackson tribute event) is dropped", () => {
+    expect(judgeRelevance(png("SerenaWilliamsSignature", "Signature of Serena Williams", ["Serena Williams"]), person(["Serena Williams"], "Serena Williams"))).toBe("png_not_photo");
+    expect(judgeRelevance(png("Kindle accessibility font menu", "kindle accessibility font menu", ["Amazon Kindle"]), withKind(["Amazon Kindle", "Kindle"], "e-reader"))).toBe("png_not_photo");
+    expect(judgeRelevance(png("Evento \"Domingo na Paulista\" - Sesi & FIESP - São Paulo 2018", "Estávamos passeando na paulista e estava acontecendo um show em homenagem ao Michael Jackson no dia dos Pais.", ["Avenida Paulista", "Michael Jackson"]), person(["Michael Jackson"], "Michael Jackson"))).toBe("png_not_photo");
+  });
+
+  test("the article's own lead stays even when it is a PNG, and JPEG photos are not touched", () => {
+    expect(judgeRelevance({ ...png("PlayStation 5 and DualSense with transparent background", "", ["PlayStation 5"]), lead: true }, thing(["PlayStation 5"]))).toBeNull();
+    expect(judgeRelevance(commons("Serena Williams 2013", "Serena Williams at the US Open", { categories: ["Serena Williams"] }), person(["Serena Williams"], "Serena Williams"))).toBeNull();
+  });
+
+  test("an office photo filed in 'Amazon Kindle' beside three office categories is dropped (IT-Zeux im MUC-office)", () => {
+    const row = commons("IT-Zeux im MUC-office 14", "Smarphones von apple, samsung, Dell-PC, Kindle E-reader, Memorysticks etc. im MUC-Office Zeppelinstr. 41", { categories: ["Amazon Kindle", "IT-Technik Pimpinellus", "Office mit PC und Labtop", "Offices and library in Stadthaus (Munich)"] });
+    expect(judgeRelevance(row, withKind(["Amazon Kindle", "Kindle"], "e-reader"))).toBe("crowded_categories");
+  });
+
+  test("an in-flight meal photo and a festival street display tagged with the subject are dropped (Sushi, Game Boy)", () => {
+    const meal = commons("After take-off (5793253862)", "Champagne: Roederer Brut\nAssorted Canapé / Sushi\n\nTK051 from Tokyo to Istanbul", { categories: ["First class in-flight meals", "Sushi", "Turkish Airlines in-flight meals"] });
+    expect(judgeRelevance(meal, thing(["Sushi"], "Sushi"))).toBe("crowded_categories");
+    const street = commons("Carrers guarnits Gràcia 2012 - Plaça Rovira, Recreatius Rovira 04", "A large model of a Game Boy system on display at a decorated streets contest (Festa Major de Gràcia, Barcelona, year 2012.)", { categories: ["Game Boy", "Plaça Rovira i Trias in Festa Major de Gràcia 2012", "Tetris"] });
+    expect(judgeRelevance(street, thing(["Game Boy"], "Game Boy"))).toBe("crowded_categories");
+  });
+
+  test("a file whose title names the subject is kept however many categories it has", () => {
+    const row = commons("Machu Picchu panorama", "", { categories: ["Machu Picchu", "Inca Empire", "Panoramas of Peru"] });
+    expect(judgeRelevance(row, thing(["Machu Picchu"], "Machu Picchu"))).toBeNull();
+  });
+
+  test("a person's file is not subject to the crowded-category rule", () => {
+    const row = commons("Kyoto Prize ceremony", "Albert Einstein medal", { categories: ["Albert Einstein", "Awards", "Kyoto"] });
+    expect(judgeRelevance(row, person(["Albert Einstein"], "Albert Einstein"))).not.toBe("crowded_categories");
+  });
+
+  test("Taj Mahal: a bulk-renamed title with the name swallowed ('Banke bTaj Mahalihari') is dropped though its description repeats the category", () => {
+    expect(judgeRelevance(commons("Banke bTaj Mahalihari (219)", "Taj Mahal", { categories: ["Taj Mahal"] }), thing(["Taj Mahal"], "Taj Mahal"))).toBe("title_name_glued");
+    expect(judgeRelevance(commons("Taj Mahal at dawn", "Taj Mahal", { categories: ["Taj Mahal"] }), thing(["Taj Mahal"], "Taj Mahal"))).toBeNull();
+    // a derived word that merely starts with the name is an ordinary title, not a mangled one.
+    expect(judgeRelevance(commons("Parisian cafe terrace", "A cafe terrace in Paris", { categories: ["Paris"] }), thing(["Paris"], "Paris"))).not.toBe("title_name_glued");
+  });
+
+  test("Ramen: a delivery-machine description listing five foods with the subject second counts as a weak list", () => {
+    expect(isWeakEvidence(commons("Demaeki", "Home delivery of cooked foods machine, ramen, sushi, soba, udon", { categories: ["Blue Honda Super Cub", "Ramen"] }), { names: subjectNames(["Ramen"]) })).toBe("description_list");
+    expect(isWeakEvidence(commons("Ramen bowl", "Tonkotsu ramen, with egg, nori, scallion"), { names: subjectNames(["Ramen"]) })).toBeNull();
   });
 });

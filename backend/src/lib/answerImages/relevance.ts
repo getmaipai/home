@@ -232,6 +232,19 @@ export function namesSubject(text: string, names: readonly string[]): boolean {
   return names.some((name) => hays.some((hay) => hay.includes(` ${name} `) || hay.includes(` ${name}s `) || hay.includes(` ${name}es `)));
 }
 
+/** IMGQ-08: the title holds a name of the subject (five letters or more) only inside a longer word. */
+function gluedName(title: string, names: readonly string[]): boolean {
+  if (!title || namesSubject(title, names)) return false;
+  const hay = normalizeForMatch(title, false);
+  // Swallowed inside a word ("bTaj Mahal"): a letter sits right before the name. A derived word that merely
+  // begins with it ("Parisian", "Japanese") is ordinary and is not this.
+  return names.some((n) => {
+    if (n.replace(/ /g, "").length < 5) return false;
+    const at = hay.indexOf(n);
+    return at > 0 && hay[at - 1] !== " ";
+  });
+}
+
 function withoutNames(normalized: string, names: readonly string[]): string {
   let out = normalized;
   for (const name of names) out = out.split(` ${name} `).join("  ");
@@ -283,6 +296,9 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   // Vetoes. The lead image is the article's own choice and is exempt from
   // the agreement count, not from the vetoes on what kind of file it is.
   if (c.nonPhoto) return "non_photo_property";
+  // IMGQ-08: on Commons a PNG that is not the article's lead is nearly always a screenshot, signature, diagram or
+  // scan (measured: 4 of the 8 visible non-lead PNGs in the judged sample were that, 1 was junk). Photos are JPEG.
+  if (c.source === "wikimedia" && !c.lead && /\.png$/i.test(c.page)) return "png_not_photo";
   if ((c.format && NOT_STILL_FORMATS.has(c.format)) || NOT_STILL.test(c.image)) return "not_still_raster";
   if (c.width !== undefined && c.width > 0 && c.width < 200) return "api_size";
   const restrictions = (c.restrictions ?? []).map((r) => r.toLowerCase());
@@ -329,6 +345,10 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   const isProduct = !subjectIsPerson && PRODUCT_KIND.test(kind);
   const mustName = !subjectIsPerson && (ctx.media === true || isProduct || SITE_KIND.test(kind) || FRANCHISE_KIND.test(kind));
   if (mustName && !namesSubject(words, names)) return "subject_not_named";
+  // IMGQ-08 M1: a Commons file whose own title holds the subject's name only inside other letters ("Banke
+  // bTaj Mahalihari (219)": a bulk rename that swallowed the name) is a mangled title; the description a bulk
+  // upload copies from the category ("Taj Mahal") is then no evidence. Open-web rows are scored by their engines.
+  if (c.source === "wikimedia" && !subjectIsPerson && gluedName(c.title, names)) return "title_name_glued";
   // The subject's own name never counts against it ("My Little Pony",
   // "LEGO Batman", "Windows user interface").
   const said = withoutNames(normalizeForMatch(words), names);
@@ -365,6 +385,12 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
     const onSite = OCCUPIES_SITE.exec(hay)?.[1];
     if (onSite !== undefined && names.some((n) => onSite.trimStart().startsWith(n.trim()))) return "near:occupy";
   }
+  // IMGQ-08 M2: a file whose own title and object name leave the subject out, filed in three or more categories of
+  // which at most one names it, is a picture of something else that lists the subject among many ("IT-Zeux im MUC-office"
+  // sits in 'Amazon Kindle' beside three office categories; 'Sushi' beside two in-flight meal categories). The curator's tag is a mention, not the subject.
+  if (c.source === "wikimedia" && !c.lead && !subjectIsPerson && (c.categories?.length ?? 0) >= 3
+    && !namesSubject(`${c.title} ${c.objectName ?? ""}`, names)
+    && c.categories!.filter((cat) => namesSubject(cat, names)).length <= 1) return "crowded_categories";
   // Agreement: two independent signals that the picture is of the subject.
   let signals = 0;
   if (c.source === "wikimedia") {
@@ -405,5 +431,7 @@ export function isWeakEvidence(c: Pick<RelevanceInput, "source" | "lead" | "desc
   const parts = description.split(",");
   if (parts.length < 4) return null;
   const first = parts.findIndex((part) => namesSubject(part, ctx.names));
-  return first >= 2 ? "description_list" : null;
+  // IMGQ-08 M3: a list of five or more with the subject second ("Home delivery of cooked foods machine, ramen,
+  // sushi, soba, udon") is the same shape: the picture shows the first thing, the subject is one of its tags.
+  return first >= 2 || (first >= 1 && parts.length >= 5) ? "description_list" : null;
 }

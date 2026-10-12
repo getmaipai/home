@@ -1,0 +1,142 @@
+{
+  "description": "IMGQ-08: held-out subjects for the picture filters, never used to tune them. Public figures, places and things only.",
+  "subjects": [
+    {
+      "id": "h-colosseum",
+      "subject": "Colosseum",
+      "kind": "amphitheatre"
+    },
+    {
+      "id": "h-petra",
+      "subject": "Petra",
+      "kind": "archaeological site"
+    },
+    {
+      "id": "h-stonehenge",
+      "subject": "Stonehenge",
+      "kind": "monument"
+    },
+    {
+      "id": "h-niagara",
+      "subject": "Niagara Falls",
+      "kind": "waterfall"
+    },
+    {
+      "id": "h-bigben",
+      "subject": "Big Ben",
+      "kind": "clock tower"
+    },
+    {
+      "id": "h-notredame",
+      "subject": "Notre-Dame de Paris",
+      "kind": "cathedral"
+    },
+    {
+      "id": "h-parthenon",
+      "subject": "Parthenon",
+      "kind": "temple"
+    },
+    {
+      "id": "h-fuji",
+      "subject": "Mount Fuji",
+      "kind": "mountain"
+    },
+    {
+      "id": "h-xbox",
+      "subject": "Xbox Series X",
+      "kind": "game console"
+    },
+    {
+      "id": "h-applewatch",
+      "subject": "Apple Watch",
+      "kind": "smartwatch"
+    },
+    {
+      "id": "h-gameboy",
+      "subject": "Game Boy",
+      "kind": "handheld game console"
+    },
+    {
+      "id": "h-model3",
+      "subject": "Tesla Model 3",
+      "kind": "car"
+    },
+    {
+      "id": "h-roomba",
+      "subject": "Roomba",
+      "kind": "robot vacuum"
+    },
+    {
+      "id": "h-airpods",
+      "subject": "AirPods",
+      "kind": "earbuds"
+    },
+    {
+      "id": "h-harrypotter",
+      "subject": "Harry Potter and the Philosopher's Stone",
+      "kind": "film"
+    },
+    {
+      "id": "h-frozen",
+      "subject": "Frozen",
+      "kind": "film"
+    },
+    {
+      "id": "h-simpsons",
+      "subject": "The Simpsons",
+      "kind": "TV series"
+    },
+    {
+      "id": "h-minecraft",
+      "subject": "Minecraft",
+      "kind": "video game"
+    },
+    {
+      "id": "h-pikachu",
+      "subject": "Pikachu",
+      "kind": "fictional character"
+    },
+    {
+      "id": "h-panda",
+      "subject": "giant panda",
+      "kind": "animal"
+    },
+    {
+      "id": "h-eagle",
+      "subject": "bald eagle",
+      "kind": "bird"
+    },
+    {
+      "id": "h-sushi",
+      "subject": "sushi",
+      "kind": "dish"
+    },
+    {
+      "id": "h-pizza",
+      "subject": "pizza",
+      "kind": "dish"
+    },
+    {
+      "id": "h-einstein",
+      "subject": "Albert Einstein",
+      "kind": "physicist",
+      "person": true
+    },
+    {
+      "id": "h-swift",
+      "subject": "Taylor Swift",
+      "kind": "singer",
+      "person": true
+    },
+    {
+      "id": "h-realmadrid",
+      "subject": "Real Madrid",
+      "kind": "football club"
+    },
+    {
+      "id": "h-pearl",
+      "subject": "Girl with a Pearl Earring",
+      "kind": "painting"
+    }
+  ]
+}

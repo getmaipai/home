@@ -7,6 +7,11 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Fixed
+- Pictures under an answer: a screenshot, signature or diagram saved as a PNG,
+  a file whose name was mangled by a bulk rename, and a photo of something
+  else that is only tagged with the subject no longer show up as pictures of it.
+
 ### Added
 - The composer and streaming: replies now stream into the chat as they are
   generated instead of arriving all at once, and an interrupted stream resumes
