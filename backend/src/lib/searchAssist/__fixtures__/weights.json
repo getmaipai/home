@@ -1,0 +1,15 @@
+{
+  "embed": { "model": "nomic-embed-text-v1.5.Q4_K_M", "dims": 2, "preprocess": "v1", "prefix": "" },
+  "features": "concat",
+  "classes": ["no_tool", "recency", "stable"],
+  "coef": [
+    [0.5, -1.25, 0.75, 0.1],
+    [-0.8, 2.0, -0.3, 1.5],
+    [0.2, -0.4, 0.6, -1.2]
+  ],
+  "intercept": [0.1, -0.2, 0.05],
+  "thresholds": { "websearch": { "class": "recency", "value": 0.67 } },
+  "label_spec_version": "fixture-0",
+  "dataset_sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+  "bench_record": "fixture, not a trained head"
+}
