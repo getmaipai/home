@@ -45,3 +45,13 @@ Nothing here weakens the self-harm path. `detectSelfHarm`, the crisis overlay an
 - A child's levels (`topics.*`, group `person.topics`) show on the child's `PersonProfilePage` in a Topics tab, drawn by `SettingsRenderer` with `only=["person.topics"]` (the same pattern as the Limits tab; the spec lists the group under `not_placed` for this reason). The tab shows for an owner or admin viewing a child, never on the child's own page. Select options use the key's `copy.option_labels` (plain words) instead of title-cased option ids.
 - The two teen rows (`topics.teen.bodies`, `topics.teen.risk`) are the `household.topics` card the spec already places under Settings, Privacy.
 - `assertCanSetChildTopic` in `backend/src/lib/settings.ts` guards `setValue` and `resetValue` for any person-scope `topics.*` key: the target must be a child and the actor an owner or admin. A child cannot change their own keys; no admin path writes a teen's own keys (condition 5); the fixed families have no key, so a write is an unknown-key 400. `backend/tests/topicSettingsAccess.test.ts` covers each.
+
+## Bench dataset (MINOR-TOPICS-01f)
+
+`backend/scripts/bench/minor-topics-01/` holds the rows the 01g bench replays (design section 6.1).
+
+- Hand-written seeds live in `seedsChild.ts` and `seedsTeen.ts`; `build.ts` expands each seed into its plain form plus one framed variant (friend, homework, no punctuation, typo, spoken, pretend) and writes `child.jsonl` and `teen.jsonl`. Run `bun backend/scripts/bench/minor-topics-01/build.ts` after editing a seed; `tests/minorTopicsDataset.test.ts` fails when the committed files drift from the seeds.
+- Row fields: `id`, `band`, `kind` (topic, near_miss, hard_line, family_story, safety_emergency), `family`, `subtopic`, `text`, `framing`, `group`, `split` (dev or held_out), `implicit` (a phrasing a keyword detector is expected to miss), `hard_line`, `human_review`, `default_stance`.
+- Counts: 33 subtopics at 12 rows per band (self-harm 30, of which 18 implicit), 200 benign near-miss rows per band (at least 5 per subtopic), 7 hard lines at 15 rows per band, 16 safety-emergency rows per band, 40 family-story rows for a child. Child 775 rows, teen 735.
+- The split is by seed: a seed and its variants always share a split, so a wording tuned on dev cannot leak into held-out. About a fifth of the seeds carry `human_review`, the sample a person labels to measure the author's disagreement rate.
+- The seeds are written by the model, over persona-roster names only, with no household text. They are requests only; nothing in the set is a reply.
