@@ -240,3 +240,31 @@ No engine run, no enabling of rescue, no change to defaults, `answerImages`, or 
 outbound connection. Minors stay capped at shadow whatever the result. The next steps after approval: author and double-label
 the rows, ask Jesse for the 100-row spot check, build the NEW scripts, run the offline stage, commit `PREREG.json`'s hash, then
 take the engine lock.
+
+## 10. Pre-registration (ROUTER-BUILD-04, 2026-10-12)
+
+The dev stage ran before any lock-box number exists. This section is the freeze: the lock box may now run, once per arm.
+
+- `data-scratch/chat-ab/router-build-02/PREREG.json` sha256: `83b3c218ec88beb06c6ec7d800ea7f0283e16830380131c57c16eae20f251e78`
+- Lock box (`data-scratch/chat-ab/router-build-03/lockbox.json`, sealed, not opened by this item) sha256: `21430c8ca0ce7d6259c4b0cc481b62934ffd6fd3be96bb9fb1ce6d7e5a425d9d`
+- A: shipped head, weights sha256 `0f592c19a0e1d1921e30a4ee5a59a6a0c7e5c19acffc28e5ae85198a161b0ede`, threshold 0.674744.
+- C: logistic regression (C=10) on the nomic vectors, weights sha256 `e97cb1e97d2f9b200ad033749fdcf2d47d148b0408d4ab5f1a4d89854b213468`, threshold 0.604421.
+- B: prompt variant 2, prompt sha256 `1ecc27ff1ff5a195034ad5f8ba5fd93a0be03b4d545427050856e55860e41a0d`.
+- D: C scores, SEARCH at or above 0.9035, NO_SEARCH below 0.0247, B between (band 25.0% of dev rows).
+
+Label provenance: Jesse's 100-row spot check found 2 disagreements (`rb3-dev-recency-0438`, `-0439`, world-record questions). Both are
+dev rows, relabelled `stable` in `dev.json` before any scoring; they stay contested (author tagged boundary), so they sit outside the marks.
+
+Dev results (1,033 adult non-contested rows, 383 families; family bootstrap 95% intervals, 2,000 resamples; A and B have no
+held-out fold, C and D use out-of-fold scores; B is one repeat; A's weights saw some older dev rows, so its dev number is optimistic):
+
+| Arm | Recall | Follow-up recall | False stable | False no_tool |
+|---|---|---|---|---|
+| A | 89.3% [85.2, 93.3] | 92.3% | 1.1% [0.0, 3.2] | 1.0% [0.0, 2.9] |
+| C | 95.1% [91.6, 98.1] | 97.6% | 1.2% [0.0, 3.3] | 1.2% [0.3, 2.8] |
+| B (v2) | 98.2% [96.5, 99.5] | 96.0% | 2.3% [0.7, 4.8] | 0.8% [0.1, 1.9] |
+| D | 99.7% [99.2, 100] | 97.6% | 1.2% [0.1, 3.6] | 0.5% [0.0, 1.2] |
+
+Nested family-grouped CV, recall at the 2% ceiling: LR 94.6%, MLP 93.5%, SVM 93.0%. B answered something other than SEARCH or
+NO_SEARCH (counted as NO_SEARCH, fail open) on about 10% of rows, almost all stable and no_tool; B's latency on the bench was a
+median 173 ms, p95 233 ms. B and D contain the 9B decision pass and need an architect ruling (rule 1) if they are the only arms that clear the marks.
