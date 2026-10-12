@@ -46,7 +46,30 @@ export type AnswerImageTurnState = {
   done: Promise<void>;
   /** The accepted `image_gallery` block event, once built; it is also in the turn's tool events. */
   block?: Extract<ToolStreamEvent, { t: "block" }>;
+  /** SEARCH-IMAGES-01: the other names of a `subjects` call, each its own one-picture pipeline. */
+  extras?: AnswerImageTurnState[];
 };
+
+/** SEARCH-IMAGES-01: the most names one `show_images` call may ask for, and how many run at once. */
+export const SHOW_IMAGES_MAX_SUBJECTS = 5;
+const SUBJECTS_CONCURRENCY = 3;
+
+/** The call's names: `subject` first, then `subjects`, trimmed, case-insensitively deduped, capped. */
+export function showImagesNames(subject: string, subjects?: unknown): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const raw = [subject, ...(Array.isArray(subjects) ? subjects : [])];
+  for (const item of raw) {
+    if (typeof item !== "string") continue;
+    const name = item.replace(/\s+/g, " ").trim().slice(0, 120);
+    const key = name.toLowerCase();
+    if (!name || seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+    if (out.length >= SHOW_IMAGES_MAX_SUBJECTS) break;
+  }
+  return out;
+}
 
 /** Section 4.3's one line, the same whatever the pipeline later finds: no
  * count, no bytes. ANSWER-IMG-05b kept it short (it is new prompt the
@@ -79,31 +102,47 @@ export function answerImagesAllowed(input: { actor: PersonRow; band: AgeBand; su
   return value !== false;
 }
 
-/** Starts the pipeline for this turn's first `show_images` call; a second
- * call in the same turn reuses the first. */
-export function startAnswerImages(state: TurnState, subject: string, kind = "", callId = ""): AnswerImageTurnState {
+/** Starts the pipeline for this turn's first `show_images` call; a second call in the same turn reuses the first.
+ * SEARCH-IMAGES-01: with more than one distinct name each name gets one picture (its own small gallery block, under
+ * the answer like any other), run at most three at a time; no model call, and the per-host pace is the fetch
+ * module's own shared state, so parallel names are paced together. */
+export function startAnswerImages(state: TurnState, subject: string, kind = "", callId = "", subjects?: unknown): AnswerImageTurnState {
   if (state.answerImages) return state.answerImages;
+  const names = showImagesNames(subject, subjects);
+  if (names.length === 0) names.push(subject);
+  const many = names.length > 1;
   const roster = state.context.filter((c) => c.source === "roster").map((c) => c.text);
   const band = state.planBasis?.band ?? state.plan.age_band;
-  const entry: AnswerImageTurnState = { subject, callId, done: Promise.resolve() };
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const budget = new Promise<AnswerImageSelection>((resolve) => {
-    timer = setTimeout(() => resolve({ set: null, trace: { subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
-  });
-  const deadlineAt = Date.now() + ANSWER_IMAGES_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
   // IMG-QUALITY-01b: a failed read of the shown set is an empty set, never a failed turn (rule 6).
   let shown: ReturnType<typeof shownPicturesIn> | undefined;
   try { shown = shownPicturesIn(state.conversationId); } catch { shown = undefined; }
-  entry.done = Promise.race([selectAnswerImages({ subject, kind, actor: state.actor, band, roster, deadlineAt, ...(shown ? { shown } : {}) }), budget])
-    .catch((): AnswerImageSelection => ({ set: null, trace: { subject, skipped: "error" } }))
-    .then((selection) => {
-      clearTimeout(timer);
-      entry.result = selection.set;
-      entry.trace = selection.trace;
-      addGalleryBlock(state, entry);
+  const entries = names.map((name): AnswerImageTurnState => ({ subject: name, callId, done: Promise.resolve() }));
+  const run = (entry: AnswerImageTurnState): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const budget = new Promise<AnswerImageSelection>((resolve) => {
+      timer = setTimeout(() => resolve({ set: null, trace: { subject: entry.subject, skipped: "error" } }), ANSWER_IMAGES_BUDGET_MS);
     });
-  state.answerImages = entry;
-  return entry;
+    const deadlineAt = Date.now() + ANSWER_IMAGES_BUDGET_MS - ANSWER_IMAGES_FINISH_MS;
+    return Promise.race([selectAnswerImages({ subject: entry.subject, kind: many ? "" : kind, actor: state.actor, band, roster, deadlineAt, ...(shown ? { shown } : {}) }), budget])
+      .catch((): AnswerImageSelection => ({ set: null, trace: { subject: entry.subject, skipped: "error" } }))
+      .then((selection) => {
+        clearTimeout(timer);
+        entry.result = selection.set && many ? { ...selection.set, visible: 1, items: selection.set.items.slice(0, 1) } : selection.set;
+        entry.trace = selection.trace;
+        addGalleryBlock(state, entry);
+      });
+  };
+  if (!many) {
+    entries[0]!.done = run(entries[0]!);
+  } else {
+    const queue = [...entries];
+    const worker = async (): Promise<void> => { for (let e = queue.shift(); e; e = queue.shift()) await run(e); };
+    const all = Promise.all(Array.from({ length: Math.min(SUBJECTS_CONCURRENCY, queue.length) }, worker)).then(() => undefined);
+    for (const e of entries) e.done = all;
+    entries[0]!.extras = entries.slice(1);
+  }
+  state.answerImages = entries[0]!;
+  return entries[0]!;
 }
 
 /** The settled set as an `image_gallery` block event on the turn, through the one block filter. A set the filter
@@ -201,11 +240,15 @@ export async function settleAnswerImages(state: TurnState, input: { keep: boolea
   const entry = state.answerImages;
   if (!entry) return;
   await entry.done;
+  const all = [entry, ...(entry.extras ?? [])];
   const call = state.outcomes.find((o) => o.packageId === SHOW_IMAGES_TOOL_ID && o.status === "succeeded");
-  if (call && entry.trace) call.detail = JSON.stringify(entry.trace);
-  const block = entry.block;
-  if (input.keep || !block) return;
-  // A gallery already placed (streamed with a paragraph) holds a stamped copy in the event list, so match by id.
-  state.toolEvents = state.toolEvents.filter((e) => !(e.t === "block" && e.block.id === block.block.id));
-  if (state.placedBlocks) state.placedBlocks = state.placedBlocks.filter((p) => p.event.block.id !== block.block.id);
+  if (call && entry.trace) call.detail = JSON.stringify(all.length > 1 ? all.map((e) => e.trace) : entry.trace);
+  if (input.keep) return;
+  for (const one of all) {
+    const block = one.block;
+    if (!block) continue;
+    // A gallery already placed (streamed with a paragraph) holds a stamped copy in the event list, so match by id.
+    state.toolEvents = state.toolEvents.filter((e) => !(e.t === "block" && e.block.id === block.block.id));
+    if (state.placedBlocks) state.placedBlocks = state.placedBlocks.filter((p) => p.event.block.id !== block.block.id);
+  }
 }

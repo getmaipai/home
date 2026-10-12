@@ -30,6 +30,13 @@
         "minLength": 1,
         "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Use this when they ask what something looks like, ask who or what a well-known thing is, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them."
       },
+      "subjects": {
+        "type": "array",
+        "maxItems": 5,
+        "grounded": false,
+        "items": {"type": "string", "minLength": 1},
+        "description": "Optional. When the answer lists several different things (for example three cars or the films of a series), their exact full names, up to 5, including the first; the app shows one picture of each under the answer. Leave it out for a single thing."
+      },
       "kind": {
         "type": "string",
         "minLength": 1,

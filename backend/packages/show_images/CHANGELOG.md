@@ -4,6 +4,12 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ## [Unreleased]
 
+### Added
+
+- SEARCH-IMAGES-01: an optional `subjects` list (up to 5 exact names). Each
+  distinct name gets one picture under the answer; a name with no picture adds
+  nothing. No extra model call; the same sources, age rules and host pace.
+
 ### Fixed
 
 - IMG-QUALITY-01a: the result line no longer tells the model to describe the

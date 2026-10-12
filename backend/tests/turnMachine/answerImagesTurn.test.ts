@@ -21,7 +21,7 @@ import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { __setToolOfferOverridesForTests } from "@/lib/turnMachine/budget";
 import { streamTurnEvents } from "@/routes/turn";
 import { listConversationTurns } from "@/lib/conversationHistory";
-import { SHOW_IMAGES_UNAVAILABLE_LINE } from "@/lib/answerImages/turn";
+import { SHOW_IMAGES_UNAVAILABLE_LINE, showImagesNames } from "@/lib/answerImages/turn";
 import { __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
 import { __setAnswerImageDepsForTests } from "@/lib/answerImages/select";
 import { createAssistantStreamSink } from "@/lib/assistantStreamWire";
@@ -355,6 +355,33 @@ describe("GENUI-05: the gallery builder and the turns stored before it", () => {
       // A reload never changes it (no data debt: a stable id and the turn's own time).
       expect(read().blocks).toEqual(turn.blocks);
       expect(filterAnswerBlocks([gallery[0]], "show_images", ["image_gallery"], "adult", { displayName: "Sage" })).toHaveLength(1);
+    });
+  });
+});
+
+describe("SEARCH-IMAGES-01: show_images takes a subjects list", () => {
+  const STATUE: FixtureSubject = { id: "Q9202", label: "Statue of Liberty", category: "Statue of Liberty", image: "Statue lead.jpg", files: ["Statue lead.jpg", "Statue night.jpg", "Statue river.jpg"], description: "statue in New York" };
+
+  test("names are trimmed, deduped without case, capped at five, and the first is kept", () => {
+    expect(showImagesNames(" Eiffel  Tower ", ["eiffel tower", "A", "", 7, "B", "C", "D", "E"])).toEqual(["Eiffel Tower", "A", "B", "C", "D"]);
+    expect(showImagesNames("Solo", undefined)).toEqual(["Solo"]);
+    expect(showImagesNames("Solo", "not a list")).toEqual(["Solo"]);
+  });
+
+  test("two names give one picture each, as two galleries; a name with no picture adds nothing", async () => {
+    offerShowImages();
+    __setAnswerImageDepsForTests(fixtureWorld([TOWER, STATUE]).deps);
+    const call = { id: "call-img", name: "show_images", args: JSON.stringify({ subject: "Eiffel Tower", subjects: ["Eiffel Tower", "Statue of Liberty", "Nobody Atall"] }) };
+    await withStub({ calls: (r: ChatCompletionRequest) => (r.tool_choice === "none" || isPhrasing(r) ? undefined : [call]), reply: () => TWO_PARAGRAPHS }, async (seen) => {
+      const { events } = await streamEvents();
+      const imgs = imagesEvents(events).map(galleryOf);
+      expect(imgs).toHaveLength(2);
+      for (const g of imgs) expect(g.props.images).toHaveLength(1);
+      expect(new Set(imgs.map((g) => g.props.images[0]!.id)).size).toBe(2);
+      const value = doneValue(events);
+      expect((value.blocks ?? []).filter((b) => b.kind === "image_gallery")).toHaveLength(2);
+      const toolMessage = seen.find(isPhrasing)!.messages.find((m) => m.role === "tool")!.content!.toString();
+      expect(toolMessage).not.toMatch(/answer-image|ai_[a-f0-9]/);
     });
   });
 });

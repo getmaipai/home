@@ -9,7 +9,7 @@ import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
-import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
+import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesNames, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
@@ -78,7 +78,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
   // beside a search rather than after it (section 4.3).
   if (state.answerImagesAllowed) {
     const call = input.proposals.find((p) => p.request.tool === SHOW_IMAGES_TOOL_ID && typeof p.request.args.subject === "string" && p.request.args.subject.trim().length > 0);
-    if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "", call.request.callId);
+    if (call) startAnswerImages(state, (call.request.args.subject as string).trim(), typeof call.request.args.kind === "string" ? call.request.args.kind.trim() : "", call.request.callId, call.request.args.subjects);
   }
   for (const proposal of input.proposals) {
     const { tool, callId } = proposal.request;
@@ -125,9 +125,10 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // runs a package (the pipeline was started above, beside the answer).
     if (tool === SHOW_IMAGES_TOOL_ID) {
       const subject = typeof args.subject === "string" ? args.subject.trim() : "";
+      const names = showImagesNames(subject, args.subjects);
       const kind = typeof args.kind === "string" ? args.kind.trim().slice(0, 80) : "";
-      const line = state.answerImagesAllowed && state.answerImages ? showImagesResultLine(state.answerImages.subject) : SHOW_IMAGES_UNAVAILABLE_LINE;
-      const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject, ...(kind ? { kind } : {}) }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
+      const line = state.answerImagesAllowed && state.answerImages ? showImagesResultLine(names.length > 1 ? names.join(", ") : state.answerImages.subject) : SHOW_IMAGES_UNAVAILABLE_LINE;
+      const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject, ...(names.length > 1 ? { subjects: names } : {}), ...(kind ? { kind } : {}) }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line } });
       continue;
