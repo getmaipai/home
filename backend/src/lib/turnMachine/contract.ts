@@ -166,6 +166,8 @@ export interface TurnState {
   speakerEvidence?: SpeakerEvidence | null;
   present?: readonly PresentPerson[] | null;
   utterance: string;
+  /** ROUTER-BUILD-01d: the search assist's shadow record (set by applyContext). */
+  searchAssist?: import("@/wire").SearchAssistStats;
   images?: import("@/wire").ChatImagePart[];
   /** VISION-02c: the turn's pictures as picture parts for a chat model
    * that reads them (the context node decides, from the Stack's chat row

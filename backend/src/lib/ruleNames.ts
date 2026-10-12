@@ -137,6 +137,8 @@ export const RULES = {
   // the two closed-vocabulary regexes it uses (a pure-number shape, a
   // pronoun-word split) satisfy the rule-budget lint's own marker
   // requirement honestly, not as a live-fired counter yet.
+  // ROUTER-BUILD-01d: the search assist scored the turn in shadow (a number, never text).
+  "search_assist.scored": "the search assist scored an adult written turn in shadow and changed nothing",
   "grounding.pure_number": "an argument token was dropped as a bare number, year, or date before the overlap check",
   "grounding.bare_pronoun": "a tool argument was refused for being a bare pronoun with no other content",
 } as const;

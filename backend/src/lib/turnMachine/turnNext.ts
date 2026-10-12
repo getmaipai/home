@@ -173,7 +173,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // "One trace, not a second log" (section 11): every node this turn
     // ran or skipped, beside the generations buildTurnStats() already
     // projects above.
-    stats: { ...stats, nodes: state.nodes },
+    stats: { ...stats, nodes: state.nodes, ...(state.searchAssist ? { search_assist: state.searchAssist } : {}) },
     // REASONING-02's own field, populated only when `context` allowed
     // emitting this turn AND output_gate's own safety pass over the
     // span didn't refuse it - the gated span itself, never the raw one.
@@ -245,7 +245,7 @@ function logResult(state: TurnState, actor: PersonRow, surface: Surface, text: s
   // used because it also carries the earlier turns' state, which would
   // keep the window open forever.
   const crisisSignal = carriesCrisisSignal(state.safety) || carriesCrisisSignal(value.safety);
-  const opts = { signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
+  const opts = { ...(state.searchAssist?.eligible && state.searchAssist.p_rounded !== null ? { rules: ["search_assist.scored"] } : {}), signal: state.signal, plan: state.plan, outcomes: state.outcomes, temporary: state.temporary, crisisSignal, ...(state.images?.length ? { images: state.images } : {}), ...(state.subjects && state.subjects.length > 0 ? { subjects: state.subjects } : {}), ...(state.bare ? { bare: true } : {}), ...(state.supersedes ? { supersedes: state.supersedes } : {}), ...(state.continuation?.fromTurnId ? { branchFrom: state.continuation.fromTurnId } : {}) };
   if (state.temporary) {
     // THIN-0C: the old path's own status for a temporary turn (never a
     // judge candidate; the row is process memory only).

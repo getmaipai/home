@@ -17,6 +17,7 @@ import { chatFolders } from "@/db/schema";
 import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "../messages";
 import { toolSpecFor, replyMaxTokensFor } from "./model";
+import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
 import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
 import { subjectsForTurn } from "@/lib/askNames";
@@ -99,6 +100,8 @@ export interface ContextOutput {
   promptLimit?: TurnState["promptLimit"];
   /** VISION-02c: this turn's pictures as picture parts (TurnState.pictureParts). */
   pictureParts?: LlmImagePart[];
+  /** ROUTER-BUILD-01d: the search assist's shadow record (numbers and closed names only). */
+  searchAssist?: import("@/wire").SearchAssistStats;
 }
 
 /** KS-02E: the household's chat model's `model_cutoff` from its catalog
@@ -216,6 +219,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   // for a temporary chat (no memory:write either - the policy node's
   // own rule - and nothing here should ground a temporary answer in a
   // durable record that outlives it).
+  let recallVector: Awaited<ReturnType<typeof embedQueryForRecall>>;
   if (!temporary) {
     // CONTEXT-RECALL-01 (dev.md "The owner's three live turns", (2)):
     // carries the old path's own recall call whole (the old engine file
@@ -240,6 +244,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     const withholdSensitive = state.surface === "robot" || ageBand === "child" || ageBand === "teen";
     const anonymous = speakerIsAnonymous(state);
     const queryVector = await embedQueryForRecall(input.utterance);
+    recallVector = queryVector;
     const recalled = recall(state.actor, input.utterance, {
       selfOnly: true,
       asOf: now,
@@ -501,7 +506,15 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     }
   }
 
-  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
+  // ROUTER-BUILD-01d: the search assist's shadow score. Fails open inside; it
+  // never changes what the model is sent.
+  const searchAssist = await runSearchAssistShadow(
+    { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes },
+    input.utterance,
+    recallVector,
+  );
+
+  return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, searchAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };
 };
 
 /** Applies the node's output onto TurnState, the same small
@@ -517,6 +530,7 @@ export function applyContext(state: import("../contract").TurnState, output: Con
   state.unknownAsk = output.unknownAsk ?? null;
   if (output.promptLimit) state.promptLimit = output.promptLimit;
   state.pictureParts = output.pictureParts;
+  if (output.searchAssist) state.searchAssist = output.searchAssist;
   if (output.disclosureWithheld) {
     // THIN-0B: the plan's inputs, recomputed once with the withheld flag,
     // and the trusted-adult move when a child or teen asked a question

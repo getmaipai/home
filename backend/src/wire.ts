@@ -84,6 +84,17 @@ export interface AnswerImageItem {
  * and the badge is `items.length - visible` (never 1: a lone extra is dropped). */
 export interface AnswerImageSet { layout: "row"; after_paragraph: number; visible: number; items: AnswerImageItem[] }
 
+/** ROUTER-BUILD-01d: the search assist's shadow record on a turn. Numbers and
+ * closed names only, never the utterance, a query or model text. */
+export interface SearchAssistStats {
+  mode: "off" | "shadow" | "rescue";
+  eligible: boolean;
+  bucket: "over" | "mid" | "low" | "none";
+  p_rounded: number | null;
+  action: "none";
+  off_reason?: string;
+}
+
 export interface TurnStats {
   prompt_tokens: number | null;
   predicted_tokens: number | null;
@@ -129,6 +140,8 @@ export interface TurnStats {
    * turnMachine/trace.ts's own NodeExecution shape and this one are
    * kept in step by hand, not by a shared import. */
   nodes?: TurnNodeExecution[];
+  /** ROUTER-BUILD-01d: present on a turn the new path ran with the search assist known. */
+  search_assist?: SearchAssistStats;
 }
 
 /** Shared vocabulary for measured turn context segments. */
