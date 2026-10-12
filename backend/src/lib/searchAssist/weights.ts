@@ -56,9 +56,13 @@ export interface WeightsPin {
   sha256: string;
 }
 
-/** The production pin stays absent until Jesse releases the signed asset; the
- * loader then reports weights_missing and the shadow log carries off_reason. */
-export const SEARCH_ASSIST_PIN: WeightsPin | null = null;
+/** The released asset (search-assist-weights-v1, published by Jesse). Without a
+ * pin the loader reports weights_missing and the shadow log carries off_reason. */
+export const SEARCH_ASSIST_PIN: WeightsPin | null = {
+  file: "search-assist-weights.json",
+  url: "https://github.com/getmaipai/home/releases/download/search-assist-weights-v1/search-assist-weights.json",
+  sha256: "0f592c19a0e1d1921e30a4ee5a59a6a0c7e5c19acffc28e5ae85198a161b0ede",
+};
 
 export interface ExpectedEmbed {
   model?: string;

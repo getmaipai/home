@@ -86,6 +86,9 @@ beforeEach(async () => {
   // Imported here, not at the top, so paths.ts reads MAIPAI_DATA_DIR after this file has set it.
   (await import("@/lib/blocklists/listStore")).__setListsReadyForTests(true);
   __setDefaultStackClientForTests(defaultScriptedStack.client);
+  // ROUTER-BUILD-01g: the production weights are now pinned, so an unstubbed turn would download them from GitHub.
+  // Tests that are not about the search assist see "no weights"; the assist's own tests install their manifest after this runs.
+  (await import("@/lib/searchAssist/shadow")).__setSearchAssistLoaderForTests(async () => ({ missing: "weights_missing" }));
 });
 
 // getmaipai/home#123: a fire-and-forget background job (a crisis
