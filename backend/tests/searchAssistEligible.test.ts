@@ -1,7 +1,7 @@
-// ROUTER-BUILD-01c: who is scored and who may be rescued. Children and teens
-// are never scored; spoken turns are scored but never rescued.
+// ROUTER-BUILD-01c: who is scored and who may be rescued. A child or teen is scored only with a minor context (01i);
+// spoken turns are scored but never rescued.
 import { describe, expect, test } from "bun:test";
-import { searchAssistEligibility, type EligibilityState } from "@/lib/searchAssist/eligible";
+import { searchAssistEligibility, cappedSearchAssistMode, MINOR_RESCUE_ENABLED, type EligibilityState } from "@/lib/searchAssist/eligible";
 
 const NOW = new Date("2026-10-11T12:00:00Z");
 
@@ -33,24 +33,55 @@ describe("search assist eligibility", () => {
     expect(searchAssistEligibility(state(), "off", { now: NOW })).toEqual({ scored: false, rescuable: false, off_reason: "mode_off" });
   });
 
-  test("a child or teen is never scored, whatever the mode", () => {
+  test("a child or teen with no minor context fails closed and is not scored", () => {
     for (const mode of ["shadow", "rescue"] as const) {
-      expect(searchAssistEligibility(state({ actor: { id: "c", role: "child", birthdate: null } }), mode, { now: NOW, modelToolCalls: 0 })).toEqual({
-        scored: false,
-        rescuable: false,
-        off_reason: "band_child",
-      });
-      expect(searchAssistEligibility(state({ actor: { id: "t", role: "teen", birthdate: null } }), mode, { now: NOW, modelToolCalls: 0 })).toEqual({
-        scored: false,
-        rescuable: false,
-        off_reason: "band_teen",
-      });
+      for (const role of ["child", "teen"]) {
+        expect(searchAssistEligibility(state({ actor: { id: "c", role, birthdate: null } }), mode, { now: NOW, modelToolCalls: 0 })).toEqual({
+          scored: false,
+          rescuable: false,
+          off_reason: "gate_not_allow",
+        });
+      }
     }
+  });
+
+  test("a minor is scored only with the gate allowing, the web on and a recall vector, and named when one is missing", () => {
+    const child = state({ actor: { id: "c", role: "child", birthdate: null } });
+    const ok = { gateAllows: true, webOn: true, recallVector: true };
+    expect(searchAssistEligibility(child, "shadow", { now: NOW, minor: ok })).toEqual({ scored: true, rescuable: false });
+    expect(searchAssistEligibility(child, "shadow", { now: NOW, minor: { ...ok, gateAllows: false } }).off_reason).toBe("gate_not_allow");
+    expect(searchAssistEligibility(child, "shadow", { now: NOW, minor: { ...ok, webOn: false } }).off_reason).toBe("web_off_for_mode");
+    expect(searchAssistEligibility(child, "shadow", { now: NOW, minor: { ...ok, recallVector: false } }).off_reason).toBe("no_recall_vector");
+  });
+
+  test("no minor turn is rescuable in any mode, surface, round or context while the constant is false", () => {
+    expect(MINOR_RESCUE_ENABLED).toBe(false);
+    for (const role of ["child", "teen"]) {
+      for (const mode of ["off", "shadow", "rescue"] as const) {
+        for (const spoken of [false, true]) {
+          for (const surfaceClass of ["written", "spoken"]) {
+            for (const modelToolCalls of [undefined, 0, 1]) {
+              for (const gateAllows of [false, true]) {
+                for (const webOn of [false, true]) {
+                  for (const recallVector of [false, true]) {
+                    const r = searchAssistEligibility(state({ actor: { id: "m", role, birthdate: null }, spoken, planBasis: { surfaceClass } }), mode, { now: NOW, modelToolCalls, minor: { gateAllows, webOn, recallVector } });
+                    expect(r.rescuable).toBe(false);
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(cappedSearchAssistMode("child", "rescue")).toBe("shadow");
+    expect(cappedSearchAssistMode("teen", "rescue")).toBe("shadow");
+    expect(cappedSearchAssistMode("adult", "rescue")).toBe("rescue");
   });
 
   test("a birthdate under 18 outranks an adult role", () => {
     const young = state({ actor: { id: "t", role: "adult", birthdate: "2012-01-01" } });
-    expect(searchAssistEligibility(young, "rescue", { now: NOW, modelToolCalls: 0 }).off_reason).toBe("band_teen");
+    expect(searchAssistEligibility(young, "rescue", { now: NOW, modelToolCalls: 0 }).off_reason).toBe("gate_not_allow");
   });
 
   test("an unidentified robot speaker is anonymous and not scored", () => {

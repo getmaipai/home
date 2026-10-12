@@ -10,6 +10,7 @@
 // stay in memory.ts's own canRead() (RULES-AND-LEARNED-COMPONENTS.md,
 // "household privacy and disclosure ... filtered before the prompt,
 // never left to the model").
+import { minorSearchGate } from "@/lib/searchAssist/minorGate";
 import { resolveOrCreateConversation, buildConversationWindow, isTemporaryConversation, windowPreview, type ConversationWindow } from "@/lib/conversationHistory";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -512,6 +513,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
     { surface: state.surface, actor: state.actor, speakerEvidence: state.speakerEvidence, spoken: state.spoken, bare: state.bare, crisis: state.crisis, continuation: state.continuation, promptLimit: promptLimit ?? state.promptLimit, budget: state.budget, planBasis: state.planBasis, outcomes: state.outcomes },
     input.utterance,
     recallVector,
+    minorSearchGate(state, temporary),
   );
 
   return { outcome: { ok: true }, output: { conversationId: conversation.id, temporary, items, reasoning, disclosureWithheld, searchAssist, subjects: resolvedSubjects.subjects, unknownAsk: resolvedSubjects.unknownAsk, ...(promptLimit ? { promptLimit } : {}), ...(pictureParts.length > 0 ? { pictureParts } : {}) } };

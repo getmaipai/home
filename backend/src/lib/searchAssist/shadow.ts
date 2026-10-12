@@ -9,7 +9,8 @@ import type { SearchAssistStats } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { embed } from "@/lib/llm";
 import type { QueryVector } from "@/lib/memory";
-import { searchAssistEligibility, type EligibilityState, type SearchAssistMode } from "./eligible";
+import { turnAgeBand } from "@/lib/turnMachine/speaker";
+import { searchAssistEligibility, cappedSearchAssistMode, type MinorEligibility, type EligibilityState, type SearchAssistMode } from "./eligible";
 import { loadSearchAssistWeights, type LoadedWeights, type WeightsResult } from "./weights";
 import { buildFeatures, scoreHead } from "./score";
 import { bumpSearchAssistCounter } from "./counters";
@@ -46,16 +47,19 @@ function sameSpace(manifest: LoadedWeights, v: { space: string; dims: number; pr
 }
 
 /** `recallVector` is the raw recall embedding when the turn made one. */
-export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnState, "surface" | "actor" | "speakerEvidence">, utterance: string, recallVector: QueryVector | undefined): Promise<SearchAssistStats> {
+export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnState, "surface" | "actor" | "speakerEvidence">, utterance: string, recallVector: QueryVector | undefined, minorGate?: Omit<MinorEligibility, "recallVector">): Promise<SearchAssistStats> {
   let mode: SearchAssistMode = "shadow";
   let eligible = false;
   try {
-    mode = readMode();
-    const eligibility = searchAssistEligibility(state, mode);
+    const band = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
+    const minor = band !== "adult";
+    const bandKey = minor ? band : undefined;
+    mode = cappedSearchAssistMode(band, readMode());
+    const eligibility = searchAssistEligibility(state, mode, minor ? { minor: { gateAllows: minorGate?.gateAllows === true, webOn: minorGate?.webOn === true, recallVector: recallVector !== undefined } } : {});
     if (!eligibility.scored) {
       const reason = eligibility.off_reason;
       if (reason === "mode_off") bumpSearchAssistCounter("off");
-      else if (reason === "band_child" || reason === "band_teen") bumpSearchAssistCounter("skipped_band", reason === "band_child" ? "child" : "teen");
+      else if (bandKey && (reason === "gate_not_allow" || reason === "web_off_for_mode" || reason === "no_recall_vector")) bumpSearchAssistCounter("skipped_band", bandKey);
       // anonymous, no websearch offered, or a turn shape that offers no tool.
       else bumpSearchAssistCounter("skipped_surface");
       return record(mode, { off_reason: reason });
@@ -68,6 +72,11 @@ export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnS
       return record(mode, { eligible: true, off_reason: reason });
     }
     let vector: QueryVector | undefined = recallVector && weights.embed.prefix === "" && sameSpace(weights, recallVector) ? recallVector : undefined;
+    if (!vector && minor) {
+      // A minor's turn never pays for a fallback embed: no usable recall vector is not scored.
+      bumpSearchAssistCounter("skipped_band", bandKey);
+      return record(mode, { eligible: false, off_reason: "no_recall_vector" });
+    }
     if (!vector) {
       // Temporary chats, a failed recall embed, or a prefixed head: one extra
       // embed through the Stack's embed role.
@@ -95,8 +104,8 @@ export async function runSearchAssistShadow(state: EligibilityState & Pick<TurnS
       return record(mode, { eligible: true, off_reason: "embed_mismatch" });
     }
     const head = scoreHead(features, weights, TOOL);
-    bumpSearchAssistCounter("scored");
-    if (head.over) bumpSearchAssistCounter("over_threshold");
+    bumpSearchAssistCounter("scored", bandKey);
+    if (head.over) bumpSearchAssistCounter("over_threshold", bandKey);
     return record(mode, { eligible: true, bucket: head.bucket, p_rounded: Math.round(head.p * 100) / 100 });
   } catch {
     try {

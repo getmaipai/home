@@ -28,7 +28,8 @@ import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
 import { pictureFailureWords, picturesNotReadNote } from "@/lib/chatImageNote";
 import type { ChatImagePart } from "@/wire";
-import { searchAssistEligibility } from "@/lib/searchAssist/eligible";
+import { turnAgeBand } from "../speaker";
+import { searchAssistEligibility, MINOR_RESCUE_ENABLED } from "@/lib/searchAssist/eligible";
 import { bumpSearchAssistCounter } from "@/lib/searchAssist/counters";
 
 /** STREAM-PARTIAL-01: `!attempt.ok` covers two different failures this
@@ -1076,8 +1077,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
  * 01c eligibility decides (adult band, written, not spoken, not anonymous,
  * websearch offered, round 1), plus the shadow step's own over-threshold
  * result in rescue mode. Fails closed: any throw means no hold. */
-function searchAssistMayHold(state: TurnState, tools: readonly ToolSpec[]): boolean {
+export function searchAssistMayHold(state: TurnState, tools: readonly ToolSpec[]): boolean {
   try {
+    // MINOR-SEARCH-01i: a child or teen never reaches the rescue branch (checked here, before the shadow record is read).
+    if (turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()) !== "adult" && !MINOR_RESCUE_ENABLED) return false;
     const sa = state.searchAssist;
     if (!sa || sa.mode !== "rescue" || sa.bucket !== "over" || !sa.eligible) return false;
     if (!tools.some((t) => t.id === "websearch")) return false;

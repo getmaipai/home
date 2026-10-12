@@ -82,11 +82,33 @@ describe("runSearchAssistShadow", () => {
       expect(out.eligible).toBe(false);
       expect(out.p_rounded).toBeNull();
       expect(out.action).toBe("none");
-      expect(out.off_reason === "band_child" || out.off_reason === "band_teen").toBe(true);
+      expect(out.off_reason).toBe("gate_not_allow");
       expect(embedSpy).not.toHaveBeenCalled();
     }
     expect(searchAssistCounters()["search_assist.skipped_band.child"]).toBe(1);
     expect(searchAssistCounters()["search_assist.skipped_band.teen"]).toBe(1);
+  });
+
+  test("a minor with a recall vector is scored with band-keyed counters; without one it is not scored and makes no embed", async () => {
+    const ok = { gateAllows: true, webOn: true };
+    const vec = await embedQueryForRecall(UTTERANCE);
+    embedSpy.mockClear();
+    __resetSearchAssistCountersForTests();
+    setHouseholdSettingValue("chat.search_assist", "rescue");
+    const missing = await runSearchAssistShadow(eligibilityState(people.child), UTTERANCE, undefined, ok);
+    expect(missing).toEqual({ mode: "shadow", eligible: false, bucket: "none", p_rounded: null, action: "none", off_reason: "no_recall_vector" });
+    expect(embedSpy).not.toHaveBeenCalled();
+    expect(searchAssistCounters()["search_assist.skipped_band.child"]).toBe(1);
+    const blocked = await runSearchAssistShadow(eligibilityState(people.child), UTTERANCE, vec, { gateAllows: true, webOn: false });
+    expect(blocked.off_reason).toBe("web_off_for_mode");
+    if (vec) {
+      const scored = await runSearchAssistShadow(eligibilityState(teen), UTTERANCE, vec, ok);
+      expect(scored.mode).toBe("shadow");
+      expect(scored.action).toBe("none");
+      expect(embedSpy).not.toHaveBeenCalled();
+    }
+    // Numbers and closed names only: no key carries text, an id or a hash.
+    for (const key of Object.keys(searchAssistCounters())) expect(key).toMatch(/^search_assist\.[a-z_]+(\.(child|teen|adult))?$/);
   });
 
   test("mode off embeds nothing and records only off", async () => {
@@ -180,7 +202,7 @@ describe("search assist in the turn path", () => {
     const stats = storedStats(value.turn_id) as { search_assist?: { eligible: boolean; p_rounded: number | null; off_reason?: string } };
     expect(stats.search_assist?.eligible).toBe(false);
     expect(stats.search_assist?.p_rounded).toBeNull();
-    expect(stats.search_assist?.off_reason).toBe("band_child");
+    expect(stats.search_assist?.off_reason).toBe("no_websearch");
     // Every embed the child's turn made was the memory recall's own, never a second one.
     const childEmbeds = embedSpy.mock.calls.length;
     embedSpy.mockClear();
