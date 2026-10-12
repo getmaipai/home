@@ -1094,7 +1094,7 @@ export function compositionInstruction(input: Pick<ComposerInput, "constraints" 
   ];
   if (hints.length > 0) lines.push(`Hint: ${hints.join("; ")}.`);
   if ((input.moves ?? DEFAULT_MOVES).repeat === "forbidden") lines.push("Say something new; never repeat what you said before.");
-  if (input.ageBand === "child") lines.push("Keep it simple and kind, for a child.");
+  // MINOR-TOPICS-01c: the child line is gone; the topic block in the stable prefix (topicPrompt.ts) carries it.
   const constraints = constraintsLine(input.constraints);
   if (constraints) lines.push(constraints);
   return lines.join(" ");

@@ -79,6 +79,7 @@ import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import type { BlockCapture } from "@/lib/packageBlocks";
 import { cachedFetch } from "@/lib/packageCache";
+import { topicMessages } from "@/lib/topicPrompt";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
 import type { PersonRow } from "@/types";
@@ -2273,7 +2274,8 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // found an earlier version doing exactly that) only had to drift
         // out of sync with it, since it checked array-non-emptiness but
         // not per-message shape the way validate() does.
-        const result = await llmComplete("chat", (messages ?? []) as LlmMessage[]);
+        // MINOR-TOPICS-01c: a child or teen's package call carries the topic block first.
+        const result = await llmComplete("chat", topicMessages(actor, (messages ?? []) as LlmMessage[]));
         if (!result.ok) {
           // lib/llm.ts's own error codes aren't errors.json's own
           // vocabulary - remapped to the closest real HostError code

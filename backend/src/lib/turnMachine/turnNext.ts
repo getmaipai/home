@@ -37,6 +37,7 @@ import { newConversationTurnId } from "@/lib/id";
 import { buildTurnStats } from "@/lib/turnStats";
 import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "./messages";
+import { topicBlockForTurn } from "@/lib/topicPrompt";
 import type { ContextSegmentKey } from "@/wire";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf } from "@/lib/turnContext";
@@ -206,8 +207,8 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
 async function measuredContextSegments(state: TurnState): Promise<Partial<Record<ContextSegmentKey, number>> | undefined> {
   if (state.bare || state.generations.length === 0) return undefined;
   try {
-  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? []);
-  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true);
+  const base = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], false, state.topicBlock);
+  const memoryCut = contextToMessages(state.context, state.utterance, state.persona, state.plan, state.signal, state.planBasis.surfaceClass ?? "spoken", state.pictureParts ?? [], true, state.topicBlock);
   const windowEnd = 1 + state.context.filter((item) => item.source === "window").length;
   const [prefix, withTools, withHistory, withMemory] = await Promise.all([
     countTokens(base.slice(0, 1)),
@@ -538,6 +539,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     signal,
     budget,
     persona,
+    topicBlock: topicBlockForTurn(actor, band),
     plan,
     planBasis,
     safety: { flagged: false, categories: [], action: "allow", notify_parent: false, matched_signals: [], checked_at: new Date().toISOString() },

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
 import { requireRole } from "@/middleware/auth";
+import { topicMessages } from "@/lib/topicPrompt";
 import { complete, embed, personWithinTurnBudget, type LlmMessage, type LlmRole } from "@/lib/llm";
 import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -107,7 +108,8 @@ llmRoutes.post("/chat", requireRole("owner", "admin"), bodyLimit({ maxSize: 256 
     return c.json({ text: REFUSAL_TEXT, model: "safety_refuse" });
   }
 
-  const result = await complete(role, messages, {
+  // MINOR-TOPICS-01c: a child or teen's call carries the topic block first.
+  const result = await complete(role, topicMessages(actor, messages), {
     temperature: body.temperature,
     max_tokens: clampMaxTokens(body.max_tokens),
   });

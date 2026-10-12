@@ -236,9 +236,9 @@ describe("the constraints and the shape", () => {
     expect(plan.messages[plan.messages.length - 1]!.content).toContain('Answer this question of mine from the tool results above, in one to three sentences, in your own voice: "rivet 3 used price".');
   });
 
-  test("the instruction: the child band's line, ACT-03's forbidden repeat, the hints", () => {
+  test("the instruction: no lone child line (the topic block carries it), ACT-03's forbidden repeat, the hints", () => {
     const line = compositionInstruction({ ageBand: "child", moves: { repeat: "forbidden" } }, ["answer from these results"]);
-    expect(line).toContain("for a child");
+    expect(line).not.toContain("for a child"); // MINOR-TOPICS-01c: the topic block in the stable prefix replaces it
     expect(line).toContain("never repeat what you said before");
     expect(line).toContain("Hint: answer from these results.");
     expect(compositionInstruction({ ageBand: "adult" }, [])).not.toContain("Hint:");

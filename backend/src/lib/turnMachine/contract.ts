@@ -191,6 +191,8 @@ export interface TurnState {
    * of a second `resolvePersona()` lookup, the same "decided once"
    * shape `plan`/`planBasis` already follow. */
   persona: Persona;
+  /** MINOR-TOPICS-01c: the sensitive-subject prompt block, decided once per turn; "" for an adult. */
+  topicBlock: string;
   plan: ReplyPlan;
   /** U4c: the exact non-evidence `planFor()` inputs `turnNext.ts`
    * resolved once, up front (signal, surface, surfaceClass, companion,

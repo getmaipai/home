@@ -361,7 +361,13 @@ export function capSection(text: string, maxChars: number): string {
  * companion/rules/naturalness sections it composes with are unchanged
  * (the spoken persona fragments stay, as the designed fallback until
  * EVAL-03). */
-export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken"): string {
+export function buildStablePrefix(persona: Persona = DEFAULT_PERSONA, surfaceClass: SurfaceClass = "spoken", topicBlock = ""): string {
+  const prefix = stablePrefixBody(persona, surfaceClass);
+  // MINOR-TOPICS-01c: the sensitive-subject block follows the persona sections; "" (an adult) adds nothing.
+  return topicBlock.length > 0 ? `${prefix}\n\n${topicBlock}` : prefix;
+}
+
+function stablePrefixBody(persona: Persona, surfaceClass: SurfaceClass): string {
   if (surfaceClass === "written") {
     const base = `${identityLine(persona)} ${stableSuffixFor("written")}`;
     const voiceSection = capSection(composePersonaPrompt(persona, "written"), MAX_WRITTEN_VOICE_SECTION_CHARS);

@@ -10,6 +10,7 @@
 import { mkdirSync, writeFileSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { complete } from "@/lib/llm";
+import { topicMessagesForId } from "@/lib/topicPrompt";
 import { newProjectArtifactId } from "@/lib/id";
 import { projectsDir } from "@/lib/paths";
 import { gateText } from "./gate";
@@ -81,7 +82,7 @@ function writeAndGateArtifact(project: Project, step: { id: string }, kind: Proj
 
 async function runTextStep(project: Project, step: PlanTextStep): Promise<void> {
   const prompt = renderTemplate(step.params.promptTemplate, project, step.params.inputs);
-  const result = await complete("chat", [{ role: "user", content: prompt }]);
+  const result = await complete("chat", topicMessagesForId(project.provenance.person, [{ role: "user", content: prompt }]));
   if (!result.ok) throw new Error(`the "${step.id}" step's model call failed: ${result.error}`);
   writeAndGateArtifact(project, step, "document", result.value.text);
 }
