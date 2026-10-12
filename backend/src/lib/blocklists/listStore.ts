@@ -72,12 +72,25 @@ export function readState(): ListSyncState {
   return emptyState();
 }
 
+let stateWrites = 0;
+/** A short text that changes whenever the state file does (a write by this process, or a new size or time on disk),
+ * for callers that keep something built from it. One stat call, no parsing. */
+export function stateStamp(): string {
+  try {
+    const st = statSync(statePath());
+    return `${stateWrites}:${st.size}:${st.mtimeMs}`;
+  } catch {
+    return `${stateWrites}:none`;
+  }
+}
+
 export function writeState(state: ListSyncState): void {
   mkdirSync(blockListsDir, { recursive: true });
   const tmp = `${statePath()}.tmp`;
   writeFileSync(tmp, JSON.stringify(state, null, 2));
   renameSync(tmp, statePath());
   stateCache = null;
+  stateWrites++;
 }
 
 /** Removes every file in a list's folder except those named in `keep` (checksums). */

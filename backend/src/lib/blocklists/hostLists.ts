@@ -14,21 +14,36 @@ import { getDomain } from "tldts";
 import type { AgeBand } from "@/lib/ageBand";
 import { blocklistIds, enabledListIds, lockedListIds } from "@/lib/blocklists/policy";
 import { customHostRules, hostInSet } from "@/lib/blocklists/customHosts";
-import { listsReadyForBand, listsReadyOverride, parseStoredFile, readState } from "@/lib/blocklists/listStore";
+import { listsReadyForBand, listsReadyOverride, parseStoredFile, readState, stateStamp } from "@/lib/blocklists/listStore";
 
 export const LISTS_NOT_READY = "lists-not-ready";
 
 interface HostIndex {
   signature: string;
-  hashes: BigUint64Array;
+  /** `stateStamp()` when the signature was last confirmed, so a lookup does not re-read the state file. */
+  stamp: string;
+  /** High and low 32 bits of each 64-bit host hash, sorted together by (hi, lo). Two Uint32Arrays rather than one
+   * BigUint64Array: a probe compares plain numbers and allocates no BigInt (about 3 times faster, same 12 bytes a host). */
+  hi: Uint32Array;
+  lo: Uint32Array;
+  /** Which lists name the entry: bit i is the list at index i of `blocklistIds()`. */
   bits: Uint32Array;
   bitOf: Map<string, number>;
 }
 
 let cached: HostIndex | null = null;
 
+// The 64-bit hash of a host. A collision of two different hosts is accepted by design (section 4 of the lists design,
+// about 1 in 10^13 per lookup at 4 million hosts: a table of n entries gives n/2^64 per probe). Its effect is fail
+// closed: the colliding host reads as listed and the entry's list bits are the OR of both. The seam below lets a test
+// force one.
+let hashImpl: (host: string) => bigint = (host) => BigInt(Bun.hash.wyhash(host));
 function hashHost(host: string): bigint {
-  return BigInt(Bun.hash.wyhash(host));
+  return BigInt.asUintN(64, hashImpl(host));
+}
+export function __setHostHashForTests(fn: ((host: string) => bigint) | null): void {
+  hashImpl = fn ?? ((host) => BigInt(Bun.hash.wyhash(host)));
+  cached = null;
 }
 
 /** Lowercase ASCII host from a URL or a bare host, or null when there is none to check. */
@@ -60,7 +75,7 @@ function signatureOf(): { signature: string; loaded: Array<[string, string, "hos
 
 /** Builds the merged table from the verified files. Synchronous; about a second for a 26 MB list, done once per
  * change of the loaded set (the sync job and boot call `prepareHostIndex` so a search does not pay for it). */
-function build(signature: string, loaded: Array<[string, string, "hosts" | "domains"]>): HostIndex {
+function build(signature: string, stamp: string, loaded: Array<[string, string, "hosts" | "domains"]>): HostIndex {
   const ids = blocklistIds();
   if (ids.length > 31) throw new Error("the blocked-site matcher holds at most 31 lists; widen the mask first");
   const bitOf = new Map<string, number>();
@@ -76,7 +91,8 @@ function build(signature: string, loaded: Array<[string, string, "hosts" | "doma
     perList.push({ bit, hashes });
   }
   const total = perList.reduce((n, l) => n + l.hashes.length, 0);
-  const outHashes = new BigUint64Array(total);
+  const outHi = new Uint32Array(total);
+  const outLo = new Uint32Array(total);
   const outBits = new Uint32Array(total);
   const at = new Array<number>(perList.length).fill(0);
   let n = 0;
@@ -96,17 +112,21 @@ function build(signature: string, loaded: Array<[string, string, "hosts" | "doma
         at[k]!++;
       }
     }
-    outHashes[n] = min;
+    outHi[n] = Number(min >> 32n);
+    outLo[n] = Number(min & 0xffffffffn);
     outBits[n] = bits;
     n++;
   }
-  return { signature, hashes: outHashes.slice(0, n), bits: outBits.slice(0, n), bitOf };
+  return { signature, stamp, hi: outHi.slice(0, n), lo: outLo.slice(0, n), bits: outBits.slice(0, n), bitOf };
 }
 
 /** Builds (or reuses) the table for what is loaded now. */
 export function prepareHostIndex(): HostIndex {
+  const stamp = stateStamp();
+  if (cached && cached.stamp === stamp) return cached;
   const { signature, loaded } = signatureOf();
-  if (!cached || cached.signature !== signature) cached = build(signature, loaded);
+  if (!cached || cached.signature !== signature) cached = build(signature, stamp, loaded);
+  else cached.stamp = stamp;
   return cached;
 }
 
@@ -124,17 +144,33 @@ export function __resetHostIndexForTests(): void {
   cached = null;
 }
 
+/** The list bits of the entry for one 64-bit hash (0 when none): a binary search of about 22 steps at 4 million hosts. */
 function bitsAt(index: HostIndex, hash: bigint): number {
-  let lo = 0;
-  let hi = index.hashes.length - 1;
-  while (lo <= hi) {
-    const mid = (lo + hi) >>> 1;
-    const v = index.hashes[mid]!;
-    if (v === hash) return index.bits[mid]!;
-    if (v < hash) lo = mid + 1;
-    else hi = mid - 1;
+  const qh = Number(hash >> 32n);
+  const ql = Number(hash & 0xffffffffn);
+  const { hi, lo } = index;
+  let a = 0;
+  let b = hi.length - 1;
+  while (a <= b) {
+    const mid = (a + b) >>> 1;
+    const vh = hi[mid]!;
+    if (vh === qh) {
+      const vl = lo[mid]!;
+      if (vl === ql) return index.bits[mid]!;
+      if (vl < ql) a = mid + 1;
+      else b = mid - 1;
+    } else if (vh < qh) a = mid + 1;
+    else b = mid - 1;
   }
   return 0;
+}
+
+/** What the table holds, for the memory test and the bench: entries and the bytes the arrays take. */
+export function hostIndexStats(): { hosts: number; bytes: number; bytesPerHost: number } {
+  const index = prepareHostIndex();
+  const hosts = index.hi.length;
+  const bytes = index.hi.byteLength + index.lo.byteLength + index.bits.byteLength;
+  return { hosts, bytes, bytesPerHost: hosts === 0 ? 0 : bytes / hosts };
 }
 
 /** The host and each parent down to (and including) its registrable domain. */
@@ -149,6 +185,18 @@ export function probeNames(host: string): string[] {
     if (name === domain) break;
   }
   return names;
+}
+
+/** The OR of the list bits for the host and each parent down to its registrable domain. */
+function hitMask(index: HostIndex, host: string): number {
+  let bits = 0;
+  for (const name of probeNames(host)) bits |= bitsAt(index, hashHost(name));
+  return bits;
+}
+
+/** Bench seam: one probe walk against the current table, no policy, no custom entries. */
+export function __hostMaskForBench(host: string): number {
+  return hitMask(prepareHostIndex(), host);
 }
 
 export const CUSTOM_DENY = "custom-deny";
@@ -193,8 +241,7 @@ export function checkHost(band: AgeBand, input: string | null | undefined): stri
     }
     mask |= 1 << bit;
   }
-  let hitBits = 0;
-  for (const name of probeNames(host)) hitBits |= bitsAt(index, hashHost(name)) & mask;
+  const hitBits = hitMask(index, host) & mask;
   if (hitBits === 0) return null;
   const hits = enabled.filter((id) => {
     const bit = index.bitOf.get(id);

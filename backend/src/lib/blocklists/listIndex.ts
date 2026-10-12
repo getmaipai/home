@@ -13,7 +13,7 @@ export const LIST_INDEX_URL = "https://github.com/getmaipai/catalog/releases/lat
 export const LIST_SOURCE_HOST = "raw.githubusercontent.com";
 /** 128 MiB: the malware list is about 72 MB (owner-approved 2026-10-12). Twin of the other repo's constant. */
 export const LIST_MAX_BYTES = 128 * 1024 * 1024;
-export const LIST_MAX_ENTRIES = 2_000_000;
+export const LIST_MAX_ENTRIES = 3_000_000;
 /** The index is a few KB; anything bigger is not the index. */
 export const LIST_INDEX_MAX_BYTES = 1024 * 1024;
 const PINNED_SOURCE_URL = /^https:\/\/raw\.githubusercontent\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/[0-9a-f]{40}\/[^?#\s]+$/;
