@@ -9,7 +9,7 @@ import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { START_PROJECT_TOOL_ID, runStartProjectTool, type StartProjectArgs } from "@/lib/projects/tool";
-import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesNames, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
+import { SHOW_IMAGES_TOOL_ID, SHOW_IMAGES_UNAVAILABLE_LINE, showImagesMultiResultLine, showImagesNames, showImagesResultLine, startAnswerImages } from "@/lib/answerImages/turn";
 import type { Node, ActionProposal, ToolExecutionOutcome } from "../contract";
 import { TOOL_RESULT_SITES_MAX, type TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/turn-stream-event.js";
 
@@ -127,7 +127,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       const subject = typeof args.subject === "string" ? args.subject.trim() : "";
       const names = showImagesNames(subject, args.subjects);
       const kind = typeof args.kind === "string" ? args.kind.trim().slice(0, 80) : "";
-      const line = state.answerImagesAllowed && state.answerImages ? showImagesResultLine(names.length > 1 ? names.join(", ") : state.answerImages.subject) : SHOW_IMAGES_UNAVAILABLE_LINE;
+      const line = state.answerImagesAllowed && state.answerImages ? (names.length > 1 ? showImagesMultiResultLine(names) : showImagesResultLine(state.answerImages.subject)) : SHOW_IMAGES_UNAVAILABLE_LINE;
       const outcome = outcomeOf({ callId, packageId: tool, status: "succeeded", via: "tool_call", args: { subject, ...(names.length > 1 ? { subjects: names } : {}), ...(kind ? { kind } : {}) }, result: { reply: { text: line }, actions: [] }, durationMs: 0 });
       outcomes.push(outcome);
       toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: line } });

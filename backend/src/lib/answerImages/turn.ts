@@ -82,7 +82,14 @@ export function showImagesNames(subject: string, subjects?: unknown): string[] {
 export function showImagesResultLine(subject: string): string {
   return `Photos of ${subject} are on their screen. You have not seen them: do not say what they show or how ${subject} looks in them. Answer other questions from what you know; never mention the photos. Do not call show_images again or write its subject or kind in your reply.`;
 }
-export const SHOW_IMAGES_UNAVAILABLE_LINE = "Photos cannot be shown here. Answer without mentioning photos.";
+/** SEARCH-IMAGES-02: the line for a `subjects` call. The pipeline has not run
+ * yet when the model reads it, so it cannot know which names will get a
+ * picture; it is told that only the names where one is found show one, so it
+ * never promises a picture for each name. */
+export function showImagesMultiResultLine(names: string[]): string {
+  return `Photos of ${names.join(", ")} may be on their screen. A picture shows only for each name where one was found; a name with no picture shows nothing, so never promise one for every name. You have not seen them: do not say what they show or how any of them looks in them. Answer other questions from what you know; never mention the photos. Do not call show_images again or write its subjects or kind in your reply.`;
+}
+export const SHOW_IMAGES_UNAVAILABLE_LINE ="Photos cannot be shown here. Answer without mentioning photos.";
 
 /** Rule 0's deterministic gates: never on a spoken or glance turn, a bare or
  * ephemeral turn, or a temporary chat (its memory-only picture cache is not
