@@ -116,6 +116,10 @@ ensureCoreJob("memory.embedding_retry", "every:1m");
 // concept, same documented gap backup.run's own comment names).
 ensureCoreJob("memory.judge", "every:1m");
 ensureCoreJob("memory.consolidate", "every:7d");
+// KS-05: the news shelf. Every 15 minutes is the polling floor; each feed
+// still waits for its own interval (news.poll_interval_s). The prune is daily.
+ensureCoreJob("news.shelf.poll", "every:15m");
+ensureCoreJob("news.shelf.prune", "every:1d");
 // 2.5 asks for "daily at a household-set time in the nightly window";
 // the scheduler's `when` grammar has no time-of-day concept yet (a
 // pre-existing, already-documented gap, see lib/scheduler.ts's own header

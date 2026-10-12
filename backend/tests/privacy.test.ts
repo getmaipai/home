@@ -259,3 +259,15 @@ describe("the ddgs search row (SEARCH-DDGS-01)", () => {
     }
   });
 });
+
+describe("the news shelf row (KS-05)", () => {
+  beforeEach(() => resetDb());
+  const row = () => privacyConnections().find((r) => r.id === "platform:news-shelf-feeds");
+  test("listed only for admin-added feeds while the shelf is on, naming the host", () => {
+    expect(row()).toBeUndefined();
+    setHouseholdSettingValue("news.feeds.adult", "https://feeds.example.com/news.xml");
+    expect(row()?.destination).toBe("feeds.example.com");
+    setHouseholdSettingValue("news.shelf.enabled", false);
+    expect(row()).toBeUndefined();
+  });
+});

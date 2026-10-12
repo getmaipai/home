@@ -870,6 +870,38 @@ export const projects = sqliteTable("projects", {
   updatedAt: text("updated_at").notNull(),
 });
 
+// KS-05 (docs/design/knowledge-sources.md, "The shelf"): one row per news
+// feed the shelf polls, the spec's Feed shape (spec/gen/ts/feed.ts) with
+// its polling state. Package feeds (a feed-list package's feeds.json) and
+// feeds an admin added under `news.feeds.<band>` both live here; `band` is
+// the audience (child: child only, teen: teen and adult, adult: adult
+// only). The items themselves are cache and live in knowledge.db
+// (lib/shelf/shelfStore.ts), never here.
+export const feeds = sqliteTable(
+  "feeds",
+  {
+    id: text("id").primaryKey(),
+    url: text("url").notNull(),
+    title: text("title").notNull(),
+    publisher: text("publisher").notNull(),
+    band: text("band").notNull(), // child|teen|adult
+    packageId: text("package_id"), // the feed-list package, null for an admin's own feed
+    personId: text("person_id"),
+    etag: text("etag"),
+    lastModified: text("last_modified"),
+    pollIntervalS: integer("poll_interval_s").notNull(),
+    nextPollAt: text("next_poll_at").notNull(),
+    failCount: integer("fail_count").notNull().default(0),
+    quietUntil: text("quiet_until"),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+  },
+  (table) => [uniqueIndex("feeds_url_idx").on(table.url), index("feeds_package_id_idx").on(table.packageId)],
+);
+
 // Cloned voices (2026-09-04, voice cloning): a household member's own
 // uploaded audio sample, usable as `tts.voice_id` the same way a preset
 // or community-catalog voice is - Pocket TTS's own `/tts` route accepts

@@ -41,6 +41,7 @@ import {
   chatFolders,
   chatFolderShares,
   clonedVoices,
+  feeds,
   commands,
   notificationDeliveries,
   issues,
@@ -154,6 +155,7 @@ export function resetDb(): void {
   db.delete(jobs).run();
   db.delete(modelDownloadJobs).run();
   db.delete(clonedVoices).run();
+  db.delete(feeds).run();
   db.delete(pendingEpisodeEmbeddings).run();
   db.delete(episodeEmbeddings).run();
   db.delete(episodes).run();

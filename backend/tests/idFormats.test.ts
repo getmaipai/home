@@ -32,6 +32,8 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newArtifactKey", "artk-", 10],
   ["newProjectId", "project-", 10],
   ["newProjectArtifactId", "projart-", 10],
+  ["newFeedId", "feed-", 10],
+  ["newNewsItemId", "news-", 10],
 ];
 
 describe("id generators", () => {

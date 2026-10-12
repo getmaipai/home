@@ -339,6 +339,37 @@ Rows join the blend before `attachSearchPages`, so the adult always-block list a
 SearXNG rows. Results are not cached. The `platform:ddgs-search` privacy row shows while the sidecar is set up
 and DuckDuckGo is picked. Quiet-mode state is in memory, so a hub restart clears it (SEARCH-DDGS-01c would persist it). Stack installing and supervising the sidecar is STACK-DDGS-01 (hub first).
 
+**KS-05a (2026-10-12): the news shelf store and poller.** Code is in `backend/src/lib/shelf/`. Feeds live in
+`hub.db` (`feeds` table, migration 0096, schema version 53, HLC-stamped, validated through the spec `Feed` shape);
+items live in `knowledge.db` beside the retrieval cache (`shelf_item` plus a `shelf_item_feed` link table,
+cache class, rebuilt by the next poll) through the shelf's own handle in `shelfStore.ts`. A story two feeds link is
+one row with two links: `canonicalUrl` lowercases the host, drops the default port, fragment, trailing slash and
+tracking parameters, and sorts the query; it never fetches an article page. Two core scheduler jobs, both low
+priority: `news.shelf.poll` (every 15 minutes, the polling floor) and `news.shelf.prune` (daily, to
+`news.retention_days`). `runShelfTick` first syncs the `feeds` table to the settings (`shelfFeeds.ts`), then polls.
+The poller (`shelfPoller.ts`) runs only when no chat turn is in flight or recent, one feed at a time (so one
+request per host), each host at most once a minute (`net:feed:<host>` bucket), at most 10 feeds a tick, with
+conditional GET (ETag, Last-Modified), manual redirects (3 at most, each https-only, no credentials, through
+`assertNotPrivateHost`; the platform fetch goes through `guardedFetch`), a 2 MB body cap, 50 items per feed and a
+20 s timeout. On the first bad signal (403, 429, 5xx, timeout, unreadable body) the wait doubles from the interval
+up to 24 h; `Retry-After` wins when longer, also capped at 24 h; the interval is never under 15 minutes
+(`news.poll_interval_s`, default 30 minutes). Each item link host passes the SSRF guard before the item is stored.
+Request budget: at most 10 feed requests per tick, about 20 requests an hour with the default interval and about
+ten feeds, fewer on 304.
+Who sees what: a feed has an audience (`Feed.band`: child feed to children only, teen feed to teens and adults,
+adult feed to adults only). A bundled list's audience is the youngest user type the policy
+(`spec/news/feed-lists.json`) offers it to. A package feed reaches a user type only when the list is ticked for it
+(`news.lists.<band>`), offered to it by the policy (enforced here whatever is stored) and inside the audience. An
+admin's feed (`news.feeds.<band>`, one https address per line) shows only while its address is in its box; an
+address in several boxes goes to the older user type's box. An item is shown only when its `band_ok` rank is at or
+below the asker's; the minor floor stamps `band_ok` at ingest and runs again at release (`shelfRead.ts`). The save
+of a `news.feeds.*` box is refused with a plain two-part error for a bad address (`feedAddresses.ts`, called from
+`writeValue`). Counters are a closed list of names with at most an age band (no feed, title or person), RULES 6a.
+The privacy page lists admin-typed feed hosts (`platform:news-shelf-feeds`); bundled lists get rows from their
+package manifests (KS-05b). This supersedes BUILD-SLICES' "Settings rows for feeds (adults add; a parent sets a
+child's)": the owner's 2026-10-12 requirement is the admin OptionMatrix grid, with no per-parent feed entry.
+Tests: `tests/shelfPoller.test.ts`, `tests/shelfVisibility.test.ts` (offline, stub fetch, enumerates user type x list x audience).
+
 **Reworked by KS-02 (2026-10-09); the off switch is now the source mode (KS-MODE-01, 2026-10-10).**
 `search.wikipedia_fallback` is retired. The household value `search.source_mode`
 (`live | offline | mix`, default `mix`) and the overrides

@@ -25,6 +25,7 @@ import { telegramConfigured } from "@/lib/telegramChannel";
 import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
 import { webSourcesPicked } from "@/lib/retrieval/webSources";
 import { DDGS_DESTINATION_HOST, ddgsConfigured } from "@/lib/retrieval/ddgsSource";
+import { shelfAdminHosts } from "@/lib/shelf/shelfFeeds";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -134,6 +135,14 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:ddgs-search", ddgsConfigured() && ddgsPicked() ? DDGS_DESTINATION_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while DuckDuckGo is picked under Settings, Search, Web search sources. Never for a child, teen or guest.",
       what: "the words searched, and your home's internet address, sent by a small search service running on this computer. Nothing else anyone in the house said or saved.",
+    }),
+    // KS-05: the news shelf. Bundled feed lists get their own rows from their
+    // package manifests' data_sources; this row covers feeds an adult typed in
+    // under Settings, News shelf. Listed only while the shelf is on and at least
+    // one such feed exists.
+    row("platform:news-shelf-feeds", shelfAdminHosts().join(", ") || null, {
+      when: "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only for the news feed addresses an adult added under Settings, News shelf. Turn the shelf off there to stop it.",
+      what: "a request for each feed file, plus your home's internet address. No name, device ID or cookie goes with it. Home reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",

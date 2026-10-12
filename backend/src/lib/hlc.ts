@@ -51,6 +51,7 @@ export const HLC_BEARING_TABLES = [
   "attachments",
   "artifacts",
   "projects",
+  "feeds",
   "shares",
   "biometric_prints",
 ] as const;

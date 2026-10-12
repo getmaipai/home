@@ -189,3 +189,13 @@ export function newProjectId(): string {
 export function newProjectArtifactId(): string {
   return `projart-${randomSuffix(10)}`;
 }
+
+/** Matches spec/schemas/feed.schema.json's `^feed-[a-z0-9]{6,}$` (KS-05). */
+export function newFeedId(): string {
+  return `feed-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/news-item.schema.json's `^news-[a-z0-9]{6,}$` (KS-05). */
+export function newNewsItemId(): string {
+  return `news-${randomSuffix(10)}`;
+}

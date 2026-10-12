@@ -49,6 +49,8 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
       if ((key.range as { multiple?: boolean } | undefined)?.multiple) return [...(key.range?.options ?? [])];
       return key.range?.options?.at(-1) ?? key.default;
     case "text":
+      // KS-05: a news feed box holds https feed addresses, one per line; free text is refused with a fix.
+      if (key.key.startsWith("news.feeds.")) return "https://news.example.com/feed.xml";
       return key.default === "" ? "stress-test-value" : `${key.default}-stressed`;
     case "person": {
       // Home Assistant's `range.multiple` shape selects every person;

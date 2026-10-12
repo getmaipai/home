@@ -3,6 +3,7 @@
 // definitions from the registry (3.2) and from package manifests." This
 // is the store and its API; the generic renderer and the UI rules in
 // 6.5/6.6 are shell/kit work (chapter 6, not started).
+import { checkFeedAddressBox } from "@/lib/shelf/feedAddresses";
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
 import { settingsValues, people, entities } from "@/db/schema";
@@ -363,6 +364,13 @@ function writeValue(
   if (!opts.skipValidation) {
     const validated = validateSelectorValue(keyDef, value);
     if (!validated.ok) return validated;
+  }
+
+  // KS-05: a feed-address box is checked before it is stored, so a bad
+  // address is refused with the fix instead of failing quietly at poll time.
+  if (key.startsWith("news.feeds.")) {
+    const checked = checkFeedAddressBox(value);
+    if (!checked.ok) return { ok: false, status: 400, error: checked.error };
   }
 
   if (keyDef.key === HOUSEHOLD_HOME_KEY && value !== null) {

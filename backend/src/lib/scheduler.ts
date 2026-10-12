@@ -51,6 +51,7 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { sweepFavicons } from "@/lib/favicons";
 import { sweepAnswerImages } from "@/lib/answerImages/cache";
 import { sweepFetchCache } from "@/lib/retrieval/fetchCache";
+import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
@@ -298,6 +299,15 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   "memory.consolidate": async () => {
     await runConsolidation();
   },
+  // KS-05: the news shelf. A poll tick that fetches only what is due and only
+  // while the house is quiet (lib/shelf/shelfPoller.ts), and a daily prune
+  // to the household's retention (news.retention_days).
+  "news.shelf.poll": async () => {
+    await runShelfTick();
+  },
+  "news.shelf.prune": async () => {
+    pruneShelf();
+  },
   // Session F (platform and trust), step 5: lib/householdCa.ts's own
   // "rotation as a Repairs item" - a real Repairs warning well before the
   // hub's own TLS leaf certificate actually expires.
@@ -441,7 +451,7 @@ export function runDueJobs(
 // query returned it. A plain, exported function (not inlined into
 // runDueJobsUnguarded below) so the ordering rule itself is directly
 // testable without running real jobs.
-const LOW_PRIORITY_CORE_JOBS = new Set(["memory.judge", "memory.consolidate"]);
+const LOW_PRIORITY_CORE_JOBS = new Set(["memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune"]);
 export function sortDueJobsForPriority<T extends { job: string }>(rows: readonly T[]): T[] {
   return [...rows].sort((a, b) => Number(LOW_PRIORITY_CORE_JOBS.has(a.job)) - Number(LOW_PRIORITY_CORE_JOBS.has(b.job)));
 }
