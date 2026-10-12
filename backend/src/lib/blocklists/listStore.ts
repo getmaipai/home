@@ -12,6 +12,7 @@ import { parseHostList, type HostListFormat, type HostListParse } from "@maipai/
 import { blockListsDir } from "@/lib/paths";
 import { sha256OfFile } from "@/lib/modelDownload";
 import type { AgeBand } from "@/lib/ageBand";
+import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
 import { enabledListIds } from "@/lib/blocklists/policy";
 
 export interface StoredList {
@@ -140,10 +141,10 @@ export function listsReadyOverride(): boolean | null {
 
 /** Every list enabled for the band has loaded at least once: the gate a child or teen's web search waits on
  * (design section 3, "offline and first boot"). An adult band with no list enabled is always ready. */
-export function listsReadyForBand(band: AgeBand): boolean {
+export function listsReadyForBand(band: AgeBand, personId: string | null | undefined = currentBlockViewer()): boolean {
   if (readyOverride === true) return true;
   const loaded = readState().lists;
-  return enabledListIds(band).every((id) => Boolean(loaded[id]) && currentFileExists(id, loaded[id]!));
+  return enabledListIds(band, personId).every((id) => Boolean(loaded[id]) && currentFileExists(id, loaded[id]!));
 }
 
 export interface ReverifyReport {

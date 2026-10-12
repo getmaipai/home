@@ -9,6 +9,9 @@ import { getDomain } from "tldts";
 import type { AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { normalizeHost } from "@/lib/blocklists/hostLists";
+import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
+import { resolveUnion } from "@/lib/settingsLayers";
+import { readLayerRow } from "@/lib/settings";
 
 export const HOSTS_DENY_KEY = "search.hosts.deny";
 export const HOSTS_ALLOW_KEY = "search.hosts.allow";
@@ -73,7 +76,15 @@ function read(key: string): Set<string> {
 }
 
 /** The custom lists that count for a band: the household's plus the band's own (MINOR-SEARCH-01e-9). */
-export function customHostRules(band: AgeBand): CustomHostRules {
+export function customHostRules(band: AgeBand, personId: string | null | undefined = currentBlockViewer()): CustomHostRules {
+  // SETTINGS-LAYERS-01c: a person with their own overrides of a host list gets the resolved layers
+  // (user defaults, global defaults, their overrides); everyone else keeps the cached household-plus-band sets.
+  if (personId && (readLayerRow(personId, HOSTS_DENY_KEY) !== undefined || readLayerRow(personId, HOSTS_ALLOW_KEY) !== undefined)) {
+    return {
+      deny: new Set(resolveUnion(HOSTS_DENY_KEY, { band, personId }).items),
+      allow: new Set(resolveUnion(HOSTS_ALLOW_KEY, { band, personId }).items),
+    };
+  }
   const merge = (household: Set<string>, own: Set<string>): Set<string> => {
     if (own.size === 0) return household;
     if (household.size === 0) return own;

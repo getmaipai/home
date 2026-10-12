@@ -61,7 +61,15 @@ export function bandsInUse(now: Date): AgeBand[] {
 /** The list ids the household needs loaded right now. */
 export function neededListIds(now: Date): string[] {
   const ids = new Set<string>();
-  for (const band of bandsInUse(now)) for (const id of enabledListIds(band)) ids.add(id);
+  const inUse = new Set(bandsInUse(now));
+  for (const band of inUse) for (const id of enabledListIds(band, null)) ids.add(id);
+  // A list only one person's override turns on (a teen's added gambling list) is needed too, or that person's
+  // every URL would fail closed on LISTS_NOT_READY.
+  const rows = db.select().from(people).where(isNull(people.deletedAt)).all() as PersonRow[];
+  for (const row of rows) {
+    const band = speakerAgeBand(row, now);
+    if (inUse.has(band)) for (const id of enabledListIds(band, row.id)) ids.add(id);
+  }
   return [...ids];
 }
 

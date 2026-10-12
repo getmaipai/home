@@ -845,17 +845,22 @@ export function readLayerRow(personId: string, key: string): string | undefined 
     .where(and(eq(settingsValues.scope, `person:${personId}`), eq(settingsValues.key, key))).get()?.value;
 }
 
-export function writeLayerRow(personId: string, key: string, jsonText: string): void {
+export function readLayerSetBy(personId: string, key: string): string | undefined {
+  return db.select({ setBy: settingsValues.setBy }).from(settingsValues)
+    .where(and(eq(settingsValues.scope, `person:${personId}`), eq(settingsValues.key, key))).get()?.setBy ?? undefined;
+}
+
+export function writeLayerRow(personId: string, key: string, jsonText: string, setBy?: string): void {
   const scope = `person:${personId}`;
   const hlc = nextHlc();
   const now = new Date().toISOString();
-  const existing = db.select({ hlc: settingsValues.hlc }).from(settingsValues)
+  const existing = db.select({ hlc: settingsValues.hlc, setBy: settingsValues.setBy }).from(settingsValues)
     .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).get();
   if (existing) {
-    db.update(settingsValues).set({ value: jsonText, hlc, source: "user", updatedAt: now })
+    db.update(settingsValues).set({ value: jsonText, hlc, source: "user", updatedAt: now, setBy: setBy ?? existing.setBy ?? null })
       .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   } else {
-    db.insert(settingsValues).values({ scope, key, value: jsonText, hlc, source: "user", updatedAt: now }).run();
+    db.insert(settingsValues).values({ scope, key, value: jsonText, hlc, source: "user", updatedAt: now, setBy: setBy ?? null }).run();
   }
   settingsCache.delete(settingsCacheKey(scope, key));
 }

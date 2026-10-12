@@ -152,7 +152,9 @@ describe("producers", () => {
     const select = readFileSync(join(root, "answerImages", "select.ts"), "utf-8");
     expect(host.match(/urlAllowedFor\(/g)!.length).toBeGreaterThanOrEqual(5);
     expect(host).toContain("blocked site is not fetched");
-    expect(select).toContain("urlAllowedFor(input.band, c.url)");
+    expect(select).toContain("urlAllowedFor(input.band, c.url, input.actor.id)");
+    // SETTINGS-LAYERS-01c: the tool call that runs a search or a page read runs as the asking person.
+    expect(host).toContain("runAsBlockViewer(actor.id");
   });
 });
 

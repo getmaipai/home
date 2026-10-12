@@ -244,7 +244,7 @@ export async function selectAnswerImages(input: { subject: string; kind?: string
       seen.add(c.url);
       if (trips(`${c.title}. ${c.description}`, input.band)) { droppedByFloor++; continue; }
       // MINOR-SEARCH-01e-5: a picture hosted on, or taken from a page on, a blocked site is never shown.
-      if (!urlAllowedFor(input.band, c.url) || (c.page && !urlAllowedFor(input.band, c.page))) { droppedByBlocklist++; continue; }
+      if (!urlAllowedFor(input.band, c.url, input.actor.id) || (c.page && !urlAllowedFor(input.band, c.page, input.actor.id))) { droppedByBlocklist++; continue; }
       const off = judgeRelevance({ source: c.source, lead: c.lead, title: c.title, description: c.description, page: c.page, image: c.url, ...(c.objectName ? { objectName: c.objectName } : {}), ...(c.categories ? { categories: c.categories } : {}), ...(c.restrictions ? { restrictions: c.restrictions } : {}), ...(c.width !== undefined ? { width: c.width } : {}), ...(c.format ? { format: c.format } : {}), ...(c.nonPhoto ? { nonPhoto: true } : {}), ...(c.engines ? { engines: c.engines } : {}) }, context);
       if (off) { droppedByRelevance[off] = (droppedByRelevance[off] ?? 0) + 1; continue; }
       if (perSource[c.source] >= PER_SOURCE_SLOTS) continue;

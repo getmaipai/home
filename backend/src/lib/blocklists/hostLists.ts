@@ -14,6 +14,7 @@ import { getDomain } from "tldts";
 import type { AgeBand } from "@/lib/ageBand";
 import { blocklistIds, enabledListIds, lockedListIds } from "@/lib/blocklists/policy";
 import { customHostRules, hostInSet } from "@/lib/blocklists/customHosts";
+import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
 import { listsReadyForBand, listsReadyOverride, parseStoredFile, readState, stateStamp } from "@/lib/blocklists/listStore";
 
 export const LISTS_NOT_READY = "lists-not-ready";
@@ -202,29 +203,29 @@ export function __hostMaskForBench(host: string): number {
 export const CUSTOM_DENY = "custom-deny";
 
 /** True when a band has anything to check: an enabled list or a custom entry. */
-export function siteBlocksActive(band: AgeBand): boolean {
-  if (enabledListIds(band).length > 0) return true;
-  const rules = customHostRules(band);
+export function siteBlocksActive(band: AgeBand, personId: string | null | undefined = currentBlockViewer()): boolean {
+  if (enabledListIds(band, personId).length > 0) return true;
+  const rules = customHostRules(band, personId);
   return rules.deny.size > 0;
 }
 
 /** A short text that changes whenever a band's lists or custom entries change (a search cache key part). */
-export function siteBlockSignature(band: AgeBand): string {
-  const rules = customHostRules(band);
-  return `${enabledListIds(band).join("+")}|${[...rules.deny].sort().join("+")}|${[...rules.allow].sort().join("+")}`;
+export function siteBlockSignature(band: AgeBand, personId: string | null | undefined = currentBlockViewer()): string {
+  const rules = customHostRules(band, personId);
+  return `${enabledListIds(band, personId).join("+")}|${[...rules.deny].sort().join("+")}|${[...rules.allow].sort().join("+")}`;
 }
 
 /** Why this host may not be shown to the band: `custom-deny` (a custom always-block entry, which wins over every
  * allow), a blocked-site list id, `LISTS_NOT_READY` when an enabled list is not loaded (the caller fails closed),
  * or null. A custom allow lifts a hit only when every list naming the host is unlocked for the band, so it can
  * never unblock a locked list (the adult-site list stays locked for child and teen controls). */
-export function checkHost(band: AgeBand, input: string | null | undefined): string | null {
+export function checkHost(band: AgeBand, input: string | null | undefined, personId: string | null | undefined = currentBlockViewer()): string | null {
   const host = normalizeHost(input);
-  const rules = customHostRules(band);
+  const rules = customHostRules(band, personId);
   if (host && hostInSet(host, rules.deny)) return CUSTOM_DENY;
-  const enabled = enabledListIds(band);
+  const enabled = enabledListIds(band, personId);
   if (enabled.length === 0) return null;
-  if (!listsReadyForBand(band)) return LISTS_NOT_READY;
+  if (!listsReadyForBand(band, personId)) return LISTS_NOT_READY;
   if (!host) return null;
   let index: HostIndex;
   try {
@@ -275,13 +276,13 @@ export function __resetListDropCountersForTests(): void {
 /** True when a URL (or host) may be shown to this band. Counts a drop by list id. A band with no enabled list
  * always passes; one with an unloaded list never does. An empty value has nothing to show and passes; a value
  * with no readable host (a relative path, a data: address, malformed text) is dropped for a band that has lists. */
-export function urlAllowedFor(band: AgeBand, url: string | null | undefined): boolean {
+export function urlAllowedFor(band: AgeBand, url: string | null | undefined, personId: string | null | undefined = currentBlockViewer()): boolean {
   if (url === null || url === undefined || url.trim() === "") return true;
-  if (enabledListIds(band).length > 0 && normalizeHost(url) === null) {
+  if (enabledListIds(band, personId).length > 0 && normalizeHost(url) === null) {
     bumpListDrop("unreadable-address", band);
     return false;
   }
-  const verdict = checkHost(band, url);
+  const verdict = checkHost(band, url, personId);
   if (verdict === null) return true;
   // A grown-up's band is never held: lists still loading let the page through (a custom deny still applies).
   if (verdict === LISTS_NOT_READY && band === "adult") return true;

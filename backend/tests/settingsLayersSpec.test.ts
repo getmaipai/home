@@ -55,7 +55,7 @@ describe("SETTINGS-LAYERS-01a page-text check write guard", () => {
     return {
       owner: db.select().from(people).where(eq(people.displayName, "Sage")).get()!,
       child: await add("Bramble", "child"),
-      teen: await add("Rill", "teen"),
+      teen: await add("Willow", "teen"),
       adult: await add("Marlow", "adult"),
     };
   }

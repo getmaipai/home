@@ -23,7 +23,7 @@ export function minorSearchGate(state: GateState, temporary: boolean): { gateAll
       what: { capabilities: manifest.permissions ?? [], summary: "Search the web for this request.", consequential: manifest.consequential, minRole: manifest.min_role },
       context: { crisis: state.crisis, temporary },
     });
-    return { gateAllows: gate.kind === "allow" || gate.kind === "allow_with_limits", webOn: webSourcesFor(band, temporary).length > 0 };
+    return { gateAllows: gate.kind === "allow" || gate.kind === "allow_with_limits", webOn: webSourcesFor(band, temporary, state.actor.id).length > 0 };
   } catch {
     return { gateAllows: false, webOn: false };
   }

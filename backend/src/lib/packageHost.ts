@@ -52,6 +52,7 @@
 // other real method here already follows. See spec/llm/README.md and
 // docs/dev.md's Package Host section for everything else deferred and
 // why.
+import { runAsBlockViewer } from "@/lib/blocklists/blockViewer";
 import { siteBlockSignature, siteBlocksActive, urlAllowedFor } from "@/lib/blocklists/hostLists";
 import { isPrivacyFlaggedSearchEngine } from "@/lib/searchEngines";
 import type { Host, FetchOptions, MemoryRecordLike } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -2254,7 +2255,10 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // domain-gated write shape to reuse. Every other id/method
       // combination stays capability_missing; this is deliberately not a
       // registry pattern for two entries.
-      async call(id: string, method: string, args?: unknown): Promise<unknown> {
+      // SETTINGS-LAYERS-01c: every site-block check under a web search or page read is for this actor, so their own
+      // overrides (a block they or an admin added) apply to results, page reads and the pictures taken from them.
+      call(id: string, method: string, args?: unknown): Promise<unknown> {
+        return runAsBlockViewer(actor.id, async () => {
         requirePermission(`integration:${id}`);
         if (id === "home_assistant" && method === "get_state") {
           return homeAssistantGetState(args);
@@ -2325,6 +2329,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           return doc;
         }
         notImplemented("integration.call");
+        });
       },
     },
     speak: {

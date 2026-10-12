@@ -12,7 +12,8 @@
 // dedupe are one step. A source that fails contributes nothing; only when every
 // picked source fails does the first one's error stand (rule 6).
 import type { AgeBand } from "@/lib/ageBand";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, readLayerRow } from "@/lib/settings";
+import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
 import { effectiveMode, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
 import { ddgsConfigured, ddgsSearch } from "@/lib/retrieval/ddgsSource";
@@ -77,15 +78,31 @@ export const NO_SOURCE_NOTE = "Pick at least one web search source. To turn web 
 export const UNBUILT_ONLY_NOTE = "DuckDuckGo search is not set up on this computer yet. Keep SearXNG selected, or start the ddgs search service described in Set up web search.";
 
 /** The stored list, in the household's order; an unset, malformed or empty value is the default. */
-function storedSources(): WebSourceId[] {
+function knownSources(raw: unknown): WebSourceId[] {
+  const list = Array.isArray(raw) ? raw.filter((id): id is WebSourceId => (WEB_SOURCE_IDS as readonly unknown[]).includes(id)) : [];
+  return [...new Set(list)];
+}
+
+/** SETTINGS-LAYERS-01c: a person's own pick (a user override, stored in their `person:<id>` row) replaces the
+ * household's global default for them; an unreadable or empty override reads as no override. */
+function storedSources(personId: string | null | undefined = currentBlockViewer()): WebSourceId[] {
+  if (personId) {
+    try {
+      const text = readLayerRow(personId, WEB_SOURCES_KEY);
+      const own = text === undefined ? [] : knownSources(JSON.parse(text));
+      if (own.length > 0) return own;
+    } catch {
+      // fall through to the household's pick
+    }
+  }
   let raw: unknown;
   try {
     raw = getHouseholdSettingValue(WEB_SOURCES_KEY);
   } catch {
     raw = undefined;
   }
-  const list = Array.isArray(raw) ? raw.filter((id): id is WebSourceId => (WEB_SOURCE_IDS as readonly unknown[]).includes(id)) : [];
-  return [...new Set(list)].length > 0 ? [...new Set(list)] : [...DEFAULT_WEB_SOURCES];
+  const list = knownSources(raw);
+  return list.length > 0 ? list : [...DEFAULT_WEB_SOURCES];
 }
 
 /** The household's stored picks, whether or not they can answer now (the privacy page asks this). */
@@ -100,8 +117,8 @@ function modeSourceOf(id: WebSourceId): ModeSource {
 /** The sources that may answer this band's web search: the stored list, minus unbuilt sources,
  * minus any whose mode is closed or offline for the band. A child or teen reaches SearXNG only,
  * and only when the household picked it. */
-export function webSourcesFor(band: AgeBand, temporary = false): WebSourceId[] {
-  return storedSources().filter((id) => {
+export function webSourcesFor(band: AgeBand, temporary = false, personId?: string | null): WebSourceId[] {
+  return storedSources(personId).filter((id) => {
     if (!isBuilt(id)) return false;
     const mode = effectiveMode(modeSourceOf(id), band, temporary);
     return mode !== "closed" && mode !== "offline";

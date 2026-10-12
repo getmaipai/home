@@ -5,7 +5,8 @@
 import blocklistsPolicy from "@maipai/spec/search/blocklists.json" with { type: "json" };
 import { Blocklists } from "@maipai/spec/gen/ts/blocklists.js";
 import type { AgeBand } from "@/lib/ageBand";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { currentBlockViewer } from "@/lib/blocklists/blockViewer";
+import { resolveUnion } from "@/lib/settingsLayers";
 
 export type BlocklistRow = Blocklists["lists"][number];
 
@@ -35,18 +36,18 @@ export function defaultListIds(band: AgeBand): string[] {
   return BLOCKLIST_POLICY.lists.filter((row) => row.default_for.includes(band)).map((row) => row.id);
 }
 
-/** Every list that counts for one band: the locked set (always, whatever was stored) plus the stored choice,
- * with unknown ids dropped. An unreadable or never-stored choice means the spec's defaults, and an adult
- * default is the empty set. A stored value that is not a list of ids fails to the defaults, never to nothing
- * for a child or teen (rule 0: the protection fails closed). */
-export function enabledListIds(band: AgeBand): string[] {
+/** Every list that counts for one band and, when a person is given (or the ambient block viewer), that
+ * person's own overrides: the layers resolve user defaults, then the household's global defaults, then the
+ * person's overrides, and the band's locked set is always in (whatever was stored). An unreadable or
+ * never-stored choice means the spec's defaults, and an adult default is the empty set. A stored value that
+ * is not a list of ids fails to the defaults, never to nothing for a child or teen (rule 0: the protection
+ * fails closed). */
+export function enabledListIds(band: AgeBand, personId: string | null | undefined = currentBlockViewer()): string[] {
   const known = new Set(blocklistIds());
-  let chosen: string[];
   try {
-    const stored = getHouseholdSettingValue(BLOCKLIST_KEYS[band]);
-    chosen = Array.isArray(stored) ? stored.filter((id): id is string => typeof id === "string" && known.has(id)) : defaultListIds(band);
+    const items = resolveUnion("search.blocklists", { band, personId }).items.filter((id) => known.has(id));
+    return [...new Set([...lockedListIds(band), ...items])];
   } catch {
-    chosen = defaultListIds(band);
+    return [...new Set([...lockedListIds(band), ...defaultListIds(band)])];
   }
-  return [...new Set([...lockedListIds(band), ...chosen])];
 }
