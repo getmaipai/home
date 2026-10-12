@@ -71,6 +71,7 @@ import { WIKIMEDIA_LIVE_RATE_LIMIT, WIKIMEDIA_LIVE_RATE_LIMIT_KEY, wikimediaLive
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
+import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
@@ -2173,6 +2174,11 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           // result cache either, so a later lookup of the same words, by anyone, is a fresh one.
           const temporary = turn?.conversationId !== undefined && isTemporaryConversation(turn.conversationId);
           const webSide = async (ctx: { kMatched: boolean; timeRange: "month" | undefined }) => {
+            // MINOR-SEARCH-01f: a child's or teen's query with a closed personal detail never leaves the house
+            // (the local library, which stays in the house, still sees it).
+            if (typeof input?.query === "string" && input.query.length > 0 && minorQueryHit(input.query, band)) {
+              return { text: MINOR_QUERY_PERSONAL_NOTE, rows: [] };
+            }
             const hosted = typeof input?.query === "string" && input.query.length > 0 ? await hostedSearch(input.query, band, safeSearchLevel, input.category, actor.role, runtime.signal) : null;
             if (hosted) return hosted;
             const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
@@ -2204,6 +2210,8 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const readBand = speakerAgeBand(actor, new Date());
           const readTemporary = turn?.conversationId !== undefined && isTemporaryConversation(turn.conversationId);
           if (webSideOff(readBand, readTemporary)) throw new HostError("permission_denied", refuseWeb(readBand, readTemporary));
+          // MINOR-SEARCH-01f: an address carrying an email, phone or id number is not fetched for a minor.
+          if (readBand !== "adult" && closedFormatHit(JSON.stringify(args ?? {}))) throw new HostError("invalid_input", MINOR_QUERY_PERSONAL_NOTE);
           const doc = await searxngPageRead(args, runtime.signal);
           // THIN-4C: a page a child or teen asks for by address passes the
           // same floor before their model call can see it.
