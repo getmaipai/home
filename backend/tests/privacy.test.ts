@@ -240,3 +240,22 @@ describe("GET /api/privacy", () => {
     expect(body.offlinePlugins.length).toBeGreaterThan(0);
   });
 });
+
+describe("the ddgs search row (SEARCH-DDGS-01)", () => {
+  beforeEach(() => resetDb());
+  const has = () => privacyConnections().some((r) => r.id === "platform:ddgs-search");
+  test("listed only while the sidecar is set up and DuckDuckGo is picked", () => {
+    delete process.env.MAIPAI_DDGS_URL;
+    setHouseholdSettingValue("search.web_sources", ["searxng", "ddgs"]);
+    expect(has()).toBe(false);
+    process.env.MAIPAI_DDGS_URL = "http://127.0.0.1:8793";
+    try {
+      expect(has()).toBe(true);
+      expect(privacyConnections().find((r) => r.id === "platform:ddgs-search")?.destination).toContain("duckduckgo.com");
+      setHouseholdSettingValue("search.web_sources", ["searxng"]);
+      expect(has()).toBe(false);
+    } finally {
+      delete process.env.MAIPAI_DDGS_URL;
+    }
+  });
+});

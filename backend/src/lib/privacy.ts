@@ -23,10 +23,16 @@ import { LIST_INDEX_URL, LIST_SOURCE_HOST } from "@/lib/blocklists/listIndex";
 import { neededListIds } from "@/lib/blocklists/listSync";
 import { telegramConfigured } from "@/lib/telegramChannel";
 import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
+import { webSourcesPicked } from "@/lib/retrieval/webSources";
+import { DDGS_DESTINATION_HOST, ddgsConfigured } from "@/lib/retrieval/ddgsSource";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
+
+function ddgsPicked(): boolean {
+  return webSourcesPicked().includes("ddgs");
+}
 
 function blockListsInUse(): boolean {
   try {
@@ -124,6 +130,11 @@ export function platformConnections(): PrivacyConnection[] {
     }),
     // THIN-4H: only once an adult has added a hosted search key; with none
     // set, search stays on the household's own SearXNG and nothing is listed.
+    // SEARCH-DDGS-01: only while the ddgs sidecar is set up on this computer and DuckDuckGo is picked.
+    row("platform:ddgs-search", ddgsConfigured() && ddgsPicked() ? DDGS_DESTINATION_HOST : null, {
+      when: "when an adult asks something that needs a web search, and only while DuckDuckGo is picked under Settings, Search, Web search sources. Never for a child, teen or guest.",
+      what: "the words searched, and your home's internet address, sent by a small search service running on this computer. Nothing else anyone in the house said or saved.",
+    }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
       what: "the words searched, and your home's internet address. Nothing else anyone in the house said or saved.",

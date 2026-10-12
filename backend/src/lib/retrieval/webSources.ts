@@ -15,6 +15,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { effectiveMode, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
+import { ddgsConfigured, ddgsSearch } from "@/lib/retrieval/ddgsSource";
 
 export const WEB_SOURCES_KEY = "search.web_sources";
 export const DEFAULT_WEB_SOURCES = ["searxng"] as const;
@@ -33,22 +34,26 @@ export interface WebRows {
 }
 export type WebSourceSearch = () => Promise<WebRows>;
 
-/** The source registry. `built: false` means listed in the setting but not yet able to answer
- * (ddgs, until SEARCH-DDGS-01 fills the slot). */
-const REGISTRY: { id: WebSourceId; built: boolean }[] = [
-  { id: "searxng", built: true },
-  { id: "ddgs", built: false },
+/** The source registry. A source that is not `built` is listed in the setting but cannot answer: ddgs
+ * until the household runs the sidecar and names it (`MAIPAI_DDGS_URL`, ddgsSource.ts). */
+const REGISTRY: { id: WebSourceId; built: () => boolean }[] = [
+  { id: "searxng", built: () => true },
+  { id: "ddgs", built: () => ddgsConfigured() },
 ];
+const builtOverride: Partial<Record<WebSourceId, boolean>> = {};
+const isBuilt = (id: WebSourceId): boolean => builtOverride[id] ?? REGISTRY.find((source) => source.id === id)!.built();
 
 export interface WebSearchContext {
   args: unknown;
   band: AgeBand;
   signal?: AbortSignal;
   deadlineAt?: number;
+  /** The asker's role; a guest carries no age signal and never reaches ddgs. */
+  role?: string;
 }
 /** Rows-only search functions for sources other than SearXNG (whose step lives in packageHost.ts,
- * next to its tiers, cache and engine health). SEARCH-DDGS-01 fills the ddgs slot. */
-const SEARCHERS: Partial<Record<WebSourceId, (ctx: WebSearchContext) => Promise<WebRows>>> = {};
+ * next to its tiers, cache and engine health). */
+const SEARCHERS: Partial<Record<WebSourceId, (ctx: WebSearchContext) => Promise<WebRows>>> = { ddgs: ddgsSearch };
 
 export function webSourceSearch(id: WebSourceId): ((ctx: WebSearchContext) => Promise<WebRows>) | undefined {
   return SEARCHERS[id];
@@ -56,16 +61,20 @@ export function webSourceSearch(id: WebSourceId): ((ctx: WebSearchContext) => Pr
 
 /** Test seam: register a fake backend for a source (which marks it built), or clear it with null. */
 export function __setWebSourceForTests(id: WebSourceId, search: ((ctx: WebSearchContext) => Promise<WebRows>) | null): void {
-  const entry = REGISTRY.find((source) => source.id === id)!;
-  if (search) SEARCHERS[id] = search;
-  else delete SEARCHERS[id];
-  entry.built = search !== null || id === "searxng";
+  if (search) {
+    SEARCHERS[id] = search;
+    builtOverride[id] = true;
+  } else {
+    if (id === "ddgs") SEARCHERS.ddgs = ddgsSearch;
+    else delete SEARCHERS[id];
+    delete builtOverride[id];
+  }
 }
 
 export const WEB_SOURCE_IDS: readonly WebSourceId[] = REGISTRY.map((source) => source.id);
 
 export const NO_SOURCE_NOTE = "Pick at least one web search source. To turn web search off, set Web searches to Library only.";
-export const UNBUILT_ONLY_NOTE = "DuckDuckGo search is not available yet. Keep SearXNG selected until a later update adds it.";
+export const UNBUILT_ONLY_NOTE = "DuckDuckGo search is not set up on this computer yet. Keep SearXNG selected, or start the ddgs search service described in Set up web search.";
 
 /** The stored list, in the household's order; an unset, malformed or empty value is the default. */
 function storedSources(): WebSourceId[] {
@@ -79,6 +88,11 @@ function storedSources(): WebSourceId[] {
   return [...new Set(list)].length > 0 ? [...new Set(list)] : [...DEFAULT_WEB_SOURCES];
 }
 
+/** The household's stored picks, whether or not they can answer now (the privacy page asks this). */
+export function webSourcesPicked(): WebSourceId[] {
+  return storedSources();
+}
+
 function modeSourceOf(id: WebSourceId): ModeSource {
   return id === "ddgs" ? "ddgs" : "web";
 }
@@ -87,9 +101,8 @@ function modeSourceOf(id: WebSourceId): ModeSource {
  * minus any whose mode is closed or offline for the band. A child or teen reaches SearXNG only,
  * and only when the household picked it. */
 export function webSourcesFor(band: AgeBand, temporary = false): WebSourceId[] {
-  const built = new Set(REGISTRY.filter((source) => source.built).map((source) => source.id));
   return storedSources().filter((id) => {
-    if (!built.has(id)) return false;
+    if (!isBuilt(id)) return false;
     const mode = effectiveMode(modeSourceOf(id), band, temporary);
     return mode !== "closed" && mode !== "offline";
   });
@@ -102,7 +115,7 @@ export function validateWebSources(key: string, value: unknown): string | null {
   if (key !== WEB_SOURCES_KEY || !Array.isArray(value)) return null;
   if (value.length === 0) return NO_SOURCE_NOTE;
   const known = value.filter((id): id is WebSourceId => (WEB_SOURCE_IDS as readonly unknown[]).includes(id));
-  if (known.length === value.length && !known.some((id) => REGISTRY.find((source) => source.id === id)!.built)) return UNBUILT_ONLY_NOTE;
+  if (known.length === value.length && !known.some((id) => isBuilt(id))) return UNBUILT_ONLY_NOTE;
   return null;
 }
 

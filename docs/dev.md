@@ -320,8 +320,20 @@ at once and fuse by reciprocal rank (k 60, `src/lib/retrieval/rrf.ts`, shared wi
 way `dedupeRows` keys rows, so fusion and URL dedupe are one step; page reading then runs once on the blended
 rows (`attachSearchPages`). Each source is gated by `effectiveMode` as a `ModeSource` (`web`, `ddgs`), so a
 minor reaches SearXNG only. A failed source contributes nothing; only if all fail does the first error stand.
-A write of `[]`, or of only an unbuilt source, is a 400 that names the fix. The ddgs slot is empty until
-SEARCH-DDGS-01 registers a searcher. Images, videos, hosted search and page reads are outside the chooser.
+A write of `[]`, or of only an unbuilt source, is a 400 that names the fix. The ddgs searcher is
+SEARCH-DDGS-01 (below). Images, videos, hosted search and page reads are outside the chooser.
+
+**SEARCH-DDGS-01 (2026-10-12): the ddgs source.** `src/lib/retrieval/ddgsSource.ts` fills the ddgs slot. The
+maintained `ddgs` library runs in a local sidecar (`scripts/ddgs-sidecar/server.py`, pinned in its
+`requirements.txt`, binds 127.0.0.1) that owns the one fixed browser identity: no proxy, no rotation. Home
+reaches it only when `MAIPAI_DDGS_URL` names a loopback address; unset, ddgs stays unbuilt and nothing changes.
+It is adults only: `ModeSource "ddgs"` is closed for a child and teen, a guest is filtered in `packageHost.ts`,
+and `ddgsSearch` refuses a non-adult band itself. Traffic goes through the shared limiter (key `ddgs`, burst 2,
+one token per 10 s). The first 429 from the sidecar opens quiet mode: no request for 1 h, then 3 h, 12 h, 24 h
+on repeat blocks, reset by one normal answer; a refused connection or timeout is "not answering", not a block.
+Rows join the blend before `attachSearchPages`, so the adult always-block list and the page budget apply as for
+SearXNG rows. Results are not cached. The `platform:ddgs-search` privacy row shows while the sidecar is set up
+and DuckDuckGo is picked. Quiet-mode state is in memory, so a hub restart clears it (SEARCH-DDGS-01c would persist it). Stack installing and supervising the sidecar is STACK-DDGS-01 (hub first).
 
 **Reworked by KS-02 (2026-10-09); the off switch is now the source mode (KS-MODE-01, 2026-10-10).**
 `search.wikipedia_fallback` is retired. The household value `search.source_mode`

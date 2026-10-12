@@ -33,6 +33,16 @@ When you search, MaiPai sends your search words to your SearXNG. It does not nee
 3. Paste the address, for example `http://192.0.2.10:8888`, and save.
 4. Ask MaiPai a question you know the answer to, like "Search the web for the capital of France."
 
+## Add DuckDuckGo as a second source (optional)
+
+SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. It is off unless you set it up, and only adults use it. Children, teens and guests always use SearXNG alone.
+
+1. Start the small search service that comes with MaiPai. In the `scripts/ddgs-sidecar` folder, create its environment with `python3 -m venv .venv`, install with `.venv/bin/pip install -r requirements.txt`, then run `.venv/bin/python server.py`.
+2. Tell MaiPai where it is by setting `MAIPAI_DDGS_URL` to `http://127.0.0.1:8793` and restarting MaiPai.
+3. Open **Settings**, then **Search**, and pick DuckDuckGo under **Web search sources**.
+
+What it sends: the words searched and your home's internet address go to DuckDuckGo, from the service on your computer. Nothing else anyone in the house said or saved. It asks at a person's pace. If DuckDuckGo pushes back, MaiPai stops asking for an hour or more and answers from your other source meanwhile.
+
 ## Using search when you are away from home
 
 MaiPai runs on your computer at home, and that computer is the one that talks to your search server. If your search server is on the same home network, being away changes nothing.
