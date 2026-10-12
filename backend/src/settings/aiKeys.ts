@@ -91,6 +91,18 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "chat.search_assist",
+    scope: "household",
+    selector: "select",
+    range: { options: ["off", "shadow", "rescue"] },
+    default: "shadow",
+    label: "Help the chat remember to search the web",
+    help: "\"Off\" is the kill switch: nothing is scored. \"Shadow\" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. \"Rescue\" is not active yet; for now it behaves like shadow. Children and teens are never scored.",
+    level: "advanced",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "engines.stack.url",
     scope: "household",
     selector: "text",
