@@ -129,6 +129,24 @@ function assertCanSetAnswerPictures(actor: PersonRow, targetId: string): Setting
   return { ok: false, status: 403, error: "only a household adult may change a child's picture setting, and only a teen changes their own" };
 }
 
+/** MINOR-TOPICS-01e: a child's sensitive-subject levels (`topics.*` person keys) are set by a household
+ * owner or admin on the child's page and nowhere else. A child never changes their own, no key exists
+ * for a teen (the teen levels are the two household rows), and an adult has no use for one. */
+function assertCanSetChildTopic(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  const targetRole = getPersonRole(targetId);
+  if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
+  if (targetRole === "teen") {
+    return { ok: false, status: 403, error: "Sensitive-subject levels are set for a child only. A teen's levels are the household teen controls in Settings, Privacy." };
+  }
+  if (targetRole !== "child") {
+    return { ok: false, status: 403, error: "Sensitive-subject levels apply to a child only. To change them, open a child's page, Topics." };
+  }
+  if (!isOwnerOrAdmin(actor)) {
+    return { ok: false, status: 403, error: "A household owner or admin sets a child's sensitive-subject levels. Ask one of them to open the child's page, Topics." };
+  }
+  return { ok: true, value: true };
+}
+
 function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpResult<true> {
   const range = keyDef.range as Record<string, unknown> | undefined;
   switch (keyDef.selector) {
@@ -537,6 +555,8 @@ export function setValue(
           ? assertCanSetPhotoUploads(actor, parsed.id!)
         : key === "reference.images" && parsed.kind === "person"
           ? assertCanSetAnswerPictures(actor, parsed.id!)
+        : key.startsWith("topics.") && parsed.kind === "person"
+          ? assertCanSetChildTopic(actor, parsed.id!)
         : key === PERSON_STORAGE_CAP_KEY
           ? assertCanSetPersonStorageCap(actor, parsed.id!)
           : assertCanAccessScope(actor, parsed, "write");
@@ -773,7 +793,9 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   const auth = key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
     ? assertCanAccessWakewordDeviceSetting(actor)
-    : assertCanAccessScope(actor, parsed, "write");
+    : key.startsWith("topics.") && parsed.kind === "person"
+      ? assertCanSetChildTopic(actor, parsed.id!)
+      : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
   if (key === LEGACY_HOME_PLACE_KEY) {

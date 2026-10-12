@@ -80,6 +80,12 @@ function limitSettings() {
       key, scope: "person", selector: "number", default: 0, label: key, level: "basic", secret: false,
       lives_in: "person.storage", honoured_by: ["home"], range: { min: 0, max: 100000 },
     } as SettingsKey)),
+    {
+      key: "topics.bodies", scope: "person", selector: "select", default: "default", label: "Bodies and relationships",
+      level: "basic", secret: false, lives_in: "person.topics", honoured_by: ["home"],
+      range: { options: ["default", "redirect", "gentle"] },
+      copy: { option_labels: { default: "Follow child controls (recommended)", redirect: "Gently point to you", gentle: "Answer simply with correct body words" } },
+    } as unknown as SettingsKey,
   ];
   const values: ResolvedSetting[] = registry.map((setting) => ({ key: setting.key, value: 30, source: "default", label: setting.label, level: setting.level, secret: false }));
   return { registry, values };
@@ -188,6 +194,32 @@ describe("PersonProfilePage", () => {
       expect(document.querySelector('[id="settings-weather.places"]')).toBeNull();
       expect(view.queryByText("Weather places")).toBeNull();
     } finally { restore(); globalThis.fetch = original; }
+  });
+
+  test("an owner sees a child's Topics tab with plain-word choices and the fixed note", async () => {
+    const restore = stubProfileAndLimitsFetch();
+    try {
+      const view = renderProfile("/people/person-bramble?tab=topics", viewer({ role: "owner" }));
+      expect(await view.findByRole("tab", { name: "Topics" })).toBeTruthy();
+      expect(view.getByRole("tab", { name: "Topics" }).getAttribute("aria-selected")).toBe("true");
+      expect(await view.findByText("Sensitive subjects")).toBeTruthy();
+      expect(await view.findByRole("combobox", { name: "Bodies and relationships" })).toBeTruthy();
+      expect(await view.findByText(/Some things never change for Bramble/)).toBeTruthy();
+      expect(view.queryByText("Allowance 1")).toBeNull();
+    } finally { restore(); }
+  });
+
+  test("Topics is not on a child's own profile, a teen's profile or a member's view of a child", async () => {
+    const restore = stubProfileAndLimitsFetch();
+    try {
+      const own = renderProfile("/people/person-bramble?tab=topics", viewer({ id: "person-bramble", display_name: "Bramble", role: "child", age_band: "child" }));
+      await own.findByText("Bramble");
+      expect(own.queryByRole("tab", { name: "Topics" })).toBeNull();
+      own.unmount();
+      const member = renderProfile("/people/person-bramble?tab=topics", viewer({ role: "adult" }));
+      await member.findByText("Bramble");
+      expect(member.queryByRole("tab", { name: "Topics" })).toBeNull();
+    } finally { restore(); }
   });
 
   test("an owner does not see Limits on their own profile", async () => {

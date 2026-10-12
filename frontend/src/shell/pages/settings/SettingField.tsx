@@ -162,7 +162,9 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     );
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
-    const getLabel = def.key === "household.locale" ? localeDisplayName : titleCaseOption;
+    const optionLabels = (def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels;
+    // MINOR-TOPICS-01e: a key's spec copy names its options in plain words; titleCaseOption is the fallback.
+    const getLabel = (option: string) => optionLabels?.[option] ?? (def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
     control = (
       <Select value={String(resolved.value)} onValueChange={onChange} disabled={disabled}>
         <SelectTrigger aria-label={def.label}>

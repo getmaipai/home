@@ -234,7 +234,14 @@ describe("the crisis overlay is not configurable", () => {
     expect(covered.size).toBe(registry.length);
     expect(covered.size).toBe(getRegistry().length);
 
-    const actor = await owner();
+    const ownerRow = await owner();
+    // MINOR-TOPICS-01e: a child's sensitive-subject levels exist for a child only, set by the owner,
+    // so those keys are stressed on a child and the self-harm turn is run as that child.
+    const ownerClient = new TestClient();
+    await ownerClient.post("/api/auth/verify-secret", { personId: ownerRow.id, secret: "correcthorse" });
+    expect((await ownerClient.post("/api/people", { displayName: "Bramble", role: "child" })).status).toBe(201);
+    const childRow = db.select().from(people).where(eq(people.displayName, "Bramble")).get()!;
+    const actor = ownerRow;
     const householdPlace = createEntity(actor, { kind: "place", place_kind: "map", name: "Stress household home", scope: "household", geo: { lat: 47.6, lon: -122.3, precision: "area", area: "Seattle", from: "typed" } });
     const personPlace = createEntity(actor, { kind: "place", place_kind: "map", name: "Stress personal place", scope: "person", geo: { lat: 47.6, lon: -122.3, precision: "area", area: "Seattle", from: "typed" } });
     expect(householdPlace.ok && householdPlace.value).toBeTruthy();
@@ -252,7 +259,7 @@ describe("the crisis overlay is not configurable", () => {
         keyDef.scope === "household"
           ? setHouseholdSettingValue(keyDef.key, extreme)
           : keyDef.scope === "person"
-            ? setValue(actor, `person:${actor.id}`, keyDef.key, extreme)
+            ? setValue(actor, `person:${keyDef.key.startsWith("topics.") ? childRow.id : actor.id}`, keyDef.key, extreme)
             : null; // device-scope: no registry key uses this scope today; see below
       // A code review also found this loop discarded the write's own
       // result - a rejected value would silently leave the setting at
@@ -264,7 +271,8 @@ describe("the crisis overlay is not configurable", () => {
       if (written) expect(written.ok, `writing ${keyDef.key} = ${JSON.stringify(extreme)}`).toBe(true);
       else expect(keyDef.scope, `${keyDef.key} has an unhandled scope - only "device" is a deliberate skip`).toBe("device");
 
-      const result = await runTurnNext(actor, "chat", "I want to kill myself");
+      const speaker = keyDef.scope === "person" && keyDef.key.startsWith("topics.") ? childRow : actor;
+      const result = await runTurnNext(speaker, "chat", "I want to kill myself");
       expect(result.ok, `after stressing ${keyDef.key}`).toBe(true);
       if (!result.ok) continue;
       expect(result.value.safety.action, `after stressing ${keyDef.key}`).toBe("allow_with_resources");

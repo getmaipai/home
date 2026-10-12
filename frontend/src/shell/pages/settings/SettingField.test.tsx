@@ -37,3 +37,24 @@ test("renders does, state, and reason as kit descriptions without a wrapper", ()
   ]);
   expect(descriptions).toHaveLength(3);
 });
+
+test("a select shows the plain-word option labels from the key's copy", () => {
+  const setting = {
+    def: SettingsKey.parse({
+      key: "topics.bodies",
+      scope: "person",
+      selector: "select",
+      range: { options: ["default", "redirect", "gentle"] },
+      default: "default",
+      label: "Bodies and relationships",
+      level: "basic",
+      lives_in: "person.topics",
+      honoured_by: ["home"],
+      copy: { does: "Sets how MaiPai talks about this.", option_labels: { default: "Follow child controls (recommended)", redirect: "Gently point to you", gentle: "Answer simply with correct body words" } },
+    }),
+    resolved: { key: "topics.bodies", value: "gentle", source: "user", label: "Bodies and relationships", level: "basic", secret: false },
+  } as MergedSetting;
+  const view = render(<SettingField setting={setting} onChange={async () => true} onReset={() => {}} />);
+  expect(view.getByText("Answer simply with correct body words")).toBeTruthy();
+  expect(view.queryByText("Gentle")).toBeNull();
+});

@@ -16,7 +16,7 @@ import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnr
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
 import { useTabItem } from "@/shell/tabIdentity";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import { PERSON_LIMIT_GROUP_IDS } from "@/shell/pages/settings/personLimits";
+import { PERSON_LIMIT_GROUP_IDS, PERSON_TOPIC_GROUP_IDS } from "@/shell/pages/settings/personLimits";
 
 const PencilIcon = getIcon("pencil");
 type ProfileEntry = PersonRosterEntry | Roster;
@@ -42,11 +42,13 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
     ? "memories"
     : params.get("tab") === "limits" && canViewLimits
       ? "limits"
-      : "overview";
+      : params.get("tab") === "topics" && canViewLimits
+        ? "topics"
+        : "overview";
   function onTabChange(value: string) {
     setParams((previous) => {
       const next = new URLSearchParams(previous);
-      if (value === "memories" || value === "limits") next.set("tab", value);
+      if (value === "memories" || value === "limits" || value === "topics") next.set("tab", value);
       else next.delete("tab");
       return next;
     }, { replace: true });
@@ -104,6 +106,7 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                   <TabsTrigger value="overview">Overview</TabsTrigger>
                   {canViewMemories ? <TabsTrigger value="memories">Memories</TabsTrigger> : null}
                   {showLimits ? <TabsTrigger value="limits">Limits</TabsTrigger> : null}
+                  {showLimits ? <TabsTrigger value="topics">Topics</TabsTrigger> : null}
                 </TabsList>
                 <TabsContent value="overview">
                   <div className="flex flex-col gap-4 py-2">
@@ -126,6 +129,15 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
                     <div className="flex flex-col gap-4 py-2">
                       <p className="text-sm text-muted-foreground">Daily time limits for {profile.display_name}.</p>
                       <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_LIMIT_GROUP_IDS} titleOverrides={{ "person.storage": "Storage" }} />
+                    </div>
+                  </TabsContent>
+                ) : null}
+                {showLimits ? (
+                  <TabsContent value="topics">
+                    <div className="flex flex-col gap-4 py-2">
+                      <p className="text-sm text-muted-foreground">How MaiPai answers {profile.display_name} about sensitive subjects. Only you and other admins can change these.</p>
+                      <SettingsRenderer scope="person" scopeValue={`person:${profile.id}`} only={PERSON_TOPIC_GROUP_IDS} titleOverrides={{ "person.topics": "Sensitive subjects" }} />
+                      <p className="text-sm text-muted-foreground">Some things never change for {profile.display_name}. Feelings and safety always get care first and a trusted grown-up. Bullying, secrets and sharing where they live are never helped. On religion and politics, MaiPai takes no side. In danger, MaiPai points to a grown-up and the emergency number.</p>
                     </div>
                   </TabsContent>
                 ) : null}

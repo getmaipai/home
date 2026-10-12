@@ -49,6 +49,8 @@ function loadRegistry(): SettingsKey[] {
 }
 
 const CHILD_GUARDIAN_KEYS = new Set(["chat.photo_uploads", "reference.images"]);
+// MINOR-TOPICS-01e: a child's sensitive-subject levels are guardian-set (assertCanSetChildTopic in settings.ts).
+const isChildTopicKey = (key: string) => key.startsWith("topics.");
 const ADMIN_ONLY_KEYS = new Set([
   "security.session_lock_required",
   "security.session_lock_timeout_minutes",
@@ -67,9 +69,9 @@ function withPersonGuardFacts(key: SettingsKey): SettingsKey {
     adult: key.key === "search.safe_search" ? "off" : key.default,
   };
   const control = {
-    child: CHILD_GUARDIAN_KEYS.has(key.key) || ADMIN_ONLY_KEYS.has(key.key) ? "guardian" : "self",
-    teen: ADMIN_ONLY_KEYS.has(key.key) ? "guardian" : "self",
-    adult: ADMIN_ONLY_KEYS.has(key.key) ? "guardian" : "self",
+    child: CHILD_GUARDIAN_KEYS.has(key.key) || ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
+    teen: ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
+    adult: ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
   };
   return SettingsKey.parse({ ...key, control: key.control ?? control, band_default: key.band_default ?? bandDefault });
 }
