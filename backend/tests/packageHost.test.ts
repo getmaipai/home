@@ -2117,7 +2117,7 @@ describe("searxng search cache", () => {
 });
 
 describe("searxng search rotation", () => {
-  test("asks three enabled web engines in one request and keeps wikipedia when configured (THIN-GROUND-01 part 2)", async () => {
+  test("asks three enabled web engines in one request and leaves wikipedia for a thin result (THIN-GROUND-01 part 2, SEARCH-TIER-02)", async () => {
     const seen: string[] = [];
     const config = { engines: [
       { name: "alpha", enabled: true, safesearch: true, categories: ["general", "web"] },
@@ -2135,7 +2135,7 @@ describe("searxng search rotation", () => {
       setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
       await searxngSearch({ query: "one" });
       await searxngSearch({ query: "two" });
-      expect(seen).toEqual(["alpha,bravo,charlie,wikipedia", "alpha,bravo,charlie,wikipedia"]);
+      expect(seen).toEqual(["alpha,bravo,charlie", "alpha,bravo,charlie"]);
     } finally { server.stop(true); }
   });
 
@@ -2211,7 +2211,7 @@ describe("searxng search rotation", () => {
         __resetSearxngEnginesCacheForTests();
         await answerImageSearch(`image ${band}`, actor, band);
       }
-      expect(seen).toHaveLength(4);
+      expect(seen).toHaveLength(6); // each thin web search widens once with wikipedia (SEARCH-TIER-02)
       for (const url of seen) {
         const asked = url.searchParams.get("engines")?.split(",") ?? [];
         expect(asked.length).toBeGreaterThan(0);
@@ -2534,5 +2534,115 @@ describe("SEARCH-BUDGET-01", () => {
     expect(webSearchToolDeadlineMs("child", "written", 10_000)).toBe(10_000);
     expect(webSearchToolDeadlineMs("teen", "written", 10_000)).toBe(10_000);
     expect(retryDeadlineMs(webSearchToolDeadlineMs("adult", "spoken", 10_000), true)).toBe(5_000);
+  });
+});
+
+describe("search tiers: wikipedia only widens a thin result (SEARCH-TIER-02)", () => {
+  const tierConfig = { engines: ["alpha", "bravo", "charlie", "delta", "wikipedia"].map((name) => ({ name, enabled: true, safesearch: true, categories: ["general", "web"] })) };
+  const rows = (count: number, tag: string) => Array.from({ length: count }, (_, i) => ({ title: `${tag} ${i}`, url: `https://${tag}.example.com/${i}`, content: "content" }));
+  function tierServer(rowsFor: (call: number) => unknown[]) {
+    const asked: string[] = [];
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(tierConfig);
+      asked.push(url.searchParams.get("engines") ?? "");
+      return Response.json({ results: rowsFor(asked.length) });
+    } });
+    setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+    return { asked, server };
+  }
+  function reset(): void {
+    __resetSearxngEnginesCacheForTests();
+    __resetSearchRotationForTests();
+    __resetSearchCacheForTests();
+    __resetRateLimiterForTests();
+  }
+
+  test("three rows make exactly one upstream call and it carries no wikipedia", async () => {
+    reset();
+    const { asked, server } = tierServer(() => rows(3, "primary"));
+    try {
+      const out = await searxngSearch({ query: "tier enough" }, { safeSearchLevel: "off" });
+      expect(asked).toHaveLength(1);
+      expect(asked[0]!.split(",")).not.toContain("wikipedia");
+      expect(out.rows).toHaveLength(3);
+    } finally { server.stop(true); }
+  });
+
+  test("a thin first result makes a second call that adds wikipedia, and the rows merge", async () => {
+    reset();
+    const { asked, server } = tierServer((call) => (call === 1 ? rows(2, "primary") : rows(2, "widened")));
+    try {
+      const out = await searxngSearch({ query: "tier thin" }, { safeSearchLevel: "off" });
+      expect(asked).toHaveLength(2);
+      expect(asked[0]!.split(",")).not.toContain("wikipedia");
+      expect(asked[1]!.split(",")).toContain("wikipedia");
+      expect(out.rows).toHaveLength(4);
+    } finally { server.stop(true); }
+  });
+
+  test("a thin result with no other engine left still widens with wikipedia alone", async () => {
+    reset();
+    const lone = { engines: ["alpha", "wikipedia"].map((name) => ({ name, enabled: true, safesearch: true, categories: ["general", "web"] })) };
+    const asked: string[] = [];
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (request) => {
+      const url = new URL(request.url);
+      if (url.pathname === "/config") return Response.json(lone);
+      asked.push(url.searchParams.get("engines") ?? "");
+      return Response.json({ results: rows(1, `lone${asked.length}`) });
+    } });
+    try {
+      setHouseholdSettingValue("search.searxng_url", `http://127.0.0.1:${server.port}`);
+      await searxngSearch({ query: "tier lone" }, { safeSearchLevel: "off" });
+      expect(asked).toEqual(["alpha", "wikipedia"]);
+    } finally { server.stop(true); }
+  });
+
+  test("the cache key carries the tier: a widened result is cached apart and a repeat makes no new call", async () => {
+    reset();
+    const { asked, server } = tierServer((call) => (call === 1 ? rows(1, "primary") : rows(1, "widened")));
+    try {
+      await searxngSearch({ query: "tier cache" }, { safeSearchLevel: "off" });
+      expect(asked).toHaveLength(2);
+      const again = await searxngSearch({ query: "tier cache" }, { safeSearchLevel: "off" });
+      expect(asked).toHaveLength(2);
+      expect(again.rows).toHaveLength(2);
+    } finally { server.stop(true); }
+  });
+
+  test("a primary-only result never answers a request that needs widening", async () => {
+    reset();
+    let first = true;
+    const { asked, server } = tierServer(() => { const out = first ? rows(3, "full") : rows(1, "thin"); return out; });
+    try {
+      await searxngSearch({ query: "tier primary" }, { safeSearchLevel: "off" });
+      expect(asked).toHaveLength(1);
+      first = false;
+      // A different query is a different key: it must run its own tiers, not reuse the primary entry.
+      await searxngSearch({ query: "tier primary two" }, { safeSearchLevel: "off" });
+      expect(asked).toHaveLength(3);
+    } finally { server.stop(true); }
+  });
+
+  test("an empty widened result is not cached", async () => {
+    reset();
+    const { asked, server } = tierServer(() => []);
+    try {
+      await searxngSearch({ query: "tier empty" }, { safeSearchLevel: "off" });
+      const before = asked.length;
+      __resetRateLimiterForTests();
+      await searxngSearch({ query: "tier empty" }, { safeSearchLevel: "off" });
+      expect(asked.length).toBe(before * 2);
+    } finally { server.stop(true); }
+  });
+
+  test("a failed widening call still returns the first rows (SEARCH-HEALTH-02) and the pace budget is one fetch per call", async () => {
+    reset();
+    const { asked, server } = tierServer((call) => (call === 1 ? rows(2, "primary") : []));
+    try {
+      const out = await searxngSearch({ query: "tier keeps first" }, { safeSearchLevel: "off" });
+      expect(out.rows).toHaveLength(2);
+      expect(asked).toHaveLength(2);
+    } finally { server.stop(true); }
   });
 });

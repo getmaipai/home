@@ -1055,14 +1055,24 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
   const rotationPool = !isImages && input?.category !== "videos" ? await webRotationPool(baseUrl, safeLevel, opts, minorRequest) : null;
   const rotated = rotationPool ? pickSearchEngines(rotationPool) : null;
   const wikipedia = rotationPool?.includes("wikipedia") ? ["wikipedia"] : [];
-  const requestEngines = rotated && rotated.length > 0 ? [...rotated, ...wikipedia] : rotated;
-  const key = [baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", opts.timeRange ?? "", opts.allowWikipediaFallback === false ? "no-live-fallback" : "", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  // SEARCH-TIER-02: the first request asks the rotated web engines only. The
+  // wikipedia engine joins the top-up or retry, and only when the first request
+  // came back thin (fewer than 3 rows, a row count, no wording read).
+  const requestEngines = rotated;
+  const keyFor = (tier: "primary" | "widened"): string => [tier, baseUrl.replace(/\/+$/, ""), query, wantsPages(input) ? (wantsSpoken(input as { spoken?: unknown }) ? "page-spoken" : "page") : "", isImages ? "images" : "general", safeLevel, opts.minorBand ?? "adult", opts.timeRange ?? "", opts.allowWikipediaFallback === false ? "no-live-fallback" : "", (requestEngines ?? safeEngines ?? []).join(",")].join("\u001f");
+  const key = keyFor("primary");
+  const widenedKey = keyFor("widened");
   const now = Date.now();
-  const cached = searchCache.get(key);
-  if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
-  if (cached) searchCache.delete(key);
+  // A primary entry exists only for a result that did not need widening; a
+  // widened result lives under its own tier token, so neither answers for the other.
+  for (const candidate of [key, widenedKey]) {
+    const cached = searchCache.get(candidate);
+    if (cached && now - cached.storedAt < SEARCH_CACHE_TTL_MS) return cached.result;
+    if (cached) searchCache.delete(candidate);
+  }
   const running = searchInFlight.get(key);
   if (running) return running;
+  let widened = false;
   const searchRows = async (): Promise<SearxngSearchResult> => {
     const asked = (requestEngines ?? []).filter((name) => name !== "wikipedia");
     // THIN-GROUND-01 part 2: the one retry. Engines SearXNG reports unresponsive
@@ -1076,6 +1086,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
     } catch (err) {
       if (!(err instanceof HostError && err.code === "search_unavailable") || next.length === 0) throw err;
       const retryNext = pickSearchEngines(rotationPool!, asked);
+      widened = true;
       if (retryNext.length === 0) {
         // Benching during the request emptied the pool: the first request left the
         // Wikipedia fallback for a retry that cannot happen, so try it here.
@@ -1087,7 +1098,8 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
     }
     if (!rotationPool || !requestEngines || requestEngines.length === 0 || result.rows.length >= 3) return result;
     const more = pickSearchEngines(rotationPool, asked);
-    if (more.length === 0) {
+    widened = true;
+    if (more.length === 0 && wikipedia.length === 0) {
       const fallback = result.text === SEARXNG_NO_RESULTS_TEXT && (opts.allowWikipediaFallback ?? true) && opts.speakerBand === "adult" && next.length > 0 ? await tryWikipediaFallback(query, opts.fallbackSignal, opts.fallbackDeadlineAt ?? opts.deadlineAt, opts.speakerBand) : null;
       return fallback ?? result;
     }
@@ -1108,7 +1120,7 @@ async function searxngSearchWithOptions(args: unknown, opts: SearchOptions = {})
     // robots decline) is not cached: a retry should try the pages again.
     if (result.rows.length > 0 && (!wantsPages(input) || (result.pages?.length ?? 0) > 0)) {
       if (searchCache.size >= SEARCH_CACHE_MAX_ENTRIES) searchCache.delete(searchCache.keys().next().value!);
-      searchCache.set(key, { result, storedAt: Date.now() });
+      searchCache.set(widened ? widenedKey : key, { result, storedAt: Date.now() });
     }
     return result;
   }).finally(() => searchInFlight.delete(key));
