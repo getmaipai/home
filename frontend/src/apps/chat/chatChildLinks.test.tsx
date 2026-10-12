@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
@@ -58,5 +58,23 @@ describe("MINOR-SEARCH-01h child links", () => {
   });
   test("an adult's answer keeps the links", async () => {
     expect((await outboundLinks("adult")).length).toBeGreaterThan(0);
+  });
+});
+
+// MINOR-SEARCH-01n: on a touch screen (no hover, a tapped button may not take focus) a child can still read the excerpt.
+describe("MINOR-SEARCH-01n touch citation", () => {
+  test("a child's tap on the citation chip shows the source name, and a tap elsewhere hides it", async () => {
+    const view = renderWithQueryClient(<MemoryRouter><Harness band="child" /></MemoryRouter>);
+    await waitFor(() => expect(view.container.textContent).toContain("Water boils at 100 C"));
+    const chip = await waitFor(() => {
+      const found = Array.from(view.container.querySelectorAll<HTMLButtonElement>("button")).find((b) => b.textContent === "1");
+      expect(found).toBeTruthy();
+      return found!;
+    });
+    fireEvent.pointerDown(chip, { pointerType: "touch" });
+    fireEvent.click(chip);
+    expect(await within(document.body).findByText("Water facts")).toBeTruthy();
+    fireEvent.pointerDown(document.body, { pointerType: "touch" });
+    await waitFor(() => expect(within(document.body).queryByText("Water facts")).toBeNull());
   });
 });
