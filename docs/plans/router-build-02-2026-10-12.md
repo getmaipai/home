@@ -268,3 +268,9 @@ held-out fold, C and D use out-of-fold scores; B is one repeat; A's weights saw 
 Nested family-grouped CV, recall at the 2% ceiling: LR 94.6%, MLP 93.5%, SVM 93.0%. B answered something other than SEARCH or
 NO_SEARCH (counted as NO_SEARCH, fail open) on about 10% of rows, almost all stable and no_tool; B's latency on the bench was a
 median 173 ms, p95 233 ms. B and D contain the 9B decision pass and need an architect ruling (rule 1) if they are the only arms that clear the marks.
+
+Addendum (ROUTER-BUILD-05, registered before any lock box number exists, no arm has been run): `PREREG.json` compares each arm only
+to plain, so B or D could not be shown to beat C. `data-scratch/chat-ab/router-build-02/PREREG-ADDENDUM.json` sha256
+`bab3bcbd6404e083502c58af815a40c8721ea6b446e39696b5a89b29366122ae` adds paired family cluster-bootstrap intervals for B minus C and
+D minus C recall (10,000 resamples, seed 1, 95%); the pass line is a lower bound above 0, and the arm must still pass M1, M2 and M3
+on its own. `PREREG.json` is unchanged (sha256 above).
