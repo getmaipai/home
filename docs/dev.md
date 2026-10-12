@@ -370,6 +370,21 @@ package manifests (KS-05b). This supersedes BUILD-SLICES' "Settings rows for fee
 child's)": the owner's 2026-10-12 requirement is the admin OptionMatrix grid, with no per-parent feed entry.
 Tests: `tests/shelfPoller.test.ts`, `tests/shelfVisibility.test.ts` (offline, stub fetch, enumerates user type x list x audience).
 
+**KS-05b (2026-10-12): the two feed-list packages and the `news` rewire.** `backend/packages/feeds-household`
+(offered to teens and adults) and `backend/packages/feeds-children` (offered to children) are `kind: "module"`
+packages: a `manifest.json`, a `feeds.json` (the spec `FeedListPackage`, `list_id` equal to the list id in
+`spec/news/feed-lists.json`), README, CHANGELOG and `quality_scale.yaml`. Each feed host has a `net:<host>`
+permission and one `data_sources` privacy row; `tests/shelfFeedLists.test.ts` fails when a feed has either missing.
+The feed addresses were chosen from memory of the publishers' public feeds and have not been fetched from this
+build environment: the first live poll is their check, and a dead address backs off like any bad signal.
+`privacy.ts` now reads manifests with `loadManifestOnly`, so a package with no recipe (Tier 1 `news`, these modules)
+contributes its `data_sources` rows to the privacy page; before this the NPR row was dropped.
+`runPlugin` serves `news` from the shelf while `news.shelf.enabled` is on (`shelfNews.ts`): it asks
+`releaseShelfItems` for the asker's user type (so the lists ticked for that type, the audience and `band_ok`
+rules above all apply), builds the same `Top headlines:` reply and hands it to `applyNewsMinorFloor`. No live
+fetch happens on that path. An empty shelf answers with a plain "nothing saved yet" line; no list ticked for the asker says so and points to
+Settings, News shelf. With the shelf off, or its store unable to open, the old live NPR path is unchanged. Tests that exercise the live handler's failure and cache paths set the shelf off.
+
 **Reworked by KS-02 (2026-10-09); the off switch is now the source mode (KS-MODE-01, 2026-10-10).**
 `search.wikipedia_fallback` is retired. The household value `search.source_mode`
 (`live | offline | mix`, default `mix`) and the overrides

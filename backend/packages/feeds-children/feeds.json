@@ -1,0 +1,23 @@
+{
+  "list_id": "feeds-children",
+  "feeds": [
+    {
+      "url": "https://feeds.bbci.co.uk/newsround/rss.xml",
+      "title": "CBBC Newsround",
+      "publisher": "BBC",
+      "lang": "en"
+    },
+    {
+      "url": "https://www.snexplores.org/feed",
+      "title": "Science News Explores",
+      "publisher": "Science News Explores",
+      "lang": "en"
+    },
+    {
+      "url": "https://www.dogonews.com/rss",
+      "title": "DOGOnews",
+      "publisher": "DOGOnews",
+      "lang": "en"
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "id": "news",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Info",
   "display": "News",
@@ -30,7 +30,7 @@
     {
       "id": "npr-rss",
       "destination": "NPR's own public RSS feed",
-      "when": "the household asks for the news",
+      "when": "the household asks for the news while the News shelf is turned off in Settings",
       "what": "nothing personal - a plain, unauthenticated GET",
       "who": "NPR",
       "opt_in": true,

@@ -100,7 +100,13 @@ describe("every bundled package clears bronze", () => {
       const dir = join(PACKAGES_DIR, id);
       const manifest = PackageManifest.parse(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8")));
 
+      // KS-05b: a feed-list package (feeds-*) only fills a shelf list for the poller; nobody
+      // can ask for it, so it has no routing to give examples for.
       test("has 5+ routing examples", () => {
+        if (id.startsWith("feeds-")) {
+          expect(manifest.routing).toBeUndefined();
+          return;
+        }
         expect(manifest.routing?.examples?.length ?? 0).toBeGreaterThanOrEqual(5);
       });
 

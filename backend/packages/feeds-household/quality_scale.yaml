@@ -1,0 +1,31 @@
+# Bronze/silver/gold criteria per getmaipai/.github's docs/PACKAGES.md.
+package: feeds-household
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: backend/tests/shelfFeedLists.test.ts reads feeds.json through the spec's FeedListPackage and checks each host has a privacy row and a permission
+  routing_examples:
+    met: true
+    note: module package, no tool; the News shelf feeds the existing news package, which holds the routing examples
+  privacy_row_per_data_source:
+    met: true
+    note: one data_sources[] row per feed host
+  offline_behavior_stated:
+    met: true
+    note: "offline: unavailable - the feeds are fetched live; fetched headlines stay on the shelf"
+  smoke_test:
+    met: true
+    note: "smoke: { kind: static }, loads only; the poller is covered by shelfPoller.test.ts"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose (keyless public feeds)
+gold:
+  real_service_verified:
+    met: false
+    note: feed addresses not yet checked against the live publishers

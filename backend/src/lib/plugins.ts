@@ -26,6 +26,7 @@ import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/l
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
+import { shelfNewsResult } from "@/lib/shelf/shelfNews";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { registerProjectType } from "@/lib/projects/projectTypes";
 import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
@@ -541,6 +542,13 @@ export async function runPlugin(
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
 
   if (manifest.tier === 1) {
+    // KS-05b: while the News shelf is on, the news answer comes from the shelf the poller
+    // keeps, never from a live fetch; the minor floor still runs over what the shelf releases.
+    if (id === "news") {
+      const band = speakerAgeBand(actor, new Date());
+      const shelved = shelfNewsResult(band);
+      if (shelved) return { ok: true, value: applyNewsMinorFloor(shelved, band) };
+    }
     // ALM-01: the almanac handlers are sandboxed Tier 1 packages, so the
     // turn's already-frozen clock crosses the MCP boundary as an internal
     // argument. The production path gets the real current instant from

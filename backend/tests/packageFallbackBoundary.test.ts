@@ -20,6 +20,7 @@ import { PACKAGES_DIR, installedPackageVersionDir } from "@/lib/paths";
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetDenoHostForTests } from "@/lib/denoHost";
 import { getWidgetData } from "@/lib/widgets";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import type { PersonRow } from "@/types";
 
@@ -32,6 +33,9 @@ beforeEach(() => {
   __resetThrottleForTests();
   __resetDenoHostForTests();
   __resetPackageCachesForTests();
+  // KS-05b: with the News shelf on, the news answer never runs the handler. These tests
+  // are about the handler's failure fallback, which is the shelf-off (live) path.
+  setHouseholdSettingValue("news.shelf.enabled", false);
 });
 
 afterEach(() => {

@@ -2,10 +2,11 @@
 
 All notable changes to the News package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
-## [Unreleased]
+## [0.2.0] - 2026-10-12
 
 ### Changed
 
+- While the News shelf is on (Settings, News shelf), the answer comes from the headlines the shelf already saved for the asker's kind of person, and the live NPR request is not made. With the shelf off, the live NPR path below is used as before. The minor safety floor runs over both.
 - The handler also returns up to eight candidate headlines as data, so the host can check each one against the minor safety floor before a child or teen sees any.
 
 ## [0.1.0] - 2026-09-06

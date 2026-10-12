@@ -1,0 +1,23 @@
+{
+  "list_id": "feeds-household",
+  "feeds": [
+    {
+      "url": "https://feeds.npr.org/1001/rss.xml",
+      "title": "NPR News",
+      "publisher": "NPR",
+      "lang": "en"
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/rss.xml",
+      "title": "BBC News",
+      "publisher": "BBC",
+      "lang": "en"
+    },
+    {
+      "url": "https://www.pbs.org/newshour/feeds/rss/headlines",
+      "title": "PBS NewsHour headlines",
+      "publisher": "PBS NewsHour",
+      "lang": "en"
+    }
+  ]
+}

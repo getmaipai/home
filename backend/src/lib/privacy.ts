@@ -18,7 +18,7 @@ import { VISION_ALL_ASSETS } from "@/lib/visionAssets";
 import { ROBOT_ASSETS } from "@/lib/robotAssets";
 import { SILERO_VAD_ASSET } from "@/lib/sttAssets";
 import { voiceCatalogUrl } from "@/lib/voiceCatalog";
-import { listPackageIds, loadPackage, type LoadedPackage } from "@/lib/plugins";
+import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { LIST_INDEX_URL, LIST_SOURCE_HOST } from "@/lib/blocklists/listIndex";
 import { neededListIds } from "@/lib/blocklists/listSync";
 import { telegramConfigured } from "@/lib/telegramChannel";
@@ -260,9 +260,12 @@ function row(
 function loadedManifests(): PackageManifest[] {
   return listPackageIds()
     .sort()
-    .map((id) => loadPackage(id))
-    .filter((r): r is { ok: true; value: LoadedPackage } => r.ok)
-    .map((r) => r.value.manifest);
+    // loadManifestOnly, not loadPackage: a Tier 1 or module package has no recipe.json, and
+    // loadPackage would drop it, so its data_sources rows (NPR, the news shelf's feed lists)
+    // never reached this page.
+    .map((id) => loadManifestOnly(id))
+    .filter((r): r is { ok: true; value: PackageManifest } => r.ok)
+    .map((r) => r.value);
 }
 
 /** Every bundled package's declared connections, read from the manifests

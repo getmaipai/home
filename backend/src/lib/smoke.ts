@@ -36,7 +36,7 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { packageStatus } from "@/db/schema";
-import { listPackageIds, loadPackage, loadProjectPackage } from "@/lib/plugins";
+import { listPackageIds, loadManifestOnly, loadPackage, loadProjectPackage } from "@/lib/plugins";
 import { loadSkill } from "@/lib/skills";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isValidPackageId } from "@/lib/paths";
@@ -245,6 +245,12 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
     if (manifestJson.kind === "project") {
       const loadedProject = loadProjectPackage(id);
       return recordResult(id, loadedProject.ok ? { ok: true, message: "project package loads" } : { ok: false, message: loadedProject.error });
+    }
+    if (manifestJson.kind === "module") {
+      // KS-05b: a module package (the shelf's feed lists) ships data, not a recipe, so only
+      // its manifest has to load and validate.
+      const loadedModule = loadManifestOnly(id);
+      return recordResult(id, loadedModule.ok ? { ok: true, message: "module manifest loads" } : { ok: false, message: loadedModule.error });
     }
     const loaded = loadPackage(id);
     return recordResult(id, loaded.ok ? { ok: true, message: "package loads" } : { ok: false, message: loaded.error });

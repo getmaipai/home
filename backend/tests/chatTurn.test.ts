@@ -754,6 +754,8 @@ describe("CHAT-02: one output safety boundary", () => {
     "the two outlets outside a chat turn meet the same boundary: a direct package run and a dashboard widget never return the unsafe headline",
     async () => {
       const { childRow } = await ownerAndChild();
+      // KS-05b: this seeds the live feed cache, which only the shelf-off path reads.
+      setHouseholdSettingValue("news.shelf.enabled", false);
       await seedUnsafeNews();
       try {
         const childClient = new TestClient();

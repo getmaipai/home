@@ -1,0 +1,65 @@
+{
+  "id": "feeds-household",
+  "version": "0.1.0",
+  "kind": "module",
+  "category": "Info",
+  "display": "Household news feeds",
+  "description": "Fill the News shelf with headlines from public news sites, for teens and adults.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "incognito": "unaffected",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "teen",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "feed-feeds-bbci-co-uk",
+      "destination": "the BBC's own public news feed (feeds.bbci.co.uk)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "the BBC",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-feeds-npr-org",
+      "destination": "NPR's own public news feed (feeds.npr.org)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "NPR",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-pbs-org",
+      "destination": "PBS's own public news feed (www.pbs.org)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "PBS",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    }
+  ],
+  "permissions": [
+    "net:feeds.bbci.co.uk",
+    "net:feeds.npr.org",
+    "net:www.pbs.org"
+  ],
+  "notifications": [],
+  "backup": "exclude",
+  "background": true,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "static"
+  }
+}
