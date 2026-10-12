@@ -74,6 +74,30 @@ describe("GET /api/artifacts/:id", () => {
   });
 });
 
+describe("a child's artifact (MINOR-SEARCH-01o)", () => {
+  test("a child reads and downloads their own document with no link in it; an adult keeps the link", async () => {
+    const { client: ownerClient, person: ownerPerson } = await owner();
+    const { client: childClient, person: childPerson } = await child(ownerClient);
+    const body = "Read [frogs](https://example.com/f) now.";
+    const mine = (who: typeof childPerson) => {
+      const conversationId = conversationFor(who);
+      const turnId = turnFor(who, conversationId);
+      return createArtifact({ conversationId, turnId, kind: "markdown", title: "Frog notes", body, createdBy: who.id, provenance: `artifact-tool:${turnId}` });
+    };
+    const kids = mine(childPerson);
+    const read = (await (await childClient.get(`/api/artifacts/${kids.id}`)).json()) as { body: string };
+    expect(read.body).toBe("Read frogs now.");
+    const current = (await (await childClient.get(`/api/artifacts/${kids.id}/current`)).json()) as { body: string };
+    expect(current.body).toBe("Read frogs now.");
+    expect(await (await childClient.get(`/api/artifacts/${kids.id}/export`)).text()).toBe("Read frogs now.");
+    const header = (await childClient.get(`/api/artifacts/${kids.id}/export`)).headers.get("content-disposition") ?? "";
+    expect(header).not.toContain("http");
+    const adults = mine(ownerPerson);
+    const adultRead = (await (await ownerClient.get(`/api/artifacts/${adults.id}`)).json()) as { body: string };
+    expect(adultRead.body).toBe(body);
+  });
+});
+
 describe("GET /api/artifacts/:id/current", () => {
   // SHELL-02 slice 4's own acceptance: "a later turn's update to the
   // same artifact id replaces the pane's content" - the canvas panel

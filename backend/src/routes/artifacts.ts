@@ -8,6 +8,8 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { Artifact } from "@maipai/spec/gen/ts/artifact.js";
 import { requireAuth } from "@/middleware/auth";
 import { getArtifactRow, currentArtifactRow, visibleArtifactRow, toArtifact } from "@/lib/artifacts";
+import { artifactTextForBand } from "@/lib/childLinks";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { AppEnv } from "@/types";
 
 export const artifactsRoutes = apiRouter();
@@ -36,7 +38,7 @@ artifactsRoutes.openapi(getArtifactRoute, (c) => {
   const actor = c.get("person");
   const row = getArtifactRow(c.req.valid("param").id);
   if (!row || !visibleArtifactRow(actor, row)) return c.json({ error: "artifact not found" }, 404);
-  return c.json(toArtifact(row), 200);
+  return c.json(artifactTextForBand(toArtifact(row), speakerAgeBand(actor, new Date())), 200);
 });
 
 // SHELL-02 slice 4: canvas-split's own acceptance ("a later turn's
@@ -68,7 +70,7 @@ artifactsRoutes.openapi(getCurrentArtifactRoute, (c) => {
   if (!row || !visibleArtifactRow(actor, row)) return c.json({ error: "artifact not found" }, 404);
   const current = currentArtifactRow(row.artifactKey) ?? row;
   if (!visibleArtifactRow(actor, current)) return c.json({ error: "artifact not found" }, 404);
-  return c.json(toArtifact(current), 200);
+  return c.json(artifactTextForBand(toArtifact(current), speakerAgeBand(actor, new Date())), 200);
 });
 
 const exportArtifactRoute = createRoute({
@@ -92,7 +94,9 @@ artifactsRoutes.openapi(exportArtifactRoute, (c) => {
   const row = getArtifactRow(c.req.valid("param").id);
   if (!row || !visibleArtifactRow(actor, row)) return c.json({ error: "artifact not found" }, 404);
   const kind = row.kind as Artifact["kind"];
+  const shown = artifactTextForBand(row, speakerAgeBand(actor, new Date()));
   c.header("Content-Type", `${CONTENT_TYPE_BY_KIND[kind]}; charset=utf-8`);
-  c.header("Content-Disposition", `attachment; filename="${slugify(row.title)}.${EXTENSION_BY_KIND[kind]}"`);
-  return c.body(row.body);
+  c.header("Content-Disposition", `attachment; filename="${slugify(shown.title)}.${EXTENSION_BY_KIND[kind]}"`);
+  // MINOR-SEARCH-01o: a child's download carries no link either.
+  return c.body(shown.body);
 });

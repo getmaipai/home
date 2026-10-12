@@ -26,7 +26,7 @@ import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { sourcesForChild } from "@/lib/childLinks";
+import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
 import { FAILURE_COPY } from "@/lib/failureCopy";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
@@ -157,6 +157,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
       }
     : outputFlag ?? state.blockSafety;
   const crisisResources = safety ? (deriveCrisisResources(safety) ?? inputCrisisLine) : inputCrisisLine;
+  const valueBand = turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date());
   return {
     reply: { text, speech },
     source,
@@ -185,7 +186,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // called here, so the new path built no structured part (the
     // weather/almanac card) and no artifact (write_document's own
     // outcome) for anything, on any turn. Same functions, same input.
-    structured_part: structuredPartForOutcomes(state.outcomes, turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date())) ?? undefined,
+    structured_part: structuredPartForBand(structuredPartForOutcomes(state.outcomes, valueBand) ?? undefined, valueBand),
     artifact: artifactForOutcomes(state.outcomes) ?? undefined,
     // PROJECT-PROGRESS-01: a start_project outcome names the project id
     // it just launched, the same unconditional-line, no-new-dispatch
@@ -195,7 +196,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
     // MINOR-SEARCH-01m: a child's sources keep title and site but not the page address.
-    ...(sources && sources.length > 0 ? { sources: turnAgeBand(state.surface, state.actor, state.speakerEvidence, new Date()) === "child" ? sourcesForChild(sources) : sources } : {}),
+    ...(sources && sources.length > 0 ? { sources: valueBand === "child" ? sourcesForChild(sources) : sources } : {}),
   } as TurnValue;
 }
 

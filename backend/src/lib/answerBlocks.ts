@@ -6,6 +6,7 @@ import { carriesCrisisSignal } from "@/lib/safety";
 import { notifyIfFlagged } from "@/lib/notifications";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import type { PersonRow } from "@/types";
+import { stripLinksDeep } from "@/lib/childLinks";
 
 const BAND_RANK: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 const STRUCTURAL_KEYS = new Set([
@@ -96,6 +97,18 @@ export function filterAnswerBlocks(
       continue;
     }
     ids.add(block.id);
+    // MINOR-SEARCH-01o: a child's block holds no web address, in the stream, the stored row or the copy.
+    if (band === "child") {
+      // A strip that leaves the block unable to validate (a required text now empty) drops the block, never ships it broken.
+      const stripped = AnswerBlock.safeParse(stripLinksDeep(block));
+      if (!stripped.success) {
+        console.warn("[answer-block] dropped block that held an address a child may not see");
+        ids.delete(block.id);
+        continue;
+      }
+      accepted.push(stripped.data as AnswerBlockValue);
+      continue;
+    }
     accepted.push(block);
   }
   return accepted;

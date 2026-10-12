@@ -40,3 +40,40 @@ export function sourcesForChild(sources: Source[]): Source[] {
 export function sourcesForBand<T>(sources: T[] | undefined, band: string): T[] | undefined {
   return sources && Array.isArray(sources) && band === "child" ? (sourcesForChild(sources as unknown as Source[]) as unknown as T[]) : sources;
 }
+
+// MINOR-SEARCH-01o: the same strip for the structured parts of a turn (answer blocks, the spec-sheet part, a generated
+// document's body). Every string loses its links; a `url` or `href` field that holds a web address is removed (the
+// block schema makes it optional), and `src` is left alone because the hub rewrites it to its own picture route.
+const KEEP_AS_IS = new Set(["src", "full", "id", "kind", "hlc", "created_at"]);
+const ADDRESS_KEYS = new Set(["url", "href"]);
+
+/** A copy of `value` with every closed link format removed from every string inside it. */
+export function stripLinksDeep<T>(value: T, key = ""): T {
+  // A kept key stays only when it is the hub's own path (a picture route), never an outside address.
+  if (typeof value === "string") return (KEEP_AS_IS.has(key) && !/^\s*(?:https?:)?\/\//i.test(value) ? value : stripLinksForChild(value)) as unknown as T;
+  if (Array.isArray(value)) return value.map((item) => stripLinksDeep(item, key)) as unknown as T;
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [childKey, child] of Object.entries(value)) {
+      if (ADDRESS_KEYS.has(childKey) && typeof child === "string" && /^https?:\/\//i.test(child.trim())) continue;
+      out[childKey] = stripLinksDeep(child, childKey);
+    }
+    return out as T;
+  }
+  return value;
+}
+
+export function blocksForBand<T>(blocks: T[] | undefined, band: string): T[] | undefined {
+  return blocks && band === "child" ? stripLinksDeep(blocks) : blocks;
+}
+
+export function structuredPartForBand<T>(part: T | undefined, band: string): T | undefined {
+  return part && band === "child" ? stripLinksDeep(part) : part;
+}
+
+/** A child's generated document: the body and title lose their links. Code is left whole (an address inside code is
+ * text, not a link the child can follow). */
+export function artifactTextForBand<T extends { kind: string; title: string; body: string }>(artifact: T, band: string): T {
+  if (band !== "child" || artifact.kind === "code") return artifact;
+  return { ...artifact, title: stripLinksForChild(artifact.title), body: stripLinksForChild(artifact.body) };
+}
