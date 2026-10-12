@@ -60,6 +60,10 @@ const OLD_CHILD = new Set([
   "ui.appearance", "ui.look", "ui.show_turn_stats", "ui.enrollment_sounds",
 ]);
 // A teen saw the same, plus the chat photo switch (hidden from a child).
+// EASE-OF-USE-01c: ease of use is comfort, not protection, so a child and a teen see the ease keys (one deliberate
+// addition to the old snapshot; every other key stays exactly as it was).
+const EASE_KEYS = REGISTRY.filter((k) => k.key.startsWith("ease.")).map((k) => k.key);
+for (const key of EASE_KEYS) OLD_CHILD.add(key);
 const OLD_TEEN = new Set([...OLD_CHILD, "chat.photo_uploads"]);
 
 describe("which sections each role sees", () => {

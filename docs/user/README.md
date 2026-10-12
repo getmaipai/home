@@ -14,6 +14,8 @@ day the hub arrives; the rest are for when you need them.
 - [What MaiPai remembers](memory.md): see, export, or forget what MaiPai has remembered from your conversations.
 - [People and parental controls](people.md): see who is in your household, manage accounts, and check in on a child.
 - [Settings](settings.md): find your way around MaiPai's settings, for the household and for you.
+- [Ease of use](ease-of-use.md): make words bigger, buttons roomier and colors clearer for yourself.
+
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.
 - [Privacy](privacy.md): see exactly what, if anything, leaves your house.
 - [Set up web search](web-search.md): connect MaiPai to your own SearXNG search server, use it away from home, and fix it if it stops.

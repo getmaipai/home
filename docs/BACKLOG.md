@@ -59,6 +59,7 @@ Three layers: user overrides over global defaults over user defaults (Kids, Teen
 - [x] SETTINGS-LAYERS-01b (M): the resolver and the one write gate for per-person list overrides (29678422).
 - [x] SETTINGS-LAYERS-01c (M): per-person site blocks, web sources and list downloads on the resolver (a8f55df6).
 - [x] SETTINGS-LAYERS-01d (M): the People page blocked-sites section, `/api/people/:id/site-blocks` routes, OptionMatrix on the 48px checkbox, pins ui-v0.5.198 (6a512b19).
+- [x] EASE-OF-USE-01c (S): pins spec-v0.1.129 and ui-v0.5.199, `useEase` sets the five `data-ease-*` attributes, the self-service write gate (`lib/layeredScalar.ts`), `layer` and `locked` on resolved settings, `scripts/screenshotEase.ts`. Not done: the kit tag ui-v0.5.199 ships the token generator and its test but not the generated `tokens.css` block or the rail change, so Large changes no sizes yet (commons fix, then re-pin and run the screenshot script with `--require-rail`); the kit row cannot show the lock or a "Large + N changes" summary (additive prop, commons first).
 - [ ] SETTINGS-LAYERS-01e (M): migrate the band-named household keys (`search.blocklists.teen` and kin) to `band:<band>` scope rows.
 - [ ] SETTINGS-LAYERS-01f (M): SafeSearch on the resolver; retire `assertCanSetSafeSearch`.
 - [ ] SETTINGS-LAYERS-01g (M): per-person app permissions on the resolver.

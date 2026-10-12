@@ -91,6 +91,9 @@ describe("settings guard agreement metadata", () => {
           : key.key === "search.page_text_cleaning" ? true : key.default,
         adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "adult") : key.default,
       };
+      // Ease of use is comfort, not protection: only the preset and reading level differ for a child (EASE-OF-USE-01).
+      if (key.key === "ease.preset") expectedDefaults.child = "simple";
+      if (key.key === "ease.reading_level") expectedDefaults.child = "plain";
       expect(key.band_default, `${key.key} band default`).toEqual(expectedDefaults);
     }
 

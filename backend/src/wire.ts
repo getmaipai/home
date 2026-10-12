@@ -572,6 +572,11 @@ export interface ResolvedSetting {
   does?: string;
   state?: string;
   reason?: string;
+  /** Which layer the value comes from, for a setting that comes in layers (EASE-OF-USE-01c): the person's own,
+   * the household's, the age group's, or the key's default. Absent on a setting with no layers. */
+  layer?: "person" | "household" | "band" | "default";
+  /** True when an admin set this for the person, so the person cannot change it until an admin resets it. */
+  locked?: boolean;
 }
 
 export interface BackupInfo {

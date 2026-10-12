@@ -22,6 +22,7 @@ import { blocklistStatusNote } from "@/lib/blocklists/status";
 import { describeSetting } from "@maipai/spec/interpreters/ts/describeSetting.js";
 import type { PersonRow } from "@/types";
 import { newEntityId } from "@/lib/id";
+import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayeredScalar } from "@/lib/layeredScalar";
 import { createEntity, updateEntity } from "@/lib/entities";
 
 const LEGACY_HOME_PLACE_KEY = "household.home_place";
@@ -340,6 +341,12 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
     .filter((k) => !(parsed.kind === "person" && parsed.id !== actor.id && k.selector === "location"))
     .map((k) => {
       const row = storedByKey.get(k.key);
+      if (parsed.kind === "person" && parsed.id && isLayeredScalar(k)) {
+        // EASE-OF-USE-01c: person's own value, else household's, else the age group's, else the default.
+        const layered = resolveLayeredScalar(k, parsed.id, speakerAgeBand(subject, new Date()));
+        const own = layered.layer === "person";
+        return { ...resolveForResponse(k, layered.value, own ? "user" : "default", descriptionContext), layer: layered.layer, locked: layered.locked };
+      }
       const rawValue = k.key === LEGACY_HOME_PLACE_KEY
         ? getHouseholdSettingValue(LEGACY_HOME_PLACE_KEY)
         : row ? decodeStoredRow(k, row.value) : k.default;
@@ -358,7 +365,7 @@ function writeValue(
   scope: string,
   keyDef: SettingsKey,
   value: unknown,
-  opts: { skipValidation?: boolean; viewer?: PersonRow; subject?: PersonRow; adminName?: string | null } = {},
+  opts: { skipValidation?: boolean; viewer?: PersonRow; subject?: PersonRow; adminName?: string | null; setBy?: string } = {},
 ): SettingsOpResult<ResolvedSetting> {
   const key = keyDef.key;
   if (!opts.skipValidation) {
@@ -398,11 +405,11 @@ function writeValue(
   const serialized = encodeForStorage(keyDef, value);
   if (existing) {
     db.update(settingsValues)
-      .set({ value: serialized, hlc, source: "user", updatedAt: now })
+      .set({ value: serialized, hlc, source: "user", updatedAt: now, ...(opts.setBy ? { setBy: opts.setBy } : {}) })
       .where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key)))
       .run();
   } else {
-    db.insert(settingsValues).values({ scope, key, value: serialized, hlc, source: "user", updatedAt: now }).run();
+    db.insert(settingsValues).values({ scope, key, value: serialized, hlc, source: "user", updatedAt: now, setBy: opts.setBy ?? null }).run();
   }
 
   settingsCache.delete(settingsCacheKey(scope, key));
@@ -566,6 +573,15 @@ export function setValue(
     return { ok: false, status: 403, error: "location settings are private to each person" };
   }
 
+  // EASE-OF-USE-01c: a self-service key (the ease.* comfort keys) has its own gate: the person writes their
+  // own unless an admin locked it, and an admin writes any person's, which locks it. See lib/layeredScalar.ts.
+  if (parsed.kind === "person" && isSelfService(keyDef)) {
+    const gate = assertCanWriteSelfService(actor, parsed.id!, keyDef);
+    if (!gate.ok) return gate;
+    const written = writeValue(scope, keyDef, value, { ...responseContext(actor, responseSubject(actor, parsed), parsed.kind), setBy: gate.setBy });
+    return written.ok ? { ok: true, value: { ...written.value, layer: "person", locked: gate.setBy !== "self" } } : written;
+  }
+
   const auth =
     key === SAFE_SEARCH_KEY && parsed.kind === "person"
       ? assertCanSetSafeSearch(actor, parsed.id!, value)
@@ -692,6 +708,7 @@ export function getHouseholdSettingSource(key: string): string | undefined {
 export function getPersonSettingValue(actor: PersonRow, key: string): unknown {
   const keyDef = getRegistryKey(key);
   if (!keyDef || keyDef.scope !== "person") return undefined;
+  if (isLayeredScalar(keyDef)) return resolveLayeredScalar(keyDef, actor.id, speakerAgeBand(actor, new Date())).value;
   return resolveStoredValue(`person:${actor.id}`, keyDef);
 }
 
@@ -708,6 +725,10 @@ export function getSettingValueForPerson(personId: string, key: string): unknown
   const keyDef = getRegistryKey(key);
   if (!keyDef || keyDef.scope !== "person") return undefined;
   if (keyDef.selector === "location") return undefined;
+  if (isLayeredScalar(keyDef)) {
+    const person = db.select().from(people).where(eq(people.id, personId)).get();
+    return resolveLayeredScalar(keyDef, personId, person ? speakerAgeBand(person, new Date()) : "adult").value;
+  }
   return resolveStoredValue(`person:${personId}`, keyDef);
 }
 
@@ -813,6 +834,17 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
   if (keyDef.selector === "location" && parsed.kind === "person" && parsed.id !== actor.id) {
     return { ok: false, status: 403, error: "location settings are private to each person" };
+  }
+
+  if (parsed.kind === "person" && isSelfService(keyDef)) {
+    // A person resets their own unless an admin locked it; an admin's reset lifts the lock.
+    const gate = assertCanWriteSelfService(actor, parsed.id!, keyDef);
+    if (!gate.ok) return gate;
+    db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
+    settingsCache.delete(settingsCacheKey(scope, key));
+    const subject = responseSubject(actor, parsed);
+    const layered = resolveLayeredScalar(keyDef, parsed.id!, speakerAgeBand(subject, new Date()));
+    return { ok: true, value: { ...resolveForResponse(keyDef, layered.value, layered.layer === "person" ? "user" : "default", responseContext(actor, subject, parsed.kind)), layer: layered.layer, locked: false } };
   }
 
   const auth = key === WAKEWORD_SETTING_KEY && parsed.kind === "device"

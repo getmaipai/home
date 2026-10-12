@@ -36821,3 +36821,12 @@ Verdict: not shipped, working tree reverted. The 40 percent token bar is not met
 - Row reset (`resetBlocklistRow`) drops the entry directly, so it works after the global defaults come to hold the same category.
 - Not yet: SafeSearch on the resolver (01f), band-named keys (01e), `page_text_cleaning` has no consumer, custom sites are not in the People section.
 - Pins: spec-v0.1.128, ui-v0.5.198 (OptionMatrix uses the 48px kit Checkbox; commons 120ff26).
+
+## EASE-OF-USE-01c (2026-10-12)
+
+- Keys resolve through `lib/layeredScalar.ts`: the person's row, then the `household` row, then `band_default`, then the key default. `ResolvedSetting` gains `layer` and `locked` (additive).
+- Write gate (`assertCanWriteSelfService`, called by `setValue` and `resetValue` for any key with `self_service`): a person writes their own and the row is stamped `self`; an owner or admin writes another person's and the row is stamped with their id, which is the lock; a locked key is refused to its person (write and reset) with a message naming who to ask; an admin cannot touch an owner's or another admin's. Only `ease.*` keys carry `self_service`; a test pins that.
+- Deliberate choice: the ease keys are in the child and teen visible lists (comfort, not protection), and an admin may set them for an adult as well.
+- Screen: `useEase` (`frontend/src/shell/useEase.ts`, pure part in `easeResolve.ts`) resolves `preset` against `@maipai/spec/ease/presets.json` and sets `data-ease-text|spacing|targets|contrast|motion` on `<html>`. The card is drawn from the spec's `profile.ease` group; no Home component.
+- Open: ui-v0.5.199 lacks the generated token CSS and the rail change (only the generator and its test are in the tag), so the attributes are set and nothing yet reacts. The kit row cannot show a lock or a "Large + N changes" summary.
+- Captures: `bun run scripts/screenshotEase.ts` (phone, 320 reflow, desktop, Standard and Large).

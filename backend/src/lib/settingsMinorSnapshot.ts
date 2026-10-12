@@ -14,9 +14,16 @@ const TELEGRAM_EVENTS = [
   "model.download_failed", "model.download_ready", "person.band_changed", "repairs.new", "updates.available",
 ];
 
+/** The ease of use keys (EASE-OF-USE-01c). Comfort, not protection: a child and a teen change
+ * their own, unless an admin has locked one, so they are shown here on purpose. */
+export const EASE_SETTING_KEYS: readonly string[] = [
+  "ease.preset", "ease.text_size", "ease.spacing", "ease.targets", "ease.motion", "ease.contrast",
+  "ease.simple_mode", "ease.read_aloud", "ease.word_help", "ease.explainers", "ease.reading_level",
+];
+
 /** The person-scope keys a child saw: personality, safe search, voice, the
- * alert switch and muted senders, quiet hours, Telegram, appearance and the
- * enrollment-sounds switch. */
+ * alert switch and muted senders, quiet hours, Telegram, appearance, the
+ * enrollment-sounds switch and (since EASE-OF-USE-01c) the ease of use keys. */
 export const CHILD_VISIBLE_SETTING_KEYS: readonly string[] = [
   "persona.active_id",
   "search.safe_search",
@@ -31,6 +38,7 @@ export const CHILD_VISIBLE_SETTING_KEYS: readonly string[] = [
   "ui.look",
   "ui.show_turn_stats",
   "ui.enrollment_sounds",
+  ...EASE_SETTING_KEYS,
 ];
 
 /** A teen saw everything a child did, plus the chat photo switch (a child's
