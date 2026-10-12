@@ -351,6 +351,8 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const adminHomeReview = process.argv.includes("--admin-home-review");
+// MINOR-SEARCH-01e-10: the Blocked sites card (a tick-box grid) in Home settings, Search, as an admin.
+const blockedSitesReview = process.argv.includes("--blocked-sites-review");
 const rule9PagesReview = process.argv.includes("--rule9-pages-review");
 const chatColumnReview = process.argv.includes("--chat-column-review") || elementsReview || chatProjectsReview || engineDownReview;
 const noticeStyleReview = process.argv.includes("--notice-style-review");
@@ -2828,6 +2830,34 @@ async function captureChatSkillsReview(browser: Browser, ownerSession: string): 
  * Account when they ask for Home settings, which the capture shows. Each
  * capture logs what the page measured (column width, card width, title size,
  * first row height) so a reviewer can compare it with the reference. */
+async function captureBlockedSitesReview(browser: Browser, ownerSession: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "chat-ab", "blocked-sites-shots");
+  mkdirSync(outDir, { recursive: true });
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, ownerSession);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.goto(`${BASE_URL}/settings/home/search`);
+        const card = page.locator('[id="settings-household.blocked_sites"]');
+        await card.waitFor();
+        await card.scrollIntoViewIfNeeded();
+        await page.waitForTimeout(600);
+        const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+        if (overflow) throw new Error(`blocked sites ${slug} ${theme} scrolls sideways`);
+        await settleAnimations(page);
+        const file = join(outDir, `blocked-sites-${viewport.width}-${theme}.png`);
+        await card.screenshot({ path: file });
+        console.log(`Wrote ${file}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 async function captureAppSettingsReview(browser: Browser, ownerSession: string): Promise<void> {
   const outDir = join(ROOT, "data-scratch", "chat-ab", "app-settings-shots");
   mkdirSync(outDir, { recursive: true });
@@ -10130,6 +10160,12 @@ async function main() {
     if (appSettingsReview) {
       await captureAppSettingsReview(browser, sessionValue);
       console.log("completed named review: --app-settings-review");
+      return;
+    }
+
+    if (blockedSitesReview) {
+      await captureBlockedSitesReview(browser, sessionValue);
+      console.log("completed named review: --blocked-sites-review");
       return;
     }
 

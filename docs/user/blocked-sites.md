@@ -18,9 +18,11 @@ When MaiPai searches the web, it can check each result against lists of sites th
 
 Only an admin can change these.
 
-1. Open **Settings**, then **Search**.
-2. Find **Blocked sites with child controls**, **Blocked sites with teen controls** or **Blocked sites with adult controls**.
-3. Add or remove lists in the box, and save.
+1. Open **Settings**, then **Home**, then **Search**.
+2. Find the **Blocked sites** card. It has a row for each kind of site (adult, gambling, scam, phishing, malware, drugs) and a column of boxes for **Kids**, **Teens** and **Adults**.
+3. Tick a box to block that kind of site for that group, or clear it to allow it. Each tick saves on its own.
+
+The adult sites boxes for Kids and Teens are ticked and greyed out. Nobody can clear them. If a tick does not save, the card says so; check your connection and tick the box again.
 
 Each row also shows a line like "Updated 3 days ago, 4 lists, about 1.1 million sites blocked." It tells you the lists are fresh. It never shows which sites were blocked or what anyone searched for.
 
@@ -30,7 +32,7 @@ MaiPai downloads each list once, then checks for a newer one about once a day. W
 
 ## Your own block and allow lists
 
-Under the same Search settings you can type your own sites, separated by commas, like example.com. A site you list also covers its pages and subdomains.
+Under the grid, in **Show 8 advanced settings**, you can type your own sites, separated by commas, like example.com. A site you list also covers its pages and subdomains.
 
 - **Always block these sites** hides a site from web search. Use the household row for everyone, or a row for child, teen or adult accounts to block it for that group only. A group's row adds to the household row, it never replaces it. A site you block is always blocked. Nothing overrides it.
 - **Allow these sites** lets web search show a site that one of the optional lists blocks, such as a gambling or scam list. It never lets through an adult site for child or teen controls, and it never lets through a site you blocked yourself.

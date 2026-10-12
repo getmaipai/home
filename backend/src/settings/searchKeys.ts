@@ -165,7 +165,7 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
       },
       "level": "advanced",
       "secret": false,
-      "lives_in": "household.search",
+      "lives_in": "household.blocked_sites",
       "honoured_by": [
           "home"
       ]
@@ -211,7 +211,7 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
       },
       "level": "advanced",
       "secret": false,
-      "lives_in": "household.search",
+      "lives_in": "household.blocked_sites",
       "honoured_by": [
           "home"
       ]
@@ -255,7 +255,7 @@ export const SEARCH_SETTINGS_KEYS: SettingsKey[] = [
       },
       "level": "advanced",
       "secret": false,
-      "lives_in": "household.search",
+      "lives_in": "household.blocked_sites",
       "honoured_by": [
           "home"
       ]

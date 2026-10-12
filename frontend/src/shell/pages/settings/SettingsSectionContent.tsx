@@ -59,6 +59,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
       titleOverrides={{ [group]: title }}
       beforeChange={beforeSettingChange}
       focusKey={props.focusKey}
+      matrix={card.matrix}
     />
   );
   if (!card.collapsed) return renderer;
