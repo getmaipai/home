@@ -23,7 +23,9 @@ it cites.
 **0. Age and surface gates outrank every rule below.** Nothing here
 loosens a protection for a child or teen, and nothing here changes how
 a spoken turn is shaped. Where a rule below would do either, this rule
-wins.
+wins. A child's or teen's search is protected by what it may fetch and show (SafeSearch at the band floor, the band's
+sources, the floor on fetched text, the adult-site host list and the output gate), not by refusing to search; web
+search runs without a parent's approval when the household has it on for their controls.
 
 1. **The model decides, not a word rule.** No regex, word list or
    classifier reads open-ended wording to decide whether a message needs
@@ -36,7 +38,12 @@ wins.
    consent, temporary mode, crisis, the household-name gate, a minor's
    safesearch). An explicit request never reaches a tool the person's
    role or the household's settings do not allow. A learned or embedding
-   signal about search need runs in shadow, logged as a number with no text, and changes no turn, with one exception. On an adult written turn the person may search, when the model returns text with no tool call and the score is above the recorded threshold, the engine's query writer writes the query and the call passes the same policy checks as a model call. It never cancels a model call. It never applies to a child, a teen, a spoken turn, or the safety, consent, privacy or credentials paths, and an admin setting can switch it off. What stays deterministic: the safety
+   signal about search need runs in shadow, logged as a number with no text, and changes no turn, with one exception. On a written turn where the person may search, when the model returns text with no tool call and the score is
+   above the recorded threshold, the engine's query writer writes the query and the call passes the same policy
+   checks as a model call. It never cancels a model call. For a child or a teen it applies only when web search is
+   on for their controls, takes that person's own search path and protections, and a refused rescued call is
+   dropped without a reply. It never applies to a spoken turn or the safety, consent, privacy or credentials paths,
+   and an admin setting can switch it off. What stays deterministic: the safety
    floor on input and output, the credential catch, consent words, the
    household-name gate on search arguments, the crisis, temporary-mode
    and grounding refusals, and exact commands, forget among them. The
