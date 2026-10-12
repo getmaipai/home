@@ -1,0 +1,2526 @@
+{
+ "id": "search-recency-04-labels",
+ "note": "SEARCH-RECENCY-04: ~300 new adult labeled prompts for the embedding-classifier bench (measure only). split = tune/heldout by sha256(id) mod 100 < 60. Categories as KS-BENCH-01: recency needs a live search, stable is a stable-fact answer, no_tool is chat/math/household. Follow-ups carry priorUser and priorAssistant. Persona names only, no real people or data.",
+ "rows": [
+  {
+   "id": "sr4-recency-s-001",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who won the game last night?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-002",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the score of the Celtics game right now?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-003",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the price of Bitcoin today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-004",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is it going to rain in Seattle tomorrow?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-005",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are the top news headlines this morning?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-006",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who is the current prime minister of the United Kingdom?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-007",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the latest version of Node.js?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-008",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Did the Fed change interest rates this week?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-009",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What movies are playing in theaters this weekend?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-010",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How is traffic on the highway to the airport right now?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-011",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What time does the pharmacy on Main Street close tonight?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-012",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who won the most recent Super Bowl?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-013",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What happened in the stock market today?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-014",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the new Zelda game out yet?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-015",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the current exchange rate from pounds to euros?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-016",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Are there any flight delays at Chicago O'Hare today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-017",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the latest iPhone and how much is it?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-018",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who is leading the Tour de France standings right now?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-019",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the weather like in Denver at the moment?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-020",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Has the space station crew changed recently?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-021",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are people saying about the new Marvel trailer?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-022",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "When is the next SpaceX launch?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-023",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the current gas price in my area?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-024",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Did the city council vote on the bike lane proposal?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-025",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who won the Oscar for best picture this year?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-026",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the library open on Sunday this week?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-027",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's trending on the internet today?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-028",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the current population estimate of Tokyo?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-029",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Latest news on the election results?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-030",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How many points did the Lakers score last night?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-031",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the newest Android version released?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-032",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is there a recall on the baby stroller I bought?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-033",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who is the current CEO of Microsoft?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-034",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the price of eggs at the grocery store these days?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-035",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the air quality index today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-036",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are the new tariffs announced this month?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-037",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the Golden Gate Bridge closed today?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-038",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who got traded in the NBA this week?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-039",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the release date of the next Star Wars movie?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-040",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Any updates on the hurricane heading for Florida?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-041",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is Tesla's stock price right now?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-042",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Which team is on top of the Premier League table at the moment?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-043",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the pool open late this evening?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-044",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the newest episode of that baking show?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-045",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How much does a gallon of milk cost currently?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-046",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What did the Supreme Court decide this week?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-047",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are today's top stories in science?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-048",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the power outage in the north end fixed yet?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-049",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the latest on the strike at the port?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-050",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "When does the farmers market open this Saturday?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-051",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the current version of Python?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-052",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who is hosting the Oscars this year?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-053",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Did anything big happen in tech news yesterday?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-054",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are the new features in the latest iOS update?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-055",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How cold is it outside right now in Minneapolis?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-056",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the current mortgage rate?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-057",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Which songs are number one on the charts this week?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-058",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the new restaurant downtown open yet?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-059",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the latest research on intermittent fasting?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-060",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is there a new season of Severance coming?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-061",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are the current COVID guidelines for travel?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-062",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who just won the French Open?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-063",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What time is sunset today in Portland?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-064",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Did the Yankees win today?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-065",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the newest laptop Apple released?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-066",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the current record for the 100 meter dash?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-067",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Has the strike at the car plant ended?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-068",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How many people have signed up for the petition so far?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-069",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the latest on the Mars sample return mission?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-070",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Check whether the dentist office is open this afternoon.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-071",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the lowest airfare to Lisbon next month right now?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-072",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Are there any new episodes of the podcast out?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-073",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What are the most recent reviews of the new Nintendo console?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-074",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the score in the cricket match?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-075",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is there an update to the Chrome browser?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-076",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Who is the newest member of the Supreme Court?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-077",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What did the president say in the speech tonight?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-078",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What is the current unemployment rate?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-079",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Find me the newest article about electric car batteries.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-080",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How many gold medals does Norway have so far?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-s-081",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What's the status of my package delivery today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-s-082",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "What happened at the school board meeting last night?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-001",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's the latest news on the Mars sample return mission?",
+   "priorAssistant": "Plans were still being debated, with several mission designs under review.",
+   "prompt": "Any updates since then?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-002",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Who won the Lakers game last night?",
+   "priorAssistant": "The Lakers beat the Suns 112 to 104.",
+   "prompt": "What about the Celtics?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-003",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's the score of the Yankees game?",
+   "priorAssistant": "I don't have a live score; they were tied last I knew.",
+   "prompt": "And the Mets?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-004",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What is the price of gold today?",
+   "priorAssistant": "Gold was trading around two thousand dollars an ounce when I last knew.",
+   "prompt": "What about silver?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-005",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Is it going to rain in Seattle tomorrow?",
+   "priorAssistant": "The forecast showed a chance of showers.",
+   "prompt": "And on Saturday?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-006",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Who is the current prime minister of Canada?",
+   "priorAssistant": "As of my last information, it was a Liberal prime minister.",
+   "prompt": "Is that still the case?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-007",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What is the latest version of Python?",
+   "priorAssistant": "The latest I know of is a 3.12 release.",
+   "prompt": "Has a newer one come out?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-008",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What time does the pharmacy close tonight?",
+   "priorAssistant": "Most pharmacies close around nine.",
+   "prompt": "Is the one on Elm Street open later today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-009",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's the exchange rate for the euro today?",
+   "priorAssistant": "It was near one dollar and ten cents.",
+   "prompt": "What about the yen?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-010",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Who won the Formula 1 race on Sunday?",
+   "priorAssistant": "I believe a Red Bull driver won the last race I know of.",
+   "prompt": "Who is leading the standings now?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-011",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What are the top headlines today?",
+   "priorAssistant": "Headlines covered the economy and an upcoming election.",
+   "prompt": "Anything newer than that?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-012",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Tell me about the new iPhone.",
+   "priorAssistant": "The newest iPhone I know of has an upgraded camera.",
+   "prompt": "How much does it cost right now?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-013",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Is the airport busy today?",
+   "priorAssistant": "Airports are usually busier on weekends.",
+   "prompt": "Are there any delays at Chicago O'Hare at the moment?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-014",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's the weather in Denver?",
+   "priorAssistant": "It was sunny and mild when I last knew.",
+   "prompt": "How about Phoenix right now?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-015",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Who won the Oscar for best actress?",
+   "priorAssistant": "The last winner I know of was for a drama.",
+   "prompt": "And this year's winner?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-016",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's trending in tech news?",
+   "priorAssistant": "Chip makers and AI were in the news.",
+   "prompt": "Anything from this morning?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-017",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "How much is Bitcoin worth?",
+   "priorAssistant": "It has swung widely, around sixty thousand dollars at one point.",
+   "prompt": "And Ethereum today?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-recency-f-018",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What movies are out this weekend?",
+   "priorAssistant": "Several new releases open on Fridays.",
+   "prompt": "Is the new Pixar one showing near us yet?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-019",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Who is the CEO of Twitter?",
+   "priorAssistant": "I know of a few leaders over the years.",
+   "prompt": "Who is it today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-recency-f-020",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's the mortgage rate?",
+   "priorAssistant": "Rates were around seven percent.",
+   "prompt": "What did it close at this week?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-001",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who wrote Hamlet?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-002",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the capital of Canada?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-003",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does a rainbow form?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-004",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who painted The Starry Night?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-005",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the speed of light?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-006",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain how vaccines work.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-007",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What year did World War II end?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-008",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who was the first person to walk on the Moon?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-009",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the chemical formula for table salt?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-010",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How many continents are there?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-011",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Why is the sky blue?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-012",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who discovered penicillin?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-013",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the longest river in Africa?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-014",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain the rules of chess.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-015",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What does DNA stand for?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-016",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who composed the Four Seasons?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-017",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the difference between weather and climate?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-018",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who was Cleopatra?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-019",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How do airplanes stay in the air?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-020",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the largest planet in the solar system?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-021",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Tell me about the Roman Empire.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-022",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the Pythagorean theorem?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-023",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who invented the telephone?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-024",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is photosynthesis?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-025",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who was the first president of the United States?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-026",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What causes the seasons?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-027",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How many bones are in the human body?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-028",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who wrote The Odyssey?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-029",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the boiling point of water in Celsius?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-030",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the meaning of the word serendipity?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-031",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does a bill become law in the United States?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-032",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who discovered gravity?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-033",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the tallest building in the world as of the last time you knew?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-034",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What language is spoken in Brazil?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-035",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Describe the water cycle.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-036",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who was Albert Einstein?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-037",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the plot of Romeo and Juliet?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-038",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the difference between a virus and a bacterium?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-039",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How do I convert Celsius to Fahrenheit?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-040",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who sculpted David?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-041",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the capital of Japan?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-042",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How do tides work?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-043",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is an atom made of?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-044",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who wrote 1984?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-045",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the history of the printing press?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-046",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does compound interest work?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-047",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who is the author of Pride and Prejudice?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-048",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the population of the Earth roughly?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-049",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain what inflation is.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-050",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How did the Great Wall of China get built?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-051",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the Fibonacci sequence?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-052",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What are the primary colors?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-053",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who painted the ceiling of the Sistine Chapel?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-054",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does the electoral college work in general?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-055",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the speed of sound?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-056",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Which element has atomic number 79?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-057",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who was Ada Lovelace?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-058",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How do bees make honey?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-059",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What does a mitochondrion do?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-060",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who wrote Moby Dick?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-061",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "When was the Declaration of Independence signed?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-062",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the Big Bang theory?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-063",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain the difference between affect and effect.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-064",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What are the three states of matter?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-065",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who was the first woman in space?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-066",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the deepest ocean trench?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-067",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does a refrigerator work?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-068",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain how a bill of exchange works.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-069",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who wrote The Great Gatsby?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-070",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the origin of the Olympic Games?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-071",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does a transistor work?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-072",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the largest mammal?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-073",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the freezing point of water in Fahrenheit?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-s-074",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Why did the Roman Empire fall?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-075",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What are the planets in order from the Sun?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-076",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who painted Guernica?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-077",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What is the French word for library?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-078",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How does the stock market work in general?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-079",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain what an API is.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-s-080",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What was the Renaissance?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-001",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who wrote Hamlet?",
+   "priorAssistant": "William Shakespeare wrote Hamlet around 1600.",
+   "prompt": "What about Macbeth?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-002",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is the capital of France?",
+   "priorAssistant": "The capital of France is Paris.",
+   "prompt": "And Italy?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-003",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who painted the Mona Lisa?",
+   "priorAssistant": "Leonardo da Vinci painted it.",
+   "prompt": "When did he paint it?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-004",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "How does photosynthesis work?",
+   "priorAssistant": "Plants turn sunlight, water and carbon dioxide into sugar and oxygen.",
+   "prompt": "What about fungi?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-005",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who was Marie Curie?",
+   "priorAssistant": "A physicist and chemist who won two Nobel Prizes.",
+   "prompt": "Where was she born?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-006",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is the tallest mountain on Earth?",
+   "priorAssistant": "Mount Everest.",
+   "prompt": "What about in South America?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-007",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What causes the tides?",
+   "priorAssistant": "The Moon's gravity mostly.",
+   "prompt": "Does the Sun matter too?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-008",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who invented the light bulb?",
+   "priorAssistant": "Thomas Edison is credited, with many predecessors.",
+   "prompt": "What about the telephone?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-009",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is the boiling point of water?",
+   "priorAssistant": "One hundred degrees Celsius at sea level.",
+   "prompt": "And the freezing point?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-010",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who wrote Pride and Prejudice?",
+   "priorAssistant": "Jane Austen.",
+   "prompt": "Did she write anything else?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-011",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is the Pythagorean theorem?",
+   "priorAssistant": "a squared plus b squared equals c squared for right triangles.",
+   "prompt": "Can you give an example?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-012",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Tell me about the Roman Empire.",
+   "priorAssistant": "It grew from the city of Rome to rule the Mediterranean.",
+   "prompt": "Why did it fall?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-013",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who discovered penicillin?",
+   "priorAssistant": "Alexander Fleming in 1928.",
+   "prompt": "How does it kill bacteria?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-014",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is an atom?",
+   "priorAssistant": "The smallest unit of an element.",
+   "prompt": "What about a molecule?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-015",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who painted The Starry Night?",
+   "priorAssistant": "Vincent van Gogh.",
+   "prompt": "Where was it painted?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-016",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is the largest ocean?",
+   "priorAssistant": "The Pacific Ocean.",
+   "prompt": "And the smallest?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-017",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who wrote The Odyssey?",
+   "priorAssistant": "Homer, traditionally.",
+   "prompt": "What about The Iliad?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-018",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "How many planets are in the solar system?",
+   "priorAssistant": "Eight.",
+   "prompt": "Which is the biggest?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-stable-f-019",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What is inflation?",
+   "priorAssistant": "A general rise in prices over time.",
+   "prompt": "What is deflation?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-stable-f-020",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who was Ada Lovelace?",
+   "priorAssistant": "An early mathematician known for work on Babbage's engine.",
+   "prompt": "What did she write?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-001",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Hi there, how are you?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-002",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Thanks, that helps a lot.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-003",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 48 times 12?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-004",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Tell me a joke about dogs.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-005",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 20 percent of 350?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-006",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Remind me what Daisy asked for on her birthday.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-007",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Add bread and butter to the shopping list.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-008",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What did we talk about earlier today?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-009",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Convert 10 miles to kilometers.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-010",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Write a haiku about winter.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-011",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is Bruno's favorite color from what you remember?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-012",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Summarize what I just said in one line.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-013",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Set a timer for ten minutes.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-014",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Good morning!",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-015",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Can you help me write a thank you note to Marlow?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-016",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What's 144 divided by 12?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-017",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Rewrite this sentence to sound friendlier: send me the report.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-018",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Give me a bedtime story about a fox named Ember.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-019",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Turn on the living room lights.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-020",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What's on my calendar for the family this week?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-021",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Who in our house likes pizza?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-022",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Translate good night into Spanish.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-023",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Help me pick a name for our new puppy.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-024",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "I'm feeling a bit tired today.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-025",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is two to the power of ten?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-026",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Can you proofread this paragraph for me?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-027",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Remind me to call Oliver at five.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-028",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What did Nova tell you about her trip?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-029",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Tell me something fun about yourself.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-030",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 7 plus 15?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-031",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Write a limerick about a sleepy cat.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-032",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Never mind, forget that.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-033",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Please repeat that more slowly.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-034",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "How many minutes are in three hours?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-035",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Give me a pep talk before my meeting.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-036",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What did Atlas say about the garden yesterday?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-037",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Play some relaxing music.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-038",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Brainstorm five names for a book club.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-039",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "How do you spell necessary?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-040",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Ok, sounds good.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-041",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Can you draft a short message to Clover about dinner?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-042",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 9 squared?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-043",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Cheer me up with a silly rhyme.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-044",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Let's play twenty questions.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-045",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Which of us has chores today, based on what you know?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-046",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Explain that again in simpler words.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-047",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is half of 86?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-048",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Tell me a riddle.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-049",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Save a note that the wifi password is on the fridge.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-050",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What was the last thing I asked you to remember?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-051",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Write a short poem about spring rain.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-052",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Pretend you are a pirate and greet me.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-053",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "How are you feeling today?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-054",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Can you count to ten in French?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-055",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 33 minus 17?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-056",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Make that list shorter.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-057",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Say that in a more formal tone.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-058",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Give me three ideas for a rainy afternoon.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-059",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Who is coming to dinner tonight, from my notes?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-060",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 25 percent of 80?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-061",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Tell me a fun fact about Willow's favorite animal, which I told you before.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-062",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "You're funny.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-063",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Can we start over?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-064",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Translate thank you into German.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-065",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Write a tweet-length cheer for Riff's soccer team.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-066",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Remind me what Pippa's allergy was.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-067",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is 5 factorial?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-068",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Draft a grocery list for tacos.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-069",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Describe a cozy cabin in three sentences.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-070",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What is the sum of 100 and 250?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-071",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Rename this reminder to buy flowers.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-072",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Have a good night.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-073",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Why did you say that?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-074",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Tell me about the book I mentioned yesterday.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-075",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Roll a dice for me.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-s-076",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Spell Mississippi backwards.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-077",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Quiz me on multiplication tables.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-s-078",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "What do I have on my to-do list?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-001",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What is 12 times 12?",
+   "priorAssistant": "144.",
+   "prompt": "And 13 times 13?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-002",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Tell me a joke about cats.",
+   "priorAssistant": "Why did the cat sit on the computer? To keep an eye on the mouse.",
+   "prompt": "Another one.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-003",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Add milk to the shopping list.",
+   "priorAssistant": "Done, milk is on the list.",
+   "prompt": "Add eggs too.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-004",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What did Daisy want for her birthday?",
+   "priorAssistant": "From my notes, she wanted a telescope.",
+   "prompt": "And what about Cosmo?",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-005",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Write a haiku about autumn.",
+   "priorAssistant": "Crisp leaves drift and fall, quiet gold on the cool path, the year exhales slow.",
+   "prompt": "Now one about winter.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-006",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Convert 5 kilometers to miles.",
+   "priorAssistant": "About 3.1 miles.",
+   "prompt": "What about 10?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-007",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Good morning!",
+   "priorAssistant": "Good morning! How can I help?",
+   "prompt": "How are you?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-008",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Set a timer for ten minutes.",
+   "priorAssistant": "Timer set for ten minutes.",
+   "prompt": "Make it fifteen.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-009",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Who likes pizza in our house?",
+   "priorAssistant": "From what you've told me, Riff and Pippa.",
+   "prompt": "What about Iris?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-010",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Help me name the puppy.",
+   "priorAssistant": "How about Biscuit, Scout or Maple?",
+   "prompt": "Something shorter.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-011",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Draft a note to Marlow thanking him.",
+   "priorAssistant": "Dear Marlow, thank you for your help.",
+   "prompt": "Make it warmer.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-012",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What is 20 percent of 150?",
+   "priorAssistant": "30.",
+   "prompt": "And 25 percent?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-013",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Tell me a bedtime story about a fox.",
+   "priorAssistant": "Once upon a time a small fox named Ember found a lantern.",
+   "prompt": "Make it shorter.",
+   "split": "tune"
+  },
+  {
+   "id": "sr4-no_tool-f-014",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What's on the family calendar?",
+   "priorAssistant": "Soccer practice Tuesday and dinner Friday.",
+   "prompt": "Move soccer to Wednesday.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-015",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Translate good night into Spanish.",
+   "priorAssistant": "Buenas noches.",
+   "prompt": "And in French?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-016",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Rewrite this to sound friendlier: send me the report.",
+   "priorAssistant": "Could you share the report when you get a chance?",
+   "prompt": "Even friendlier.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-017",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What did we talk about yesterday?",
+   "priorAssistant": "We planned the garden and the grocery list.",
+   "prompt": "What about the day before?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-018",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Tell me a riddle.",
+   "priorAssistant": "What has keys but cannot open locks? A piano.",
+   "prompt": "Give me a harder one.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-019",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What's Oliver's favorite color?",
+   "priorAssistant": "From my notes, it is green.",
+   "prompt": "What about Nova's?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr4-no_tool-f-020",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Count to five in German.",
+   "priorAssistant": "Eins, zwei, drei, vier, fuenf.",
+   "prompt": "Now to ten.",
+   "split": "heldout"
+  }
+ ]
+}

@@ -1,0 +1,606 @@
+{
+ "id": "search-recency-06-heldout",
+ "note": "ROUTER-HELDOUT-01: 72 adult prompts written fresh as an independent held-out test set for a search-need classifier. Never train or tune on it. Every row is split heldout. Categories as KS-BENCH-01 and SEARCH-RECENCY-04: recency needs a live search, stable is answerable from training (history, science, definitions, how-to, concept math, code, advice, opinion), no_tool is chat, rewrite, summarize pasted text, arithmetic, personal memory and creative writing. Follow-ups carry priorUser and priorAssistant; 6 need a fresh search, 6 do not (3 no_tool, 2 stable, 1 arithmetic as no_tool). Not reused or paraphrased from search-recency-04-labels, tools-recall-01 or search-recency-02. Persona names only. Hard middle labeled by judgment: 'Who is the CEO of Apple' is stable (long-tenured role, no time word); 'How many time zones does Russia span' is stable (rarely changes). Ambiguous, deliberately kept out of the rows: 'what's the minimum wage in California', 'is Pluto a planet', 'what's the best phone for photos', 'how much should a plumber charge per hour', 'how tall is the tallest building in Dubai', 'what's the population of Lagos'.",
+ "rows": [
+  {
+   "id": "sr6-recency-s-001",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "is the new Kindle Paperwhite out",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-002",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "how did Arsenal get on against Spurs at the weekend",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-003",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "whos winning the Ashes test, quick",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-004",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "what's a litre of petrol going for in Melbourne at the moment",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-005",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "do I need a coat for the school run in Leeds tomorrow morning or will it be mild",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-006",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the M25 still shut near Heathrow?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-007",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "who's mayor of Toronto now",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-008",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is the PS6 in stock anywhere? I've tried three shops and they're all sold out",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-009",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "what time does the Ikea in Tempe close on sundays",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-010",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Has the Steam summer sale started?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-011",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "rbi repo rate after the last meeting?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-012",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Any snow on the Sea to Sky highway? Heading up to Whistler this afternoon",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-013",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "what's everyone talking about on tiktok rn",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-014",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Are trains running between Amsterdam and Brussels or is the rail strike still on",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-015",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "How much is a Nintendo Switch 2 at Target",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-016",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "has the Eurovision lineup for next year been announced",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-017",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is Disneyland Paris open on Christmas Day this year and how busy does it get",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-018",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "how's the Nikkei doing",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-019",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is there a firmware update for the Sonos Era 100 that fixes the audio dropouts",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-020",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "can you check if flight BA 283 is on time",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-021",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Which Michelin-starred places opened in Copenhagen recently",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-022",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "the bridge on Harbour Road was closed for repairs, has it reopened",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-023",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "uk inflation figure came out this morning, what was it",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-024",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "When's the next ferry from Split to Hvar",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-025",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "how long are the queues at passport control in Dublin airport these days",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-026",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Did the volcano in Iceland erupt again",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-027",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is Netflix putting its prices up again",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-028",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Are the northern lights likely to be visible from Edinburgh tonight",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-029",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "whats the waiting list like for a Rivian R2, my neighbor Marlow reckons months",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-s-030",
+   "band": "adult",
+   "category": "recency",
+   "followUp": false,
+   "prompt": "Is GitHub down or is it just me",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-001",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What was the Treaty of Westphalia about?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-002",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "how do i reverse a linked list in python",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-003",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Explain the difference between mitosis and meiosis like I'm 12",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-004",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Why is the square root of 2 irrational? Walk me through the proof",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-005",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What does the Portuguese word saudade mean, and is there an English equivalent",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-006",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "how long should I rest a steak after grilling, and why",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-007",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "What caused the 1929 stock market crash?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-008",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Should I pay off a credit card or build an emergency fund first",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-009",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How do I tell my teenager I don't like one of their friends without starting a fight",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-010",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "In SQL whats the difference between a left join and an inner join",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-011",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "who designed the Eiffel Tower",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-012",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Is a hot dog a sandwich? Give me your honest take",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-013",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "why do onions make you cry",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-014",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How did the Silk Road change medieval Europe",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-015",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "what does idempotent mean for a REST endpoint",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-016",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "Who is the CEO of Apple",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-017",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "How many time zones does Russia span",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-s-018",
+   "band": "adult",
+   "category": "stable",
+   "followUp": false,
+   "prompt": "whats the safest way to defrost chicken fast",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-001",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "lol you're on a roll today",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-002",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Make my cover letter opening punchier: I am writing to apply for the role of operations lead at your company.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-003",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "tl;dr this: The meeting moved to Thursday because the projector broke, and Sage will bring snacks. Budget review is pushed to next month.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-004",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "When is Juniper's dentist appointment? I told you last week",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-005",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Write a short sea shanty about doing the dishes",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-006",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "whats 17.5% of 2,400",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-007",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "ugh mondays",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-008",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Do you remember which wine Velvet liked at the anniversary dinner?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-009",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Turn these notes into a polite email to the school: kid sick, missing Friday, will catch up on homework",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-010",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Give me a villain monologue for our tabletop game, a lighthouse keeper named Quill",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-011",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "Put this list in alphabetical order: plums, apricots, kiwi, bananas",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-s-012",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": false,
+   "prompt": "good night, talk tomorrow",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-f-001",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Who won the Monaco Grand Prix in 1992?",
+   "priorAssistant": "It went to a McLaren driver after a long late-race duel for the lead.",
+   "prompt": "and who's leading the championship this season?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-f-002",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "How does a heat pump work?",
+   "priorAssistant": "It moves heat instead of making it, using a refrigerant that absorbs heat outside and releases it indoors.",
+   "prompt": "are there any rebates for installing one in Ontario right now",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-f-003",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's a good beginner camera?",
+   "priorAssistant": "A used mirrorless body with a kit zoom lens is a solid, affordable start.",
+   "prompt": "cool, which of those is cheapest on sale this week",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-f-004",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Tell me about the Rosetta Stone.",
+   "priorAssistant": "It is a stone slab from 196 BC carrying one decree in three scripts, and it unlocked Egyptian hieroglyphs. It is kept at the British Museum.",
+   "prompt": "Is that museum open late on Fridays at the moment?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-f-005",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "Remind me what the capital of Australia is.",
+   "priorAssistant": "Canberra.",
+   "prompt": "what's the weather doing there today",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-recency-f-006",
+   "band": "adult",
+   "category": "recency",
+   "followUp": true,
+   "priorUser": "What's the score in the Wimbledon final?",
+   "priorAssistant": "When I checked, the first set had gone to a tiebreak.",
+   "prompt": "ok update?",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-f-007",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Who won the Women's World Cup final?",
+   "priorAssistant": "Spain beat England 1-0 in the final.",
+   "prompt": "Nice. Write a two-line cheer about it for the group chat.",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-f-008",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What does a Tesla Model 3 cost right now?",
+   "priorAssistant": "Listings I found start around 42,000 dollars before incentives.",
+   "prompt": "what would the monthly payment be with 5k down over 5 years at 6 percent",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-f-009",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "What's the latest on the Artemis mission?",
+   "priorAssistant": "The crewed lunar flyby is scheduled after more heat shield testing.",
+   "prompt": "what is a heat shield actually made of",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-f-010",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "What is the Krebs cycle?",
+   "priorAssistant": "It is a series of reactions in the mitochondria that break down fuel molecules and release energy carriers like NADH and ATP.",
+   "prompt": "simpler please, I'm studying for a quiz",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-stable-f-011",
+   "band": "adult",
+   "category": "stable",
+   "followUp": true,
+   "priorUser": "Who wrote Frankenstein?",
+   "priorAssistant": "Mary Shelley; it was published in 1818.",
+   "prompt": "what inspired her to write it",
+   "split": "heldout"
+  },
+  {
+   "id": "sr6-no_tool-f-012",
+   "band": "adult",
+   "category": "no_tool",
+   "followUp": true,
+   "priorUser": "Any traffic on the bridge right now?",
+   "priorAssistant": "Reports show a stalled truck in the right lane, with about 15 minutes of delay.",
+   "prompt": "ok thanks, ill leave in 10",
+   "split": "heldout"
+  }
+ ]
+}

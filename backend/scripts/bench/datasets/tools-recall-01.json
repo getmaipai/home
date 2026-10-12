@@ -1,0 +1,1345 @@
+{
+  "description": "TOOLS-RECALL-01 labeled fixture: per-tool call reliability for the ten base tools. kind positive/followup expect `expected` to be called; none/nearmiss expect no tool call at all (nearmiss names the `confusable` tool that must not fire). heldOut = fnv1a(id) % 100 < 40. Child rows must never produce a websearch call.",
+  "rows": [
+    {
+      "id": "tr-weather-p01",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "what's it like outside in Portland right now"
+    },
+    {
+      "id": "tr-weather-p02",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "do I need an umbrella in Seattle today"
+    },
+    {
+      "id": "tr-weather-p03",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "wheather in denver"
+    },
+    {
+      "id": "tr-weather-p04",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "is it gonna be hot in Phoenix this weekend"
+    },
+    {
+      "id": "tr-weather-p05",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "how cold is it in Minneapolis"
+    },
+    {
+      "id": "tr-weather-p06",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "should i bring a jacket to Boston tomorrow"
+    },
+    {
+      "id": "tr-weather-p07",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "hey, what's the forecast for Austin?"
+    },
+    {
+      "id": "tr-weather-p08",
+      "kind": "positive",
+      "expected": "weather",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "chance of rain in Miami this afternoon"
+    },
+    {
+      "id": "tr-weather-f01",
+      "kind": "followup",
+      "expected": "weather",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "what about tomorrow?",
+      "priorUser": "What's the weather in Chicago?",
+      "priorAssistant": "Chicago is 54 and cloudy, with a high of 58 and a 20 percent chance of rain."
+    },
+    {
+      "id": "tr-weather-f02",
+      "kind": "followup",
+      "expected": "weather",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "how about Portland instead?",
+      "priorUser": "What's the weather in Seattle?",
+      "priorAssistant": "Seattle is 49 and drizzling."
+    },
+    {
+      "id": "tr-weather-f03",
+      "kind": "followup",
+      "expected": "weather",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "will it rain later today?",
+      "priorUser": "How's the weather in Denver?",
+      "priorAssistant": "Denver is sunny and 63."
+    },
+    {
+      "id": "tr-weather-f04",
+      "kind": "followup",
+      "expected": "weather",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "and is it the same in Tampa?",
+      "priorUser": "weather in Miami",
+      "priorAssistant": "Miami is 84 and humid with a chance of storms."
+    },
+    {
+      "id": "tr-timer-p01",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "set a timer for 10 minutes"
+    },
+    {
+      "id": "tr-timer-p02",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "timer 5 min"
+    },
+    {
+      "id": "tr-timer-p03",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "tell me when 25 minutes are up, pasta's on"
+    },
+    {
+      "id": "tr-timer-p04",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "can you count down 90 seconds for me"
+    },
+    {
+      "id": "tr-timer-p05",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "start a three minute timer for teeth brushing"
+    },
+    {
+      "id": "tr-timer-p06",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "egg timer, eight minutes"
+    },
+    {
+      "id": "tr-timer-p07",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "i need a 45 minute timer for the oven"
+    },
+    {
+      "id": "tr-timer-p08",
+      "kind": "positive",
+      "expected": "timer",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "tmer for 2 hours"
+    },
+    {
+      "id": "tr-timer-f01",
+      "kind": "followup",
+      "expected": "timer",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "make it 15 instead",
+      "priorUser": "Set a timer for 10 minutes.",
+      "priorAssistant": "Timer set for 10 minutes."
+    },
+    {
+      "id": "tr-timer-f02",
+      "kind": "followup",
+      "expected": "timer",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "actually add another one for 8 minutes",
+      "priorUser": "Set a timer for 5 minutes.",
+      "priorAssistant": "Okay, 5 minutes starting now."
+    },
+    {
+      "id": "tr-timer-f03",
+      "kind": "followup",
+      "expected": "timer",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "set the same again",
+      "priorUser": "Start a timer for the cookies, 12 minutes.",
+      "priorAssistant": "Timer set for 12 minutes."
+    },
+    {
+      "id": "tr-timer-f04",
+      "kind": "followup",
+      "expected": "timer",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "and one for twenty minutes too",
+      "priorUser": "Timer for 3 minutes please.",
+      "priorAssistant": "Three minute timer started."
+    },
+    {
+      "id": "tr-remind-p01",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "remind me to call the dentist tomorrow at 9"
+    },
+    {
+      "id": "tr-remind-p02",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "remind me in an hour to move the laundry"
+    },
+    {
+      "id": "tr-remind-p03",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "dont let me forget to take the trash out tonight"
+    },
+    {
+      "id": "tr-remind-p04",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "ping me at 6pm about soccer practice"
+    },
+    {
+      "id": "tr-remind-p05",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "remind me to feed the fish at 7"
+    },
+    {
+      "id": "tr-remind-p06",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "remind me about grandma's birthday on Friday"
+    },
+    {
+      "id": "tr-remind-p07",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "can you nudge me in 30 minutes to stretch"
+    },
+    {
+      "id": "tr-remind-p08",
+      "kind": "positive",
+      "expected": "remind",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "reminder: buy milk on the way home"
+    },
+    {
+      "id": "tr-remind-f01",
+      "kind": "followup",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "make that 10 instead",
+      "priorUser": "Remind me to call the dentist tomorrow at 9.",
+      "priorAssistant": "Okay, I'll remind you tomorrow at 9 AM to call the dentist."
+    },
+    {
+      "id": "tr-remind-f02",
+      "kind": "followup",
+      "expected": "remind",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "also remind me to email the landlord",
+      "priorUser": "Remind me to pay the water bill on the 1st.",
+      "priorAssistant": "Done, I'll remind you on the 1st."
+    },
+    {
+      "id": "tr-remind-f03",
+      "kind": "followup",
+      "expected": "remind",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "can you remind me again an hour before?",
+      "priorUser": "Remind me to take out the recycling tonight at 8.",
+      "priorAssistant": "Got it, reminder set for 8 PM tonight."
+    },
+    {
+      "id": "tr-remind-f04",
+      "kind": "followup",
+      "expected": "remind",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "and one more for Friday at noon about the bake sale",
+      "priorUser": "Remind me to practice piano after dinner.",
+      "priorAssistant": "Okay, I'll remind you after dinner."
+    },
+    {
+      "id": "tr-convert-p01",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "how many cups in a quart"
+    },
+    {
+      "id": "tr-convert-p02",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "convert 72 fahrenheit to celsius"
+    },
+    {
+      "id": "tr-convert-p03",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "whats 5 km in miles"
+    },
+    {
+      "id": "tr-convert-p04",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "how heavy is 3 kilos in pounds"
+    },
+    {
+      "id": "tr-convert-p05",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "10 ounces to grams"
+    },
+    {
+      "id": "tr-convert-p06",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "how many tablespoons make half a cup"
+    },
+    {
+      "id": "tr-convert-p07",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "350 degrees F in C for my recipe"
+    },
+    {
+      "id": "tr-convert-p08",
+      "kind": "positive",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "how many inchs in 2.5 meters"
+    },
+    {
+      "id": "tr-convert-f01",
+      "kind": "followup",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "and in a gallon?",
+      "priorUser": "How many cups in a quart?",
+      "priorAssistant": "There are 4 cups in a quart."
+    },
+    {
+      "id": "tr-convert-f02",
+      "kind": "followup",
+      "expected": "convert",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "what about 85?",
+      "priorUser": "Convert 72 F to C.",
+      "priorAssistant": "72 F is about 22.2 C."
+    },
+    {
+      "id": "tr-convert-f03",
+      "kind": "followup",
+      "expected": "convert",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "and 10 km?",
+      "priorUser": "How many miles is 5 km?",
+      "priorAssistant": "5 km is about 3.1 miles."
+    },
+    {
+      "id": "tr-convert-f04",
+      "kind": "followup",
+      "expected": "convert",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "how about in pounds?",
+      "priorUser": "10 ounces to grams",
+      "priorAssistant": "10 ounces is about 283 grams."
+    },
+    {
+      "id": "tr-math-p01",
+      "kind": "positive",
+      "expected": "math",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what's 17 times 23"
+    },
+    {
+      "id": "tr-math-p02",
+      "kind": "positive",
+      "expected": "math",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "calculate 15% of 240"
+    },
+    {
+      "id": "tr-math-p03",
+      "kind": "positive",
+      "expected": "math",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "square root of 1764"
+    },
+    {
+      "id": "tr-math-p04",
+      "kind": "positive",
+      "expected": "math",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "whats 1,250 divided by 8"
+    },
+    {
+      "id": "tr-math-p05",
+      "kind": "positive",
+      "expected": "math",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "if i split 187.50 four ways how much each"
+    },
+    {
+      "id": "tr-math-p06",
+      "kind": "positive",
+      "expected": "math",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "12 plus 9 times 3"
+    },
+    {
+      "id": "tr-math-p07",
+      "kind": "positive",
+      "expected": "math",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "what is 2 to the power of 12"
+    },
+    {
+      "id": "tr-math-p08",
+      "kind": "positive",
+      "expected": "math",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "how much is an 18 percent tip on 64 dollars"
+    },
+    {
+      "id": "tr-math-f01",
+      "kind": "followup",
+      "expected": "math",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "now divide that by 7",
+      "priorUser": "What's 17 times 23?",
+      "priorAssistant": "17 times 23 is 391."
+    },
+    {
+      "id": "tr-math-f02",
+      "kind": "followup",
+      "expected": "math",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what about 20%?",
+      "priorUser": "What's 15% of 240?",
+      "priorAssistant": "15% of 240 is 36."
+    },
+    {
+      "id": "tr-math-f03",
+      "kind": "followup",
+      "expected": "math",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "add 50 to it",
+      "priorUser": "What's 144 divided by 12?",
+      "priorAssistant": "That's 12."
+    },
+    {
+      "id": "tr-math-f04",
+      "kind": "followup",
+      "expected": "math",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "and half of that?",
+      "priorUser": "What is 9 times 8?",
+      "priorAssistant": "9 times 8 is 72."
+    },
+    {
+      "id": "tr-remember-p01",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "remember that Willow's birthday is March 3rd"
+    },
+    {
+      "id": "tr-remember-p02",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "note that we're out of coffee filters"
+    },
+    {
+      "id": "tr-remember-p03",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "keep in mind I prefer window seats"
+    },
+    {
+      "id": "tr-remember-p04",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "the vet is closed on Mondays, remember that"
+    },
+    {
+      "id": "tr-remember-p05",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "remember my favorite color is green"
+    },
+    {
+      "id": "tr-remember-p06",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "fyi bruno gets his medicine at 8, please remember"
+    },
+    {
+      "id": "tr-remember-p07",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "save this for later: the plumber's name is Marsh"
+    },
+    {
+      "id": "tr-remember-p08",
+      "kind": "positive",
+      "expected": "remember",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "rember that i dont eat mushrooms"
+    },
+    {
+      "id": "tr-remember-f01",
+      "kind": "followup",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "also remember she likes chocolate cake",
+      "priorUser": "Remember that Willow's birthday is March 3rd.",
+      "priorAssistant": "Got it, I'll remember that Willow's birthday is March 3rd."
+    },
+    {
+      "id": "tr-remember-f02",
+      "kind": "followup",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "and Cosmo's allergic to shellfish, remember that too",
+      "priorUser": "Remember that Daisy is allergic to cats.",
+      "priorAssistant": "Okay, noted that Daisy is allergic to cats."
+    },
+    {
+      "id": "tr-remember-f03",
+      "kind": "followup",
+      "expected": "remember",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "remember that for me",
+      "priorUser": "I'm taking the car to the shop on Thursday.",
+      "priorAssistant": "Sounds good, hope it's a quick fix."
+    },
+    {
+      "id": "tr-remember-f04",
+      "kind": "followup",
+      "expected": "remember",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "make a note of that",
+      "priorUser": "The contractor said he'd come back next Tuesday.",
+      "priorAssistant": "Okay, thanks for telling me."
+    },
+    {
+      "id": "tr-almanac-date-p01",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what's today's date"
+    },
+    {
+      "id": "tr-almanac-date-p02",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what day is it"
+    },
+    {
+      "id": "tr-almanac-date-p03",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "what is the date today"
+    },
+    {
+      "id": "tr-almanac-date-p04",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "which day of the week is it"
+    },
+    {
+      "id": "tr-almanac-date-p05",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "whats the date, i forgot"
+    },
+    {
+      "id": "tr-almanac-date-p06",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "date today?"
+    },
+    {
+      "id": "tr-almanac-date-p07",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "is it Tuesday or Wednesday today"
+    },
+    {
+      "id": "tr-almanac-date-p08",
+      "kind": "positive",
+      "expected": "almanac-date",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "what's today's date, I need it for a form"
+    },
+    {
+      "id": "tr-almanac-date-f01",
+      "kind": "followup",
+      "expected": "almanac-date",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "and what's the date?",
+      "priorUser": "What time is it?",
+      "priorAssistant": "It's 3:42 PM."
+    },
+    {
+      "id": "tr-almanac-date-f02",
+      "kind": "followup",
+      "expected": "almanac-date",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what day is it again?",
+      "priorUser": "What's the weather in Boston?",
+      "priorAssistant": "Boston is 51 and clear."
+    },
+    {
+      "id": "tr-almanac-date-f03",
+      "kind": "followup",
+      "expected": "almanac-date",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "what's the date today, by the way?",
+      "priorUser": "Set a timer for 5 minutes.",
+      "priorAssistant": "Timer set for 5 minutes."
+    },
+    {
+      "id": "tr-almanac-date-f04",
+      "kind": "followup",
+      "expected": "almanac-date",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "cool, what day is it today?",
+      "priorUser": "Tell me a fun fact about owls.",
+      "priorAssistant": "Owls can rotate their heads about 270 degrees."
+    },
+    {
+      "id": "tr-almanac-time-p01",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what time is it"
+    },
+    {
+      "id": "tr-almanac-time-p02",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "got the time?"
+    },
+    {
+      "id": "tr-almanac-time-p03",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "whats the time right now"
+    },
+    {
+      "id": "tr-almanac-time-p04",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "tell me the current time"
+    },
+    {
+      "id": "tr-almanac-time-p05",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "is it past noon yet"
+    },
+    {
+      "id": "tr-almanac-time-p06",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what's the time, am I late for the 3 o'clock"
+    },
+    {
+      "id": "tr-almanac-time-p07",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "time check please"
+    },
+    {
+      "id": "tr-almanac-time-p08",
+      "kind": "positive",
+      "expected": "almanac-time",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "wat time is it"
+    },
+    {
+      "id": "tr-almanac-time-f01",
+      "kind": "followup",
+      "expected": "almanac-time",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "and the time?",
+      "priorUser": "What's today's date?",
+      "priorAssistant": "It's October 11."
+    },
+    {
+      "id": "tr-almanac-time-f02",
+      "kind": "followup",
+      "expected": "almanac-time",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "ok what time is it now?",
+      "priorUser": "What's the weather in Denver?",
+      "priorAssistant": "Denver is sunny and 63."
+    },
+    {
+      "id": "tr-almanac-time-f03",
+      "kind": "followup",
+      "expected": "almanac-time",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "thanks, what time is it right now?",
+      "priorUser": "What is 12 times 12?",
+      "priorAssistant": "That's 144."
+    },
+    {
+      "id": "tr-almanac-time-f04",
+      "kind": "followup",
+      "expected": "almanac-time",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "and what time is it where I am?",
+      "priorUser": "How many cups in a pint?",
+      "priorAssistant": "Two cups in a pint."
+    },
+    {
+      "id": "tr-bedtime-storybook-p01",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "tell me a bedtime story about a sleepy bear"
+    },
+    {
+      "id": "tr-bedtime-storybook-p02",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "can you write a long bedtime story about a dragon who is afraid of the dark"
+    },
+    {
+      "id": "tr-bedtime-storybook-p03",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "child",
+      "heldOut": true,
+      "prompt": "i want a story with chapters about a space puppy"
+    },
+    {
+      "id": "tr-bedtime-storybook-p04",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "make a three part bedtime story for Pippa about a lost kite"
+    },
+    {
+      "id": "tr-bedtime-storybook-p05",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "write a bedtime storybook about a friendly robot named Rivet"
+    },
+    {
+      "id": "tr-bedtime-storybook-p06",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "story time! a story about a mermaid, the long kind"
+    },
+    {
+      "id": "tr-bedtime-storybook-p07",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "bedtime story please, something about a brave little turtle"
+    },
+    {
+      "id": "tr-bedtime-storybook-p08",
+      "kind": "positive",
+      "expected": "bedtime-storybook",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "can u make a story book for tonight about a moon rabbit"
+    },
+    {
+      "id": "tr-bedtime-storybook-f01",
+      "kind": "followup",
+      "expected": "bedtime-storybook",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "yes please, a long one about owls",
+      "priorUser": "I'm tired and can't sleep.",
+      "priorAssistant": "I'm sorry to hear that. Would you like a story?"
+    },
+    {
+      "id": "tr-bedtime-storybook-f02",
+      "kind": "followup",
+      "expected": "bedtime-storybook",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "a fox who finds a lantern, with chapters",
+      "priorUser": "My daughter wants a story tonight.",
+      "priorAssistant": "Sure, what should it be about?"
+    },
+    {
+      "id": "tr-bedtime-storybook-f03",
+      "kind": "followup",
+      "expected": "bedtime-storybook",
+      "band": "child",
+      "heldOut": false,
+      "prompt": "make it longer, with chapters",
+      "priorUser": "Tell me a story about a bear.",
+      "priorAssistant": "Once upon a time a bear found a honey tree. The end. Want a longer one?"
+    },
+    {
+      "id": "tr-bedtime-storybook-f04",
+      "kind": "followup",
+      "expected": "bedtime-storybook",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "another one, but a full storybook this time",
+      "priorUser": "Tell me a story about Rover the dog.",
+      "priorAssistant": "Rover chased a ball all day and then slept. The end."
+    },
+    {
+      "id": "tr-websearch-p01",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "who won the game last night"
+    },
+    {
+      "id": "tr-websearch-p02",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "latest news on the new Mars rover"
+    },
+    {
+      "id": "tr-websearch-p03",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "current mortgage rates"
+    },
+    {
+      "id": "tr-websearch-p04",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what happened at the climate summit this week"
+    },
+    {
+      "id": "tr-websearch-p05",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "when is the next total solar eclipse and where can it be seen"
+    },
+    {
+      "id": "tr-websearch-p06",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "best-reviewed standing desks 2026"
+    },
+    {
+      "id": "tr-websearch-p07",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "whats the newest iphone"
+    },
+    {
+      "id": "tr-websearch-p08",
+      "kind": "positive",
+      "expected": "websearch",
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "is the farmers market open this sunday"
+    },
+    {
+      "id": "tr-websearch-f01",
+      "kind": "followup",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "and what did they say about the next mission?",
+      "priorUser": "What's the latest on the Mars rover?",
+      "priorAssistant": "I found a report about a new sample collected this week."
+    },
+    {
+      "id": "tr-websearch-f02",
+      "kind": "followup",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what did they look like a year ago?",
+      "priorUser": "What are current mortgage rates?",
+      "priorAssistant": "Around 6.5 percent for a 30-year fixed."
+    },
+    {
+      "id": "tr-websearch-f03",
+      "kind": "followup",
+      "expected": "websearch",
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "is it open to visitors right now?",
+      "priorUser": "Tell me about the Eiffel Tower.",
+      "priorAssistant": "It is a wrought-iron tower in Paris, finished in 1889."
+    },
+    {
+      "id": "tr-websearch-f04",
+      "kind": "followup",
+      "expected": "websearch",
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "what are people saying about the cheapest one this month?",
+      "priorUser": "What are the best standing desks?",
+      "priorAssistant": "A few top-reviewed models come up this year."
+    },
+    {
+      "id": "tr-none-01",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "how are you today"
+    },
+    {
+      "id": "tr-none-02",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "tell me a joke"
+    },
+    {
+      "id": "tr-none-03",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "why is the sky blue"
+    },
+    {
+      "id": "tr-none-04",
+      "kind": "none",
+      "expected": null,
+      "band": "child",
+      "heldOut": false,
+      "prompt": "explain how photosynthesis works"
+    },
+    {
+      "id": "tr-none-05",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "what do you think about pineapple on pizza"
+    },
+    {
+      "id": "tr-none-06",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "write a haiku about autumn"
+    },
+    {
+      "id": "tr-none-07",
+      "kind": "none",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "why do cats purr"
+    },
+    {
+      "id": "tr-none-08",
+      "kind": "none",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "what's the capital of France"
+    },
+    {
+      "id": "tr-none-09",
+      "kind": "none",
+      "expected": null,
+      "band": "child",
+      "heldOut": false,
+      "prompt": "how many legs does a spider have"
+    },
+    {
+      "id": "tr-none-10",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "help me word an apology to my neighbor"
+    },
+    {
+      "id": "tr-none-11",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "give me three ideas for a birthday party"
+    },
+    {
+      "id": "tr-none-12",
+      "kind": "none",
+      "expected": null,
+      "band": "child",
+      "heldOut": true,
+      "prompt": "what's your favorite color"
+    },
+    {
+      "id": "tr-none-13",
+      "kind": "none",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "thank you, that was really helpful"
+    },
+    {
+      "id": "tr-none-14",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "I had a rough day"
+    },
+    {
+      "id": "tr-none-15",
+      "kind": "none",
+      "expected": null,
+      "band": "child",
+      "heldOut": true,
+      "prompt": "what rhymes with orange"
+    },
+    {
+      "id": "tr-none-16",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "is a tomato a fruit or a vegetable"
+    },
+    {
+      "id": "tr-none-17",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "how do I get better at chess"
+    },
+    {
+      "id": "tr-none-18",
+      "kind": "none",
+      "expected": null,
+      "band": "child",
+      "heldOut": false,
+      "prompt": "can you explain what a black hole is"
+    },
+    {
+      "id": "tr-none-19",
+      "kind": "none",
+      "expected": null,
+      "band": "child",
+      "heldOut": true,
+      "prompt": "why do we have to sleep"
+    },
+    {
+      "id": "tr-none-20",
+      "kind": "none",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": true,
+      "prompt": "I'm bored, any ideas"
+    },
+    {
+      "id": "tr-none-21",
+      "kind": "none",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "tell me something interesting about octopuses"
+    },
+    {
+      "id": "tr-none-22",
+      "kind": "none",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "do you think dogs dream"
+    },
+    {
+      "id": "tr-none-23",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "give me a synonym for happy"
+    },
+    {
+      "id": "tr-none-24",
+      "kind": "none",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "what should I make for dinner with chicken and rice"
+    },
+    {
+      "id": "tr-near-01",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "why does it rain so much in the Pacific Northwest in general",
+      "confusable": "weather"
+    },
+    {
+      "id": "tr-near-02",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "child",
+      "heldOut": true,
+      "prompt": "what is a tornado",
+      "confusable": "weather"
+    },
+    {
+      "id": "tr-near-03",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "how long should I boil an egg for a soft yolk, just in general",
+      "confusable": "timer"
+    },
+    {
+      "id": "tr-near-04",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "what does a stopwatch do",
+      "confusable": "timer"
+    },
+    {
+      "id": "tr-near-05",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "how can I get better at remembering to take my vitamins",
+      "confusable": "remind"
+    },
+    {
+      "id": "tr-near-06",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "why does the US use fahrenheit instead of celsius",
+      "confusable": "convert"
+    },
+    {
+      "id": "tr-near-07",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "child",
+      "heldOut": false,
+      "prompt": "what is a prime number",
+      "confusable": "math"
+    },
+    {
+      "id": "tr-near-08",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "how does human memory work",
+      "confusable": "remember"
+    },
+    {
+      "id": "tr-near-09",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "why does February only have 28 days",
+      "confusable": "almanac-date"
+    },
+    {
+      "id": "tr-near-10",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "spoken",
+      "heldOut": false,
+      "prompt": "why do we have time zones",
+      "confusable": "almanac-time"
+    },
+    {
+      "id": "tr-near-11",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": true,
+      "prompt": "how long should a bedtime routine be for a toddler",
+      "confusable": "bedtime-storybook"
+    },
+    {
+      "id": "tr-near-12",
+      "kind": "nearmiss",
+      "expected": null,
+      "band": "adult",
+      "heldOut": false,
+      "prompt": "explain how a search engine works",
+      "confusable": "websearch"
+    }
+  ]
+}

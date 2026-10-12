@@ -1,0 +1,126 @@
+{
+  "id": "search-recency-02-followups",
+  "note": "12 adult follow-up rows added by SEARCH-RECENCY-02 (6 need a live search, 6 do not). Prior turns are fixed text for the diagnostic arm; live arms run the prior user turn through the hub and use its real reply. Weather is a prior turn only on no-tool rows, because 'what about tomorrow' after weather belongs to the weather tool, not websearch.",
+  "rows": [
+    {
+      "id": "sr2-adult-followup-recency-01",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Any updates since then?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "What's the latest news on the Mars sample return mission?",
+      "priorAssistant": "Plans to bring the Mars samples back were still being debated, with several competing mission designs under review."
+    },
+    {
+      "id": "sr2-adult-followup-recency-02",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What about the Celtics?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "Who won the Lakers game last night?",
+      "priorAssistant": "The Lakers beat the Suns 112 to 104."
+    },
+    {
+      "id": "sr2-adult-followup-recency-03",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "And the Mets?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "What's the score of the Yankees game?",
+      "priorAssistant": "I don't have a live score. The last I knew they were tied in the fifth inning."
+    },
+    {
+      "id": "sr2-adult-followup-recency-04",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "What about Ethereum?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "How much is a bitcoin right now?",
+      "priorAssistant": "Bitcoin was trading around 60 thousand dollars the last time I had data."
+    },
+    {
+      "id": "sr2-adult-followup-recency-05",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "Is it still going?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "What's going on with the transit strike?",
+      "priorAssistant": "The transit workers had rejected the latest offer and talks were set to resume."
+    },
+    {
+      "id": "sr2-adult-followup-recency-06",
+      "band": "adult",
+      "category": "recency",
+      "prompt": "When does the next one come out?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "What's the newest iPhone?",
+      "priorAssistant": "The newest model I know of is the iPhone 15 Pro."
+    },
+    {
+      "id": "sr2-adult-followup-no_tool-01",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Thanks, that helps.",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "What's the weather in Denver today?",
+      "priorAssistant": "It is 58 degrees and cloudy in Denver, with a high of 64 and a 20 percent chance of rain."
+    },
+    {
+      "id": "sr2-adult-followup-no_tool-02",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Can you say that in one sentence?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "Who wrote Pride and Prejudice?",
+      "priorAssistant": "Jane Austen wrote it, and it was published in 1813."
+    },
+    {
+      "id": "sr2-adult-followup-no_tool-03",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Okay, thanks for checking.",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "What's the latest news on the Mars sample return mission?",
+      "priorAssistant": "Plans to bring the Mars samples back were still being debated, with several competing mission designs under review."
+    },
+    {
+      "id": "sr2-adult-followup-no_tool-04",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Ha, great, I'm a big fan.",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "Who won the Lakers game last night?",
+      "priorAssistant": "The Lakers beat the Suns 112 to 104."
+    },
+    {
+      "id": "sr2-adult-followup-no_tool-05",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Why does that matter for animals?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "Explain photosynthesis in a sentence.",
+      "priorAssistant": "Plants use sunlight to turn water and carbon dioxide into sugar and oxygen."
+    },
+    {
+      "id": "sr2-adult-followup-no_tool-06",
+      "band": "adult",
+      "category": "no_tool",
+      "prompt": "Another one?",
+      "heldOut": false,
+      "followUp": true,
+      "priorUser": "Give me a synonym for happy.",
+      "priorAssistant": "Joyful."
+    }
+  ]
+}
