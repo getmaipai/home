@@ -135,7 +135,7 @@ export type ModelOutput =
   // whether a LATER policy refusal of exactly this call should retry
   // via the raw utterance (queryWriterFallback) instead of the generic
   // honesty line every other refusal gets.
-  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string; queryWriterUsed?: boolean; /** ROUTER-BUILD-01e: the search assist added this call. */ searchAssistRescued?: boolean }
+  | { kind: "tool_calls"; calls: ToolCall[]; reasoning?: string; queryWriterUsed?: boolean; /** ROUTER-BUILD-01e: the search assist added this call. */ searchAssistRescued?: boolean; /** SEARCH-ANSWER-06: text the model streamed in the same generation as its calls; the gate was reset, so it only survives here, for an all-refused turn to keep. */ draft?: string }
   // DEADLINE-01 (dev.md "U6 rerun ruling" (a)): a generation that never
   // finished at all (the model node's own deadline, a dead engine) -
   // distinct from `text` with an empty string, which `answerInputFrom()`
@@ -1057,7 +1057,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
 
   if (attempt.toolCalls && attempt.toolCalls.length > 0) {
     gate?.reset();
-    return { outcome: { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning } };
+    // SEARCH-ANSWER-06: a draft written beside the calls is kept on the output (and flagged in
+    // stats), so a turn whose every call policy refuses can still answer with it.
+    const draft = attempt.text.trim().length > 0 ? attempt.text : undefined;
+    return { outcome: draft ? { ok: true, draft_discarded: true } : { ok: true }, output: { kind: "tool_calls", calls: attempt.toolCalls, reasoning, ...(draft ? { draft } : {}) } };
   }
 
   // The one exit that ever ships real, streamable text - settle the

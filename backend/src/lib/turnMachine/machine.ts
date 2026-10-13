@@ -95,6 +95,9 @@ interface MachineContext {
   // `output_gate` can still gate it - see the `model` state's own
   // onDone actions.
   modelReasoning: string | undefined;
+  // SEARCH-ANSWER-06: text the model wrote beside its tool calls this round; read once,
+  // by answerInputFrom(), when policy refuses every call.
+  modelDraft: string | undefined;
 }
 
 /** T5 / THIN-2G: true while the one retry round (its model call, its policy
@@ -356,7 +359,7 @@ export const turnMachine = setup({
   },
 }).createMachine({
   id: "turn",
-  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, retryUsed: false, queryWriterUsed: false, step: null, modelReasoning: undefined }),
+  context: ({ input }) => ({ turnState: input.turnState, trace: new TraceRecorder(), abortSignal: input.abortSignal, preConfirmed: input.preConfirmed, roundsUsed: 0, retryUsed: false, queryWriterUsed: false, step: null, modelReasoning: undefined, modelDraft: undefined }),
   initial: "safety",
   states: {
     safety: {
@@ -420,7 +423,7 @@ export const turnMachine = setup({
           // output directly (never carried over from an earlier round -
           // a real model call or a plain builder row both leave it
           // undefined/false, matching ModelOutput's own optional field).
-          { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning, queryWriterUsed: (event.output as ModelOutput & { kind: "tool_calls" }).queryWriterUsed === true })), target: "policy" },
+          { guard: "modelIsToolCalls", actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning, queryWriterUsed: (event.output as ModelOutput & { kind: "tool_calls" }).queryWriterUsed === true, modelDraft: (event.output as ModelOutput & { kind: "tool_calls" }).draft })), target: "policy" },
           { actions: assign(({ event }) => ({ step: event.output, modelReasoning: event.output.reasoning })), target: "answer" },
         ],
       },
@@ -550,6 +553,15 @@ function answerInputFrom(context: MachineContext): AnswerInput {
     const p = step as PolicyOutput;
     const refused: PolicyEntry | undefined = p.entries.find((e) => !e.decision.allow);
     const reason = refused && !refused.decision.allow ? refused.decision.reason : "min_role";
+    // SEARCH-ANSWER-06: a failed tool never fails the answer. When the model wrote text beside
+    // a call policy found ungrounded or unknown, that text is the answer and the call is
+    // dropped; the refusal line is for a generation that produced none. Every other reason
+    // (age, surface, crisis, temporary, household, consent) keeps its line, and the text
+    // still passes output_gate like any reply.
+    const onlyCallFaults = p.entries.length > 0 && p.entries.every((e) => e.decision.allow || e.decision.reason === "ungrounded_args" || e.decision.reason === "unknown_tool");
+    if (onlyCallFaults && context.modelDraft && context.modelDraft.trim().length > 0) {
+      return { kind: "model_text", text: context.modelDraft };
+    }
     return { kind: "policy_refused", reason: reason as PolicyRefusedReason };
   }
   if (step && typeof step === "object" && "matched" in step && (step as CommandsOutput).matched) {

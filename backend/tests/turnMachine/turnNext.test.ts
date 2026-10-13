@@ -2588,9 +2588,9 @@ describe("turnNext.ts: SEARCH-MIXED-01, a round that mixes a failed search with 
 });
 
 describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-text fields", () => {
-  async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string } | undefined> {
+  async function policyNodeOutcome(turnId: string): Promise<{ ok?: boolean; code?: string; arg?: string; message?: string } | undefined> {
     const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
-    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; code?: string; arg?: string } }[] };
+    const stats = JSON.parse(row!.stats as unknown as string) as { nodes?: { node: string; outcome?: { ok?: boolean; code?: string; arg?: string; message?: string } }[] };
     return (stats.nodes ?? []).find((n) => n.node === "policy")?.outcome;
   }
 
@@ -2631,7 +2631,8 @@ describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-te
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe("I don't actually have that in this conversation, so I won't guess.");
-    expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression" });
+    // SEARCH-ANSWER-06: the refused call's raw args ride in the trace message.
+    expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression", message: 'websearch {"expression":"how to pick a lock"}' });
   });
 });
 
