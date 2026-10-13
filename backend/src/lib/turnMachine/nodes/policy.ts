@@ -106,7 +106,7 @@ interface ArgPropertySchema {
    * the person's words (show_images' `kind`: "person", "building"), so it is
    * not checked for term overlap. The field that carries the person's words
    * (the subject, the query) is still checked. ANSWER-IMG-06. */
-  grounded?: boolean;
+  grounded?: boolean | "conversation";
 }
 interface ArgSchema {
   properties?: Record<string, ArgPropertySchema>;
@@ -135,8 +135,12 @@ interface GroundingCheck {
   arg?: string;
 }
 
-function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly string[], schema: ArgSchema | undefined): GroundingCheck {
+function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly string[], schema: ArgSchema | undefined, conversationTexts: readonly string[] = []): GroundingCheck {
   const sourceTerms = tokenize(sourceTexts.join(" "));
+  // SEARCH-ANSWER-05: only a field the manifest marks `grounded: "conversation"` also grounds on the
+  // recent assistant turns (a follow-up like "show me the poster" names no film; the last reply did).
+  const hasWidened = conversationTexts.length > 0 && Object.values(schema?.properties ?? {}).some((p) => p.grounded === "conversation");
+  const conversationTerms = hasWidened ? tokenize(conversationTexts.join(" ")) : new Set<string>();
   for (const [key, value] of Object.entries(args)) {
     if (typeof value !== "string" || value.trim().length === 0) continue;
     const prop = schema?.properties?.[key];
@@ -154,13 +158,23 @@ function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly str
     if (isBarePronoun(value)) return { ok: false, arg: key };
     const terms = [...tokenize(value)].filter((t) => !PURE_NUMBER_RE.test(t));
     if (terms.length === 0) continue; // nothing left but numbers/stopwords - never counts against it
-    if (!terms.some((t) => sourceTerms.has(t))) return { ok: false, arg: key };
+    const widened = prop?.grounded === "conversation";
+    if (!terms.some((t) => sourceTerms.has(t) || (widened && conversationTerms.has(t)))) return { ok: false, arg: key };
   }
   return { ok: true };
 }
 
-export function argsGrounded(args: Record<string, unknown>, sourceTexts: readonly string[], schema?: ArgSchema): boolean {
-  return checkGrounding(args, sourceTexts, schema).ok;
+export function argsGrounded(args: Record<string, unknown>, sourceTexts: readonly string[], schema?: ArgSchema, conversationTexts: readonly string[] = []): boolean {
+  return checkGrounding(args, sourceTexts, schema, conversationTexts).ok;
+}
+
+/** SEARCH-ANSWER-05: the last two assistant turns with text in the window (a tool-call-only turn has none and takes no slot), for a manifest field marked
+ * `grounded: "conversation"` (show_images' `subject`) alone. Never a tool item
+ * (`window-tool-*`) or the system summary, and never read for any other field. */
+const CONVERSATION_GROUNDING_TURNS = 2;
+function conversationGroundingTexts(context: TurnState["context"]): string[] {
+  const assistant = context.filter((item) => item.source === "window" && item.id.startsWith("window-assistant-") && item.text.trim().length > 0);
+  return assistant.slice(-CONVERSATION_GROUNDING_TURNS).map((item) => item.text);
 }
 
 /** "The utterance, the window's user turns or the hub-said names"
@@ -226,6 +240,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
   // grounds against the window's prior user turn instead.
   const sourceTexts = groundingSourceTexts(state.utterance, state.context);
   const roster = rosterNames(state.context);
+  const conversationTexts = conversationGroundingTexts(state.context);
 
   for (const call of input.calls) {
     // PROJECT-START-01: `start_project` is never a real package (tool.ts's
@@ -357,7 +372,7 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       // Grounded on the arguments the call will actually run with: a stray
       // model-set field the tool node strips (websearch's retired
       // `category`, ANSWER-IMG-02) never blocks the call.
-      const grounding = checkGrounding(modelFacingArgs(call.tool, args), sourceTexts, manifest.args as ArgSchema | undefined);
+      const grounding = checkGrounding(modelFacingArgs(call.tool, args), sourceTexts, manifest.args as ArgSchema | undefined, conversationTexts);
       if (!grounding.ok) {
         // GROUND-01: the trace records the branch and the argument name, never the terms.
         noteRefusal("ungrounded_args", grounding.arg);

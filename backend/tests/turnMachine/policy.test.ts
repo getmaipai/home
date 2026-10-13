@@ -245,3 +245,62 @@ describe("policyNode: THIN-0D, a remember proposal is refused for an unidentifie
     expect(chat.output.entries[0]?.decision).toEqual({ allow: true });
   });
 });
+
+// SEARCH-ANSWER-05: "show me the poster" names no film; the last reply did. show_images'
+// `subject` alone (manifest `grounded: "conversation"`) also grounds on the last two
+// `window-assistant-*` turns. Never a tool item, never another tool's arguments, never three back.
+describe("policyNode: show_images' subject grounds on the last assistant turns", () => {
+  beforeEach(() => resetDb());
+
+  const item = (id: string, text: string, source = "window") => ({ id, text, source, subjects: [], disclosure: "child_ok" });
+  function stateWith(utterance: string, context: unknown[], role = "adult"): TurnState {
+    return { actor: { role }, context, crisis: false, temporary: false, utterance } as unknown as TurnState;
+  }
+  async function decide(state: TurnState, tool: string, args: Record<string, unknown>) {
+    const result = await policyNode(state, { calls: [{ tool, args, id: "c1" }] }, new AbortController().signal);
+    return result.output.entries[0]?.decision;
+  }
+  const poster = { subject: "Zanzibar Quartz", kind: "film" };
+
+  test("a name that appears only in the last assistant turn grounds the subject", async () => {
+    const state = stateWith("show me the poster", [item("window-user-1", "tell me about that old film"), item("window-assistant-2", "That is Zanzibar Quartz, a 1974 thriller.")]);
+    expect(await decide(state, "show_images", poster)).toEqual({ allow: true });
+  });
+
+  test("the same name only in a tool item is still refused", async () => {
+    const state = stateWith("show me the poster", [item("window-user-1", "tell me about that old film"), item("window-tool-2", "Zanzibar Quartz, a 1974 thriller.")]);
+    expect(await decide(state, "show_images", poster)).toEqual({ allow: false, reason: "ungrounded_args" });
+  });
+
+  test("an assistant turn that only carried tool calls takes no slot", async () => {
+    const state = stateWith("show me the poster", [
+      item("window-assistant-1", "That is Zanzibar Quartz, a 1974 thriller."),
+      item("window-assistant-2", ""), item("window-tool-3", "results"), item("window-assistant-4", "Here is what I found."),
+    ]);
+    expect(await decide(state, "show_images", poster)).toEqual({ allow: true });
+  });
+
+  test("the system summary never grounds it either", async () => {
+    const state = stateWith("show me the poster", [item("window-system-summary", "Zanzibar Quartz was discussed.")]);
+    expect(await decide(state, "show_images", poster)).toEqual({ allow: false, reason: "ungrounded_args" });
+  });
+
+  test("a websearch call with an assistant-only name is still refused", async () => {
+    const state = stateWith("look it up", [item("window-user-1", "tell me about that old film"), item("window-assistant-2", "That is Zanzibar Quartz, a 1974 thriller.")]);
+    expect(await decide(state, "websearch", { expression: "Zanzibar Quartz" })).toEqual({ allow: false, reason: "ungrounded_args" });
+  });
+
+  test("a name from three assistant turns back is refused", async () => {
+    const state = stateWith("show me the poster", [
+      item("window-assistant-1", "That is Zanzibar Quartz, a 1974 thriller."),
+      item("window-user-2", "ok"), item("window-assistant-3", "Anything else?"),
+      item("window-user-4", "no"), item("window-assistant-5", "Fine."),
+    ]);
+    expect(await decide(state, "show_images", poster)).toEqual({ allow: false, reason: "ungrounded_args" });
+  });
+
+  test("a bare pronoun subject is still refused whatever the assistant said", async () => {
+    const state = stateWith("show me", [item("window-assistant-1", "He was in it, and it was good.")]);
+    expect(await decide(state, "show_images", { subject: "it", kind: "film" })).toEqual({ allow: false, reason: "ungrounded_args" });
+  });
+});

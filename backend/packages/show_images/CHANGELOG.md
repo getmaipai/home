@@ -4,6 +4,10 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ## [Unreleased]
 
+### Fixed
+
+- SEARCH-ANSWER-05: `subject` is marked `grounded: "conversation"`, so "show me the poster" after a reply that named the film is no longer refused as ungrounded. The subject also grounds on words from the last two assistant turns; tool results and the system summary never count, and a bare pronoun is still refused.
+
 ### Changed
 
 - IMGQ-09: a stronger tool description and four worked examples (three who/what-is calls and one chat mention, plus four requests that never call it) in the `subject` argument. Held-out recall 0.28 to 0.50 and false offers 0.06 to 0.03 from wording alone.
