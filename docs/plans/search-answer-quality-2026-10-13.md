@@ -79,3 +79,56 @@ Element); the baseline lints did not catch it because the button is a kit Button
 
 Nothing here needs a rule change. A hard grounding check on the output (named film must appear in a source) would read
 the answer's wording; it is not proposed, and if wanted it is the owner's call because of rules 1 and 6.
+
+## Follow-up 2026-10-13 (poster request)
+
+Conversation conv-iv2n72jlpb. Turns turn-d3ushvu41k, turn-jvdegpmqi4, turn-o416bde5y6 (the same "show je the poster" sent
+three times) all stored the canned line; the earlier answer is turn-4rxa10ml9h. Read from `data/hub.db` (read-only) and code.
+
+(1) The phrase is `policyRefusalLine()`'s fallback branch, `backend/src/lib/turnMachine/nodes/answer.ts:90`. Every policy
+refusal reason without its own line (`ungrounded_args`, `unknown_tool`) ends there (GROUND-01 made that on purpose). The trace
+of all three turns shows `policy` outcome `{ok:false, code:"ungrounded_args", arg:"subject"}` and `stop_reason:"tool_calls"`.
+
+(2) Why the draft vanished. The model answered with text AND a tool call in one generation (first_delta_ms 0-1, so the text
+streamed live to the screen). The call was almost certainly `show_images` with `subject` "The Woman in the Window". The policy
+node (`nodes/policy.ts:138-160`, `checkGrounding`) requires some term of every free-text arg to appear in the utterance, the
+window's USER turns or the roster (`groundingSourceTexts`, `policy.ts:176-182`). "show je the poster" contains no film name and
+the film name lives only in an assistant turn, so the subject is "ungrounded", the call is refused, the machine goes to
+`answer` with `policy_refused` (`machine.ts:252`, `answerInputFrom` `machine.ts:553`), and the turn value's reply text becomes
+the canned line; the client swaps the streamed text for the final reply. Only the final text is stored (`reply_text`); the
+discarded draft and the refused call args are not in `stats` (`tool_call_raw_args` is null on these generations), so the
+draft cannot be recovered afterwards. The show_images manifest itself tells the model that "a follow-up means the previous
+message's subject" (`backend/packages/show_images/manifest.json`, subject description) while policy refuses exactly that.
+The IMGQ-09 re-ask (`turnNext.ts:759`) did not run: it needs a kept text reply, `MAIPAI_IMGQ09_REASK=1` and no tool call.
+The unabomber turn (turn-licsedj994) shows the sibling `unknown_tool` path to the same line.
+
+(3) Correctness. The earlier answer was wrong. The film is almost certainly "Bring Her Back" (2025, the Philippou brothers):
+it was the second search result (cambridgeday.com, "Beware the foster mom with the dead daughter") in turn-uo4ikmaypk. The
+model ignored it and named "The Woman in the Window" with invented plot. turn-4rxa10ml9h (the re-ask of the same question)
+made NO tool call (sources empty, no tool nodes) yet wrote "the search results I found earlier confirmed ... [1] [4] [3]",
+so those markers cite nothing. The poster request was refused before any picture work, and would have shown the wrong film.
+
+(4) Bare digits. `[n]` markers are rewritten to `[n](#citation-n)` by `citeMarkers` (`frontend/src/apps/chat/chatCitations.ts:49`),
+for every marker whether or not sources exist. `ChatCitationLink` (`chatCitationLink.tsx:15-16`) then, when the message has
+no source at that index, returns `<span>{children}</span>`, which is the bare digit with its brackets gone. Turn
+turn-4rxa10ml9h has no sources, so every hallucinated marker survives as "1", "3", "4". (`markCitations` leaves an
+unmatched `[7]` as written; the live path uses `citeMarkers`, so that promise is not kept.)
+
+(5) Fixes, smallest first. None conflicts with a rule; none reads wording.
+- SEARCH-ANSWER-05 (S, regression test only): `groundingSourceTexts` also includes the previous assistant turns (and the
+  titles of shown sources) for `show_images`' `subject`, or the manifest marks `subject` as grounded against the whole
+  window. Code, not a word list; rule 1 intact (the model still picks the subject). Safety gates untouched (age and surface
+  gates still run first in `policy.ts`). Note: for a child the existing household-subject check stays in front.
+- SEARCH-ANSWER-06 (S): a refused tool call after text already streamed must not replace a good draft with the canned line;
+  keep the streamed text and drop only the call (a failed tool never fails the answer, RULES). Needs a test of the
+  `policy_refused` path with a non-empty draft. Also store the refused args/draft in `stats` (names only is fine) so it is diagnosable.
+- SEARCH-ANSWER-07 (S, frontend): `ChatCitationLink` shows nothing (not the bare digit) for a marker with no source, or the
+  backend strips `[n]` when the turn has no sources. Restore the `markCitations` "stays text" promise.
+- SEARCH-ANSWER-08 (M, rule 3 bench first): a re-ask of a question the previous turn failed to answer should search again
+  (turn-4rxa10ml9h answered from memory with fake citations). Candidate: a prompt line plus the existing search assist
+  (it scored p=0.01, shadow mode). Phrasing/prompt change, so 3 repeats on the CHAT-AB-01 fresh set. Related to SEARCH-ANSWER-02/03.
+Cheapest first: 05 and 07, then 06, then 08.
+
+## Supersedes
+
+This note amends the "Grounding, stated exactly" paragraph of `docs/plans/turn-machine-state-record-2026-09-22.md` (lines 131-148). The grounding set stays the utterance, the window's user turns and the names the hub itself said. `show_images.subject` alone additionally grounds on words from the last 1 to 2 `window-assistant-*` turns. It never grounds on `window-tool-*` turns or the system summary, and never on websearch, store or recall arguments. The bare-pronoun refusal stays. Age, surface, crisis, temporary and household checks keep running first.
