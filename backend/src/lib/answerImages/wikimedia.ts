@@ -156,6 +156,28 @@ export function kindScore(kind: string, description: string): number {
   return score;
 }
 
+/** IMGQ-13: a name folded for comparison: case, accents and punctuation
+ * dropped, each word's plural folded ("tacos" and "Taco" are one name). */
+export function foldName(text: string): string {
+  const folded = text.normalize("NFKD").replace(/[\u0300-\u036f]/g, "").toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+    .map((w) => (w.length > 4 && w.endsWith("ies") ? `${w.slice(0, -3)}y` : w.length > 3 && w.endsWith("ie") ? `${w.slice(0, -2)}y` : w.length > 3 && w.endsWith("s") && !w.endsWith("ss") ? w.slice(0, -1) : w)).join(" ");
+  return folded;
+}
+const withoutQualifier = (title: string): string => title.replace(/\s*\([^)]*\)\s*$/, "");
+/** IMGQ-13: a pool item with under this share of the pool's best sitelink
+ * count is a lesser thing with the same name (measured: 3% and 27% drop, 49% stays). */
+const SITELINK_CUT = 0.4;
+/** IMGQ-13: at most this many linked titles of a disambiguation page are resolved in the one entities call. */
+const TITLE_CAP = 50;
+
+/** IMGQ-13: how many of the kind's words a description carries exactly as
+ * written (no plural or spelling variant): "state of the United States" beats
+ * "capital city of the United States" for the kind "state". Tie-break only. */
+function kindExact(kind: string, description: string): number {
+  const have = new Set(words(description));
+  return words(kind).filter((k) => have.has(k)).length;
+}
+
 /** Why a subject resolves to nothing (counted on the trace). */
 export type ResolveSkip = "no_article" | "ambiguous" | "error" | "offline";
 
@@ -182,7 +204,7 @@ export type ResolveOptions = {
   library?: (subject: string) => Promise<LibraryPage | null>;
 };
 
-type Sense = { id: string; label: string; description: string };
+type Sense = { id: string; label: string; description: string; /** The text the Wikidata search matched (the label, or an alias). */ matched?: string };
 
 /** The subject as Wikipedia and Wikidata know it (IMGQ, image-search accuracy
  * study R1 and R2, 2026-10-06): the subject's own English Wikipedia page
@@ -193,8 +215,18 @@ type Sense = { id: string; label: string; description: string };
  * "car") picks among them: the page's own item unless another sense's
  * description fits the kind and the page's does not. A disambiguation page
  * with no sense fitting the kind is ambiguous: no pictures (owner,
- * 2026-10-06: only when the conversation makes the meaning clear). Never
- * more than 3 Wikimedia calls here. */
+ * 2026-10-06: only when the conversation makes the meaning clear).
+ *
+ * IMGQ-13 (docs/plans/imgq-13-entity-resolution-2026-10-12.md section 4):
+ * the asked name picks the entity and `kind` is only a hint. The pool is the
+ * page's item plus the search hits whose label (or matched alias) equals the subject (case,
+ * accent and plural folded); items under 40% of the pool's best sitelink
+ * count drop out; among the rest an item fitting the kind wins (ties by
+ * sitelinks, then order), otherwise the page's item. A disambiguation page
+ * pools the pages it links to whose title starts with the subject and needs
+ * one of them to fit the kind. When nothing matches the name the older
+ * kind-fit choice among the search hits still applies. Never more than 3
+ * Wikimedia calls here, 4 on a disambiguation page (the links call). */
 export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJson, kind = "", opts: ResolveOptions = {}): Promise<{ entity: WikimediaEntity } | { skipped: ResolveSkip; nothingByName?: boolean }> {
   if (opts.band && wikimediaLiveBlocked(opts.band)) return { skipped: "offline" };
   // KS-02C: the library names the page first. A hit replaces the Wikipedia
@@ -226,7 +258,7 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
   };
   const [pageResult, searchResult] = await Promise.all([
     pageFromLibrary(),
-    fetchJson(`${WD}?action=wbsearchentities&search=${encodeURIComponent(subject)}&language=en&type=item&format=json&limit=10`).catch(() => null) as Promise<{ search?: Array<{ id?: string; label?: string; description?: string }> } | null>,
+    fetchJson(`${WD}?action=wbsearchentities&search=${encodeURIComponent(subject)}&language=en&type=item&format=json&limit=10`).catch(() => null) as Promise<{ search?: Array<{ id?: string; label?: string; description?: string; match?: { text?: string } }> } | null>,
   ]);
   // Either lookup failing is an error, never "no article": nothing may be
   // concluded about a name Wikimedia did not answer for.
@@ -237,7 +269,7 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
   // truth, is the test.
   const disambiguation = Boolean(page && page.missing === undefined && page.pageprops !== undefined && "disambiguation" in page.pageprops);
   const pageItem = page && page.missing === undefined && !disambiguation && /^Q\d+$/.test(page.pageprops?.wikibase_item ?? "") ? page.pageprops!.wikibase_item! : null;
-  const senses: Sense[] = (searchResult?.search ?? []).filter((r) => typeof r.id === "string" && /^Q\d+$/.test(r.id)).map((r) => ({ id: r.id!, label: r.label ?? "", description: r.description ?? "" }));
+  const senses: Sense[] = (searchResult?.search ?? []).filter((r) => typeof r.id === "string" && /^Q\d+$/.test(r.id)).map((r) => ({ id: r.id!, label: r.label ?? "", description: r.description ?? "", ...(typeof r.match?.text === "string" ? { matched: r.match.text } : {}) }));
   const wanted = subject.trim().toLowerCase();
   const pageSense = pageItem ? senses.find((x) => x.id === pageItem) : undefined;
   const kindFit = (x: Sense) => (kind.trim() ? kindScore(kind, x.description) : 0);
@@ -246,28 +278,99 @@ export async function resolveWikimediaSubject(subject: string, fetchJson: FetchJ
   // never moves the subject off its own page onto a hit named exactly the
   // subject. Specific kinds keep the full veto.
   const looseKind = words(kind).length > 0 && words(kind).every((w) => LOOSE_KINDS.has(w));
+  const kindUsable = kind.trim().length > 0 && !looseKind;
   const fitting = senses.filter((x) => x.id !== pageItem && kindFit(x) > 0 && !(looseKind && pageItem && x.label.toLowerCase() === wanted)).sort((x, y) => kindFit(y) - kindFit(x));
-  // One entity call for the page's item and the senses that fit the kind
-  // best: another sense wins only when it fits the kind, the page's item
-  // does not, and it has an English article (a museum object or a zoo
-  // enclosure that happens to say "instrument" or "animal" never does).
   const exact = senses.filter((x) => x.label.toLowerCase() === wanted);
-  const ids = [...new Set([...(pageItem ? [pageItem] : []), ...fitting.slice(0, 4).map((x) => x.id), ...(pageItem ? [] : exact.slice(0, 3).map((x) => x.id)), ...(pageItem || exact.length ? [] : senses.slice(0, 1).map((x) => x.id))])];
   // Nothing by this name at all: no Wikipedia page and no Wikidata item with
   // exactly this label (an item with no English article may be a person).
   const nothingByName = !pageItem && !disambiguation && exact.length === 0;
-  if (ids.length === 0) return disambiguation ? { skipped: "ambiguous" } : { skipped: "no_article", nothingByName };
   type Ent = { claims?: Record<string, unknown[]>; sitelinks?: Record<string, { title?: string }>; labels?: Record<string, { value?: string }>; descriptions?: Record<string, { value?: string }>; aliases?: Record<string, Array<{ value?: string }>> };
-  const response = await fetchJson(`${WD}?action=wbgetentities&ids=${ids.join("%7C")}&props=claims%7Csitelinks%7Clabels%7Cdescriptions%7Caliases&languages=${NAME_LANGUAGES}&sitefilter=enwiki&format=json`) as { entities?: Record<string, Ent> };
-  const withArticle = (id: string) => Boolean(response.entities?.[id]?.sitelinks?.enwiki?.title);
-  const pageFits = !kind.trim() || !pageSense || kindFit(pageSense) > 0;
-  const fit = fitting.find((x) => withArticle(x.id));
-  let chosen: string | null;
-  let via: "wikipedia" | "kind" | "wikidata_search";
-  if (pageItem && withArticle(pageItem) && (pageFits || !fit)) { chosen = pageItem; via = "wikipedia"; }
-  else if (fit) { chosen = fit.id; via = "kind"; }
-  else if (disambiguation) return { skipped: "ambiguous" };
-  else { chosen = ids.find(withArticle) ?? null; via = "wikidata_search"; }
+  const PROPS = `props=claims%7Csitelinks%7Clabels%7Cdescriptions%7Caliases&languages=${NAME_LANGUAGES}&format=json`;
+  const entitiesById = async (ids: string[]) => (await fetchJson(`${WD}?action=wbgetentities&ids=${ids.join("%7C")}&${PROPS}`) as { entities?: Record<string, Ent> }).entities ?? {};
+  const wantedKey = foldName(subject);
+  const nameMatch = (name: string) => wantedKey !== "" && (foldName(name) === wantedKey || foldName(withoutQualifier(name)) === wantedKey);
+  const startsWithName = (name: string) => wantedKey !== "" && foldName(name).startsWith(wantedKey);
+  // Whole-name titles ("Hamilton (musical)") rank before word-boundary ones ("Amazon River"), then bare prefixes ("Pythonidae").
+  const linkTier = (name: string) => (nameMatch(name) ? 0 : foldName(name).startsWith(`${wantedKey} `) ? 1 : 2);
+  type Pooled = { id: string; sitelinks: number; description: string; order: number };
+  // IMGQ-13: notability cut, then the kind as a hint among what is left.
+  const rank = (pool: Pooled[], fitOnly: boolean, hint = kindUsable): { id: string; byKind: boolean } | null => {
+    const fits = hint ? pool.filter((x) => kindScore(kind, x.description) > 0) : [];
+    const base = fitOnly ? fits : pool;
+    if (base.length === 0) return null;
+    const best = Math.max(...base.map((x) => x.sitelinks));
+    const kept = base.filter((x) => x.sitelinks >= best * SITELINK_CUT);
+    const keptFits = hint ? kept.filter((x) => kindScore(kind, x.description) > 0) : [];
+    if (keptFits.length > 0) {
+      const top = [...keptFits].sort((x, y) => kindScore(kind, y.description) - kindScore(kind, x.description) || kindExact(kind, y.description) - kindExact(kind, x.description) || y.sitelinks - x.sitelinks || x.order - y.order)[0]!;
+      return { id: top.id, byKind: true };
+    }
+    // No kept item fits the kind: the page's item (order 0) if it kept, else the most notable.
+    return { id: [...kept].sort((x, y) => Number(y.order === 0) - Number(x.order === 0) || y.sitelinks - x.sitelinks || x.order - y.order)[0]!.id, byKind: false };
+  };
+  const nameHits = senses.filter((x) => x.id !== pageItem && (nameMatch(x.label) || nameMatch(x.matched ?? "")) && !NOT_A_THING.test(x.description));
+  let fetchedIds: string[] = [];
+  let response: { entities?: Record<string, Ent> } = {};
+  let chosen: string | null = null;
+  let via: "wikipedia" | "kind" | "wikidata_search" = "wikipedia";
+  let settled = false;
+  if (disambiguation) {
+    // No kind at all cannot choose among a disambiguation page's links: no more calls.
+    if (!kind.trim()) return { skipped: "ambiguous" };
+    // A disambiguation page lists the intended thing even when the search's
+    // ten hits do not ("Hamilton (musical)", "Amazon River"): one links call.
+    const links = await fetchJson(`${WP}?action=query&titles=${encodeURIComponent(page?.title ?? subject)}&prop=links&plnamespace=0&pllimit=max&format=json`).catch(() => null) as { query?: { pages?: Record<string, { links?: Array<{ title?: string }> }> } } | null;
+    const titles = [...new Set(Object.values(links?.query?.pages ?? {}).flatMap((p) => p.links ?? []).map((l) => l.title ?? "").filter((t) => t && startsWithName(t)))]
+      .sort((a, b) => linkTier(a) - linkTier(b)).slice(0, TITLE_CAP);
+    if (titles.length > 0) {
+      settled = true;
+      // A failed lookup is an error, never "ambiguous" (nothing may be concluded from a missing answer).
+      const answer = await fetchJson(`${WD}?action=wbgetentities&sites=enwiki&titles=${titles.map(encodeURIComponent).join("%7C")}&${PROPS}`).catch(() => null) as { entities?: Record<string, Ent> } | null;
+      if (!answer) return { skipped: "error" };
+      const entities = answer.entities ?? {};
+      response = { entities };
+      const pool: Pooled[] = Object.entries(entities).filter(([id, e]) => /^Q\d+$/.test(id) && e.sitelinks?.enwiki?.title && !NOT_A_THING.test(e.descriptions?.en?.value ?? "")).map(([id, e], order) => ({ id, sitelinks: Object.keys(e.sitelinks ?? {}).length, description: e.descriptions?.en?.value ?? "", order: order + 1 }));
+      const pick = rank(pool, true, true);
+      if (!pick) return { skipped: "ambiguous" };
+      chosen = pick.id;
+      via = "kind";
+    }
+  } else if (pageItem || nameHits.length > 0) {
+    const poolIds = [...(pageItem ? [pageItem] : []), ...nameHits.map((x) => x.id)].slice(0, 5);
+    if (poolIds.length > 0) {
+      const ids = [...new Set([...poolIds, ...fitting.slice(0, 2).map((x) => x.id)])];
+      fetchedIds = ids;
+      response = { entities: await entitiesById(ids) };
+      const pool: Pooled[] = poolIds.flatMap((id, order) => {
+        const e = response.entities?.[id];
+        const description = e?.descriptions?.en?.value ?? senses.find((x) => x.id === id)?.description ?? "";
+        const title = e?.sitelinks?.enwiki?.title;
+        if (!e || !title || NOT_A_THING.test(description)) return [];
+        return [{ id, sitelinks: Object.keys(e.sitelinks ?? {}).length, description, order }];
+      });
+      const pick = pool.length > 0 ? rank(pool, false) : null;
+      if (pick) {
+        settled = true;
+        chosen = pick.id;
+        via = chosen === pageItem ? "wikipedia" : pick.byKind ? "kind" : "wikidata_search";
+      }
+    }
+  }
+  if (!settled) {
+    // Nothing matches the name (a list-article page, a name Wikidata files
+    // under another label, a failed links call): the older choice, with the
+    // kind picking among the search hits.
+    const ids = fetchedIds.length > 0 ? fetchedIds : [...new Set([...(pageItem ? [pageItem] : []), ...fitting.slice(0, 4).map((x) => x.id), ...(pageItem ? [] : exact.slice(0, 3).map((x) => x.id)), ...(pageItem || exact.length ? [] : senses.slice(0, 1).map((x) => x.id))])];
+    if (ids.length === 0) return disambiguation ? { skipped: "ambiguous" } : { skipped: "no_article", nothingByName };
+    if (!response.entities || !ids.every((id) => response.entities![id])) response = { entities: { ...(response.entities ?? {}), ...(await entitiesById(ids.filter((id) => !response.entities?.[id]))) } };
+    const withArticle = (id: string) => Boolean(response.entities?.[id]?.sitelinks?.enwiki?.title);
+    const pageFits = !kind.trim() || !pageSense || kindFit(pageSense) > 0;
+    const fit = fitting.find((x) => withArticle(x.id));
+    if (pageItem && withArticle(pageItem) && (pageFits || !fit)) { chosen = pageItem; via = "wikipedia"; }
+    else if (fit) { chosen = fit.id; via = "kind"; }
+    else if (disambiguation) return { skipped: "ambiguous" };
+    else { chosen = ids.find(withArticle) ?? null; via = "wikidata_search"; }
+  }
   if (!chosen) return { skipped: "no_article", nothingByName };
   const entity = response.entities![chosen]!;
   const title = entity.sitelinks!.enwiki!.title!;
