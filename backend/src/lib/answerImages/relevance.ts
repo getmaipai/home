@@ -204,6 +204,37 @@ const MINOR_WORDS = /\b(child|children|kid|kids|boy|boys|girl|girls|baby|babies|
 const NAME_IN_CATEGORY = /^(\p{Lu}[\p{L}'.-]+(?: \p{Lu}[\p{L}'.-]+)+) in (?:\d{4}|[\p{Lu}])/u;
 const PEOPLE_STEMS = new Set(["people at", "tourists", "visitors", "audiences", "crowds", "conventions", "cosplayers", "selfies"]);
 
+/** SEARCH-ANSWER-09: words that say the picture is a made image, not a photograph. A closed list, one counter per
+ * word (`caption:<word>`). A subject that holds the word itself ("drawings of X") or whose own Wikidata description
+ * holds it (the Mona Lisa is a painting) is exempt. Only ever removes. */
+const ART_WORDS = /\b(drawings?|drawn|paintings?|sketch(?:es)?|caricatures?|illustrations?)\b/;
+function artRoot(word: string): string {
+  const w = word === "drawn" ? "drawing" : word.endsWith("ches") ? word.slice(0, -2) : word.replace(/s$/, "");
+  return w;
+}
+
+/** SEARCH-ANSWER-09: how a caption names a person only through a relative or a companion ("Janet Jackson, sister
+ * of Michael Jackson", "Fan with Michael Jackson"). Closed list of relation words, one counter per word. */
+const RELATIVE_WORDS = ["sister", "brother", "wife", "husband", "son", "daughter", "mother", "father", "with"];
+
+/** The relation word when the subject appears in `text` only as "<relation> of <subject>" or "with <subject>". */
+function onlyAsRelative(text: string, names: readonly string[]): string | null {
+  const hay = normalizeForMatch(text);
+  for (const rel of RELATIVE_WORDS) {
+    const lead = rel === "with" ? "with" : `${rel} of`;
+    let rest = hay;
+    let hit = false;
+    for (const name of names) {
+      for (const the of ["", "the "]) {
+        const phrase = ` ${lead} ${the}${name} `;
+        if (rest.includes(phrase)) { hit = true; rest = rest.split(phrase).join("  "); }
+      }
+    }
+    if (hit && !namesSubject(rest, names)) return rel === "with" ? "with" : `${rel} of`;
+  }
+  return null;
+}
+
 /** Picture kinds that are not a still photo. */
 const NOT_STILL = /\.(svg|gif|tiff?|pdf|djvu|webm|mp4|ogv)(\?|$)/i;
 const NOT_STILL_FORMATS = new Set(["svg", "gif", "tif", "tiff", "pdf", "djvu", "webm", "mp4"]);
@@ -377,6 +408,15 @@ export function judgeRelevance(c: RelevanceInput, ctx: RelevanceContext): Releva
   if (isProduct && firstUnexempt(PERSON_WITH_PRODUCT, said, own)) return "private_person";
   const screen = firstWord(SCREENSHOT_WORDS, said);
   if (screen) return `caption:${screen}`;
+  const art = firstUnexempt(ART_WORDS, said, own);
+  if (art) {
+    const root = artRoot(art);
+    if (!names.some((n) => n.split(" ").some((w) => artRoot(w) === root))) return `caption:${art}`;
+  }
+  if (subjectIsPerson) {
+    const relative = onlyAsRelative(words, names);
+    if (relative) return `caption:${relative}`;
+  }
   const disc = firstUnexempt(DISC_WORDS, said, own) ?? visible.map((cat) => firstUnexempt(DISC_WORDS, cat, own)).find((w) => w !== null) ?? null;
   if (disc) return "disc_or_label";
   const personal = firstWord(PERSONAL_WORDS, said) ?? firstWord(PERSONAL_WORDS, path);

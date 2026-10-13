@@ -488,3 +488,31 @@ describe("IMGQ-10: the depicts search is merged behind the lead and fails soft",
     expect(await wikimediaDepicts({ id: "Q4", image: undefined }, async () => pages(["y"]), { now: 1000 })).toHaveLength(1);
   });
 });
+
+describe("SEARCH-ANSWER-09: made images and relatives are not photos of the subject", () => {
+  const mj = person(["Michael Jackson"], "Michael Jackson");
+  const mjDrawings = person(["Michael Jackson drawings", "Michael Jackson"], "Michael Jackson");
+  const cats = { categories: ["Michael Jackson"] };
+
+  test("'photos of Michael Jackson' drops a 'drawing of Michael Jackson' caption", () => {
+    expect(judgeRelevance(commons("Drawing of Michael Jackson", "A drawing of Michael Jackson", cats), mj)).toBe("caption:drawing");
+    expect(judgeRelevance(commons("Michael Jackson caricature", "", cats), mj)).toBe("caption:caricature");
+  });
+
+  test("'drawings of Michael Jackson' keeps the drawing", () => {
+    expect(judgeRelevance(commons("Michael Jackson drawing", "A drawing of Michael Jackson", cats), mjDrawings)).toBeNull();
+  });
+
+  test("'Janet Jackson, sister of Michael Jackson' is dropped for 'photos of Michael Jackson'", () => {
+    expect(judgeRelevance(commons("Janet Jackson", "Janet Jackson, sister of Michael Jackson", cats), mj)).toBe("caption:sister of");
+  });
+
+  test("plain 'Michael Jackson performing in 1988' is kept", () => {
+    expect(judgeRelevance(commons("Michael Jackson performing in 1988", "Michael Jackson performing in 1988", cats), mj)).toBeNull();
+  });
+
+  test("an asked 'Janet Jackson' keeps a 'Janet Jackson, sister of Michael Jackson' caption", () => {
+    const janet = person(["Janet Jackson"], "Janet Jackson");
+    expect(judgeRelevance(commons("Janet Jackson", "Janet Jackson, sister of Michael Jackson", { categories: ["Janet Jackson"] }), janet)).toBeNull();
+  });
+});
