@@ -56,7 +56,8 @@ import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { PARENT_REQUIRED_LINE } from "./nodes/answer";
-import { AnswerImagePlacer, answerImagesAllowed, settleAnswerBlocks, settleAnswerImages } from "@/lib/answerImages/turn";
+import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, answerImagesAllowed, settleAnswerBlocks, settleAnswerImages, startAnswerImages } from "@/lib/answerImages/turn";
+import { reAskForShowImages } from "./nodes/model";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import type { GateDecision } from "@/lib/gate/types";
 
@@ -755,7 +756,14 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     // the stored `blocks` carry where each one sits.
     // GENUI-05: the picture gallery is one of the turn's blocks, so the picture pipeline settles first (a gallery that
     // finished late is then placed after the reply with the rest); an answer that is not kept stores no pictures.
-    await settleAnswerImages(state, { keep: !gateOutput?.refused && !state.failedGenerationReply && (gateOutput?.text ?? "").trim().length > 0 });
+    // IMGQ-09 (b): the first pass offered show_images and answered in text with no tool call; ask once more, after the
+    // reply has streamed, and append a gallery only if the model calls the tool (auto, never forced). Adult offer path only.
+    const replyKept = !gateOutput?.refused && !state.failedGenerationReply && (gateOutput?.text ?? "").trim().length > 0;
+    if (state.answerImagesAllowed && process.env.MAIPAI_IMGQ09_REASK === "1" && replyKept && !state.answerImages && !state.continuation && !state.whoAnswer && state.outcomes.length === 0 && state.lastTools.some((t) => t.id === SHOW_IMAGES_TOOL_ID)) {
+      const again = await reAskForShowImages(state, gateOutput?.text ?? "", abortSignal);
+      if (again) startAnswerImages(state, again.subject, again.kind, again.callId, again.subjects);
+    }
+    await settleAnswerImages(state, { keep: replyKept });
     settleAnswerBlocks(state, gateOutput?.text ?? "");
     value = buildTurnValue(state, startedAt, source, gateOutput?.text ?? "", gateOutput?.speech, gateOutput?.reasoningOut, gateOutput?.sources, contextSegments);
     // 2026-10-03: after a successful tool call the reply is the model's

@@ -7,6 +7,9 @@ checklist (`docs/dev.md`); no release has been cut yet.
 
 ## [Unreleased]
 
+### Changed
+- Pictures when you ask: the assistant now shows pictures more often when an adult asks who or what something is. The check-again step (after the answer is on screen, add pictures when the question was about a famous person, place or thing) is built and off until it is switched on. Adults on written chat only.
+
 ### Fixed
 - Pictures under an answer: a screenshot, signature or diagram saved as a PNG,
   a file whose name was mangled by a bulk rename, and a photo of something

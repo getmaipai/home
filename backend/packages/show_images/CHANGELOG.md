@@ -4,6 +4,10 @@ All notable changes to the Show Pictures package, in [Keep a Changelog](https://
 
 ## [Unreleased]
 
+### Changed
+
+- IMGQ-09: a stronger tool description and four worked examples (three who/what-is calls and one chat mention, plus four requests that never call it) in the `subject` argument. Held-out recall 0.28 to 0.50 and false offers 0.06 to 0.03 from wording alone.
+
 ### Added
 
 - SEARCH-IMAGES-01: an optional `subjects` list (up to 5 exact names). Each

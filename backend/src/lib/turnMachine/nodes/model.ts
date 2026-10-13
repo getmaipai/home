@@ -1159,3 +1159,41 @@ export function markPicturesShown(images: readonly ChatImagePart[] | undefined, 
   const shown = new Set(messages.flatMap((message) => (message.images ?? []).map((part) => part.id)));
   return images.map((image) => shown.has(image.id) ? { ...image, shown_to_model: true as const } : image);
 }
+
+/** IMGQ-09 (b): the instruction of the after-the-answer re-ask. The reply is already on the person's screen, so the
+ * model is told to leave it alone and only to call the tool when the message was about a thing worth a picture. */
+export const SHOW_IMAGES_REASK_INSTRUCTION = "Your reply above is final and already shown; do not repeat or change it. Only if the person's message was about a specific famous person, place, film, show, game, animal, car or product (who or what it is, what it looks like, or chat about it), call show_images for it. Otherwise answer with nothing at all.";
+
+export interface ShowImagesReAsk {
+  subject: string;
+  kind: string;
+  subjects?: unknown;
+  callId: string;
+  ms: number;
+}
+
+/** IMGQ-09 (b), rule 1 and rule 0: when the first pass offered `show_images` and answered in text with no tool call,
+ * the model is asked once more, after the reply has streamed, with `tool_choice: "auto"` only (never forced). It can
+ * only add a gallery under the finished reply; its own text is never shown (the stream gate is cut off for this call)
+ * and a failure of any kind is no gallery, never a failed turn (rule 6). The caller has already checked
+ * `answerImagesAllowed`, so a teen, a child, a spoken or a temporary turn never reaches here. */
+export async function reAskForShowImages(state: TurnState, replyText: string, signal: AbortSignal): Promise<ShowImagesReAsk | null> {
+  const began = Date.now();
+  const gate = state.streamGate;
+  const savedMessages = state.messages;
+  state.streamGate = undefined;
+  try {
+    const messages: LlmMessage[] = [...state.messages, { role: "assistant", content: replyText }, { role: "user", content: SHOW_IMAGES_REASK_INSTRUCTION }];
+    const attempt = await runOneGeneration(state, messages, state.lastTools, "auto", false, 200, "show_images_reask", signal);
+    if (!attempt.ok) return null;
+    const call = attempt.toolCalls?.find((c) => c.tool === SHOW_IMAGES_TOOL_ID);
+    const args = (call?.args ?? {}) as Record<string, unknown>;
+    if (!call || typeof args.subject !== "string" || args.subject.trim().length === 0) return null;
+    return { subject: args.subject.trim(), kind: typeof args.kind === "string" ? args.kind.trim() : "", subjects: args.subjects, callId: call.id ?? `${state.turnId}:reask`, ms: Date.now() - began };
+  } catch {
+    return null;
+  } finally {
+    state.streamGate = gate;
+    state.messages = savedMessages;
+  }
+}
