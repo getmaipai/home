@@ -26,7 +26,7 @@ beforeEach(() => {
   __resetLlmSupervisorForTests();
   __resetRateLimiterForTests();
   __resetSearchCacheForTests();
-  __setChatWindowContextForTests(4096);
+  __setChatWindowContextForTests(4608);
   people = createBenchPeople();
   setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 });

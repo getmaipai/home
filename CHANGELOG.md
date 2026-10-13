@@ -12,6 +12,8 @@ checklist (`docs/dev.md`); no release has been cut yet.
   more pictures of the subject and puts them first, behind the same checks as every other
   picture. Photos with children in them, and photos filed under another person's own
   Commons category, are left out of a person's row.
+### Changed
+- Pictures when you ask: the assistant now shows pictures more often when an adult asks who or what something is. The check-again step (after the answer is on screen, add pictures when the question was about a famous person, place or thing) is built and off until it is switched on. Adults on written chat only.
 
 ### Fixed
 - Pictures under an answer: a screenshot, signature or diagram saved as a PNG,

@@ -4,8 +4,13 @@
   "kind": "plugin",
   "category": "Info",
   "display": "Show Pictures",
-  "description": "Show photos when someone asks who or what a famous person, place, film, game, animal, car or product is.",
-  "offer": {"mode":"conditional","gate":"answerImagesAllowed","bench_row":"answer-images","reason":"owner ruling 2026-10-10: on for adults below the 85% recall bar; re-run later, back off if worse"},
+  "description": "Show photos of a famous person, place, film, show, game, animal, car or product.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "answerImagesAllowed",
+    "bench_row": "answer-images",
+    "reason": "owner ruling 2026-10-10: on for adults below the 85% recall bar; re-run later, back off if worse"
+  },
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -28,13 +33,16 @@
       "subject": {
         "type": "string",
         "minLength": 1,
-        "description": "The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Always call this when they ask \"who is\" or \"what is\" a well-known person or thing (for example \"who is Tom Hanks\", \"what is Star Trek\") or ask what something looks like, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them."
+        "description": "Use it when someone asks who or what it is, what it looks like, or chats about it; not for advice or how-to. The thing to show, by its full proper name as in the conversation, for example \"Pontiac Fiero\", \"Stranger Things\", \"Eiffel Tower\". A follow-up like \"what does he look like\" means the previous message's subject. Always call this when they ask \"who is\" or \"what is\" a well-known person or thing (for example \"who is Tom Hanks\", \"what is Star Trek\") or ask what something looks like, or are chatting about a thing whose look matters (artwork too), for example \"that old Ford Mustang was a beautiful car\" means subject \"Ford Mustang\", \"I just watched Jaws again\" means subject \"Jaws\" and \"what is the PlayStation 5\" means subject \"PlayStation 5\"; never for advice, how-to, maths, code, news facts, feelings or anything with nothing to look at. Call it in short, casual replies too. The app shows the photos itself; never mention them. Examples, the person's words then the call: \"who is Frida Kahlo\" -> subject \"Frida Kahlo\", kind \"person\"; \"what is the Space Needle\" -> subject \"Space Needle\", kind \"building\"; \"what does a pangolin look like\" -> subject \"pangolin\", kind \"animal\"; \"I love my old Toyota Supra\" -> subject \"Toyota Supra\", kind \"car\". These never call it: \"how do I change a tire\", \"who should I vote for\", \"recommend a good book\", \"my back hurts\"."
       },
       "subjects": {
         "type": "array",
         "maxItems": 5,
         "grounded": false,
-        "items": {"type": "string", "minLength": 1},
+        "items": {
+          "type": "string",
+          "minLength": 1
+        },
         "description": "Optional. When the answer lists several different things (for example three cars or the films of a series), their exact full names, up to 5, including the first; the app shows one picture of each under the answer. Leave it out for a single thing."
       },
       "kind": {
@@ -54,7 +62,9 @@
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
-  "returns_blocks": ["image_gallery"],
+  "returns_blocks": [
+    "image_gallery"
+  ],
   "config": [],
   "data_sources": [
     {
