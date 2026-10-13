@@ -84,7 +84,7 @@ type Stats = { nodes?: { node: string; outcome?: { code?: string; arg?: string; 
 const statsOf = (turnId: string) => JSON.parse(db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get()!.stats as unknown as string) as Stats;
 
 describe("SEARCH-ANSWER-06: a refused tool call never wipes a streamed answer", () => {
-  test("text plus a show_images call with an ungrounded subject keeps the text and records the refused args", async () => {
+  test("text plus a show_images call with an ungrounded subject keeps the text and stores no argument text", async () => {
     const result = await withTextAndCall(
       TEXT, { name: "show_images", args: { subject: "Zanzibar Quartz" } },
       () => runTurnNext(people.owner, "chat", "tell me about that old film"),
@@ -95,7 +95,9 @@ describe("SEARCH-ANSWER-06: a refused tool call never wipes a streamed answer", 
     const nodes = statsOf(result.value.turn_id).nodes ?? [];
     const policy = nodes.find((n) => n.node === "policy")?.outcome;
     expect(policy?.code).toBe("ungrounded_args");
-    expect(policy?.message).toContain("Zanzibar Quartz");
+    // PRIVACY / GROUND-01: traces record the branch and the argument name, never the terms.
+    expect(policy?.arg).toBe("subject");
+    expect(JSON.stringify(statsOf(result.value.turn_id))).not.toContain("Zanzibar");
     expect(nodes.find((n) => n.node === "model")?.outcome?.draft_discarded).toBe(true);
   });
 

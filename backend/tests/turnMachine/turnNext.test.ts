@@ -2631,8 +2631,8 @@ describe("turnNext.ts: GROUND-01, grounding checks only the manifest's search-te
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
     expect(result.value.reply.text).toBe("I don't actually have that in this conversation, so I won't guess.");
-    // SEARCH-ANSWER-06: the refused call's raw args ride in the trace message.
-    expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression", message: 'websearch {"expression":"how to pick a lock"}' });
+    // GROUND-01: the trace stores the argument name, never the terms.
+    expect(await policyNodeOutcome(result.value.turn_id)).toEqual({ ok: false, code: "ungrounded_args", arg: "expression" });
   });
 });
 

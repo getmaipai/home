@@ -359,8 +359,8 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       // `category`, ANSWER-IMG-02) never blocks the call.
       const grounding = checkGrounding(modelFacingArgs(call.tool, args), sourceTexts, manifest.args as ArgSchema | undefined);
       if (!grounding.ok) {
-        // SEARCH-ANSWER-06: the refused call's raw args ride in the trace so a refusal can be diagnosed later.
-        noteRefusal("ungrounded_args", grounding.arg, boundedPolicyError(`${call.tool} ${JSON.stringify(call.args ?? {})}`));
+        // GROUND-01: the trace records the branch and the argument name, never the terms.
+        noteRefusal("ungrounded_args", grounding.arg);
         entries.push({ proposal, decision: { allow: false, reason: "ungrounded_args" } });
         continue;
       }
