@@ -858,7 +858,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(citation).toHaveAttribute("href", "https://example.com/tides");
       // The inline chip resolves through ChatCitationLink's native-source hook.
       expect(view.queryByText("Lantern Bay tide chart")).toBeNull();
-      const trigger = view.getByRole("button", { name: "1 Source" });
+      const trigger = view.getByRole("button", { name: /^Sources 1/ });
       expect(trigger).toBeVisible();
       fireEvent.click(trigger);
       const row = view.container.querySelector('[data-slot="sources-list"]');
@@ -888,7 +888,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       );
       await sendMessage(view, "do they agree");
       await view.findByText("Two sites agree.");
-      expect(view.getByRole("button", { name: "2 Sources" })).toBeVisible();
+      expect(view.getByRole("button", { name: /^Sources 2/ })).toBeVisible();
     } finally {
       restore();
     }

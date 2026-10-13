@@ -36,7 +36,6 @@ import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelec
 import { Button as ElementsButton } from "@maipai/ui/src/elements/ui/button";
 import { Button as KitButton } from "@maipai/ui/src/ui/button";
 import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type StatusAppsResponse, type TurnErrorDetail, type TurnStats } from "@/lib/api";
 import { CONTEXT_SEGMENT_KEYS, type ContextSegmentKey } from "@maipai/home-backend/src/wire";
@@ -635,19 +634,12 @@ export function MessageFooterExtra() {
     <>
       <BareModelBadge />
       {turnId && sources.length ? (
-        <>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <ElementsButton type="button" variant="ghost" size="icon" aria-label={`${sources.length} ${sources.length === 1 ? "Source" : "Sources"}`} aria-expanded={sourceOpen.isOpen(turnId)} onClick={() => sourceOpen.toggle(turnId)}>
-                {sources.length}
-              </ElementsButton>
-            </TooltipTrigger>
-            <TooltipContent>{sources.length} {sources.length === 1 ? "Source" : "Sources"}</TooltipContent>
-          </Tooltip>
-          <SourcesCard sources={sources} open={sourceOpen.isOpen(turnId)} onOpenChange={(open) => {
-            if (sourceOpen.isOpen(turnId) !== open) sourceOpen.toggle(turnId);
-          }} layout="list" hideTrigger />
-        </>
+        // SEARCH-ANSWER-04 (rule 9): the kit's own sources trigger as it ships
+        // ("Sources", the count, a chevron), not a hand-made button that drew
+        // a bare number.
+        <SourcesCard sources={sources} open={sourceOpen.isOpen(turnId)} onOpenChange={(open) => {
+          if (sourceOpen.isOpen(turnId) !== open) sourceOpen.toggle(turnId);
+        }} layout="list" />
       ) : null}
       <MessageDetailsReveal />
       {memoryChips ? <MemoryChips {...memoryChips} /> : null}
