@@ -10,7 +10,7 @@
 import type { ToolExecutionOutcome } from "../contract";
 import type { FailureKind } from "@/lib/turnContext";
 import type { SurfaceClass } from "@/lib/surfaceClass";
-import type { ToolCall, ToolSpec } from "@/lib/llm";
+import type { LlmMessage, ToolCall, ToolSpec } from "@/lib/llm";
 import { quoteForPrompt } from "@/lib/composer";
 import { loadManifestOnly } from "@/lib/plugins";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
@@ -136,4 +136,22 @@ export function retryInstruction(surfaceClass: SurfaceClass, utterance: string, 
     "When you answer without a lookup, say plainly, in your own words and in your usual voice, that you could not look that up, fresh wording each time, " +
     "and leave out any specific current fact you cannot know rather than guessing it."
   );
+}
+
+/** SEARCH-ANSWER-01: the retry round's instruction message, mapped to how many
+ * outcomes existed when it was sent. Once the retry produced results the
+ * phrasing prompt leaves the message out and counts only the outcomes after
+ * that mark as missed lookups, so the reply never confesses a failure the
+ * retry already fixed. A turn whose retry also found nothing is unchanged. */
+const retryMessageMarks = new WeakMap<LlmMessage, number>();
+
+export function markRetryMessage(message: LlmMessage, outcomesBefore: number): LlmMessage {
+  retryMessageMarks.set(message, outcomesBefore);
+  return message;
+}
+
+export function recoveredRetry(history: readonly LlmMessage[]): { history: LlmMessage[]; outcomesBefore: number } | null {
+  const marked = history.find((m) => retryMessageMarks.has(m));
+  if (!marked) return null;
+  return { history: history.filter((m) => m !== marked), outcomesBefore: retryMessageMarks.get(marked)! };
 }

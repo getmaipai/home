@@ -85,6 +85,40 @@ describe("T5 / THIN-2G: one retry round after every call in a round failed", () 
     }
   });
 
+  // SEARCH-ANSWER-01 (turn-uo4ikmaypk): the first search found nothing, the retry
+  // found rows, and the reply still opened by confessing a blank search because the
+  // phrasing round carried the missed-lookup clause and the retry instruction.
+  test("SEARCH-ANSWER-01: an empty first search whose retry found rows leaves no missed-lookup clause and no retry narration in the phrasing round", async () => {
+    const searxng = startFakeSearxng();
+    setHouseholdSettingValue("search.searxng_url", searxng.url);
+    try {
+      await withStub(
+        {
+          calls: (request) => {
+            if (request.tool_choice === "none" || request.messages.some((m) => m.role === "tool")) return undefined;
+            return isRetryRound(request)
+              ? [{ id: "call-s2", name: "websearch", args: JSON.stringify({ expression: "kevin bacon shows list" }) }]
+              : [{ id: "call-s1", name: "websearch", args: JSON.stringify({ expression: "kevin bacon no results fixture" }) }];
+          },
+          reply: replies,
+        },
+        async (seen) => {
+          const result = await runTurnNext(people.owner, "chat", "what shows has kevin bacon been in");
+          expect(result.ok).toBe(true);
+          expect(seen.filter(isRetryRound)).toHaveLength(1);
+          const phrasing = seen.filter((r) => r.messages.some((m) => m.role === "tool"));
+          expect(phrasing).toHaveLength(1);
+          const prompt = JSON.stringify(phrasing[0]!.messages);
+          expect(prompt).not.toContain("did not happen");
+          expect(prompt).not.toContain("try once more");
+          expect(prompt).not.toContain("could not look");
+        },
+      );
+    } finally {
+      searxng.stop();
+    }
+  });
+
   test("the retry round never repeats the byte-identical call, and at most one retry round runs", async () => {
     const { spy, calls } = failWeather();
     try {

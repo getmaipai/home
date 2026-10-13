@@ -24,7 +24,7 @@ import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
 import { promptLimitLine } from "@/lib/failureCopy";
-import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
+import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, markRetryMessage, recoveredRetry, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
 import { pictureFailureWords, picturesNotReadNote } from "@/lib/chatImageNote";
@@ -822,7 +822,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const phrasing = picturesOnly
       ? picturesOnlyInstruction(promptSurfaceClass, input.utterance, replayedSearchCount)
       : phrasingInstruction(promptSurfaceClass, input.utterance, searchResultCount, searchResultCount > 0 && searchRows.allEmpty, replayedSearchCount);
-    const missedKinds = state.outcomes.filter(lookupMissed).map(lookupFailureKind);
+    // SEARCH-ANSWER-01: when the one retry round produced results, the retry's
+    // own instruction and the first round's misses are history, not news.
+    const recovered = phrasedOutcomes.length > 0 ? recoveredRetry(state.messages) : null;
+    const missedKinds = state.outcomes.slice(recovered?.outcomesBefore ?? 0).filter(lookupMissed).map(lookupFailureKind);
     const answering =
       phrasedOutcomes.length === 0
         ? lookupMissedInstruction(promptSurfaceClass, input.utterance, missedKinds)
@@ -830,7 +833,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
           ? `${phrasing}${lookupMissedClause(missedKinds)}`
           : phrasing;
     const instruction: LlmMessage = { role: "user", content: promptSurfaceClass === "written" ? answering : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${answering}` };
-    const history = state.messages;
+    const history = recovered?.history ?? state.messages;
     messages = phrasedOutcomes.length === 0 ? [...history, instruction] : [...history, assistantMessage, ...resultMessages, instruction];
     if (phrasedOutcomes.length > 0 && searchResultCount > 0) {
       const baseEvidenceChars = searchEvidenceMaxChars(state.budget.context_tokens);
@@ -861,7 +864,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     const promptSurfaceClass: SurfaceClass = promptSurfaceClassFor(state.planBasis.surfaceClass ?? "spoken", state.plan.age_band);
     const failures = state.outcomes.filter(lookupMissed).map((o) => ({ tool: o.packageId, kind: lookupFailureKind(o) }));
     const retrying = retryInstruction(promptSurfaceClass, input.utterance, failures);
-    messages = [...state.messages, { role: "user", content: promptSurfaceClass === "written" ? retrying : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${retrying}` }];
+    messages = [...state.messages, markRetryMessage({ role: "user", content: promptSurfaceClass === "written" ? retrying : `${planLineForTurnMachine(state.plan, state.signal, promptSurfaceClass)} ${retrying}` }, state.outcomes.length)];
     tools = retryTools(state.lastTools, state.temporary);
     tool_choice = "auto";
   } else if (!toolsAllowed) {
