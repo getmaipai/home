@@ -274,3 +274,20 @@ to plain, so B or D could not be shown to beat C. `data-scratch/chat-ab/router-b
 `bab3bcbd6404e083502c58af815a40c8721ea6b446e39696b5a89b29366122ae` adds paired family cluster-bootstrap intervals for B minus C and
 D minus C recall (10,000 resamples, seed 1, 95%); the pass line is a lower bound above 0, and the arm must still pass M1, M2 and M3
 on its own. `PREREG.json` is unchanged (sha256 above).
+
+## 11. Lock box result (ROUTER-BUILD-05, 2026-10-12)
+
+The lock box ran once per arm (stage 1 replay: plain, 3 repeats, 1,050 runs on the 9B; 140 recency, 96 stable, 92 to 93 no_tool
+families; 21 contested rows excluded). Both frozen hashes were re-checked first. No arm passes M1 or M2, so stage 2 (M3, M4) was not run.
+
+| Arm | Recall [95%] | Follow-up | Worst repeat | False stable | False no_tool | M1 | M2 |
+|---|---|---|---|---|---|---|---|
+| plain | 19.8% [15.5, 24.0] | 9.9% | 18.7% | 2.8% | 3.6% | n/a | n/a |
+| A | 75.2% [69.8, 80.5] | 81.5% | 72.9% | 5.2% | 3.6% | FAIL | FAIL |
+| B | 84.3% [80.2, 88.1] | 93.8% | 80.7% | 4.2% | 6.2% | FAIL | FAIL |
+| C | 82.4% [77.9, 86.7] | 81.5% | 79.3% | 5.6% | 3.6% | FAIL | FAIL |
+| D | 86.2% [82.6, 89.5] | 93.8% | 83.6% | 4.2% | 6.2% | FAIL | FAIL |
+
+Addendum comparisons: B minus C +1.9 points [-1.9, +6.0]; D minus C +3.8 points [+0.5, +7.4]. All arms miss the 0.91 recall lower bound
+by 4 or more points and exceed the 3% false-search mean on stable. Dev recall (89 to 99.7%) did not carry over to the lock box. Full numbers:
+`data-scratch/chat-ab/router-build-05/RESULTS.md`. By the decision rule above, nothing passes M1: rescue stays off.
