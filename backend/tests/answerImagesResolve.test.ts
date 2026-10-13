@@ -6,12 +6,12 @@
 import { describe, expect, test } from "bun:test";
 import { kindScore, resolveWikimediaSubject, type FetchJson } from "@/lib/answerImages/wikimedia";
 
-type Sense = { id: string; label: string; description: string; enwiki?: string; matched?: string };
+type Sense = { id: string; label: string; description: string; enwiki?: string };
 type Subject = { page: { title: string; item?: string; disambiguation?: boolean } | null; senses: Sense[] };
 
 const WORLD: Record<string, Subject> = {
   jaguar: { page: { title: "Jaguar", item: "Q35694" }, senses: [
-    { id: "Q30055", label: "Jaguar Cars", matched: "Jaguar", description: "former British car company", enwiki: "Jaguar Cars" },
+    { id: "Q30055", label: "Jaguar Cars", description: "former British car company", enwiki: "Jaguar Cars" },
     { id: "Q21170490", label: "Jaguar", description: "British car marque used by Jaguar Land Rover", enwiki: "Jaguar (marque)" },
     { id: "Q35694", label: "jaguar", description: "species of big cat native to the Americas", enwiki: "Jaguar" },
     { id: "Q650601", label: "Atari Jaguar", description: "Fifth-generation home video game console by Atari", enwiki: "Atari Jaguar" },
@@ -38,7 +38,7 @@ const WORLD: Record<string, Subject> = {
     { id: "Q38686", label: "golden retriever", description: "dog breed", enwiki: "Golden Retriever" },
   ] },
   apple: { page: { title: "Apple", item: "Q89" }, senses: [
-    { id: "Q312", label: "Apple Inc.", matched: "Apple", description: "American technology company", enwiki: "Apple Inc." },
+    { id: "Q312", label: "Apple Inc.", description: "American technology company", enwiki: "Apple Inc." },
     { id: "Q89", label: "apple", description: "fruit of the apple tree", enwiki: "Apple" },
     { id: "Q213710", label: "Apple", description: "album by Mother Love Bone, a thing of beauty", enwiki: "Apple (album)" },
   ] },
@@ -54,10 +54,6 @@ function world(): { fetchJson: FetchJson; calls: string[] } {
   const fetchJson: FetchJson = async (raw) => {
     calls.push(raw);
     const url = new URL(raw);
-    if (url.hostname === "en.wikipedia.org" && url.searchParams.get("prop") === "links") {
-      const s = WORLD[(url.searchParams.get("titles") ?? "").toLowerCase()];
-      return { query: { pages: { "1": { links: (s?.senses ?? []).filter((x) => x.enwiki).map((x) => ({ title: x.enwiki })) } } } };
-    }
     if (url.hostname === "en.wikipedia.org") {
       const s = WORLD[(url.searchParams.get("titles") ?? "").toLowerCase()];
       if (!s?.page) return { query: { pages: { "-1": { title: url.searchParams.get("titles"), missing: "" } } } };
@@ -65,13 +61,11 @@ function world(): { fetchJson: FetchJson; calls: string[] } {
     }
     if (url.searchParams.get("action") === "wbsearchentities") {
       const s = WORLD[(url.searchParams.get("search") ?? "").toLowerCase()];
-      return { search: (s?.senses ?? []).map((x) => ({ id: x.id, label: x.label, description: x.description, match: { text: x.matched ?? x.label } })) };
+      return { search: (s?.senses ?? []).map((x) => ({ id: x.id, label: x.label, description: x.description })) };
     }
     if (url.searchParams.get("action") === "wbgetentities") {
       const out: Record<string, unknown> = {};
-      const byTitle = url.searchParams.get("titles")?.split("|");
-      const wanted = byTitle ? byTitle.map((t) => all.find((y) => y.enwiki === t)?.id).filter((i): i is string => Boolean(i)) : url.searchParams.get("ids")!.split("|");
-      for (const id of wanted) {
+      for (const id of url.searchParams.get("ids")!.split("|")) {
         const x = all.find((y) => y.id === id);
         if (x) out[id] = { claims: {}, labels: { en: { value: x.label } }, descriptions: { en: { value: x.description } }, sitelinks: x.enwiki ? { enwiki: { title: x.enwiki } } : {} };
       }
@@ -137,11 +131,9 @@ describe("R1: the subject's own Wikipedia page names the item; the kind chooses 
     expect("entity" in planet && planet.entity.id).toBe("Q308");
   });
 
-  test("never more than three Wikimedia calls for an article, four on a disambiguation page (the links call)", async () => {
-    expect((await pick("Jaguar", "car")).calls).toHaveLength(3);
+  test("never more than three Wikimedia calls (page and search side by side, then the item)", async () => {
     const { calls } = await pick("Mercury", "planet");
-    expect(calls).toHaveLength(4);
-    expect(calls.filter((c) => c.includes("prop=links"))).toHaveLength(1);
+    expect(calls).toHaveLength(3);
   });
 });
 
