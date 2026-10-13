@@ -291,3 +291,5 @@ families; 21 contested rows excluded). Both frozen hashes were re-checked first.
 Addendum comparisons: B minus C +1.9 points [-1.9, +6.0]; D minus C +3.8 points [+0.5, +7.4]. All arms miss the 0.91 recall lower bound
 by 4 or more points and exceed the 3% false-search mean on stable. Dev recall (89 to 99.7%) did not carry over to the lock box. Full numbers:
 `data-scratch/chat-ab/router-build-05/RESULTS.md`. By the decision rule above, nothing passes M1: rescue stays off.
+
+Ship decision (ROUTER-SHIP-01, 2026-10-13): Jesse ruled to ship the best in-rules arm although none passes M1. C replaces A as the live head (`search-assist-weights-v2`). B and D are not shipped: the decision pass breaks design rule 1 and is tracked as ROUTER-FOLLOWUP-02. Dev-versus-lock-box gap: ROUTER-FOLLOWUP-01.

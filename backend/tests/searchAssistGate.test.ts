@@ -36,10 +36,11 @@ const GATE_SETS: GateSet[] = [
     tolerance: 0,
   },
   {
-    name: "shipped head (raw concat, tuned 0.67) on the held-out rows",
+    name: "shipped head (arm C, threshold 0.604421) on the held-out rows",
     manifest: shippedManifest,
     rows: heldRows,
-    // RAW-01 held-out floors: recall 0.91, no false searches on stable, no_tool or follow-ups.
+    // RAW-01 held-out floors: recall 0.91, no false searches on stable, no_tool or follow-ups. These rows are in arm C's
+    // training pool, so this gate proves wiring and no regression, not model quality (the lock box did: ROUTER-BUILD-05).
     floors: { recallMin: 0.91, falseSearchStableMax: 0, falseSearchNoToolMax: 0, falseSearchFollowUpMax: 0 },
     tolerance: 0.02,
   },

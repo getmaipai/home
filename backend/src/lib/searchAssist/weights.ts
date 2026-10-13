@@ -56,12 +56,13 @@ export interface WeightsPin {
   sha256: string;
 }
 
-/** The released asset (search-assist-weights-v1, published by Jesse). Without a
+/** The released asset (search-assist-weights-v2, arm C of ROUTER-BUILD-02,
+ * shipped by ROUTER-SHIP-01; v1 was arm A). Jesse publishes the release. Without a
  * pin the loader reports weights_missing and the shadow log carries off_reason. */
 export const SEARCH_ASSIST_PIN: WeightsPin | null = {
-  file: "search-assist-weights.json",
-  url: "https://github.com/getmaipai/home/releases/download/search-assist-weights-v1/search-assist-weights.json",
-  sha256: "0f592c19a0e1d1921e30a4ee5a59a6a0c7e5c19acffc28e5ae85198a161b0ede",
+  file: "search-assist-weights-v2.json",
+  url: "https://github.com/getmaipai/home/releases/download/search-assist-weights-v2/search-assist-weights-v2.json",
+  sha256: "e97cb1e97d2f9b200ad033749fdcf2d47d148b0408d4ab5f1a4d89854b213468",
 };
 
 export interface ExpectedEmbed {
