@@ -141,6 +141,22 @@ sense (a film named like a more famous book) can fall under the cut and then kin
 dab page caps at the first 126 titles in `plnamespace=0` (Hamilton, Amazon fit; a dab page with more would need
 continuation).
 
+## Supersedes
+
+Section 4 holds the rule; this section names what it replaces.
+
+- **IMGSEARCH-01's kind-veto sense choice** (accuracy study rules R1 and R2, 2026-10-06): "another sense wins when it fits the
+  kind, the page's item does not, and it has an English article". Replaced by section 4: the asked name picks the pool, sitelinks
+  break ties, and kind is only a hint among name-matching items. The R2 `queryTitle`, R4 `otherSenseWords` and the
+  disambiguation-page-with-no-fit skip (owner, 2026-10-06) stay.
+- **IMGQ-RESOLVE-01's loose-kind handling, where it overlaps** (2026-10-08): the special case that a loose kind never moves off the
+  page is now one instance of the general rule (a kind can never add an item that fails the name match in step 1, nor remove the
+  page's item from the pool), so the loose-kind list stays only as the guard for "kind fits nothing", not as the reason a
+  sibling is excluded.
+- **The comment and limit "Never more than 3 Wikimedia calls here"** in `backend/src/lib/answerImages/wikimedia.ts`
+  (`resolveWikimediaSubject`): becomes "never more than 4, the fourth only on a disambiguation page" (the links call, section 4
+  step 4 and the request budget table).
+
 ## 5. Measuring it on a new sealed set (the 67 are now seen)
 
 The 67 are now development data: they supplied every finding above, including the 40% number, so no result on them can be
