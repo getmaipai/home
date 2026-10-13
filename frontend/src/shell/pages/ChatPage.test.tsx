@@ -852,7 +852,7 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       await waitFor(() => expect(view.container.querySelector(".aui-md")?.textContent).toContain("High tide is at 4pm 1."));
       const markdown = view.container.querySelector<HTMLElement>(".aui-md")!;
       expect(markdown.querySelector('a[href="https://example.com/tides"]')).toBeTruthy();
-      expect(markdown.textContent).toContain("More 9; code [1].");
+      expect(markdown.textContent).toContain("More ; code [1].");
       expect(markdown.querySelector("code")?.textContent).toBe("[1]");
       const citation = view.getByRole("link", { name: /^1$/ });
       expect(citation).toHaveAttribute("href", "https://example.com/tides");
@@ -867,6 +867,29 @@ describe("ChatPage (SHELL-02's slice 3: tools and generative UI)", () => {
       expect(row).toHaveTextContent("example.com");
       expect(view.container.querySelector('[data-slot="sources-list"] img')).toBeNull();
       expect(view.container.innerHTML).not.toContain("icons.duckduckgo.com");
+    } finally {
+      restore();
+    }
+  });
+
+  test("SEARCH-ANSWER-07: a [n] marker with no matching source shows nothing, never a bare digit", async () => {
+    const text = "It is a 2019 film [1][4][3] and a book.";
+    const restore = stubTurnFetch(
+      ndjsonStream([
+        { type: "delta", text },
+        { type: "done", value: { turn_id: "turn-nosrc07", reply: { text }, source: "model", safety: SAFETY } },
+      ]),
+    );
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <ChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await sendMessage(view, "what film is that");
+      await waitFor(() => expect(view.container.querySelector(".aui-md")?.textContent).toContain("It is a 2019 film"));
+      const shown = view.container.querySelector(".aui-md")!.textContent ?? "";
+      expect(shown).toBe("It is a 2019 film  and a book.");
     } finally {
       restore();
     }
