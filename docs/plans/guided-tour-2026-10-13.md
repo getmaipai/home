@@ -1,6 +1,6 @@
 # Show me around: guided tours for Home and its packages (2026-10-13)
 
-For Jesse. This is a draft design note, revision 3. It applies your answers from 2026-10-13 (including yes to children's tours in kid wording, and your owner and admin ruling) and the architect's fixes. The architect's second verdict on `GUIDED-TOUR-01` is APPROVED; its one advisory, moving the auto-start switch out of Notifications, is applied.
+For Jesse. This is a draft design note, revision 4. It applies your answers from 2026-10-13 (including yes to children's tours in kid wording, your owner and admin ruling, and your ruling that Tailscale is a setup step, which changes the shell tour's chat line) and the architect's fixes. The architect's second verdict on `GUIDED-TOUR-01` is APPROVED; its one advisory, moving the auto-start switch out of Notifications, is applied.
 
 The note covers three things:
 
@@ -224,10 +224,12 @@ Because a tour is manifest data and the runner is one shell feature:
 | # | Target | Title | Body (adult) | Body (child) |
 |---|---|---|---|---|
 | 1 | `shell.rail` | Everything is here | "Chat, your apps and your family's things all live in this column. It stays put wherever you go." | "All your places are in this column." |
-| 2 | `rail.chat` | Talk to Home | "Ask a question, plan a meal or get help with homework. Home runs on this computer, so it works offline too." | "Ask Home anything here." |
+| 2 | `rail.chat` | Talk to Home | With `network.tailnet_access` on: "Ask a question, plan a meal or get help with homework. Home runs in your house, so it works without the internet. With the Tailscale app on your phone, it works when you're out too." With it off (a "Set up later" household): "Ask a question, plan a meal or get help with homework. Home runs in your house, so it works without the internet." The step carries two body variants chosen by a `condition` on that key, the same mechanism step 4 uses. | "Ask Home anything here." |
 | 3 | `shell.profile-menu` | Your profile | "Switch people, change how Home looks, or get help here. The owner and admins find Home settings here too. To see this tour again, choose Help, then Show me around." | "Change your colours or ask for help here." |
-| 4 | `shell.setup-checklist` (condition: owner and admins only, and only while items are left) | A few things left | "When you have a minute, finish setting up here: add your family, and choose where backups go." | (step dropped) |
+| 4 | `shell.setup-checklist` (condition: owner and admins only, and only while items are left) | A few things left | "When you have a minute, finish setting up here: add your family, choose where backups go, and anything else on the list." | (step dropped) |
 | 5 | none, `placement: center`, `hero_slide: "hero.privacy"` | (from the slide) | (from the slide: "Nothing leaves your house", and its text) | (the same; the slide's `audience` is `all`) |
+
+**Previewing it.** The install note's preview mode ends where this tour begins. The tour is previewed on the seeded demo household with its own replay (Help, Show me around), so it needs no fake shell.
 
 ### 2. Chat, with Incognito
 
