@@ -2,6 +2,8 @@ import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { grantActionClassificationIsComplete } from "@/lib/grants";
+import { db } from "@/db";
+import { grants } from "@/db/schema";
 
 beforeEach(() => resetDb());
 
@@ -36,6 +38,39 @@ async function makeAdmin(owner: TestClient, name: string): Promise<{ id: string;
 }
 
 describe("POST /api/grants", () => {
+  test("an admin can grant concrete parameterized catalog actions", async () => {
+    const owner = await ownerSession();
+    const admin = await makeAdmin(owner, "Marlow");
+    const other = await makeAdult(owner, "Iris");
+
+    for (const action of ["use:some-package", "integration:abc"]) {
+      const res = await admin.client.post("/api/grants", { person: other.id, action, effect: "allow" });
+      expect(res.status).toBe(201);
+      expect(((await res.json()) as { action: string }).action).toBe(action);
+    }
+  });
+
+  test("a non-admin can grant a parameterized action they hold literally", async () => {
+    const owner = await ownerSession();
+    const holder = await makeAdult(owner, "Marlow");
+    const other = await makeAdult(owner, "Iris");
+    const permission = "integration:abc";
+    const now = new Date().toISOString();
+    const me = await owner.get("/api/auth/me");
+    const actorId = ((await me.json()) as { id: string }).id;
+    for (const [id, action] of [["grant-held-integration", permission], ["grant-held-grant", "people.grant"]]) {
+      db.insert(grants).values({
+        id, person: holder.id, action, effect: "allow", validFrom: null, validTo: null,
+        grantedByPersonId: actorId, reason: null, acknowledgedAt: null, acknowledgedByPersonId: null,
+        createdAt: now, updatedAt: now, deletedAt: null, hlc: "00000000000000000000",
+      }).run();
+    }
+
+    const res = await holder.client.post("/api/grants", { person: other.id, action: permission, effect: "allow" });
+    expect(res.status).toBe(201);
+    expect(((await res.json()) as { action: string }).action).toBe(permission);
+  });
+
   test("an admin cannot grant backups.restore to themselves or another person", async () => {
     const owner = await ownerSession();
     const admin = await makeAdmin(owner, "Marlow");

@@ -111,17 +111,18 @@ export function grantActionClassificationIsComplete(): boolean {
     [...classified].every((action) => grantActions.actions.some((entry) => entry.id === action));
 }
 
-function actorHoldsAction(actor: { id: string; role: Role }, action: string): boolean {
+function actorHoldsAction(actor: { id: string; role: Role }, action: string, catalogActionId: string): boolean {
   if (actor.role === "owner") return true;
-  if (actor.role === "admin" && ADMIN_HELD_GRANT_ACTIONS.has(action) && !OWNER_ONLY_GRANT_ACTIONS.has(action)) return true;
+  if (actor.role === "admin" && ADMIN_HELD_GRANT_ACTIONS.has(catalogActionId) && !OWNER_ONLY_GRANT_ACTIONS.has(catalogActionId)) return true;
   return effectivePermissions(actor.id).some((permission) => permission.action === action && permission.effect === "allow");
 }
 
 export function createGrant(actor: { id: string; role: Role }, input: GrantCreate): OpResult<GrantT> {
   const person = db.select({ id: people.id }).from(people).where(and(eq(people.id, input.person), isNull(people.deletedAt))).get();
   if (!person) return { ok: false, status: 400, error: "person does not name an existing profile" };
-  if (!matchGrantAction(input.action)) return { ok: false, status: 400, error: `unknown grant action: ${input.action}` };
-  if (!actorHoldsAction(actor, input.action)) return { ok: false, status: 400, error: GRANT_AUTHORITY_ERROR };
+  const matchedAction = matchGrantAction(input.action);
+  if (!matchedAction) return { ok: false, status: 400, error: `unknown grant action: ${input.action}` };
+  if (!actorHoldsAction(actor, input.action, matchedAction.id)) return { ok: false, status: 400, error: GRANT_AUTHORITY_ERROR };
 
   const now = new Date().toISOString();
   const candidate = Grant.safeParse({
