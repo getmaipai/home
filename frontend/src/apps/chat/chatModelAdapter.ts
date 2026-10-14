@@ -148,7 +148,7 @@ export interface ChatModelAdapterDeps {
   // ChatPage.tsx so a manual "Listen" click can stop it too - never let
   // two voices overlap.
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
-  activeTurnRef?: { current: { turnId: string } | null };
+  activeTurnRef?: { current: { turnId: string; heardVisibleEnd: () => number } | null };
   // Jesse, 2026-09-06: the composer's Send/Stop toggle tracks only
   // `thread.isRunning` (text generation) - text almost always finishes
   // streaming well before its speech has finished playing (inherent to
@@ -448,7 +448,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             conversationId = event.conversation_id;
             resumeToken = event.resume_token;
             resumeTurnId = event.turn_id;
-            if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id };
+            if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id, heardVisibleEnd: () => scheduler.heardVisibleEnd() };
             continue;
           }
           if (event.type === "signal") { if (event.generation !== undefined) resumeGeneration = event.generation; continue; }
@@ -487,11 +487,15 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             if (speakReplies) {
               const pending = visible.slice(spokenLength);
               const { chunks, consumed } = splitReadyChunks(pending, spokenLength === 0);
+              let chunkSearchFrom = 0;
               // Each chunk speaks its normalized form, never the displayed
               // one: `visible` (yielded just above) keeps the model's own
               // written text - the chat bubble - completely untouched.
               for (const chunk of chunks) {
-                scheduler.enqueueSentence(normalizeForSpeech(chunk), { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}) });
+                const chunkStart = pending.indexOf(chunk, chunkSearchFrom);
+                const visibleEnd = chunkStart < 0 ? undefined : spokenLength + chunkStart + chunk.length;
+                scheduler.enqueueSentence(normalizeForSpeech(chunk), { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}), ...(visibleEnd === undefined ? {} : { visibleEnd }) });
+                if (chunkStart >= 0) chunkSearchFrom = chunkStart + chunk.length;
               }
               spokenLength += consumed;
             }
@@ -550,7 +554,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // per-chunk normalizer above is the only correct option left.
               scheduler.enqueueSentence(
                 spokenLength === 0 ? (event.value.reply.speech ?? normalizeForSpeech(trailing)) : normalizeForSpeech(trailing),
-                { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}) },
+                { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}), visibleEnd: finalText.length },
               );
             }
             if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;

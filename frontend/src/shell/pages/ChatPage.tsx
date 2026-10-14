@@ -231,7 +231,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
   const pendingSpeechRef = useRef(false);
-  const activeTurnRef = useRef<{ turnId: string } | null>(null);
+  const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(null);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's Allow once/Deny handlers, via
   // ConfirmAskAnswerContext), the same single-shot shape as

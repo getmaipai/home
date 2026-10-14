@@ -44,7 +44,7 @@ export interface LiveVoiceSessionProps {
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
   liveVoiceActiveRef: { current: boolean };
   pendingSpeechRef: { current: boolean };
-  activeTurnRef: { current: { turnId: string } | null };
+  activeTurnRef: { current: { turnId: string; heardVisibleEnd: () => number } | null };
   cancelRun: () => void;
   voiceBargeIn?: boolean;
   /** sttDictationAdapter.ts's own established shape: `createSttSocket`
@@ -86,6 +86,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const [idleActivity, setIdleActivity] = useState(0);
   const modeRef = useRef<VoiceMode>("connecting");
   const speakingStartedAtRef = useRef(0);
+  const isSpeakingRef = useRef(isSpeaking);
   const activeSpeechRef = useRef(false);
   const interruptedTurnRef = useRef<string | null>(null);
   const mutedRef = useRef(false);
@@ -93,12 +94,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
   const speechFailureShownRef = useRef(false);
   const lastSpeechFailedRef = useRef(speechFailed);
   mutedRef.current = muted;
+  isSpeakingRef.current = isSpeaking;
   const setCurrentMode = (next: VoiceMode) => { modeRef.current = next; setMode(next); };
   const interrupt = (_reason: "voice" | "tap") => {
     const active = activeTurnRef.current;
     if (active && interruptedTurnRef.current !== active.turnId) {
       interruptedTurnRef.current = active.turnId;
-      void api.cancelTurn(active.turnId).catch(() => {});
+      const heard = active.heardVisibleEnd();
+      void api.cancelTurn(active.turnId, heard).catch(() => {});
     }
     turnSchedulerRef.current?.stop();
     cancelRun();
@@ -167,7 +170,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
           case "ready":
             retryCountRef.current = 0;
             if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("listening");
-            if (voiceBargeIn || (modeRef.current !== "thinking" && modeRef.current !== "speaking")) void startCapture({
+            if (voiceBargeIn || (!isSpeakingRef.current && modeRef.current !== "thinking" && modeRef.current !== "speaking")) void startCapture({
               onFrame: (frame) => {
                 if (!mutedRef.current) socket.sendAudio(frame);
               },

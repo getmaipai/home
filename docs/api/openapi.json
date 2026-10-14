@@ -6871,6 +6871,23 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "heard_chars": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 1000000
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Whether the turn was in flight and cancelled.",
@@ -6886,6 +6903,16 @@
                   "required": [
                     "cancelled"
                   ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid heard character count",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }

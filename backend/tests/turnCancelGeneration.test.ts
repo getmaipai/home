@@ -31,6 +31,27 @@ async function firstTurnId(res: Response) {
   const event = JSON.parse(new TextDecoder().decode(chunk.value).trim().split("\n")[0]!) as { turn_id: string };
   return event.turn_id;
 }
+async function startAndReadReleased(client: TestClient, prompt: string) {
+  const response = await client.post("/api/turn/stream", { text: prompt });
+  const reader = response.body!.getReader();
+  let turnId = "";
+  let released = "";
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline && (!turnId || !released)) {
+    const item = await reader.read();
+    if (item.done) break;
+    for (const line of new TextDecoder().decode(item.value).trim().split("\n")) {
+      if (!line) continue;
+      const event = JSON.parse(line) as { type: string; turn_id?: string; text?: string };
+      if (event.type === "turn_meta") turnId = event.turn_id!;
+      if (event.type === "delta") released += event.text ?? "";
+    }
+  }
+  return { reader, turnId, released };
+}
+async function drain(reader: { read: () => Promise<{ done: boolean }> }) {
+  for (;;) { const item = await reader.read(); if (item.done) return; }
+}
 
 describe("turn cancellation generations", () => {
   test("a done that races a cancel still closes the stream as cancelled", () => {
@@ -81,6 +102,129 @@ describe("turn cancellation generations", () => {
     expect(stored?.replyText).toBe(released.trim());
   }, 10_000);
 
+  test("a cancel with heard_chars saves only the heard part of the reply, cut at a word", async () => {
+    const { client } = await owner();
+    const { reader, turnId, released } = await startAndReadReleased(client, "say a short answer");
+    const heardChars = Math.min(2, released.length);
+    expect(released.length).toBeGreaterThan(heardChars);
+    const expected = "";
+    await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: heardChars });
+    await drain(reader);
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored?.replyText).toBe(expected);
+    const history = await client.get(`/api/conversations/${stored!.conversationId}/turns`);
+    const turns = await history.json() as Array<{ id: string; replyText: string }>;
+    expect(turns.find((turn) => turn.id === turnId)?.replyText).toBe(stored?.replyText);
+  }, 10_000);
+
+  test("talking over the third sentence after sentence two starts saves the first two in the thread and history", async () => {
+    __resetLlmSupervisorForTests();
+    const firstTwo = "First sentence. Second sentence.";
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      fetch: (req) => {
+        const encoder = new TextEncoder();
+        const event = (delta: Record<string, unknown>, finish_reason: string | null = null) => encoder.encode(`data: ${JSON.stringify({ id: "voice-test", model: "stub-chat", choices: [{ index: 0, delta, finish_reason }] })}\n\n`);
+        const body = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(event({ role: "assistant" }));
+            for (const content of ["First", " sentence.", " Second", " sentence."]) controller.enqueue(event({ content }));
+            const timeout = setTimeout(() => {
+              if (!req.signal.aborted) {
+                controller.enqueue(event({ content: " Third sentence." }));
+                controller.enqueue(event({}, "stop"));
+                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                controller.close();
+              }
+            }, 2_000);
+            req.signal.addEventListener("abort", () => { clearTimeout(timeout); controller.close(); }, { once: true });
+          },
+        });
+        return new Response(body, { headers: { "content-type": "text/event-stream", ...IDENTITY_HEADERS } });
+      },
+    });
+    process.env.MAIPAI_LLAMA_SERVER_URL = `http://127.0.0.1:${server.port}`;
+    try {
+      const { client } = await owner();
+      const response = await client.post("/api/turn/stream", { text: "Say three short sentences." });
+      const reader = response.body!.getReader();
+      let turnId = "";
+      let released = "";
+      while (!turnId || !released.includes("Second sentence.")) {
+        const item = await reader.read();
+        if (item.done) break;
+        for (const line of new TextDecoder().decode(item.value).trim().split("\n")) {
+          if (!line) continue;
+          const event = JSON.parse(line) as { type: string; turn_id?: string; text?: string };
+          if (event.type === "turn_meta") turnId = event.turn_id!;
+          if (event.type === "delta") released += event.text ?? "";
+        }
+      }
+      expect(released).toContain(firstTwo);
+      await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: firstTwo.length });
+      await drain(reader);
+      const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+      expect(stored?.replyText).toBe(firstTwo);
+      const history = await client.get(`/api/conversations/${stored!.conversationId}/turns`);
+      const turns = await history.json() as Array<{ id: string; replyText: string }>;
+      expect(turns.find((turn) => turn.id === turnId)?.replyText).toBe(firstTwo);
+    } finally {
+      server.stop(true);
+      delete process.env.MAIPAI_LLAMA_SERVER_URL;
+      __resetLlmSupervisorForTests();
+    }
+  }, 10_000);
+
+  test("a cancel without heard_chars saves what it saved before", async () => {
+    const { client } = await owner();
+    const { reader, turnId, released } = await startAndReadReleased(client, "say a short answer");
+    await client.request(`/api/turn/${turnId}/cancel`, { method: "POST" });
+    await drain(reader);
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored?.replyText).toBe(released.trim());
+  }, 10_000);
+
+  test("a heard_chars larger than the reply never lengthens it", async () => {
+    const { client } = await owner();
+    const { reader, turnId, released } = await startAndReadReleased(client, "say a short answer");
+    await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: 1_000_000 });
+    await drain(reader);
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored?.replyText).toBe(released.trim());
+  }, 10_000);
+
+  test("a heard_chars of zero saves an empty reply", async () => {
+    const { client } = await owner();
+    const { reader, turnId } = await startAndReadReleased(client, "say a short answer");
+    await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: 0 });
+    await drain(reader);
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored?.replyText).toBe("");
+  }, 10_000);
+
+  test("a negative or fractional heard_chars is a 400 that says what to send", async () => {
+    const { client } = await owner();
+    for (const heard_chars of [-1, 1.5]) {
+      const response = await client.post("/api/turn/not-a-real-turn/cancel", { heard_chars });
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: expect.stringContaining("heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out") });
+    }
+  });
+
+  test("another person's turn cannot be cancelled with heard_chars", async () => {
+    const { client } = await owner();
+    const childRes = await client.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await childRes.json() as { id: string }).id;
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child });
+    const { reader, turnId } = await startAndReadReleased(childClient, "say a short answer");
+    const response = await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: 0 });
+    expect(response.status).toBe(403);
+    await childClient.post(`/api/turn/${turnId}/cancel`, {});
+    await drain(reader);
+  }, 10_000);
+
   test("a turn that is not cancelled stores byte-identical text to before", async () => {
     const { client } = await owner();
     const events = await readNdjson(await client.post("/api/turn/stream", { text: "say a short answer" }));
@@ -90,12 +234,19 @@ describe("turn cancellation generations", () => {
     expect(stored?.replyText).toBe(reply);
   });
 
-  test("a second cancel is a no-op", async () => {
+  test("a second cancel cannot change the first cancel's heard length", async () => {
     const { client } = await owner();
     const response = await client.post("/api/turn/stream", { text: "cancel twice and wait" });
     const turnId = await firstTurnId(response);
-    expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: true });
-    expect(await (await client.post(`/api/turn/${turnId}/cancel`, {})).json()).toEqual({ cancelled: false });
+    expect(await (await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: 0 })).json()).toEqual({ cancelled: true });
+    expect(await (await client.post(`/api/turn/${turnId}/cancel`, { heard_chars: 1_000_000 })).json()).toEqual({ cancelled: false });
+    let stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    const deadline = Date.now() + 5_000;
+    while (stored?.status !== "done" && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    }
+    expect(stored?.replyText).toBe("");
     expect(isStaleTurnGeneration(turnId, 0)).toBe(true);
     expect(isStaleTurnGeneration(turnId, 1)).toBe(false);
   });

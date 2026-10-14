@@ -4,11 +4,12 @@ import { ApiError } from "@/lib/api";
 
 class FakeAudioContext {
   started = 0;
+  startTimes: number[] = [];
   destination = {} as AudioNode;
   currentTime = 0;
   createGain() { return { connect: () => {}, gain: { value: 1 } } as unknown as GainNode; }
   createAnalyser() { return { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 8, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) } as unknown as AnalyserNode; }
-  createBufferSource() { return { buffer: null, connect: () => {}, start: () => { this.started++; }, onended: null } as unknown as AudioBufferSourceNode; }
+  createBufferSource() { return { buffer: null, connect: () => {}, start: (when?: number) => { this.started++; this.startTimes.push(when ?? this.currentTime); }, onended: null } as unknown as AudioBufferSourceNode; }
   async decodeAudioData() { return { duration: 2 } as AudioBuffer; }
   async close() {}
 }
@@ -67,6 +68,41 @@ describe("sentence speech scheduler", () => {
     await settle();
     expect(signal?.aborted).toBe(true);
     expect(errors).toBe(0);
+  });
+
+  test("heardVisibleEnd counts only sentences whose audio has started", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.enqueueSentence("first", { visibleEnd: 5 });
+    scheduler.enqueueSentence("second", { visibleEnd: 12 });
+    scheduler.enqueueSentence("third", { visibleEnd: 20 });
+    await settle(); await settle(); await settle(); await settle();
+    context.currentTime = 1;
+    expect(scheduler.heardVisibleEnd()).toBe(5);
+    context.currentTime = 3;
+    expect(scheduler.heardVisibleEnd()).toBe(12);
+  });
+
+  test("heardVisibleEnd ignores a cue with no visibleEnd", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.enqueueSentence("cue");
+    scheduler.enqueueSentence("visible", { visibleEnd: 9 });
+    await settle(); await settle(); await settle(); await settle();
+    expect(context.startTimes).toEqual([0, 2]);
+    expect(scheduler.heardVisibleEnd()).toBe(0);
+    context.currentTime = 2;
+    expect(scheduler.heardVisibleEnd()).toBe(9);
+  });
+
+  test("heardVisibleEnd stays readable after stop", async () => {
+    const context = new FakeAudioContext();
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => new Response(new Uint8Array(44)));
+    scheduler.enqueueSentence("first", { visibleEnd: 7 });
+    await settle(); await settle();
+    context.currentTime = 1;
+    scheduler.stop();
+    expect(scheduler.heardVisibleEnd()).toBe(7);
   });
 
 });

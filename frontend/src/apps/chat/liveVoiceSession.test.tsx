@@ -36,7 +36,7 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test" }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number] }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number] }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -50,7 +50,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   const liveVoiceActiveRef = useRef(false);
   const pendingSpeechRef = useRef(false);
-  const activeTurnRef = useRef<{ turnId: string } | null>(activeTurn);
+  const activeTurnRef = useRef<{ turnId: string; heardVisibleEnd: () => number } | null>(activeTurn);
   activeTurnRef.current = activeTurn;
   turnSchedulerRef.current = { stop: stopScheduler, readLevel: () => 0 } as unknown as SentenceSpeechScheduler;
   const connectionCount = useRef(0);
@@ -418,7 +418,7 @@ describe("live voice session", () => {
     expect(socketConnections).toEqual([0]);
   });
 
-  test("talking over a spoken reply cancels once and stops speech", async () => {
+  test("talking over a spoken reply cancels the turn with the heard length", async () => {
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const cancelRun = mock();
     const stopScheduler = mock();
@@ -432,7 +432,7 @@ describe("live voice session", () => {
     view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
     await new Promise((resolve) => setTimeout(resolve, 750));
     expect(cancel).toHaveBeenCalledTimes(1);
-    expect(cancel).toHaveBeenCalledWith("turn-test");
+    expect(cancel).toHaveBeenCalledWith("turn-test", 23);
     expect(stopScheduler).toHaveBeenCalledTimes(1);
     expect(cancelRun).toHaveBeenCalledTimes(1);
     cancel.mockRestore();
@@ -503,21 +503,21 @@ describe("live voice session", () => {
     await waitFor(() => expect(connections).toEqual([0, 1]));
   });
 
-  test("tapping the interrupt control stops speech without a transcript", async () => {
+  test("tapping the interrupt control sends the heard length too", async () => {
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const cancelRun = mock();
     const stopScheduler = mock();
     const sentTexts: string[] = [];
     const view = render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={sentTexts} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
     act(() => view.getByRole("button", { name: "Interrupt the assistant" }).click());
-    expect(cancel).toHaveBeenCalledWith("turn-test");
+    expect(cancel).toHaveBeenCalledWith("turn-test", 23);
     expect(stopScheduler).toHaveBeenCalledTimes(1);
     expect(cancelRun).toHaveBeenCalledTimes(1);
     expect(sentTexts).toEqual([]);
     cancel.mockRestore();
   });
 
-  test("interrupting twice sends one cancel for the turn", async () => {
+  test("interrupting twice sends one cancel", async () => {
     const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
     const cancelRun = mock();
     const stopScheduler = mock();
@@ -525,6 +525,7 @@ describe("live voice session", () => {
     const interrupt = view.getByRole("button", { name: "Interrupt the assistant" });
     act(() => { interrupt.click(); interrupt.click(); });
     expect(cancel).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledWith("turn-test", 23);
     cancel.mockRestore();
   });
 

@@ -108,6 +108,7 @@ interface ResumeSession {
   terminalDelivered: boolean;
   cancelled: boolean;
   releasedText: string;
+  heardChars?: number;
   expired: boolean;
   expiryTimer: ReturnType<typeof setTimeout>;
 }
@@ -136,20 +137,37 @@ const cancelTurnRoute = createRoute({
   summary: "Cancel an in-flight turn",
   description: "Aborts an in-flight completion for a turn owned by the caller.",
   middleware: [requireAuth] as const,
-  request: { params: idParamSchema("turn_id") },
+  request: {
+    params: idParamSchema("turn_id"),
+    body: {
+      required: false,
+      content: { "application/json": { schema: z.object({ heard_chars: z.number({ error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).int({ error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).min(0, { error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).max(1_000_000, { error: "heard_chars must be a whole number from 0 to 1000000: send the count of reply characters the person heard, or leave the body out" }).optional() }) } },
+    },
+  },
   responses: {
     200: { content: { "application/json": { schema: z.object({ cancelled: z.boolean() }) } }, description: "Whether the turn was in flight and cancelled." },
-    ...errorResponses({ 401: "Not signed in", 403: "The turn belongs to another person", 404: "Unknown turn" }),
+    ...errorResponses({ 400: "Invalid heard character count", 401: "Not signed in", 403: "The turn belongs to another person", 404: "Unknown turn" }),
   },
 });
 
+function cutAtWord(releasedText: string, heardChars: number): string {
+  const prefix = releasedText.slice(0, heardChars);
+  if (heardChars >= releasedText.length || releasedText[heardChars]?.trim() === "") return prefix;
+  for (let index = prefix.length - 1; index >= 0; index--) {
+    if (prefix[index]?.trim() === "") return prefix.slice(0, index + 1);
+  }
+  return "";
+}
+
 turnRoutes.openapi(cancelTurnRoute, (c) => {
+  const { heard_chars: heardChars } = c.req.valid("json") ?? {};
   const flight = inFlightTurns.get(c.req.valid("param").turn_id);
   const owner = flight?.ownerId ?? turnOwnerId(c.req.valid("param").turn_id);
   if (owner === null) return c.json({ error: "Turn not found" }, 404);
   if (owner !== c.get("person").id) return c.json({ error: "Cannot cancel another person's turn" }, 403);
   const wasInFlight = Boolean(flight && !flight.cancelled && !flight.terminal);
   if (flight && !flight.cancelled && !flight.terminal) {
+    flight.heardChars = heardChars;
     flight.controller.abort();
     flight.cancelled = true;
     flight.generation += 1;
@@ -438,7 +456,7 @@ function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText)) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars)) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -521,6 +539,7 @@ export async function* streamTurnEvents(
   // strictest band when a caller does not say.
   speakerBand: "adult" | "teen" | "child" = "child",
   releasedText?: () => string,
+  heardChars?: () => number | undefined,
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -713,7 +732,9 @@ export async function* streamTurnEvents(
     // after turn_meta is out, so it carries the same code on the error
     // event instead.
     if (signal?.aborted) {
-      result.finalize((releasedText?.() ?? fullText).trim());
+      const released = releasedText?.() ?? fullText;
+      const heard = heardChars?.();
+      result.finalize((typeof heard === "number" && heard <= released.length ? cutAtWord(released, heard) : released).trim());
       yield { type: "error", error: "cancelled", code: "turn_cancelled" };
       return;
     }

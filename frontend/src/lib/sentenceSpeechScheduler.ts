@@ -25,7 +25,7 @@ import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 
 const MAX_PARALLEL_FETCHES = 2;
 
-export interface SpeechSentenceMeta { turnId?: string; generation?: number }
+export interface SpeechSentenceMeta { turnId?: string; generation?: number; visibleEnd?: number }
 
 /** Pocket TTS's real /tts response ships a bogus placeholder WAV header
  * size (~2,000,000,000 bytes, spec/voice/README.md) regardless of the
@@ -63,6 +63,8 @@ export class SentenceSpeechScheduler {
   private dispatchTail: Promise<void> = Promise.resolve();
   private readonly abortController = new AbortController();
   private readonly speechStream: typeof api.streamSpeech;
+  private readonly scheduledSentences: Array<{ visibleEnd?: number; startTime: number }> = [];
+  private heardEndAtStop?: number;
 
   /** Fires once, the moment the first sentence is actually scheduled to
    * play - the real "time to first audio" signal. */
@@ -91,6 +93,16 @@ export class SentenceSpeechScheduler {
    * playing (silent audio centers on 128, the same as true silence). */
   readLevel(): number {
     return this.stopped ? 0 : this.meter.read();
+  }
+
+  heardVisibleEnd(): number {
+    if (this.heardEndAtStop !== undefined) return this.heardEndAtStop;
+    const currentTime = this.audioContext.currentTime;
+    let heardEnd = 0;
+    for (const sentence of this.scheduledSentences) {
+      if (sentence.visibleEnd !== undefined && sentence.startTime <= currentTime) heardEnd = sentence.visibleEnd;
+    }
+    return heardEnd;
   }
 
   private async acquireFetchSlot(): Promise<void> {
@@ -144,15 +156,16 @@ export class SentenceSpeechScheduler {
     }
     await predecessorDone;
     if (this.stopped || !audioBuffer) return;
-    this.scheduleBuffer(audioBuffer);
+    this.scheduleBuffer(audioBuffer, meta);
   }
 
-  private scheduleBuffer(audioBuffer: AudioBuffer): void {
+  private scheduleBuffer(audioBuffer: AudioBuffer, meta?: SpeechSentenceMeta): void {
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
     source.connect(this.playbackBus);
     const startTime = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startTime);
+    this.scheduledSentences.push({ ...(meta?.visibleEnd === undefined ? {} : { visibleEnd: meta.visibleEnd }), startTime });
     this.scheduledCount++;
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     source.onended = () => {
@@ -184,6 +197,7 @@ export class SentenceSpeechScheduler {
    * reply was still speaking. */
   stop(): void {
     if (this.stopped) return;
+    this.heardEndAtStop = this.heardVisibleEnd();
     this.stopped = true;
     this.abortController.abort();
     for (const wake of this.waiters.splice(0)) wake();

@@ -1803,19 +1803,23 @@ describe("the chat asks for the assistant-stream wire", () => {
     }
   });
 
-  test("activeTurnRef holds the turn id after turn_meta and is cleared when the run ends", async () => {
+  test("activeTurnRef exposes the heard length of the running scheduler", async () => {
     const env = stubEnvironment(ndjsonStream([
       { type: "turn_meta", conversation_id: "c1", turn_id: "t-live", resume_token: "r1" },
       { type: "delta", text: "Hi", sequence: 1, generation: 2 },
       { type: "done", value: { turn_id: "t-live", reply: { text: "Hi" }, source: "model", safety: SAFETY } },
     ]));
-    const activeTurnRef = { current: null as { turnId: string } | null };
+    const activeTurnRef = { current: null as { turnId: string; heardVisibleEnd: () => number } | null };
+    const turnSchedulerRef = { current: null as import("@/lib/sentenceSpeechScheduler").SentenceSpeechScheduler | null };
     try {
-      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, activeTurnRef, speakReplies: false });
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef, activeTurnRef, speakReplies: false });
       const messages = [fakeUserMessage("hello")];
       const iterator = runAdapter(adapter, { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions);
       await iterator.next();
       expect(activeTurnRef.current?.turnId).toBe("t-live");
+      expect(typeof activeTurnRef.current?.heardVisibleEnd).toBe("function");
+      turnSchedulerRef.current!.heardVisibleEnd = () => 3;
+      expect(activeTurnRef.current?.heardVisibleEnd()).toBe(3);
       while (!(await iterator.next()).done) { /* drain */ }
       expect(activeTurnRef.current).toBeNull();
     } finally {
