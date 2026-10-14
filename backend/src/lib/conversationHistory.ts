@@ -408,8 +408,9 @@ export function insertProvisionalTurn(actor: PersonRow, surface: Surface, conver
  * try/catch already takes for this whole function. */
 export function resolveSupersedes(supersedes: string | null | undefined, conversationId: string): string | null {
   if (!supersedes) return null;
-  const superseded = db.select({ conversationId: conversationTurns.conversationId }).from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get();
-  return superseded && superseded.conversationId === conversationId ? supersedes : null;
+  const superseded = db.select({ conversationId: conversationTurns.conversationId, personId: conversationTurns.personId }).from(conversationTurns).where(eq(conversationTurns.id, supersedes)).get();
+  const conversation = db.select({ personId: conversations.personId }).from(conversations).where(eq(conversations.id, conversationId)).get();
+  return superseded && superseded.conversationId === conversationId && superseded.personId === conversation?.personId ? supersedes : null;
 }
 
 export type LogTurnOpts = { guardReasons?: readonly string[]; supersedes?: string | null; branchFrom?: string | null; outcomes?: readonly ToolExecutionOutcome[]; document?: TurnArtifactValue | null; signal?: TurnSignal | null; plan?: ReplyPlan | null; judgeStatus?: "skipped" | null; subjects?: readonly SubjectRef[] | null; crisisSignal?: boolean; images?: import("@/wire").ChatImagePart[]; speakerEvidence?: SpeakerEvidence | null; present?: readonly PresentPerson[] | null; rung?: Rung | null; rules?: readonly string[] | null; bare?: boolean; status?: "done" | "failed" };
@@ -1685,13 +1686,29 @@ export function listConversations(actor: PersonRow, personId?: string, query?: s
     const matchingTurnIds = fts
       ? (
           sqlite
-            .query("SELECT ct.conversation_id AS conversationId FROM conversation_turns_fts f JOIN conversation_turns ct ON ct.rowid = f.rowid WHERE conversation_turns_fts MATCH ? AND ct.person_id = ?")
-            .all(fts, target) as Array<{ conversationId: string | null }>
+            .query("SELECT ct.id AS id FROM conversation_turns_fts f JOIN conversation_turns ct ON ct.rowid = f.rowid WHERE conversation_turns_fts MATCH ? AND ct.person_id = ?")
+            .all(fts, target) as Array<{ id: string }>
         )
-          .map((turn) => turn.conversationId)
-          .filter((id): id is string => id !== null)
+          .map((turn) => turn.id)
       : [];
-    const matchingConversationIds = new Set([...matchingTitleIds, ...matchingTurnIds]);
+    // Keep search on the same visible branch as the model's history
+    // window. FTS indexes every stored row, including a permanent row
+    // that a later turn superseded; fetch its matched rows and pass them
+    // through the shared history exclusion instead of maintaining a
+    // second definition of which turns are live.
+    const matchingRows = matchingTurnIds.length
+      ? db.select().from(conversationTurns).where(inArray(conversationTurns.id, matchingTurnIds)).all()
+      : [];
+    const matchingConversationIdsFromFts = [...new Set(matchingRows.map((turn) => turn.conversationId).filter((id): id is string => id !== null))];
+    const branchRows = matchingConversationIdsFromFts.length
+      ? db.select().from(conversationTurns).where(inArray(conversationTurns.conversationId, matchingConversationIdsFromFts)).all()
+      : [];
+    const matchedIds = new Set(matchingTurnIds);
+    const visibleMatchingRows = excludeSupersededRows(branchRows).filter((turn) => matchedIds.has(turn.id));
+    const matchingConversationIds = new Set([
+      ...matchingTitleIds,
+      ...visibleMatchingRows.map((turn) => turn.conversationId).filter((id): id is string => id !== null),
+    ]);
     rows = rows.filter((row) => matchingConversationIds.has(row.id));
   }
   rows.sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt.localeCompare(a.updatedAt));

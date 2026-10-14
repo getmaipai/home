@@ -15069,6 +15069,7 @@ other's section once (147cd28, f4779a6).
   three hub items filed (RUNTIME-01, SURFACE-01, WIRE-01):
   [docs/dev/session-a.md](dev/session-a.md) (2026-09-14).
 - STT-TURN-02 adds generation-tagged cancellation and additive per-turn latency fields to the stream wire.
+- STT-SMARTTURN-01B routes conversation-search matches through the same superseded-turn exclusion as history windows.
 - RECALL-03 and GUARD-LINES, from the live chat of 2026-09-14: the
   current conversation's own turns past the window recalled as the
   person's words (never the hub's side), and the guards' replacement

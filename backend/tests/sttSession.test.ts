@@ -87,6 +87,79 @@ function endpointConfig(endpointer: Endpointer, holdS = 0.8) {
 }
 
 describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", () => {
+  test("a held mid-sentence pause that resumes produces one final carrying the whole utterance and nothing else", async () => {
+    const receivedSamples: number[] = [];
+    fixture = startStackFixture({
+      "POST /v1/audio/transcriptions": async (req) => {
+        const form = await req.formData();
+        const file = form.get("file") as unknown as File;
+        receivedSamples.push((file.size - 44) / 2);
+        return Response.json({ text: "the whole resumed utterance" });
+      },
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const events: SttWireEvent[] = [];
+    let endpointCalls = 0;
+    const session = new SttSession(endpointConfig({ isComplete: async () => endpointCalls++ > 0 }), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 600);
+    expect(finals(events)).toHaveLength(0);
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 30; i++) session.pushPcm(silenceFrame());
+    await flush();
+    await flush();
+
+    expect(finals(events)).toEqual([{ t: "final", v: "the whole resumed utterance" }]);
+    expect(events.filter((event) => event.t === "no_speech" || event.t === "error")).toHaveLength(0);
+    expect(receivedSamples).toHaveLength(1);
+    expect(receivedSamples[0]).toBeGreaterThan(30 * FRAME * 2);
+    session.close();
+  });
+
+  test("a held pause that never resumes ends at the hold limit with one final and no second event", async () => {
+    scriptTranscript("held utterance");
+    const events: SttWireEvent[] = [];
+    let endpointCalls = 0;
+    const session = new SttSession(endpointConfig({ isComplete: async () => { endpointCalls++; return false; } }, 0.2), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 600);
+    const afterHold = [...events];
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(finals(events)).toHaveLength(1);
+    expect(events).toEqual(afterHold);
+    expect(endpointCalls).toBe(1);
+    expect(transcriptionCalls()).toBe(1);
+    session.close();
+  });
+
+  test("the first fragment of a held utterance is never sent as its own final", async () => {
+    scriptTranscript("whole utterance, not the fragment");
+    const events: SttWireEvent[] = [];
+    let endpointCalls = 0;
+    const session = new SttSession(endpointConfig({ isComplete: async () => endpointCalls++ > 0 }), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 600);
+    expect(finals(events)).toHaveLength(0);
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 30; i++) session.pushPcm(silenceFrame());
+    await flush();
+    await flush();
+
+    expect(finals(events)).toEqual([{ t: "final", v: "whole utterance, not the fragment" }]);
+    expect(transcriptionCalls()).toBe(1);
+    session.close();
+  });
+
   test("with no endpointer, a 600 ms pause ends the utterance as before", async () => {
     scriptTranscript("one utterance");
     const events: SttWireEvent[] = [];
