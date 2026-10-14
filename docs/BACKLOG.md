@@ -1,5 +1,7 @@
 # Backlog
 
+- [ ] **SETUP-PREVIEW-01 (small M):** Development-only setup preview using the production wizard and scenario-backed MSW handlers, a preview bar, a production-bundle exclusion test, request isolation checks, and seeded screenshots. Later setup screens add their scenarios with their screen work.
+
 What's missing to go from "the hub can chat" to a usable family app. This is
 a scannable list, not a narrative - full reasoning and decision history for
 any item lives in `docs/dev.md` (linked where useful) or the relevant

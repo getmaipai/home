@@ -1141,6 +1141,8 @@ The session-storage resume (`maipai:setup-wizard-step` and friends) is deleted.
 
 ## Preview mode (walk every screen, change nothing)
 
+SETUP-PREVIEW-01 implements the development-only preview against the screens present on `origin/main`; later screen-specific scenarios wait for their screen work.
+
 Your addition (2026-10-13): a way to walk through every screen, check and step, including the error and edge screens, without anything downloading, installing, writing settings or touching the machine.
 
 **Best design on merit: the real wizard, with its server answered by scenario files.** The screens, the setup client and the copy are the production ones. Only the far side of the network calls changes: in preview, every `/api/*` request the page makes is answered in the browser by a scenario, and no request ever leaves the page. That is the one seam that lets the screens stay a single copy (org principle 1): no second wizard, no `if (preview)` inside a screen, no fake components.

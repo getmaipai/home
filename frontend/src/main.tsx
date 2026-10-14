@@ -2,14 +2,26 @@ import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "@/App";
 import { installHiddenReloadOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
+import { readShellCache } from "@/shell/shellCache";
 import "@/shell/tokens.css";
 import { applyFirstPaintPalette } from "@/shell/firstPaintPalette";
 
-installStaleChunkRetry(window, sessionStorage);
-if ("serviceWorker" in navigator) {
+window.__setupPreview = __SETUP_PREVIEW__;
+if (!__SETUP_PREVIEW__) installStaleChunkRetry(window, sessionStorage);
+if (!__SETUP_PREVIEW__ && "serviceWorker" in navigator) {
   installHiddenReloadOnNewServiceWorker(navigator.serviceWorker, document, window);
 }
 
+/** Paint the migrated shell's palette before React mounts from the
+ * per-browser cache. Its appearance hooks reconcile after loading. */
+function applyCachedPalette(): void {
+  if (__SETUP_PREVIEW__) return;
+  const cached = readShellCache();
+  if (!cached) return;
+  document.body.classList.add(`style-${cached.look}`);
+  document.documentElement.classList.toggle("dark", cached.dark);
+  document.documentElement.classList.toggle("light", !cached.dark);
+}
 /** Fires `onConfirmed` after the first real render commits, not just after
  * the synchronous `render()` call returns - a hang during a lazy import
  * happens after that call already returned, so `runBootWatchdog` needs a
@@ -37,9 +49,10 @@ function renderBootFailure(): void {
     </div>`;
 }
 
+const bootStorage = __SETUP_PREVIEW__ ? new Proxy({} as Storage, { get: () => () => null, set: () => true }) : sessionStorage;
 runBootWatchdog(
   window,
-  sessionStorage,
+  bootStorage,
   (confirmBooted) => {
     const rootEl = document.getElementById("root");
     if (!rootEl) throw new Error("#root element missing from index.html");

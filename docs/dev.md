@@ -36847,3 +36847,21 @@ Verdict: not shipped, working tree reverted. The 40 percent token bar is not met
 - Screen: `useEase` (`frontend/src/shell/useEase.ts`, pure part in `easeResolve.ts`) resolves `preset` against `@maipai/spec/ease/presets.json` and sets `data-ease-text|spacing|targets|contrast|motion` on `<html>`. The card is drawn from the spec's `profile.ease` group; no Home component.
 - Open: ui-v0.5.199 lacks the generated token CSS and the rail change (only the generator and its test are in the tag), so the attributes are set and nothing yet reacts. The kit row cannot show a lock or a "Large + N changes" summary.
 - Captures: `bun run scripts/screenshotEase.ts` (phone, 320 reflow, desktop, Standard and Large).
+# Setup preview
+
+From `frontend/`, run `bun run setup:preview`. This starts Vite with
+`VITE_SETUP_PREVIEW=1` and opens `/setup?scenario=happy-local`; no backend or
+Stack is needed. The preview uses the production setup screens with in-browser
+Mock Service Worker responses. Unhandled `/api/*` calls fail, and the dev
+server blocks API fallthrough. Preview state is held in memory and resets on
+reload.
+
+Scenarios live in `frontend/src/apps/setup/preview/scenarios/`. Add a small
+override of the shared base record, using synthetic addresses and names. Keep
+record shapes aligned with `@maipai/spec` and `docs/api/openapi.json`; scenario
+validation runs with the frontend tests. Regenerate the local worker with the
+preview command; it lives under the ignored `.setup-preview/` directory.
+
+Run `bun run setup:preview:screenshots` while preview is running to capture the
+seeded screens at desktop/mobile widths in both color schemes. Captures are
+written under ignored `.setup-preview-captures/`.

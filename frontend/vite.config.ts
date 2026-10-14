@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 import { lingui } from "@lingui/vite-plugin";
 import { fileURLToPath } from "node:url";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import type { Plugin } from "vite";
 
 // `@maipai/ui`'s own source files (subpath-imported directly, no dist
@@ -118,10 +118,26 @@ function kitSharedSourceAliasPlugin(): Plugin {
 // app is served in production (backend/src/app.ts's serveStatic, same
 // process, same origin, no proxy needed there).
 export default defineConfig({
+  publicDir: "public",
+  define: {
+    __SETUP_PREVIEW__: JSON.stringify(process.env.VITE_SETUP_PREVIEW === "1"),
+  },
   plugins: [
     kitAliasPlugin(),
     kitElementsAliasPlugin(),
     kitSharedSourceAliasPlugin(),
+    ...(process.env.VITE_SETUP_PREVIEW === "1" ? [{
+      name: "setup-preview-worker",
+      configureServer(server: import("vite").ViteDevServer) {
+        server.middlewares.use((req, res, next) => {
+          if (req.url?.split("?")[0] !== "/mockServiceWorker.js") return next();
+          res.setHeader("content-type", "text/javascript; charset=utf-8");
+          res.setHeader("Service-Worker-Allowed", "/");
+          const workerPath = new URL("./.setup-preview/mockServiceWorker.js", import.meta.url);
+          res.end(readFileSync(workerPath));
+        });
+      },
+    }] : []),
     react(),
     tailwindcss(),
     // Session E step 8, i18n scaffolding: `.po` catalog compile-on-
@@ -281,7 +297,7 @@ export default defineConfig({
         // session-b-ui.md: "own data directory and ports") can point this
         // dev server at its own backend instance instead of the shared
         // default.
-        target: `http://localhost:${process.env.VITE_BACKEND_PORT ?? "8787"}`,
+        target: process.env.VITE_SETUP_PREVIEW === "1" ? "http://127.0.0.1:1" : `http://localhost:${process.env.VITE_BACKEND_PORT ?? "8787"}`,
         changeOrigin: false,
       },
     },

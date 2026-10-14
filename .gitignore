@@ -45,6 +45,10 @@ frontend/dist/
 # dev/build, ~38 MB, fully regenerable
 frontend/public/ort/
 
+# Setup preview worker and captures are generated locally, never shipped.
+frontend/.setup-preview/
+frontend/.setup-preview-captures/
+
 # scripts/screenshot.ts's throwaway demo backend data - regenerated every
 # run, never the real household, never committed. Suffixed by a reserved
 # port per run since #105 (two concurrent runs used to race on one shared

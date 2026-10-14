@@ -13,6 +13,8 @@ import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { api, type SignedInPerson } from "@/lib/api";
 import { SessionLockGate } from "@/shell/sessionLockContext";
+import { PreviewRuntime } from "@/apps/setup/preview/PreviewRuntime";
+import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 
 // A failed chunk fetch uses the shared stale-chunk retry wired in
 // main.tsx; lazy routes do not need a separate reload path.
@@ -76,10 +78,11 @@ export function App() {
   }
 
   useEffect(() => {
-    loadPerson();
+    if (__SETUP_PREVIEW__) setPerson(null);
+    else loadPerson();
   }, []);
 
-  useHouseholdLocale(person != null);
+  useHouseholdLocale(!__SETUP_PREVIEW__ && person != null);
 
   // The router now wraps every state (loading, signed out, mid-setup,
   // signed in), not just the authenticated tree: `/setup` needs to be a
@@ -95,13 +98,13 @@ export function App() {
           <ToastProvider>
             <TooltipProvider>
               <SessionLockGate person={person ?? null}>
-                <BrowserRouter>
+                <ThemeProvider storageKey={__SETUP_PREVIEW__ ? "setup-preview-theme" : "vite-ui-theme"}><BrowserRouter>
                   <RouterRoutes>
                     <Route
                       path="/setup"
                       element={
                         <Suspense fallback={<RouteSkeleton />}>
-                          <SetupWizard onDone={loadPerson} initialScreen={new URLSearchParams(window.location.search).get("checksReview") === "1" ? "checks" : undefined} />
+                          {__SETUP_PREVIEW__ ? <PreviewRuntime><SetupWizard onDone={loadPerson} /></PreviewRuntime> : <SetupWizard onDone={loadPerson} initialScreen={new URLSearchParams(window.location.search).get("checksReview") === "1" ? "checks" : undefined} />}
                         </Suspense>
                       }
                     />
@@ -145,7 +148,7 @@ export function App() {
                       }
                     />
                   </RouterRoutes>
-                </BrowserRouter>
+                </BrowserRouter></ThemeProvider>
               </SessionLockGate>
             </TooltipProvider>
           </ToastProvider>
