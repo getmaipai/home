@@ -26404,6 +26404,86 @@
         }
       }
     },
+    "/api/setup-checklist": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Setup checklist from household facts",
+        "description": "Read-only checklist for the signed-in owner or admin.",
+        "responses": {
+          "200": {
+            "description": "The current setup checklist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "done": {
+                        "type": "boolean"
+                      },
+                      "open": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "href"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "reason",
+                      "done",
+                      "open"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner and admins may read this checklist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/relationships": {
       "get": {
         "tags": [

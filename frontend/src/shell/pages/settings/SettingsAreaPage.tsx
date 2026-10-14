@@ -1,5 +1,5 @@
-import { useEffect, type ReactNode } from "react";
-import { Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Fragment, useEffect, type ReactNode } from "react";
+import { Link, Navigate, useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useQueries, useQuery } from "@tanstack/react-query";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { Empty, EmptyDescription, EmptyHeader } from "@maipai/ui/src/dashboard/components/ui/empty";
@@ -26,6 +26,11 @@ import { SettingsView } from "@/shell/pages/settings/settingsViews";
 import { baseViewer, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
+import { useSetupChecklist, setupChecklistCountLine } from "@/shell/useSetupChecklist";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
+import { Item, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemSeparator, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 
 /** The kit's `lg` breakpoint: from here the column and the content sit side
  * by side; below it the shell drills in (the column alone, then a section). */
@@ -57,6 +62,7 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   const navigate = useNavigate();
   const location = useLocation();
   const [params, setParams] = useSearchParams();
+  const setupChecklist = useSetupChecklist(person);
   const desktop = useBreakpoint().atLeast(DESKTOP_MIN_WIDTH);
   const query = params.get("q") ?? "";
   useTabItem(area.title);
@@ -139,6 +145,40 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
     content = active.kind === "view"
       ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} /> : null}</>
       : <SettingsSectionContent section={active} viewer={viewer} registry={registry} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
+  }
+
+  const checklistItems = setupChecklist.checklist.data ?? [];
+  const checklistOpenCount = checklistItems.filter((item) => !item.done).length;
+  if (area.id === "home" && active?.id === "general" && checklistOpenCount > 0) {
+    content = <>
+      <Card>
+        <CardHeader>
+          <CardTitle>Finish setting up</CardTitle>
+          <CardDescription>{setupChecklistCountLine(checklistOpenCount)}.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ItemGroup variant="card" aria-label="Finish setting up">
+            {checklistItems.map((item, index) => <Fragment key={item.id}>
+              {index > 0 ? <ItemSeparator variant="inset" /> : null}
+              <Item>
+                <ItemContent>
+                  <ItemTitle>{item.title}</ItemTitle>
+                  <ItemDescription clamp={false}>{item.reason}</ItemDescription>
+                </ItemContent>
+                <ItemFooter>
+                  {item.done ? <Badge variant="secondary">Done</Badge> : <>
+                    <Button aria-label={`Open ${item.title}`} variant="outline" size="row" render={<Link to={item.open.href} />}>{item.open.label}</Button>
+                    <Button variant="ghost" size="row" disabled={setupChecklist.dismiss.isPending} onClick={() => setupChecklist.dismiss.mutate(item.id)}>Not now</Button>
+                  </>}
+                </ItemFooter>
+              </Item>
+            </Fragment>)}
+          </ItemGroup>
+          {setupChecklist.dismiss.isError ? <p role="alert" className="text-sm text-destructive">Could not hide this item. Try again.</p> : null}
+        </CardContent>
+      </Card>
+      {content}
+    </>;
   }
 
   return (

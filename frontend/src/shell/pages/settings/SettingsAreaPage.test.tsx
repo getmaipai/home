@@ -66,6 +66,37 @@ const column = (_view: ReturnType<typeof open>) => document.body.querySelector<H
 const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")].map((link) => link.textContent?.trim());
 
 describe("the settings route", () => {
+  test("Not now writes the dismissal setting and leaves pinned apps byte-identical", async () => {
+    const view = open(makePerson("owner"), "/settings/home/general", {
+      pinnedApps: ["existing-app"],
+      setupChecklist: [
+        { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
+        { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", done: true, open: { label: "Open Storage and backups", href: "/settings/home/storage" } },
+      ],
+    });
+    await waitFor(() => expect(view.getByText("1 thing left to finish setting up.")).toBeTruthy());
+    expect(view.getByText("Done")).toBeTruthy();
+    const pinnedAppsBefore = fixture!.pinnedAppsValue();
+    fireEvent.click(view.getByRole("button", { name: "Not now" }));
+    await waitFor(() => expect(fixture!.puts).toContainEqual({
+      scope: "person:person-owner",
+      key: "setup.checklist_dismissed",
+      value: JSON.stringify(["family"]),
+    }));
+    expect(fixture!.puts.some((setting) => setting.key === "ui.pinned_apps")).toBe(false);
+    expect(fixture!.pinnedAppsValue()).toBe(pinnedAppsBefore);
+  });
+
+  test("nothing open means the checklist card is absent", async () => {
+    const view = open(makePerson("owner"), "/settings/home/general", {
+      setupChecklist: [
+        { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: true, open: { label: "Open People", href: "/settings/home/people" } },
+      ],
+    });
+    await waitFor(() => expect(fixture!.requests.some((request) => request.includes("/api/setup-checklist"))).toBe(true));
+    expect(view.queryByText("Finish setting up")).toBeNull();
+  });
+
   test("an adult asking for Home settings is replaced to Account and no household request is made", async () => {
     const adult = makePerson("adult");
     const view = open(adult, "/settings/home/ai");
@@ -211,7 +242,7 @@ describe("what a band is shown", () => {
 });
 
 describe("what the page asks for", () => {
-  test("it reads only the viewer's own person scope, and the household scope for an admin on Home settings", async () => {
+  test("it reads the household scope for Home settings and only the viewer's settings when needed", async () => {
     const teen = open(makePerson("teen"), "/settings/account/notifications");
     await waitFor(() => expect(teen.getByText("Show alerts on this device")).toBeTruthy());
     expect(fixture!.scopes.every((scope) => scope === "person:person-teen")).toBe(true);
@@ -219,6 +250,7 @@ describe("what the page asks for", () => {
     fixture!.restore();
     const owner = open(makePerson("owner"), "/settings/home/general");
     await waitFor(() => expect(owner.getByText("Family name")).toBeTruthy());
+    expect(fixture!.scopes).toContain("household");
     expect(fixture!.scopes.every((scope) => scope === "household")).toBe(true);
     expect(fixture!.requests.some((r) => /scope=person%3A(?!person-owner)/.test(r))).toBe(false);
   });

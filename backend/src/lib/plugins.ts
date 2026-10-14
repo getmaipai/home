@@ -74,21 +74,30 @@ export type PluginOpResult<T> =
   // treated as if the package itself had said it.
   | { ok: false; status: 502; error: string; code: string; fallback_reply: PluginResult };
 
+function bundledPackageIds(): string[] {
+  try {
+    return readdirSync(PACKAGES_DIR, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name);
+  } catch {
+    return [];
+  }
+}
+
 /** Every package id this hub can load: every bundled directory name,
  * plus any id the store has installed that was never bundled at all (a
  * genuinely new community package). A `Set` so a package that's both
  * bundled AND store-installed (an update to a default package, step 6's
  * own "weather installed from the local index" case) is listed once. */
 export function listPackageIds(): string[] {
-  let bundled: string[] = [];
-  try {
-    bundled = readdirSync(PACKAGES_DIR, { withFileTypes: true })
-      .filter((e) => e.isDirectory())
-      .map((e) => e.name);
-  } catch {
-    bundled = [];
-  }
+  const bundled = bundledPackageIds();
   return [...new Set([...bundled, ...listInstalledPackageIds()])];
+}
+
+/** True when the store has an active install for a package outside the bundled default set. */
+export function hasNonDefaultInstalledPackage(): boolean {
+  const defaults = new Set(bundledPackageIds());
+  return listInstalledPackageIds().some((id) => !defaults.has(id));
 }
 
 // mtime-keyed caches for loadManifestOnly()/loadPackage() (a latency
