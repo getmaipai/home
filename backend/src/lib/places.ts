@@ -46,17 +46,29 @@ function entityResult(entity: EntityT, from: ResolvedPlace["from"]): ResolvedPla
   return { label: entity.name, area: entity.geo?.area ?? null, lat: entity.geo?.lat ?? null, lon: entity.geo?.lon ?? null, precision: entity.geo?.precision ?? null, from };
 }
 
-/** Country label for the offline holiday package. Reads the configured
- * household home directly and passes only the final area segment onward. */
-export function householdHomeCountryName(): string | null {
+function householdHomeEntity(): EntityT | null {
   const homeId = getHouseholdSettingValue("household.home");
   if (typeof homeId !== "string") return null;
   const home = getEntity({ id: "system", role: "adult" }, homeId);
-  if (!home.ok || !home.value || home.value.kind !== "place" || home.value.scope !== "household") return null;
-  const area = home.value.geo?.area;
+  if (!home.ok || !home.value) return null;
+  return home.value.kind === "place" && home.value.scope === "household" ? home.value : null;
+}
+
+/** Country label for the offline holiday package. It uses the configured
+ * household home place and passes only the final area segment onward. */
+export function householdHomeCountryName(): string | null {
+  const area = householdHomeEntity()?.geo?.area;
   if (typeof area !== "string" || !area.trim()) return null;
   const country = area.split(",").at(-1)?.trim();
   return country || null;
+}
+
+/** Coordinates for the local sky sandbox only. This never geocodes or
+ * returns place text, and rounds the point to about one kilometre first. */
+export function householdHomeSkyInput(): { lat: number; lon: number } | null {
+  const geo = householdHomeEntity()?.geo;
+  if (typeof geo?.lat !== "number" || !Number.isFinite(geo.lat) || typeof geo.lon !== "number" || !Number.isFinite(geo.lon)) return null;
+  return { lat: Number(geo.lat.toFixed(2)), lon: Number(geo.lon.toFixed(2)) };
 }
 
 async function withGeocode(place: ResolvedPlace, name: string): Promise<ResolvedPlace> {

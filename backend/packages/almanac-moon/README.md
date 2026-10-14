@@ -1,22 +1,22 @@
 <!-- Store card. Dad test: grade 6, one action per step, no jargon. -->
-# Moon Phase
+# Sun and Moon
 
-Ask MaiPai what phase the moon is in tonight.
+Ask MaiPai when the sun rises or sets, or what the moon is doing tonight.
 
 ## Try it
 
+- "when is sunrise tomorrow"
+- "what time does the sun set tonight"
 - "what phase is the moon in"
 - "is it a full moon"
-- "what's the moon phase tonight"
 
 ## What it needs
 
-Nothing to set up. Works as soon as it's installed.
+Set the household home place in Settings for sunrise and sunset. Moon phase works without a home place.
 
 ## What it uses
 
-Nothing leaves the house - the moon's phase is worked out right here,
-from the date alone.
+Sun and moon details are worked out right here from the date and, for sunrise and sunset, the home place. Nothing leaves the house.
 
 ## Offline
 

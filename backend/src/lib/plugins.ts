@@ -36,7 +36,7 @@ import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
 import type { ProjectPlan } from "@/lib/projects/types";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
-import { householdHomeCountryName, resolvePlace } from "@/lib/places";
+import { householdHomeCountryName, householdHomeSkyInput, resolvePlace } from "@/lib/places";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow } from "@/lib/benchSampling";
@@ -54,6 +54,15 @@ const MINOR_QUERY_CHECK_PACKAGE_IDS = new Set(["book-lookup", "place-lookup"]);
 function localClockInput(now: Date): string {
   const pad = (value: number, width = 2) => String(value).padStart(width, "0");
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}.${pad(now.getMilliseconds(), 3)}`;
+}
+
+export function almanacHostInputs(id: string): Record<string, unknown> {
+  if (!id.startsWith("almanac-")) return {};
+  return {
+    __now: localClockInput(promptNow()),
+    ...(id === "almanac-holiday" ? { __home_country: householdHomeCountryName() } : {}),
+    ...(id === "almanac-moon" ? { __home_sky: householdHomeSkyInput() } : {}),
+  };
 }
 
 export interface LoadedPackage {
@@ -566,7 +575,7 @@ export async function runPlugin(
     // turn's already-frozen clock crosses the MCP boundary as an internal
     // argument. The production path gets the real current instant from
     // promptNow(); the bench pins that same source without changing Date.
-    const handlerInputs = id.startsWith("almanac-") ? { ...inputs, __now: localClockInput(promptNow()), ...(id === "almanac-holiday" ? { __home_country: householdHomeCountryName() } : {}) } : inputs;
+    const handlerInputs = id.startsWith("almanac-") ? { ...inputs, ...almanacHostInputs(id) } : inputs;
     if (id === "book-lookup" || id === "place-lookup") {
       (handlerInputs as Record<string, unknown>).__attribution = manifest.data_sources?.[0]?.attribution ?? "";
     }

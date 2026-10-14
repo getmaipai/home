@@ -1,10 +1,10 @@
 {
   "id": "almanac-moon",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Info",
-  "display": "Moon Phase",
-  "description": "Tell you tonight's moon phase.",
+  "display": "Sun and Moon",
+  "description": "Answer questions about the Sun and Moon.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -14,7 +14,9 @@
       "what's the moon phase tonight",
       "is it a full moon",
       "tell me the moon phase",
-      "what does the moon look like tonight"
+      "what does the moon look like tonight",
+      "when is sunrise tomorrow",
+      "what time does the sun set tonight"
     ],
     "patterns": [
       "what phase is the moon in",

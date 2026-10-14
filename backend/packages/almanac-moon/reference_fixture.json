@@ -1,0 +1,273 @@
+{
+  "sources": {
+    "sun": {
+      "name": "U.S. Naval Observatory Astronomical Applications API, Complete Sun and Moon Data for One Day",
+      "url": "https://aa.usno.navy.mil/api/rstt/oneday",
+      "retrieved": "2026-10-14",
+      "minutes": "USNO local-time values are rounded to whole minutes; compare circular minute distance after converting from the listed UTC offset, accepting at most 1 minute."
+    },
+    "moon": {
+      "name": "U.S. Naval Observatory Astronomical Applications API, Phases of the Moon and Complete Sun and Moon Data for One Day",
+      "phase_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+      "illumination_url": "https://aa.usno.navy.mil/api/rstt/oneday",
+      "retrieved": "2026-10-14",
+      "illumination": "USNO reports illumination as whole percent at noon UT at 0,0; compare within 0.02. Principal-phase instants are the API's UTC minutes; compare within 15 minutes."
+    }
+  },
+  "sun": [
+    {
+      "place": "Reykjavik",
+      "lat": 64.15,
+      "lon": -21.94,
+      "tz": 0,
+      "date": "2026-03-20",
+      "sunrise": "07:29",
+      "sunset": "19:43",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-3-20&coords=64.15,-21.94&tz=0",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Reykjavik",
+      "lat": 64.15,
+      "lon": -21.94,
+      "tz": 0,
+      "date": "2026-06-21",
+      "sunrise": "02:55",
+      "sunset": "00:04",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-6-21&coords=64.15,-21.94&tz=0",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Reykjavik",
+      "lat": 64.15,
+      "lon": -21.94,
+      "tz": 0,
+      "date": "2026-09-23",
+      "sunrise": "07:14",
+      "sunset": "19:25",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-9-23&coords=64.15,-21.94&tz=0",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Reykjavik",
+      "lat": 64.15,
+      "lon": -21.94,
+      "tz": 0,
+      "date": "2026-12-21",
+      "sunrise": "11:22",
+      "sunset": "15:29",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-12-21&coords=64.15,-21.94&tz=0",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Singapore",
+      "lat": 1.35,
+      "lon": 103.82,
+      "tz": 8,
+      "date": "2026-03-20",
+      "sunrise": "07:09",
+      "sunset": "19:15",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-3-20&coords=1.35,103.82&tz=8",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Singapore",
+      "lat": 1.35,
+      "lon": 103.82,
+      "tz": 8,
+      "date": "2026-06-21",
+      "sunrise": "07:00",
+      "sunset": "19:12",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-6-21&coords=1.35,103.82&tz=8",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Singapore",
+      "lat": 1.35,
+      "lon": 103.82,
+      "tz": 8,
+      "date": "2026-09-23",
+      "sunrise": "06:54",
+      "sunset": "19:00",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-9-23&coords=1.35,103.82&tz=8",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Singapore",
+      "lat": 1.35,
+      "lon": 103.82,
+      "tz": 8,
+      "date": "2026-12-21",
+      "sunrise": "07:01",
+      "sunset": "19:04",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-12-21&coords=1.35,103.82&tz=8",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Buenos Aires",
+      "lat": -34.6,
+      "lon": -58.38,
+      "tz": -3,
+      "date": "2026-03-20",
+      "sunrise": "06:57",
+      "sunset": "19:05",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-3-20&coords=-34.6,-58.38&tz=-3",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Buenos Aires",
+      "lat": -34.6,
+      "lon": -58.38,
+      "tz": -3,
+      "date": "2026-06-21",
+      "sunrise": "08:00",
+      "sunset": "17:50",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-6-21&coords=-34.6,-58.38&tz=-3",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Buenos Aires",
+      "lat": -34.6,
+      "lon": -58.38,
+      "tz": -3,
+      "date": "2026-09-23",
+      "sunrise": "06:41",
+      "sunset": "18:51",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-9-23&coords=-34.6,-58.38&tz=-3",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Buenos Aires",
+      "lat": -34.6,
+      "lon": -58.38,
+      "tz": -3,
+      "date": "2026-12-21",
+      "sunrise": "05:37",
+      "sunset": "20:06",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-12-21&coords=-34.6,-58.38&tz=-3",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Seattle",
+      "lat": 47.61,
+      "lon": -122.33,
+      "tz": -7,
+      "date": "2026-03-20",
+      "sunrise": "07:12",
+      "sunset": "19:22",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-3-20&coords=47.61,-122.33&tz=-7",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Seattle",
+      "lat": 47.61,
+      "lon": -122.33,
+      "tz": -7,
+      "date": "2026-06-21",
+      "sunrise": "05:12",
+      "sunset": "21:11",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-6-21&coords=47.61,-122.33&tz=-7",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Seattle",
+      "lat": 47.61,
+      "lon": -122.33,
+      "tz": -7,
+      "date": "2026-09-23",
+      "sunrise": "06:58",
+      "sunset": "19:05",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-9-23&coords=47.61,-122.33&tz=-7",
+      "retrieved": "2026-10-14"
+    },
+    {
+      "place": "Seattle",
+      "lat": 47.61,
+      "lon": -122.33,
+      "tz": -8,
+      "date": "2026-12-21",
+      "sunrise": "07:55",
+      "sunset": "16:20",
+      "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-12-21&coords=47.61,-122.33&tz=-8",
+      "retrieved": "2026-10-14"
+    }
+  ],
+  "moon": {
+    "phases": [
+      {
+        "phase": "Full Moon",
+        "utc": "2026-01-03T10:03:00Z",
+        "source_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "phase": "First Quarter",
+        "utc": "2026-02-24T12:27:00Z",
+        "source_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "phase": "New Moon",
+        "utc": "2026-03-19T01:23:00Z",
+        "source_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "phase": "Last Quarter",
+        "utc": "2026-04-10T04:51:00Z",
+        "source_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "phase": "Full Moon",
+        "utc": "2026-05-31T08:45:00Z",
+        "source_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "phase": "New Moon",
+        "utc": "2026-08-12T17:37:00Z",
+        "source_url": "https://aa.usno.navy.mil/api/moon/phases/year?year=2026",
+        "retrieved": "2026-10-14"
+      }
+    ],
+    "illumination": [
+      {
+        "utc": "2026-01-03T12:00:00Z",
+        "fraction": 1.0,
+        "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-1-3&coords=0,0&tz=0",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "utc": "2026-02-24T12:00:00Z",
+        "fraction": 0.5,
+        "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-2-24&coords=0,0&tz=0",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "utc": "2026-03-19T12:00:00Z",
+        "fraction": 0.0,
+        "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-3-19&coords=0,0&tz=0",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "utc": "2026-04-10T12:00:00Z",
+        "fraction": 0.47,
+        "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-4-10&coords=0,0&tz=0",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "utc": "2026-05-31T12:00:00Z",
+        "fraction": 1.0,
+        "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-5-31&coords=0,0&tz=0",
+        "retrieved": "2026-10-14"
+      },
+      {
+        "utc": "2026-08-12T12:00:00Z",
+        "fraction": 0.0,
+        "source_url": "https://aa.usno.navy.mil/api/rstt/oneday?date=2026-8-12&coords=0,0&tz=0",
+        "retrieved": "2026-10-14"
+      }
+    ]
+  }
+}
