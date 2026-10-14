@@ -7,7 +7,6 @@ import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { describeHardware } from "@/apps/settings/ModelsSection";
 import { api, ApiError, type HardwareInfo, type BackupInfo } from "@/lib/api";
-import { AwayFromHome } from "@/apps/setup/AwayFromHome";
 
 interface SetupWizardProps {
   /** Fires once the owner account exists and the wizard is done (or the
@@ -355,7 +354,15 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
       break;
 
     case "remote":
-      content = <AwayFromHome onContinue={advance} />;
+      content = (
+        <StepFields>
+          <p className="text-base text-muted-foreground">
+            You can optionally set up secure remote access to your hub away from home. This isn't built yet - skip it for now.
+          </p>
+        </StepFields>
+      );
+      skipLabel = "Skip - not built yet";
+      onSkip = advance;
       nextDisabled = true;
       break;
 

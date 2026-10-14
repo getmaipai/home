@@ -11,6 +11,7 @@ import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
 import { notifyTsLeafRenewed } from "@/lib/tailscaleTls";
 import { getHouseholdSettingValue, setValue } from "@/lib/settings";
 import { listActivePeople } from "@/lib/access";
+import { encryptSecret, decryptSecret } from "@/lib/secrets";
 
 const execFileAsync = promisify(execFile);
 
@@ -71,7 +72,7 @@ let renewalActive = false;
 export interface TsCert { certPem: string; keyPem: string; name: string }
 export function getTailscaleLeafForServer(): TsCert | null {
   if (!existsSync(TS_CERT_PATH) || !existsSync(TS_KEY_PATH)) return null;
-  return { certPem: readFileSync(TS_CERT_PATH, "utf8"), keyPem: readFileSync(TS_KEY_PATH, "utf8"), name: "*.ts.net" };
+  return { certPem: readFileSync(TS_CERT_PATH, "utf8"), keyPem: decryptSecret(readFileSync(TS_KEY_PATH, "utf8")), name: "*.ts.net" };
 }
 
 export async function ensureTailscaleCert(): Promise<TsCert> {
@@ -86,7 +87,7 @@ export async function ensureTailscaleCert(): Promise<TsCert> {
   const keyPem = readFileSync(keyPath, "utf8");
   try {
     writeFileSync(TS_CERT_PATH, certPem, { mode: 0o644 });
-    writeFileSync(TS_KEY_PATH, keyPem, { mode: 0o600 });
+    writeFileSync(TS_KEY_PATH, encryptSecret(keyPem), { mode: 0o600 });
     protectSecretPath(TS_KEY_PATH);
   } finally { rmSync(certPath, { force: true }); rmSync(keyPath, { force: true }); }
   chmodSync(TS_KEY_PATH, 0o600); protectSecretPath(TS_KEY_PATH);
