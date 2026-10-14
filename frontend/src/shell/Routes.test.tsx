@@ -73,6 +73,7 @@ describe("Routes appearance", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/settings")) {
         return Promise.resolve(
           Response.json([
@@ -120,6 +121,7 @@ describe("Routes appearance", () => {
     });
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/settings") && init?.method === "PUT") {
         const body = JSON.parse(String(init.body));
         puts.push(body);
@@ -164,6 +166,7 @@ describe("Routes status indicator", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/settings")) return Promise.resolve(Response.json([
         { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
@@ -200,6 +203,7 @@ describe("Routes notifications bell", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/notifications")) return Promise.resolve(Response.json([{ id: "n1", typeId: "repairs.new", level: "time_sensitive", text: "MaiPai Stack is offline", channels: ["in_app"], createdAt: "2026-10-06T00:00:00.000Z", readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: false }]));
@@ -238,6 +242,7 @@ describe("Routes Incognito toggle", () => {
     (document as unknown as { startViewTransition: unknown }).startViewTransition = startViewTransition;
     globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/settings")) return Response.json([
         { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
         { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
@@ -292,6 +297,7 @@ describe("Routes sign-in redirect", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/conversations")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/settings")) {
@@ -350,6 +356,7 @@ describe("Routes signed-out redirect", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/auth/profiles")) return Promise.resolve(Response.json([makePerson()]));
       return Promise.resolve(new Response("{}", { status: 200 }));
     }) as unknown as typeof fetch;
@@ -377,6 +384,7 @@ describe("Routes retired Tools paths", () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/settings")) {
         return Promise.resolve(Response.json([
@@ -461,6 +469,7 @@ describe("next Manage routes", () => {
     const body = routeToBody[route]!;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes(endpoint)) {
         return Promise.resolve(Response.json(body));
       }
@@ -518,6 +527,7 @@ describe("Routes notifications history page", () => {
     const delivery = { id: "n1", typeId: "repairs.new", level: "time_sensitive", text: "MaiPai Stack is offline", channels: ["in_app"], createdAt: new Date().toISOString(), readAt: null, dismissedAt: null, subjectTurnId: null, memoryIds: null, toast: false };
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/health")) return Promise.resolve(healthResponse());
       if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
       if (url.includes("/api/notifications")) return Promise.resolve(Response.json([delivery]));

@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Autoplay from "embla-carousel-autoplay";
 import type { CarouselApi } from "@maipai/ui/src/ui/carousel";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/ui/card";
@@ -8,6 +9,14 @@ import { heroSlides } from "@/content/heroSlides";
 export function WhatHomeCanDoPage() {
   const slides = heroSlides();
   const [carouselApi, setCarouselApi] = useState<CarouselApi | undefined>();
+  const autoplayPlugin = useMemo(() => Autoplay({
+    delay: 8000,
+    playOnInit: false,
+    stopOnFocusIn: false,
+    stopOnInteraction: false,
+    stopOnLastSnap: false,
+    stopOnMouseEnter: false,
+  }), []);
   const [paused, setPaused] = useState(() =>
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -22,18 +31,21 @@ export function WhatHomeCanDoPage() {
     return () => query.removeEventListener("change", update);
   }, []);
 
+  useEffect(() => {
+    const autoplay = carouselApi?.plugins().autoplay;
+    if (!autoplay) return;
+    if (paused) autoplay.stop();
+    else autoplay.play();
+  }, [carouselApi, paused]);
+
   return (
     <main>
       <h1>What Home can do</h1>
       <Carousel
         aria-label="What Home can do"
-        autoplay
-        autoplayDelay={8000}
+        opts={{ loop: true }}
+        plugins={[autoplayPlugin]}
         setApi={setCarouselApi}
-        paused={paused}
-        onPausedChange={setPaused}
-        pauseOnFocus={false}
-        pauseOnHover={false}
       >
         <CarouselContent>
           {slides.map((slide) => (
