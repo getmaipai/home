@@ -24,12 +24,13 @@ export function baseViewer(person: Pick<Roster, "id" | "role" | "age_band">): Se
  * shell draws no developer controls yet) and, for a child or teen, only the
  * keys the old Settings page showed them. One filter feeds the shell, its
  * search and every card, so none of them can show a minor more. */
-export function visibleRegistry(registry: readonly SettingsKey[], band: Band): KitSettingsKey[] {
+export function visibleRegistry(registry: readonly SettingsKey[], band: Band, includeExpertKeys: readonly string[] = []): KitSettingsKey[] {
   const allowed = minorVisibleSettingKeys(band);
   // The installed settings kit does not render the location selector yet.
   // Keep the existing household.home_place editor visible until the kit
   // ships that control; the canonical key is used by backend resolvers now.
-  return registry.filter((key) => key.selector !== "location" && key.level !== "expert" && (!allowed || allowed.has(key.key))) as KitSettingsKey[];
+  const expertKeys = new Set(includeExpertKeys);
+  return registry.filter((key) => key.selector !== "location" && (key.level !== "expert" || expertKeys.has(key.key)) && (!allowed || allowed.has(key.key))) as KitSettingsKey[];
 }
 
 /** The runtime scope string the settings API expects for a card's scope. */

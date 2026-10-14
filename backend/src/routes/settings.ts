@@ -12,6 +12,9 @@ import { validateWebSources } from "@/lib/retrieval/webSources";
 import { validateCustomHosts } from "@/lib/blocklists/customHosts";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
 import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY, refreshConfiguredEngineLink } from "@/lib/remoteStackSettings";
+import { canBindHubPort, configuredHubPort, configuredLanExposure, HUB_PORT_IN_USE_MESSAGE, HUB_PORT_SETTING } from "@/lib/networkSettings";
+import { detectLanIps } from "@/lib/hubEndpoints";
+import { scheduleHubRestart } from "@/lib/hubRestart";
 
 export const settingsRoutes = apiRouter();
 
@@ -107,6 +110,10 @@ settingsRoutes.openapi(putRoute, async (c) => {
   const body = c.req.valid("json");
   if (body.value === undefined) return c.json({ error: "scope, key, and value are required" }, 400);
   if (body.scope === "household") {
+    if (body.key === HUB_PORT_SETTING && typeof body.value === "number" && body.value !== configuredHubPort()) {
+      const exposure = configuredLanExposure();
+      if (!canBindHubPort(body.value, exposure, detectLanIps())) return c.json({ error: HUB_PORT_IN_USE_MESSAGE }, 400);
+    }
     const refusal = await validateRemoteEngineSetting(body.key, body.value);
     if (refusal) return c.json({ error: refusal }, 400);
     const sourcesRefusal = validateWebSources(body.key, body.value);
@@ -124,6 +131,7 @@ settingsRoutes.openapi(putRoute, async (c) => {
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
+  if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json(result.value, 200);
 });
 
@@ -154,6 +162,12 @@ const resetRoute = createRoute({
 settingsRoutes.openapi(resetRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
+  if (body.scope === "household" && body.key === HUB_PORT_SETTING) {
+    const defaultPort = Number(getRegistry().find((key) => key.key === HUB_PORT_SETTING)?.default);
+    if (defaultPort !== configuredHubPort() && !canBindHubPort(defaultPort, configuredLanExposure(), detectLanIps())) {
+      return c.json({ error: HUB_PORT_IN_USE_MESSAGE }, 400);
+    }
+  }
   const result = resetValue(actor, body.scope, body.key);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
@@ -162,6 +176,7 @@ settingsRoutes.openapi(resetRoute, async (c) => {
   publishSettingsChanged(body.scope, body.key, result.value.value);
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
   if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
+  if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json({ ...result.value, success: true as const }, 200);
 });
 

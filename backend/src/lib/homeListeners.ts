@@ -29,9 +29,11 @@ export function startHomeListeners(options: {
   websocket: typeof HonoWebSocket;
   tls?: HouseholdTlsMaterial | null;
   networkAddresses?: string[];
+  exposure?: "loopback" | "lan";
 }): HomeListenerSet {
   const { fetch } = options;
   const tls = options.tls ?? null;
+  const exposure = options.exposure ?? "lan";
   const servers: Bun.Server<any>[] = [];
   let port = options.port;
 
@@ -49,7 +51,10 @@ export function startHomeListeners(options: {
   };
 
   try {
-    if (!tls) {
+    if (exposure === "loopback") {
+      serve("127.0.0.1", false);
+      serve("::1", false);
+    } else if (!tls) {
       serve(undefined, false);
     } else {
       // The specific-address binds can share a port: loopback gets plain
@@ -83,6 +88,7 @@ export function attachHouseholdTlsRebind(options: {
   fetch: FetchHandler;
   websocket: typeof HonoWebSocket;
   networkAddresses?: () => string[];
+  exposure?: "loopback" | "lan";
   onBound?: (listeners: HomeListenerSet) => void;
   onFailure?: (error: unknown) => void;
 }): { current(): HomeListenerSet; stop(): void } {
@@ -102,6 +108,7 @@ export function attachHouseholdTlsRebind(options: {
         websocket: options.websocket,
         tls: leaf,
         networkAddresses: options.networkAddresses?.(),
+        exposure: options.exposure,
       }))
         .then(({ server: next }) => {
           if (!active) {
