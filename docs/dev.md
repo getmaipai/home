@@ -34903,6 +34903,8 @@ page beside the row they concern:
 - Any class on a disk with under 10 percent or under 5 GB free, whichever
   is larger, or where the class's growth over the last 30 days would
   fill the disk within 30 days.
+- The growth warning sentence is: "At this rate, this drive could fill
+  within 30 days."
 - The "ignore ownership" setting on a macOS external volume holding a
   personal class, with where to turn it off (Finder, Get Info, Sharing &
   Permissions).
@@ -34960,6 +34962,13 @@ set appears as one volume; when the OS does not report the physical
 disks behind it, "same physical disk" says "MaiPai can't tell which
 disks this uses" rather than guessing, and the backup warning is shown
 unless the backup volume is plainly a different device.
+
+The exact unknown-disk row is: "MaiPai can't tell which disks this uses."
+When that row concerns backups, the same-disk warning still reads: "Your
+backups are on the same disk as your household. If that disk fails, you
+lose both." It is omitted only when the backup volume is plainly a
+different device (a different volume UUID or physical store, or network
+versus local).
 
 **The Linux sandbox: `ProtectSystem=full`.** The unit changes from
 `ProtectSystem=strict` with `ReadWritePaths=<install>` to
