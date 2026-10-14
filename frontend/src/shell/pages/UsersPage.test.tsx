@@ -57,6 +57,38 @@ describe("UsersPage", () => {
       globalThis.fetch = originalFetch;
     }
   });
+
+  test("creating an adult sends the required secret and explains how to fix a rejected create", async () => {
+    const originalFetch = globalThis.fetch;
+    const createBodies: Array<Record<string, unknown>> = [];
+    const fetchMock = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/api/people") && init?.method === "POST") {
+        const body = JSON.parse(String(init.body)) as Record<string, unknown>;
+        createBodies.push(body);
+        if (!body.secret) return Promise.resolve(Response.json({ error: "a adult profile requires a secret" }, { status: 400 }));
+        return Promise.resolve(Response.json(member("person-added", String(body.displayName), "adult"), { status: 201 }));
+      }
+      if (url.includes("/api/people")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      const view = renderUsersPage(actor("owner"));
+      await view.findByText("Add someone");
+      fireEvent.change(view.getByPlaceholderText("Name"), { target: { value: "Avery" } });
+      fireEvent.submit(view.getByPlaceholderText("Name").closest("form")!);
+      await view.findByText("This role requires a PIN or password. Enter one above, then try again.");
+      expect(createBodies[0]).toEqual({ displayName: "Avery", role: "adult", secret: "" });
+
+      const secret = view.getByLabelText("PIN or password");
+      fireEvent.change(secret, { target: { value: "123456" } });
+      fireEvent.submit(view.getByPlaceholderText("Name").closest("form")!);
+      await waitFor(() => expect(createBodies[1]).toEqual({ displayName: "Avery", role: "adult", secret: "123456" }));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });
 
 // NEXT-RETIRE-02C: the removal, rename and role cases below are ported from

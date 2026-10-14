@@ -102,7 +102,9 @@ export function UsersSection({ person }: UsersSectionProps) {
       setSecret("");
       await invalidateRoster();
     } catch (err) {
-      setFormError(err instanceof ApiError ? err.message : "Could not add that person.");
+      setFormError(err instanceof ApiError && /profile requires a secret/i.test(err.message)
+        ? "This role requires a PIN or password. Enter one above, then try again."
+        : err instanceof ApiError ? err.message : "Could not add that person.");
     } finally {
       setSubmitting(false);
     }
@@ -404,14 +406,21 @@ export function UsersSection({ person }: UsersSectionProps) {
             aria-label="Role"
           />
           {requiresSecret(role) ? (
-            <Input
-              type="password"
-              placeholder="PIN or password (required for this role)"
-              value={secret}
-              onChange={(e) => setSecret(e.target.value)}
-              disabled={submitting}
-              required
-            />
+            <>
+              <label className="flex flex-col gap-1 text-sm">
+                <span>PIN or password (required for {ROLE_LABELS[role].toLowerCase()})</span>
+                <Input
+                  type="password"
+                  aria-label="PIN or password"
+                  placeholder="Enter a PIN or password"
+                  value={secret}
+                  onChange={(e) => setSecret(e.target.value)}
+                  disabled={submitting}
+                  required
+                />
+              </label>
+              <p className="text-sm text-muted-foreground">This person will use it to sign in.</p>
+            </>
           ) : null}
           {formError ? <p className="text-base text-[var(--destructive)]">{formError}</p> : null}
           <Button type="submit" disabled={submitting}>
