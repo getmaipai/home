@@ -9,9 +9,7 @@
 
 <p align="center"><a href="docs/dev.md">Documentation</a> · <a href="https://github.com/getmaipai/home/releases">Releases</a></p>
 
-Your own AI, music, videos, podcasts, maps, books, and more, on your own
-hardware, online or offline, for protection, privacy, and independence.
-Nothing leaves your house.
+Your chats, people and memories stay in your house. Home goes online only to do what you ask: downloads, updates and web searches.
 
 <p align="center">
   <img src="docs/assets/hero.png" alt="Chat, People, and Settings running in a browser, dark theme">
