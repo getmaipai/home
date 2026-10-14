@@ -53,15 +53,6 @@ function allows(viewer: SettingsViewer, gate: Gate): boolean {
 
 export interface SettingPlace { area: string; section: string; card: string }
 
-// The pinned areas file is a shared page map, but Home owns the network
-// controls. Keep its network card visible for Home's basic and advanced
-// keys even when an older pinned map limits that card to expert settings.
-function cardLevels(card: AreaCard): readonly string[] | undefined {
-  return card.group === "household.network" && card.scope === "household"
-    ? undefined
-    : card.levels;
-}
-
 /** Where the viewer finds a registry key: the area, section and card whose
  * card draws its group at its scope, at the key's level, with every gate on
  * the path open to the viewer. Undefined when the viewer has no page that
@@ -78,8 +69,7 @@ export function placeSetting(key: SettingsKey, viewer: SettingsViewer): SettingP
       if (section.kind !== "keys" || !allows(viewer, section)) continue;
       for (const card of (section.cards ?? []) as AreaCard[]) {
         if (card.group !== key.lives_in || card.scope !== key.scope || !allows(viewer, card)) continue;
-        const levels = cardLevels(card);
-        if (levels && !levels.includes(key.level as never)) continue;
+        if (card.levels && !card.levels.includes(key.level as never)) continue;
         return { area: area.id, section: section.id, card: card.label };
       }
     }
