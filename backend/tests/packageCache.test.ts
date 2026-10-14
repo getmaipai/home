@@ -144,6 +144,17 @@ describe("sweepPackageCache", () => {
     expect(clearPackageCache({ source: null })).toEqual({ removed: 1, bytes: expect.any(Number) });
   });
 
+  test("clearing Other removes corrupt JSON entries", () => {
+    const dir = join(cacheDir, PKG);
+    mkdirSync(dir, { recursive: true });
+    const corruptPath = join(dir, "corrupt.json");
+    writeFileSync(corruptPath, "{broken json");
+
+    expect(getCacheSourceStats()).toEqual([{ source: OTHER_CACHE_SOURCE, packageId: PKG, entryCount: 1, sizeBytes: Buffer.byteLength("{broken json") }]);
+    expect(clearPackageCache({ source: null })).toEqual({ removed: 1, bytes: Buffer.byteLength("{broken json") });
+    expect(existsSync(corruptPath)).toBe(false);
+  });
+
   test("clearing a URL makes the next cachedFetch call the fetcher once", async () => {
     __resetPackageQuietWindowsForTests();
     const url = "https://example.com/refetch-after-clear";

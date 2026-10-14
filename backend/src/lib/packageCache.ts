@@ -23,7 +23,7 @@
 // have a side effect on the third-party service (or is at least not
 // provably idempotent from here), and caching one could serve a stale
 // result for what looks like a fresh action.
-import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, utimesSync, statfsSync, rmSync, rmdirSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync, writeFileSync, unlinkSync, statSync, utimesSync, statfsSync, rmSync, rmdirSync } from "node:fs";
 import { join, relative, resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -204,7 +204,16 @@ function isInsidePackageCache(entry: DiskEntry): boolean {
   const rel = relative(root, path);
   if (!rel || rel.startsWith(`..${sep}`) || rel === ".." || resolve(root, rel) !== path) return false;
   const parts = rel.split(sep);
-  return parts.length === 2 && parts[0] === entry.packageId && parts[1]!.endsWith(".json");
+  if (parts.length !== 2 || parts[0] !== entry.packageId || !parts[1]!.endsWith(".json")) return false;
+  try {
+    const realRoot = realpathSync(root);
+    const realPath = realpathSync(path);
+    const realRel = relative(realRoot, realPath);
+    const realParts = realRel.split(sep);
+    return Boolean(realRel) && !realRel.startsWith(`..${sep}`) && realRel !== ".." && realParts.length === 2 && realParts[0] === entry.packageId && realParts[1]!.endsWith(".json");
+  } catch {
+    return false;
+  }
 }
 
 function removeEntries(entries: DiskEntry[], shouldRemove: (entry: DiskEntry) => boolean, reconcileIfEmpty = false): { removed: number; bytes: number; packages: Set<string> } {
@@ -241,6 +250,7 @@ function walkAllEntries(): DiskEntry[] {
   if (!existsSync(cacheDir)) return [];
   const entries: DiskEntry[] = [];
   for (const pkgEntry of readdirSync(cacheDir, { withFileTypes: true })) {
+    // Dirent directory/file checks deliberately skip symlinked package dirs and entries.
     if (!pkgEntry.isDirectory()) continue;
     const dir = join(cacheDir, pkgEntry.name);
     for (const fileEntry of readdirSync(dir, { withFileTypes: true })) {
@@ -440,7 +450,7 @@ export function clearPackageCache(options: { source?: string | null } = {}): { r
       const source = parsed && typeof parsed.source === "string" ? parsed.source : null;
       return options.source === null ? source === null : source === options.source;
     } catch {
-      return options.source === OTHER_CACHE_SOURCE;
+      return options.source === null || options.source === OTHER_CACHE_SOURCE;
     }
   });
   return { removed: removed.removed, bytes: removed.bytes };

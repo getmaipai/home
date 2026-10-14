@@ -65,7 +65,6 @@ function mockFetch(overview: StorageUsageOverview | { status: number }, registry
       return Promise.resolve(Response.json(overview));
     }
     if (url.includes("/api/storage/package-cache") && url.endsWith("/clear")) {
-      if (url.endsWith("/fail")) return Promise.resolve(new Response("{}", { status: 500 }));
       return Promise.resolve(Response.json({ removed: 14, bytes: 2.1 * 1024 * 1024 }));
     }
     if (url.includes("/api/storage/package-cache")) return Promise.resolve(Response.json([{ source: "weather:current", packageId: "weather", label: "Weather · Weather service", entryCount: 14, sizeBytes: 2.1 * 1024 * 1024 }]));
@@ -133,6 +132,34 @@ describe("StoragePage", () => {
       expect(document.body.textContent).toContain("Home will fetch it again the next time someone asks.");
       fireEvent.click(Array.from(document.querySelectorAll("[role=alertdialog] button")).find((button) => button.textContent?.trim() === "Clear all")!);
       await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Cleared 14 saved copies (2.1 MB) from all sources."));
+    } finally { restore(); }
+  });
+
+  test("a source row confirms its clear and reports that source in the toast", async () => {
+    const restore = mockFetch(makeOverview());
+    try {
+      renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      toastSuccess.mockClear();
+      const table = await waitFor(() => {
+        const element = document.querySelector('[role="table"][aria-label="Saved data by source"]');
+        expect(element).not.toBeNull();
+        return element!;
+      });
+      const actions = await waitFor(() => {
+        const button = table.querySelector('button[aria-label="More actions"]');
+        expect(button).not.toBeNull();
+        return button!;
+      });
+      fireEvent.click(actions);
+      const rowAction = await waitFor(() => {
+        const item = Array.from(document.querySelectorAll('[role="menuitem"]')).find((candidate) => candidate.textContent?.includes("Clear Weather"));
+        expect(item).toBeDefined();
+        return item!;
+      });
+      fireEvent.click(rowAction);
+      await waitFor(() => expect(document.body.textContent).toContain("Saved copies of weather, news and other things Home looked up online."));
+      fireEvent.click(Array.from(document.querySelectorAll("[role=alertdialog] button")).find((button) => button.textContent?.trim() === "Confirm")!);
+      await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Cleared 14 saved copies (2.1 MB) from Weather · Weather service."));
     } finally { restore(); }
   });
 

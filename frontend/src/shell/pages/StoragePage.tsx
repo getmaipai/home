@@ -114,12 +114,11 @@ export function StoragePage({ person }: { person: Roster }) {
   const client = useQueryClient();
   const [clearAllOpen, setClearAllOpen] = useState(false);
 
-  async function clear(source?: string, label = "all sources") {
+  async function clear(source?: string, label?: string) {
     try {
       const result = await api.clearPackageCache(source);
       await client.invalidateQueries({ queryKey: ["storage-package-cache"] });
-      const clearedLabel = label === "all sources" ? "all sources" : label;
-      toast.success(`Cleared ${result.removed} saved ${result.removed === 1 ? "copy" : "copies"} (${formatBytes(result.bytes)}) from ${clearedLabel}.`);
+      toast.success(`Cleared ${result.removed} saved ${result.removed === 1 ? "copy" : "copies"} (${formatBytes(result.bytes)}) from ${label ?? "all sources"}.`);
       setClearAllOpen(false);
     } catch {
       toast.error("Home could not clear the saved copies. Check that Home is running and try again.");
@@ -180,19 +179,23 @@ function StorageContent({ data, isAdmin, cacheRows, cacheLoading, clearAllOpen, 
       <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage usage by person" getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
-        <CardHeader>
-          <CardTitle>Saved online data</CardTitle>
-        </CardHeader>
-        <p>Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.</p>
-        <DataTable
-          columns={CACHE_COLUMNS}
-          rows={cacheRows.map((row) => ({ source: row.source, label: row.label, entries: String(row.entryCount), size: formatBytes(row.sizeBytes) }))}
-          caption="Saved data by source"
-          getRowId={(row) => row.source}
-          emptyLabel={cacheLoading ? "Loading saved data…" : "No saved online data."}
-          rowActions={(row) => <DataTableRowActions actions={[{ label: `Clear ${row.label}`, destructive: true, confirmLabel: CLEAR_CONFIRM, onClick: () => clear(row.source, row.label) }]} />}
-        />
-        <Button type="button" variant="destructive" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}>Clear all</Button>
+        <Card>
+          <CardHeader>
+            <CardTitle>Saved online data</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p>Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.</p>
+          </CardContent>
+          <DataTable
+            columns={CACHE_COLUMNS}
+            rows={cacheRows.map((row) => ({ source: row.source, label: row.label, entries: String(row.entryCount), size: formatBytes(row.sizeBytes) }))}
+            caption="Saved data by source"
+            getRowId={(row) => row.source}
+            emptyLabel={cacheLoading ? "Loading saved data…" : "No saved online data."}
+            rowActions={(row) => <DataTableRowActions actions={[{ label: `Clear ${row.label}`, destructive: true, confirmLabel: CLEAR_CONFIRM, onClick: () => clear(row.source, row.label) }]} />}
+          />
+          <Button type="button" variant="destructive" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}>Clear all</Button>
+        </Card>
         <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
