@@ -58,6 +58,52 @@
             "order": 10
           }
         ]
+      },
+      {
+        "id": "tour.chat.first-run",
+        "version": 1,
+        "title": "Show me around chat",
+        "starts_on": "page:chat",
+        "audience": [
+          "adult",
+          "teen",
+          "child"
+        ],
+        "steps": [
+          {
+            "id": "thread",
+            "target": "chat.thread",
+            "title": "Your conversation",
+            "body": "Home keeps the messages in this chat together here.",
+            "body_by_audience": {
+              "child": "Your chat with Home is here."
+            },
+            "placement": "left",
+            "order": 10
+          },
+          {
+            "id": "composer",
+            "target": "chat.composer",
+            "title": "Ask anything",
+            "body": "Type or tap the microphone to talk. Your words stay on this computer.",
+            "body_by_audience": {
+              "child": "Type or talk to Home here."
+            },
+            "placement": "top",
+            "order": 20
+          },
+          {
+            "id": "send",
+            "target": "chat.send",
+            "title": "Send your message",
+            "body": "When you are ready, send your message here.",
+            "body_by_audience": {
+              "child": "Tap here when you are ready."
+            },
+            "placement": "top",
+            "order": 30
+          }
+        ]
       }
     ]
   },

@@ -16,6 +16,8 @@ import { FakeAudioContext } from "../../../tests/fakeAudioContext";
 import { ndjsonStream as bareNdjsonStream } from "../../../tests/ndjsonStream";
 import { assistantStreamBody as ndjsonStream, staggeredAssistantStreamBody as staggeredNdjsonStream, ASSISTANT_STREAM_HEADERS } from "../../../tests/assistantStreamBody";
 import { waitForGone } from "../../../tests/waitForGone";
+import { Tour } from "@maipai/spec/gen/ts/tour.js";
+import defaultManifest from "../../../../backend/packages/default/manifest.json";
 
 // CHAT-UI-03 (6): the rail's own default-collapsed state now reads
 // `window.matchMedia("(max-width: 1024px)")` on mount - happy-dom's own
@@ -200,6 +202,7 @@ async function sendMessage(view: ReturnType<typeof render>, text: string): Promi
 
 describe("ChatPage (SHELL-02's first slice)", () => {
   test("the chat thread, composer, and send targets render", async () => {
+    expect(Tour.safeParse(defaultManifest.contributes.tours[1]).success).toBe(true);
     const restore = stubFetch();
     try {
       const view = renderPage(
