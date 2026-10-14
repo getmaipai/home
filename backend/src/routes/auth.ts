@@ -26,8 +26,10 @@ import { requireAuth, invalidateSessionCache } from "@/middleware/auth";
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
+import { setupLocalOnly } from "@/middleware/setupLocalOnly";
 
 export const auth = apiRouter();
+auth.use("/setup", setupLocalOnly);
 
 const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), hasPasskeys: z.boolean(), age_band: z.enum(["child", "teen", "adult"]) });
 

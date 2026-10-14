@@ -11,7 +11,12 @@ import { __resetStackLinkControlForTests, setStackLinkControl } from "@/lib/remo
 import { isSecurePairingRequest, pairingSourceAddress, ENGINE_ADDRESS_MISSING_MESSAGE, PAIRING_NEEDS_HTTPS_MESSAGE } from "@/routes/engineLink";
 
 beforeEach(() => { resetDb(); revokeLinkKey(); __setLinkKeyCommandForTests(null); __resetRateLimiterForTests(); __resetStackLinkControlForTests(); });
-async function owner(): Promise<TestClient> { const client = new TestClient("192.168.1.40"); await client.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" }); return client; }
+async function owner(): Promise<TestClient> {
+  const client = new TestClient();
+  await client.post("/api/auth/setup", { displayName: "Owner", secret: "correcthorse" });
+  client.setRemoteAddress("192.168.1.40");
+  return client;
+}
 
 const HOST_LINE = "192.168.1.40 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPoISQD6sKkxbk5FD8YL6LuvYzhXACmFp4cr8oleBk1h test";
 

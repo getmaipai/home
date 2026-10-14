@@ -4,14 +4,24 @@ import { app } from "@/app";
 // an HTTP client instead of hand-threading Set-Cookie headers.
 export class TestClient {
   private cookie: string | null = null;
-  constructor(private readonly remoteAddress?: string) {}
+  constructor(private remoteAddress?: string) {}
+
+  setRemoteAddress(address: string): void {
+    this.remoteAddress = address;
+  }
+
+  private get server() {
+    const address = this.remoteAddress ?? "127.0.0.1";
+    return {
+      requestIP: () => ({ address, family: address.includes(":") ? "IPv6" : "IPv4", port: 12345 }),
+    };
+  }
 
   async request(
     path: string,
     init: { method?: string; body?: unknown; headers?: Record<string, string> } = {},
   ): Promise<Response> {
-    const headers: Record<string, string> = { ...init.headers };
-    const remoteAddress = this.remoteAddress;
+    const headers: Record<string, string> = { host: "localhost", ...init.headers };
     if (init.body !== undefined) headers["content-type"] = "application/json";
     if (this.cookie) headers["cookie"] = this.cookie;
 
@@ -19,7 +29,7 @@ export class TestClient {
       method: init.method ?? (init.body !== undefined ? "POST" : "GET"),
       headers,
       body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-    }, remoteAddress ? { server: { requestIP: () => ({ address: remoteAddress, family: remoteAddress.includes(":") ? "IPv6" : "IPv4", port: 12345 }) } } : undefined);
+    }, { server: this.server });
 
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) this.cookie = setCookie.split(";")[0]!;
@@ -44,9 +54,9 @@ export class TestClient {
   // the FormData instance, so this bypasses request()'s content-type
   // logic entirely rather than trying to make one code path handle both.
   async postForm(path: string, form: FormData): Promise<Response> {
-    const headers: Record<string, string> = {};
+    const headers: Record<string, string> = { host: "localhost" };
     if (this.cookie) headers["cookie"] = this.cookie;
-    const res = await app.request(path, { method: "POST", headers, body: form });
+    const res = await app.request(path, { method: "POST", headers, body: form }, { server: this.server });
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) this.cookie = setCookie.split(";")[0]!;
     return res;
@@ -58,9 +68,9 @@ export class TestClient {
   // own bypass too, with a caller-supplied content-type since there's no
   // single right default the way JSON has one.
   async postBytes(path: string, bytes: Uint8Array, contentType: string): Promise<Response> {
-    const headers: Record<string, string> = { "content-type": contentType };
+    const headers: Record<string, string> = { host: "localhost", "content-type": contentType };
     if (this.cookie) headers["cookie"] = this.cookie;
-    const res = await app.request(path, { method: "POST", headers, body: bytes });
+    const res = await app.request(path, { method: "POST", headers, body: bytes }, { server: this.server });
     const setCookie = res.headers.get("set-cookie");
     if (setCookie) this.cookie = setCookie.split(";")[0]!;
     return res;

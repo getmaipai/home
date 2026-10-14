@@ -388,12 +388,16 @@ describe("forwarded-header trust (only behind TRUST_PROXY)", () => {
   });
 
   test("X-Forwarded-Proto does not flip the Secure cookie flag when not trusting a proxy", async () => {
-    const res = await app.request("/api/auth/setup", {
+    const setupClient = new TestClient();
+    const { person } = await setUpOwner(setupClient);
+    const res = await app.request("http://localhost/api/auth/verify-secret", {
       method: "POST",
-      headers: { "content-type": "application/json", "x-forwarded-proto": "https" },
-      body: JSON.stringify({ displayName: "Sage", secret: "correcthorse" }),
+      headers: { host: "localhost", "content-type": "application/json", "x-forwarded-proto": "https" },
+      body: JSON.stringify({ personId: person.id, secret: "correcthorse" }),
+    }, {
+      server: { requestIP: () => ({ address: "127.0.0.1", family: "IPv4", port: 12345 }) },
     });
-    expect(res.status).toBe(201);
+    expect(res.status).toBe(200);
     const setCookie = res.headers.get("set-cookie") ?? "";
     // The real connection in this test harness is plain http, so Secure
     // must NOT be set even though a spoofed X-Forwarded-Proto: https was sent.

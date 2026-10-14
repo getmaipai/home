@@ -14,6 +14,7 @@ import { tryConsume } from "@/lib/rateLimiter";
 import { getClientIp } from "@/lib/secretThrottle";
 import { detectHardware } from "@/lib/hardware";
 import { recommend } from "@/lib/modelCatalog";
+import { setupLocalOnly } from "@/middleware/setupLocalOnly";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -27,6 +28,7 @@ import { recommend } from "@/lib/modelCatalog";
 const SETUP_CA_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 
 export const setupRoutes = apiRouter();
+setupRoutes.use("*", setupLocalOnly);
 
 // Public (unauthenticated) by design, the same reason GET /api/auth/profiles
 // is: a household member trusting the hub's CA is exactly the step that
