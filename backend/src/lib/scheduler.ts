@@ -38,6 +38,7 @@ import { runRetention } from "@/lib/conversationHistory";
 import { runBackupAndMirror } from "@/lib/backup";
 import { createJob, updateJob } from "@/lib/jobs";
 import { checkLeafExpiry } from "@/lib/householdCa";
+import { renewTailscaleCert } from "@/lib/tailscale";
 import { checkSearxngHealth } from "@/lib/searxngHealth";
 import { disableExpiredGuests, applyAgeBandChanges } from "@/lib/personLifecycle";
 import { trigger, deliverHeldNotifications } from "@/lib/notifications";
@@ -313,6 +314,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // hub's own TLS leaf certificate actually expires.
   "householdCa.check_leaf_expiry": async () => {
     await checkLeafExpiry();
+  },
+  "tailscale.renew_certificate": async () => {
+    await renewTailscaleCert();
   },
   // Jesse, 2026-09-07: "we need to be able to detect if search is down,
   // outdated, or simply not returning results - or if the URL is

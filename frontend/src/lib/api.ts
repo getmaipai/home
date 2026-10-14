@@ -641,6 +641,9 @@ export interface HomeJobView {
   forPersonName?: string;
 }
 
+export interface TailscaleStatus { state: "not_installed" | "stopped" | "running"; dnsName: string | null; ips: string[]; installed: boolean; signedIn: boolean; httpsEnabled: boolean; machineName: string | null; enabled: boolean; url: string | null }
+export interface SetupChecklistItem { id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }
+
 export const api = {
   profiles: () => request<Roster[]>("/api/auth/profiles"),
   setup: (displayName: string, secret: string) =>
@@ -649,6 +652,9 @@ export const api = {
       body: JSON.stringify({ displayName, secret }),
     }),
   setupCa: () => request<{ certificate: string }>("/api/setup/ca"),
+  tailscaleStatus: () => request<TailscaleStatus>("/api/tailscale/status"),
+  enableTailscale: () => request<{ url: string; qrPayload: string }>("/api/tailscale/enable", { method: "POST" }),
+  setupChecklist: () => request<SetupChecklistItem[]>("/api/setup-checklist"),
   select: (personId: string) =>
     request<{ success: true }>("/api/auth/select", {
       method: "POST",

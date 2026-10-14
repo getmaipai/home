@@ -16,6 +16,7 @@ import { asc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { hubEndpoints } from "@/db/schema";
 import { getTailscaleStatus } from "@/lib/tailscale";
+import { getHouseholdSettingValue } from "@/lib/settings";
 import { newEndpointId } from "@/lib/id";
 import { isPrivateOrLoopbackIpv4, isCgnatIpv4 } from "@maipai/core/src/ssrfGuard";
 import { configuredHubPort, configuredLanExposure } from "@/lib/networkSettings";
@@ -141,6 +142,7 @@ function detectLanUrls(): string[] {
 }
 
 async function detectTailnetUrls(): Promise<string[]> {
+  if (getHouseholdSettingValue("network.tailnet_access") !== true) return [];
   const status = await getTailscaleStatus();
   if (status.state !== "running") return [];
   // MagicDNS name first (stable across reconnects), the tailnet IP as backup.

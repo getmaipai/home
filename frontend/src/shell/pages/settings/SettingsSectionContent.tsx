@@ -12,6 +12,7 @@ import { SettingsLinks } from "@/shell/pages/settings/SettingsLinks";
 import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 import { scopeValueFor, type KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
+import { AwayFromHome } from "@/apps/setup/AwayFromHome";
 
 const ChevronDown = getIcon("chevron-down");
 
@@ -87,6 +88,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     includeExpert: props.section.id === "network",
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
+  if (props.section.id === "network") return <>{renderer}<AwayFromHome onContinue={() => undefined} /></>;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
   return (

@@ -18,16 +18,20 @@ describe("interpretTailscaleStatusJson()", () => {
       state: "running",
       dnsName: "hub.example-tailnet.ts.net",
       ips: ["100.64.1.2"],
+      installed: true,
+      signedIn: false,
+      httpsEnabled: true,
+      machineName: "hub",
     });
   });
 
   test("a stopped backend reports stopped with no addresses", () => {
     const json = JSON.stringify({ BackendState: "Stopped" });
-    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "stopped", dnsName: null, ips: [] });
+    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "stopped", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null });
   });
 
   test("a running backend with no Self block still reports running, with empty addresses", () => {
     const json = JSON.stringify({ BackendState: "Running" });
-    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "running", dnsName: null, ips: [] });
+    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "running", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null });
   });
 });

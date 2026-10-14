@@ -40,6 +40,7 @@ import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
+import { syncTailscaleRenewalSetting } from "@/lib/tailscale";
 
 const configuredPort = configuredHubPort();
 purgeLegacyHubLogs();
@@ -282,6 +283,8 @@ statusPruneInterval.unref();
 // cheap (a single file read and a date comparison) when nothing's close
 // to expiring, which is every day but the last 30 of a year.
 ensureCoreJob("householdCa.check_leaf_expiry", "every:1d");
+ensureCoreJob("tailscale.renew_certificate", "every:30d");
+syncTailscaleRenewalSetting();
 // Step 7: guest expiry and the age-band birthday sweep - see
 // lib/scheduler.ts's own CORE_JOBS entries for why daily is enough for
 // both.
