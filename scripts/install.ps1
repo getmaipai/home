@@ -27,6 +27,12 @@
 
 $ErrorActionPreference = 'Stop'
 
+if ($args -contains '--check') {
+  $backend = Join-Path $PSScriptRoot '..\backend'
+  bun --cwd $backend -e 'import { checkInstallPreflight } from "./src/lib/installPreflight.ts"; console.log(JSON.stringify(await checkInstallPreflight(), null, 2));'
+  exit $LASTEXITCODE
+}
+
 $Repo = 'getmaipai/home'
 $InstallRoot = 'C:\ProgramData\MaiPai Home'
 $ServiceName = 'MaiPaiHome'
@@ -38,7 +44,7 @@ for ($i = 0; $i -lt $args.Count; $i++) {
     $script:PlanArgument = [string]$args[$i + 1]
     $i++
   } elseif ($args[$i] -like '--*') {
-    throw "Unknown option '$($args[$i])'. Allowed options are --plan recommended, --plan moderate, and --plan minimal. Use one and run the installer again."
+    throw "Unknown option '$($args[$i])'. Allowed options are --check, --plan recommended, --plan moderate, and --plan minimal. Use one and run the installer again."
   } else {
     throw "Unexpected argument '$($args[$i])'. Use --plan recommended, --plan moderate, or --plan minimal, then run the installer again."
   }
@@ -229,6 +235,12 @@ function Install-Service([string]$Dir, [string]$BunExe, [int]$Port) {
 function Main {
   $plan = Resolve-SetupPlan
   Assert-Admin
+  $preflightJson = bun --cwd (Join-Path $PSScriptRoot '..\backend') -e 'import { checkInstallPreflight } from "./src/lib/installPreflight.ts"; console.log(JSON.stringify(await checkInstallPreflight()));'
+  if ($LASTEXITCODE -ne 0) { throw 'Could not check this computer before install. Check that Bun runs, then run the installer again.' }
+  $preflight = $preflightJson | ConvertFrom-Json
+  $blockers = @($preflight | Where-Object { $_.severity -eq 'critical' -or $_.severity -eq 'error' })
+  foreach ($item in $blockers) { Write-Host "$($item.title): $($item.text) Fix: $($item.fix.label)" -ForegroundColor Red }
+  if ($blockers.Count -gt 0) { throw 'This computer did not pass the install checks. Follow the fixes above, then run the installer again.' }
   $tag = Get-LatestTag
   $port = Find-FreePort $AppPort
   if ($port -ne $AppPort) { Write-Host "Port $AppPort is already in use - using $port instead." }

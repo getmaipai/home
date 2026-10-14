@@ -23,6 +23,11 @@
 # the same way.
 set -euo pipefail
 
+if [ "${1:-}" = "--check" ]; then
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  exec bun --cwd "${script_dir}/../backend" -e 'import { checkInstallPreflight } from "./src/lib/installPreflight.ts"; console.log(JSON.stringify(await checkInstallPreflight(), null, 2));'
+fi
+
 REPO="getmaipai/home"
 STACK_REPO="getmaipai/stack"
 # HOME-STACK-01: the Stack has no release of its own, so this is a
@@ -732,6 +737,13 @@ main() {
     setup_stack "$install_root" "$bun_bin" "$os" "$arch" "yes"
     exit 0
   fi
+
+  local preflight_json blockers backend_dir
+  backend_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../backend" && pwd)"
+  preflight_json=$(bun --cwd "$backend_dir" -e 'import { checkInstallPreflight } from "./src/lib/installPreflight.ts"; console.log(JSON.stringify(await checkInstallPreflight()));') \
+    || die "Could not check this computer before install. Check that Bun runs, then run the installer again."
+  blockers=$(printf '%s' "$preflight_json" | bun -e 'const rows = JSON.parse(await Bun.stdin.text()); const blocked = rows.filter((row) => row.severity === "critical" || row.severity === "error"); for (const row of blocked) console.error(`${row.title}: ${row.text} Fix: ${row.fix?.label ?? "Check the system and try again."}`); console.log(blocked.length);')
+  [ "$blockers" = "0" ] || die "This computer did not pass the install checks. Follow the fixes above, then run the installer again."
 
   require_root
   local tag
