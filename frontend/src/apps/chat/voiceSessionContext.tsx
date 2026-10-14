@@ -16,6 +16,7 @@ import { createContext, useContext } from "react";
 interface VoiceSessionContextValue {
   open: boolean;
   setOpen: (open: boolean) => void;
+  openFromWake?: () => void;
 }
 
 const VoiceSessionContext = createContext<VoiceSessionContextValue | null>(null);

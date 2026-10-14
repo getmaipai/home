@@ -36,6 +36,9 @@ export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Optional quiet timeout for wake-opened sessions; null keeps a
+   * person-opened voice session active until they end it. */
+  idleCloseMs?: number | null;
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
   liveVoiceActiveRef: { current: boolean };
   pendingSpeechRef: { current: boolean };
@@ -63,13 +66,17 @@ export interface LiveVoiceSessionProps {
   speakingEndedAt: number;
 }
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
+export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
+
+export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
   const [listenGeneration, setListenGeneration] = useState(0);
   const mutedRef = useRef(false);
   mutedRef.current = muted;
+  const idleCloseMsRef = useRef<number | null>(idleCloseMs);
+  idleCloseMsRef.current = idleCloseMs;
 
   // Reset all local display state the moment the overlay opens, so a
   // second call never shows the previous one's mode.
@@ -99,6 +106,11 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedule
     // silently blocking the mock socket's own setTimeout-based fixture
     // delivery forever.
     let levelTimer: ReturnType<typeof setInterval> | undefined;
+    let idleCloseTimer: ReturnType<typeof setTimeout> | undefined;
+    const clearIdleCloseTimer = () => {
+      clearTimeout(idleCloseTimer);
+      idleCloseTimer = undefined;
+    };
 
     setMode("connecting");
     const socket = createSocket({
@@ -112,6 +124,13 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedule
         switch (message.t) {
           case "ready":
             setMode("listening");
+            clearIdleCloseTimer();
+            if (typeof idleCloseMsRef.current === "number") {
+              idleCloseTimer = setTimeout(() => {
+                idleCloseTimer = undefined;
+                if (!cancelled) onOpenChange(false);
+              }, idleCloseMsRef.current);
+            }
             void startCapture({
               onFrame: (frame) => {
                 if (!mutedRef.current) socket.sendAudio(frame);
@@ -135,12 +154,17 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedule
               });
             break;
           case "partial":
+            clearIdleCloseTimer();
             // Not shown: a partial can revise itself several times a
             // second (interim ASR hypotheses) - the listening ring's
             // own movement (the level meter) is already the "it's
             // hearing you" signal while this is live.
             break;
+          case "vad":
+            if (message.speaking) clearIdleCloseTimer();
+            break;
           case "final": {
+            clearIdleCloseTimer();
             const text = message.v.trim();
             micHandle?.stop();
             micHandle = null;
@@ -161,6 +185,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedule
             break;
           }
           case "no_speech":
+            clearIdleCloseTimer();
             micHandle?.stop();
             micHandle = null;
             levelMeter?.stop();
@@ -176,6 +201,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedule
           // way a connection-level failure does rather than looping on a
           // broken session.
           case "error":
+            clearIdleCloseTimer();
             micHandle?.stop();
             levelMeter?.stop();
             clearInterval(levelTimer);
@@ -184,12 +210,14 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, turnSchedule
         }
       },
       onError() {
+        clearIdleCloseTimer();
         if (!cancelled) onOpenChange(false);
       },
     });
 
     return () => {
       cancelled = true;
+      clearIdleCloseTimer();
       clearInterval(levelTimer);
       micHandle?.stop();
       levelMeter?.stop();

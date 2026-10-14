@@ -11,8 +11,12 @@ export function WakeWordController({ person, runtime }: { person: Roster; runtim
   const setting = useDeviceWakeWordSetting(person);
   const persistEnabled = setting.setEnabled;
   const voiceSession = useVoiceSession();
+  const openFromWake = voiceSession?.openFromWake;
   const setVoiceOpen = voiceSession?.setOpen;
-  const onWakeDetected = useCallback(() => setVoiceOpen?.(true), [setVoiceOpen]);
+  const onWakeDetected = useCallback(() => {
+    if (openFromWake) openFromWake();
+    else setVoiceOpen?.(true);
+  }, [openFromWake, setVoiceOpen]);
   const { enabled, status, start, stop } = useWakeWord({ onWakeDetected, ...runtime });
 
   useEffect(() => {

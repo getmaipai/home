@@ -57,7 +57,7 @@ Tap the microphone icon next to the message box and start speaking. MaiPai liste
 
 ## Wake word (experimental)
 
-Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. This is an early, experimental feature. MaiPai can hear its wake word today, but it can't act on it yet. That's coming soon.
+Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. Saying the wake word opens a voice conversation. Home stops listening by itself if nobody speaks for a few seconds.
 
 ## Chat options and status
 

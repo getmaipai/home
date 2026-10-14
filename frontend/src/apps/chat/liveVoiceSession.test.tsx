@@ -5,7 +5,7 @@
 // own established shape), so this exercises the actual listen -> send ->
 // speak -> listen-again loop with a scripted STT fixture and a trivial
 // runtime adapter that just records what it received.
-import { describe, expect, test, afterEach } from "bun:test";
+import { describe, expect, test, afterEach, mock } from "bun:test";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { useRef } from "react";
 import { Link, MemoryRouter } from "react-router-dom";
@@ -35,7 +35,7 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sentTexts }: { open: boolean; onOpenChange: (open: boolean) => void; isSpeaking: boolean; speakingEndedAt: number; fixture: readonly SttFixtureStep[]; sentTexts: string[] }) {
+function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sentTexts, idleCloseMs }: { open: boolean; onOpenChange: (open: boolean) => void; isSpeaking: boolean; speakingEndedAt: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -49,6 +49,7 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   const liveVoiceActiveRef = useRef(false);
   const pendingSpeechRef = useRef(false);
+  const connectionCount = useRef(0);
   const session = useLiveVoiceSession({
     composer: runtime.thread.composer,
     open,
@@ -58,7 +59,11 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
     pendingSpeechRef,
     isSpeaking,
     speakingEndedAt,
-    createSocket: (handlers) => createMockSttSocket(fixture, handlers),
+    idleCloseMs,
+    createSocket: (handlers) => {
+      const connection = connectionCount.current++;
+      return createMockSttSocket(typeof fixture === "function" ? fixture(connection) : fixture, handlers);
+    },
     startCapture: fakeStartCapture(),
   });
   return (
@@ -88,6 +93,61 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
 }
 
 describe("live voice session", () => {
+  test("a wake-opened session with no speech closes itself after the quiet window", async () => {
+    const onOpenChange = mock();
+    render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} idleCloseMs={150} />);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  test("a person speaking inside the window keeps the session open", async () => {
+    const onOpenChange = mock();
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 80, message: { t: "vad", speaking: true, rms: 0.1 } },
+    ];
+    render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} />);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  test("the quiet window restarts after a spoken reply so a follow-up still works", async () => {
+    const onOpenChange = mock();
+    const sentTexts: string[] = [];
+    const fixture = (connection: number): readonly SttFixtureStep[] => connection === 0
+      ? [{ delayMs: 0, message: { t: "ready" } }, { delayMs: 35, message: { t: "final", v: "hello" } }]
+      : [{ delayMs: 0, message: { t: "ready" } }];
+    const view = render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={150} />);
+    await waitFor(() => expect(sentTexts).toEqual(["hello"]));
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={150} />));
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={1} fixture={fixture} sentTexts={sentTexts} idleCloseMs={150} />));
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false), { timeout: 400 });
+  });
+
+  test("a session opened by the waveform button never auto-closes", async () => {
+    const onOpenChange = mock();
+    render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} idleCloseMs={null} />);
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  test("the timer does not run while thinking or speaking", async () => {
+    const onOpenChange = mock();
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 35, message: { t: "final", v: "hello" } },
+    ];
+    const view = render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} />));
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
   test("renders nothing while closed", () => {
     const view = render(<Harness open={false} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} />);
     expect(view.container).toBeEmptyDOMElement();

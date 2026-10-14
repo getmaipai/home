@@ -162,6 +162,34 @@ describe("Routes appearance", () => {
 // RAIL-01 (owner's layout, 2026-10-06): system status moved from the
 // header pill into the rail's profile menu; the row still links to /status.
 describe("Routes status indicator", () => {
+  test("a non-chat status route renders its shell heading without a voice-session provider", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/health")) return Promise.resolve(healthResponse());
+      if (url.includes("/api/settings")) return Promise.resolve(Response.json([
+        { scope: "person:person-abc123", key: "ui.appearance", value: "dark" },
+        { scope: "person:person-abc123", key: "ui.look", value: "neutral" },
+      ]));
+      if (url.includes("/api/status/apps")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/notifications")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderWithQueryClient(
+        <TooltipProvider>
+          <MemoryRouter initialEntries={["/status"]}>
+            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+          </MemoryRouter>
+        </TooltipProvider>,
+      );
+      expect(await view.findByRole("heading", { level: 1, name: "Status" })).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test.each(["/", "/chat"])("shows the shared status link in the profile menu on %s", async (path) => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {

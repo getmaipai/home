@@ -28,7 +28,7 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 ## If voice input doesn't work
 
 - Make sure your browser has permission to use your microphone.
-- The wake word feature is experimental. It can hear its name today, but it can't act on it yet.
+- Saying the wake word opens a voice conversation. Home stops listening by itself if nobody speaks for a few seconds.
 
 ## If you can't sign in
 

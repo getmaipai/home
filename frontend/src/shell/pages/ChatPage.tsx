@@ -50,7 +50,7 @@ import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
-import { useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
+import { useLiveVoiceSession, WAKE_SESSION_IDLE_CLOSE_MS } from "@/apps/chat/liveVoiceSession";
 import { createLocalImageAttachmentAdapter } from "@/apps/chat/localImageAttachmentAdapter";
 import { photoUploadsEnabledForBand } from "@/apps/chat/photoUploadAccess";
 import { createSttDictationAdapter } from "@/lib/voice/sttDictationAdapter";
@@ -1031,6 +1031,15 @@ export function ChatPage({ person }: { person: Roster }) {
   // composerVoiceControls.tsx's zero-prop slot needs a context to reach
   // it) and useLiveVoiceSession read the identical state.
   const [voiceOpen, setVoiceOpen] = useState(false);
+  const [voiceOpenedByWake, setVoiceOpenedByWake] = useState(false);
+  const closeAwareSetVoiceOpen = useCallback((open: boolean) => {
+    if (!open) setVoiceOpenedByWake(false);
+    setVoiceOpen(open);
+  }, []);
+  const openVoiceFromWake = useCallback(() => {
+    setVoiceOpenedByWake(true);
+    setVoiceOpen(true);
+  }, []);
   // COLUMN-01: the history column's open/hidden state (remembered per
   // browser), its thread search, and the phone sheet. lg (960px) is where
   // the column stops being a sheet.
@@ -1277,7 +1286,8 @@ export function ChatPage({ person }: { person: Roster }) {
   const voiceSession = useLiveVoiceSession({
     composer: runtime.thread.composer,
     open: voiceOpen,
-    onOpenChange: setVoiceOpen,
+    onOpenChange: closeAwareSetVoiceOpen,
+    idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,
     liveVoiceActiveRef,
     pendingSpeechRef,
@@ -1388,7 +1398,7 @@ export function ChatPage({ person }: { person: Roster }) {
       <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
       <PhotoUploadsContext.Provider value={{ settingAllowed: photoUploadsEnabled, modelCanReadPictures: imagePartsAvailable }}>
-      <VoiceSessionProvider value={{ open: voiceOpen, setOpen: setVoiceOpen }}>
+      <VoiceSessionProvider value={{ open: voiceOpen, setOpen: closeAwareSetVoiceOpen, openFromWake: openVoiceFromWake }}>
       <WakeWordPersonContext.Provider value={person}>
       <DictationLevelMeterProvider value={dictationLevelMeter}>
       <ChatColumnControlContext.Provider value={column.control}>
@@ -1401,7 +1411,7 @@ export function ChatPage({ person }: { person: Roster }) {
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
         {settingsDialog}
-        <Dialog open={voiceOpen} onOpenChange={setVoiceOpen}>
+        <Dialog open={voiceOpen} onOpenChange={closeAwareSetVoiceOpen}>
           <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
             <VoiceConversation
               mode={voiceSession.mode}

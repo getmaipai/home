@@ -1,10 +1,11 @@
 import { afterEach, describe, expect, mock, spyOn, test } from "bun:test";
-import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import * as fs from "node:fs";
 import { useState } from "react";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { WakeWordController } from "@/apps/chat/WakeWordController";
 import { WakeWordIndicator } from "@/apps/chat/WakeWordIndicator";
+import { Button } from "@maipai/ui/src/ui/button";
 import { emitWakeDetected } from "@/lib/voice/wake-word-events";
 import type { Roster, ResolvedSetting } from "@/lib/api";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
@@ -63,14 +64,27 @@ function stubWakewordSettings(initialValue: boolean) {
   return { writes, restore: () => { globalThis.fetch = original; } };
 }
 
-function ControllerHarness({ runtime, person = adult() }: { runtime?: React.ComponentProps<typeof WakeWordController>["runtime"]; person?: Roster }) {
+function ControllerHarness({ runtime, person = adult(), openFromWake }: { runtime?: React.ComponentProps<typeof WakeWordController>["runtime"]; person?: Roster; openFromWake?: () => void }) {
   const [open, setOpen] = useState(false);
+  const [openedByWake, setOpenedByWake] = useState(false);
+  const closeAwareSetOpen = (value: boolean) => {
+    if (!value) setOpenedByWake(false);
+    setOpen(value);
+  };
+  const openSessionFromWake = () => {
+    setOpenedByWake(true);
+    setOpen(true);
+    openFromWake?.();
+  };
   return (
     <>
-      <VoiceSessionProvider value={{ open, setOpen }}>
+      <VoiceSessionProvider value={{ open, setOpen: closeAwareSetOpen, openFromWake: openFromWake ? openSessionFromWake : undefined }}>
         <WakeWordController person={person} runtime={runtime} />
       </VoiceSessionProvider>
       <output data-testid="voice-session-open">{String(open)}</output>
+      <output data-testid="voice-session-wake-origin">{String(openedByWake)}</output>
+      <Button data-testid="close-voice-session" onClick={() => closeAwareSetOpen(false)}>Close session</Button>
+      <Button data-testid="open-voice-session-by-button" onClick={() => closeAwareSetOpen(true)}>Open session by button</Button>
     </>
   );
 }
@@ -168,7 +182,7 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
     }
   });
 
-  test("wake detection opens the existing voice-session context", async () => {
+  test("without openFromWake, wake detection still opens the session as before", async () => {
     localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
     const fetcher = stubWakewordSettings(true);
     const view = renderWithQueryClient(
@@ -176,8 +190,33 @@ describe("HANDSFREE-01(c) wake-word safety", () => {
     );
     try {
       await view.findByRole("status", { name: "Wake word is listening" });
-      emitWakeDetected({ modelId: "hey_jarvis", score: 0.9, threshold: 0.5, frameIndex: 1, timestamp: Date.now() });
+      act(() => emitWakeDetected({ modelId: "hey_jarvis", score: 0.9, threshold: 0.5, frameIndex: 1, timestamp: Date.now() }));
       await waitFor(() => expect(view.getByTestId("voice-session-open").textContent).toBe("true"));
+    } finally {
+      fetcher.restore();
+    }
+  });
+
+  test("a wake detection opens the session through openFromWake", async () => {
+    localStorage.setItem("maipai.device-settings-id.v1", "browser-1234567890ab");
+    const fetcher = stubWakewordSettings(true);
+    const setOrigin = mock();
+    const view = renderWithQueryClient(
+      <ControllerHarness
+        openFromWake={setOrigin}
+        runtime={{ loadModels: modelLoadNoop, startCapture: async () => ({ stop: () => {}, sampleRate: 16_000 }), createLoop: inertLoop }}
+      />,
+    );
+    try {
+      await view.findByRole("status", { name: "Wake word is listening" });
+      act(() => emitWakeDetected({ modelId: "hey_jarvis", score: 0.9, threshold: 0.5, frameIndex: 1, timestamp: Date.now() }));
+      await waitFor(() => expect(setOrigin).toHaveBeenCalledTimes(1));
+      expect(view.getByTestId("voice-session-open").textContent).toBe("true");
+      expect(view.getByTestId("voice-session-wake-origin").textContent).toBe("true");
+      fireEvent.click(view.getByTestId("close-voice-session"));
+      fireEvent.click(view.getByTestId("open-voice-session-by-button"));
+      expect(view.getByTestId("voice-session-wake-origin").textContent).toBe("false");
+      expect(view.getByTestId("voice-session-open").textContent).toBe("true");
     } finally {
       fetcher.restore();
     }
