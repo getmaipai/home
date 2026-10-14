@@ -1,4 +1,4 @@
-import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { SttSession, encodeWav, decodeWav, isLikelySpeech, __setSileroLoaderForTests, __resetSileroLoaderForTests, type Endpointer } from "@/lib/sttSession";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -248,6 +248,26 @@ describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", (
     const final = events.find((e) => e.t === "final");
     expect(final).toEqual({ t: "final", v: "hello there" });
     session.close();
+  });
+
+  test("the speech socket never sends a raw engine message to the browser", async () => {
+    const sentinel = "unique-engine-sentinel";
+    fixture = startStackFixture({ "POST /v1/audio/transcriptions": async () => Response.json({ error: sentinel }, { status: 503 }) });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+    const errorLog = spyOn(console, "error").mockImplementation(() => {});
+    const events: SttWireEvent[] = [];
+    const session = new SttSession(config({ silenceTimeoutS: 0.05 }), (event) => events.push(event));
+    for (let i = 0; i < 20; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 10; i++) session.pushPcm(silenceFrame());
+    await flush();
+    await flush();
+    const error = events.find((event) => event.t === "error");
+    expect(error?.t === "error" && error.v.includes(sentinel)).toBe(false);
+    expect(JSON.stringify(errorLog.mock.calls).includes(sentinel)).toBe(true);
+    session.close();
+    errorLog.mockRestore();
   });
 
   test("an empty buffer shorter than the minimum speech fraction reports no_speech, not final", async () => {

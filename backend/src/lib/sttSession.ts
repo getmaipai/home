@@ -15,6 +15,7 @@
 // A complete WAV with a long silent pre-roll can decode to an empty string,
 // so finalize() retries once from the voiced onset before giving up.
 import { transcribeUtterance } from "@/lib/stt";
+import { voiceFailureLine } from "@/lib/failureCopy";
 import { getSileroStream, type SileroVadStream } from "@/lib/sileroVad";
 import type { SttWireEvent } from "@maipai/spec/voice/ts/sttTypes.js";
 
@@ -338,7 +339,8 @@ export class SttSession {
         text = await transcribeUtterance(full, this.cfg.sampleRate);
       } catch (err) {
         this.reset();
-        if (!this.closed) this.send({ t: "error", v: (err as Error).message });
+        console.error("STT transcription failed:", err);
+        if (!this.closed) this.send({ t: "error", v: voiceFailureLine("listening_engine", { minor: false, canOpenRepairs: true }) });
         return;
       }
       if (!text && this.prerollIncludedLen > 0) {

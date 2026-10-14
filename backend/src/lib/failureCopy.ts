@@ -2,6 +2,35 @@
 // may read it. Kinds and the classifier live in generationFailure.ts.
 export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
 
+export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked";
+export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adultNoRepairs: string; minor: string }> = {
+  listening_lost: {
+    adult: "Voice listening stopped because the connection to your hub dropped. Check that the hub is on, then tap the waveform to start again.",
+    adultNoRepairs: "Voice listening stopped because the connection to your hub dropped. Check that the hub is on, then tap the waveform to start again.",
+    minor: "I can't hear you right now. Please tell a grown-up.",
+  },
+  listening_engine: {
+    adult: "Home can't hear you right now because its listening engine is not running. Type your message instead, or open Repairs to check it.",
+    adultNoRepairs: "Home can't hear you right now because its listening engine is not running. Type your message instead, or ask an owner or admin to check it.",
+    minor: "I can't hear you right now. Please tell a grown-up.",
+  },
+  speaking_failed: {
+    adult: "Home couldn't speak that reply, so read it on screen. Voice will try again on your next question.",
+    adultNoRepairs: "Home couldn't speak that reply, so read it on screen. Voice will try again on your next question.",
+    minor: "I can't talk right now, but you can read my answer.",
+  },
+  microphone_blocked: {
+    adult: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again.",
+    adultNoRepairs: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again.",
+    minor: "I can't use the microphone. Please tell a grown-up.",
+  },
+};
+
+export function voiceFailureLine(kind: VoiceFailureKind, options: { minor: boolean; canOpenRepairs: boolean }): string {
+  const copy = VOICE_FAILURE_COPY[kind];
+  return options.minor ? copy.minor : options.canOpenRepairs ? copy.adult : copy.adultNoRepairs;
+}
+
 interface FailureCopy {
   adult: string;
   adultAway?: string;

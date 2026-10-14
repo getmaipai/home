@@ -1351,6 +1351,32 @@ describe("Lane 11 item 1: the transient activity line (chatTurnActivity.ts)", ()
 });
 
 describe("createChatModelAdapter errors", () => {
+  test("a chat engine failure mid-reply finishes the scheduler so live voice can return to listening", async () => {
+    const originalAudioContext = (globalThis as unknown as { AudioContext: unknown }).AudioContext;
+    (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
+    const env = stubEnvironment(ndjsonStream([
+      { type: "turn_meta", conversation_id: "conv-voice-error", turn_id: "turn-voice-error", resume_token: "voice-error-resume" },
+      { type: "delta", text: "Partial reply" },
+      { type: "error", error: "chat model unavailable: engine stopped", code: "engine_unavailable" },
+    ]));
+    const speakingEvents: boolean[] = [];
+    const schedulerRef: { current: import("@/lib/sentenceSpeechScheduler").SentenceSpeechScheduler | null } = { current: null };
+    try {
+      const { error } = await collect([fakeUserMessage("spoken question")], undefined, undefined, undefined, undefined, undefined, {
+        turnSchedulerRef: schedulerRef,
+        onSpeakingChange: (speaking) => speakingEvents.push(speaking),
+      });
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      expect(error).toBeInstanceOf(ChatTurnError);
+      expect(schedulerRef.current).not.toBeNull();
+      expect(speakingEvents.filter((speaking) => !speaking).length).toBeGreaterThanOrEqual(2);
+      expect(env.turnBodies[0]).toMatchObject({ text: "spoken question" });
+    } finally {
+      env.restore();
+      (globalThis as unknown as { AudioContext: unknown }).AudioContext = originalAudioContext;
+    }
+  });
+
   test("a mid-stream error event surfaces the friendly down-state message", async () => {
     const env = stubEnvironment(
       ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "chat model unavailable: llama-server crashed" }]),

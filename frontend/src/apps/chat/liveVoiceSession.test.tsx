@@ -36,7 +36,7 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test" }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections }: { open: boolean; onOpenChange: (open: boolean) => void; isSpeaking: boolean; speakingEndedAt: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[] }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test" }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number] }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -58,6 +58,7 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
     composer: runtime.thread.composer,
     open,
     onOpenChange,
+    onProblem: onProblem as (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked") => void,
     turnSchedulerRef,
     liveVoiceActiveRef,
     pendingSpeechRef,
@@ -66,13 +67,27 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
     voiceBargeIn,
     isSpeaking,
     speakingEndedAt,
+    speechFailed,
+    retryDelays,
     idleCloseMs,
     createSocket: (handlers) => {
       const connection = connectionCount.current++;
       socketConnections?.push(connection);
+      if (dropConnections.includes(connection)) {
+        setTimeout(() => handlers.onError?.(new Error("socket dropped")), 0);
+        return { sendAudio: () => {}, close: () => {} };
+      }
+      if (doubleDropConnections.includes(connection)) {
+        setTimeout(() => {
+          handlers.onError?.(new Error("socket error"));
+          handlers.onError?.(new Error("socket close"));
+        }, 0);
+        return { sendAudio: () => {}, close: () => {} };
+      }
+      if (dropWhileSpeaking && connection === 0) setTimeout(() => handlers.onError?.(new Error("socket dropped")), 30);
       return createMockSttSocket(typeof fixture === "function" ? fixture(connection) : fixture, handlers);
     },
-    startCapture: fakeStartCapture(),
+    startCapture: async (options) => { captureCalls?.push(captureCalls.length); return fakeStartCapture()(options); },
   });
   return (
     <MemoryRouter initialEntries={["/chat"]}>
@@ -102,6 +117,100 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
 }
 
 describe("live voice session", () => {
+  test("a dropped listening connection reconnects once and the call goes back to Listening with no message", async () => {
+    const onOpenChange = mock();
+    const onProblem = mock();
+    const socketConnections: number[] = [];
+    const view = render(<Harness open onOpenChange={onOpenChange} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={(connection) => connection === 1 ? [{ delayMs: 0, message: { t: "ready" } }] : []} sentTexts={[]} socketConnections={socketConnections} dropConnections={[0]} retryDelays={[0, 5]} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    expect(socketConnections).toEqual([0, 1]);
+    expect(onProblem).not.toHaveBeenCalled();
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  test("a drop while Home speaks reconnects without cutting the reply", async () => {
+    const onProblem = mock();
+    const stopScheduler = mock();
+    const cancelRun = mock();
+    const view = render(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} stopScheduler={stopScheduler} cancelRun={cancelRun} dropWhileSpeaking retryDelays={[0, 5]} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    view.rerender(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} stopScheduler={stopScheduler} cancelRun={cancelRun} dropWhileSpeaking retryDelays={[0, 5]} />);
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(view.getByText("Speaking")).toBeTruthy();
+    expect(stopScheduler).not.toHaveBeenCalled();
+    expect(cancelRun).not.toHaveBeenCalled();
+    expect(onProblem).not.toHaveBeenCalled();
+  });
+
+  test("a child's recovered listening socket stays off while Home speaks", async () => {
+    const captureCalls: number[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={(connection) => connection === 0 ? [{ delayMs: 0, message: { t: "ready" } }] : [{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} voiceBargeIn={false} captureCalls={captureCalls} dropWhileSpeaking retryDelays={[0, 5]} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={(connection) => connection === 0 ? [{ delayMs: 0, message: { t: "ready" } }] : [{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} voiceBargeIn={false} captureCalls={captureCalls} dropWhileSpeaking retryDelays={[0, 5]} />);
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(captureCalls).toHaveLength(1);
+  });
+
+  test("after two failed reconnects the call ends and says what to do", async () => {
+    const onOpenChange = mock();
+    const onProblem = mock();
+    const socketConnections: number[] = [];
+    render(<Harness open onOpenChange={onOpenChange} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketConnections={socketConnections} dropConnections={[0, 1, 2]} retryDelays={[0, 5]} />);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(socketConnections).toEqual([0, 1, 2]);
+    expect(onProblem).toHaveBeenCalledTimes(1);
+    expect(onProblem).toHaveBeenCalledWith("listening_lost");
+  });
+
+  test("one socket error followed by close counts as one failed connection", async () => {
+    const onOpenChange = mock();
+    const onProblem = mock();
+    const socketConnections: number[] = [];
+    render(<Harness open onOpenChange={onOpenChange} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[]} sentTexts={[]} socketConnections={socketConnections} doubleDropConnections={[0, 1, 2]} retryDelays={[0, 5]} />);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(socketConnections).toEqual([0, 1, 2]);
+    expect(onProblem).toHaveBeenCalledTimes(1);
+  });
+
+  test("a speech engine error ends the call and names the listening engine, without retrying", async () => {
+    const onOpenChange = mock();
+    const onProblem = mock();
+    const socketConnections: number[] = [];
+    render(<Harness open onOpenChange={onOpenChange} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "error", v: "private engine detail" } }]} sentTexts={[]} socketConnections={socketConnections} />);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(onProblem).toHaveBeenCalledWith("listening_engine");
+    expect(socketConnections).toEqual([0]);
+  });
+
+  test("a failed sentence tells the person once, even when several sentences fail", async () => {
+    const onProblem = mock();
+    const props = { open: true, onOpenChange: () => {}, onProblem, isSpeaking: false, speakingEndedAt: 0, speechFailed: 0, fixture: [{ delayMs: 0, message: { t: "ready" } }] as SttFixtureStep[], sentTexts: [] as string[] };
+    const view = render(<Harness {...props} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    view.rerender(<Harness {...props} speechFailed={3} />);
+    await waitFor(() => expect(onProblem).toHaveBeenCalledTimes(1));
+    expect(onProblem).toHaveBeenCalledWith("speaking_failed");
+  });
+
+  test("a reply with a failed sentence still ends and listening resumes", async () => {
+    const onProblem = mock();
+    const props = { open: true, onOpenChange: () => {}, onProblem, isSpeaking: true, speakingEndedAt: 0, speechFailed: 0, fixture: [{ delayMs: 0, message: { t: "ready" } }] as SttFixtureStep[], sentTexts: [] as string[] };
+    const view = render(<Harness {...props} />);
+    await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    view.rerender(<Harness {...props} isSpeaking={false} speakingEndedAt={1} speechFailed={1} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    expect(onProblem).toHaveBeenCalledWith("speaking_failed");
+  });
+
+  test("stopping a reply never shows the could-not-speak line", async () => {
+    const onProblem = mock();
+    render(<Harness open onOpenChange={() => {}} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} speechFailed={3} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} />);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(onProblem).not.toHaveBeenCalledWith("speaking_failed");
+  });
+
   test("a wake-opened session with no speech closes itself after the quiet window", async () => {
     const onOpenChange = mock();
     render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} idleCloseMs={150} />);

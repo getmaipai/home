@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, us
 import { Link, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { voiceFailureLine, type VoiceFailureKind } from "@maipai/home-backend/src/lib/failureCopy";
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
@@ -250,6 +251,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   // regardless of the previous value, so useLiveVoiceSession can depend on
   // this instead of `isSpeaking` alone to notice "speaking is over."
   const [speakingEndedAt, setSpeakingEndedAt] = useState(0);
+  const [speechFailed, setSpeechFailed] = useState(0);
   const [connection, setConnection] = useState<ConnectionState>({ phase: "online" });
   const [searchParams, setSearchParams] = useSearchParams();
   // Archive first switches an active remote thread to the blank thread
@@ -539,6 +541,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             setIsSpeaking(speaking);
             if (!speaking) setSpeakingEndedAt((n) => n + 1);
           },
+          onSpeechError: () => setSpeechFailed((n) => n + 1),
           turnSchedulerRef,
           activeTurnRef,
           // VOICE-LIVE-02: on only for the one send the live voice
@@ -675,7 +678,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     },
   });
 
-  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1178,7 +1181,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // inside useChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, speechFailed, dictationLevelMeter } = useChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1289,6 +1292,7 @@ export function ChatPage({ person }: { person: Roster }) {
     composer: runtime.thread.composer,
     open: voiceOpen,
     onOpenChange: closeAwareSetVoiceOpen,
+    onProblem: (kind: VoiceFailureKind) => toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" }),
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,
     liveVoiceActiveRef,
@@ -1298,6 +1302,7 @@ export function ChatPage({ person }: { person: Roster }) {
     voiceBargeIn: person.age_band === "adult",
     isSpeaking,
     speakingEndedAt,
+    speechFailed,
   });
   const [pageSearchParams] = useSearchParams();
   const requestedConversationId = pageSearchParams.get("conversation") ?? undefined;

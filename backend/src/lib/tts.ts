@@ -5,6 +5,8 @@
 // right status code for.
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
+const TTS_UNAVAILABLE_COPY = "Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
+
 // Bound a speech request generously above any real reply length.
 const MAX_TEXT_LENGTH = 4_000;
 
@@ -49,12 +51,13 @@ export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise
   }
 
   if (!isStackConfigured()) {
-    return { ok: false, status: 503, code: "unavailable", error: "voice unavailable: the MaiPai Stack is required for text to speech" };
+    return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };
   }
 
   try {
-    return await synthesizeViaStack(text, voiceUrl);
-  } catch (err) {
-    return { ok: false, status: 503, code: "unavailable", error: `voice unavailable: ${(err as Error).message}` };
+    const result = await synthesizeViaStack(text, voiceUrl);
+    return result.ok ? result : { ...result, error: TTS_UNAVAILABLE_COPY };
+  } catch {
+    return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };
   }
 }

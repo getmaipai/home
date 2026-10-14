@@ -1,12 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { ApiError } from "@/lib/api";
 
 class FakeAudioContext {
+  started = 0;
   destination = {} as AudioNode;
   currentTime = 0;
   createGain() { return { connect: () => {}, gain: { value: 1 } } as unknown as GainNode; }
   createAnalyser() { return { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 8, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) } as unknown as AnalyserNode; }
-  createBufferSource() { return { buffer: null, connect: () => {}, start: () => {}, onended: null } as unknown as AudioBufferSourceNode; }
+  createBufferSource() { return { buffer: null, connect: () => {}, start: () => { this.started++; }, onended: null } as unknown as AudioBufferSourceNode; }
   async decodeAudioData() { return { duration: 2 } as AudioBuffer; }
   async close() {}
 }
@@ -16,6 +18,39 @@ function fakeAudioContext() { return new FakeAudioContext() as unknown as AudioC
 async function settle() { await new Promise((resolve) => setTimeout(resolve, 0)); }
 
 describe("sentence speech scheduler", () => {
+  test("a cut TTS body drops the whole sentence but later sentences still schedule in order", async () => {
+    const context = new FakeAudioContext();
+    let calls = 0;
+    const scheduler = new SentenceSpeechScheduler(context as unknown as AudioContext, async () => {
+      calls++;
+      if (calls === 1) {
+        const response = new Response(new Uint8Array([1, 2, 3]));
+        Object.defineProperty(response, "arrayBuffer", { value: async () => { throw new Error("Stack dropped mid-synthesis"); } });
+        return response;
+      }
+      return new Response(new Uint8Array(44));
+    });
+    let errors = 0;
+    scheduler.onError = () => { errors++; };
+    scheduler.enqueueSentence("first");
+    scheduler.enqueueSentence("second");
+    scheduler.enqueueSentence("third");
+    scheduler.finish();
+    for (let i = 0; i < 8; i++) await settle();
+    expect(errors).toBe(1);
+    expect(context.started).toBe(2);
+  });
+
+  test("a cancelled turn does not report a speech failure", async () => {
+    const scheduler = new SentenceSpeechScheduler(fakeAudioContext(), async () => { throw new ApiError("cancelled", 409, "turn_cancelled"); });
+    let errors = 0;
+    scheduler.onError = () => { errors++; };
+    scheduler.enqueueSentence("stopped reply");
+    scheduler.finish();
+    for (let i = 0; i < 4; i++) await settle();
+    expect(errors).toBe(0);
+  });
+
   test("stop aborts sentence fetches still in flight and reports no error", async () => {
     const context = fakeAudioContext();
     let signal: AbortSignal | undefined;

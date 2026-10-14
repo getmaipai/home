@@ -7,6 +7,7 @@ import { upgradeWebSocket } from "hono/bun";
 import { requireAuth } from "@/middleware/auth";
 import { SttSession, decodeWav, getEndpointer } from "@/lib/sttSession";
 import { transcribeUtterance } from "@/lib/stt";
+import { voiceFailureLine } from "@/lib/failureCopy";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import type { SttStatusResponse, SttTranscribeResponse } from "@maipai/spec/voice/ts/sttTypes.js";
 import type { AppEnv } from "@/types";
@@ -54,7 +55,7 @@ sttRoutes.get(
             const parsed = JSON.parse(evt.data) as { t?: string };
             if (parsed.t === "end") session.end();
           } catch {
-            ws.send(JSON.stringify({ t: "error", v: "malformed control message" }));
+            ws.send(JSON.stringify({ t: "error", v: voiceFailureLine("listening_engine", { minor: false, canOpenRepairs: true }) }));
           }
           return;
         }
@@ -72,7 +73,7 @@ sttRoutes.get(
         // reaching the client, unlike the REST route's own decodeWav()
         // try/catch below.
         if (evt.data.byteLength % 4 !== 0) {
-          ws.send(JSON.stringify({ t: "error", v: "malformed audio frame (not a multiple of 4 bytes)" }));
+          ws.send(JSON.stringify({ t: "error", v: voiceFailureLine("listening_engine", { minor: false, canOpenRepairs: true }) }));
           return;
         }
         session.pushPcm(new Float32Array(evt.data));

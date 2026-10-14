@@ -28,6 +28,9 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 ## If voice input doesn't work
 
 - Make sure your browser has permission to use your microphone.
+- If the connection to your hub drops, check that the hub is on, then tap the waveform to start again.
+- If Home says its listening engine is not running, type your message instead, or open Repairs to check it. Ask an owner or admin if you cannot open Repairs.
+- If Home cannot speak a reply, read it on screen. Voice will try again on your next question.
 - Saying the wake word opens a voice conversation. Home stops listening by itself if nobody speaks for a few seconds.
 
 ## If you can't sign in

@@ -20,7 +20,7 @@
 // sentence 2 is still being fetched/generated), not from streaming
 // within one. This is the same tradeoff the legacy hub's own backend
 // made (one JSON payload per sentence, not streamed either).
-import { api } from "@/lib/api";
+import { ApiError, api } from "@/lib/api";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 
 const MAX_PARALLEL_FETCHES = 2;
@@ -133,7 +133,7 @@ export class SentenceSpeechScheduler {
       fixWavHeaderSize(bytes);
       audioBuffer = await this.audioContext.decodeAudioData(bytes.buffer as ArrayBuffer);
     } catch (error) {
-      if (!this.stopped && !(error instanceof DOMException && error.name === "AbortError")) this.onError?.();
+      if (!this.stopped && !(error instanceof DOMException && error.name === "AbortError") && !(error instanceof ApiError && error.code === "turn_cancelled")) this.onError?.();
       // A failed sentence just doesn't speak - the reply's TEXT already
       // rendered regardless of TTS (ChatPage.tsx treats them as
       // independent), so one bad sentence never blocks or breaks the rest

@@ -37,6 +37,7 @@ export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onProblem?: (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked") => void;
   /** Optional quiet timeout for wake-opened sessions; null keeps a
    * person-opened voice session active until they end it. */
   idleCloseMs?: number | null;
@@ -68,12 +69,16 @@ export interface LiveVoiceSessionProps {
    * on instead of `isSpeaking` alone so "speaking is over" is never
    * missed. */
   speakingEndedAt: number;
+  /** Incremented for each scheduler fetch/body failure. */
+  speechFailed?: number;
+  /** Injectable retry waits keep the reconnect tests quick. */
+  retryDelays?: [number, number];
 }
 
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
+export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -84,6 +89,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
   const activeSpeechRef = useRef(false);
   const interruptedTurnRef = useRef<string | null>(null);
   const mutedRef = useRef(false);
+  const retryCountRef = useRef(0);
+  const speechFailureShownRef = useRef(false);
+  const lastSpeechFailedRef = useRef(speechFailed);
   mutedRef.current = muted;
   const setCurrentMode = (next: VoiceMode) => { modeRef.current = next; setMode(next); };
   const interrupt = (_reason: "voice" | "tap") => {
@@ -108,6 +116,22 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
     setListenGeneration(0);
   }, [open]);
 
+  useEffect(() => {
+    if (!open) {
+      speechFailureShownRef.current = false;
+      lastSpeechFailedRef.current = speechFailed;
+      retryCountRef.current = 0;
+      return;
+    }
+    if (speechFailed > lastSpeechFailedRef.current) {
+      lastSpeechFailedRef.current = speechFailed;
+      if (!speechFailureShownRef.current) {
+        speechFailureShownRef.current = true;
+        onProblem?.("speaking_failed");
+      }
+    }
+  }, [open, speechFailed, onProblem]);
+
   // Listens once per `listenGeneration` - (re)connects the STT socket,
   // starts the mic, and on a real "final" transcript sends the turn.
   // Cleanup here is what mic-capture.ts's own `stop()` and the socket's
@@ -127,7 +151,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
     // silently blocking the mock socket's own setTimeout-based fixture
     // delivery forever.
     let levelTimer: ReturnType<typeof setInterval> | undefined;
-    setCurrentMode("connecting");
+    let retryTimer: ReturnType<typeof setTimeout> | undefined;
+    let connectionFailureHandled = false;
+    let terminalServerError = false;
+    if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("connecting");
     const socket = createSocket({
       onMessage(message) {
         if (cancelled) return;
@@ -138,8 +165,9 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
         // rather than live.
         switch (message.t) {
           case "ready":
-            setCurrentMode("listening");
-            void startCapture({
+            retryCountRef.current = 0;
+            if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("listening");
+            if (voiceBargeIn || (modeRef.current !== "thinking" && modeRef.current !== "speaking")) void startCapture({
               onFrame: (frame) => {
                 if (!mutedRef.current) socket.sendAudio(frame);
               },
@@ -158,7 +186,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
                 micHandle = handle;
               })
               .catch(() => {
-                if (!cancelled) onOpenChange(false);
+                if (!cancelled) {
+                  onProblem?.("microphone_blocked");
+                  onOpenChange(false);
+                }
               });
             break;
           case "partial":
@@ -220,21 +251,37 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
           // way a connection-level failure does rather than looping on a
           // broken session.
           case "error":
+            terminalServerError = true;
             setCurrentMode("connecting");
             micHandle?.stop();
             levelMeter?.stop();
             clearInterval(levelTimer);
+            onProblem?.("listening_engine");
             onOpenChange(false);
             break;
         }
       },
       onError() {
-        if (!cancelled) onOpenChange(false);
+        if (cancelled || connectionFailureHandled || terminalServerError) return;
+        connectionFailureHandled = true;
+        if (modeRef.current === "listening" || modeRef.current === "connecting") setCurrentMode("connecting");
+        micHandle?.stop();
+        levelMeter?.stop();
+        clearInterval(levelTimer);
+        if (retryCountRef.current < 2) {
+          const delay = retryDelays[retryCountRef.current];
+          retryCountRef.current += 1;
+          retryTimer = setTimeout(() => { if (!cancelled) setListenGeneration((generation) => generation + 1); }, delay);
+        } else {
+          onProblem?.("listening_lost");
+          onOpenChange(false);
+        }
       },
     });
 
     return () => {
       cancelled = true;
+      clearTimeout(retryTimer);
       clearInterval(levelTimer);
       micHandle?.stop();
       levelMeter?.stop();
