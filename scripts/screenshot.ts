@@ -74,6 +74,7 @@ import { startScreenshotStack } from "./screenshotStack";
 import { waitForAnimationSettle } from "./animationSettle";
 import { RICH_REPLY_MARKDOWN, RICH_REPLY_PROMPT } from "../frontend/src/shell/pages/richReplyFixture";
 import { runMobileSmoke } from "./mobileSmoke";
+import { seedToursDisabledForCapture, TOUR_AUTOSTART_SETTING } from "./screenshotTourSeed";
 import { createOwnedDemoDataDir, processStartTime, removeOwnedDemoDataDir, sweepStaleDemoDataDirs as sweepOwnedDemoDataDirs, waitForBackendPort, withScreenshotBuildLock, type RunOwner } from "./screenshotRuntime";
 
 // getmaipai/home#114: each backend asks Bun.serve() to bind port 0 atomically and reports
@@ -625,6 +626,7 @@ async function seedHousehold(): Promise<string> {
   seedChatHistoryRows(sage.id);
   seedTraceReviewTurn(sage.id);
   if (chatArtifactCapture) attachWriteDocumentRoutingStats(sage.id);
+  const screenshotPersonIds = [sage.id];
   for (const person of [
     { displayName: "Marlow", role: "teen" },
     { displayName: "Nova", role: "child" },
@@ -635,6 +637,21 @@ async function seedHousehold(): Promise<string> {
       body: JSON.stringify(person),
     });
     if (!res.ok) throw new Error(`seed person ${person.displayName} failed: ${res.status}`);
+    screenshotPersonIds.push(((await res.json()) as { id: string }).id);
+  }
+
+  // The capture household is always looking at pages for the first time.
+  // Keep tours disabled in its person settings so Joyride never obscures
+  // the screenshots or changes their accessibility tree.
+  const settingsDb = new Database(join(DATA_DIR, "hub.db"));
+  try {
+    seedToursDisabledForCapture(settingsDb, screenshotPersonIds);
+    for (const id of screenshotPersonIds) {
+      const row = settingsDb.query("SELECT value FROM settings_values WHERE scope = ? AND key = ?").get(`person:${id}`, TOUR_AUTOSTART_SETTING) as { value: string } | null;
+      if (row?.value !== "false") throw new Error(`capture tour autostart seed failed for person ${id}`);
+    }
+  } finally {
+    settingsDb.close();
   }
 
   if (chatStatsReview) {
@@ -898,6 +915,15 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // h1 is there, any [role="status"] still around is stuck, not "still
     // loading" - the whole point of waiting for the real shell first.
     await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
+
+    // The seeded capture household has tours.autostart.enabled=false for
+    // each demo person. Wait beyond the runner's one-second delay and
+    // assert the capture stays free of Joyride's portal.
+    if (["home", "chat", "chat-list", "people"].includes(route.slug)) {
+      await page.waitForTimeout(1100);
+      const tourPortal = page.locator("#react-joyride-portal");
+      if (await tourPortal.count()) throw new Error(`${route.slug} capture unexpectedly started a guided tour`);
+    }
 
     // getmaipai/home#102, found live 2026-09-13: Home's own WeatherCard
     // fires a real ephemeral turn on every mount (`runFixedTurn()`,
