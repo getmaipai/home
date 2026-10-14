@@ -398,6 +398,73 @@ describe("--dry-run", () => {
   });
 });
 
+describe("setup plan option", () => {
+  function planCall(args: string[], env: Record<string, string | undefined> = {}, existing = "") {
+    const root = mkdtempSync(join(tmpdir(), "maipai-setup-plan-"));
+    const data = join(root, "data");
+    if (existing) {
+      mkdirSync(data, { recursive: true });
+      writeFileSync(join(data, "setup-plan"), `${existing}\n`);
+    }
+    try {
+      const scriptArgs = args.map((arg) => `'${arg.replaceAll("'", "'\\''")}'`).join(" ");
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; INSTALL_ROOT_LINUX="$TEST_ROOT"; INSTALL_ROOT_DARWIN="$TEST_ROOT"; main ${scriptArgs}`], {
+        env: { ...process.env, ...env, TEST_ROOT: root },
+      });
+      return { stdout: result.stdout.toString(), stderr: result.stderr.toString(), exitCode: result.exitCode, record: existsSync(join(data, "setup-plan")) ? readFileSync(join(data, "setup-plan"), "utf8").trim() : "" };
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  }
+
+  test.each(["recommended", "moderate", "minimal"] as const)("records accepted plan %s", (plan) => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-setup-plan-"));
+    try {
+      const result = bashCall(`record_setup_plan "${root}/data" "${plan}" no`);
+      expect(result.exitCode).toBe(0);
+      expect(readFileSync(join(root, "data", "setup-plan"), "utf8").trim()).toBe(plan);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("rejects an unknown plan with allowed values and the next step", () => {
+    const result = planCall(["--plan", "huge"]);
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("recommended, moderate, and minimal");
+    expect(result.stderr).toContain("run the installer again");
+  });
+
+  test("reads MAIPAI_PLAN", () => {
+    const result = planCall(["--dry-run"], { MAIPAI_PLAN: "moderate" });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("would record setup plan moderate");
+  });
+
+  test("rejects an unknown MAIPAI_PLAN with allowed values and the next step", () => {
+    const result = planCall(["--dry-run"], { MAIPAI_PLAN: "huge" });
+    expect(result.exitCode).not.toBe(0);
+    expect(result.stderr).toContain("recommended, moderate, and minimal");
+    expect(result.stderr).toContain("run the installer again");
+  });
+
+  test("flag wins over MAIPAI_PLAN and repeated flags use the last value", () => {
+    const result = planCall(["--plan", "minimal", "--plan", "recommended", "--dry-run"], { MAIPAI_PLAN: "moderate" });
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("using --plan recommended");
+    expect(result.stdout).toContain("given more than once");
+  });
+
+  test("without a new plan, keeps the saved record", () => {
+    const result = planCall(["--dry-run"], {}, "moderate");
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout).toContain("Keeping the saved setup plan moderate");
+    expect(result.record).toBe("moderate");
+  });
+
+  test("dry-run never writes a plan record", () => {
+    const result = planCall(["--plan", "recommended", "--dry-run"]);
+    expect(result.exitCode).toBe(0);
+    expect(result.record).toBe("");
+  });
+});
+
 describe("REMOTE-STACK-BOX-01 engine computer dry runs", () => {
   test("the box prints the same SHA-256 host check code as Home", () => {
     const folder = mkdtempSync(join(tmpdir(), "maipai-engine-check-code-"));

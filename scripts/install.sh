@@ -15,6 +15,7 @@
 #
 # Usage: curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | bash
 #        bash scripts/install.sh --dry-run   # see "Dry run" below
+#        bash scripts/install.sh --plan recommended|moderate|minimal
 #
 # Idempotent: re-running upgrades an existing install in place (stop,
 # replace the source tree, keep data/backups untouched, restart) - the
@@ -49,6 +50,26 @@ ENGINE_STACK_DATA=/data/stack
 
 log() { printf '%s\n' "$*"; }
 die() { printf 'error: %s\n' "$*" >&2; exit 1; }
+
+valid_plan() {
+  case "$1" in recommended|moderate|minimal) return 0 ;; *) return 1 ;; esac
+}
+
+record_setup_plan() {
+  local data_dir="$1" requested="$2" dry_run="$3" record="${1}/setup-plan"
+  if [ -n "$requested" ]; then
+    if [ "$dry_run" = "yes" ]; then
+      log "[dry-run] would record setup plan ${requested} in ${record}"
+    else
+      mkdir -p "$data_dir"
+      printf '%s\n' "$requested" > "$record"
+      chmod 0600 "$record"
+      log "Recorded setup plan ${requested}. The setup wizard will use it after its checks."
+    fi
+  elif [ -f "$record" ]; then
+    log "Keeping the saved setup plan $(cat "$record")."
+  fi
+}
 
 require_root() {
   if [ "$(id -u)" -ne 0 ]; then
@@ -652,12 +673,37 @@ setup_engine_computer() {
 main() {
   local dry_run="no"
   local engine_computer="no"
-  for arg in "$@"; do
-    case "$arg" in
+  local plan_flag="" plan_flag_seen="no"
+  local plan_flag_count=0
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
       --dry-run) dry_run="yes" ;;
       --engine-computer) engine_computer="yes" ;;
+      --plan)
+        [ "$#" -ge 2 ] || die "--plan needs a value: recommended, moderate, or minimal. Run bash scripts/install.sh --help for the next step."
+        plan_flag="$2"; plan_flag_seen="yes"; plan_flag_count=$((plan_flag_count + 1)); shift ;;
+      --help|-h)
+        log "Usage: install.sh [--dry-run] [--engine-computer] [--plan recommended|moderate|minimal]"
+        log "You can also set MAIPAI_PLAN to recommended, moderate, or minimal. The setup wizard still runs its checks before downloads."
+        exit 0 ;;
+      --*) die "Unknown option: $1. Run bash scripts/install.sh --help for allowed options." ;;
+      *) die "Unexpected argument: $1. Run bash scripts/install.sh --help for allowed options." ;;
     esac
+    shift
   done
+
+  local requested_plan=""
+  if [ "$plan_flag_seen" = "yes" ]; then
+    valid_plan "$plan_flag" || die "Invalid plan '$plan_flag'. Allowed values are recommended, moderate, and minimal. Choose one and run the installer again."
+    requested_plan="$plan_flag"
+    [ "$plan_flag_count" -le 1 ] || log "--plan was given more than once; using the last value, ${plan_flag}."
+    if [ -n "${MAIPAI_PLAN:-}" ] && [ "$MAIPAI_PLAN" != "$plan_flag" ]; then
+      log "Both --plan and MAIPAI_PLAN were set; using --plan ${plan_flag}."
+    fi
+  elif [ -n "${MAIPAI_PLAN:-}" ]; then
+    valid_plan "$MAIPAI_PLAN" || die "Invalid MAIPAI_PLAN '$MAIPAI_PLAN'. Allowed values are recommended, moderate, and minimal. Set it to one of those values and run the installer again."
+    requested_plan="$MAIPAI_PLAN"
+  fi
 
   local os
   os=$(detect_os)
@@ -681,6 +727,7 @@ main() {
     [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
     local bun_bin="${install_root}/.bun/bin/bun"
     log "[dry-run] MaiPai Stack install plan for ${os}/${arch} at ${install_root}"
+    record_setup_plan "${install_root}/data" "$requested_plan" yes
     log "[dry-run] STACK_TAG=${STACK_TAG}"
     setup_stack "$install_root" "$bun_bin" "$os" "$arch" "yes"
     exit 0
@@ -692,6 +739,8 @@ main() {
   local install_root
   [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
   local bun_home="${install_root}/.bun"
+
+  record_setup_plan "${install_root}/data" "$requested_plan" no
 
   local port
   port=$(find_free_port "$APP_PORT")

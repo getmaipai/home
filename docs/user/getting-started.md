@@ -10,6 +10,12 @@ The first time you open MaiPai Home, it walks you through a short setup wizard. 
 - A name for your household (you can change it later)
 - A name and a PIN or password for yourself, the household's owner
 
+If someone is setting up the hub for you, they can choose a plan before
+installing: use `--plan recommended`, `--plan moderate`, or `--plan minimal`
+with the installer, or set `MAIPAI_PLAN` to one of those words. You will
+still review the plan in the setup wizard, and Home checks the computer
+before it downloads anything.
+
 ## Steps
 
 1. **Name your household.** This is a label, like "The Bramble household." You can change it any time in Settings.
