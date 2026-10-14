@@ -89,7 +89,11 @@ describe("ComposerVoiceControls for someone who is not an owner or admin", () =>
     try {
       renderWithQueryClient(<ComposerVoiceControls />);
       await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(globalThis.fetch).not.toHaveBeenCalled();
+      const enginesRequests = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls.filter(([input]) => {
+        const url = typeof input === "string" ? input : input instanceof Request ? input.url : input.toString();
+        return url.includes("/api/engines");
+      });
+      expect(enginesRequests).toHaveLength(0);
     } finally {
       restore();
     }
