@@ -21,6 +21,7 @@ import { resolveHumanSession } from "@/middleware/auth";
 import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, type SetupStepId } from "@/lib/setupState";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { runSetupChecks, healthItems } from "@/setup/checks/checks";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -35,6 +36,16 @@ const SETUP_CA_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 
 export const setupRoutes = apiRouter();
 setupRoutes.use("*", setupLocalOnly);
+
+const checksRoute = createRoute({
+  method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",
+  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState }) } }, description: "The ordered check rows and updated setup state." } },
+});
+setupRoutes.openapi(checksRoute, async (c) => {
+  const rows = await runSetupChecks();
+  const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows) });
+  return c.json({ rows: rows.map(({ id, title, state, text }) => ({ id, title, state, text })), state }, 200);
+});
 
 const SetupStepIdSchema = z.enum(SETUP_STEP_IDS);
 const SetupStatusSchema = SetupState.shape.steps.element.shape.status;

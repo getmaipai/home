@@ -67,6 +67,8 @@ export interface StackClient {
     opts?: { signal?: AbortSignal },
   ): Promise<Record<string, unknown>>;
   models(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  /** POST /stack/v1/models: install a pinned model and start its download job. */
+  pullModel(body: { id: string; role: string; repo?: string; url: string; sha256: string; approx_bytes?: number; licence: string; revision: string; engine?: string; archive?: boolean; hub_file?: string; component?: string }, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   modelAction(id: string, action: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   health(opts?: { signal?: AbortSignal }): Promise<{ health: HealthItem[] }>;
   healthFix(code: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
@@ -326,6 +328,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     engineAction: (name, action, opts) =>
       call(`/stack/v1/engines/${encodeURIComponent(name)}/${action}`, { method: "POST" }, json<Record<string, unknown>>, opts),
     models: (opts) => call("/stack/v1/models", { method: "GET" }, json<Record<string, unknown>>, opts),
+    pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),

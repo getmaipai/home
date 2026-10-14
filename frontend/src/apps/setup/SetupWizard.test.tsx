@@ -47,6 +47,25 @@ async function advanceTo(viewResult: ReturnType<typeof view>, buttonText: string
 }
 
 describe("SetupWizard", () => {
+  test("Checks screen uses persisted rows, continues on amber and holds on red", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const original = globalThis.fetch;
+    globalThis.fetch = mock(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
+      if (url.includes("/api/setup/checks/run")) return new Response(JSON.stringify({ rows: [{ id: "engine", title: "Engine service", state: "amber", text: "The engine is slow." }, { id: "system", title: "System", state: "red", text: "Unsupported system." }], state }), { status: 200 });
+      throw new Error(`Unstubbed request ${url}`);
+    }) as unknown as typeof fetch;
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("The engine is slow."));
+      expect(rendered.getAllByRole("alert").some((alert) => alert.textContent?.includes("Unsupported system."))).toBe(true);
+      expect(rendered.getByRole("button", { name: "Try again" }).textContent).toContain("Try again");
+      expect(rendered.getByRole("button", { name: "Try again" }).hasAttribute("disabled")).toBe(true);
+    } finally { globalThis.fetch = original; }
+  });
+
   test("resumes at the first pending step from server state and ignores browser storage", async () => {
     const state = freshState();
     for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";

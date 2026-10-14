@@ -6,6 +6,10 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Separator } from "@maipai/ui/src/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { List } from "@maipai/ui/src/primitives/List";
+import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
+import { Badge } from "@maipai/ui/src/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { api, ApiError } from "@/lib/api";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
@@ -50,6 +54,9 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
   const [certificate, setCertificate] = useState<"loading" | "ready" | "error">("loading");
   const [backupKey, setBackupKey] = useState<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string } | null>(null);
   const [backupKeyError, setBackupKeyError] = useState(false);
+  const [checkRows, setCheckRows] = useState<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> | null>(null);
+  const [checkError, setCheckError] = useState(false);
+  const [checksFetching, setChecksFetching] = useState(false);
 
   const refresh = async () => {
     const result = await api.setupState();
@@ -77,6 +84,22 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
     if (screen !== "done") return;
     void api.setupCa().then(() => setCertificate("ready"), () => setCertificate("error"));
     void api.emergencyKit().then((kit) => { setBackupKey(kit); setBackupKeyError(false); }, () => setBackupKeyError(true));
+  }, [screen]);
+
+  useEffect(() => {
+    if (screen !== "checks") return;
+    let active = true;
+    setChecksFetching(true);
+    void api.setupChecks().then((result) => {
+      if (!active) return;
+      setCheckRows(result.rows);
+      setState(result.state);
+      setCheckError(false);
+      if (result.rows.every((row) => row.state === "green" || row.state === "idle")) {
+        window.setTimeout(() => { if (active) setScreen("plan"); }, 1500);
+      }
+    }, () => { if (active) setCheckError(true); }).finally(() => { if (active) setChecksFetching(false); });
+    return () => { active = false; };
   }, [screen]);
 
   async function loadEmergencyKit() {
@@ -199,7 +222,20 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
     case "welcome": body = <Card><CardHeader><img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" width="280" /><CardTitle>Welcome to MaiPai Home</CardTitle><CardDescription>{COPY_HOME}</CardDescription></CardHeader><CardContent><ul><li>Nothing leaves your house.</li><li>No account with us, no subscription, no tracking.</li><li>Kids get their own safe profiles. Parents decide what they can access.</li></ul><Separator /><p>{DISCLAIMER}</p><Button type="button" variant="link" disabled>Restore from a backup</Button><p className="text-sm text-muted-foreground">Restore from a backup is not available in this setup build.</p></CardContent></Card>; break;
     case "engine_location": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><RadioGroup value={engine} onValueChange={(v) => setEngine(v as typeof engine)}><div className="flex items-start gap-3"><RadioGroupItem value="this_computer" id="engine-local" /><div><Label htmlFor="engine-local">This computer</Label><p>Simplest. Home and its AI share this computer.</p></div></div><div className="flex items-start gap-3"><RadioGroupItem value="another_computer" id="engine-remote" /><div><Label htmlFor="engine-remote">Another computer on my network</Label><p>For a bigger computer elsewhere in the house, like a gaming PC or a Mac Studio.</p></div></div></RadioGroup>{engine === "another_computer" ? <p role="status">The engine-link pairing flow is available in Home settings, AI. Pairing and saving an engine link during first-run setup is not supported by the current setup API.</p> : null}</CardContent></Card>; break;
     case "storage": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle><CardDescription>AI models are big (7 to 10 GB). Pick a disk with room to spare.</CardDescription></CardHeader><CardContent><p>Home's data-location disk picker is not available in this build. No disk has been selected or recorded.</p></CardContent></Card>; break;
-    case "checks": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><p>Setup checks are not built yet. Home has not checked this computer, the engine computer, or the selected disk. Downloads have not started.</p></CardContent></Card>; break;
+    case "checks": {
+      const blocking = checkRows?.some((row) => row.state === "red") ?? false;
+      const warnings = checkRows?.some((row) => row.state === "amber") ?? false;
+      body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent>
+        <AsyncState data={checkRows} error={checkError} isFetching={checksFetching} onRetry={() => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); }} errorMessage="Home couldn't check these computers." loadingLabel="Checking your computers">
+          {(rows) => <List items={rows} getKey={(row) => row.id} label="Setup checks" renderItem={(row) => <div className="flex min-w-0 flex-1 flex-col gap-1 py-1"><div className="flex items-center gap-2"><Badge variant={row.state === "red" ? "destructive" : row.state === "amber" ? "outline" : "secondary"}>{row.state}</Badge><span className="font-medium">{row.title}</span></div><p className="text-sm text-muted-foreground">{row.text}</p></div>} />}
+        </AsyncState>
+        {checkRows?.filter((row) => row.state === "amber" || row.state === "red").map((row) => <Alert key={row.id} variant={row.state === "red" ? "destructive" : "default"}><AlertTitle>{row.title}</AlertTitle><AlertDescription>{row.text}</AlertDescription></Alert>)}
+        {blocking ? <p>Fix the red checks, then press Try again.</p> : null}
+        {warnings && !blocking ? <Button type="button" variant="secondary" disabled={busy} onClick={() => { void record("checks", "deferred").then((updated) => { if (updated) setScreen("plan"); }); }}>Continue anyway</Button> : null}
+        <Button type="button" variant="link" onClick={() => setScreen("welcome")}>Restore from a backup</Button>
+      </CardContent></Card>;
+      break;
+    }
     case "plan": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><p>Hardware checks and the Stack's plan recommendations are not built into setup yet. No plan has been installed or selected.</p></CardContent></Card>; break;
     case "away": body = <Card><CardHeader><CardTitle>Reach Home from anywhere</CardTitle><CardDescription>Tailscale connects your family's devices to Home away from home.</CardDescription></CardHeader><CardContent><p>The Tailscale setup and status checks are not built yet. Home has not contacted Tailscale or enabled remote access.</p><p>Set up later. Home works only at home until then.</p><p className="text-sm text-muted-foreground">You can finish this later in Home settings.</p></CardContent></Card>; break;
     case "owner": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><Card><CardHeader><CardTitle>Owner or admin?</CardTitle></CardHeader><CardContent><p>{OWNER_COPY}</p><p>{ADMIN_COPY}</p></CardContent></Card><Separator /><form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void submitOwner(); }}><Label htmlFor="owner-name">Your name</Label><Input id="owner-name" value={ownerName} onChange={(event) => setOwnerName(event.target.value)} autoComplete="name" /><Label htmlFor="owner-secret">PIN or password</Label><Input id="owner-secret" type="password" inputMode="numeric" value={ownerSecret} onChange={(event) => setOwnerSecret(event.target.value)} autoComplete="new-password" /><p className="text-sm text-muted-foreground">You'll use this to sign in and to change Home's settings.</p>{error ? <p role="alert">{error}</p> : null}</form></CardContent></Card>; break;
@@ -211,7 +247,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const screenIndex = SCREEN_IDS.indexOf(screen);
   const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "away" ? "Set up later" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : "Continue"} nextDisabled={screen === "owner" && (!ownerName.trim() || !ownerSecret)} busy={busy || (screen === "done" && certificate === "loading")} phaseMode>{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "away" ? "Set up later" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" && (!ownerName.trim() || !ownerSecret) || screen === "checks" && (checksFetching || !!checkRows?.some((row) => row.state === "red") || !!checkRows?.every((row) => row.state === "green" || row.state === "idle"))} busy={busy || (screen === "done" && certificate === "loading")} phaseMode>{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {

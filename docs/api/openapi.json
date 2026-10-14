@@ -16430,6 +16430,150 @@
         }
       }
     },
+    "/api/engines/models/pull": {
+      "post": {
+        "tags": [
+          "Engines"
+        ],
+        "summary": "Install one Stack pinned model",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "role": {
+                    "type": "string"
+                  },
+                  "repo": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "minLength": 64,
+                    "maxLength": 64
+                  },
+                  "approx_bytes": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "licence": {
+                    "type": "string"
+                  },
+                  "revision": {
+                    "type": "string"
+                  },
+                  "engine": {
+                    "type": "string"
+                  },
+                  "archive": {
+                    "type": "boolean"
+                  },
+                  "hub_file": {
+                    "type": "string"
+                  },
+                  "component": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "role",
+                  "url",
+                  "sha256",
+                  "licence",
+                  "revision"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Stack download job.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request was bad",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Stack rejected an unverified setting",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is offline or unreachable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/engines/models/{id}/actions": {
       "post": {
         "tags": [
@@ -19560,6 +19704,375 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/checks/run": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Run setup checks and persist their health items",
+        "responses": {
+          "200": {
+            "description": "The ordered check rows and updated setup state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "green",
+                              "amber",
+                              "red",
+                              "idle"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "state",
+                          "text"
+                        ]
+                      }
+                    },
+                    "state": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "description": "Stable id for this hub setup record."
+                        },
+                        "source": {
+                          "type": "string",
+                          "enum": [
+                            "wizard",
+                            "restore"
+                          ],
+                          "description": "How setup began; this is the record provenance."
+                        },
+                        "steps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "enum": [
+                                  "welcome",
+                                  "engine_location",
+                                  "storage",
+                                  "checks",
+                                  "plan",
+                                  "away",
+                                  "owner",
+                                  "face",
+                                  "profile",
+                                  "hello",
+                                  "done"
+                                ]
+                              },
+                              "status": {
+                                "type": "string",
+                                "enum": [
+                                  "pending",
+                                  "running",
+                                  "done",
+                                  "skipped",
+                                  "deferred",
+                                  "failed"
+                                ]
+                              },
+                              "at": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "error": {
+                                "type": "object",
+                                "properties": {
+                                  "code": {
+                                    "type": "string",
+                                    "pattern": "^[a-z][a-z0-9.-]*$",
+                                    "description": "Stable and unique per condition, `engine.crashed.chat`, `memory-pressure-warn`."
+                                  },
+                                  "severity": {
+                                    "type": "string",
+                                    "enum": [
+                                      "critical",
+                                      "error",
+                                      "warning"
+                                    ]
+                                  },
+                                  "title": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "text": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "since": {
+                                    "type": "string",
+                                    "format": "date-time"
+                                  },
+                                  "cause": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "fix": {
+                                    "type": "object",
+                                    "properties": {
+                                      "label": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "action": {
+                                        "type": "string",
+                                        "enum": [
+                                          "restart_engine",
+                                          "free_memory",
+                                          "retry_download",
+                                          "rollback_update",
+                                          "reinstall_engine",
+                                          "reinstall_model"
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "label",
+                                      "action"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "code",
+                                  "severity",
+                                  "title",
+                                  "text",
+                                  "since",
+                                  "cause"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "status",
+                              "at"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "description": "Progress for the fixed setup flow, in screen order."
+                        },
+                        "phase": {
+                          "type": "string",
+                          "enum": [
+                            "computers",
+                            "away",
+                            "meet",
+                            "done"
+                          ]
+                        },
+                        "engine": {
+                          "type": "object",
+                          "properties": {
+                            "where": {
+                              "type": "string",
+                              "enum": [
+                                "this_computer",
+                                "another_computer"
+                              ],
+                              "description": "Mirrors engines.stack.where; it does not replace that setting."
+                            },
+                            "link_id": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "hardware": {
+                              "type": "object",
+                              "additionalProperties": {
+                                "nullable": true
+                              },
+                              "description": "Hardware facts reported by the selected engine computer."
+                            }
+                          },
+                          "required": [
+                            "where",
+                            "hardware"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "away": {
+                          "type": "string",
+                          "enum": [
+                            "on",
+                            "later"
+                          ]
+                        },
+                        "plan": {
+                          "type": "object",
+                          "properties": {
+                            "option": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "tier": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "roles": {
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^engines\\.[a-z_]+\\.choice$",
+                                "description": "The key of a per-role Setting record, not its copied value."
+                              },
+                              "description": "References to per-role Setting records, never copies of their values."
+                            }
+                          },
+                          "required": [
+                            "option",
+                            "tier",
+                            "roles"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "checks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "code": {
+                                "type": "string",
+                                "pattern": "^[a-z][a-z0-9.-]*$",
+                                "description": "Stable and unique per condition, `engine.crashed.chat`, `memory-pressure-warn`."
+                              },
+                              "severity": {
+                                "type": "string",
+                                "enum": [
+                                  "critical",
+                                  "error",
+                                  "warning"
+                                ]
+                              },
+                              "title": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "text": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "since": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "cause": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fix": {
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "action": {
+                                    "type": "string",
+                                    "enum": [
+                                      "restart_engine",
+                                      "free_memory",
+                                      "retry_download",
+                                      "rollback_update",
+                                      "reinstall_engine",
+                                      "reinstall_model"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "label",
+                                  "action"
+                                ],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": [
+                              "code",
+                              "severity",
+                              "title",
+                              "text",
+                              "since",
+                              "cause"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "started_at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "completed_at": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ]
+                        },
+                        "hlc": {
+                          "type": "string",
+                          "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                          "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source",
+                        "steps",
+                        "phase",
+                        "engine",
+                        "away",
+                        "plan",
+                        "checks",
+                        "started_at",
+                        "completed_at",
+                        "hlc"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The household-scope setup progress record for one hub. Choices reference existing settings; the record does not duplicate them."
+                    }
+                  },
+                  "required": [
+                    "rows",
+                    "state"
+                  ]
                 }
               }
             }

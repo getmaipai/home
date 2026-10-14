@@ -261,6 +261,17 @@ enginesRoutes.openapi(modelsRoute, async (c) => {
   }
 });
 
+const modelPullRoute = createRoute({
+  method: "post", path: "/models/pull", tags: ["Engines"], summary: "Install one Stack pinned model",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ id: z.string(), role: z.string(), repo: z.string().optional(), url: z.string().url(), sha256: z.string().length(64), approx_bytes: z.number().int().nonnegative().optional(), licence: z.string(), revision: z.string(), engine: z.string().optional(), archive: z.boolean().optional(), hub_file: z.string().optional(), component: z.string().optional() }).strict() } } } },
+  responses: { 202: { content: { "application/json": { schema: z.record(z.string(), z.unknown()) } }, description: "Stack download job." }, ...errorResponses({ 403: "Not owner/admin" }), ...STACK_ERROR_RESPONSES },
+});
+enginesRoutes.openapi(modelPullRoute, async (c) => {
+  try { return c.json(await getStackClient().pullModel(c.req.valid("json")), 202); }
+  catch (err) { const failure = classifyStackError(err); return c.json(failure.body, failure.status); }
+});
+
 const ModelIdParamSchema = z.object({ id: z.string().openapi({ param: { name: "id", in: "path" }, example: "qwen3-8b-instruct-q4_k_m.gguf" }) });
 
 const modelActionRoute = createRoute({

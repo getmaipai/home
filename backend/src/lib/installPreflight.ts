@@ -31,6 +31,11 @@ export type InstallPreflightOptions = {
   now?: () => Date;
 };
 
+/** The installer and setup Checks must agree on the supported Home hosts. */
+export function isSupportedInstallPlatform(platform: string, architecture: string): boolean {
+  return ["darwin", "linux", "win32"].includes(platform) && !(platform === "darwin" && architecture === "x64");
+}
+
 const RELEASE_HOST = "github.com";
 const GB = 1_000_000_000;
 const since = (opts: InstallPreflightOptions) => (opts.now ?? (() => new Date()))().toISOString();
@@ -98,7 +103,7 @@ export async function checkInstallPreflight(opts: InstallPreflightOptions = {}):
       : mem.free < 512 * 1024 * 1024
         ? row(opts, "memory.pressure", "warning", "Memory is almost full", "Close some apps before installing Home.", `Only ${(mem.free / 1024 / 1024).toFixed(0)} MB of memory is free.`, "Close apps, then try again.")
         : row(opts, "memory.ok", null, "Memory", `${(mem.free / GB).toFixed(1)} GB is currently free; this check passed.`, "The computer has enough memory for installation.", ""),
-    (["darwin", "linux", "win32"].includes(platform) && !(platform === "darwin" && architecture === "x64"))
+    (isSupportedInstallPlatform(platform, architecture))
       ? row(opts, "system.ok", null, "System version", `${version} is supported for installation.`, `Installer platform is ${platform}.`, "")
       : row(opts, "system.unsupported", "error", "This system is not supported", `${version} is not supported by the Home installer.`, `Installer platform is ${platform}${platform === "darwin" ? ` ${architecture}` : ""}.`, "Use a supported Apple silicon Mac, Linux, or Windows computer."),
     lock

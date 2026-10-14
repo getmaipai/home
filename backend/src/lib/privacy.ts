@@ -30,6 +30,7 @@ import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { INTERNET_PROBE_ENABLED_KEY, INTERNET_PROBE_DNS_NAME_KEY, INTERNET_PROBE_TCP_ADDRESS_KEY, INTERNET_PROBE_TCP_PORT_KEY } from "@/settings/coreKeys";
+import { isRemoteStackSelected } from "@/lib/stackEngine";
 
 function ddgsPicked(): boolean {
   return webSourcesPicked().includes("ddgs");
@@ -96,6 +97,18 @@ export function platformConnections(): PrivacyConnection[] {
   const internetProbePort = Number(getHouseholdSettingValue(INTERNET_PROBE_TCP_PORT_KEY) ?? 443);
 
   const rows: (PrivacyConnection | null)[] = [
+    !isRemoteStackSelected() ? {
+      id: "platform:setup-model-host",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "Hugging Face or the mirror chosen in Stack settings",
+      when: "during setup Checks and when you try those checks again, while Home checks the pinned model download host",
+      what: "one empty TCP connection to check whether the model host answers. It sends no request or credentials, and nothing anyone in the house said or saved.",
+      who: "the pinned model host",
+      optIn: true,
+      retention: THIRD_PARTY_RETENTION,
+      direction: "outbound",
+    } : null,
     row("platform:wake-word-models", wakewordHosts, {
       when: "once, when someone turns on listening for a wake word",
       what: DOWNLOAD_CARRIES,
