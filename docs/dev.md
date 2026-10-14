@@ -36375,6 +36375,10 @@ Fail-first coverage exercises an unauthenticated upgrade, disconnected command r
 
 The final `bash scripts/check.sh` passed: backend 4,732/4,732, scripts 82/82, frontend 1,355/1,355, with typecheck, lint, build, a11y, docs, and standards checks green. Two intermediate runs exposed unrelated timing-sensitive failures (`partialRestore` temporary backup read, then `summaryRefresh` duplicate debounce); each passed alone, and the final sharded gate passed. Full output is in `data-scratch/chat-ab/a47-gate.log`.
 
+## ROBOT-CLIPS-01: hub-rendered robot clips (slice 1)
+
+The hub renders each paired robot's fixed speech clips through the local Stack `tts` role and stores them under `data/robot-clips/<deviceId>`. Its bundle manifest records each clip's text, voice id, file size, checksum and licence, plus a bundle checksum; the existing device-session asset route serves only that robot's files after verification. An adult paired person's `tts.voice_id` supplies the voice, while a non-adult or missing paired person uses the voice key's declared default. The voice licence is `UNVERIFIED` because this repository does not record a licence for the preset voice itself. Voice changes and alarm sensor mapping changes start a background render, and any line refused by the format checks or the child-band safety gate creates a Repair. Rendering stays on the hub and local Stack, so it adds no outbound privacy row. The Bot's fetch and playback remain G4b follow-up work.
+
 ## IMG-QUALITY-01a: five tiles, a disc and label veto, and a result line that stops inventing looks (2026-10-10)
 
 Found in the judged live sample after IMG-OFFER-01. Owner decided five tiles; the architect ruled APPROVED (`data-scratch/architect/IMG-QUALITY-01.verdict`).

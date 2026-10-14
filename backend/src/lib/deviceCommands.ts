@@ -157,6 +157,13 @@ export function issueDeviceCommand(
   return command;
 }
 
+/** The robot ids paired under one person, shared by settings notifications and derived asset refreshes. */
+export function listRobotsPairedUnderPerson(personId: string): string[] {
+  return db.select({ id: devices.id }).from(devices)
+    .where(and(eq(devices.personId, personId), eq(devices.kind, "robot")))
+    .all().map((device) => device.id);
+}
+
 /** Device/person scope changes go to that person's paired robots only. */
 export function publishSettingsChanged(scope: string, key: string, value: unknown): void {
   const definition = getRegistryKey(key);
@@ -170,9 +177,7 @@ export function publishSettingsChanged(scope: string, key: string, value: unknow
   } else {
     const personScope = /^person:([a-z0-9-]+)$/.exec(scope);
     if (!personScope) return;
-    robotIds = db.select({ id: devices.id }).from(devices)
-      .where(and(eq(devices.personId, personScope[1]!), eq(devices.kind, "robot")))
-      .all().map((device) => device.id);
+    robotIds = listRobotsPairedUnderPerson(personScope[1]!);
   }
   for (const deviceId of robotIds) {
     issueDeviceCommand(deviceId, "settings_changed", { values: { [key]: value } });

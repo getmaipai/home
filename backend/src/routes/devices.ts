@@ -15,6 +15,7 @@ import { discoverRobots } from "@/lib/robotDiscovery";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
 import { storeRobotCredential, hasRotatedRobotCredential, getRobotCredential, getMostRecentRobotCredentialForHost } from "@/lib/robotCredentials";
 import { ensureRobotAssets, isRobotAssetAvailable, readVerifiedRobotAsset, robotAssetById, ROBOT_ASSETS } from "@/lib/robotAssets";
+import { readRobotClipBundle, readVerifiedRobotClipAsset, robotClipAssetForDevice, robotClipBundleExists } from "@/lib/robotClips";
 import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand } from "@/lib/deviceCommands";
 import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
@@ -162,11 +163,13 @@ const robotAssetsRoute = createRoute({
 });
 devicesRoutes.openapi(robotAssetsRoute, async (c) => {
   if (process.env.MAIPAI_TEST_ALLOW_MULTIPLE_HUBS !== "1" && process.env.NODE_ENV !== "test") void ensureRobotAssets();
+  const deviceId = c.get("deviceId");
+  const clipBundle = await robotClipAssetForDevice(deviceId);
   return c.json({
-    assets: await Promise.all(ROBOT_ASSETS.map(async (asset) => ({
+    assets: [...await Promise.all(ROBOT_ASSETS.map(async (asset) => ({
       id: asset.id, file: asset.file, sha256: asset.sha256, bytes: asset.bytes, licence: asset.licence, kind: asset.kind,
       available: await isRobotAssetAvailable(asset.id),
-    }))),
+    }))), ...(clipBundle ? [clipBundle] : [])],
   }, 200);
 });
 
@@ -183,7 +186,24 @@ const robotAssetBytesRoute = createRoute({
   },
 });
 devicesRoutes.openapi(robotAssetBytesRoute, async (c) => {
-  const asset = robotAssetById(c.req.valid("param").id);
+  const id = c.req.valid("param").id;
+  if (id === "clip-bundle" || id.startsWith("clip:")) {
+    const deviceId = c.get("deviceId");
+    const bundle = await readRobotClipBundle(deviceId);
+    if (id === "clip-bundle" && !bundle && robotClipBundleExists(deviceId)) {
+      await readVerifiedRobotClipAsset(deviceId, id);
+      return c.json({ error: "Robot clip manifest failed its integrity check" }, 503);
+    }
+    const knownClip = id === "clip-bundle" ? bundle !== null : bundle?.clips.some((clip) => id === `clip:${clip.id}`) === true;
+    if (!knownClip) return c.json({ error: "Unknown robot asset" }, 404);
+    const asset = await readVerifiedRobotClipAsset(deviceId, id);
+    if (!asset) return c.json({ error: "Robot clip is not ready" }, 503);
+    return new Response(asset.bytes, {
+      status: 200,
+      headers: { "Content-Type": asset.contentType, "Content-Length": String(asset.bytes.byteLength), ETag: `"${asset.sha256}"`, "Cache-Control": "private, max-age=31536000, immutable" },
+    });
+  }
+  const asset = robotAssetById(id);
   if (!asset) return c.json({ error: "Unknown robot asset" }, 404);
   const bytes = await readVerifiedRobotAsset(asset);
   if (!bytes) return c.json({ error: "Robot asset is not ready" }, 503);

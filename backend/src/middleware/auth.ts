@@ -327,6 +327,7 @@ export function requireDeviceSession(kind: DeviceKind, capability?: string) {
     }
 
     c.set("person", result);
+    c.set("deviceId", deviceId!);
     await next();
   });
 }

@@ -11,6 +11,7 @@ import { createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickCo
 import { isTotpEnabled, verifyTotp } from "@/lib/totp";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { renderClipBundle } from "@/lib/robotClips";
 
 export const quickConnectRoutes = apiRouter();
 
@@ -111,7 +112,12 @@ quickConnectRoutes.openapi(pollRoute, (c) => {
     // it must redeem it like any other native client (POST
     // /api/auth/devices/redeem), which is where the rotation gate lives.
     if (approved.kind !== "robot") issueSession(c, approved.personId, sessionSignInSource(c));
-    const { token, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label, approved.capabilities);
+    const { token, deviceId, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label, approved.capabilities);
+    if (approved.kind === "robot") {
+      void renderClipBundle(deviceId).catch(() => {
+        console.error("[robot-clips] pairing render failed; check Repairs to retry the bundle");
+      });
+    }
     return c.json({ status: "approved" as const, device_token: token, expires_at: expiresAt }, 200);
   }
   if (isQuickConnectPending(poll_token)) return c.json({ status: "pending" as const }, 200);

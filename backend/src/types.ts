@@ -6,5 +6,6 @@ export type MemoryRecordRow = typeof memoryRecords.$inferSelect;
 export type AppEnv = {
   Variables: {
     person: PersonRow;
+    deviceId: string;
   };
 };

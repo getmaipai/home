@@ -5,7 +5,9 @@ import { listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
-import { publishSettingsChanged } from "@/lib/deviceCommands";
+import { listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
+import { listDevicesByKind } from "@/lib/devices";
+import { renderClipBundle } from "@/lib/robotClips";
 import { refreshHomeAssistantEvents } from "@/lib/integrations/homeAssistant";
 import { refreshSafetyAlarmSensors } from "@/lib/safetyAlarm";
 import { validateWebSources } from "@/lib/retrieval/webSources";
@@ -18,6 +20,14 @@ import { scheduleHubRestart } from "@/lib/hubRestart";
 import { turnOnTailscaleAccess, setTailscaleRenewalActive } from "@/lib/tailscale";
 
 export const settingsRoutes = apiRouter();
+
+function refreshRobotClips(deviceIds: string[]): void {
+  for (const deviceId of deviceIds) {
+    void renderClipBundle(deviceId).catch(() => {
+      console.error("[robot-clips] settings render failed; check Repairs to retry the bundle");
+    });
+  }
+}
 
 // `value` is genuinely arbitrary JSON (its real shape depends on the
 // key's selector in the registry, validated at the lib layer, not by
@@ -136,8 +146,13 @@ settingsRoutes.openapi(putRoute, async (c) => {
   if (body.scope === "household" && body.key === ENGINE_WHERE_KEY) await applyEngineWhere(body.value);
   else if (body.scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(body.key)) refreshConfiguredEngineLink();
   publishSettingsChanged(body.scope, body.key, result.value.value);
+  const personScope = /^person:([a-z0-9-]+)$/.exec(body.scope);
+  if (personScope && body.key === "tts.voice_id") refreshRobotClips(listRobotsPairedUnderPerson(personScope[1]!));
   if (body.scope === "household" && ["home.base_url", "home.access_token"].includes(body.key)) refreshHomeAssistantEvents();
-  if (body.scope === "household" && body.key === "safety.alarm.sensors") refreshSafetyAlarmSensors();
+  if (body.scope === "household" && body.key === "safety.alarm.sensors") {
+    refreshSafetyAlarmSensors();
+    refreshRobotClips(listDevicesByKind("robot").map((device) => device.id));
+  }
   if (body.scope === "household" && ["network.lan_exposure", "network.hub_port"].includes(body.key)) scheduleHubRestart();
   return c.json(result.value, 200);
 });
