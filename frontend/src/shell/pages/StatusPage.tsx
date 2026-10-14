@@ -37,6 +37,7 @@ export function StatusPage({ person }: { person: Roster }) {
   const boardQuery = useQuery({ queryKey: STATUS_BOARD_QUERY_KEY, queryFn: () => api.statusBoard(), refetchInterval: 30_000 });
   const historyQuery = useQuery<StatusHistory>({ queryKey: ["status-history", 90], queryFn: () => api.statusHistory(90), refetchInterval: 60_000, retry: false, enabled: canSeeParts });
   const engineComputerQuery = useQuery({ queryKey: ["status", "engine-computer", canSeeParts ? "admin" : "member"], queryFn: api.engineComputerStatus, refetchInterval: 10_000 });
+  const missingToursQuery = useQuery({ queryKey: ["status", "tour-missing-targets"], queryFn: api.missingTourTargets, enabled: canSeeParts, retry: false });
   const boardData = boardQuery.data && Array.isArray(boardQuery.data.maintenance) ? boardQuery.data : undefined;
   const maintenance = activeMaintenanceParts(boardData?.maintenance);
   const apps = appsQuery.data ?? [];
@@ -70,6 +71,10 @@ export function StatusPage({ person }: { person: Roster }) {
       {incident ? <Card>
         <CardHeader><CardTitle><AlertIcon className={`mr-2 inline size-5 ${incident.amber ? "text-attention-fg" : "text-destructive"}`} aria-hidden="true" />{incident.title}</CardTitle></CardHeader>
         <CardContent><StatusIncidentBody facts={incident} /></CardContent>
+      </Card> : null}
+      {canSeeParts && (missingToursQuery.data?.length ?? 0) > 0 ? <Card>
+        <CardHeader><CardTitle>Tour targets not found</CardTitle></CardHeader>
+        <CardContent><ul className="flex flex-col gap-1 text-sm">{missingToursQuery.data!.map(({ key, count }) => <li key={key}>{key}: {count}</li>)}</ul></CardContent>
       </Card> : null}
       {appsQuery.data ? <StatusApps person={person} apps={apps} behindTheScenes={canSeeParts && healthQuery.data ? <Card>
         <CardHeader><CardTitle>Parts</CardTitle><StatusLegend /></CardHeader>
