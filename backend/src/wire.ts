@@ -353,6 +353,7 @@ export interface TurnValue {
    * they do not create a conversation row. */
   parent_turn_id?: string | null;
   branch_chosen?: boolean;
+  latency?: TurnLatency;
   /** CHAT-PARITY-04: a continuation is a new sibling answer, not an edit;
    * the original stopped turn remains immutable and this points back to it. */
   continued_from_turn_id?: string | null;
@@ -459,6 +460,8 @@ export interface TurnValue {
   reasoning?: string;
 }
 
+export interface TurnLatency { stt_ms: number | null; first_token_ms: number | null; tts_ttfa_ms: number | null; e2e_ms: number | null }
+
 export interface ChatImagePart {
   id: string; name: string; width: number; height: number; media_type: string;
   /** VISION-02c, set by the hub only (never taken from a client): the
@@ -528,8 +531,8 @@ export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" 
 export type TurnStreamEvent =
   | { type: "turn_meta"; conversation_id: string; turn_id: string; resume_token?: string }
   /** WIRE-01: immediately after turn_meta, before any status, spoken_cue or delta, on every turn, immediate ones included. */
-  | { type: "signal"; signal: TurnSignal }
-  | { type: "delta"; text: string; sequence?: number }
+  | { type: "signal"; signal: TurnSignal; generation?: number }
+  | { type: "delta"; text: string; sequence?: number; generation?: number }
   /** REASONING-01 (docs/plans/shell-on-shadcndashboard-2026-09-21.md's
    * own wire table): the model's own think-block content, split out of
    * `delta` at the wire boundary (routes/turn.ts's streamTurnEvents(),
@@ -538,10 +541,10 @@ export type TurnStreamEvent =
    * turn (child or teen, ageBand.ts's shared band - docs/dev.md's own
    * call: a minor sees the answer, not the model's thinking) - dropped
    * at that same boundary, not redacted. */
-  | { type: "reasoning"; text: string; sequence?: number }
+  | { type: "reasoning"; text: string; sequence?: number; generation?: number }
   /** CHAT-16: frontend chatTurnActivity.ts transient activity contract. */
-  | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing" }
-  | { type: "spoken_cue"; text: string }
+  | { type: "status"; text: string; stage: "lookup" | "thinking" | "tool" | "composing"; generation?: number }
+  | { type: "spoken_cue"; text: string; generation?: number }
   | { type: "done"; value: TurnValue }
   // `code` (step 9, session-a-intelligence.md: "emit error with the
   // catalogue code") is optional and additive: a spec/errors/errors.json

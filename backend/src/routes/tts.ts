@@ -4,11 +4,14 @@ import { synthesizeSpeech } from "@/lib/tts";
 import { getPersonSettingValue } from "@/lib/settings";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import { isOwnedStaleTurnGeneration } from "@/routes/turn";
 
 export const ttsRoutes = apiRouter();
 
 const TTS_BODY = z.object({
   text: z.string().max(4_000),
+  turn_id: z.string().optional(),
+  generation: z.number().int().optional(),
 });
 
 // TTS errors carry a machine-readable `code` alongside the human message -
@@ -43,16 +46,19 @@ const ttsSynthesizeRoute = createRoute({
       content: { "application/json": { schema: TTS_ERROR } },
       description: "Not signed in.",
     },
+    409: { content: { "application/json": { schema: TTS_ERROR } }, description: "The reply was stopped." },
   },
 });
 
 ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   const actor = c.get("person");
   const body = c.req.valid("json");
+  if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
   const voiceId = getPersonSettingValue(actor, "tts.voice_id") as string;
+  const startedAt = Date.now();
   const result = await synthesizeSpeech(body.text, voiceId);
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }
-  return new Response(result.value.stream, { headers: { "content-type": result.value.contentType } });
+  return new Response(result.value.stream, { headers: { "content-type": result.value.contentType, "x-maipai-tts-ttfa-ms": String(Math.max(0, Date.now() - startedAt)) } });
 });

@@ -6758,6 +6758,12 @@
                   "text": {
                     "type": "string",
                     "maxLength": 4000
+                  },
+                  "turn_id": {
+                    "type": "string"
+                  },
+                  "generation": {
+                    "type": "integer"
                   }
                 },
                 "required": [
@@ -6803,6 +6809,28 @@
           },
           "401": {
             "description": "Not signed in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "code": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error",
+                    "code"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The reply was stopped.",
             "content": {
               "application/json": {
                 "schema": {

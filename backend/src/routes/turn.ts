@@ -83,6 +83,9 @@ function wireFor(accept: string | undefined): Wire {
 }
 
 interface ResumeSession {
+  generation: number;
+  startedAtMs: number;
+  sttMs: number | null;
   token: string;
   ownerId: string;
   // THIN-1E: who the stream is for, so the done value's raw error detail is admin-only.
@@ -111,6 +114,22 @@ interface ResumeSession {
 const resumeSessions = new Map<string, ResumeSession>();
 const inFlightTurns = new Map<string, ResumeSession>();
 
+export function isStaleTurnGeneration(turnId: string, generation: number | undefined): boolean {
+  const session = inFlightTurns.get(turnId);
+  return Boolean(session && generation !== undefined && generation < session.generation);
+}
+
+export function isOwnedStaleTurnGeneration(turnId: string, ownerId: string, generation: number | undefined): boolean {
+  const session = inFlightTurns.get(turnId);
+  return Boolean(session && session.ownerId === ownerId && isStaleTurnGeneration(turnId, generation));
+}
+
+export function staleGenerationEvent(event: TurnStreamEvent | ToolStreamEvent, stale: boolean): TurnStreamEvent | ToolStreamEvent | null {
+  if (!stale) return event;
+  if ("type" in event && (event.type === "done" || event.type === "error")) return { type: "error", error: "cancelled", code: "turn_cancelled" };
+  return null;
+}
+
 const cancelTurnRoute = createRoute({
   method: "post", path: "/{turn_id}/cancel", tags: ["Turns"],
   summary: "Cancel an in-flight turn",
@@ -132,6 +151,7 @@ turnRoutes.openapi(cancelTurnRoute, (c) => {
   if (flight && !flight.cancelled && !flight.terminal) {
     flight.controller.abort();
     flight.cancelled = true;
+    flight.generation += 1;
   }
   return c.json({ cancelled: wasInFlight }, 200);
 });
@@ -414,6 +434,7 @@ function streamResponse(session: ResumeSession, resumeFrom: number | null, wire:
 }
 
 function startResumeSession(session: ResumeSession): void {
+  const generation = session.generation;
   void (async () => {
     try {
       for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()))) {
@@ -422,10 +443,14 @@ function startResumeSession(session: ResumeSession): void {
         // real per-event sequence for both, or a `reasoning` event sitting
         // between two `delta` sequence numbers would never be redelivered
         // on a resume exactly at that boundary.
-        const event = rawEvent.type === "delta" || rawEvent.type === "reasoning" ? { ...rawEvent, sequence: ++session.sequence } : rawEvent;
+        const current = staleGenerationEvent(rawEvent, session.generation !== generation);
+        if (!current) continue;
+        const stamped = "type" in current && (current.type === "delta" || current.type === "reasoning" || current.type === "status" || current.type === "spoken_cue") ? { ...current, generation } : current;
+        const event = "type" in stamped && (stamped.type === "delta" || stamped.type === "reasoning") ? { ...stamped, sequence: ++session.sequence } : stamped;
+        const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: null, e2e_ms: Date.now() - session.startedAtMs } } } : event;
         // THIN-1E and CHAT-CALM-ERRORS-01b (rule 6): the done value and the
         // error event's admin detail pass the one viewer filter.
-        appendSessionEvent(session, streamEventForViewer(event, session.viewer));
+        appendSessionEvent(session, streamEventForViewer(withLatency as TurnStreamEvent, session.viewer));
       }
     } catch (err) {
       // streamTurnEvents() maps generation failures to a terminal event. This
@@ -757,6 +782,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     bare?: boolean;
     temporary?: boolean;
     spoken?: boolean;
+    stt_ms?: number;
     ask_answer?: unknown;
     document_attachments?: { name: string; media_type: string; data: string }[];
     images?: { id: string; name: string; width: number; height: number; media_type: string }[];
@@ -936,6 +962,9 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   }
 
   const session: ResumeSession = {
+    generation: 0,
+    startedAtMs: Date.now(),
+    sttMs: typeof body.stt_ms === "number" && Number.isFinite(body.stt_ms) && body.stt_ms >= 0 && body.stt_ms < 600_000 ? body.stt_ms : null,
     token: resumeToken,
     ownerId: actor.id,
     viewer: actor,
@@ -951,7 +980,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     turnId: result.turnId,
     controller: abortController,
     result,
-    events: [{ event: { type: "signal", signal: result.signal }, sequence: null, afterSequence: 0, terminal: false }],
+    events: [],
     subscribers: new Set(),
     sequence: 0,
     terminal: false,
@@ -970,6 +999,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   };
   resumeSessions.set(session.token, session);
   inFlightTurns.set(session.turnId, session);
+  appendSessionEvent(session, { type: "signal", signal: result.signal, generation: session.generation });
   startResumeSession(session);
   const response = streamResponse(session, null, wireFor(c.req.header("accept")));
   // The initial response has a signal in its replay buffer, but its meta
