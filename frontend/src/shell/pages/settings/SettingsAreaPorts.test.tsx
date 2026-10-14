@@ -69,6 +69,19 @@ describe("ported from the old settings page", () => {
     expect(view.getByText("Choose a look for this browser. It does not change your personal setting.")).toBeTruthy();
   });
 
+  test("Appearance shows the tour autostart switch and writes the person setting", async () => {
+    const view = open(makePerson("adult"), "/settings/account/appearance");
+    const toggle = await view.findByRole("switch", { name: "Start tours automatically" });
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(fixture!.puts).toContainEqual({
+      scope: "person:person-adult",
+      key: "tours.autostart.enabled",
+      value: false,
+    }));
+    await waitFor(() => expect(toggle.getAttribute("aria-checked")).toBe("false"));
+  });
+
   test("Notifications has the alert switch, muted senders and quiet hours rows", async () => {
     const view = open(makePerson("adult"), "/settings/account/notifications");
     await waitFor(() => expect(view.getByText("Show alerts on this device")).toBeTruthy());
