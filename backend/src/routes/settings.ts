@@ -103,7 +103,7 @@ const putRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: ResolvedSettingSchema } }, description: "The value as stored." },
-    ...errorResponses({ 400: "Invalid scope/key/value, or a newer value already exists", 401: "Not signed in", 403: "Not allowed to write this scope" }),
+    ...errorResponses({ 400: "Invalid scope/key/value, or a newer value already exists", 401: "Not signed in", 403: "A child needs a parent to choose a voice, or only the person may change their own voice" }),
   },
 });
 settingsRoutes.openapi(putRoute, async (c) => {

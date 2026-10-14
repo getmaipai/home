@@ -109,6 +109,30 @@ describe("GET /api/settings (list)", () => {
   });
 });
 
+describe("PUT /api/settings for tts.voice_id", () => {
+  test("a child writing their own tts.voice_id is refused with the next step", async () => {
+    const { childClient, childId } = await ownerAndChild();
+    const res = await childClient.request("/api/settings", { method: "PUT", body: { scope: `person:${childId}`, key: "tts.voice_id", value: "mira" } });
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: "A parent chooses your voice. Ask the person who manages Home to pick one for you." });
+  });
+
+  test("an admin writing a child's tts.voice_id works; an admin writing a teen's is refused", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const child = (await (await owner.post("/api/people", { displayName: "Bramble", role: "child" })).json()) as { id: string };
+    const teen = (await (await owner.post("/api/people", { displayName: "Nova", role: "teen" })).json()) as { id: string };
+    const setChild = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${child.id}`, key: "tts.voice_id", value: "alba" } });
+    expect(setChild.status).toBe(200);
+    const customChildVoice = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${child.id}`, key: "tts.voice_id", value: "hf://example/community" } });
+    expect(customChildVoice.status).toBe(403);
+    expect(await customChildVoice.json()).toEqual({ error: "A parent chooses your voice. Ask the person who manages Home to pick a preset voice for you." });
+    const setTeen = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${teen.id}`, key: "tts.voice_id", value: "mira" } });
+    expect(setTeen.status).toBe(403);
+    expect(await setTeen.json()).toEqual({ error: "That person chooses their own voice. Only they can change it." });
+  });
+});
+
 describe("PUT /api/settings (write)", () => {
   test("accepts engines.chat.choice = auto and leaves crisis behavior intact", async () => {
     const owner = new TestClient();
@@ -250,15 +274,16 @@ describe("PUT /api/settings for notifications.file_shared.muted_senders (a perso
 // assertCanAccessScope person branches existed but had nothing to
 // exercise them through the HTTP layer until this key was declared.
 describe("PUT /api/settings for tts.voice_id (the registry's first real person-scope key)", () => {
-  test("a person can set their own voice; list reflects it with source=user", async () => {
-    const { childClient, childId } = await ownerAndChild();
-    const put = await childClient.request("/api/settings", {
+  test("an adult can set their own voice; list reflects it with source=user", async () => {
+    const { owner } = await ownerAndChild();
+    const adultId = db.select().from(people).where(eq(people.displayName, "Sage")).get()!.id;
+    const put = await owner.request("/api/settings", {
       method: "PUT",
-      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "vera" },
+      body: { scope: `person:${adultId}`, key: "tts.voice_id", value: "vera" },
     });
     expect(put.status).toBe(200);
 
-    const res = await childClient.get(`/api/settings?scope=person:${childId}`);
+    const res = await owner.get(`/api/settings?scope=person:${adultId}`);
     const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;
     const voice = body.find((s) => s.key === "tts.voice_id");
     expect(voice?.value).toBe("vera");
@@ -283,11 +308,12 @@ describe("PUT /api/settings for tts.voice_id (the registry's first real person-s
     expect(put.status).toBe(200);
   });
 
-  test("a value outside Pocket TTS's known preset names is refused", async () => {
-    const { childClient, childId } = await ownerAndChild();
-    const res = await childClient.request("/api/settings", {
+  test("a value outside the known preset names is refused", async () => {
+    const { owner } = await ownerAndChild();
+    const adultId = db.select().from(people).where(eq(people.displayName, "Sage")).get()!.id;
+    const res = await owner.request("/api/settings", {
       method: "PUT",
-      body: { scope: `person:${childId}`, key: "tts.voice_id", value: "not-a-real-voice" },
+      body: { scope: `person:${adultId}`, key: "tts.voice_id", value: "not-a-real-voice" },
     });
     expect(res.status).toBe(400);
   });
@@ -553,8 +579,8 @@ describe("lib/settings.ts getPersonSettingValue()", () => {
   });
 
   test("resolves a stored value once one exists", async () => {
-    const { childClient, childId, childPerson } = await ownerAndChild();
-    await childClient.request("/api/settings", {
+    const { owner, childId, childPerson } = await ownerAndChild();
+    await owner.request("/api/settings", {
       method: "PUT",
       body: { scope: `person:${childId}`, key: "tts.voice_id", value: "estelle" },
     });
@@ -583,7 +609,7 @@ describe("lib/settings.ts getPersonSettingValue()", () => {
       method: "PUT",
       body: { scope: `person:${ownerPerson.id}`, key: "tts.voice_id", value: "jean" },
     });
-    await childClient.request("/api/settings", {
+    await owner.request("/api/settings", {
       method: "PUT",
       body: { scope: `person:${childId}`, key: "tts.voice_id", value: "estelle" },
     });

@@ -16,6 +16,7 @@ import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
+import { VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { BLOCKLIST_KEYS } from "@/lib/blocklists/policy";
 import { blocklistStatusNote } from "@/lib/blocklists/status";
@@ -103,6 +104,17 @@ export function assertCanAccessScope(
 function assertCanAccessWakewordDeviceSetting(actor: PersonRow): SettingsOpResult<true> {
   if (isOwnerOrAdmin(actor) || actor.role === "adult") return { ok: true, value: true };
   return { ok: false, status: 403, error: "only a household adult may access the wakeword setting" };
+}
+
+export function assertCanSetTtsVoice(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  const targetRole = getPersonRole(targetId);
+  if (!targetRole) return { ok: false, status: 403, error: "That person cannot choose a voice here. Ask the person who manages Home to check the household profiles." };
+  if (actor.id === targetId) {
+    if (targetRole === "child") return { ok: false, status: 403, error: "A parent chooses your voice. Ask the person who manages Home to pick one for you." };
+    return { ok: true, value: true };
+  }
+  if (isOwnerOrAdmin(actor) && targetRole === "child") return { ok: true, value: true };
+  return { ok: false, status: 403, error: "That person chooses their own voice. Only they can change it." };
 }
 
 function assertCanSetPhotoUploads(actor: PersonRow, targetId: string): SettingsOpResult<true> {
@@ -609,6 +621,8 @@ export function setValue(
         ? assertCanSetSessionLock(actor, parsed.id!)
       : key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
         ? assertCanAccessWakewordDeviceSetting(actor)
+        : key === "tts.voice_id" && parsed.kind === "person"
+          ? assertCanSetTtsVoice(actor, parsed.id!)
         : key === "chat.photo_uploads" && parsed.kind === "person"
           ? assertCanSetPhotoUploads(actor, parsed.id!)
         : key === "reference.images" && parsed.kind === "person"
@@ -621,6 +635,10 @@ export function setValue(
           ? assertCanSetPersonStorageCap(actor, parsed.id!)
           : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
+
+  if (key === "tts.voice_id" && parsed.kind === "person" && getPersonRole(parsed.id!) === "child" && isOwnerOrAdmin(actor) && !VOICE_PRESET_NAMES.includes(value as typeof VOICE_PRESET_NAMES[number])) {
+    return { ok: false, status: 403, error: "A parent chooses your voice. Ask the person who manages Home to pick a preset voice for you." };
+  }
 
   if (key === LEGACY_HOME_PLACE_KEY) {
     const trimmed = typeof value === "string" ? value.trim() : "";
@@ -778,6 +796,8 @@ export function getPersonSettingSource(personId: string, key: string): string | 
 export function setPersonTtsVoiceUnchecked(actor: PersonRow, hfPath: string): SettingsOpResult<ResolvedSetting> {
   const keyDef = getRegistryKey("tts.voice_id");
   if (!keyDef) return { ok: false, status: 400, error: "unknown settings key: tts.voice_id" };
+  const authorization = assertCanSetTtsVoice(actor, actor.id);
+  if (!authorization.ok) return authorization;
   return writeValue(`person:${actor.id}`, keyDef, hfPath, { skipValidation: true, ...responseContext(actor, actor, "person") });
 }
 

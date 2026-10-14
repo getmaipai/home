@@ -917,6 +917,8 @@ export const api = {
   },
   selectClonedVoice: (id: string) =>
     request<ResolvedSetting>(`/api/voice/cloned/${encodeURIComponent(id)}/select`, { method: "POST" }),
+  selectCatalogVoice: (path: string) =>
+    request<ResolvedSetting>("/api/voice/catalog/select", { method: "POST", body: JSON.stringify({ path }) }),
   deleteClonedVoice: (id: string) =>
     request<{ success: true }>(`/api/voice/cloned/${encodeURIComponent(id)}/delete`, { method: "POST" }),
   resetSetting: (scope: string, key: string) =>

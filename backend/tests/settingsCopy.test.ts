@@ -74,7 +74,8 @@ describe("settings guard agreement metadata", () => {
       const value = writableValue(key, owner.id);
       for (const [band, person] of [["child", child], ["teen", teen], ["adult", adult]] as const) {
         const result = setValue(person, `person:${person.id}`, key.key, value);
-        expect(result.ok, `${key.key} ${band} self write`).toBe(key.control?.[band] === "self");
+        const childVoiceGuard = key.key === "tts.voice_id" && band === "child";
+        expect(result.ok, `${key.key} ${band} self write`).toBe(childVoiceGuard ? false : key.control?.[band] === "self");
         // Topic levels exist for a child only; assertCanSetChildTopic refuses a teen or adult target (topicSettingsAccess.test.ts).
         if (key.key.startsWith("topics.") && band !== "child") continue;
         if (key.control?.[band] === "guardian") {

@@ -87,5 +87,5 @@ export function SettingsView({ view, person, onPersonChange }: SettingsViewProps
 
 function AccountVoiceControls({ person }: SettingsViewProps) {
   useTabItem("Voice");
-  return <ClonedVoicesSection person={person} />;
+  return <><VoiceBrowserSection person={person} /><ClonedVoicesSection person={person} /></>;
 }

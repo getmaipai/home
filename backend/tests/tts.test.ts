@@ -124,14 +124,14 @@ describe("POST /api/tts", () => {
         method: "PUT",
         body: { scope: `person:${ownerPerson.id}`, key: "tts.voice_id", value: "estelle" },
       });
-      await childClient.request("/api/settings", {
+      await owner.request("/api/settings", {
         method: "PUT",
-        body: { scope: `person:${childId}`, key: "tts.voice_id", value: "jean" },
+        body: { scope: `person:${childId}`, key: "tts.voice_id", value: "alba" },
       });
 
       await owner.post("/api/tts", { text: "hi" });
       await childClient.post("/api/tts", { text: "hi" });
-      expect(receivedVoiceUrls).toEqual(["estelle", "jean"]);
+      expect(receivedVoiceUrls).toEqual(["estelle", "alba"]);
     });
   });
 });

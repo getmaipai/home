@@ -5121,7 +5121,7 @@
             }
           },
           "403": {
-            "description": "Not allowed to write this scope",
+            "description": "A child needs a parent to choose a voice, or only the person may change their own voice",
             "content": {
               "application/json": {
                 "schema": {

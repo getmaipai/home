@@ -102,6 +102,19 @@ describe("ClonedVoicesSection", () => {
     }
   });
 
+  test("a child can view cloned voices but has no select control", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = stubFetch();
+    try {
+      const { findByText, queryAllByText } = render(<ClonedVoicesSection person={makePerson({ id: "person-nova", display_name: "Nova", role: "child" })} />);
+      await findByText("Dad's voice");
+      await findByText("Nova's voice");
+      expect(queryAllByText("Use this voice").length).toBe(0);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test("an owner sees household cloned voices and may delete them", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = stubFetch();

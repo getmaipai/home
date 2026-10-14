@@ -4508,6 +4508,7 @@ async function captureVoiceBrowserReview(browser: Browser, sessionValue: string)
   mkdirSync(outDir, { recursive: true });
   const fixture = [
     { id: "voice-alba", name: "Alba", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "" },
+    { id: "voice-cosette", name: "Cosette", description: "A clear, warm voice", language: "en", country: "US", gender: "female", source: "preset", onDisk: true, licence: null, revision: "" },
     { id: "voice-download", name: "Voice to add", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "preset", onDisk: false, licence: null, revision: "" },
   ];
   const pcmBytes = 320_000;
@@ -4516,10 +4517,56 @@ async function captureVoiceBrowserReview(browser: Browser, sessionValue: string)
   wav.set(new TextEncoder().encode("RIFF"), 0); view.setUint32(4, 36 + pcmBytes, true); wav.set(new TextEncoder().encode("WAVEfmt "), 8);
   view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 16_000, true);
   view.setUint32(28, 32_000, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); wav.set(new TextEncoder().encode("data"), 36); view.setUint32(40, pcmBytes, true);
+  const demoPeople = await (await fetch(`${BASE_URL}/api/people`, { headers: { Cookie: `session=${sessionValue}` } })).json() as Array<{ id: string; display_name: string; role: string }>;
+  const nova = demoPeople.find((entry) => entry.display_name === "Nova" && entry.role === "child");
+  if (!nova) throw new Error("voice browser review: the seeded child Nova is required");
+  const childLogin = await fetch(`${BASE_URL}/api/auth/select`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: nova.id }) });
+  const childSession = childLogin.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!childSession) throw new Error("voice browser review: Nova sign-in returned no session");
+  const adultCreate = await fetch(`${BASE_URL}/api/people`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` }, body: JSON.stringify({ displayName: "Riff", role: "adult", secret: "2468" }) });
+  if (!adultCreate.ok) throw new Error(`voice browser review: Riff creation failed: ${adultCreate.status} ${await adultCreate.text()}`);
+  const adultId = ((await adultCreate.json()) as { id: string }).id;
+  const adultLogin = await fetch(`${BASE_URL}/api/auth/verify-secret`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: adultId, secret: "2468" }) });
+  const adultSession = adultLogin.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!adultSession) throw new Error("voice browser review: Riff sign-in returned no session");
+  const adminCreate = await fetch(`${BASE_URL}/api/people`, { method: "POST", headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` }, body: JSON.stringify({ displayName: "Admin", role: "admin", secret: "1357" }) });
+  if (!adminCreate.ok) throw new Error(`voice browser review: Admin creation failed: ${adminCreate.status} ${await adminCreate.text()}`);
+  const adminId = ((await adminCreate.json()) as { id: string }).id;
+  const adminLogin = await fetch(`${BASE_URL}/api/auth/verify-secret`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ personId: adminId, secret: "1357" }) });
+  const adminSession = adminLogin.headers.get("set-cookie")?.split(";")[0]?.split("=")[1];
+  if (!adminSession) throw new Error("voice browser review: Admin sign-in returned no session");
+
+  const sessionCookie = (value: string) => ({ Cookie: `session=${value}` });
+  async function readVoice(personId: string, cookie: string): Promise<unknown> {
+    const response = await fetch(`${BASE_URL}/api/settings?scope=person:${personId}`, { headers: sessionCookie(cookie) });
+    if (!response.ok) throw new Error(`voice browser review: settings read failed ${response.status}`);
+    return ((await response.json()) as Array<{ key: string; value: unknown }>).find((entry) => entry.key === "tts.voice_id")?.value;
+  }
+  async function writeVoice(personId: string, voice: string, cookie: string): Promise<Response> {
+    return fetch(`${BASE_URL}/api/settings`, { method: "PUT", headers: { ...sessionCookie(cookie), "Content-Type": "application/json" }, body: JSON.stringify({ scope: `person:${personId}`, key: "tts.voice_id", value: voice }) });
+  }
+  const adultWrite = await writeVoice(adultId, "cosette", adultSession);
+  if (!adultWrite.ok || await readVoice(adultId, adultSession) !== "cosette") throw new Error("voice browser review: adult preset write did not persist as cosette");
+  const childWrite = await writeVoice(nova.id, "cosette", adminSession);
+  if (!childWrite.ok || await readVoice(nova.id, adminSession) !== "cosette") throw new Error(`voice browser review: admin child preset write failed: ${childWrite.status} ${await childWrite.text()}`);
+  const childSelfWrite = await writeVoice(nova.id, "alba", childSession);
+  const childSelfBody = await childSelfWrite.json() as { error?: string };
+  if (childSelfWrite.status !== 403 || childSelfBody.error !== "A parent chooses your voice. Ask the person who manages Home to pick one for you.") throw new Error(`voice browser review: child self-write refusal mismatch ${childSelfWrite.status} ${childSelfBody.error}`);
+  const marlow = demoPeople.find((entry) => entry.display_name === "Marlow" && entry.role === "teen");
+  if (!marlow) throw new Error("voice browser review: seeded demo teen Marlow is required");
+  const teenWrite = await writeVoice(marlow.id, "cosette", adminSession);
+  const teenBody = await teenWrite.json() as { error?: string };
+  if (teenWrite.status !== 403 || teenBody.error !== "That person chooses their own voice. Only they can change it.") throw new Error(`voice browser review: admin teen-write refusal mismatch ${teenWrite.status} ${teenBody.error}`);
+  console.log(`voice-browser live checks: adult ${await readVoice(adultId, adultSession)}, child ${await readVoice(nova.id, adminSession)}, child self-write 403 ${childSelfBody.error}, admin teen-write 403 ${teenBody.error}`);
+  const resetAdult = await writeVoice(adultId, "alba", adultSession);
+  if (!resetAdult.ok) throw new Error(`voice browser review: could not reset disposable adult fixture: ${resetAdult.status}`);
+
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
     for (const theme of THEMES) {
-      const context = await newContext(browser, viewport, theme, sessionValue);
+      const resetChild = await writeVoice(nova.id, "cosette", adminSession);
+      if (!resetChild.ok) throw new Error(`voice browser review: could not reset child capture state: ${resetChild.status}`);
+      const context = await newContext(browser, viewport, theme, adminSession);
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
@@ -4534,24 +4581,50 @@ async function captureVoiceBrowserReview(browser: Browser, sessionValue: string)
         });
         await page.route("**/api/voice/voices", (route) => route.fulfill({ json: { voices: fixture } }));
         await page.route("**/api/voice/voices/*/preview", (route) => route.fulfill({ status: 200, contentType: "audio/wav", body: Buffer.from(wav) }));
+        await page.route("**/api/voice/voices/*/preview", (route) => route.fulfill({ status: 200, contentType: "audio/wav", body: Buffer.from(wav) }));
+        await page.route("**/api/voice/voices", (route) => route.fulfill({ json: { voices: fixture } }));
         await page.goto(`${BASE_URL}/settings/home/voices`);
-        const rows = page.locator(slug === "phone" ? "[data-slot='data-table-cards']" : "[data-slot='data-table-body']");
-        await rows.getByText("Alba", { exact: true }).first().waitFor();
-        await rows.getByRole("button", { name: "Play" }).first().click();
-        await rows.getByRole("button", { name: "Stop" }).first().waitFor();
-        const download = rows.getByRole("button", { name: "Download" }).first();
-        await download.waitFor();
-        if (slug === "phone") await download.evaluate((button) => {
-          let scroller = button.parentElement;
-          while (scroller && scroller.scrollHeight <= scroller.clientHeight) scroller = scroller.parentElement;
-          if (scroller) scroller.scrollTop = 230;
-        });
-        await settleAnimations(page);
-        const file = `voice-browser-preview-download-${slug}-${theme}.png`;
-        await page.screenshot({ path: join(outDir, file), fullPage: false });
-        console.log(`Wrote ${join(outDir, file)}`);
-        dedicatedScreenshots.push({ file, route: "/settings/home/voices", viewport: slug, theme });
+        await page.getByText("Browse voices", { exact: true }).waitFor();
+        const choosing = page.getByRole("combobox", { name: "Choosing a voice for" });
+        await choosing.click();
+        await page.getByRole("option", { name: "Nova" }).click();
+        await page.getByText("Ask a parent to choose your voice.").waitFor();
+        await page.locator('[data-slot="item"]').filter({ hasText: "Alba" }).getByRole("button", { name: "Use this voice" }).click();
+        await page.getByRole("row").filter({ hasText: "Alba" }).getByText("Current voice").waitFor();
+        if (await readVoice(nova.id, adminSession) !== "alba") throw new Error("voice browser review: admin UI child choice did not persist as alba");
+        await page.screenshot({ path: join(outDir, `voice-browser-admin-child-${slug}-${theme}.png`) });
+        dedicatedScreenshots.push({ file: `voice-browser-admin-child-${slug}-${theme}.png`, route: "/settings/home/voices", viewport: slug, theme });
+        await context.close();
       } finally { await context.close(); }
+
+      const childContext = await newContext(browser, viewport, theme, childSession);
+      try {
+        const page = await childContext.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/voice/voices", (route) => route.fulfill({ json: { voices: fixture } }));
+        await page.goto(`${BASE_URL}/settings/account/voice`);
+        await page.getByText("Ask a parent to choose your voice.").waitFor();
+        await page.getByRole("row").filter({ hasText: "Alba" }).waitFor();
+        await page.screenshot({ path: join(outDir, `voice-browser-child-${slug}-${theme}.png`) });
+        dedicatedScreenshots.push({ file: `voice-browser-child-${slug}-${theme}.png`, route: "/settings/account/voice", viewport: slug, theme });
+      } finally { await childContext.close(); }
+
+      const adultContext = await newContext(browser, viewport, theme, adultSession);
+      try {
+        const resetAdult = await writeVoice(adultId, "alba", adultSession);
+        if (!resetAdult.ok) throw new Error(`voice browser review: could not reset adult capture state: ${resetAdult.status}`);
+        const page = await adultContext.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/voice/voices", (route) => route.fulfill({ json: { voices: fixture } }));
+        await page.goto(`${BASE_URL}/settings/account/voice`);
+        await page.getByText("Browse voices", { exact: true }).waitFor();
+        await page.getByRole("row").filter({ hasText: "Cosette" }).getByRole("button", { name: "Use this voice" }).click();
+        await page.reload();
+        await page.getByRole("row").filter({ hasText: "Cosette" }).getByText("Current voice").waitFor();
+        if (await readVoice(adultId, adultSession) !== "cosette") throw new Error("voice browser review: adult UI choice did not persist as cosette after reload");
+        await page.screenshot({ path: join(outDir, `voice-browser-adult-${slug}-${theme}.png`) });
+        dedicatedScreenshots.push({ file: `voice-browser-adult-${slug}-${theme}.png`, route: "/settings/account/voice", viewport: slug, theme });
+      } finally { await adultContext.close(); }
     }
   }
 }

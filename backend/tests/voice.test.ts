@@ -296,6 +296,11 @@ describe("household voice catalog routes", () => {
     const adultClient = await clientFor(adult.id);
     const teenClient = await clientFor(teen.id);
     const childClient = await clientFor(child.id);
+    const upload = new FormData();
+    upload.set("label", "Sage voice");
+    upload.set("file", wavFile());
+    const uploaded = (await (await owner.postForm("/api/voice/cloned", upload)).json()) as { id: string };
+    expect((await childClient.post(`/api/voice/cloned/${uploaded.id}/select`, {})).status).toBe(403);
     // Owner/admin proceed to the catalog fetch; use an unreachable local endpoint so the test stays offline.
     expect((await adminClient.get("/api/voice/catalog")).status).toBe(503);
     expect((await owner.get("/api/voice/catalog")).status).toBe(503);
@@ -304,5 +309,6 @@ describe("household voice catalog routes", () => {
       expect((await member.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(403);
     }
     expect((await adminClient.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(503);
+    expect((await childClient.post("/api/voice/catalog/select", { path: "en/example.wav" })).status).toBe(403);
   });
 });

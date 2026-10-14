@@ -173,11 +173,12 @@ describe("deleteClonedVoice()", () => {
     const nova = makePerson("Nova", "child");
     const saved = saveClonedVoice(jesse, "Dad's voice", WAV_BYTES, "audio/wav");
     if (!saved.ok) throw new Error("setup failed");
-    setPersonTtsVoiceUnchecked(nova, "some-other-preset");
+    setPersonTtsVoiceUnchecked(nova, "alba");
+    expect(getPersonSettingValue(nova, "tts.voice_id")).toBe("alba");
 
     deleteClonedVoice(jesse, saved.value.id);
 
-    expect(getPersonSettingValue(nova, "tts.voice_id")).toBe("some-other-preset");
+    expect(getPersonSettingValue(nova, "tts.voice_id")).toBe("alba");
   });
 
   // A code review (2026-09-04) found the original cleanup compared the

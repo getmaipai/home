@@ -145,9 +145,9 @@ export function ClonedVoicesSection({ person }: ClonedVoicesSectionProps) {
                     <span className="text-base text-[var(--muted-foreground)]">Uploaded by {voice.creatorName}</span>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => selectVoice(voice.id)}>
+                    {person.role !== "child" ? <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => selectVoice(voice.id)}>
                       {pendingId === voice.id ? "Setting…" : "Use this voice"}
-                    </Button>
+                    </Button> : null}
                     {canManage || voice.creatorId === person.id ? (
                       <Button variant="secondary" disabled={pendingId === voice.id} onClick={() => deleteVoice(voice.id)}>Delete</Button>
                     ) : null}

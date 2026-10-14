@@ -1,21 +1,18 @@
 import { describe, expect, test } from "bun:test";
-import { toVoiceRow, distinctFilterValues, applyVoiceFilters, presetNameForVoice } from "@/lib/voice/voiceBrowserRows";
-import type { StackVoice } from "@/lib/api";
+import type { PersonRosterEntry, Roster, StackVoice } from "@/lib/api";
+import { listForTarget, voiceTargets } from "@/lib/voice/voiceBrowserRows";
 
-const voice = (id: string, extra: Partial<StackVoice> = {}): StackVoice => ({ id, name: id, description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "unknown", onDisk: false, licence: null, revision: "", ...extra });
+const person = (id: string, role: Roster["role"]) => ({ id, display_name: id, role } as Roster & PersonRosterEntry);
+const voices = [{ id: "one", source: "preset" }, { id: "two", source: "community" }, { id: "three", source: "cloned" }] as StackVoice[];
 
-describe("voice browser row helpers", () => {
-  test("keeps unknown metadata and maps country and language as plain text", () => {
-    expect(toVoiceRow(voice("x"))).toMatchObject({ description: "unknown", languageCountry: "unknown / unknown", gender: "unknown" });
+describe("voice browser target helpers", () => {
+  test("voiceTargets lists owner and children only for an admin", () => {
+    const roster = [person("owner", "owner"), person("admin", "admin"), person("adult", "adult"), person("teen", "teen"), person("child", "child")];
+    expect(voiceTargets(roster as PersonRosterEntry[], roster[1]!)).toEqual([roster[1]!, roster[4]!]);
+    expect(voiceTargets(roster as PersonRosterEntry[], roster[2]!)).toEqual([]);
   });
-  test("builds distinct filter values and applies all filters together", () => {
-    const rows = [voice("a", { language: "en", country: "US", gender: "female", source: "preset" }), voice("b", { language: "fr", country: "FR", gender: "male", source: "community" })].map(toVoiceRow);
-    expect(distinctFilterValues(rows).language).toEqual(["en", "fr"]);
-    expect(applyVoiceFilters(rows, { language: "en", country: "__all", gender: "__all", source: "__all" })).toHaveLength(1);
-    expect(applyVoiceFilters(rows, { language: "en", country: "US", gender: "__all", source: "preset" })).toHaveLength(1);
-  });
-  test("maps Stack ids using the resolved setting options", () => {
-    expect(presetNameForVoice("engine-a-voice-alba", ["alba", "mira"])).toBe("alba");
-    expect(presetNameForVoice("other", ["alba", "mira"])).toBeNull();
+  test("listForTarget restricts children to preset voices", () => {
+    expect(listForTarget(voices, person("child", "child")).map((voice) => voice.id)).toEqual(["one"]);
+    expect(listForTarget(voices, person("adult", "adult"))).toEqual(voices);
   });
 });

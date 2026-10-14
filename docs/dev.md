@@ -36879,3 +36879,9 @@ preview command; it lives under the ignored `.setup-preview/` directory.
 Run `bun run setup:preview:screenshots` while preview is running to capture the
 seeded screens at desktop/mobile widths in both color schemes. Captures are
 written under ignored `.setup-preview-captures/`.
+
+### VOICE-BROWSER-01D: person and child voice picker (2026-10-14)
+
+The companion's spoken voice and a person's selected voice share the single person setting `tts.voice_id`; `/api/tts` reads that value for the signed-in person. There is no second companion voice store. An adult may set their own voice. An owner or admin may set a child's voice from the voice browser. Teens and other adults only choose their own. Children see preset voices and cannot change their own voice; the UI says "Ask a parent to choose your voice." and the backend enforces the same rule in `assertCanSetTtsVoice()` from both `PUT /api/settings` and the existing arbitrary-voice setter used by catalog and cloned select routes. A child target accepts preset values only.
+
+The browser's installed preset rows write to the normal person settings route. Community and cloned rows have no browser Use action unless a Stack ID exactly matches the catalog path or cloned ID accepted by an existing select route; the current Stack voice shape exposes no exact mapping for those non-preset rows, so they remain a Stack-wire follow-up. The kit ships `Select`, `DataTable.rowActions`, `Chip`, and a fitting `Item` with outline, content and action parts. The browser uses up to six top choices from the Stack list order and includes name, description, language, Play, and the current-voice mark.
