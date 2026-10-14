@@ -58,7 +58,7 @@ describe("POST /api/grants", () => {
     const now = new Date().toISOString();
     const me = await owner.get("/api/auth/me");
     const actorId = ((await me.json()) as { id: string }).id;
-    for (const [id, action] of [["grant-held-integration", permission], ["grant-held-grant", "people.grant"]]) {
+    for (const [id, action] of [["grant-held-integration", permission], ["grant-held-grant", "people.grant"]] as const) {
       db.insert(grants).values({
         id, person: holder.id, action, effect: "allow", validFrom: null, validTo: null,
         grantedByPersonId: actorId, reason: null, acknowledgedAt: null, acknowledgedByPersonId: null,
