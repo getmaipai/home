@@ -15,6 +15,9 @@ import { db } from "@/db";
 import { grants, people } from "@/db/schema";
 import { newGrantId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
+import { effectivePermissions } from "@/lib/permissions";
+import type { Role } from "@/middleware/auth";
+import grantActions from "@maipai/spec/vocab/grant-actions.json" with { type: "json" };
 import { validateGrant, matchGrantAction } from "@maipai/spec/records/ts/validate.js";
 import { Grant } from "@maipai/spec/gen/ts/grant.js";
 import type { Grant as GrantT } from "@maipai/spec/gen/ts/grant.js";
@@ -71,10 +74,54 @@ export interface GrantCreate {
   acknowledged_by_person_id?: string | null;
 }
 
-export function createGrant(actor: { id: string }, input: GrantCreate): OpResult<GrantT> {
+const OWNER_ONLY_GRANT_ACTIONS = new Set(["backups.restore"]);
+const ADMIN_HELD_GRANT_ACTIONS = new Set([
+  "use:<package>",
+  "packages.use_all",
+  "packages.install",
+  "packages.remove",
+  "skills.use_all",
+  "commands.create",
+  "integration:<id>",
+  "tool.offer:show_images",
+  "chat.unrestricted",
+  "generate.unrestricted",
+  "memory.read_household",
+  "memory.write_household",
+  "people.manage",
+  "people.grant",
+  "settings.household",
+  "settings.admin",
+  "devices.manage",
+  "backups.run",
+  "relationships.manage",
+  "share.create",
+  "upload.photo",
+  "search.hosted",
+  "search.safe_search",
+  "search.household_subject",
+  "notify.person",
+  "approvals.decide",
+]);
+const GRANT_AUTHORITY_ERROR = "You can't give someone a permission you don't have. Ask the owner to grant it.";
+
+export function grantActionClassificationIsComplete(): boolean {
+  const classified = new Set([...OWNER_ONLY_GRANT_ACTIONS, ...ADMIN_HELD_GRANT_ACTIONS]);
+  return grantActions.actions.every((action) => classified.has(action.id)) &&
+    [...classified].every((action) => grantActions.actions.some((entry) => entry.id === action));
+}
+
+function actorHoldsAction(actor: { id: string; role: Role }, action: string): boolean {
+  if (actor.role === "owner") return true;
+  if (actor.role === "admin" && ADMIN_HELD_GRANT_ACTIONS.has(action) && !OWNER_ONLY_GRANT_ACTIONS.has(action)) return true;
+  return effectivePermissions(actor.id).some((permission) => permission.action === action && permission.effect === "allow");
+}
+
+export function createGrant(actor: { id: string; role: Role }, input: GrantCreate): OpResult<GrantT> {
   const person = db.select({ id: people.id }).from(people).where(and(eq(people.id, input.person), isNull(people.deletedAt))).get();
   if (!person) return { ok: false, status: 400, error: "person does not name an existing profile" };
   if (!matchGrantAction(input.action)) return { ok: false, status: 400, error: `unknown grant action: ${input.action}` };
+  if (!actorHoldsAction(actor, input.action)) return { ok: false, status: 400, error: GRANT_AUTHORITY_ERROR };
 
   const now = new Date().toISOString();
   const candidate = Grant.safeParse({

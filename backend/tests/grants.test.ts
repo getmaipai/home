@@ -1,8 +1,13 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { grantActionClassificationIsComplete } from "@/lib/grants";
 
 beforeEach(() => resetDb());
+
+test("every catalog grant action has exactly one authority classification", () => {
+  expect(grantActionClassificationIsComplete()).toBe(true);
+});
 
 async function ownerSession(): Promise<TestClient> {
   const client = new TestClient();
@@ -22,7 +27,46 @@ async function makeAdult(owner: TestClient, name: string): Promise<{ id: string;
   return { id, client };
 }
 
+async function makeAdmin(owner: TestClient, name: string): Promise<{ id: string; client: TestClient }> {
+  const res = await owner.post("/api/people", { displayName: name, role: "admin", secret: "0000" });
+  const { id } = (await res.json()) as { id: string };
+  const client = new TestClient();
+  await client.post("/api/auth/verify-secret", { personId: id, secret: "0000" });
+  return { id, client };
+}
+
 describe("POST /api/grants", () => {
+  test("an admin cannot grant backups.restore to themselves or another person", async () => {
+    const owner = await ownerSession();
+    const admin = await makeAdmin(owner, "Marlow");
+    const other = await makeAdult(owner, "Iris");
+
+    for (const person of [admin.id, other.id]) {
+      const res = await admin.client.post("/api/grants", { person, action: "backups.restore", effect: "allow" });
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: "You can't give someone a permission you don't have. Ask the owner to grant it." });
+    }
+    expect((await owner.get("/api/grants")).status).toBe(200);
+    expect(((await (await owner.get(`/api/grants?person=${admin.id}`)).json()) as unknown[])).toHaveLength(0);
+    expect(((await (await owner.get(`/api/grants?person=${other.id}`)).json()) as unknown[])).toHaveLength(0);
+  });
+
+  test("an owner can grant backups.restore", async () => {
+    const owner = await ownerSession();
+    const { id } = await makeAdult(owner, "Marlow");
+    const res = await owner.post("/api/grants", { person: id, action: "backups.restore", effect: "allow" });
+    expect(res.status).toBe(201);
+  });
+
+  test("an admin can grant an action the admin holds", async () => {
+    const owner = await ownerSession();
+    const admin = await makeAdmin(owner, "Marlow");
+    const other = await makeAdult(owner, "Iris");
+    await owner.post("/api/grants", { person: admin.id, action: "backups.restore", effect: "allow" });
+    const res = await admin.client.post("/api/grants", { person: other.id, action: "backups.restore", effect: "allow" });
+    expect(res.status).toBe(201);
+  });
+
   test("an owner can grant an adult a household-management action", async () => {
     const owner = await ownerSession();
     const { id, client } = await makeAdult(owner, "Marlow");

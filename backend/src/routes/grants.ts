@@ -8,6 +8,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth, requireRoleOrGrant } from "@/middleware/auth";
 import { createGrant, listGrants, revokeGrant } from "@/lib/grants";
 import { Grant } from "@maipai/spec/gen/ts/grant.js";
+import type { Role } from "@/middleware/auth";
 
 export const grantsRoutes = apiRouter();
 
@@ -65,7 +66,7 @@ const createRoute_ = createRoute({
 });
 grantsRoutes.openapi(createRoute_, (c) => {
   const actor = c.get("person");
-  const result = createGrant(actor, c.req.valid("json"));
+  const result = createGrant({ id: actor.id, role: actor.role as Role }, c.req.valid("json"));
   if (!result.ok || !result.value) return c.json({ error: result.error ?? "invalid grant" }, 400);
   return c.json(result.value, 201);
 });
