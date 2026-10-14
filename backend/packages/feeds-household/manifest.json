@@ -1,10 +1,10 @@
 {
   "id": "feeds-household",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "module",
   "category": "Info",
   "display": "Household news feeds",
-  "description": "Fill the News shelf with headlines from public news sites, for teens and adults.",
+  "description": "Fill the News shelf with public headlines, including NASA news releases, for teens and adults.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -45,12 +45,22 @@
       "who": "PBS",
       "opt_in": true,
       "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-nasa-gov",
+      "destination": "NASA's own public news feed (www.nasa.gov)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "NASA",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
     }
   ],
   "permissions": [
     "net:feeds.bbci.co.uk",
     "net:feeds.npr.org",
-    "net:www.pbs.org"
+    "net:www.pbs.org",
+    "net:www.nasa.gov"
   ],
   "notifications": [],
   "backup": "exclude",

@@ -12,6 +12,12 @@
       "title": "Science News Explores",
       "publisher": "Science News Explores",
       "lang": "en"
+    },
+    {
+      "url": "https://www.nasa.gov/feeds/iotd-feed/",
+      "title": "NASA Image of the Day",
+      "publisher": "NASA",
+      "lang": "en"
     }
   ]
 }

@@ -18,6 +18,12 @@
       "title": "PBS NewsHour headlines",
       "publisher": "PBS NewsHour",
       "lang": "en"
+    },
+    {
+      "url": "https://www.nasa.gov/news-release/feed/",
+      "title": "NASA news releases",
+      "publisher": "NASA",
+      "lang": "en"
     }
   ]
 }

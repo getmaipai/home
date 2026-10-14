@@ -2,6 +2,12 @@
 
 All notable changes to the Household news feeds package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.0] - 2026-10-14
+
+### Added
+
+- NASA news releases.
+
 ## [0.1.0] - 2026-10-12
 
 ### Added

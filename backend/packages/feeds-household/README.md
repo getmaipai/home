@@ -5,7 +5,7 @@ The list of news feeds behind the "Household news" choice on the News shelf.
 
 ## What it gives you
 
-Headlines from: NPR News, BBC News, PBS NewsHour headlines.
+Headlines from: NPR News, BBC News, PBS NewsHour headlines, NASA news releases.
 
 It adds no questions to ask. It only feeds the News shelf, and the News
 shelf feeds the "what's the news" answer.

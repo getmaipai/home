@@ -27,5 +27,5 @@ silver:
     note: no auth to diagnose (keyless public feeds)
 gold:
   real_service_verified:
-    met: false
-    note: feed addresses not yet checked against the live publishers
+    met: true
+    note: "2026-10-14: checked https://www.nasa.gov/news-release/feed/ and https://www.nasa.gov/feeds/iotd-feed/"
