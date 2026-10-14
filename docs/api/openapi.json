@@ -19907,6 +19907,16 @@
                 }
               }
             }
+          },
+          "403": {
+            "description": "Only owner/admin may view away setup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }

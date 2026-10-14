@@ -27,6 +27,7 @@ import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
 import { detectLanIps } from "@/lib/hubEndpoints";
+import { getTailscaleLeafForServer } from "@/lib/tailscale";
 import { configuredHubPort, configuredLanExposure } from "@/lib/networkSettings";
 import { installConsoleFileMirror, installFatalErrorHandlers, appendLogLine } from "@/lib/log";
 import { shutdownEngines } from "@/lib/hubShutdown";
@@ -352,6 +353,10 @@ attachHouseholdTlsRebind({
   fetch: app.fetch,
   websocket,
   networkAddresses: detectLanIps,
+  tailscaleTls: () => {
+    const leaf = getTailscaleLeafForServer();
+    return leaf ? { ...leaf, name: leaf.name } : null;
+  },
   exposure: networkExposure,
   onBound: (next) => {
     listeners = next;
