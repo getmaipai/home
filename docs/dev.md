@@ -36854,6 +36854,12 @@ Verdict: not shipped, working tree reverted. The 40 percent token bar is not met
 The Settings > Voices browser reads `GET /api/voice/voices` and the signed-in person's resolved `tts.voice_id` options/value. It shows unknown metadata as “unknown”, searches names, and filters language, country, gender and source. The filters are kit `Select`s in the `DataTable` toolbar because the shipped kit has no filter-column part; `DataTable` supplies its toolbar and row-action slots. “Use this voice” writes only through the person's existing settings write and appears for selectable presets when the resolved setting is unlocked. Children see preset rows only. Household Settings > Voices reuses the browser above its existing catalog section.
 
 The screenshot fixture models the current Stack response: preset voices with unknown description, language, country and gender. Captures: `bun run screenshots --voice-browser-review`.
+
+## VOICE-BROWSER-01C (2026-10-14)
+
+The Settings > Voices browser previews installed voices through `POST /api/voice/voices/{id}/preview`, which forwards to the Stack's `POST /stack/v1/voices/{id}/preview`. The Stack owns the per voice WAV cache under `voice-previews/`; Home keeps no preview copy. For a preset voice that is not installed, an owner or admin can use Download. The Stack performs the pinned, checksummed fetch through its own downloader as part of that one preview request; Home shows an indeterminate working state because the first call has no byte progress. When the response returns, the page refreshes the voice list and the row becomes Play. Other signed in people can play installed voices, while children keep the preset only list.
+
+The screenshot fixture shows an installed row in its active Stop state beside an uninstalled row with Download at desktop and phone widths in light and dark themes: `bun run screenshots --voice-browser-review`.
 # Setup preview
 
 From `frontend/`, run `bun run setup:preview`. This starts Vite with

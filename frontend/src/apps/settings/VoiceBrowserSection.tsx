@@ -1,13 +1,15 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Input } from "@maipai/ui/src/ui/input";
 import { api, ApiError, type ResolvedSetting, type Roster, type StackVoice } from "@/lib/api";
 import { useDataTableControls } from "@/shell/pages/dataTableControls";
 import { applyVoiceFilters, distinctFilterValues, presetNameForVoice, toVoiceRow, type VoiceFilters, type VoiceRow } from "@/lib/voice/voiceBrowserRows";
+import { voicePreviewPlayer, type VoicePreviewState } from "@/lib/voice/voicePreviewPlayer";
 
 const columns: readonly DataTableColumn<VoiceRow>[] = [
   { id: "id", header: "ID", minWidth: 100 },
@@ -24,6 +26,11 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const valuesQuery = useQuery<ResolvedSetting[]>({ queryKey: ["settings-values", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const [filters, setFilters] = useState<VoiceFilters>({ language: all, country: all, gender: all, source: all });
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState<VoicePreviewState>(voicePreviewPlayer.getState());
+  useEffect(() => {
+    const unsubscribe = voicePreviewPlayer.subscribe(setPreview);
+    return () => { unsubscribe(); voicePreviewPlayer.stop(); };
+  }, []);
   const source = useMemo(() => (voicesQuery.data?.voices ?? []).filter((v) => person.role !== "child" || v.source === "preset").map(toVoiceRow), [voicesQuery.data, person.role]);
   const options = distinctFilterValues(source);
   const filtered = useMemo(() => applyVoiceFilters(source, filters), [source, filters]);
@@ -61,12 +68,19 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   return <>
     <h2 className="text-base font-medium">Browse voices</h2>
     {settingReason ? <p className="text-sm text-muted-foreground">{settingReason}</p> : null}
+    {preview.error ? <p role="alert">{preview.error}</p> : null}
     <AsyncState data={voicesQuery.data && registryQuery.data && valuesQuery.data ? voicesQuery.data.voices : undefined} error={error} isFetching={voicesQuery.isFetching || registryQuery.isFetching || valuesQuery.isFetching} onRetry={() => { void voicesQuery.refetch(); void registryQuery.refetch(); void valuesQuery.refetch(); }} errorMessage={failed instanceof ApiError ? failed.message : failed instanceof Error ? failed.message : "Could not load voices. Check your connection and try again."} loadingLabel="Loading voices">
       {() => <DataTable rows={displayRows} columns={table.columns} getRowId={(row) => row.id} caption="Available voices" sort={table.sort} onSortChange={table.onSortChange} toolbar={toolbar} emptyLabel={table.emptyLabel} rowActionsLabel="Voice actions" rowActions={(row) => {
         const voice = (voicesQuery.data?.voices ?? []).find((v: StackVoice) => v.id === row.id);
         const option = voice && voice.source === "preset" ? presetNameForVoice(voice.id, voiceOptions) : null;
-        if (!option || !canChoose) return null;
-        return <Button type="button" variant="outline" disabled={saving} onClick={() => void choose(option)}>{current === option ? "Current voice" : "Use this voice"}</Button>;
+        const selectAction = option && canChoose ? <Button type="button" variant="outline" disabled={saving} onClick={() => void choose(option)}>{current === option ? "Current voice" : "Use this voice"}</Button> : null;
+        const busy = preview.voiceId === row.id && preview.busy;
+        const playing = preview.voiceId === row.id && !preview.busy;
+        if (!voice) return null;
+        if (busy) return <><Progress mode="spinner" label={voice.onDisk ? "Preparing this voice preview" : "Downloading this voice"} /><Button type="button" variant="outline" disabled>{voice.onDisk ? "Starting" : "Downloading"}</Button>{selectAction}</>;
+        if (voice.onDisk) return <><Button type="button" variant="outline" onClick={() => playing ? voicePreviewPlayer.stop() : void voicePreviewPlayer.start(row.id)}>{playing ? "Stop" : "Play"}</Button>{selectAction}</>;
+        if (person.role === "child" || !["owner", "admin"].includes(person.role) || voice.source !== "preset") return <><span>Not installed. This voice is not on this home yet. Ask the person who manages Home to add it.</span>{selectAction}</>;
+        return <><Button type="button" variant="outline" disabled={saving} onClick={() => void voicePreviewPlayer.start(row.id, () => { void queryClient.invalidateQueries({ queryKey: ["stack-voices"] }); })}>Download</Button>{selectAction}</>;
       }} />}
     </AsyncState>
   </>;

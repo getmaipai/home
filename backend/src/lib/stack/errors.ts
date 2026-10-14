@@ -21,8 +21,9 @@ export class StackError extends Error {
   /** The `x-maipai-engine` and `x-maipai-model` headers of the failed reply, when it carried any. */
   engine?: string;
   model?: string;
+  reason?: string;
 
-  constructor(kind: StackErrorKind, message: string, extra?: { status?: number; offline_reason?: string; body?: string; state?: string; engine?: string; model?: string }) {
+  constructor(kind: StackErrorKind, message: string, extra?: { status?: number; offline_reason?: string; body?: string; state?: string; engine?: string; model?: string; reason?: string }) {
     super(message);
     this.name = "StackError";
     this.kind = kind;
@@ -32,5 +33,6 @@ export class StackError extends Error {
     this.state = extra?.state;
     this.engine = extra?.engine;
     this.model = extra?.model;
+    this.reason = extra?.reason;
   }
 }

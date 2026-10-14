@@ -55,6 +55,8 @@ export interface StackClient {
   transcribe(form: FormData, opts?: { signal?: AbortSignal }): Promise<{ data: { text: string }; identity: EngineIdentity }>;
   /** POST /v1/audio/speech; returns the streamed WAV Response. */
   speak(form: FormData, opts?: { signal?: AbortSignal }): Promise<Response>;
+  /** POST /stack/v1/voices/{id}/preview; an intentionally unbounded first download/render. */
+  voicePreview(id: string, opts?: { signal?: AbortSignal }): Promise<Response>;
   /** POST /v1/images/generations; returns the job. */
   imageJob(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   submitJob(request: { kind: string; role?: string | null; input?: Record<string, unknown> }, opts?: { signal?: AbortSignal }): Promise<StackJob>;
@@ -198,7 +200,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       const value = res.headers.get(name);
       return value && value !== "none" ? value : undefined;
     };
-    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model") };
+    const facts = { status: res.status, body: text, state: typeof fb?.state === "string" ? fb.state : undefined, engine: header("x-maipai-engine"), model: header("x-maipai-model"), reason: typeof fb?.reason === "string" ? fb.reason : undefined };
     if (kind === "offline") {
       throw new StackError("offline", message, { ...facts, offline_reason: fb?.offline_reason });
     }
@@ -275,6 +277,19 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       if (res.ok) return res;
       await fail(res);
       throw new Error("unreachable");
+    },
+    async voicePreview(id, opts) {
+      let res: Response;
+      try {
+        // Deliberately no default timeout: the Stack can fetch a 5–8 MB
+        // pinned voice before it renders this first preview.
+        res = await doFetch(`${base}/stack/v1/voices/${encodeURIComponent(id)}/preview`, { method: "POST", signal: opts?.signal });
+      } catch (err) { wrapError(err); }
+      if (!res.ok) { await fail(res); throw new Error("unreachable"); }
+      if (!/^audio\/(wav|x-wav)(?:;|$)/i.test(res.headers.get("content-type") ?? "")) {
+        throw new StackError("unexpected", "the Stack returned a preview that was not a WAV", { status: res.status });
+      }
+      return res;
     },
     async imageJob(request, opts) {
       let res: Response;

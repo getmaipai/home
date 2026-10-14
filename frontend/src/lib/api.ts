@@ -1270,6 +1270,10 @@ export const api = {
   // unaffected.
   streamSpeech: (text: string, signal?: AbortSignal) =>
     rawStreamPost("/api/tts", { text }, 185_000, "Timed out waiting for voice", signal),
+  // A first preview can include the Stack's pinned voice download, so let
+  // the Stack response complete without Home guessing a timeout.
+  previewVoice: (id: string, signal?: AbortSignal) =>
+    rawStreamPost(`/api/voice/voices/${encodeURIComponent(id)}/preview`, {}, 0, undefined, signal, "audio/wav"),
   // Real token-by-token streaming (2026-09-04): the reply text arrives as
   // it's generated instead of all at once, the prerequisite for speaking
   // it sentence by sentence as it's typed (spec/voice/README.md's "what

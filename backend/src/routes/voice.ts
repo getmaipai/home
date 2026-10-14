@@ -31,6 +31,8 @@ import {
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import type { StackVoice } from "@/lib/stack/types";
+import { StackError } from "@/lib/stack/errors";
+import { speakerAgeBand } from "@/lib/ageBand";
 
 export const voiceRoutes = apiRouter();
 
@@ -59,6 +61,52 @@ voiceRoutes.openapi(stackVoicesRoute, async (c) => {
   } catch (err) {
     const failure = stackFailureResult(err, "tts");
     return c.json({ error: `${failure.error}. ${outageHelp}` }, failure.status);
+  }
+});
+
+const voicePreviewRoute = createRoute({
+  method: "post", path: "/voices/{id}/preview", tags: ["Voice"], summary: "Preview a voice",
+  description: "Streams the Stack's cached sample for a voice, or installs it through the Stack before rendering the first sample.",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string().min(1) }) },
+  responses: {
+    200: { content: { "audio/wav": { schema: z.string().openapi({ format: "binary" }) } }, description: "The fixed voice preview WAV." },
+    ...errorResponses({ 400: "Voice cannot be safely installed", 401: "Not signed in", 403: "This voice is not available to this person", 404: "Unknown voice", 409: "Voice cloning is unavailable", 503: "The Stack did not answer" }),
+  },
+});
+
+voiceRoutes.openapi(voicePreviewRoute, async (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const help = isOwnerOrAdmin(actor)
+    ? "Open Settings, then Engines, and check the voice setup."
+    : "Ask the person who manages Home to check the voice setup in Settings.";
+  if (!isStackConfigured()) return c.json({ error: `Home could not prepare this voice preview. ${help}` }, 503);
+  try {
+    const client = getStackClient();
+    const voices = await client.voices();
+    const voice = voices.find((candidate) => candidate.id === id);
+    if (!voice) return c.json({ error: "That voice is not on this home's list. Reload the page to see the current voices." }, 404);
+    if (speakerAgeBand(actor, new Date()) === "child" && voice.source !== "preset") {
+      return c.json({ error: "This voice is not available for your account. Ask the person who manages Home to choose a voice." }, 403);
+    }
+    if (!voice.onDisk && !isOwnerOrAdmin(actor)) {
+      return c.json({ error: "This voice is not on this home yet. Ask the person who manages Home to add it." }, 403);
+    }
+    const response = await client.voicePreview(id, { signal: c.req.raw.signal });
+    return new Response(response.body, { status: 200, headers: { "content-type": "audio/wav", "cache-control": "private, max-age=86400" } });
+  } catch (err) {
+    const failure = stackFailureResult(err, "tts");
+    const reason = err instanceof StackError ? err.reason : undefined;
+    if (reason === "voice-cloning-unavailable") {
+      const step = isOwnerOrAdmin(actor) ? "Open Settings, then Engines, turn on voice cloning, and restart the voice service." : "Ask the person who manages Home to check voice cloning in Settings.";
+      return c.json({ error: `Home cannot preview this voice yet. ${step}` }, 409);
+    }
+    if (reason === "voice-not-pinnable") {
+      const step = isOwnerOrAdmin(actor) ? "Open Settings, then Voices, and choose a voice Home can safely add." : "Ask the person who manages Home to choose a voice Home can safely add.";
+      return c.json({ error: `Home cannot safely add this voice. ${step}` }, 400);
+    }
+    return c.json({ error: `Home could not prepare this voice preview. ${help}` }, failure.status);
   }
 });
 

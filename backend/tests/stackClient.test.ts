@@ -34,6 +34,9 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
   ["/v1/embeddings", "POST", () => ({ status: 200, body: { object: "list", data: [{ embedding: [0.1, 0.2] }] }, headers: IDENTITY_HEADERS })],
   ["/v1/audio/transcriptions", "POST", () => ({ status: 200, body: { text: "transcribed words" }, headers: IDENTITY_HEADERS })],
   ["/v1/audio/speech", "POST", () => ({ status: 200, body: "wav", headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } })],
+  ["/stack/v1/voices/voice%20one/preview", "POST", () => ({ status: 200, body: "wav-bytes", headers: { "content-type": "audio/wav" } })],
+  ["/stack/v1/voices/refused/preview", "POST", () => ({ status: 409, body: { error: "raw host and token details", reason: "voice-not-pinnable" } })],
+  ["/stack/v1/voices/bad/preview", "POST", () => ({ status: 200, body: { error: "not a WAV" }, headers: { "content-type": "application/json" } })],
   [
     "/v1/images/generations",
     "POST",
@@ -395,6 +398,21 @@ describe("createStackClient", () => {
     expect(res.headers.get("content-type")).toBe("audio/wav");
     const bytes = new Uint8Array(await res.arrayBuffer());
     expect(bytes[0]).toBe(0xff);
+  });
+
+  test("client.voicePreview() returns the WAV and surfaces a Stack refusal's error and reason", async () => {
+    const client = createStackClient({ baseUrl });
+    const response = await client.voicePreview("voice one");
+    expect(response.headers.get("content-type")).toBe("audio/wav");
+    expect(await response.text()).toBe('"wav-bytes"');
+    const err = await expectStackError(() => client.voicePreview("refused"), "unverified", "raw host and token details");
+    expect(err.reason).toBe("voice-not-pinnable");
+    await expectStackError(() => client.voicePreview("bad"), "unexpected", "the Stack returned a preview that was not a WAV");
+  });
+
+  test("voicePreview tolerates the long first download without the default timeout", async () => {
+    const client = createStackClient({ baseUrl, timeoutMs: 1, fetch: (async () => { await new Promise((resolve) => setTimeout(resolve, 40)); return new Response("slow-wav", { headers: { "content-type": "audio/wav" } }); }) as unknown as typeof fetch });
+    expect(await (await client.voicePreview("slow")).text()).toBe("slow-wav");
   });
 
   test("a 400 maps to unknown with the Stack's own message", async () => {

@@ -4508,8 +4508,14 @@ async function captureVoiceBrowserReview(browser: Browser, sessionValue: string)
   mkdirSync(outDir, { recursive: true });
   const fixture = [
     { id: "voice-alba", name: "Alba", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "" },
-    { id: "voice-community", name: "Community voice", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "community", onDisk: true, licence: null, revision: "" },
+    { id: "voice-download", name: "Voice to add", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "preset", onDisk: false, licence: null, revision: "" },
   ];
+  const pcmBytes = 320_000;
+  const wav = new Uint8Array(44 + pcmBytes);
+  const view = new DataView(wav.buffer);
+  wav.set(new TextEncoder().encode("RIFF"), 0); view.setUint32(4, 36 + pcmBytes, true); wav.set(new TextEncoder().encode("WAVEfmt "), 8);
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true); view.setUint32(24, 16_000, true);
+  view.setUint32(28, 32_000, true); view.setUint16(32, 2, true); view.setUint16(34, 16, true); wav.set(new TextEncoder().encode("data"), 36); view.setUint32(40, pcmBytes, true);
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
     for (const theme of THEMES) {
@@ -4517,18 +4523,32 @@ async function captureVoiceBrowserReview(browser: Browser, sessionValue: string)
       try {
         const page = await context.newPage();
         page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.addInitScript(() => {
+          class CaptureAudioContext {
+            currentTime = 0; destination = {};
+            close() { return Promise.resolve(); }
+            createBuffer(channels: number, length: number, sampleRate: number) { return { duration: length / sampleRate, getChannelData: () => new Float32Array(length) }; }
+            createBufferSource() { return { buffer: null as { duration: number } | null, onended: null as (() => void) | null, connect() {}, start() {} }; }
+          }
+          Object.defineProperty(window, "AudioContext", { configurable: true, value: CaptureAudioContext });
+        });
         await page.route("**/api/voice/voices", (route) => route.fulfill({ json: { voices: fixture } }));
+        await page.route("**/api/voice/voices/*/preview", (route) => route.fulfill({ status: 200, contentType: "audio/wav", body: Buffer.from(wav) }));
         await page.goto(`${BASE_URL}/settings/home/voices`);
         const rows = page.locator(slug === "phone" ? "[data-slot='data-table-cards']" : "[data-slot='data-table-body']");
         await rows.getByText("Alba", { exact: true }).first().waitFor();
-        const sourceFilter = page.getByRole("combobox", { name: "Filter by source" });
-        await sourceFilter.click();
-        await page.getByRole("option", { name: "preset", exact: true }).click();
-        await rows.getByText("Alba", { exact: true }).first().waitFor();
-        if (await rows.getByText("Community voice", { exact: true }).count()) throw new Error("source filter did not narrow voice rows");
+        await rows.getByRole("button", { name: "Play" }).first().click();
+        await rows.getByRole("button", { name: "Stop" }).first().waitFor();
+        const download = rows.getByRole("button", { name: "Download" }).first();
+        await download.waitFor();
+        if (slug === "phone") await download.evaluate((button) => {
+          let scroller = button.parentElement;
+          while (scroller && scroller.scrollHeight <= scroller.clientHeight) scroller = scroller.parentElement;
+          if (scroller) scroller.scrollTop = 230;
+        });
         await settleAnimations(page);
-        const file = `voice-browser-${slug}-${theme}.png`;
-        await page.screenshot({ path: join(outDir, file), fullPage: true });
+        const file = `voice-browser-preview-download-${slug}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: false });
         console.log(`Wrote ${join(outDir, file)}`);
         dedicatedScreenshots.push({ file, route: "/settings/home/voices", viewport: slug, theme });
       } finally { await context.close(); }

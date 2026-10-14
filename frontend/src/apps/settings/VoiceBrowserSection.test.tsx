@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { api } from "@/lib/api";
+import { voicePreviewPlayer } from "@/lib/voice/voicePreviewPlayer";
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { StackVoice, Roster } from "@/lib/api";
@@ -12,12 +13,20 @@ const voice = (id: string, more: Partial<StackVoice> = {}): StackVoice => ({ id,
 
 afterEach(() => { cleanup(); mock.restore(); });
 
+class FakeAudioContext {
+  currentTime = 0; destination = {};
+  close() { return Promise.resolve(); }
+  createBuffer() { return { duration: 0, getChannelData: () => new Float32Array(0) }; }
+  createBufferSource() { return { buffer: null, connect() {}, start() {}, onended: null as (() => void) | null }; }
+}
+globalThis.AudioContext = FakeAudioContext as unknown as typeof AudioContext;
+
 function renderPage(voices: StackVoice[], options = ["alba", "mira"], settings: Record<string, unknown> = {}) {
   spyOn(api, "stackVoices").mockResolvedValue({ voices });
   spyOn(api, "settingsRegistry").mockResolvedValue([{ key: "tts.voice_id", label: "Speaking voice", scope: "person", selector: "select", range: { options }, default: "alba", control: { child: "self", teen: "self", adult: "self" }, band_default: { child: "alba", teen: "alba", adult: "alba" }, copy: { does: "Sets speaking voice" } }] as never);
   spyOn(api, "settingsValues").mockResolvedValue([{ key: "tts.voice_id", value: settings.voice ?? "alba", source: "default", label: "Speaking voice", level: "basic", secret: false, locked: settings.locked as boolean | undefined, reason: settings.reason as string | undefined }]);
   spyOn(api, "setSetting").mockResolvedValue({ key: "tts.voice_id", value: "alba", source: "user", label: "Speaking voice", level: "basic", secret: false });
-  return renderWithQueryClient(<VoiceBrowserSection person={person(settings.role as Roster["role"] | undefined)} />);
+  return renderWithQueryClient(<VoiceBrowserSection person={person((settings.role as Roster["role"] | undefined) ?? "adult")} />);
 }
 
 describe("VoiceBrowserSection", () => {
@@ -66,7 +75,7 @@ describe("VoiceBrowserSection", () => {
     const setter = spyOn(api, "setSetting").mockResolvedValue({ key: "tts.voice_id", value: "mira", source: "user", label: "Speaking voice", level: "basic", secret: false });
     const buttons = view.getAllByRole("button", { name: "Use this voice" }); expect(buttons).toHaveLength(2); fireEvent.click(buttons[0]!);
     const communityRow = view.getAllByText("community")[0]!.closest('[role="row"]');
-    expect(communityRow?.querySelector("button")).toBeNull();
+    expect(communityRow?.textContent).not.toContain("Use this voice");
     await waitFor(() => expect(setter).toHaveBeenCalledWith("person:person-1", "tts.voice_id", "mira"));
   });
   test("the current voice is marked", async () => { const view = renderPage([voice("alba")], ["alba"], { voice: "alba" }); await view.findAllByText("Current voice"); });
@@ -83,5 +92,58 @@ describe("VoiceBrowserSection", () => {
   test("a child sees only preset voices", async () => {
     const view = renderPage([voice("alba"), voice("community", { source: "community" })], ["alba"], { role: "child" }); await view.findAllByText("alba");
     expect(view.queryByText("community")).toBeNull();
+  });
+
+  test("an on-disk voice shows Play and an uninstalled voice shows Download, never both", async () => {
+    const view = renderPage([voice("ready"), voice("missing", { onDisk: false })], ["alba"], { role: "owner" });
+    await view.findAllByText("ready"); await view.findAllByText("missing");
+    const readyRow = view.getAllByText("ready")[0]!.closest('[role="row"]')!;
+    const missingRow = view.getAllByText("missing")[0]!.closest('[role="row"]')!;
+    expect(readyRow.querySelectorAll("button").length).toBe(1);
+    expect(readyRow.querySelector("button")?.textContent).toBe("Play");
+    expect(missingRow.querySelectorAll("button").length).toBe(1);
+    expect(missingRow.querySelector("button")?.textContent).toBe("Download");
+  });
+
+  test("Download calls preview once, shows the working state, then refreshes the row to Play", async () => {
+    const load = spyOn(api, "stackVoices").mockResolvedValueOnce({ voices: [voice("missing", { onDisk: false })] }).mockResolvedValue({ voices: [voice("missing", { onDisk: true })] });
+    spyOn(api, "settingsRegistry").mockResolvedValue([{ key: "tts.voice_id", label: "Speaking voice", scope: "person", selector: "select", range: { options: ["alba"] }, default: "alba" }] as never);
+    spyOn(api, "settingsValues").mockResolvedValue([{ key: "tts.voice_id", value: "alba", source: "default", label: "Speaking voice", level: "basic", secret: false }]);
+    spyOn(api, "previewVoice").mockResolvedValue(new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav" } }));
+    const view = renderWithQueryClient(<VoiceBrowserSection person={person("owner")} />);
+    const download = (await view.findAllByRole("button", { name: "Download" }))[0]!; fireEvent.click(download);
+    expect((await view.findAllByRole("button", { name: "Downloading" }))[0]!.hasAttribute("disabled")).toBe(true);
+    expect(api.previewVoice).toHaveBeenCalledTimes(1);
+    await view.findAllByRole("button", { name: "Play" });
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
+  test("a failed preview shows its error and returns the row to idle", async () => {
+    const view = renderPage([voice("ready")]); await view.findAllByText("ready");
+    spyOn(api, "previewVoice").mockRejectedValue(new Error("Home cannot preview this voice yet. Ask the person who manages Home to check Settings."));
+    const play = [...document.querySelectorAll("button")].find((button) => button.textContent === "Play")!;
+    fireEvent.click(play);
+    await waitFor(() => expect(document.querySelector('[role="alert"]')?.textContent).toContain("Ask the person who manages Home"));
+    expect([...document.querySelectorAll("button")].some((button) => button.textContent === "Play")).toBe(true);
+  });
+
+  test("leaving the page stops playback", async () => {
+    const stop = spyOn(voicePreviewPlayer, "stop").mockImplementation(() => {});
+    const view = renderPage([voice("ready")]); await view.findAllByText("ready");
+    view.unmount();
+    expect(stop).toHaveBeenCalled();
+  });
+
+  test("unknown voice metadata still gets its Play or Download action from onDisk", async () => {
+    const view = renderPage([voice("mystery", { onDisk: true, source: "unknown", name: "", description: "", language: "", country: "" })]);
+    await view.findAllByText("mystery");
+    expect([...document.querySelectorAll("button")].some((button) => button.textContent === "Play")).toBe(true);
+  });
+
+  test("a non-admin sees Not installed guidance without Download", async () => {
+    const view = renderPage([voice("missing", { onDisk: false })]);
+    await view.findAllByText("missing");
+    expect(view.getAllByText("Not installed. This voice is not on this home yet. Ask the person who manages Home to add it.").length).toBeGreaterThan(0);
+    expect(view.queryByRole("button", { name: "Download" })).toBeNull();
   });
 });
