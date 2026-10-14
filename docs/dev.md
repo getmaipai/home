@@ -166,6 +166,8 @@ GET entries can also keep an `ETag` and `Last-Modified` validator. An expired en
 
 Package fetches keep an in-memory quiet window per destination host after a 429 or 503, or after the second consecutive other 5xx. The base is 60 seconds, doubled per consecutive failure, so a 429 or 503 starts with a two-minute window; the base caps at one hour. A longer `Retry-After` wins up to 24 hours. A 2xx or 304 clears the failure count. A quiet host receives no package request; a cached value can still serve through its own `staleUntil`, but never past it. These windows reset on restart and are not persisted.
 
+`POST /api/storage/package-cache/clear` removes only package-cache entry files. It resets the byte total to unknown so the next budget check re-walks the cache. It does not clear the shelf, retrieval cache, backups, or attachments. Clearing entries does not lift an active host quiet window; the next ask still respects that host's backoff.
+
 `createHost().fetch()` observes the HTTP outcome after the existing per-host
 rate limiter and cache have allowed an actual outbound request. The bounded
 in-memory service window stores timestamps, outcome class, last success, and

@@ -2034,7 +2034,7 @@ async function captureChatIncognitoAudit(browser: Browser, sessionValue: string)
     await settleAnimations(page);
     const file = `step-${step}-${viewport.width}-dark.png`;
     const path = join(outDir, file);
-    await page.screenshot({ path, fullPage: true });
+    await page.screenshot({ path, fullPage: viewport.slug === "phone" });
     dedicatedScreenshots.push({ file, route: "incognito-audit", viewport: viewport.slug, theme: "dark" });
     console.log(`[incognito-audit] screenshot ${path}`);
     if (viewport.slug === "phone") await page.context().close();
@@ -5330,7 +5330,7 @@ async function captureNextChatReview(browser: Browser, sessionValue: string): Pr
         }
         const filename = `next-chat-${viewport.width}-${theme}.png`;
         const path = join(outDir, filename);
-        await page.screenshot({ path, fullPage: slug === "phone" });
+        await page.screenshot({ path, fullPage: true });
         dedicatedScreenshots.push({ file: filename, route: "/chat", viewport: viewport.slug, theme });
         console.log(`Wrote ${path}`);
         if (consoleErrors.length || httpErrors.length) throw new Error(`captureNextChatReview: ${slug}/${theme} browser errors: ${[...consoleErrors, ...httpErrors].join(" | ")}`);
@@ -9188,7 +9188,14 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
     body: JSON.stringify({ scope: "household", key: "storage.household.cap_bytes", value: 20 * 1024 ** 3 }),
   });
   if (!cap.ok) throw new Error(`storage review: setting the screenshot household cap failed: ${cap.status} ${await cap.text()}`);
-
+  const cacheSeed = Bun.spawnSync({
+    cmd: ["bun", "run", "scripts/seed-storage-package-cache.ts"],
+    cwd: join(ROOT, "backend"),
+    env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR },
+    stdout: "inherit",
+    stderr: "inherit",
+  });
+  if (cacheSeed.exitCode !== 0) throw new Error(`storage review: seeded cache entries failed with exit ${cacheSeed.exitCode}`);
 
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
@@ -9200,10 +9207,12 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
         await page.locator("text=Household total").first().waitFor({ timeout: 15000 });
         await page.getByRole("meter", { name: "bytes used" }).waitFor({ timeout: 15000 });
         await page.locator("text=Household storage cap").first().waitFor({ timeout: 15000 });
+        await page.getByRole("table", { name: "Saved data by source" }).getByRole("cell", { name: "Weather · Open-Meteo" }).first().waitFor({ timeout: 15000 });
+        await page.getByRole("table", { name: "Saved data by source" }).getByRole("cell", { name: /currency/i }).first().waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Storage");
         await settleAnimations(page);
         const path = join(outDir, `next-storage-${viewport.width}-${theme}.png`);
-        await page.screenshot({ path, fullPage: slug === "phone" });
+        await page.screenshot({ path, fullPage: true, animations: "disabled" });
         console.log(`Wrote ${path}`);
         await page.close();
       } finally {

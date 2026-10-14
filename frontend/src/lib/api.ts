@@ -77,6 +77,7 @@ import type {
   PerformanceDisk,
   PersonStorageRow,
   StorageUsageOverview,
+  PackageCacheSourceRow,
   TurnErrorDetail,
 } from "@maipai/home-backend/src/wire";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@maipai/home-backend/src/wire";
@@ -965,6 +966,11 @@ export const api = {
   // null household. The row-visibility rule lives on the backend
   // (storageUsageOverview()), not re-applied here.
   storageUsage: () => request<StorageUsageOverview>("/api/storage/usage"),
+  packageCacheSources: () => request<PackageCacheSourceRow[]>("/api/storage/package-cache"),
+  clearPackageCache: (source?: string) => request<{ removed: number; bytes: number }>("/api/storage/package-cache/clear", {
+    method: "POST",
+    body: JSON.stringify(source === undefined ? {} : { source }),
+  }),
   createPerson: (input: { displayName: string; role: Role; secret?: string }) =>
     request<PersonRosterEntry>("/api/people", {
       method: "POST",

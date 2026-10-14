@@ -32527,6 +32527,119 @@
         }
       }
     },
+    "/api/storage/package-cache": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Saved copies fetched by packages, grouped by source",
+        "responses": {
+          "200": {
+            "description": "Cached entries grouped by their declared source.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "source": {
+                        "type": "string"
+                      },
+                      "packageId": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "entryCount": {
+                        "type": "number"
+                      },
+                      "sizeBytes": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "source",
+                      "packageId",
+                      "label",
+                      "entryCount",
+                      "sizeBytes"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/storage/package-cache/clear": {
+      "post": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Clear saved copies fetched by packages",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "source": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Number and size of removed cache entries.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "number"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "removed",
+                    "bytes"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/storage": {
       "get": {
         "tags": [

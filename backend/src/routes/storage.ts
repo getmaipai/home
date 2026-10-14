@@ -9,12 +9,66 @@ import { storageUsageOverview } from "@/lib/storage/usage";
 import { listNasMounts, createNasMount, deleteNasMount } from "@/lib/nasMounts";
 import { stageFactoryReset, pendingFactoryReset, cancelPendingFactoryReset, FACTORY_RESET_CONFIRMATION_PHRASE } from "@/lib/factoryReset";
 import { generateDiagnostics } from "@/lib/diagnostics";
+import { clearPackageCache, getCacheSourceStats, OTHER_CACHE_SOURCE } from "@/lib/packageCache";
+import { loadManifestOnly } from "@/lib/plugins";
 // Renamed from the bare `File` export, same reason attachments.ts's own
 // toRecord() does: `File` is a Bun/Fetch global, so importing the spec's
 // zod object under that name would shadow it.
 import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
 
 export const storageRoutes = apiRouter();
+
+const PackageCacheSourceSchema = z.object({ source: z.string(), packageId: z.string(), label: z.string(), entryCount: z.number(), sizeBytes: z.number() });
+const packageCacheRoute = createRoute({
+  method: "get",
+  path: "/package-cache",
+  tags: ["Storage"],
+  summary: "Saved copies fetched by packages, grouped by source",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.array(PackageCacheSourceSchema) } }, description: "Cached entries grouped by their declared source." },
+    ...errorResponses({ 403: "Not owner/admin" }),
+  },
+});
+storageRoutes.openapi(packageCacheRoute, (c) => {
+  const rows = new Map<string, { source: string; packageId: string; label: string; entryCount: number; sizeBytes: number }>();
+  for (const row of getCacheSourceStats()) {
+    if (row.source === OTHER_CACHE_SOURCE) {
+      const other = rows.get(OTHER_CACHE_SOURCE) ?? { source: OTHER_CACHE_SOURCE, packageId: "other", label: "Other", entryCount: 0, sizeBytes: 0 };
+      other.entryCount += row.entryCount;
+      other.sizeBytes += row.sizeBytes;
+      rows.set(OTHER_CACHE_SOURCE, other);
+      continue;
+    }
+    const loaded = loadManifestOnly(row.packageId);
+    const manifest = loaded.ok ? loaded.value : null;
+    const sourceId = row.source.startsWith(`${row.packageId}:`) ? row.source.slice(row.packageId.length + 1) : row.source;
+    const declared = manifest?.data_sources?.find((item) => item.id === sourceId);
+    const sourceLabel = declared?.who || declared?.id || row.source;
+    rows.set(row.source, { ...row, label: `${manifest?.display || row.packageId} · ${sourceLabel}` });
+  }
+  return c.json([...rows.values()], 200);
+});
+
+const clearPackageCacheRoute = createRoute({
+  method: "post",
+  path: "/package-cache/clear",
+  tags: ["Storage"],
+  summary: "Clear saved copies fetched by packages",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ source: z.string().optional() }) } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ removed: z.number(), bytes: z.number() }) } }, description: "Number and size of removed cache entries." },
+    ...errorResponses({ 403: "Not owner/admin" }),
+  },
+});
+storageRoutes.openapi(clearPackageCacheRoute, (c) => {
+  const { source } = c.req.valid("json");
+  const result = clearPackageCache({ source: source === OTHER_CACHE_SOURCE ? null : source });
+  const person = c.get("person");
+  console.log(`[storage] package cache cleared person=${person.id} source=${source ?? "all"} removed=${result.removed} bytes=${result.bytes}`);
+  return c.json(result, 200);
+});
 
 const AreaUsageSchema = z.object({ area: z.string(), bytes: z.number() });
 const StorageSummarySchema = z.object({

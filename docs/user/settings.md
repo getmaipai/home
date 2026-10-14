@@ -12,6 +12,10 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 
 Under **Manage**, open **Users** to add, edit, or remove household members; **AI models** to choose models; **Backups** to run or review backups; **Repairs** to check and fix issues; **Updates** to see what is available; and **Privacy** to review connections. See [People and parental controls](people.md) for account details.
 
+## Clear saved online data
+
+An owner or admin can open **Manage**, then **Storage**, to see saved copies Home fetched for weather, news, and other lookups. Clear one source or choose **Clear all**. This does not clear chats, memories, or items in the news shelf. Home fetches a cleared copy again the next time someone asks. If a service is taking a break, Home may wait before trying it again.
+
 ## Your own settings
 
 Switch to the **Me** tab for your own personal preferences:

@@ -1159,6 +1159,14 @@ export interface StorageUsageOverview {
   household: { usageBytes: number; capBytes: number; inherited: { files: number; bytes: number } } | null;
 }
 
+export interface PackageCacheSourceRow {
+  source: string;
+  packageId: string;
+  label: string;
+  entryCount: number;
+  sizeBytes: number;
+}
+
 export interface Performance {
   turns: PerformanceTurns;
   queues: PerformanceQueues;

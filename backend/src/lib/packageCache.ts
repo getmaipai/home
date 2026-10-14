@@ -24,7 +24,7 @@
 // provably idempotent from here), and caching one could serve a stale
 // result for what looks like a fresh action.
 import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, utimesSync, statfsSync, rmSync, rmdirSync } from "node:fs";
-import { join } from "node:path";
+import { join, relative, resolve, sep } from "node:path";
 import { createHash } from "node:crypto";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { cacheDir, dataDir, ensureDataDir } from "@/lib/paths";
@@ -194,6 +194,40 @@ interface DiskEntry {
   path: string;
   size: number;
   mtimeMs: number;
+}
+
+export const OTHER_CACHE_SOURCE = "__other__";
+
+function isInsidePackageCache(entry: DiskEntry): boolean {
+  const root = resolve(cacheDir);
+  const path = resolve(entry.path);
+  const rel = relative(root, path);
+  if (!rel || rel.startsWith(`..${sep}`) || rel === ".." || resolve(root, rel) !== path) return false;
+  const parts = rel.split(sep);
+  return parts.length === 2 && parts[0] === entry.packageId && parts[1]!.endsWith(".json");
+}
+
+function removeEntries(entries: DiskEntry[], shouldRemove: (entry: DiskEntry) => boolean, reconcileIfEmpty = false): { removed: number; bytes: number; packages: Set<string> } {
+  let removed = 0;
+  let bytes = 0;
+  const packages = new Set<string>();
+  for (const entry of entries) {
+    if (!shouldRemove(entry) || !isInsidePackageCache(entry)) continue;
+    try {
+      unlinkSync(entry.path);
+      removed++;
+      bytes += entry.size;
+      packages.add(entry.packageId);
+    } catch { /* unreadable or concurrently removed entries are skipped */ }
+  }
+  for (const packageId of packages) {
+    try { rmdirSync(packageDir(packageId)); } catch { /* non-empty or changed concurrently */ }
+  }
+  if (removed > 0 || reconcileIfEmpty) {
+    runningTotalBytes = null;
+    evictIfOverBudget();
+  }
+  return { removed, bytes, packages };
 }
 
 /** The one directory walk every disk-facing function below builds on -
@@ -379,10 +413,7 @@ export async function cachedFetch(
 
 export function sweepPackageCache(nowMs: number = Date.now()): { expired: number; bytes: number; packages: number } {
   const entries = walkAllEntries();
-  let expired = 0;
-  let bytes = 0;
-  const packages = new Set<string>();
-  for (const entry of entries) {
+  const removed = removeEntries(entries, (entry) => {
     let remove = false;
     try {
       const parsed = JSON.parse(readFileSync(entry.path, "utf-8")) as CacheEntryFile;
@@ -395,22 +426,48 @@ export function sweepPackageCache(nowMs: number = Date.now()): { expired: number
     } catch {
       remove = true;
     }
-    if (!remove) continue;
+    return remove;
+  }, true);
+  return { expired: removed.removed, bytes: removed.bytes, packages: removed.packages.size };
+}
+
+export function clearPackageCache(options: { source?: string | null } = {}): { removed: number; bytes: number } {
+  const entries = walkAllEntries();
+  const removed = removeEntries(entries, (entry) => {
+    if (options.source === undefined) return true;
     try {
-      unlinkSync(entry.path);
-      expired++;
-      bytes += entry.size;
-      packages.add(entry.packageId);
+      const parsed = JSON.parse(readFileSync(entry.path, "utf-8")) as CacheEntryFile;
+      const source = parsed && typeof parsed.source === "string" ? parsed.source : null;
+      return options.source === null ? source === null : source === options.source;
     } catch {
-      // An unreadable or concurrently removed entry is skipped.
+      return options.source === OTHER_CACHE_SOURCE;
     }
+  });
+  return { removed: removed.removed, bytes: removed.bytes };
+}
+
+export interface CacheSourceStats {
+  source: string;
+  packageId: string;
+  entryCount: number;
+  sizeBytes: number;
+}
+
+export function getCacheSourceStats(): CacheSourceStats[] {
+  const grouped = new Map<string, CacheSourceStats>();
+  for (const entry of walkAllEntries()) {
+    let source: string;
+    try {
+      const parsed = JSON.parse(readFileSync(entry.path, "utf-8")) as CacheEntryFile;
+      source = parsed && typeof parsed.source === "string" ? parsed.source : OTHER_CACHE_SOURCE;
+    } catch { source = OTHER_CACHE_SOURCE; }
+    const key = `${source}\n${entry.packageId}`;
+    const row = grouped.get(key) ?? { source, packageId: entry.packageId, entryCount: 0, sizeBytes: 0 };
+    row.entryCount++;
+    row.sizeBytes += entry.size;
+    grouped.set(key, row);
   }
-  for (const packageId of packages) {
-    try { rmdirSync(packageDir(packageId)); } catch { /* non-empty or changed concurrently */ }
-  }
-  runningTotalBytes = null;
-  evictIfOverBudget();
-  return { expired, bytes, packages: packages.size };
+  return [...grouped.values()];
 }
 
 export interface CacheEnvelope {

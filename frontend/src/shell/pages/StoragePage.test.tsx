@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+const toastSuccess = mock(() => {});
+const toastError = mock(() => {});
+mock.module("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
 import { StoragePage } from "@/shell/pages/StoragePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
@@ -61,6 +64,11 @@ function mockFetch(overview: StorageUsageOverview | { status: number }, registry
       if ("status" in overview) return Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: overview.status }));
       return Promise.resolve(Response.json(overview));
     }
+    if (url.includes("/api/storage/package-cache") && url.endsWith("/clear")) {
+      if (url.endsWith("/fail")) return Promise.resolve(new Response("{}", { status: 500 }));
+      return Promise.resolve(Response.json({ removed: 14, bytes: 2.1 * 1024 * 1024 }));
+    }
+    if (url.includes("/api/storage/package-cache")) return Promise.resolve(Response.json([{ source: "weather:current", packageId: "weather", label: "Weather · Weather service", entryCount: 14, sizeBytes: 2.1 * 1024 * 1024 }]));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.includes("/api/settings?scope=")) {
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
@@ -107,6 +115,55 @@ describe("StoragePage", () => {
     } finally {
       restore();
     }
+  });
+
+  test("clear all confirms the exact data boundary and reports success", async () => {
+    const restore = mockFetch(makeOverview());
+    try {
+      renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      toastSuccess.mockClear();
+      const clearButton = await waitFor(() => {
+        const button = Array.from(document.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "Clear all");
+        expect(button).toBeDefined();
+        return button!;
+      });
+      fireEvent.click(clearButton);
+      await waitFor(() => expect(document.body.textContent).toContain("Clear all saved online data?"));
+      expect(document.body.textContent).toContain("Your own chats, memories and the news shelf stay.");
+      expect(document.body.textContent).toContain("Home will fetch it again the next time someone asks.");
+      fireEvent.click(Array.from(document.querySelectorAll("[role=alertdialog] button")).find((button) => button.textContent?.trim() === "Clear all")!);
+      await waitFor(() => expect(toastSuccess).toHaveBeenCalledWith("Cleared 14 saved copies (2.1 MB) from all sources."));
+    } finally { restore(); }
+  });
+
+  test("clear failure says what went wrong and what to do", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/storage/usage")) return Promise.resolve(Response.json(makeOverview()));
+      if (url.includes("/api/storage/package-cache/clear")) return Promise.resolve(new Response("{}", { status: 500 }));
+      if (url.includes("/api/storage/package-cache")) return Promise.resolve(Response.json([{ source: "weather:current", packageId: "weather", label: "Weather", entryCount: 1, sizeBytes: 100 }]));
+      if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({}));
+    }) as unknown as typeof fetch;
+    try {
+      toastError.mockClear();
+      renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      const clearButton = await waitFor(() => {
+        const button = Array.from(document.querySelectorAll("button")).find((candidate) => candidate.textContent?.trim() === "Clear all");
+        expect(button).toBeDefined();
+        return button!;
+      });
+      fireEvent.click(clearButton);
+      const confirmButton = await waitFor(() => {
+        const button = Array.from(document.querySelectorAll("[role=alertdialog] button")).find((candidate) => candidate.textContent?.trim() === "Clear all");
+        expect(button).toBeDefined();
+        return button!;
+      });
+      fireEvent.click(confirmButton);
+      await waitFor(() => expect(toastError).toHaveBeenCalledWith("Home could not clear the saved copies. Check that Home is running and try again."));
+    } finally { globalThis.fetch = originalFetch; }
   });
 
   test("the kit usage table sorts its returned people by name", async () => {

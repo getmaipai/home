@@ -1,14 +1,20 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { getIcon } from "@maipai/ui/src/icons";
 import { QuotaBanner } from "@maipai/ui/src/elements/quota-banner";
 import { Card, CardHeader, CardContent, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { DataTable } from "@maipai/ui/src/elements/data-table";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { DataTableControls } from "@/shell/components/DataTableControls";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
+import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
 import { formatBytes } from "@/apps/settings/formatBytes";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
+import type { PackageCacheSourceRow } from "@maipai/home-backend/src/wire";
 import { useTabItem } from "@/shell/tabIdentity";
 
 // Exported: pageHeaderTitle.tsx's own MANAGE_PAGE_ENTRIES imports this
@@ -26,6 +32,21 @@ interface PersonUsageRow extends Record<string, unknown> {
   cap: string;
   "top kind": string;
 }
+
+interface CacheRow extends Record<string, unknown> {
+  source: string;
+  label: string;
+  entries: string;
+  size: string;
+}
+
+const CACHE_COLUMNS: readonly DataTableColumn<CacheRow>[] = [
+  { id: "label", header: "Source" },
+  { id: "entries", header: "Saved copies" },
+  { id: "size", header: "Size" },
+];
+
+const CLEAR_CONFIRM = "Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch it again the next time someone asks.";
 
 function capLabel(capBytes: number): string {
   // 0 is every cap key's own "no cap enforced at this level" (usage.ts's
@@ -89,6 +110,21 @@ export function StoragePage({ person }: { person: Roster }) {
   useTabItem("Storage");
   const query = useQuery<StorageUsageOverview>({ queryKey: ["storage-usage"], queryFn: () => api.storageUsage() });
   const isAdmin = isOwnerOrAdminRole(person.role);
+  const cacheQuery = useQuery<PackageCacheSourceRow[]>({ queryKey: ["storage-package-cache"], queryFn: () => api.packageCacheSources(), enabled: isAdmin });
+  const client = useQueryClient();
+  const [clearAllOpen, setClearAllOpen] = useState(false);
+
+  async function clear(source?: string, label = "all sources") {
+    try {
+      const result = await api.clearPackageCache(source);
+      await client.invalidateQueries({ queryKey: ["storage-package-cache"] });
+      const clearedLabel = label === "all sources" ? "all sources" : label;
+      toast.success(`Cleared ${result.removed} saved ${result.removed === 1 ? "copy" : "copies"} (${formatBytes(result.bytes)}) from ${clearedLabel}.`);
+      setClearAllOpen(false);
+    } catch {
+      toast.error("Home could not clear the saved copies. Check that Home is running and try again.");
+    }
+  }
 
   return (
     <AsyncState
@@ -99,12 +135,12 @@ export function StoragePage({ person }: { person: Roster }) {
       errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load storage."}
       loadingLabel="Loading storage"
     >
-      {(data: StorageUsageOverview) => <StorageContent data={data} isAdmin={isAdmin} />}
+      {(data: StorageUsageOverview) => <StorageContent data={data} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} />}
     </AsyncState>
   );
 }
 
-function StorageContent({ data, isAdmin }: { data: StorageUsageOverview; isAdmin: boolean }) {
+function StorageContent({ data, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear }: { data: StorageUsageOverview; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void> }) {
   const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
   const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"], {
     person: 180,
@@ -142,7 +178,34 @@ function StorageContent({ data, isAdmin }: { data: StorageUsageOverview; isAdmin
         </Card>
       ) : null}
       <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage usage by person" getRowId={(row) => row.person} />
-      {isAdmin ? <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} /> : null}
+      {isAdmin ? <>
+        <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
+        <CardHeader>
+          <CardTitle>Saved online data</CardTitle>
+        </CardHeader>
+        <p>Saved copies of weather, news and other things Home looked up online. Your own chats, memories and the news shelf stay. Home will fetch cleared data again the next time someone asks.</p>
+        <DataTable
+          columns={CACHE_COLUMNS}
+          rows={cacheRows.map((row) => ({ source: row.source, label: row.label, entries: String(row.entryCount), size: formatBytes(row.sizeBytes) }))}
+          caption="Saved data by source"
+          getRowId={(row) => row.source}
+          emptyLabel={cacheLoading ? "Loading saved data…" : "No saved online data."}
+          rowActions={(row) => <DataTableRowActions actions={[{ label: `Clear ${row.label}`, destructive: true, confirmLabel: CLEAR_CONFIRM, onClick: () => clear(row.source, row.label) }]} />}
+        />
+        <Button type="button" variant="destructive" disabled={cacheRows.length === 0} onClick={() => setClearAllOpen(true)}>Clear all</Button>
+        <AlertDialog open={clearAllOpen} onOpenChange={setClearAllOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Clear all saved online data?</AlertDialogTitle>
+              <AlertDialogDescription>{CLEAR_CONFIRM}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction variant="destructive" onClick={() => void clear()}>Clear all</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </> : null}
     </>
   );
 }

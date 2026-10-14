@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, symlinkSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "@/lib/paths";
 import {
@@ -8,6 +8,9 @@ import {
   CACHE_NOT_MODIFIED,
   packageCacheResponse,
   getCacheStats,
+  getCacheSourceStats,
+  clearPackageCache,
+  OTHER_CACHE_SOURCE,
   getCacheEnvelope,
   __resetPackageCacheForTests,
   __setTestCacheBudgetBytes,
@@ -16,6 +19,7 @@ import {
   LEGACY_ENTRY_GRACE_S,
 } from "@/lib/packageCache";
 import { backoffSeconds, effectiveTtlSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
+import { __resetPackageQuietWindowsForTests } from "@/lib/packageHost";
 
 const PKG = "test-cache-pkg";
 
@@ -115,6 +119,57 @@ describe("sweepPackageCache", () => {
       return Math.max(max, ...caches.map((cache: any) => Number(cache?.stale_ok_s ?? 0)));
     }, 0);
     expect(LEGACY_ENTRY_GRACE_S).toBeGreaterThanOrEqual(maxStale);
+  });
+
+  test("clear-all removes every package cache entry and reports exact bytes", async () => {
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/clear-a", undefined, async () => ({ v: 1 }), { source: "weather:current", attribution: null });
+    await cachedFetch("other-cache-pkg", { ttl_s: 60 }, "https://example.com/clear-b", undefined, async () => ({ v: 2 }), { source: "news:top", attribution: null });
+    const before = getCacheSourceStats().reduce((sum, row) => sum + row.sizeBytes, 0);
+    const result = clearPackageCache();
+    expect(result.removed).toBe(2);
+    expect(result.bytes).toBe(before);
+    expect(getCacheSourceStats()).toEqual([]);
+  });
+
+  test("per-source clear keeps other sources and source groups unreadable entries as Other", async () => {
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/clear-weather", undefined, async () => ({ v: 1 }), { source: "weather:current", attribution: null });
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/clear-news", undefined, async () => ({ v: 2 }), { source: "news:top", attribution: null });
+    const weather = getCacheSourceStats().find((row) => row.source === "weather:current")!;
+    const result = clearPackageCache({ source: "weather:current" });
+    expect(result).toEqual({ removed: 1, bytes: weather.sizeBytes });
+    expect(getCacheSourceStats().map((row) => row.source)).toEqual(["news:top"]);
+    expect(clearPackageCache({ source: "missing:source" })).toEqual({ removed: 0, bytes: 0 });
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/clear-other", undefined, async () => ({ v: 3 }));
+    expect(getCacheSourceStats().some((row) => row.source === OTHER_CACHE_SOURCE)).toBe(true);
+    expect(clearPackageCache({ source: null })).toEqual({ removed: 1, bytes: expect.any(Number) });
+  });
+
+  test("clearing a URL makes the next cachedFetch call the fetcher once", async () => {
+    __resetPackageQuietWindowsForTests();
+    const url = "https://example.com/refetch-after-clear";
+    let calls = 0;
+    const doFetch = async () => ({ value: ++calls });
+    expect(await cachedFetch(PKG, { ttl_s: 60 }, url, undefined, doFetch, { source: "weather:current", attribution: null })).toEqual({ value: 1 });
+    expect(clearPackageCache({ source: "weather:current" }).removed).toBe(1);
+    expect(await cachedFetch(PKG, { ttl_s: 60 }, url, undefined, doFetch, { source: "weather:current", attribution: null })).toEqual({ value: 2 });
+    expect(calls).toBe(2);
+  });
+
+  test("clear refuses a package directory symlink that points outside cacheDir", async () => {
+    const outside = join(cacheDir, "outside-cache-sentinel");
+    const outsidePackage = join(outside, "linked-package");
+    mkdirSync(outsidePackage, { recursive: true });
+    const victim = join(outsidePackage, "victim.json");
+    writeFileSync(victim, JSON.stringify({ url: "https://example.com/untouched", value: "stay" }));
+    const link = join(cacheDir, "linked-package");
+    symlinkSync(outsidePackage, link, "dir");
+    try {
+      expect(clearPackageCache().removed).toBe(0);
+      expect(existsSync(victim)).toBe(true);
+    } finally {
+      unlinkSync(link);
+      __clearPackageCacheDirForTests("outside-cache-sentinel");
+    }
   });
 });
 

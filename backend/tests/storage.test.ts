@@ -19,6 +19,9 @@ import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { conversationTurns } from "@/db/schema";
+import { cachedFetch, clearPackageCache, __resetPackageCacheForTests } from "@/lib/packageCache";
+import { openShelfStore } from "@/lib/shelf/shelfStore";
+import { __resetPackageQuietWindowsForTests } from "@/lib/packageHost";
 import type { PersonRow } from "@/types";
 
 function toPersonRow(id: string): PersonRow {
@@ -79,6 +82,51 @@ describe("GET /api/storage", () => {
     const adultClient = new TestClient();
     await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "0000" });
     expect((await adultClient.get("/api/storage")).status).toBe(403);
+  });
+});
+
+describe("package cache controls", () => {
+  test("owner can list and clear package cache while shelf items remain", async () => {
+    const { client } = await owner();
+    __resetPackageCacheForTests();
+    const cacheUrl = "https://example.com/storage-clear-test";
+    const packageId = "data-life-05-storage-test";
+    const source = `${packageId}:source`;
+    await cachedFetch(packageId, { ttl_s: 60 }, cacheUrl, undefined, async () => ({ forecast: "sunny" }), { source, attribution: null });
+    const shelf = openShelfStore(":memory:");
+    const now = new Date().toISOString();
+    shelf.put({ id: "item-1", feed_id: "feed-1", url: "https://example.com/story", canonical_url: "https://example.com/story", title: "Story", summary: "Summary", published_at: null, fetched_at: now, publisher: "News", lang: "en", band_ok: "adult", hlc: "1788000000000:0:test", provenance: "feed-1" });
+    try {
+      const listed = await client.get("/api/storage/package-cache");
+      expect(listed.status).toBe(200);
+      const rows = await listed.json() as Array<{ source: string; entryCount: number }>;
+      expect(rows.filter((row) => row.source === source)).toEqual([expect.objectContaining({ source, entryCount: 1 })]);
+      const cleared = await client.post("/api/storage/package-cache/clear", { source });
+      expect(cleared.status).toBe(200);
+      expect(await cleared.json()).toMatchObject({ removed: 1 });
+      expect(shelf.count()).toBe(1);
+    } finally { shelf.close(); clearPackageCache({ source }); }
+  });
+
+  test("adults, teens and children get 403 on both routes and cannot delete entries", async () => {
+    const { client: ownerClient } = await owner();
+    __resetPackageCacheForTests();
+    const packageId = "data-life-05-refused-test";
+    const source = `${packageId}:source`;
+    await cachedFetch(packageId, { ttl_s: 60 }, "https://example.com/refused-clear", undefined, async () => ({ forecast: "sunny" }), { source, attribution: null });
+    try {
+      for (const role of ["adult", "teen", "child"] as const) {
+        const created = await ownerClient.post("/api/people", { displayName: `Person ${role}`, role, secret: "0000" });
+        const person = (await created.json()) as { id: string };
+        const member = new TestClient();
+        await member.post("/api/auth/verify-secret", { personId: person.id, secret: "0000" });
+        expect((await member.get("/api/storage/package-cache")).status).toBe(403);
+        expect((await member.post("/api/storage/package-cache/clear", { source })).status).toBe(403);
+      }
+      expect(clearPackageCache({ source }).removed).toBe(1);
+    } finally {
+      clearPackageCache({ source });
+    }
   });
 });
 
