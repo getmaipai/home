@@ -48,6 +48,7 @@ function open(person: Roster, url: string, home: Parameters<typeof mockHome>[0] 
     <MemoryRouter initialEntries={[url]}>
       <Where />
       <Routes>
+        <Route path="setup/away" element={<h1>Away setup wizard</h1>} />
         <Route element={<FullLayout rail activeAppHref={activeAppHref(new URL(url, "http://home").pathname)} railProfile={<RailProfileMenu displayName={person.display_name} subtitle={person.role} settingsHref="/settings" helpHref="https://example.com/help" onLogout={() => {}} />} />}>
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
           <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={() => {}} />} />
@@ -135,6 +136,32 @@ describe("the settings route", () => {
     } finally {
       window.confirm = originalConfirm;
     }
+  });
+
+  test("away wizard opens from the checklist and from Settings, network", async () => {
+    const checklist = open(makePerson("owner"), "/settings/home/general", {
+      setupChecklist: [{ id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", done: false, open: { label: "Open", href: "/setup/away" } }],
+    });
+    const checklistLink = await checklist.findByRole("link", { name: "Open Set up access away from home" });
+    fireEvent.click(checklistLink);
+    await waitFor(() => expect(where(checklist)).toBe("/setup/away"));
+    expect(checklist.getByRole("heading", { name: "Away setup wizard" })).toBeTruthy();
+    cleanup();
+    fixture?.restore();
+    fixture = null;
+
+    const settings = open(makePerson("owner"), "/settings/home/network");
+    fireEvent.click(await settings.findByRole("link", { name: "Set up away access" }));
+    await waitFor(() => expect(where(settings)).toBe("/setup/away"));
+    expect(settings.getByRole("heading", { name: "Away setup wizard" })).toBeTruthy();
+  });
+
+  test("Settings, network renders no second copy of the setup steps", async () => {
+    const view = open(makePerson("owner"), "/settings/home/network");
+    await view.findByRole("link", { name: "Set up away access" });
+    expect(view.queryByText("Install Tailscale on this computer")).toBeNull();
+    expect(view.queryByText("Turn on secure addresses")).toBeNull();
+    expect(view.queryByRole("img", { name: /QR code for your Home address/ })).toBeNull();
   });
 
   test("an admin opens the household voice catalog in Home settings", async () => {

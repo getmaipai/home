@@ -2,27 +2,33 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { getTailscaleStatus, interpretTailscaleStatusJson } from "@/lib/tailscale";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { owner, teen } from "./support/testAuth";
 
 beforeEach(() => resetDb());
 
-test("pre-owner status and enable are available only through setup-local checks", async () => {
+test("away routes refuse anyone signed out, even before an owner exists", async () => {
   const local = new TestClient();
-  expect((await local.get("/api/tailscale/status")).status).toBe(200);
-  const tsHost = new TestClient();
-  expect((await tsHost.get("/api/tailscale/status", { host: "hub.example.ts.net" })).status).toBe(403);
-  const remote = new TestClient("192.0.2.40");
-  expect((await remote.get("/api/tailscale/status")).status).toBe(403);
-  expect((await local.post("/api/tailscale/enable", {})).status).toBe(400);
+  expect((await local.get("/api/tailscale/status")).status).toBe(401);
+  expect((await local.post("/api/tailscale/enable", {})).status).toBe(401);
 });
 
-test("after owner creation, status and enable require an owner/admin session", async () => {
-  const owner = new TestClient();
-  expect((await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).status).toBe(201);
-  expect((await new TestClient().get("/api/tailscale/status")).status).toBe(401);
-  expect((await owner.get("/api/tailscale/status")).status).toBe(200);
-  const nonLoopbackWithOwnerSession = new TestClient("192.0.2.40");
-  // The session cookie is host-independent; a network peer still needs a valid owner session.
-  expect((await nonLoopbackWithOwnerSession.get("/api/tailscale/status")).status).toBe(401);
+test("away routes refuse a non-admin with a message that says who can do it", async () => {
+  const household = await owner();
+  const adult = await teen(household.client);
+  const status = await adult.get("/api/tailscale/status");
+  const enable = await adult.post("/api/tailscale/enable", {});
+  expect(status.status).toBe(403);
+  expect(enable.status).toBe(403);
+  for (const response of [status, enable]) {
+    const body = await response.json() as { error: string };
+    expect(body.error).toContain("Only the owner or an admin");
+    expect(body.error).toContain("Ask one of them.");
+  }
+});
+
+test("owner sessions can read away status", async () => {
+  const household = await owner();
+  expect((await household.client.get("/api/tailscale/status")).status).toBe(200);
 });
 
 describe("getTailscaleStatus() (real query on this machine)", () => {

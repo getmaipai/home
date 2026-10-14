@@ -26,6 +26,7 @@ describe("GET /api/setup-checklist", () => {
     ]);
     expect(result.every((item) => typeof item.done === "boolean" && item.reason.length > 0 && item.open.href.length > 0)).toBe(true);
     expect(result.find((item) => item.id === "phone-or-tablet")?.open.href).toBe("/devices");
+    expect(result.find((item) => item.id === "away-access")?.open.href).toBe("/setup/away");
     expect(result.map((item) => item.title)).not.toContain("Save your backup key");
     expect(result.map((item) => item.title)).not.toContain("Add the offline library");
   });

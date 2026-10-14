@@ -26,10 +26,9 @@ declare global {
 
 const PHASES: WizardStep[] = [
   { id: "computers", title: "Your computers" },
-  { id: "away", title: "Away from home" },
   { id: "meet", title: "Meet your Home" },
 ];
-const SCREEN_IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "hello", "done"] as const;
+const SCREEN_IDS = ["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "hello", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
@@ -37,7 +36,6 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   storage: "Where should Home keep its files?",
   checks: "Checking your computers",
   plan: "Here's the plan for your Home",
-  away: "Reach Home from anywhere",
   owner: "Create your owner account",
   face: "Let Home recognise you",
   hello: "Hello",
@@ -103,7 +101,9 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       return null;
     }
     setState(result);
-    const firstPending = result.steps.find((step) => step.status === "pending" || step.status === "running" || step.status === "failed")?.id;
+    // `away` remains in the persisted setup contract for older records, but
+    // is now completed from the post-setup checklist rather than first run.
+    const firstPending = result.steps.find((step) => step.id !== "away" && (step.status === "pending" || step.status === "running" || step.status === "failed"))?.id;
     // The common new-person profile flow is not built. The plan explicitly
     // removes screen 9 until it exists, so its server record is not a UI step.
     const next = firstPending === "profile" ? "hello" : firstPending;
@@ -184,8 +184,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     popup.print();
   }
 
-  const phase = screen === "away" ? "away" : screen === "owner" || screen === "face" || screen === "hello" || screen === "done" ? "meet" : "computers";
-  const completedCount = phase === "away" ? 1 : phase === "meet" ? 2 : 0;
+  const phase = screen === "owner" || screen === "face" || screen === "hello" || screen === "done" ? "meet" : "computers";
+  const completedCount = phase === "meet" ? 1 : 0;
   const pendingThings = state && (stepIsDone(state, "face") || state.steps.find((step) => step.id === "face")?.status === "deferred") ? 1 : 2;
 
   async function record(id: string, status: "done" | "skipped" | "deferred" = "done") {
@@ -204,7 +204,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   }
 
   async function next() {
-    const deferred = ["checks", "plan", "away", "hello"].includes(screen) || (screen === "engine_location" && engine === "another_computer");
+    const deferred = ["checks", "plan", "hello"].includes(screen) || (screen === "engine_location" && engine === "another_computer");
     const updated = await record(screen, deferred ? "deferred" : "done");
     if (!updated) return;
     if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
@@ -266,7 +266,6 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
 
   function moveToPhase(id: string) {
     if (id === "computers") setScreen("welcome");
-    if (id === "away") setScreen("away");
     if (id === "meet") setScreen("owner");
   }
   const back = () => {
@@ -298,7 +297,6 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       break;
     }
     case "plan": body = renderSetupReviewScreen({ screen: "plan", searchCandidate, onChooseSearchCandidate: () => void chooseSearchCandidate(), searchError, busy }); break;
-    case "away": body = <Card><CardHeader><CardTitle>Reach Home from anywhere</CardTitle><CardDescription>Tailscale connects your family's devices to Home away from home.</CardDescription></CardHeader><CardContent><p>The Tailscale setup and status checks are not built yet. Home has not contacted Tailscale or enabled remote access.</p><p>Set up later. Home works only at home until then.</p><p className="text-sm text-muted-foreground">You can finish this later in Home settings.</p></CardContent></Card>; break;
     case "owner": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><Card><CardHeader><CardTitle>Owner or admin?</CardTitle></CardHeader><CardContent><p>{OWNER_COPY}</p><p>{ADMIN_COPY}</p></CardContent></Card><Separator /><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} /></CardContent></Card>; break;
     case "face": body = <Card><CardHeader><CardTitle>Let Home recognise you</CardTitle><CardDescription>Home can greet you by face. Your face is stored as numbers on this computer only.</CardDescription></CardHeader><CardContent><p>Face enrollment is available from your profile after setup.</p></CardContent></Card>; break;
     case "hello": body = <Card><CardHeader><CardTitle>Hello</CardTitle></CardHeader><CardContent><p>The first greeting is not built yet. No greeting has been generated.</p></CardContent></Card>; break;
@@ -309,12 +307,11 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const screenIndex = SCREEN_IDS.indexOf(screen);
   const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
   const previewBanner = window.__setupPreview ? <SetupPreviewBar currentScreen={screenIndex + 1} onJump={(index) => setScreen(SCREEN_IDS[Math.max(0, Math.min(SCREEN_IDS.length - 1, index))]!)} /> : undefined;
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "away" ? "Set up later" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "checks" && (checksFetching || !!checkRows?.some((row) => row.state === "red") || !!checkRows?.every((row) => row.state === "green" || row.state === "idle"))} busy={busy || (screen === "done" && certificate === "loading")} phaseMode banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "checks" && (checksFetching || !!checkRows?.some((row) => row.state === "red") || !!checkRows?.every((row) => row.state === "green" || row.state === "idle"))} busy={busy || (screen === "done" && certificate === "loading")} phaseMode banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {
   if (id === "done") return "done";
-  if (id === "away") return "away";
   if (["owner", "face", "profile", "hello"].includes(id)) return "meet";
   return "computers";
 }

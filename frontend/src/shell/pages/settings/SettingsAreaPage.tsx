@@ -169,7 +169,7 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
                 </ItemContent>
                 <ItemFooter>
                   {item.done ? <Badge variant="secondary">Done</Badge> : <>
-                    <Button aria-label={`Open ${item.title}`} variant="outline" size="row" render={<Link to={item.open.href} />}>{item.open.label}</Button>
+                    <Button aria-label={`Open ${item.title}`} variant="outline" size="row" render={<Link to={item.open.href} state={item.id === "away-access" ? { from: `${location.pathname}${location.search}${location.hash}` } : undefined} />}>{item.open.label}</Button>
                     <Button variant="ghost" size="row" disabled={setupChecklist.dismiss.isPending} onClick={() => setupChecklist.dismiss.mutate(item.id)}>Not now</Button>
                   </>}
                 </ItemFooter>

@@ -12,6 +12,12 @@ Settings are split into two tabs at the top of the page. **Household** holds sha
 
 Under **Manage**, open **Users** to add, edit, or remove household members; **AI models** to choose models; **Backups** to run or review backups; **Repairs** to check and fix issues; **Updates** to see what is available; and **Privacy** to review connections. See [People and parental controls](people.md) for account details.
 
+## Reach Home away from home
+
+An owner or admin can open **Home**, then **Network**, and choose **Set up away access**. Home guides you through installing and signing in to Tailscale, enabling its secure addresses, and opening Home on a phone or tablet. The same setup is available from the setup checklist.
+
+Until away access is enabled, Home works only on your home network. Tailscale connects your family's devices privately. Turning on Home's secure address publishes this computer's Tailscale name in public certificate logs. Choose a plain computer name, not a family name. This setup uses Tailscale's DNS and HTTPS certificate service; Headscale is not supported.
+
 ## Clear saved online data
 
 An owner or admin can open **Manage**, then **Storage**, to see saved copies Home fetched for weather, news, and other lookups. Clear one source or choose **Clear all**. This does not clear chats, memories, or items in the news shelf. Home fetches a cleared copy again the next time someone asks. If a service is taking a break, Home may wait before trying it again.

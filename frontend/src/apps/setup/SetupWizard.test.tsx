@@ -78,6 +78,17 @@ describe("SetupWizard", () => {
     } finally { h.restore(); }
   });
 
+  test("first run skips the legacy away step and resumes at owner setup", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Create your owner account"));
+      expect(rendered.container.textContent).not.toContain("Reach Home from anywhere");
+    } finally { h.restore(); }
+  });
+
   test("a refresh mid-wizard resumes from the server and each visited screen records its step", async () => {
     const h = harness();
     try {
@@ -102,14 +113,13 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Continue", "Where should Home keep its files?");
       await advanceTo(rendered, "Continue", "Checking your computers");
       await advanceTo(rendered, "Continue", "Here's the plan for your Home");
-      await advanceTo(rendered, "Continue", "Reach Home from anywhere");
-      await advanceTo(rendered, "Set up later", "Create your owner account");
+      await advanceTo(rendered, "Continue", "Create your owner account");
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
       await advanceTo(rendered, "Continue", "Let Home recognise you");
       await advanceTo(rendered, "Do this later", "Hello");
       await advanceTo(rendered, "Continue", "Your Home is ready");
-      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello"]);
+      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile", "hello"]);
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
       expect(h.posts.at(-1)).toBe("done");
       await waitFor(() => expect(rendered.container.textContent).toContain("Sign in"));

@@ -1,38 +1,186 @@
 import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { Field, FieldContent, FieldDescription, FieldGroup, FieldTitle } from "@maipai/ui/src/dashboard/components/ui/field";
+import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { Button } from "@maipai/ui/src/ui/button";
 import { QrCode } from "@maipai/ui/src/ui/qr-code";
-import { api, type TailscaleStatus } from "@/lib/api";
+import { api, type SignedInPerson, type TailscaleStatus } from "@/lib/api";
 
-export function AwayFromHome({ onContinue }: { onContinue: () => void }) {
+const STEPS: WizardStep[] = [
+  { id: "device", title: "Install and sign in" },
+  { id: "secure", title: "Turn on secure addresses" },
+  { id: "phone", title: "Scan the code" },
+];
+type StepId = (typeof STEPS)[number]["id"];
+type RouteState = { from?: string };
+
+function firstUnfinishedStep(status: TailscaleStatus): StepId {
+  if (!status.installed || !status.signedIn) return "device";
+  if (!status.httpsEnabled || !status.enabled) return "secure";
+  return "phone";
+}
+
+function isOwnerOrAdmin(person: SignedInPerson | null): person is SignedInPerson {
+  return person?.role === "owner" || person?.role === "admin";
+}
+
+export function AwayFromHome({ operator }: { operator: SignedInPerson | null }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [status, setStatus] = useState<TailscaleStatus | null>(null);
-  const [url, setUrl] = useState<string | null>(null);
-  const [qrPayload, setQrPayload] = useState<string | null>(null);
+  const [stepOverride, setStepOverride] = useState<StepId | null>(null);
+  const [enabledAddress, setEnabledAddress] = useState<{ url: string; qrPayload: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
   useEffect(() => {
+    if (!isOwnerOrAdmin(operator)) return;
     let active = true;
-    const poll = () => void api.tailscaleStatus().then((next) => { if (active) setStatus(next); }).catch(() => undefined);
-    poll(); const timer = window.setInterval(poll, 4000);
-    const focus = () => poll(); window.addEventListener("focus", focus);
+    const poll = () => void api.tailscaleStatus().then((next) => {
+      if (!active) return;
+      setStatus(next);
+      setError(null);
+    }).catch((reason) => {
+      if (active) setError(reason instanceof Error ? reason.message : "Home couldn't check Tailscale. Try again.");
+    });
+    poll();
+    const timer = window.setInterval(poll, 4000);
+    const focus = () => poll();
+    window.addEventListener("focus", focus);
     return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", focus); };
-  }, []);
-  const ready = Boolean(status?.installed && status.signedIn && status.httpsEnabled);
-  async function turnOn() {
-    setBusy(true); setError(null);
-    try { const result = await api.enableTailscale(); setUrl(result.url); setQrPayload(result.qrPayload); }
-    catch (e) { setError(e instanceof Error ? e.message : "Could not turn on away access."); }
-    finally { setBusy(false); }
+  }, [operator]);
+
+  function close() {
+    const from = (location.state as RouteState | null)?.from;
+    navigate(from?.startsWith("/") && !from.startsWith("//") && from !== "/setup/away" ? from : "/settings/home/network");
   }
-  return <div className="flex max-w-2xl flex-col gap-6">
-    <div><h2 className="text-xl font-semibold">Reach Home from anywhere</h2><p className="text-muted-foreground">Tailscale is a free app that links your family's phones and tablets to Home privately. Your conversations go straight between your devices and this computer; Tailscale can't read them.</p></div>
-    <ul className="flex flex-col gap-3">
-      <li>Install Tailscale on this computer — {status?.installed ? "Ready" : <a href="https://tailscale.com/download" target="_blank" rel="noreferrer">Get Tailscale</a>}</li>
-      <li>Sign in to Tailscale — {status?.signedIn ? "Ready" : "Waiting"}. Use the account your family's devices will use.</li>
-      <li>Turn on secure addresses in Tailscale — {status?.httpsEnabled ? "Ready" : <a href="https://login.tailscale.com/admin/dns" target="_blank" rel="noreferrer">Open Tailscale DNS settings</a>}</li>
-    </ul>
-    <p className="text-sm text-muted-foreground">Turning this on publishes this computer's Tailscale name in public certificate logs. Pick a plain computer name, not a family name. <a href="https://tailscale.com/kb/rename" target="_blank" rel="noreferrer">How to rename it</a></p>
-    <p className="text-sm text-muted-foreground">This setup uses Tailscale's DNS and HTTPS certificate service. Headscale is not supported by this setup flow.</p>
-    {url ? <div className="flex flex-col gap-3"><p>On your phone: install Tailscale, sign in with the same account, then open this address.</p>{qrPayload ? <QrCode value={qrPayload} size={176} label="QR code for your Home address away from home" /> : null}<a href={url}>{url}</a><Button onClick={onContinue}>Continue</Button></div> : <div className="flex gap-3"><Button disabled={!ready || busy} onClick={() => void turnOn()}>{busy ? "Turning on…" : "Turn on"}</Button><Button variant="outline" onClick={onContinue}>Set up later</Button><span className="text-sm text-muted-foreground">Until you do, Home works only on your home Wi-Fi.</span></div>}
-    {error ? <p role="alert" className="text-destructive">{error}</p> : null}
-  </div>;
+
+  if (!isOwnerOrAdmin(operator)) {
+    return (
+      <main>
+        <h1>Set up away access</h1>
+        {operator ? (
+          <>
+            <p>Only the owner or an admin can set up away access.</p>
+            <p>Ask one of them to finish this setup for your Home.</p>
+          </>
+        ) : (
+          <>
+            <p>Sign in to MaiPai Home to continue.</p>
+            <p>Only the owner or an admin can set up away access.</p>
+          </>
+        )}
+        <Button asChild variant="link"><Link to="/">Go to Home</Link></Button>
+      </main>
+    );
+  }
+
+  const currentStepId = stepOverride ?? (status ? firstUnfinishedStep(status) : "device");
+  const currentIndex = STEPS.findIndex((step) => step.id === currentStepId);
+  const readyForHomeAccess = Boolean(status?.installed && status.signedIn && status.httpsEnabled);
+  const address = enabledAddress?.url ?? status?.url;
+  const qrPayload = enabledAddress?.qrPayload ?? address;
+
+  async function enableAwayAccess() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await api.enableTailscale();
+      setEnabledAddress(result);
+      setStatus((current) => current ? { ...current, enabled: true, url: result.url } : current);
+      setStepOverride("phone");
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : "Home couldn't turn on away access. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const descriptions: Record<StepId, string> = {
+    device: "Tailscale lets your family reach Home from their other devices when they are away.",
+    secure: "Turn on Tailscale's secure DNS addresses, then connect this Home to your tailnet.",
+    phone: "Install Tailscale on your phone, sign in to the same account, then scan this code.",
+  };
+
+  let body;
+  if (currentStepId === "device") {
+    body = (
+      <FieldGroup>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldTitle>Install Tailscale on this computer</FieldTitle>
+            <FieldDescription>{status?.installed ? "Ready" : "Install the Tailscale app to continue."}</FieldDescription>
+          </FieldContent>
+          {!status?.installed ? <Button asChild variant="outline"><a href="https://tailscale.com/download" target="_blank" rel="noreferrer">Get Tailscale</a></Button> : null}
+        </Field>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldTitle>Sign in to Tailscale</FieldTitle>
+            <FieldDescription>{status?.signedIn ? "Ready" : "Use the account your family's phones and tablets will use."}</FieldDescription>
+          </FieldContent>
+        </Field>
+        {status && status.installed && !status.signedIn ? <Alert><AlertTitle>Waiting for sign-in</AlertTitle><AlertDescription>Open Tailscale on this computer and sign in. Home will check again automatically.</AlertDescription></Alert> : null}
+      </FieldGroup>
+    );
+  } else if (currentStepId === "secure") {
+    body = (
+      <FieldGroup>
+        <Field orientation="horizontal">
+          <FieldContent>
+            <FieldTitle>Secure DNS addresses</FieldTitle>
+            <FieldDescription>{status?.httpsEnabled ? "Ready" : "Turn on HTTPS certificates in Tailscale's DNS settings."}</FieldDescription>
+          </FieldContent>
+          {!status?.httpsEnabled ? <Button asChild variant="outline"><a href="https://login.tailscale.com/admin/dns" target="_blank" rel="noreferrer">Open DNS settings</a></Button> : null}
+        </Field>
+        <Alert>
+          <AlertTitle>About your address</AlertTitle>
+          <AlertDescription>Turning this on publishes this computer's Tailscale name in public certificate logs. Choose a plain computer name, not a family name. This setup uses Tailscale DNS and HTTPS certificates; Headscale is not supported.</AlertDescription>
+        </Alert>
+        {readyForHomeAccess && !status?.enabled ? <p>Home is ready to turn on its secure address.</p> : null}
+      </FieldGroup>
+    );
+  } else {
+    body = address && qrPayload ? (
+      <FieldGroup>
+        <Field>
+          <FieldTitle>Your Home address</FieldTitle>
+          <FieldDescription><a href={address}>{address}</a></FieldDescription>
+        </Field>
+        <QrCode value={qrPayload} size={192} label="QR code for your Home address away from home" />
+      </FieldGroup>
+    ) : (
+      <Alert variant="destructive"><AlertTitle>Home address unavailable</AlertTitle><AlertDescription>Home could not find its secure address. Refresh the status and try again.</AlertDescription></Alert>
+    );
+  }
+
+  return (
+    <Wizard
+      steps={STEPS}
+      currentStepId={currentStepId}
+      completedCount={currentIndex}
+      onJumpTo={(id) => setStepOverride(id as StepId)}
+      layout="default"
+      heading={currentStepId === "device" ? "Install Tailscale and sign in" : currentStepId === "secure" ? "Turn on secure addresses" : "Scan the code on your phone"}
+      description={descriptions[currentStepId]}
+      progress={{ current: currentIndex + 1, total: STEPS.length }}
+      stickyFooter
+      banner={<Button type="button" variant="ghost" onClick={close}>Close</Button>}
+      onBack={currentIndex > 0 ? () => setStepOverride(STEPS[currentIndex - 1]!.id) : undefined}
+      onNext={() => {
+        if (currentStepId === "device") setStepOverride("secure");
+        else if (currentStepId === "secure") {
+          if (status?.enabled) setStepOverride("phone");
+          else void enableAwayAccess();
+        }
+        else close();
+      }}
+      nextLabel={currentStepId === "secure" && !status?.enabled ? "Turn on away access" : currentStepId === "phone" ? "Done" : "Continue"}
+      nextDisabled={currentStepId === "device" ? !status?.installed || !status.signedIn : currentStepId === "secure" ? !readyForHomeAccess : !address}
+      busy={busy || status === null}
+    >
+      {body}
+      {error ? <Alert variant="destructive"><AlertTitle>Could not check or update Tailscale</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}
+    </Wizard>
+  );
 }

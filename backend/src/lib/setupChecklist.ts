@@ -16,7 +16,7 @@ export const SETUP_CHECKLIST_ITEMS = [
   { id: "phone-or-tablet", title: "Add a phone or tablet", reason: "Sign in on another device to use Home there.", open: { label: "Open", href: "/devices" } },
   { id: "web-search", title: "Fix web search", reason: "Home cannot complete its web search check yet.", open: { label: "Open", href: "/settings/home/search" } },
   { id: "apps", title: "Add apps", reason: "Add an app to give Home another useful skill.", open: { label: "Open", href: "/store" } },
-  { id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", open: { label: "Open", href: "/settings/home/network" } },
+  { id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", open: { label: "Open", href: "/setup/away" } },
 ] as const;
 
 export type SetupChecklist = SetupChecklistItem[];

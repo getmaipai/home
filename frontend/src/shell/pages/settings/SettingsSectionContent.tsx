@@ -1,4 +1,5 @@
 import { useState, type ComponentProps, type ReactNode } from "react";
+import { Link, useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { easeRowExtras, type EaseValue } from "@/shell/easeRows";
@@ -12,7 +13,7 @@ import { SettingsLinks } from "@/shell/pages/settings/SettingsLinks";
 import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/settingsViews";
 import { scopeValueFor, type KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
-import { AwayFromHome } from "@/apps/setup/AwayFromHome";
+import { Button } from "@maipai/ui/src/ui/button";
 
 const ChevronDown = getIcon("chevron-down");
 
@@ -70,7 +71,7 @@ function EaseCardRenderer({ viewingSelf, ...rest }: { viewingSelf: boolean } & O
   return <SettingsRenderer {...rest} rowExtras={easeRowExtras((values.data ?? []) as EaseValue[], viewingSelf, resetKeys)} />;
 }
 
-function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps) {
+function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps, returnPath: string) {
   const group = card.group!;
   const scope = card.scope!;
   const title = props.section.id === "voice" && group === "person.voice" ? "Speaking voice" : card.label;
@@ -88,7 +89,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     includeExpert: props.section.id === "network",
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
-  if (props.section.id === "network") return <>{renderer}<AwayFromHome onContinue={() => undefined} /></>;
+  if (props.section.id === "network") return <>{renderer}{viewer.role === "owner" || viewer.role === "admin" ? <Button asChild variant="outline"><Link to="/setup/away" state={{ from: returnPath }}>Set up away access</Link></Button> : null}</>;
   if (!card.collapsed) return renderer;
   const focused = props.focusKey !== undefined && props.registry.some((k) => k.key === props.focusKey && k.lives_in === group && k.scope === scope);
   return (
@@ -111,6 +112,8 @@ export interface SectionContentProps extends SettingsViewProps {
  * A view section is the view alone. */
 export function SettingsSectionContent(props: SectionContentProps) {
   const { section, viewer, registry, person, onPersonChange } = props;
+  const location = useLocation();
+  const returnPath = `${location.pathname}${location.search}${location.hash}`;
   const viewProps = { person, onPersonChange };
   if (section.kind === "view") return <>{section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
   return (
@@ -122,7 +125,7 @@ export function SettingsSectionContent(props: SectionContentProps) {
         // key (the enrollment sounds switch); a second card would repeat it.
         if (section.id === "profile" && card.group === "person.profile") return null;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
-        return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props)}</div>;
+        return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props, returnPath)}</div>;
       })}
       {section.trail_view ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
     </div>

@@ -32,6 +32,10 @@ const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWi
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",
 );
+const AwayFromHome = lazyNamed<ComponentProps<typeof import("@/apps/setup/AwayFromHome")["AwayFromHome"]>>(
+  () => import("@/apps/setup/AwayFromHome"),
+  "AwayFromHome",
+);
 // FACE-02: another Wizard-driven, shell-less full-page route (the same
 // reason /setup lives here instead of under Routes - Wizard.tsx's
 // own <main> would double up on FullLayout's landmark if nested inside
@@ -106,6 +110,20 @@ export function App() {
                         <Suspense fallback={<RouteSkeleton />}>
                           {__SETUP_PREVIEW__ ? <PreviewRuntime><SetupWizard onDone={loadPerson} /></PreviewRuntime> : <SetupWizard onDone={loadPerson} initialScreen={new URLSearchParams(window.location.search).get("checksReview") === "1" ? "checks" : undefined} />}
                         </Suspense>
+                      }
+                    />
+                    <Route
+                      path="/setup/away"
+                      element={
+                        person === undefined ? (
+                          <div className="flex h-screen items-center justify-center">
+                            <Progress mode="spinner" label="Loading MaiPai Home" />
+                          </div>
+                        ) : (
+                          <Suspense fallback={<RouteSkeleton />}>
+                            <AwayFromHome operator={person} />
+                          </Suspense>
+                        )
                       }
                     />
                     <Route
