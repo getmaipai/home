@@ -125,6 +125,13 @@ function resolveSessionDeviceId(token: string): string | null {
   return row?.deviceId ?? null;
 }
 
+/** A human browser session for routes that must not accept a paired device session. */
+export function resolveHumanSession(token: string): PersonRow | null {
+  const person = resolveSession(token);
+  if (!person || resolveSessionDeviceId(token) !== null) return null;
+  return person;
+}
+
 // CSRF defense-in-depth on top of the SameSite=Strict cookie: for
 // state-changing methods, reject a request whose Origin host is not one we
 // serve. Behind a TLS-terminating reverse proxy the browser's Origin

@@ -39,6 +39,8 @@ import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
 import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceModeMigration";
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
+import { ensureSetupState } from "@/lib/setupState";
+import { restoreWasApplied } from "@/db";
 
 const configuredPort = Number(process.env.PORT ?? 8787);
 purgeLegacyHubLogs();
@@ -74,6 +76,7 @@ setWarmupPrompt(turnWarmupPrompt);
 // module-load seeding, still there - see lib/hlc.ts's own header on why
 // the wider seed lives here instead of scattered per-table).
 seedHlcFromDatabase();
+ensureSetupState(restoreWasApplied ? "restore" : "wizard");
 // Remote Stack links are optional boot work. The state machine starts its
 // SSH/DNS/probe work asynchronously, so a missing or offline engine never
 // holds Home's HTTP server startup.
