@@ -105,14 +105,21 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
       hardware = response;
     }
   } catch { /* engine rows describe an unavailable Stack */ }
-  rows.push(makeRow("engine", "Engine service", engineOk ? "green" : "red", engineOk ? "The Stack is answering." : "Home's AI engine isn't running. Install or start it, then try again.", "The Stack health endpoint did not answer.", "Repair", now));
+  const where = remote ? "on the other computer" : "on this computer";
+  const configuredUrl = remote ? "" : String(getHouseholdSettingValue("engines.stack.url") ?? "").trim();
+  const engineDown = remote
+    ? "The AI engine on the other computer isn't answering. Make sure that computer is on and the engine is running, then press Try again."
+    : configuredUrl
+      ? `The AI engine on this computer isn't answering at ${configuredUrl}. Start it, or check that address, then press Try again.`
+      : "The AI engine on this computer isn't answering. Start it, then press Try again.";
+  rows.push(makeRow("engine", "Engine service", engineOk ? "green" : "red", engineOk ? `The AI engine ${where} is answering.` : engineDown, "The Stack health endpoint did not answer.", "Repair", now));
 
   const hw = hardware && typeof hardware.hardware === "object" && hardware.hardware ? hardware.hardware as Record<string, unknown> : null;
   const proposed = hardware && typeof hardware.proposed === "object" && hardware.proposed ? hardware.proposed as Record<string, unknown> : null;
   const level = typeof proposed?.level === "string" ? proposed.level : null;
   const supported = isSupportedInstallPlatform(String(hw?.platform ?? local.platform), String(hw?.arch ?? local.arch));
-  rows.push(makeRow("memory", "Memory and graphics", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "The engine computer could not be checked." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
-  rows.push(makeRow("system", "System", !engineOk || !supported ? "red" : "green", !supported ? "This system is not supported for MaiPai Home's AI." : `${String(hw?.platform ?? local.platform)} ${String(hw?.arch ?? local.arch)} is supported.`, "The Stack hardware platform and architecture are checked against installer support.", "Use a supported computer", now));
+  rows.push(makeRow("memory", "Memory and graphics", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "Home can't check this until the AI engine is answering. Start it, then press Try again." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
+  rows.push(makeRow("system", "System", !supported ? "red" : "green", !supported ? "This system is not supported for MaiPai Home's AI." : `${String(hw?.platform ?? local.platform)} ${String(hw?.arch ?? local.arch)} is supported.`, "The Stack hardware platform and architecture are checked against installer support.", "Use a supported computer", now));
 
   let modelDisk: Awaited<ReturnType<NonNullable<CheckDeps["modelDisk"]>>> = { status: "red", message: "Choose a disk for AI models before continuing." };
   if (deps.modelDisk) modelDisk = await deps.modelDisk();
@@ -123,7 +130,7 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
   else if (!remote) modelDisk = await checkModelDisk(classDir("models"));
   rows.push(makeRow("model-disk", "Free disk for models", modelDisk.status, modelDisk.message ?? "There is enough free space for the AI models.", modelDisk.message ?? "The model disk meets placement requirements.", modelDisk.fix, now));
 
-  const nvidiaResult = remote && !deps.nvidia ? { status: "idle" as const, message: "Checked by the engine computer when downloads start" } : await checkNvidiaSysmemFallback(deps.nvidia ?? { hasNvidiaGpu: async () => false, isSysmemFallbackEnabled: async () => false });
+  const nvidiaResult = remote && !deps.nvidia ? { status: "idle" as const, message: "Checked when downloads start." } : await checkNvidiaSysmemFallback(deps.nvidia ?? { hasNvidiaGpu: async () => false, isSysmemFallbackEnabled: async () => false });
   rows.push(makeRow("graphics-driver", "Graphics driver", nvidiaResult.status === "idle" ? "idle" : nvidiaResult.status, nvidiaResult.message ?? (nvidiaResult.status === "idle" ? "Not checked on this computer." : "The NVIDIA driver is ready."), nvidiaResult.message ?? "NVIDIA fallback policy check.", undefined, now));
 
   let modelHost: string | null = null;
@@ -134,7 +141,7 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     const url = (pin?.download as Record<string, unknown> | undefined)?.url;
     if (typeof url === "string") modelHost = new URL(url).hostname;
   } catch { /* unavailable pins leave the optional reach row idle */ }
-  if (!modelHost) rows.push(makeRow("download-host", "Download host", "idle", "Checked by the engine computer when downloads start", "The Stack's pinned download host could not be read.", undefined, now));
+  if (!modelHost) rows.push(makeRow("download-host", "Download host", "idle", "Checked when downloads start.", "The Stack's pinned download host could not be read.", undefined, now));
   else {
     const reachable = await (deps.hostReach ?? tcp)(modelHost);
     const preflight = await checkInstallPreflight({ releaseHost: modelHost, reachReleaseHost: async () => reachable });
@@ -151,7 +158,7 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
   let hubDisk = deps.hubDisk ? await deps.hubDisk() : await checkHubDisk();
   rows.push(makeRow("hub-disk", "Hub disk", hubDisk.status, hubDisk.message ?? "There is enough space for Home's data.", hubDisk.message ?? "The hub disk meets placement requirements.", hubDisk.fix, now));
   const offset = await (deps.clockOffsetMs ?? (async () => null))();
-  rows.push(makeRow("clock", "Clock", offset === null ? "idle" : Math.abs(offset) > 120_000 ? "amber" : "green", offset === null ? "Checked by the engine computer when downloads start" : Math.abs(offset) > 120_000 ? `The engine computer's clock differs by ${Math.round(Math.abs(offset) / 60_000)} minutes.` : "The hub and engine clocks agree.", offset === null ? "No engine clock reading was available." : `Clock difference ${offset} ms.`, "Turn on automatic time", now));
+  rows.push(makeRow("clock", "Clock", offset === null ? "idle" : Math.abs(offset) > 120_000 ? "amber" : "green", offset === null ? "Checked when downloads start." : Math.abs(offset) > 120_000 ? `The clock on the AI engine's computer differs by ${Math.round(Math.abs(offset) / 60_000)} minutes.` : "The hub and engine clocks agree.", offset === null ? "No engine clock reading was available." : `Clock difference ${offset} ms.`, "Turn on automatic time", now));
   const reachableOnNetwork = await (deps.homeNetwork ?? (async () => true))();
   rows.push(makeRow("home-network", "Home network", reachableOnNetwork ? "green" : "amber", reachableOnNetwork ? "Home is available on your home network." : "Home answers only on this computer.", reachableOnNetwork ? "A local network address is available." : "No reachable LAN address was found.", "Allow Home through the firewall", now));
 

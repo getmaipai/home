@@ -57,6 +57,35 @@ describe("setup check row helpers", () => {
     expect((await setup(status("stopped"))).find((row) => row.id === "tailnet-peer")?.state).toBe("amber");
     expect((await setup(status("running", peer), false)).find((row) => row.id === "tailnet-allow")?.actionLabel).toBe("Allow");
   });
+  test("System row is red only when the platform is unsupported, not when the engine is down", async () => {
+    resetDb();
+    const common = { catalog: async () => ({ models: [] }), modelDisk: async () => ({ status: "green" as const }), hubDisk: async () => ({ status: "green" as const }), homeNetwork: async () => true };
+    const down = await runSetupChecks({ ...common, health: async () => ({ ok: false }), hardware: async () => { throw new Error("down"); }, localHardware: () => ({ platform: "darwin", arch: "arm64", totalMemory: 16e9 }) });
+    expect(down.find((row) => row.id === "engine")?.state).toBe("red");
+    expect(down.find((row) => row.id === "system")?.state).toBe("green");
+    expect(down.find((row) => row.id === "system")?.text).toBe("darwin arm64 is supported.");
+    const intel = await runSetupChecks({ ...common, health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "x64" }, proposed: { level: "Minimal" } }) });
+    expect(intel.find((row) => row.id === "system")?.state).toBe("red");
+  });
+  test("engine row uses plain words for This computer and says what to do when it fails", async () => {
+    resetDb();
+    setHouseholdSettingValue("engines.stack.where", "this_computer");
+    const common = { catalog: async () => ({ models: [] }), modelDisk: async () => ({ status: "green" as const }), hubDisk: async () => ({ status: "green" as const }), homeNetwork: async () => true, hardware: async () => ({ hardware: { platform: "darwin", arch: "arm64" }, proposed: { level: "Minimal" } }) };
+    const up = await runSetupChecks({ ...common, health: async () => ({ ok: true }) });
+    expect(up.find((row) => row.id === "engine")?.text).toBe("The AI engine on this computer is answering.");
+    const noAddress = await runSetupChecks({ ...common, health: async () => ({ ok: false }) });
+    const bare = noAddress.find((row) => row.id === "engine")!;
+    expect(bare.text).toContain("isn't answering");
+    expect(bare.text).toContain("Start it");
+    setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
+    const withAddress = (await runSetupChecks({ ...common, health: async () => ({ ok: false }) })).find((row) => row.id === "engine")!;
+    expect(withAddress.text).toContain("http://127.0.0.1:8770");
+    for (const rows of [up, noAddress]) for (const row of rows) { expect(row.text).not.toMatch(/\bStack\b|engine computer|\u2014/); }
+    expect(withAddress.text).not.toMatch(/\bStack\b|engine computer|\u2014/);
+    const memory = noAddress.find((row) => row.id === "memory")!;
+    expect(memory.text).not.toMatch(/engine computer/);
+    setHouseholdSettingValue("engines.stack.url", "");
+  });
   test("the shared installer platform rule accepts supported hosts and refuses Intel macOS", () => {
     expect(isSupportedInstallPlatform("darwin", "arm64")).toBe(true);
     expect(isSupportedInstallPlatform("linux", "x64")).toBe(true);
