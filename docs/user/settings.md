@@ -26,6 +26,26 @@ Switch to the **Me** tab for your own personal preferences:
 - **Commands**: teach MaiPai a phrase of your own. For example, "when I say movie night, dim the lights."
 - **Devices & sessions**: see what's signed in as you. Sign out anything you don't recognize.
 
+## Voices
+
+Open **Settings**, choose the **Me** tab, then choose **Voices**. The page shows up to six voice choices at the top. Below them, the table lists voices Home can use. Each row shows the name, a short description, language, country, gender, source, and whether the voice is installed here.
+
+Use the language, country, gender, and source filters to narrow the list. Use **Search by name** to find a voice. Choose **All** to clear a filter. Some details may say "unknown" when they are not known. Those voices still work.
+
+![Voice list with search, filters, and an installed voice](../assets/screens/voice-browser-desktop-light.png)
+
+Choose **Play** to hear one short sentence in a voice. Choose **Stop**, or play a different voice, to stop it. Home keeps the sound, so playing that voice again is quicker.
+
+If a voice says **Not installed**, it is not on this home yet. An owner or admin can choose **Download**. The first download can take a little while. Home fetches the voice file once from its public source, then saves and speaks it on this home's own disk. If you do not see **Download**, ask the person who manages Home to add the voice.
+
+![Voice list showing playback controls and a voice to download](../assets/screens/voice-browser-preview-download-desktop-light.png)
+
+Choose **Use this voice** on an installed preset voice to make it yours. The row then says **Current voice**. Home uses that voice when it talks to you in chat and when it reads text aloud.
+
+Children see a shorter list and cannot change their own voice. If you are a child, ask a parent to choose your voice. An owner or admin can open **Voices**, use **Choosing a voice for**, and choose a child. Then choose **Use this voice** on an installed preset voice. Teens and adults choose their own voice. No one else can change it for them.
+
+If Home shows "Home could not prepare this voice preview. Open Settings, then Engines, and check the voice setup.", an owner or admin can open **Settings**, then **Engines**, and check the voice setup. Everyone else can ask the person who manages Home to check it.
+
 ## Find a setting fast
 
 Use the **Search settings** box at the top of the page. It jumps you straight to what you're looking for.
