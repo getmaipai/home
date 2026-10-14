@@ -41,6 +41,9 @@ interface CacheEntryFile {
   url: string;
   method: string;
   fetchedAt: string; // ISO
+  source?: string | null;
+  expiresAt?: string;
+  attribution?: string | null;
   value: unknown;
 }
 
@@ -275,6 +278,7 @@ export async function cachedFetch(
   url: string,
   opts: CacheFetchOptions | undefined,
   doFetch: () => Promise<unknown>,
+  provenance: { source: string | null; attribution: string | null } = { source: null, attribution: null },
 ): Promise<unknown> {
   if (!cachePolicy) return doFetch();
   const method = (opts?.method ?? "GET").toUpperCase();
@@ -283,6 +287,10 @@ export async function cachedFetch(
   const ttlS = cachePolicy.ttl_s ?? DEFAULT_TTL_S;
   const staleOkS = cachePolicy.stale_ok_s ?? DEFAULT_STALE_OK_S;
   const maxBytes = cachePolicy.max_bytes ?? DEFAULT_MAX_BYTES;
+  const makeEntry = (value: unknown): CacheEntryFile => {
+    const fetchedAt = new Date().toISOString();
+    return { url, method, fetchedAt, expiresAt: new Date(Date.parse(fetchedAt) + ttlS * 1000).toISOString(), source: provenance.source, attribution: provenance.attribution, value };
+  };
   const key = cacheKey(url, opts);
   const existing = readEntry(packageId, key);
 
@@ -303,7 +311,7 @@ export async function cachedFetch(
       // (with no fresher entry) will surface the real error the ordinary
       // way, through doFetch() itself.
       void doFetch()
-        .then((value) => writeEntry(packageId, key, { url, method, fetchedAt: new Date().toISOString(), value }, maxBytes))
+        .then((value) => writeEntry(packageId, key, makeEntry(value), maxBytes))
         .catch(() => {});
       return existing.value;
     }
@@ -311,8 +319,28 @@ export async function cachedFetch(
 
   recordMiss(packageId);
   const value = await doFetch();
-  writeEntry(packageId, key, { url, method, fetchedAt: new Date().toISOString(), value }, maxBytes);
+  writeEntry(packageId, key, makeEntry(value), maxBytes);
   return value;
+}
+
+export interface CacheEnvelope {
+  source: string | null;
+  fetchedAt: string;
+  expiresAt: string;
+  attribution: string | null;
+}
+
+/** Read the metadata envelope without fetching. Old entries derive expiry from the current policy. */
+export function getCacheEnvelope(packageId: string, url: string, cachePolicy: CachePolicy, opts?: CacheFetchOptions): CacheEnvelope | null {
+  const entry = readEntry(packageId, cacheKey(url, opts));
+  if (!entry) return null;
+  const ttlS = cachePolicy.ttl_s ?? DEFAULT_TTL_S;
+  return {
+    source: entry.source ?? null,
+    fetchedAt: entry.fetchedAt,
+    expiresAt: entry.expiresAt ?? new Date(Date.parse(entry.fetchedAt) + ttlS * 1000).toISOString(),
+    attribution: entry.attribution ?? null,
+  };
 }
 
 export interface CacheStats {

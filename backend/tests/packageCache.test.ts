@@ -1,7 +1,12 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+import { createHash } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { cacheDir } from "@/lib/paths";
 import {
   cachedFetch,
   getCacheStats,
+  getCacheEnvelope,
   __resetPackageCacheForTests,
   __setTestCacheBudgetBytes,
   __clearPackageCacheDirForTests,
@@ -112,6 +117,85 @@ describe("cachedFetch", () => {
     expect(stats?.hits).toBe(1);
     expect(stats?.misses).toBe(1);
     expect(stats?.entryCount).toBe(1);
+  });
+
+  test("a cache envelope exposes its stored provenance and expiry", async () => {
+    const provenance = { source: "weather:open-meteo", attribution: "Weather credit" };
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/envelope", undefined, async () => ({ ok: true }), provenance);
+    const envelope = getCacheEnvelope(PKG, "https://example.com/envelope", { ttl_s: 60 });
+    expect(envelope?.source).toBe(provenance.source);
+    expect(envelope?.attribution).toBe(provenance.attribution);
+    expect(envelope?.fetchedAt).toBeDefined();
+    expect(Date.parse(envelope!.expiresAt) - Date.parse(envelope!.fetchedAt)).toBe(60_000);
+  });
+
+  test("old-shape entries remain hits, stale hits and misses with derived envelope expiry", async () => {
+    const url = "https://example.com/legacy";
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const dir = join(cacheDir, PKG);
+    mkdirSync(dir, { recursive: true });
+    const path = join(dir, `${key}.json`);
+    const fetchedAt = new Date(Date.now() - 5_000).toISOString();
+    writeFileSync(path, JSON.stringify({ url, method: "GET", fetchedAt, value: { old: true } }));
+    let calls = 0;
+    const value = await cachedFetch(PKG, { ttl_s: 60 }, url, undefined, async () => { calls++; return { fresh: true }; });
+    expect(value).toEqual({ old: true });
+    expect(calls).toBe(0);
+    const envelope = getCacheEnvelope(PKG, url, { ttl_s: 60 })!;
+    expect(envelope.source).toBeNull();
+    expect(envelope.attribution).toBeNull();
+    expect(envelope.expiresAt).toBe(new Date(Date.parse(fetchedAt) + 60_000).toISOString());
+
+    const staleAt = new Date(Date.now() - 10_000).toISOString();
+    writeFileSync(path, JSON.stringify({ url, method: "GET", fetchedAt: staleAt, value: { stale: true } }));
+    let finishRefresh!: (value: unknown) => void;
+    const stale = await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 60 }, url, undefined, async () => { calls++; return await new Promise((resolve) => { finishRefresh = resolve; }); }, { source: "legacy:row", attribution: "credit" });
+    expect(stale).toEqual({ stale: true });
+    const staleEnvelope = getCacheEnvelope(PKG, url, { ttl_s: 1, stale_ok_s: 60 })!;
+    expect(staleEnvelope.source).toBeNull();
+    expect(staleEnvelope.expiresAt).toBe(new Date(Date.parse(staleAt) + 1_000).toISOString());
+    expect(Date.parse(staleEnvelope.expiresAt)).toBeLessThan(Date.now());
+    finishRefresh({ refreshed: true });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const refreshed = getCacheEnvelope(PKG, url, { ttl_s: 1 })!;
+    expect(refreshed.source).toBe("legacy:row");
+    expect(refreshed.attribution).toBe("credit");
+    expect(calls).toBe(1);
+
+    writeFileSync(path, JSON.stringify({ url, method: "GET", fetchedAt: new Date(Date.now() - 120_000).toISOString(), value: { expired: true } }));
+    const missed = await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 1 }, url, undefined, async () => { calls++; return { new: true }; });
+    expect(missed).toEqual({ new: true });
+    expect(calls).toBe(2);
+  });
+
+  test("live ttl_s controls hit decisions even when an entry has stored expiresAt", async () => {
+    const url = "https://example.com/live-ttl";
+    await cachedFetch(PKG, { ttl_s: 3600 }, url, undefined, async () => ({ n: 1 }), { source: "test:row", attribution: null });
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const path = join(cacheDir, PKG, `${key}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    entry.expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+    writeFileSync(path, JSON.stringify(entry));
+    let calls = 0;
+    await cachedFetch(PKG, { ttl_s: -1 }, url, undefined, async () => { calls++; return { n: 2 }; }, { source: "test:row", attribution: null });
+    expect(calls).toBe(1);
+  });
+
+  test("a stale-while-revalidate refresh writes source, expiry and attribution", async () => {
+    const url = "https://example.com/stale-provenance";
+    const first = { source: "pkg:source", attribution: "Credit line" };
+    await cachedFetch(PKG, { ttl_s: 60 }, url, undefined, async () => ({ v: 1 }), first);
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const path = join(cacheDir, PKG, `${key}.json`);
+    const oldEntry = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    oldEntry.fetchedAt = new Date(Date.now() - 10_000).toISOString();
+    writeFileSync(path, JSON.stringify(oldEntry));
+    await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 60 }, url, undefined, async () => ({ v: 2 }), { source: "pkg:source", attribution: "Updated credit" });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const envelope = getCacheEnvelope(PKG, url, { ttl_s: 1, stale_ok_s: 60 })!;
+    expect(envelope.source).toBe("pkg:source");
+    expect(envelope.attribution).toBe("Updated credit");
+    expect(Date.parse(envelope.expiresAt) - Date.parse(envelope.fetchedAt)).toBe(1_000);
   });
 });
 

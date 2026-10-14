@@ -5,7 +5,7 @@
     "catalog_path": "plugins/fun/joke"
   },
   "media-lookup": {
-    "sha256": "7abfa6653c77a02c67a66ca1ae1a8202e64b888f38f7e49d460722d7179fc88e",
+    "sha256": "0e999af73d305a71afc8ff016dec3e719f757a9f0088465d54e9a2f28844d763",
     "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/info/media-lookup"
   },
@@ -20,7 +20,7 @@
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
-    "sha256": "3bc669a3393d4e01340eb018bf3eab6a1764f8a235ef213b045e42b371b1df34",
+    "sha256": "1ac94a3fb04ecf479e0c58455a22646fcf0a89101a7583a566faddf286b5d633",
     "source_commit": "7932306a36e7961f2706bd04b6614c3b8174390c",
     "catalog_path": "plugins/utilities/weather"
   }

@@ -134,6 +134,17 @@ describe("every bundled package clears bronze", () => {
         }
       });
 
+      test("every data_sources hosts entry is one of its manifest's net: permissions", () => {
+        const permissionHosts = new Set((manifest.permissions ?? []).filter((permission) => permission.startsWith("net:")).map((permission) => permission.slice(4).toLowerCase()));
+        const seen = new Set<string>();
+        for (const row of manifest.data_sources ?? []) for (const host of row.hosts ?? []) {
+          expect(host).toBe(host.toLowerCase());
+          expect(permissionHosts.has(host), `${id}: ${host} lacks a net: permission`).toBe(true);
+          expect(seen.has(host), `${id}: duplicate hosts entry ${host}`).toBe(false);
+          seen.add(host);
+        }
+      });
+
       test("declares a smoke entry", () => {
         expect(manifest.smoke).toBeDefined();
       });

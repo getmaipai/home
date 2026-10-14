@@ -109,6 +109,18 @@ const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 export const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+export function resolveDataSourceProvenance(manifest: PackageManifest, requestUrl: string): { source: string | null; attribution: string | null } {
+  let hostname: string;
+  try {
+    hostname = new URL(requestUrl).hostname.toLowerCase();
+  } catch {
+    return { source: null, attribution: null };
+  }
+  const rows = manifest.data_sources ?? [];
+  const matches = rows.filter((row) => row.hosts?.some((host) => host.toLowerCase() === hostname));
+  const row = matches.length === 1 ? matches[0] : matches.length === 0 && rows.length === 1 && !rows[0]!.hosts ? rows[0] : undefined;
+  return row ? { source: `${manifest.id}:${row.id}`, attribution: row.attribution ?? null } : { source: null, attribution: null };
+}
 type PackageFetch = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 let packageFetch: PackageFetch = (input, init) => globalThis.fetch(input, init);
 export function __setPackageFetchForTests(fetcher: PackageFetch | null): void {
@@ -2015,7 +2027,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           await recordServiceOutcome(parsed.host, { ok: false, status: Number.isFinite(status) ? status : undefined, error: classified.outcome === "limited" ? new Error("captcha or sign-in access wall") : err });
           throw err;
         }
-      });
+      }, resolveDataSourceProvenance(manifest, url));
     },
     memory: {
       // Async as of step 5 (session-a-intelligence.md): a real embed()

@@ -566,6 +566,8 @@ point 7 for the full unit list and point 6 for the migration order.
 
 ## Knowledge sources (2026-09-24)
 
+- [ ] **DATA-LIFE-01: source, fetched-at, expiry and attribution on package cache entries** (S; shared spec first, then Home; coordinator verdict 2026-10-14). Add optional `attribution` and `hosts` to the shared `PrivacyRow`; package cache entries then record source, fetched-at, expiry and attribution from the manifest row. Old entries continue serving and derive expiry from the live cache policy. Weather and media-lookup prove the host mapping. Follow-ups: DATA-LIFE-02 (daily sweep), DATA-LIFE-04 (conditional requests) and DATA-LIFE-05 (admin clear control). See `data-scratch/briefs/DATA-LIFE-01.md` and the report for the verdict and acceptance details.
+
 Offline Kiwix archives, live sources, and one federated `lookup()` in
 place of one tool per source - the owner-approved design,
 `docs/plans/knowledge-sources-2026-09-24.md`. Build order from that

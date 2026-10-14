@@ -354,6 +354,8 @@ same pattern as `modelsDir`/`enginesDir`). Opt-in: a package with no
 `cache` field in its manifest is never cached, `host.fetch` calls
 straight through exactly as before this step.
 
+Each package cache entry carries its source, fetched-at time, expiry and attribution from the manifest `data_sources` row; old entries without these fields still serve.
+
 **Keying, a real decision, not the manifest's `key_template` literally.**
 The schema's own `cache.key_template` (step 2) is a human-readable
 naming convention for a package author ("one entry per distinct call"),

@@ -45,6 +45,8 @@
   "data_sources": [
     {
       "id": "open-meteo",
+      "attribution": "Weather data by Open-Meteo.com (CC BY 4.0)",
+      "hosts": ["geocoding-api.open-meteo.com", "api.open-meteo.com"],
       "destination": "Open-Meteo (open-meteo.com), a free public weather API",
       "when": "each time the family asks for the weather somewhere",
       "what": "the place name spoken in the request (e.g. 'Seattle')",

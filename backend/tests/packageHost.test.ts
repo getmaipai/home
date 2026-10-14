@@ -4,7 +4,7 @@ import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
-import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
+import { cachedFetch, getCacheEnvelope, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { invalidateScopeCache, setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
@@ -18,6 +18,7 @@ import { listIssues } from "@/lib/issues";
 import { __resetServiceHealthForTests, serviceDiagnostics, serviceState } from "@/lib/serviceHealth";
 import { serviceComponent } from "@/lib/serviceComponent";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { PackageManifest as ManifestSchema } from "@maipai/spec/gen/ts/manifest.js";
 import { useDefaultScriptedStack } from "./stackFixture";
 import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
 import { retryDeadlineMs } from "@/lib/turnMachine/deadline";
@@ -305,6 +306,134 @@ describe("packageHost fetch", () => {
 });
 
 describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3)", () => {
+  test("source resolution selects exact case-insensitive hosts, with single-row fallback only", async () => {
+    const { resolveDataSourceProvenance } = await import("@/lib/packageHost");
+    const multi = manifest({ id: "media-lookup", data_sources: [
+      { id: "wikidata", destination: "Wikidata", when: "on request", what: "title", who: "Wikimedia", opt_in: true, retention: "unknown", hosts: ["www.wikidata.org"], attribution: "Wikidata credit" },
+      { id: "wikipedia", destination: "Wikipedia", when: "on request", what: "summary", who: "Wikimedia", opt_in: true, retention: "unknown", hosts: ["en.wikipedia.org"], attribution: "Wikipedia credit" },
+    ] });
+    expect(resolveDataSourceProvenance(multi, "https://WWW.WIKIDATA.ORG/entity")).toEqual({ source: "media-lookup:wikidata", attribution: "Wikidata credit" });
+    expect(resolveDataSourceProvenance(multi, "https://not-covered.example/")).toEqual({ source: null, attribution: null });
+    const single = manifest({ data_sources: [{ id: "one", destination: "One", when: "on request", what: "data", who: "One", opt_in: true, retention: "unknown" }] });
+    expect(resolveDataSourceProvenance(single, "https://anything.example/")).toEqual({ source: "test-pkg:one", attribution: null });
+  });
+
+  test("real media-lookup manifest maps each declared host to its own row", async () => {
+    const real = JSON.parse(await Bun.file(new URL("../packages/media-lookup/manifest.json", import.meta.url)).text()) as PackageManifest;
+    expect(real.data_sources?.map((row) => row.id)).toEqual(["wikidata", "wikipedia"]);
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("media-lookup");
+    __resetRateLimiterForTests();
+    __setPackageFetchForTests(async () => Response.json({ fixture: true }));
+    const actor = await owner();
+    try {
+      for (const [id, url] of [
+        ["wikidata", "https://www.wikidata.org/w/api.php?query=fixture"],
+        ["wikipedia", "https://en.wikipedia.org/api/rest_v1/page/summary/Fixture"],
+      ] as const) {
+        await createHost(actor, real).fetch(url);
+        const row = real.data_sources!.find((source) => source.id === id)!;
+        const envelope = getCacheEnvelope("media-lookup", url, real.cache!)!;
+        expect(envelope.source).toBe(`media-lookup:${row.id}`);
+        expect(envelope.attribution).toBe(row.attribution ?? null);
+      }
+    } finally { __setPackageFetchForTests(null); }
+  });
+
+  test("a host with no matching row still caches with null provenance", async () => {
+    const { resolveDataSourceProvenance } = await import("@/lib/packageHost");
+    const multi = manifest({ data_sources: [
+      { id: "a", destination: "A", when: "on request", what: "data", who: "A", opt_in: true, retention: "unknown", hosts: ["a.example"] },
+      { id: "b", destination: "B", when: "on request", what: "data", who: "B", opt_in: true, retention: "unknown", hosts: ["b.example"] },
+    ] });
+    const provenance = resolveDataSourceProvenance(multi, "https://other.example/data");
+    expect(provenance).toEqual({ source: null, attribution: null });
+    let calls = 0;
+    const value = await cachedFetch(multi.id, multi.cache ?? { ttl_s: 60 }, "https://other.example/data", undefined, async () => { calls++; return { cached: true }; }, provenance);
+    expect(value).toEqual({ cached: true });
+    expect(calls).toBe(1);
+    const envelope = getCacheEnvelope(multi.id, "https://other.example/data", multi.cache ?? { ttl_s: 60 })!;
+    expect(envelope.source).toBeNull();
+    expect(envelope.attribution).toBeNull();
+  });
+
+  test("a second manifest attribution controls the next write for the same URL", async () => {
+    const url = "https://weather.example/data";
+    const baseRow = { id: "open-meteo", destination: "Open-Meteo", when: "on request", what: "weather", who: "Open-Meteo", opt_in: true, retention: "unknown" };
+    const firstManifest = manifest({ id: "weather", cache: { ttl_s: 1 }, data_sources: [{ ...baseRow, attribution: "First credit" }] });
+    const secondManifest = manifest({ id: "weather", cache: { ttl_s: 1 }, data_sources: [{ ...baseRow, attribution: "Edited manifest credit" }] });
+    const { resolveDataSourceProvenance } = await import("@/lib/packageHost");
+    await cachedFetch(firstManifest.id, firstManifest.cache, url, undefined, async () => ({ version: 1 }), resolveDataSourceProvenance(firstManifest, url));
+    await new Promise((resolve) => setTimeout(resolve, 1_010));
+    await cachedFetch(secondManifest.id, secondManifest.cache, url, undefined, async () => ({ version: 2 }), resolveDataSourceProvenance(secondManifest, url));
+    expect(getCacheEnvelope("weather", url, secondManifest.cache!)?.attribution).toBe("Edited manifest credit");
+  });
+
+  test("host.fetch uses the manifest row attribution and still caches when provenance is absent", async () => {
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("test-pkg");
+    __resetRateLimiterForTests();
+    const actor = await owner();
+    const url = "https://api.example.com/data";
+    const oneRow = manifest({ cache: { ttl_s: 60 }, permissions: ["net:api.example.com"], data_sources: [
+      { id: "source", destination: "API", when: "on request", what: "query", who: "API", opt_in: true, retention: "unknown", attribution: "Manifest supplied credit" },
+    ] });
+    try {
+      const { resolveDataSourceProvenance } = await import("@/lib/packageHost");
+      const provenance = resolveDataSourceProvenance(oneRow, url);
+      await cachedFetch(oneRow.id, oneRow.cache, url, undefined, async () => ({ ok: true }), provenance);
+      expect(getCacheEnvelope("test-pkg", url, oneRow.cache!)?.attribution).toBe("Manifest supplied credit");
+      const uncitedUrl = "https://unlisted.example/data";
+      const multiple = manifest({ cache: { ttl_s: 60 }, permissions: ["net:unlisted.example"], data_sources: [
+        { id: "first", destination: "First", when: "on request", what: "data", who: "First", opt_in: true, retention: "unknown", hosts: ["a.example"] },
+        { id: "second", destination: "Second", when: "on request", what: "data", who: "Second", opt_in: true, retention: "unknown", hosts: ["b.example"] },
+      ] });
+      const missingProvenance = resolveDataSourceProvenance(multiple, uncitedUrl);
+      await cachedFetch(multiple.id, multiple.cache, uncitedUrl, undefined, async () => ({ ok: true }), missingProvenance);
+      expect(getCacheEnvelope("test-pkg", uncitedUrl, multiple.cache!)?.source).toBeNull();
+      expect(getCacheEnvelope("test-pkg", uncitedUrl, multiple.cache!)?.attribution).toBeNull();
+    } finally { /* no network hook is needed for the cachedFetch unit seam */ }
+  });
+
+  test("a cached weather response exposes provenance and expiry from the real manifest", async () => {
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("weather");
+    __resetRateLimiterForTests();
+    const real = JSON.parse(await Bun.file(new URL("../packages/weather/manifest.json", import.meta.url)).text()) as PackageManifest;
+    const url = "https://api.open-meteo.com/test/weather";
+    const originalFetch = globalThis.fetch;
+    __setPackageFetchForTests(async () => Response.json({ temperature: 70 }));
+    const actor = await owner();
+    const host = createHost(actor, real);
+    try {
+      await host.fetch(url);
+      const envelope = getCacheEnvelope("weather", url, real.cache!)!;
+      expect(envelope.source).toBe("weather:open-meteo");
+      expect(envelope.attribution).toBe(real.data_sources?.[0]?.attribution ?? null);
+      expect(Date.parse(envelope.expiresAt) - Date.parse(envelope.fetchedAt)).toBe(real.cache!.ttl_s! * 1000);
+    } finally { __setPackageFetchForTests(null); globalThis.fetch = originalFetch; }
+  });
+
+  test("data_sources hosts are declared net permissions across bundled manifests", async () => {
+    const { readdirSync } = await import("node:fs");
+    const { join } = await import("node:path");
+    const packages = join(import.meta.dir, "..", "packages");
+    const ids = readdirSync(packages, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name);
+    for (const id of ids) {
+      const raw = JSON.parse(await Bun.file(join(packages, id, "manifest.json")).text());
+      expect(ManifestSchema.safeParse(raw).success, `${id}: manifest validates`).toBe(true);
+      const rows = raw.data_sources ?? [];
+      const permissionHosts = new Set((raw.permissions ?? []).filter((permission: string) => permission.startsWith("net:")).map((permission: string) => permission.slice(4).toLowerCase()));
+      const seen = new Set<string>();
+      for (const row of rows) for (const host of row.hosts ?? []) {
+        expect(permissionHosts.has(host), `${id}: ${host} lacks net permission`).toBe(true);
+        expect(host).toBe(host.toLowerCase());
+        expect(seen.has(host), `${id}: duplicate hosts entry ${host}`).toBe(false);
+        seen.add(host);
+      }
+    }
+  });
+
   test("a cache hit for a declared cache policy skips rate-limit and SSRF entirely", async () => {
     __resetRateLimiterForTests();
     __resetPackageCacheForTests();
