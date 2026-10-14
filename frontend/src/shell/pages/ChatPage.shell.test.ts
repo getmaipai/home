@@ -17,4 +17,8 @@ describe("SHELL-FOLD-01 phone chat header", () => {
     expect(routes).toContain("<FullLayout rail ");
     expect(source).toContain('data-slot="chat-header"');
   });
+
+  test("continuous-mic voice barge-in is enabled only for adults", () => {
+    expect(source).toContain("voiceBargeIn: person.age_band === \"adult\"");
+  });
 });

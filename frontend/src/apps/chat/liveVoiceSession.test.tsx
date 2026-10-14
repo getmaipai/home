@@ -246,6 +246,108 @@ describe("live voice session", () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false), { timeout: 400 });
   });
 
+  test("a wake-opened session lets an adult talk over Home's reply: speech stops, the turn is cancelled once, and the session stays open", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const onOpenChange = mock();
+    const stopScheduler = mock();
+    const cancelRun = mock();
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 40, message: { t: "final", v: "first request" } },
+      { delayMs: 700, message: { t: "partial", v: "wait" } },
+    ];
+    const view = render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} voiceBargeIn stopScheduler={stopScheduler} cancelRun={cancelRun} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} voiceBargeIn stopScheduler={stopScheduler} cancelRun={cancelRun} />));
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(stopScheduler).toHaveBeenCalledTimes(1);
+    expect(cancelRun).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    cancel.mockRestore();
+  });
+
+  test("what an adult says over a wake session reply becomes the next turn and the quiet window restarts after it", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const onOpenChange = mock();
+    const sentTexts: string[] = [];
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 40, message: { t: "final", v: "first request" } },
+      { delayMs: 700, message: { t: "partial", v: "make it shorter" } },
+      { delayMs: 760, message: { t: "final", v: "make it shorter" } },
+    ];
+    const view = render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={300} voiceBargeIn />);
+    await waitFor(() => expect(sentTexts).toEqual(["first request"]));
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={300} voiceBargeIn />));
+    await waitFor(() => expect(sentTexts).toEqual(["first request", "make it shorter"]), { timeout: 2000 });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={300} voiceBargeIn />));
+    await new Promise((resolve) => setTimeout(resolve, 350));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    act(() => view.rerender(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={1} fixture={fixture} sentTexts={sentTexts} idleCloseMs={300} voiceBargeIn />));
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false), { timeout: 500 });
+    cancel.mockRestore();
+  });
+
+  test("the quiet window does not close a wake session while Home is speaking and the live mic is open", async () => {
+    const onOpenChange = mock();
+    render(<Harness open onOpenChange={onOpenChange} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} idleCloseMs={100} voiceBargeIn />);
+    await new Promise((resolve) => setTimeout(resolve, 250));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
+  test("a wake session with barge-in still closes after the quiet window when nobody talks over or after the reply", async () => {
+    const onOpenChange = mock();
+    const view = render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} idleCloseMs={100} voiceBargeIn />);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false), { timeout: 250 });
+    expect(view.getByRole("dialog", { name: "Voice conversation" })).toBeTruthy();
+  });
+
+  test("voiceBargeIn false means no interruption by voice for child and teen calls", async () => {
+    for (const ageBand of ["child", "teen"] as const) {
+      const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+      const connections: number[] = [];
+      const fixture: SttFixtureStep[] = [
+        { delayMs: 0, message: { t: "ready" } },
+        { delayMs: 40, message: { t: "final", v: "hello" } },
+        { delayMs: 500, message: { t: "partial", v: "echo" } },
+      ];
+      const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} voiceBargeIn={false} socketConnections={connections} />);
+      await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+      act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} voiceBargeIn={false} socketConnections={connections} />));
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      expect(cancel).not.toHaveBeenCalled();
+      expect(connections).toEqual([0]);
+      cancel.mockRestore();
+      cleanup();
+      expect(ageBand).toMatch(/child|teen/);
+    }
+  });
+
+  test("a button-opened session and a wake-opened session interrupt identically", async () => {
+    const outcomes: Array<{ cancelled: number; sent: string[] }> = [];
+    for (const idleCloseMs of [null, 150]) {
+      const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+      const sentTexts: string[] = [];
+      const fixture: SttFixtureStep[] = [
+        { delayMs: 0, message: { t: "ready" } },
+        { delayMs: 40, message: { t: "final", v: "first request" } },
+        { delayMs: 700, message: { t: "partial", v: "follow up" } },
+        { delayMs: 760, message: { t: "final", v: "follow up" } },
+      ];
+      const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={idleCloseMs} voiceBargeIn />);
+      await waitFor(() => expect(sentTexts).toEqual(["first request"]));
+      act(() => view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} idleCloseMs={idleCloseMs} voiceBargeIn />));
+      await waitFor(() => expect(sentTexts).toEqual(["first request", "follow up"]), { timeout: 2000 });
+      outcomes.push({ cancelled: cancel.mock.calls.length, sent: [...sentTexts] });
+      cancel.mockRestore();
+      cleanup();
+    }
+    expect(outcomes[0]).toEqual(outcomes[1]);
+  });
+
   test("a session opened by the waveform button never auto-closes", async () => {
     const onOpenChange = mock();
     render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} idleCloseMs={null} />);
