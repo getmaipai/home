@@ -123,7 +123,7 @@ describe("PUT /api/settings (write)", () => {
     expect(safety.status).toBe(200);
     const safetyBody = (await safety.json()) as Record<string, unknown>;
     expect(safetyBody).toMatchObject({ flagged: true, action: "allow_with_resources" });
-    expect(safetyBody.crisis_resources).toContain("988");
+    expect(safetyBody.crisis_resources).toBeUndefined();
   });
 
   test("owner can set a household value; list reflects it with source=user", async () => {
