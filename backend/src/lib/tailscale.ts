@@ -14,6 +14,11 @@ import { listActivePeople } from "@/lib/access";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
 
 const execFileAsync = promisify(execFile);
+const TAILSCALE_APP_STORE_CLI = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
+
+function tailscaleBinary(): string {
+  return process.platform === "darwin" && existsSync(TAILSCALE_APP_STORE_CLI) ? TAILSCALE_APP_STORE_CLI : "tailscale";
+}
 
 export type TailscaleState = "not_installed" | "stopped" | "running";
 
@@ -33,7 +38,7 @@ interface TailscaleStatusJson {
   BackendState?: string;
   Self?: { DNSName?: string; TailscaleIPs?: string[]; HostName?: string; UserID?: number };
   User?: Record<string, { ID?: number; LoginName?: string }>;
-  Health?: string[];
+  CertDomains?: string[];
 }
 
 // Pure interpretation, split from the process spawn so it's unit-testable
@@ -48,7 +53,7 @@ export function interpretTailscaleStatusJson(stdout: string): TailscaleStatus {
   const dnsName = parsed.Self?.DNSName?.replace(/\.$/, "") ?? null;
   const ips = parsed.Self?.TailscaleIPs ?? [];
   const signedIn = Boolean(parsed.Self?.UserID && parsed.User?.[String(parsed.Self.UserID)]);
-  const httpsEnabled = Boolean(dnsName?.endsWith(".ts.net") && !parsed.Health?.some((item) => /https.*disabled/i.test(item)));
+  const httpsEnabled = Boolean(dnsName && parsed.CertDomains?.some((domain) => dnsName.endsWith(domain)));
   return { state: "running", dnsName, ips, installed: true, signedIn, httpsEnabled, machineName: parsed.Self?.HostName ?? dnsName?.split(".")[0] ?? null };
 }
 
@@ -58,7 +63,7 @@ export function interpretTailscaleStatusJson(stdout: string): TailscaleStatus {
  * take. */
 export async function getTailscaleStatus(): Promise<TailscaleStatus> {
   try {
-    const { stdout } = await execFileAsync("tailscale", ["status", "--json"], { timeout: 5_000 });
+    const { stdout } = await execFileAsync(tailscaleBinary(), ["status", "--json"], { timeout: 5_000 });
     return interpretTailscaleStatusJson(stdout);
   } catch {
     return { state: "not_installed", dnsName: null, ips: [], installed: false, signedIn: false, httpsEnabled: false, machineName: null };
@@ -81,7 +86,7 @@ export async function ensureTailscaleCert(): Promise<TsCert> {
   mkdirSync(join(dataDir, "keys"), { recursive: true, mode: 0o700 });
   const certPath = join(dataDir, "keys", "tailscale-cert-source.pem");
   const keyPath = join(dataDir, "keys", "tailscale-key-source.pem");
-  try { await execFileAsync("tailscale", ["cert", "--cert-file", certPath, "--key-file", keyPath, status.dnsName], { timeout: 30_000 }); }
+  try { await execFileAsync(tailscaleBinary(), ["cert", "--cert-file", certPath, "--key-file", keyPath, status.dnsName], { timeout: 30_000 }); }
   catch (error) { rmSync(certPath, { force: true }); rmSync(keyPath, { force: true }); throw error; }
   const certPem = readFileSync(certPath, "utf8");
   const keyPem = readFileSync(keyPath, "utf8");

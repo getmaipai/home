@@ -91,6 +91,17 @@ export function listPackageIds(): string[] {
   return [...new Set([...bundled, ...listInstalledPackageIds()])];
 }
 
+/** True when the store has installed a package outside the bundled defaults. */
+export function hasNonDefaultInstalledPackage(): boolean {
+  let bundled: Set<string>;
+  try {
+    bundled = new Set(readdirSync(PACKAGES_DIR, { withFileTypes: true }).filter((entry) => entry.isDirectory()).map((entry) => entry.name));
+  } catch {
+    bundled = new Set();
+  }
+  return listInstalledPackageIds().some((id) => !bundled.has(id));
+}
+
 // mtime-keyed caches for loadManifestOnly()/loadPackage() (a latency
 // review, 2026-09-06: every one of the retired turn engine's loadAllManifests()
 // calls re-read and re-Zod-validated every bundled package's manifest,

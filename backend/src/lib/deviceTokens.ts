@@ -17,7 +17,7 @@
 // the hub's own device row, not stored separately here since the token
 // hash itself is only ever valid against this hub's own database).
 import { randomBytes, createHash } from "node:crypto";
-import { eq, lt, asc } from "drizzle-orm";
+import { eq, lt, asc, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { deviceTokens } from "@/db/schema";
 import { newDeviceTokenId } from "@/lib/id";
@@ -98,4 +98,9 @@ export function redeemDeviceToken(token: string, seenUrl: string | null): { pers
 
 export function pruneExpiredDeviceTokens(): void {
   db.delete(deviceTokens).where(lt(deviceTokens.expiresAt, new Date().toISOString())).run();
+}
+
+/** Whether a native device token has been redeemed at least once. */
+export function hasRedeemedDeviceToken(): boolean {
+  return db.select({ id: deviceTokens.id }).from(deviceTokens).where(isNotNull(deviceTokens.lastSeenAt)).limit(1).get() !== undefined;
 }

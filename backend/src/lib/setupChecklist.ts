@@ -1,7 +1,9 @@
 import { listActivePeople, isOwnerOrAdmin } from "@/lib/access";
 import { listBiometricPrints } from "@/lib/biometricPrints";
 import { getSmbTarget } from "@/lib/backupTargets";
+import { hasRedeemedDeviceToken } from "@/lib/deviceTokens";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
+import { hasNonDefaultInstalledPackage } from "@/lib/plugins";
 import { getPersonSettingValue, getHouseholdSettingValue } from "@/lib/settings";
 import { effectiveMode } from "@/lib/retrieval/sourceMode";
 import type { PersonRow } from "@/types";
@@ -41,11 +43,11 @@ export async function getSetupChecklist(actor: PersonRow): Promise<SetupChecklis
   const owner = activePeople.find((person) => person.role === "owner");
   const facePrints = owner ? listBiometricPrints(owner, owner.id) : null;
   const target = getSmbTarget();
-  const hasDevice = false;
+  const hasDevice = hasRedeemedDeviceToken();
   const webIsOffline = effectiveMode("web", "adult") === "offline";
   const searchStatus = webIsOffline ? null : await checkSearchInstance();
   const searchWorks = webIsOffline || Boolean(searchStatus?.checks.length && searchStatus.checks.every((check) => check.state === "pass"));
-  const appsAdded = false;
+  const appsAdded = hasNonDefaultInstalledPackage();
   const dismissed = dismissedIds(actor);
 
   const doneById: Record<(typeof SETUP_CHECKLIST_ITEMS)[number]["id"], boolean> = {

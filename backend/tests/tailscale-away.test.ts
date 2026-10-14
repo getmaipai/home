@@ -4,7 +4,7 @@ import { interpretTailscaleStatusJson } from "@/lib/tailscale";
 describe("Tailscale status fixtures", () => {
   test("reports installed signed-in machine and HTTPS-ready DNS name", () => {
     expect(interpretTailscaleStatusJson(JSON.stringify({
-      BackendState: "Running", Self: { DNSName: "plain-hub.tail1234.ts.net.", HostName: "plain-hub", UserID: 27, TailscaleIPs: ["100.64.0.2"] },
+      BackendState: "Running", CertDomains: ["tail1234.ts.net"], Self: { DNSName: "plain-hub.tail1234.ts.net.", HostName: "plain-hub", UserID: 27, TailscaleIPs: ["100.64.0.2"] },
       User: { "27": { ID: 27, LoginName: "owner@example.test" } },
     }))).toMatchObject({ installed: true, signedIn: true, httpsEnabled: true, machineName: "plain-hub", dnsName: "plain-hub.tail1234.ts.net" });
   });

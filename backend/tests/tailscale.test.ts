@@ -12,6 +12,7 @@ describe("interpretTailscaleStatusJson()", () => {
   test("a running backend with MagicDNS and tailnet IPs reports them", () => {
     const json = JSON.stringify({
       BackendState: "Running",
+      CertDomains: ["example-tailnet.ts.net"],
       Self: { DNSName: "hub.example-tailnet.ts.net.", TailscaleIPs: ["100.64.1.2"] },
     });
     expect(interpretTailscaleStatusJson(json)).toEqual({
