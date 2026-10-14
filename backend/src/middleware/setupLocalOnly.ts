@@ -8,7 +8,7 @@ type SetupServer = {
   requestIP?: (request: Request) => { address?: string | null } | null;
 };
 
-function setupIsComplete(): boolean {
+export function setupIsComplete(): boolean {
   return Boolean(db.select({ id: people.id }).from(people).limit(1).get());
 }
 
@@ -34,11 +34,11 @@ function hasForwardingHeader(headers: Headers): boolean {
   return false;
 }
 
-function isLocalHost(host: string | undefined): boolean {
+export function isLocalHost(host: string | undefined): boolean {
   return !!host && /^(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/i.test(host);
 }
 
-function isLoopbackPeer(c: Context): boolean {
+export function isLoopbackPeer(c: Context): boolean {
   try {
     const address = getConnInfo(c).remote.address;
     return address === "127.0.0.1" || address === "::1" || address === "::ffff:127.0.0.1";
@@ -47,7 +47,7 @@ function isLoopbackPeer(c: Context): boolean {
   }
 }
 
-function refusal(c: Context, reason: "peer" | "forwarded" | "host"): Response {
+export function setupLocalRefusal(c: Context, reason: "peer" | "forwarded" | "host"): Response {
   const url = localSetupUrl(c);
   const detail = reason === "peer"
     ? "Setup is only available on the computer running MaiPai Home."
@@ -62,8 +62,8 @@ export const setupLocalOnly: MiddlewareHandler = async (c, next) => {
   // Preserve the existing post-setup API responses, including auth/setup's 409.
   if (setupIsComplete()) return next();
 
-  if (!isLoopbackPeer(c)) return refusal(c, "peer");
-  if (hasForwardingHeader(c.req.raw.headers)) return refusal(c, "forwarded");
-  if (!isLocalHost(c.req.header("host"))) return refusal(c, "host");
+  if (!isLoopbackPeer(c)) return setupLocalRefusal(c, "peer");
+  if (hasForwardingHeader(c.req.raw.headers)) return setupLocalRefusal(c, "forwarded");
+  if (!isLocalHost(c.req.header("host"))) return setupLocalRefusal(c, "host");
   await next();
 };

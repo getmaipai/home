@@ -69,6 +69,10 @@ export function onLeafRenewed(listener: (leaf: CertAndKey) => void): void {
   leafRenewedListeners.push(listener);
 }
 
+export function __notifyLeafRenewedForTests(leaf: CertAndKey): void {
+  for (const listener of leafRenewedListeners) listener(leaf);
+}
+
 /** Test-only: leafRenewedListeners is module-local state with no other
  * reset hook. */
 export function __clearLeafRenewedListenersForTests(): void {

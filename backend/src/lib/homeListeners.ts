@@ -1,5 +1,6 @@
 import { detectLanIps } from "@/lib/hubEndpoints";
-import { onLeafRenewed } from "@/lib/householdCa";
+import { getHouseholdLeafForServer, onLeafRenewed } from "@/lib/householdCa";
+import { onTsLeafRenewed } from "@/lib/tailscaleTls";
 import { rebindWithRetry } from "@/lib/serverRebind";
 import { SERVER_IDLE_TIMEOUT_SECONDS } from "@/lib/serverConfig";
 import type { websocket as HonoWebSocket } from "hono/bun";
@@ -9,12 +10,16 @@ export interface HouseholdTlsMaterial {
   keyPem: string;
 }
 
+export interface TailscaleTlsMaterial extends HouseholdTlsMaterial { name: string }
+
 export interface HomeListenerSet {
   port: number;
   tls: boolean;
   servers: Bun.Server<any>[];
   stop(): void;
 }
+
+const currentTailscaleTls = new WeakMap<HomeListenerSet, TailscaleTlsMaterial | null>();
 
 type FetchHandler = (request: Request, server: any) => Response | Promise<Response>;
 
@@ -28,23 +33,31 @@ export function startHomeListeners(options: {
   fetch: FetchHandler;
   websocket: typeof HonoWebSocket;
   tls?: HouseholdTlsMaterial | null;
+  tailscaleTls?: TailscaleTlsMaterial | null;
   networkAddresses?: string[];
   exposure?: "loopback" | "lan";
 }): HomeListenerSet {
   const { fetch } = options;
   const tls = options.tls ?? null;
+  const tailscaleTls = options.tailscaleTls ?? null;
   const exposure = options.exposure ?? "lan";
   const servers: Bun.Server<any>[] = [];
   let port = options.port;
 
   const serve = (hostname: string | undefined, withTls: boolean) => {
+    const sni = withTls && tailscaleTls
+      ? [
+        { serverName: tailscaleTls.name, cert: tailscaleTls.certPem, key: tailscaleTls.keyPem },
+        ...householdServerNames(tls!.certPem).map((serverName) => ({ serverName, cert: tls!.certPem, key: tls!.keyPem })),
+      ]
+      : undefined;
     const server = Bun.serve({
       ...(hostname ? { hostname } : {}),
       port,
       fetch,
       websocket: options.websocket,
       idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-      ...(withTls && tls ? { tls: { cert: tls.certPem, key: tls.keyPem } } : {}),
+      ...(sni ? { tls: sni } : withTls && tls ? { tls: { cert: tls.certPem, key: tls.keyPem } } : {}),
     });
     servers.push(server);
     port = server.port!;
@@ -70,7 +83,7 @@ export function startHomeListeners(options: {
     throw error;
   }
 
-  return {
+  const result = {
     port,
     tls: tls !== null,
     servers,
@@ -78,6 +91,13 @@ export function startHomeListeners(options: {
       for (const server of servers) server.stop(true);
     },
   };
+  currentTailscaleTls.set(result, tailscaleTls);
+  return result;
+}
+
+function householdServerNames(certPem: string): string[] {
+  const subjectAltNames = certPem.match(/DNS:[^,\n]+/g)?.map((name) => name.slice(4).trim()) ?? [];
+  return [...new Set(["maipai.local", ...subjectAltNames])].filter((name) => name && name !== "*.ts.net");
 }
 
 /** The active leaf is minted by GET /api/setup/ca or renewed by Repairs.
@@ -89,16 +109,17 @@ export function attachHouseholdTlsRebind(options: {
   websocket: typeof HonoWebSocket;
   networkAddresses?: () => string[];
   exposure?: "loopback" | "lan";
+  tailscaleTls?: () => TailscaleTlsMaterial | null;
   onBound?: (listeners: HomeListenerSet) => void;
   onFailure?: (error: unknown) => void;
 }): { current(): HomeListenerSet; stop(): void } {
   let listeners = options.initial;
   let active = true;
+  const initialTailscaleTls = options.tailscaleTls?.() ?? null;
+  currentTailscaleTls.set(listeners, initialTailscaleTls);
 
-  onLeafRenewed((leaf) => {
+  const rebind = (leaf: HouseholdTlsMaterial, tailscaleLeaf = currentTailscaleTls.get(listeners) ?? null) => {
     if (!active) return;
-    // The mint may happen while a request is being handled by the HTTP
-    // listener. Let that response leave before closing the old sockets.
     setTimeout(() => {
       if (!active) return;
       listeners.stop();
@@ -107,25 +128,36 @@ export function attachHouseholdTlsRebind(options: {
         fetch: options.fetch,
         websocket: options.websocket,
         tls: leaf,
+        tailscaleTls: tailscaleLeaf,
         networkAddresses: options.networkAddresses?.(),
         exposure: options.exposure,
-      }))
-        .then(({ server: next }) => {
-          if (!active) {
-            next.stop();
-            return;
-          }
-          listeners = next;
-          options.onBound?.(next);
-        })
-        .catch((error: unknown) => options.onFailure?.(error));
+      })).then(({ server: next }) => {
+        if (!active) { next.stop(); return; }
+        listeners = next;
+        currentTailscaleTls.set(next, tailscaleLeaf);
+        options.onBound?.(next);
+      }).catch((error: unknown) => options.onFailure?.(error));
     }, 25);
+  };
+
+  onLeafRenewed((leaf) => {
+    rebind(leaf);
+  });
+  const removeTsListener = onTsLeafRenewed((leaf) => {
+    const current = { ...leaf, name: leaf.name };
+    const activeLeaf = getHouseholdLeafForServer();
+    // A Tailscale renewal changes only the SNI leaf; the household leaf is
+    // retained from the active listener set's source material.
+    if (activeLeaf) {
+      rebind({ certPem: activeLeaf.cert, keyPem: activeLeaf.key }, current);
+    }
   });
 
   return {
     current: () => listeners,
     stop() {
       active = false;
+      removeTsListener();
       listeners.stop();
     },
   };

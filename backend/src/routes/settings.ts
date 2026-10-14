@@ -15,6 +15,7 @@ import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY, refres
 import { canBindHubPort, configuredHubPort, configuredLanExposure, HUB_PORT_IN_USE_MESSAGE, HUB_PORT_SETTING } from "@/lib/networkSettings";
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { scheduleHubRestart } from "@/lib/hubRestart";
+import { turnOnTailscaleAccess, setTailscaleRenewalActive } from "@/lib/tailscale";
 
 export const settingsRoutes = apiRouter();
 
@@ -126,6 +127,12 @@ settingsRoutes.openapi(putRoute, async (c) => {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
+  if (body.scope === "household" && body.key === "network.tailnet_access") {
+    if (body.value === true) {
+      try { await turnOnTailscaleAccess(actor, true); }
+      catch (error) { return c.json({ error: error instanceof Error ? error.message : "Could not enable away access." }, 400); }
+    } else setTailscaleRenewalActive(false);
+  }
   if (body.scope === "household" && body.key === ENGINE_WHERE_KEY) await applyEngineWhere(body.value);
   else if (body.scope === "household" && ["engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"].includes(body.key)) refreshConfiguredEngineLink();
   publishSettingsChanged(body.scope, body.key, result.value.value);

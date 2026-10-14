@@ -360,6 +360,7 @@ function inboundConnections(): PrivacyConnection[] {
 
 export function privacyConnections(manifests = loadedManifests()): PrivacyConnection[] {
   const where = getHouseholdSettingValue("engines.stack.where");
+  const homeTailnet = getHouseholdSettingValue("network.tailnet_access") === true;
   const allowTailnet = getHouseholdSettingValue("engines.stack.remote.allow_tailnet") === true;
   const remoteRows: PrivacyConnection[] = where === "another_computer" ? [
     {
@@ -379,7 +380,14 @@ export function privacyConnections(manifests = loadedManifests()): PrivacyConnec
       optIn: true, retention: "The engine computer's local processing and any history Home saves under your household settings", direction: "outbound" as const,
     }] : []),
   ] : [];
-  return [...platformConnections(), ...inboundConnections(), ...remoteRows, ...pluginConnections(manifests)];
+  const homeTailnetRows: PrivacyConnection[] = homeTailnet ? [{
+    id: "platform:home-tailnet", source: "MaiPai Home", sourceKind: "platform",
+    destination: "Tailscale and Let's Encrypt", when: "When an owner turns on away access and when Home renews its certificate",
+    what: "This computer's Tailscale machine name is sent to Tailscale and appears in public certificate logs. Conversations and other Home data do not leave the house.",
+    who: "Tailscale and the public certificate log operators", optIn: true,
+    retention: "Certificate transparency records are public and permanent; Tailscale handles device names and addresses under its own policy.", direction: "outbound",
+  }] : [];
+  return [...platformConnections(), ...inboundConnections(), ...remoteRows, ...homeTailnetRows, ...pluginConnections(manifests)];
 }
 
 /** Both halves of the page from one pass over the packages. */

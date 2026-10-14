@@ -27,6 +27,7 @@ import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
 import { detectLanIps } from "@/lib/hubEndpoints";
+import { getTailscaleLeafForServer } from "@/lib/tailscale";
 import { configuredHubPort, configuredLanExposure } from "@/lib/networkSettings";
 import { installConsoleFileMirror, installFatalErrorHandlers, appendLogLine } from "@/lib/log";
 import { shutdownEngines } from "@/lib/hubShutdown";
@@ -42,6 +43,7 @@ import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
 import { ensureSetupState } from "@/lib/setupState";
 import { restoreWasApplied } from "@/db";
+import { syncTailscaleRenewalSetting } from "@/lib/tailscale";
 
 const configuredPort = configuredHubPort();
 purgeLegacyHubLogs();
@@ -285,6 +287,8 @@ statusPruneInterval.unref();
 // cheap (a single file read and a date comparison) when nothing's close
 // to expiring, which is every day but the last 30 of a year.
 ensureCoreJob("householdCa.check_leaf_expiry", "every:1d");
+ensureCoreJob("tailscale.renew_certificate", "every:30d");
+syncTailscaleRenewalSetting();
 // Step 7: guest expiry and the age-band birthday sweep - see
 // lib/scheduler.ts's own CORE_JOBS entries for why daily is enough for
 // both.
@@ -352,6 +356,10 @@ attachHouseholdTlsRebind({
   fetch: app.fetch,
   websocket,
   networkAddresses: detectLanIps,
+  tailscaleTls: () => {
+    const leaf = getTailscaleLeafForServer();
+    return leaf ? { ...leaf, name: leaf.name } : null;
+  },
   exposure: networkExposure,
   onBound: (next) => {
     listeners = next;
