@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real, blob, primaryKey, index, uniqueIndex } from "drizzle-orm/sqlite-core";
+import { sqliteTable, text, integer, real, blob, primaryKey, index, uniqueIndex, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 
@@ -87,6 +87,14 @@ export const sessions = sqliteTable("sessions", {
   // an ordinary PIN/password/passkey sign-in with no device involved.
   deviceId: text("device_id").references(() => devices.id),
 });
+
+// The one household-scope setup-state spec record. The JSON payload is
+// validated against @maipai/spec's SetupState schema on every read/write;
+// id is duplicated as the primary key so SQLite enforces one row per hub.
+export const setupState = sqliteTable("setup_state", {
+  slot: integer("slot").primaryKey(),
+  value: text("value").notNull(),
+}, (table) => [check("setup_state_singleton", sql`${table.slot} = 1`)]);
 
 // Session C step 8 (session-c-brain-and-voice.md): "authenticated by a
 // device token (F's deviceTokens.ts; a per-person API token setting

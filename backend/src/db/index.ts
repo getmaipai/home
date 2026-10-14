@@ -20,6 +20,7 @@ if (!existsSync(dataDir)) mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 // request is in flight (lib/restoreStaging.ts explains why that matters
 // and why restore is staged rather than swapped live).
 const applied = applyPendingRestore();
+export const restoreWasApplied = Boolean(applied);
 if (applied) {
   console.log(`[restore] applied backup ${applied.filename} staged at ${applied.stagedAt}`);
 }

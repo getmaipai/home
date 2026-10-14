@@ -15,6 +15,12 @@ import { getClientIp } from "@/lib/secretThrottle";
 import { detectHardware } from "@/lib/hardware";
 import { recommend } from "@/lib/modelCatalog";
 import { setupLocalOnly } from "@/middleware/setupLocalOnly";
+import { getCookie } from "hono/cookie";
+import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
+import { resolveHumanSession } from "@/middleware/auth";
+import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, type SetupStepId } from "@/lib/setupState";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -29,6 +35,84 @@ const SETUP_CA_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 
 export const setupRoutes = apiRouter();
 setupRoutes.use("*", setupLocalOnly);
+
+const SetupStepIdSchema = z.enum(SETUP_STEP_IDS);
+const SetupStatusSchema = SetupState.shape.steps.element.shape.status;
+const SetupStepBodySchema = z.object({
+  status: SetupStatusSchema,
+  error: SetupState.shape.steps.element.shape.error.optional(),
+  engine: SetupState.shape.engine.optional(),
+  away: SetupState.shape.away.optional(),
+  plan: SetupState.shape.plan.optional(),
+  checks: SetupState.shape.checks.optional(),
+  phase: SetupState.shape.phase.optional(),
+  completed_at: SetupState.shape.completed_at.optional(),
+}).strict();
+const SetupErrorSchema = z.object({ error: z.string(), next: z.string().optional() }).strict();
+
+const setupStateRoute = createRoute({
+  method: "get",
+  path: "/state",
+  tags: ["Setup"],
+  summary: "Read setup progress and resume state",
+  responses: {
+    200: { content: { "application/json": { schema: z.union([SetupState, z.object({ done: z.literal(true) }).strict()]) } }, description: "The setup record or a completion flag." },
+  },
+});
+setupRoutes.openapi(setupStateRoute, (c) => {
+  const anyone = db.select({ id: people.id }).from(people).limit(1).get();
+  if (!anyone) return c.json(getSetupState(), 200);
+  const token = getCookie(c, "session");
+  const person = token ? resolveHumanSession(token) : null;
+  if (person && (person.role === "owner" || person.role === "admin")) return c.json(getSetupState(), 200);
+  return c.json({ done: true as const }, 200);
+});
+
+const setupStepRoute = createRoute({
+  method: "post",
+  path: "/{step}",
+  tags: ["Setup"],
+  summary: "Record a setup step result",
+  request: {
+    params: z.object({ step: z.string() }),
+    body: { content: { "application/json": { schema: SetupStepBodySchema } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: SetupState } }, description: "The updated setup record." },
+    400: { content: { "application/json": { schema: SetupErrorSchema } }, description: "Unknown step id." },
+    401: { content: { "application/json": { schema: SetupErrorSchema } }, description: "Owner sign-in required." },
+    403: { content: { "application/json": { schema: SetupErrorSchema } }, description: "Only the owner may continue." },
+    409: { content: { "application/json": { schema: SetupErrorSchema } }, description: "Setup is closed or a prerequisite is incomplete." },
+  },
+});
+setupRoutes.openapi(setupStepRoute, (c) => {
+  const rawStep = c.req.valid("param").step;
+  const parsedStep = SetupStepIdSchema.safeParse(rawStep);
+  if (!parsedStep.success) {
+    return c.json({ error: "Unknown setup step.", next: "Use one of the documented setup step ids." }, 400);
+  }
+  const step = parsedStep.data as SetupStepId;
+  const body = c.req.valid("json");
+  const anyone = db.select({ id: people.id }).from(people).limit(1).get();
+  if (anyone && PRE_OWNER_STEPS.has(step)) {
+    return c.json({ error: "Home is already set up. Sign in instead.", next: "Sign in to continue." }, 409);
+  }
+  if (anyone || step === "owner") {
+    const token = getCookie(c, "session");
+    const person = token ? resolveHumanSession(token) : null;
+    if (!person) return c.json({ error: "Sign in as the owner to continue setup.", next: "Sign in with the owner account." }, 401);
+    if (person.role !== "owner") return c.json({ error: "Only the owner can continue setup.", next: "Sign in with the owner account." }, 403);
+  }
+  if (step === "checks") {
+    const state = getSetupState();
+    const answered = (id: SetupStepId) => state.steps.some((entry) => entry.id === id && entry.status === "done");
+    if (!answered("engine_location") || !answered("storage")) {
+      return c.json({ error: "The engine location and storage questions are not both complete.", next: "Complete engine_location and storage before checks." }, 409);
+    }
+  }
+  const updated = replaceSetupStep(step, body);
+  return c.json(updated, 200);
+});
 
 // Public (unauthenticated) by design, the same reason GET /api/auth/profiles
 // is: a household member trusting the hub's CA is exactly the step that
