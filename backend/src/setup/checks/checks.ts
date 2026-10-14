@@ -8,9 +8,15 @@ import { checkModelDisk, checkHubDisk } from "./placementDiskChecks";
 import { checkNvidiaSysmemFallback, type NvidiaSysmemFallbackReader } from "./nvidiaSysmemFallback";
 import { getSetupState } from "@/lib/setupState";
 import { minimum, defaultModelBytes } from "@/lib/placement";
+import { getTailscaleStatus } from "@/lib/tailscale";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY } from "@/lib/remoteStackSettings";
+import { getEngineLink } from "@/lib/stack/link";
+import { db } from "@/db";
+import { people } from "@/db/schema";
 
 export type CheckState = "green" | "amber" | "red" | "idle";
-export type SetupCheck = { id: string; title: string; state: CheckState; text: string; item?: { code: string; severity: "critical" | "error" | "warning"; title: string; text: string; since: string; cause: string; fix?: { label: string; action: "retry_download" | "reinstall_engine" } } };
+export type SetupCheck = { id: string; title: string; state: CheckState; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup"; item?: { code: string; severity: "critical" | "error" | "warning"; title: string; text: string; since: string; cause: string; fix?: { label: string; action: "retry_download" | "reinstall_engine" } } };
 export type CheckDeps = {
   hardware?: () => Promise<Record<string, unknown>>;
   catalog?: () => Promise<Record<string, unknown>>;
@@ -24,6 +30,10 @@ export type CheckDeps = {
   clockOffsetMs?: () => Promise<number | null>;
   homeNetwork?: () => Promise<boolean>;
   now?: () => Date;
+  tailscale?: () => Promise<Awaited<ReturnType<typeof getTailscaleStatus>>>;
+  tailnetAllowed?: () => boolean;
+  engineHost?: () => string;
+  link?: () => { state: string; reason?: string | null; slow?: boolean } | null;
 };
 
 function tcp(host: string): Promise<boolean> {
@@ -113,6 +123,24 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
 
   const linkState = remote ? getEngineLinkState() : null;
   rows.push(makeRow("engine-link", "Engine link", !remote ? "idle" : linkState?.state === "ready" ? "green" : linkState?.state === "degraded" ? "amber" : "red", !remote ? "This computer runs Home's AI." : linkState?.state === "ready" ? "The engine link is ready." : linkState?.state === "degraded" ? "The engine link is slow." : "Home can't reach the computer that runs its AI.", linkState?.reason ?? "The selected engine link is not ready.", "Try again", now));
+  if (remote) {
+    const host = (deps.engineHost ?? (() => String(getHouseholdSettingValue(REMOTE_ENGINE_HOST_KEY) ?? "")))().trim().replace(/^\[|\]$/g, "").toLowerCase().replace(/\.$/, "");
+    const tailscale = await (deps.tailscale ?? getTailscaleStatus)();
+    const peer = tailscale.peers?.find((candidate) => candidate.ips.some((ip) => ip.toLowerCase() === host) || candidate.dnsName?.toLowerCase() === host || candidate.hostName?.toLowerCase() === host);
+    const allowed = (deps.tailnetAllowed ?? (() => getHouseholdSettingValue(REMOTE_ALLOW_TAILNET_KEY) === true))();
+    const tailnetHost = peer !== undefined || /\.ts\.net$/.test(host) || /^100\.(?:[6-9]\d|1[01]\d|12[0-7])\./.test(host) || host.startsWith("fd7a:115c:a1e0:");
+    if (tailnetHost && !allowed) {
+      const ownerExists = Boolean(db.select({ id: people.id }).from(people).limit(1).get());
+      rows.push({ ...makeRow("tailnet-allow", "Tailscale access", "amber", "This computer reaches Home's AI through your Tailscale network. Allow that?", "This computer reaches Home's AI through your Tailscale network. Allow that?", undefined, now), action: "allow_tailnet", actionLabel: "Allow", actionRoute: ownerExists ? "settings" : "setup" });
+    }
+    if (tailnetHost) {
+      const online = Boolean(peer?.online);
+      rows.push(makeRow("tailnet-peer", "Engine computer on Tailscale", online ? "green" : "amber", online ? "The computer running Home's AI is on your Tailscale network." : "The computer that runs Home's AI isn't on your Tailscale network right now. Open Tailscale on it and sign in with the same account, then press Try again.", online ? "Tailscale lists the engine computer as an online peer." : "No matching online peer was found in Tailscale status.", undefined, now));
+      if (online) rows.push(makeRow("tailnet-route", "Tailscale connection", peer?.path === "relay" ? "amber" : "green", peer?.path === "relay" ? "Home reaches its AI through a Tailscale relay, so answers may be slower. This usually fixes itself; if it doesn't, see Tailscale's help on direct connections." : "Home reaches its AI directly over Tailscale.", peer?.path === "relay" ? "Tailscale status reports a DERP relay." : "Tailscale status reports a direct endpoint.", undefined, now));
+      const link = (deps.link ?? (() => getEngineLink()?.snapshot() ?? null))();
+      if (link) rows.push(makeRow("tailnet-latency", "Engine connection speed", link.state === "ready" || (link.state === "degraded" && !link.slow) ? "green" : link.state === "degraded" && link.slow ? "amber" : "idle", link.state === "degraded" && link.slow ? "Answers may be slow because the connection to the computer running Home's AI is slow." : "The engine link's connection speed is ready.", link.state === "degraded" && !link.slow ? "The engine link is degraded for another reason; its latency is not slow." : "The engine link's own six-probe median is at or below 500 ms.", undefined, now));
+    }
+  }
   rows.push(makeRow("camera", "Camera and microphone", "idle", "Checked when you set up your face.", "Camera and microphone permissions are requested only during face setup.", undefined, now));
   return rows;
 }

@@ -24,6 +24,8 @@ import { people } from "@/db/schema";
 import { runSetupChecks, healthItems } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
 import { getStackClient } from "@/lib/stackEngine";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { REMOTE_ALLOW_TAILNET_KEY, refreshConfiguredEngineLink, validateRemoteEngineSetting } from "@/lib/remoteStackSettings";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -43,6 +45,7 @@ const checksRoute = createRoute({
   method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",
   responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState }) } }, description: "The ordered check rows and updated setup state." } },
 });
+const allowTailnetErrorSchema = z.object({ error: z.string(), next: z.string().optional() });
 setupRoutes.openapi(checksRoute, async (c) => {
   const rows = await runSetupChecks();
   const passed = rows.every((row) => row.state === "green" || row.state === "idle");
@@ -56,7 +59,28 @@ setupRoutes.openapi(checksRoute, async (c) => {
   }
   const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows), engine });
   if (passed) void startSetupDownloads().catch(() => {});
-  return c.json({ rows: rows.map(({ id, title, state, text }) => ({ id, title, state, text })), state }, 200);
+  return c.json({ rows: rows.map(({ id, title, state, text, action, actionLabel, actionRoute }) => ({ id, title, state, text, ...(action ? { action, actionLabel, actionRoute } : {}) })), state }, 200);
+});
+
+const allowTailnetRoute = createRoute({
+  method: "post", path: "/checks/allow-tailnet", tags: ["Setup"], summary: "Allow the engine link to use Tailscale",
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ enabled: z.literal(true) }) } }, description: "Tailnet routing is enabled for the engine link." },
+    400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The engine link cannot use this Tailscale address." },
+    403: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "Only an owner or admin may enable this setting." },
+  },
+});
+setupRoutes.openapi(allowTailnetRoute, async (c) => {
+  const anyone = db.select({ id: people.id }).from(people).limit(1).get();
+  if (anyone) {
+    return c.json({ error: "Home already has an owner. Sign in as an owner or admin and use Settings to allow Tailscale for the engine link." }, 403);
+  }
+  const refusal = await validateRemoteEngineSetting(REMOTE_ALLOW_TAILNET_KEY, true);
+  if (refusal) return c.json({ error: refusal }, 400);
+  const saved = setHouseholdSettingValue(REMOTE_ALLOW_TAILNET_KEY, true);
+  if (!saved.ok) return c.json({ error: saved.error }, 400);
+  refreshConfiguredEngineLink();
+  return c.json({ enabled: true as const }, 200);
 });
 
 const SetupStepIdSchema = z.enum(SETUP_STEP_IDS);

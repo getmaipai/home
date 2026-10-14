@@ -111,13 +111,14 @@ export class EngineLink {
   private lastGood: { contract: string; rtt_ms: number; last_ok_at: string; path: "home" | "tailnet" } | null = null;
   private recentRtts: number[] = [];
   private rolesDegraded = false;
+  private slow = false;
   private connectWait: { wake: () => void } | null = null;
 
   constructor(config: LinkConfig, deps: Partial<LinkDependencies> = {}) {
     this.config = { sshPort: 22, localPort: 8771, allowTailnet: false, ...config, env: config.env ?? { PATH: process.env.PATH ?? "", HOME: process.env.HOME ?? process.cwd() } };
     this.deps = { ...defaultDeps, ...deps };
   }
-  snapshot(): EngineLinkState { return LinkState.parse(this.state); }
+  snapshot(): EngineLinkState & { slow: boolean; rolesDegraded: boolean } { return { ...this.state, slow: this.slow, rolesDegraded: this.rolesDegraded }; }
   /** Last successful probe metadata without exposing the configured host. */
   statusDetails(): { path: "home" | "tailnet" | null; lastProbeAt: string | null; contract: string | null } {
     return { path: this.lastGood?.path ?? null, lastProbeAt: this.lastGood?.last_ok_at ?? null,
@@ -299,7 +300,8 @@ export class EngineLink {
       this.notReadySince = null;
       if (this.offlineTimer) this.deps.clearTimeout(this.offlineTimer);
       this.offlineTimer = null;
-      this.setState({ state: this.isSlow() || this.rolesDegraded ? "degraded" : "ready", ...this.lastGood });
+      this.slow = this.isSlow();
+      this.setState({ state: this.slow || this.rolesDegraded ? "degraded" : "ready", ...this.lastGood });
       this.scheduleProbe(generation, path);
       this.scheduleRoles(generation, path);
     } catch (error) {
@@ -346,7 +348,8 @@ export class EngineLink {
         const rolesReady = await this.deps.onRoles!();
         if (!this.current(generation) || !this.lastGood) return;
         this.rolesDegraded = !rolesReady;
-        this.setState({ state: this.rolesDegraded || this.isSlow() ? "degraded" : "ready", ...this.lastGood });
+        this.slow = this.isSlow();
+        this.setState({ state: this.rolesDegraded || this.slow ? "degraded" : "ready", ...this.lastGood });
       } catch { this.rolesDegraded = true; if (this.current(generation) && this.lastGood) this.setState({ state: "degraded", ...this.lastGood }); }
       if (this.current(generation)) this.scheduleRoles(generation, path);
     }, ROLE_PROBE_INTERVAL);
@@ -406,5 +409,5 @@ export function startEngineLink(config: LinkConfig, deps?: Partial<LinkDependenc
 }
 export function stopEngineLink(): void { activeState.link?.stop(); activeState.link = null; }
 export function getEngineLink(): EngineLink | null { return activeState.link; }
-export function getEngineLinkState(): EngineLinkState | null { return activeState.link?.snapshot() ?? null; }
+export function getEngineLinkState(): ReturnType<EngineLink["snapshot"]> | null { return activeState.link?.snapshot() ?? null; }
 export function __setEngineLinkForTests(link: EngineLink | null): void { activeState.link?.stop(); activeState.link = link; }

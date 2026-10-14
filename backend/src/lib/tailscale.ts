@@ -42,6 +42,15 @@ export interface TailscaleStatus {
   signedIn?: boolean;
   httpsEnabled?: boolean;
   machineName?: string | null;
+  peers?: TailscalePeer[];
+}
+
+export interface TailscalePeer {
+  dnsName: string | null;
+  hostName: string | null;
+  ips: string[];
+  online: boolean;
+  path: "direct" | "relay" | null;
 }
 
 interface TailscaleStatusJson {
@@ -49,6 +58,7 @@ interface TailscaleStatusJson {
   Self?: { DNSName?: string; TailscaleIPs?: string[]; HostName?: string; UserID?: number };
   User?: Record<string, { ID?: number; LoginName?: string }>;
   CertDomains?: string[];
+  Peer?: Record<string, { DNSName?: string; HostName?: string; TailscaleIPs?: string[]; Online?: boolean; CurAddr?: string; Relay?: string }>;
 }
 
 // Pure interpretation, split from the process spawn so it's unit-testable
@@ -58,13 +68,22 @@ interface TailscaleStatusJson {
 export function interpretTailscaleStatusJson(stdout: string): TailscaleStatus {
   const parsed = JSON.parse(stdout) as TailscaleStatusJson;
   if (parsed.BackendState !== "Running") {
-    return { state: "stopped", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null };
+    return { state: "stopped", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null, peers: [] };
   }
   const dnsName = parsed.Self?.DNSName?.replace(/\.$/, "") ?? null;
   const ips = parsed.Self?.TailscaleIPs ?? [];
   const signedIn = Boolean(parsed.Self?.UserID && parsed.User?.[String(parsed.Self.UserID)]);
   const httpsEnabled = Boolean(dnsName && parsed.CertDomains?.some((domain) => dnsName.endsWith(domain)));
-  return { state: "running", dnsName, ips, installed: true, signedIn, httpsEnabled, machineName: parsed.Self?.HostName ?? dnsName?.split(".")[0] ?? null };
+  const peers = Object.values(parsed.Peer ?? {}).map((peer) => ({
+    dnsName: peer.DNSName?.replace(/\.$/, "") ?? null,
+    hostName: peer.HostName ?? null,
+    ips: peer.TailscaleIPs ?? [],
+    online: peer.Online === true,
+    // Tailscale's published LocalBackendStatus peer type exposes Relay
+    // (DERP region) and CurAddr (direct endpoint); an empty Relay means direct.
+    path: peer.Online !== true ? null : peer.Relay ? "relay" as const : peer.CurAddr ? "direct" as const : null,
+  }));
+  return { state: "running", dnsName, ips, installed: true, signedIn, httpsEnabled, machineName: parsed.Self?.HostName ?? dnsName?.split(".")[0] ?? null, peers };
 }
 
 /** Best-effort: any missing binary, timeout, or unparseable output reports
@@ -76,7 +95,7 @@ export async function getTailscaleStatus(): Promise<TailscaleStatus> {
     const { stdout } = await execFileAsync(tailscaleBinary(), ["status", "--json"], { timeout: 5_000 });
     return interpretTailscaleStatusJson(stdout);
   } catch {
-    return { state: "not_installed", dnsName: null, ips: [], installed: false, signedIn: false, httpsEnabled: false, machineName: null };
+    return { state: "not_installed", dnsName: null, ips: [], installed: false, signedIn: false, httpsEnabled: false, machineName: null, peers: [] };
   }
 }
 

@@ -652,7 +652,8 @@ export interface TailscaleStatus { state: "not_installed" | "stopped" | "running
 
 export const api = {
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
-  setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>; state: SetupState }>("/api/setup/checks/run", { method: "POST" }),
+  setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState }>("/api/setup/checks/run", { method: "POST" }),
+  setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
   setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"] }) =>
     request<SetupState>(`/api/setup/${encodeURIComponent(step)}`, {

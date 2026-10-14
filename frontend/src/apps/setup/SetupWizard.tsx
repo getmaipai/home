@@ -54,9 +54,10 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [certificate, setCertificate] = useState<"loading" | "ready" | "error">("loading");
   const [backupKey, setBackupKey] = useState<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string } | null>(null);
   const [backupKeyError, setBackupKeyError] = useState(false);
-  const [checkRows, setCheckRows] = useState<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> | null>(null);
+  const [checkRows, setCheckRows] = useState<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }> | null>(null);
   const [checkError, setCheckError] = useState(false);
   const [checksFetching, setChecksFetching] = useState(false);
+  const [tailnetError, setTailnetError] = useState<string | null>(null);
 
   const refresh = async () => {
     const result = await api.setupState();
@@ -208,6 +209,19 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     navigate("/sign-in", { replace: true });
   }
 
+  async function allowEngineTailnet() {
+    setBusy(true);
+    setTailnetError(null);
+    try {
+      const action = checkRows?.find((row) => row.action === "allow_tailnet");
+      if (action?.actionRoute === "settings") await api.setSetting("household", "engines.stack.remote.allow_tailnet", true);
+      else await api.setupAllowEngineTailnet();
+      const result = await api.setupChecks(); setCheckRows(result.rows); setState(result.state);
+    }
+    catch (reason) { setTailnetError(reason instanceof Error ? reason.message : "Home couldn't allow Tailscale for the engine link. Sign in as an owner or admin, then try again."); }
+    finally { setBusy(false); }
+  }
+
   function moveToPhase(id: string) {
     if (id === "computers") setScreen("welcome");
     if (id === "away") setScreen("away");
@@ -231,8 +245,9 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       const warnings = checkRows?.some((row) => row.state === "amber") ?? false;
       body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent>
         <AsyncState data={checkRows} error={checkError} isFetching={checksFetching} onRetry={() => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); }} errorMessage="Home couldn't check these computers." loadingLabel="Checking your computers">
-          {(rows) => <List items={rows} getKey={(row) => row.id} label="Setup checks" renderItem={(row) => <div className="flex min-w-0 flex-1 flex-col gap-1 py-1"><div className="flex items-center gap-2"><Badge variant={row.state === "red" ? "destructive" : row.state === "amber" ? "outline" : "secondary"}>{row.state}</Badge><span className="font-medium">{row.title}</span></div><p className="text-sm text-muted-foreground">{row.text}</p></div>} />}
+          {(rows) => <List items={rows} getKey={(row) => row.id} label="Setup checks" renderItem={(row) => <div className="flex min-w-0 flex-1 flex-col gap-1 py-1"><div className="flex items-center gap-2"><Badge variant={row.state === "red" ? "destructive" : row.state === "amber" ? "outline" : "secondary"}>{row.state}</Badge><span className="font-medium">{row.title}</span></div><p className="text-sm text-muted-foreground">{row.text}</p>{row.action === "allow_tailnet" ? <Button type="button" variant="secondary" disabled={busy} onClick={() => void allowEngineTailnet()}>{row.actionLabel ?? "Allow"}</Button> : null}</div>} />}
         </AsyncState>
+        {tailnetError ? <p role="alert">{tailnetError}</p> : null}
         {checkRows?.filter((row) => row.state === "amber" || row.state === "red").map((row) => <Alert key={row.id} variant={row.state === "red" ? "destructive" : "default"}><AlertTitle>{row.title}</AlertTitle><AlertDescription>{row.text}</AlertDescription></Alert>)}
         {blocking ? <p>Fix the red checks, then press Try again.</p> : null}
         {warnings && !blocking ? <Button type="button" variant="secondary" disabled={busy} onClick={() => { void record("checks", "deferred").then((updated) => { if (updated) setScreen("plan"); }); }}>Continue anyway</Button> : null}
