@@ -18,15 +18,14 @@ async function checklist(client: TestClient): Promise<Array<{ id: string; title:
 }
 
 describe("GET /api/setup-checklist", () => {
-  test("returns exactly the six facts that exist today and leaves later items out", async () => {
+  test("returns exactly the seven facts that exist today and leaves later items out", async () => {
     const { client } = await owner();
     const result = await checklist(client);
     expect(result.map((item) => item.id)).toEqual([
-      "face-sign-in", "family", "backup-target", "phone-or-tablet", "web-search", "apps",
+      "face-sign-in", "family", "backup-target", "phone-or-tablet", "web-search", "apps", "away-access",
     ]);
     expect(result.every((item) => typeof item.done === "boolean" && item.reason.length > 0 && item.open.href.length > 0)).toBe(true);
     expect(result.find((item) => item.id === "phone-or-tablet")?.open.href).toBe("/devices");
-    expect(result.map((item) => item.title)).not.toContain("Reach Home when you're away");
     expect(result.map((item) => item.title)).not.toContain("Save your backup key");
     expect(result.map((item) => item.title)).not.toContain("Add the offline library");
   });
@@ -45,7 +44,7 @@ describe("GET /api/setup-checklist", () => {
     const { client, row: ownerRow } = await owner();
     const initial = await checklist(client);
     const before = new Map(initial.map((item) => [item.id, item.done]));
-    expect([...before.values()]).toEqual([false, false, false, false, false, false]);
+    expect([...before.values()]).toEqual([false, false, false, false, false, false, false]);
 
     const face = await client.post("/api/biometric-prints", {
       person_id: ownerRow.id,
