@@ -21,6 +21,7 @@ import { PerformancePage } from "@/shell/pages/PerformancePage";
 import { TurnTracePage } from "@/shell/pages/TurnTracePage";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
 import { RepairsPage } from "@/shell/pages/RepairsPage";
+import { SetupReviewPage } from "@/apps/setup/SetupReviewPage";
 import { StatusPage } from "@/shell/pages/StatusPage";
 import { UiShowcasePage } from "@/shell/pages/UiShowcasePage";
 import { BackupsPage } from "@/shell/pages/BackupsPage";
@@ -236,6 +237,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="trace/:turnId" element={<TurnTracePage />} />
             <Route path="updates" element={<UpdatesPage person={person} />} />
             <Route path="repairs" element={<RepairsPage person={person} />} />
+            <Route path="setup/review" element={meetsMinRole(person.role, "admin") ? <SetupReviewPage /> : <Navigate to="/" replace />} />
             <Route path="status" element={<StatusPage person={person} />} />
             <Route path="backups" element={<BackupsPage person={person} />} />
             <Route path="commands" element={meetsMinRole(person.role, "adult") ? <CommandsPage person={person} /> : <Navigate to="/settings/account" replace />} />

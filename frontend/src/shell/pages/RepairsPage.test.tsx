@@ -56,6 +56,21 @@ function mockRepairsFetch(issues: Issue[]) {
 }
 
 describe("RepairsPage", () => {
+  test("admin sees Run setup again and adult does not", async () => {
+    const adminFetch = mockRepairsFetch([]);
+    try {
+      renderWithQueryClient(<RepairsPage person={makePerson({ role: "admin" })} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Run setup again"));
+      expect(document.body.textContent).toContain("Check my computers again");
+    } finally { adminFetch.restore(); cleanup(); }
+    const adultFetch = mockRepairsFetch([]);
+    try {
+      renderWithQueryClient(<RepairsPage person={makePerson({ role: "adult" })} />);
+      await waitFor(() => expect(document.body.textContent).toContain("Only an owner or admin can manage repairs."));
+      expect(document.body.textContent).not.toContain("Run setup again");
+    } finally { adultFetch.restore(); }
+  });
+
   test("a non-admin sees the denied message, never a fetch", async () => {
     const { restore } = mockRepairsFetch([makeIssue()]);
     try {

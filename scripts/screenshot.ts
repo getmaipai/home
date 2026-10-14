@@ -94,6 +94,7 @@ const useWebkit = process.argv.includes("--webkit");
 const useFirefox = process.argv.includes("--firefox") || process.env.BROWSER?.toLowerCase() === "firefox";
 const chatIncognitoAudit = process.argv.includes("--chat-incognito-audit");
 const setupChecksReview = process.argv.includes("--setup-checks-review");
+const setupReviewCaptures = process.argv.includes("--setup-review-captures");
 // MOBILE-LIVE-01: `bun run screenshots --mobile-smoke` - sign in and walk
 // every main-menu item at 390x844 with touch; see scripts/mobileSmoke.ts.
 const mobileSmoke = process.argv.includes("--mobile-smoke");
@@ -156,7 +157,9 @@ async function runPool<T, R>(items: readonly T[], poolSize: number, worker: (ite
 // path is the one that must never move; every other browser writes under
 // its own gitignored subdirectory instead; `bun run screenshots` (default,
 // no `--webkit`) is unaffected by any of this.
-const SCREENS_DIR = setupChecksReview
+const SCREENS_DIR = setupReviewCaptures
+  ? join(ROOT, "data-scratch", "screenshots", "setup-review")
+  : setupChecksReview
   ? join(ROOT, "data-scratch", "screenshots", "setup-checks")
   : chatIncognitoAudit
   ? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/incognito-shots"
@@ -449,6 +452,10 @@ const FILES_REVIEW_COMBOS: Array<{ viewport: string; theme: "light" | "dark" }> 
   { viewport: "desktop", theme: "dark" },
   { viewport: "phone", theme: "light" },
   { viewport: "phone", theme: "dark" },
+];
+const SETUP_REVIEW_COMBOS: Array<{ viewport: string; theme: "light" | "dark" }> = [
+  { viewport: "desktop", theme: "light" }, { viewport: "desktop", theme: "dark" },
+  { viewport: "phone", theme: "light" }, { viewport: "phone", theme: "dark" },
 ];
 
 async function waitForHealth(timeoutMs = 15000): Promise<void> {
@@ -10409,7 +10416,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
+    if (!a11yOnly && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -10440,7 +10447,9 @@ async function main() {
     // A11Y_ONLY_COMBOS: a review caught the earlier version still
     // running runPool over 2 combos here, opening and closing two real
     // browser contexts that would only ever iterate zero routes below.
-    const combos = filesReview
+    const combos = setupReviewCaptures
+      ? SETUP_REVIEW_COMBOS
+      : filesReview
       ? FILES_REVIEW_COMBOS
       : notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
         ? []
@@ -10461,7 +10470,7 @@ async function main() {
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : filesReview ? ROUTES.filter((entry) => entry.slug === "files") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : setupReviewCaptures ? [...ROUTES.filter((entry) => entry.slug === "settings-repairs"), { slug: "setup-review", path: "/setup/review" }] : filesReview ? ROUTES.filter((entry) => entry.slug === "files") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -10472,7 +10481,7 @@ async function main() {
           // as a failure for this one combo, never silently skipped.
           comboResult.push(
             await Promise.race([
-              visitRoute(context, route, viewport, combo.theme, !a11yOnly && !chatStatsReview),
+              visitRoute(context, route, viewport, combo.theme, !a11yOnly && !chatStatsReview, !setupReviewCaptures && chatReview),
               new Promise<RunResult>((_, reject) =>
                 setTimeout(() => reject(new Error(`timed out after ${PAGE_VISIT_TIMEOUT_MS}ms`)), PAGE_VISIT_TIMEOUT_MS),
               ),
@@ -10512,7 +10521,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
+    if (!a11yOnly && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

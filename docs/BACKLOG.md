@@ -7,6 +7,8 @@ platform standard in `getmaipai/.github`. Update this file whenever a gap
 closes or a new one is found; don't let it drift from what `main` actually
 does.
 
+- [x] **SETUP-REVIEW-01: run setup again in review mode from Repairs** (small M). Repairs actions are owner/admin only. Review shows the four production screens, never writes setup state, and only saves a changed existing engine location. Storage and plan remain read only until DATA-LOCATION keys and a working plan screen land; see the setup plan note and the review report.
+
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
 **L** (a platform-level capability, needs its own design pass first).
 

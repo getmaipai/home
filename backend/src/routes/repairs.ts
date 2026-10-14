@@ -11,11 +11,48 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
-import { listIssues, fixIssue, dismissIssue } from "@/lib/issues";
+import { listIssues, fixIssue, dismissIssue, raiseIssue, resolveIssue } from "@/lib/issues";
 import { syncStackHealthIssues } from "@/lib/stackHealthSync";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
+import { runSetupChecks, healthItems, type SetupCheck } from "@/setup/checks/checks";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { getSetupState } from "@/lib/setupState";
 
 export const repairsRoutes = apiRouter();
+let setupChecksRunner: () => Promise<SetupCheck[]> = () => runSetupChecks();
+export function __setRepairsSetupChecksRunnerForTests(runner: (() => Promise<SetupCheck[]>) | null): void {
+  setupChecksRunner = runner ?? (() => runSetupChecks());
+}
+
+const reviewRoute = createRoute({
+  method: "get", path: "/review", tags: ["Repairs"], summary: "Read setup choices for review",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ engine: z.unknown(), checks: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })) }) } }, description: "Current setting values and saved check rows." }, ...errorResponses({ 403: "Not owner/admin" }) },
+});
+repairsRoutes.openapi(reviewRoute, (c) => {
+  const state = getSetupState();
+  return c.json({ engine: getHouseholdSettingValue("engines.stack.where") ?? state.engine.where, checks: state.checks.map((item) => ({ id: item.code.replace(/^setup\./, ""), title: item.title, state: item.severity === "error" ? "red" as const : item.severity === "warning" ? "amber" as const : "green" as const, text: item.text })) }, 200);
+});
+
+const checksRoute = createRoute({
+  method: "post", path: "/checks", tags: ["Repairs"], summary: "Check computers again",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })) } }, description: "New checks and matching Health issues." }, ...errorResponses({ 403: "Not owner/admin" }) },
+});
+repairsRoutes.openapi(checksRoute, async (c) => {
+  const rows = await setupChecksRunner();
+  const items = healthItems(rows);
+  const byCode = new Map(items.map((item) => [item.code, item]));
+  const seen = new Set(rows.map((row) => `setup.${row.id}`));
+  for (const row of rows) {
+    const code = `setup.${row.id}`;
+    const item = byCode.get(code);
+    if (item) await raiseIssue({ source: "setup", key: code, severity: item.severity === "critical" ? "error" : item.severity, title: item.title, detail: item.text, fix: item.fix ? { label: item.fix.label, action: item.fix.action } : null });
+    else if (row.state === "green" || row.state === "idle") resolveIssue("setup", code);
+  }
+  for (const issue of listIssues()) if (issue.source === "setup" && issue.key.startsWith("setup.") && !seen.has(issue.key)) resolveIssue("setup", issue.key);
+  return c.json(rows.map(({ id, title, state, text }) => ({ id, title, state, text })), 200);
+});
 
 const IdParamSchema = idParamSchema("id", "issue-a1b2c3");
 

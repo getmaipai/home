@@ -1082,6 +1082,8 @@ Stack-side keys (`stack.*`, with `needs_restart`, `in_effect` and `pending`) are
 
 **Running setup again, safely.** Review mode is an ordinary signed-in admin page and shows Where Home's AI runs, Where files are kept, Checks and Your plan (screens 2 to 5) only; the owner alone may change the storage location there, as today. It never:
 
+SETUP-REVIEW-01 implementation note (2026-10-14): the existing engine-location screen reads and can save the declared `engines.stack.where` key. The current storage and plan screens are still stubs, and the pinned commons spec has no storage-location setting, so both screens render read only until their own settings shape and production behavior land. Review and Repairs checks use signed-in Repairs routes and never write setup-state or call `/api/setup/*`.
+
 - creates a new owner
 - makes a new backup key without its own confirm (a new key replaces the old one, so the old printout stops working; the confirm says so)
 - deletes a model until its replacement is checked and swapped in by the Stack

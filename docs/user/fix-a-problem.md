@@ -7,6 +7,8 @@ description: What to check first when something isn't working right.
 
 Open **Settings**, then **Repairs** under Manage. MaiPai lists anything that needs attention, its status, and the available action. This is the fastest way to find out what's wrong.
 
+Owners and admins can choose **Check my computers again** to refresh the computer checks. The results appear here in Health. Choose **Run setup again** to review the AI computer, file location, checks, and plan. You can change the AI computer choice there. The file location and plan screens are read only until those choices are ready to change. Leaving the review without a change saves nothing.
+
 ![The Repairs page, showing an issue MaiPai detected and its status](../assets/screens/settings-repairs-desktop-light.png)
 
 ## If MaiPai won't load at all

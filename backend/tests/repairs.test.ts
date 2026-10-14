@@ -5,10 +5,15 @@ import { owner, teen } from "./support/testAuth";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, type StackFixture } from "./stackFixture";
-
+import { db } from "@/db";
+import { setupState } from "@/db/schema";
+import { TestClient } from "./client";
+import { ensureSetupState } from "@/lib/setupState";
+import { __setRepairsSetupChecksRunnerForTests } from "@/routes/repairs";
 beforeEach(() => {
   resetDb();
   __resetFixHandlersForTests();
+  __setRepairsSetupChecksRunnerForTests(null);
 });
 
 describe("GET /api/repairs", () => {
@@ -26,6 +31,57 @@ describe("GET /api/repairs", () => {
     expect(res.status).toBe(200);
     const body = (await res.json()) as unknown[];
     expect(body).toHaveLength(1);
+  });
+});
+
+describe("setup review and computer checks from Repairs", () => {
+  test("admin can read setup review values while teen and adult callers are refused", async () => {
+    const { client } = await owner();
+    const adminCreated = await client.post("/api/people", { displayName: "Marlow", role: "admin", secret: "correcthorse2" });
+    const adminPerson = (await adminCreated.json()) as { id: string };
+    const admin = new TestClient();
+    await admin.post("/api/auth/verify-secret", { personId: adminPerson.id, secret: "correcthorse2" });
+    expect((await admin.get("/api/repairs/review")).status).toBe(200);
+    const teenClient = await teen(client);
+    expect((await teenClient.get("/api/repairs/review")).status).toBe(403);
+    const adultCreated = await client.post("/api/people", { displayName: "Ari", role: "adult", secret: "correcthorse3" });
+    const adultPerson = (await adultCreated.json()) as { id: string };
+    const adult = new TestClient();
+    await adult.post("/api/auth/verify-secret", { personId: adultPerson.id, secret: "correcthorse3" });
+    expect((await adult.get("/api/repairs/review")).status).toBe(403);
+  });
+
+  test("review reads and checks reruns leave setup state byte-identical", async () => {
+    const { client } = await owner();
+    ensureSetupState();
+    const before = db.select().from(setupState).get()!.value;
+    expect((await client.get("/api/repairs/review")).status).toBe(200);
+    expect(db.select().from(setupState).get()!.value).toBe(before);
+    await client.post("/api/repairs/checks");
+    expect(db.select().from(setupState).get()!.value).toBe(before);
+  });
+
+  test("computer checks endpoint is owner/admin only", async () => {
+    const { client } = await owner();
+    const teenClient = await teen(client);
+    expect((await teenClient.post("/api/repairs/checks")).status).toBe(403);
+    const adultCreated = await client.post("/api/people", { displayName: "Ari", role: "adult", secret: "correcthorse3" });
+    const adultPerson = (await adultCreated.json()) as { id: string };
+    const adult = new TestClient();
+    await adult.post("/api/auth/verify-secret", { personId: adultPerson.id, secret: "correcthorse3" });
+    expect((await adult.post("/api/repairs/checks")).status).toBe(403);
+  });
+
+  test("red check raises and green rerun resolves its setup Health Issue", async () => {
+    const { client } = await owner();
+    __setRepairsSetupChecksRunnerForTests(async () => [{ id: "engine", title: "Engine service", state: "red", text: "Engine stopped.", item: { code: "setup.engine", severity: "error", title: "Engine service", text: "Engine stopped.", since: new Date().toISOString(), cause: "Engine did not answer." } }]);
+    await client.post("/api/repairs/checks");
+    let issues = (await (await client.get("/api/repairs?include_resolved=true")).json()) as Array<{ source: string; key: string; resolved_at: string | null }>;
+    expect(issues.some((issue) => issue.source === "setup" && issue.key === "setup.engine" && issue.resolved_at === null)).toBe(true);
+    __setRepairsSetupChecksRunnerForTests(async () => [{ id: "engine", title: "Engine service", state: "green", text: "The Stack is answering." }]);
+    await client.post("/api/repairs/checks");
+    issues = (await (await client.get("/api/repairs?include_resolved=true")).json()) as typeof issues;
+    expect(issues.some((issue) => issue.source === "setup" && issue.key === "setup.engine" && issue.resolved_at !== null)).toBe(true);
   });
 });
 

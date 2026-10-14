@@ -8,6 +8,7 @@ import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
 import { tableColumns, useDataTableModel } from "@/shell/components/dataTableModel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
+import { Button as KitButton } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@maipai/ui/src/dashboard/components/ui/select";
@@ -92,6 +93,16 @@ export function RepairsPage({ person }: { person: Roster }) {
     }
   }
 
+  async function checkComputersAgain() {
+    try {
+      await api.repairsChecks();
+      await queryClient.invalidateQueries({ queryKey: ["repairs"] });
+      toast.success("Home checked your computers and updated Health.");
+    } catch (error) {
+      toast.error(error instanceof ApiError ? error.message : "Home couldn't check your computers. Check the engine connection, then try again.");
+    }
+  }
+
   return (
     <>
       <CardHeader>
@@ -108,6 +119,11 @@ export function RepairsPage({ person }: { person: Roster }) {
           </CardContent>
         </Card>
       ) : (
+        <>
+        <div className="flex flex-wrap gap-2">
+          <KitButton type="button" variant="secondary" onClick={() => void checkComputersAgain()}>Check my computers again</KitButton>
+          <KitButton type="button" variant="secondary" onClick={() => { window.location.assign("/setup/review"); }}>Run setup again</KitButton>
+        </div>
         <AsyncState
           data={query.data}
           error={query.isError}
@@ -151,6 +167,7 @@ export function RepairsPage({ person }: { person: Roster }) {
             />
           )}
         </AsyncState>
+        </>
       )}
     </>
   );

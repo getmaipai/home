@@ -15227,6 +15227,135 @@
         }
       }
     },
+    "/api/repairs/review": {
+      "get": {
+        "tags": [
+          "Repairs"
+        ],
+        "summary": "Read setup choices for review",
+        "responses": {
+          "200": {
+            "description": "Current setting values and saved check rows.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "engine": {
+                      "nullable": true
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "green",
+                              "amber",
+                              "red",
+                              "idle"
+                            ]
+                          },
+                          "text": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "state",
+                          "text"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "checks"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/repairs/checks": {
+      "post": {
+        "tags": [
+          "Repairs"
+        ],
+        "summary": "Check computers again",
+        "responses": {
+          "200": {
+            "description": "New checks and matching Health issues.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string",
+                        "enum": [
+                          "green",
+                          "amber",
+                          "red",
+                          "idle"
+                        ]
+                      },
+                      "text": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "state",
+                      "text"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/repairs": {
       "get": {
         "tags": [
