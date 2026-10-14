@@ -1,6 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { useAssistantDataUI, useAssistantToolUI, useAui, useAuiState, type ToolCallMessagePartComponent } from "@assistant-ui/react";
 import { Thread, type ThreadComponents } from "@maipai/ui/src/elements/thread.aui";
+import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { setPendingChatFolder } from "@/apps/chat/chatThreadListAdapter";
 import { AdminToolFallback, DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TOOL_BINDINGS, type DataBinding, type ToolBinding } from "@/apps/chat/elementBindings";
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
@@ -8,6 +11,8 @@ import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
 import { ChatAvailabilityContext, engineDownReason } from "@/apps/chat/useChatAvailability";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
+import { useStatusApps } from "@/shell/useStatusApps";
+import { isSearchLimitedChat } from "@/shell/statusApps";
 
 export type ChatExtrasContextValue = {
   rootRef: RefObject<HTMLDivElement | null>;
@@ -76,6 +81,14 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   // ENGINE-DOWN-UI-01: the same state also holds every other engine-dependent
   // control, through the kit Thread's one `engineDown` prop.
   const engineDown = engineDownReason(useContext(ChatAvailabilityContext));
+  const statusApps = useStatusApps().data;
+  const searchDown = Array.isArray(statusApps) && statusApps.some(isSearchLimitedChat);
+  const householdSettings = useQuery({
+    queryKey: ["settings-values", "household"],
+    queryFn: () => api.settingsValues("household"),
+  });
+  const webSearchOff = Array.isArray(householdSettings.data)
+    && householdSettings.data.some((setting) => setting.key === "search.source_mode.web" && setting.value === "offline");
   // getmaipai/home#206: while a saved chat is still opening (a slow hub
   // answering for its details), the composer belongs to a blank placeholder
   // thread; a message sent there vanished when the saved chat replaced it.
@@ -147,6 +160,17 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
       <div className="flex justify-center">
         <ChatConnectionBanner />
       </div>
+      {webSearchOff ? (
+        <Alert role="status">
+          <AlertTitle>Web search is off</AlertTitle>
+          <AlertDescription>Web search is turned off for this home. An owner can turn it on in Settings under Search.</AlertDescription>
+        </Alert>
+      ) : searchDown ? (
+        <Alert role="status">
+          <AlertTitle>Web search is unavailable</AlertTitle>
+          <AlertDescription>Home could not reach web search. An owner can check Settings under Search, then Repairs if it still does not work.</AlertDescription>
+        </Alert>
+      ) : null}
       <ChatExtrasContext.Provider value={extraContext}>
         <Thread
           temporary={temporary}

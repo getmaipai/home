@@ -1,8 +1,9 @@
-import { afterEach, beforeEach, describe, expect, jest, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, jest, mock, spyOn, test } from "bun:test";
 import { act, cleanup, fireEvent, waitFor, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter, type ThreadHistoryAdapter, type ThreadMessageLike } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
+import { api } from "@/lib/api";
 import { THREAD_SLOTS, TOOL_BINDINGS } from "@/apps/chat/elementBindings";
 import { AdminContext, ChatAgeBandContext, ConnectionStateContext, TemporaryChatContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ChatAvailabilityContext } from "@/apps/chat/useChatAvailability";
@@ -46,6 +47,13 @@ function WelcomeHarness({ availability }: { availability: "ready" | "starting" |
   return <AssistantRuntimeProvider runtime={runtime}><ChatAvailabilityContext.Provider value={availability}><ChatThread /></ChatAvailabilityContext.Provider></AssistantRuntimeProvider>;
 }
 
+let searchBannerRuntime: ReturnType<typeof useLocalRuntime> | undefined;
+function SearchBannerHarness({ adapter = NOOP }: { adapter?: ChatModelAdapter }) {
+  const runtime = useLocalRuntime(adapter, { initialMessages: [] });
+  searchBannerRuntime = runtime;
+  return <AssistantRuntimeProvider runtime={runtime}><ChatThread /></AssistantRuntimeProvider>;
+}
+
 let queuedRuntime: { thread: { composer: { setText(text: string): void; send(): void; getState(): { text: string; queue: readonly { id: string; prompt: string; parts: readonly { type: string; text?: string }[] }[] } } } } | undefined;
 function QueuedHarness({ adapter, history, temporary = false, band = "child" }: { adapter: ChatModelAdapter; history?: ThreadHistoryAdapter; temporary?: boolean; band?: "child" | "teen" | "adult" }) {
   const runtime = useLocalRuntime(adapter, { initialMessages: [], ...(history ? { adapters: { history } } : {}), unstable_enableMessageQueue: true, unstable_queueClearOnCancel: false });
@@ -64,6 +72,47 @@ afterEach(() => {
 });
 
 describe("ChatThread", () => {
+  test("search outage keeps the model's answer and shows the web search banner", async () => {
+    const status = spyOn(api, "statusApps").mockResolvedValue([{
+      id: "chat", name: "Chat", state: "degraded", reason: "Chat is working, but search is limited right now.",
+    }] as never);
+    const adapter: ChatModelAdapter = { run: async function* () {
+      yield { content: [{ type: "text", text: "I couldn't look that up just now, but here's what I know." }] };
+    } };
+    const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness adapter={adapter} /></MemoryRouter>);
+    act(() => searchBannerRuntime!.thread.composer.setText("Look this up"));
+    act(() => searchBannerRuntime!.thread.composer.send());
+    expect(await view.findByText("I couldn't look that up just now, but here's what I know.")).toBeTruthy();
+    expect(await view.findByText("Web search is unavailable")).toBeTruthy();
+    expect(view.getByText(/check Settings under Search, then Repairs/)).toBeTruthy();
+    status.mockRestore();
+  });
+
+  test("healthy web search has no banner", async () => {
+    const status = spyOn(api, "statusApps").mockResolvedValue([{
+      id: "chat", name: "Chat", state: "operational", reason: null,
+    }] as never);
+    const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness /></MemoryRouter>);
+    await waitFor(() => expect(view.container.querySelector('[role="status"]')).toBeNull());
+    expect(view.queryByText("Web search is unavailable")).toBeNull();
+    status.mockRestore();
+  });
+
+  test("an owner's deliberate web search switch-off has distinct wording", async () => {
+    const status = spyOn(api, "statusApps").mockResolvedValue([{
+      id: "chat", name: "Chat", state: "operational", reason: null,
+    }] as never);
+    const settings = spyOn(api, "settingsValues").mockResolvedValue([{
+      key: "search.source_mode.web", value: "offline",
+    }] as never);
+    const view = renderWithQueryClient(<MemoryRouter><SearchBannerHarness /></MemoryRouter>);
+    expect(await view.findByText("Web search is off")).toBeTruthy();
+    expect(view.getByText(/turned off for this home/)).toBeTruthy();
+    expect(view.queryByText("Web search is unavailable")).toBeNull();
+    status.mockRestore();
+    settings.mockRestore();
+  });
+
   test("does not render a queue row for an empty queue, including while a reply is running", async () => {
     const idle = renderWithQueryClient(<MemoryRouter><QueuedHarness adapter={NOOP} /></MemoryRouter>);
     expect(idle.container.querySelector('[data-slot="message-queue"]')).toBeNull();
