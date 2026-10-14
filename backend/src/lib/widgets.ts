@@ -75,7 +75,7 @@ export function listWidgets(actor: { role: string }): WidgetDescriptor[] {
 }
 
 /** Runs the declared widget's own package recipe with its own declared
- * `inputs`, using the household home from `resolvePlace()` when the
+ * `inputs`, using the household home from `householdHomePlaceName()` when the
  * weather widget declares a `place` (the same household-only choice the
  * warm runner applies), and wraps the resulting reply into one item. Beyond `place`, `inputs` are
  * still literal manifest placeholders until a real settings-resolution

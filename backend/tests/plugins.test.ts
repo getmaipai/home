@@ -734,6 +734,40 @@ describe("warmPackage weather privacy", () => {
   });
 });
 
+describe("warmPackage generic behavior", () => {
+  test("a runPlugin failure is logged, never thrown or silent", async () => {
+    await owner();
+    const math = loadPackage("math");
+    expect(math.ok).toBe(true);
+    if (!math.ok) return;
+    const originalError = console.error;
+    const lines: string[] = [];
+    console.error = (line: string) => lines.push(line);
+    try {
+      await expect(warmPackage("math", { ...math.value.manifest, warm: { keys: [{}] } })).resolves.toBeUndefined();
+    } finally {
+      console.error = originalError;
+    }
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatch(/^\[warm\] math failed: /);
+  });
+
+  test("no warm.keys declared is a no-op", async () => {
+    const math = loadPackage("math");
+    expect(math.ok).toBe(true);
+    if (!math.ok) return;
+    const originalError = console.error;
+    const lines: string[] = [];
+    console.error = (line: string) => lines.push(line);
+    try {
+      await expect(warmPackage("math", { ...math.value.manifest, warm: undefined })).resolves.toBeUndefined();
+    } finally {
+      console.error = originalError;
+    }
+    expect(lines).toEqual([]);
+  });
+});
+
 describe("shared outbound User-Agent", () => {
   test("the Home User-Agent literal is defined in one source file across src and packages", () => {
     const roots = [join(PACKAGES_DIR, "..", "src"), PACKAGES_DIR];

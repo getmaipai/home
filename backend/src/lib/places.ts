@@ -119,6 +119,7 @@ export async function resolvePlace(input: {
   }
 
   if (!person) {
+    // Background callers use the household name as-is, without geocoding or a child-safe label.
     const homeName = householdHomePlaceName();
     if (homeName) return { ...emptyPlace(), label: homeName, from: "household" };
   } else {
