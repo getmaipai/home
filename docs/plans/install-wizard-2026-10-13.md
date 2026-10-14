@@ -1202,7 +1202,7 @@ The research findings are in the Perceived length section. This table says which
 | Plan choice | kit `ToggleGroup` | none |
 | Custom details | kit `Collapsible`, SETUP-SIZE-01's role cards, `Switch`, `Select` | none |
 | Name and PIN | kit `Input`, `Label`, `Button` | The hand-built `StepFields` div and `ErrorText` paragraph in today's wizard are removed (rule 9b). |
-| Download progress | kit `Progress` primitive | none |
+| Download progress | kit JobProgress Element (extended) | additive props |
 | File details | kit `Sheet` | none |
 | Hero carousel | **new kit part:** shadcn Carousel (https://ui.shadcn.com/docs/components/carousel), on Embla with `embla-carousel-autoplay` | The kit has no carousel. KIT-CAROUSEL-01 adds it, after its UI-DECISIONS row. |
 | Hello | assistant-ui chat Elements from the kit | none |

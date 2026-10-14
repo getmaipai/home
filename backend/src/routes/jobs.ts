@@ -4,6 +4,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { db } from "@/db";
 import { jobs } from "@/db/schema";
+import { isOwnerOrAdmin } from "@/lib/access";
 import { canStopJob, createJob, listJobsForViewerLive } from "@/lib/jobs";
 import { trigger } from "@/lib/notifications";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
@@ -37,6 +38,15 @@ jobsRoutes.openapi(createRouteDef, (c) => {
 const stopRoute = createRoute({ method: "post", path: "/{id}/stop", tags: ["Jobs"], summary: "Stop a background job", middleware: [requireAuth] as const, request: { params: idParamSchema("id") }, responses: { 200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) }) } }, description: "Stop recorded." }, ...errorResponses({ 401: "Sign in first", 403: "Cannot stop this job", 404: "Job not found", 409: "Job is not running" }) } });
 jobsRoutes.openapi(stopRoute, async (c) => {
   const actor = c.get("person"); const id = c.req.valid("param").id;
+  if (id.startsWith("stack:") && isStackConfigured()) {
+    if (!isOwnerOrAdmin(actor)) return c.json({ error: "cannot stop this job" }, 403);
+    try {
+      const stopped = await getStackClient().cancelJob(id.slice("stack:".length));
+      if (stopped.state !== "cancelled" && stopped.state !== "done" && stopped.state !== "failed") return c.json({ error: "this job could not be stopped" }, 409);
+      if (stopped.state === "done" || stopped.state === "failed") return c.json({ error: "job is not active" }, 409);
+      return c.json({ ok: true as const }, 200);
+    } catch { return c.json({ error: "this job could not be stopped" }, 409); }
+  }
   const row = db.select().from(jobs).where(eq(jobs.id, id)).get();
   if (!row) return c.json({ error: "job not found" }, 404);
   if (!canStopJob(actor, row.forPerson, row.startedBy)) return c.json({ error: "cannot stop this job" }, 403);

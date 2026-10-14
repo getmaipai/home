@@ -199,6 +199,10 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
         if (new Set(value).size !== value.length) return { ok: false, status: 400, error: "each option can be picked once" };
         break;
       }
+      // A dynamic selector may declare only its option source instead of a
+      // static list. Its declared default remains a valid choice (for
+      // example `engines.chat.choice` defaults to `auto`).
+      if (range?.options_from && value === keyDef.default) break;
       if (!options || !options.includes(value)) {
         return { ok: false, status: 400, error: `must be one of ${JSON.stringify(options ?? [])}` };
       }

@@ -22,6 +22,7 @@ import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
 import { GenerationLoader } from "@maipai/ui/src/elements/loading-state";
 import { MessageTiming, type TimingStat } from "@maipai/ui/src/elements/message-timing";
 import { MessageQueue } from "@maipai/ui/src/elements/message-queue";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { StoppedRun } from "@maipai/ui/src/elements/stopped-run";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { BackgroundInbox } from "@maipai/ui/src/elements/background-inbox";
@@ -50,6 +51,7 @@ import { useStoppedRun } from "@/apps/chat/chatStoppedRun";
 import { useTurnActivity } from "@/apps/chat/chatTurnActivity";
 import { BranchInNewChatMenuItem } from "@/apps/chat/branchInNewChatMenuItem";
 import { useChatActivity } from "@/apps/chat/chatActivity";
+import { modelDownloadProgress } from "@/lib/modelDownloadProgress";
 import { ComposerVoiceControls } from "@/apps/chat/composerVoiceControls";
 import { ComposerWakeWordControl } from "@/apps/chat/ComposerWakeWordControl";
 import { AdminContext, ChatAgeBandContext, ChatComposerNoticeContext, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
@@ -149,7 +151,7 @@ function ChatQueueRow() {
 
 /** The ComposerQueue footer slot holds activity Elements and queued messages. */
 export function ChatMessageQueue() {
-  const { pick, backgroundRuns, busy, act, dismiss } = useChatActivity();
+  const { pick, backgroundRuns, modelDownloads, busy, act, dismiss } = useChatActivity();
   const row = pick?.row;
   const actions = row ? [
     ...row.actions.map((key) => (
@@ -198,6 +200,7 @@ export function ChatMessageQueue() {
         />
       ) : null}
       {backgroundRuns.length > 0 ? <BackgroundInbox runs={backgroundRuns} calm size="comfortable" /> : null}
+      {modelDownloads.map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}
       <ChatQueueRow />
     </>
   );

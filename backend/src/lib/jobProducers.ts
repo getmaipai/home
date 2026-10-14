@@ -20,14 +20,14 @@ export function mapStackJobToHomeJob(job: StackJob, owner: { startedBy: string; 
 export function mapModelDownloadStackJob(job: StackJob): HomeJob {
   const modelId = typeof job.input?.model === "string" ? job.input.model : job.id;
   const state = job.state;
-  return { id: `stack:${job.id}`, kind: "model_download", startedBy: "system", forPerson: null, title: modelId, state, progress: { percent: job.percent, completedBytes: job.completedBytes, totalBytes: job.totalBytes, phase: job.status }, legacyProgress: { status: job.status, percent: job.percent, completedBytes: job.completedBytes, totalBytes: job.totalBytes, removalRelease: "2026-10-13" }, resultRef: null, errorKind: state === "failed" ? "failed" : null, raw: null, provenance: { producer: "stack", stackJobId: job.id, legacyRemovalRelease: "2026-10-13" }, createdAt: job.createdAt, updatedAt: job.updatedAt };
+  return { id: `stack:${job.id}`, kind: "model_download", startedBy: "system", forPerson: null, title: modelId, state, progress: { percent: job.percent, completedBytes: job.completedBytes, totalBytes: job.totalBytes, bytesPerSecond: job.bytesPerSecond, items: job.items, phase: job.status, status: job.status }, legacyProgress: { status: job.status, percent: job.percent, completedBytes: job.completedBytes, totalBytes: job.totalBytes, removalRelease: "2026-10-13" }, resultRef: null, errorKind: state === "failed" ? "failed" : null, raw: null, provenance: { producer: "stack", stackJobId: job.id, legacyRemovalRelease: "2026-10-13" }, createdAt: job.createdAt, updatedAt: job.updatedAt };
 }
 
 /** Additive projection while model_download_jobs remains readable for one release. */
 export function modelDownloadJobsAsHomeJobs(): HomeJob[] {
   return db.select().from(modelDownloadJobs).all().map((row) => ({
     id: `model:${row.modelId}`, kind: "model_download", startedBy: "system", forPerson: null, title: row.modelId,
-    state: stateMap[row.status] ?? "running", progress: { phase: row.phase, completedBytes: row.completedBytes, totalBytes: row.totalBytes },
+    state: stateMap[row.status] ?? "running", progress: { phase: row.phase, status: row.phase, completedBytes: row.completedBytes, totalBytes: row.totalBytes },
     errorKind: row.status === "failed" ? "failed" : null, raw: row.error, provenance: { producer: "model_download_jobs", compatibility: "remove after 2026-10-13" }, createdAt: row.createdAt, updatedAt: row.updatedAt,
   }));
 }

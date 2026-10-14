@@ -49,6 +49,8 @@
       // elsewhere, unused in this kit's own vendored tree today - no
       // `paths` entry for it here until something actually needs one).
       "@/elements/*": ["./node_modules/@maipai/ui/src/elements/*"],
+      "@/primitives/*": ["./node_modules/@maipai/ui/src/primitives/*"],
+      "@/ui/*": ["./node_modules/@maipai/ui/src/ui/*"],
       "@/*": ["./src/*"]
     }
   },

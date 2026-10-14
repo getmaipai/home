@@ -78,6 +78,19 @@ describe("ACTIVITY-01c producer adapters", () => {
     } finally { fixture.stop(); }
   });
 
+  test("the existing stop route cancels a projected Stack model download", async () => {
+    const job = { id: "model-install-stop", kind: "model.install", role: "chat", state: "cancelled", percent: 15, completedBytes: 3, totalBytes: 20, status: "cancelled", position: null, input: { model: "model-a" }, result: null, reason: "Cancelled", createdAt: "2026-10-06T10:00:00.000Z", updatedAt: "2026-10-06T10:01:00.000Z" };
+    const fixture = startStackFixture({ "DELETE /stack/v1/jobs/model-install-stop": async () => Response.json({ job }) });
+    try {
+      __setStackClientForTests(fixture.client);
+      const client = new TestClient();
+      await client.post("/api/auth/setup", { displayName: "Owner", secret: "correct horse battery staple" });
+      const response = await client.post("/api/jobs/stack:model-install-stop/stop", {});
+      expect(response.status).toBe(200);
+      expect(fixture.calls).toEqual(["DELETE /stack/v1/jobs/model-install-stop"]);
+    } finally { fixture.stop(); }
+  });
+
   test("stopping a mapped Stack job cancels it upstream before Home records cancellation", async () => {
     const cancelled = { id: "img-stop-1", kind: "image", role: "image", state: "cancelled", percent: 20, completedBytes: 0, totalBytes: 0, status: "cancelled", position: null, input: null, result: null, reason: "Cancelled", createdAt: "2026-10-06T10:00:00.000Z", updatedAt: "2026-10-06T10:01:00.000Z" };
     const fixture = startStackFixture({ "DELETE /stack/v1/jobs/img-stop-1": async () => Response.json({ job: cancelled }) });

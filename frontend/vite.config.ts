@@ -93,6 +93,24 @@ function kitElementsAliasPlugin(): Plugin {
   };
 }
 
+// Some kit Elements use the commons package's own `@/primitives/*` and
+// `@/ui/*` aliases for shared primitives. Resolve those only for imports
+// from the shared UI package, leaving Home's `@/` namespace local.
+function kitSharedSourceAliasPlugin(): Plugin {
+  return {
+    name: "maipai-home-kit-shared-source-alias",
+    enforce: "pre",
+    async resolveId(source, importer, options) {
+      if (!source.startsWith("@/primitives/") && !source.startsWith("@/ui/")) return null;
+      if (!importer) return null;
+      const fromSharedUi = importer.includes("/@maipai/ui/") || importer.includes("/@maipai+ui@");
+      if (!fromSharedUi) return null;
+      const rest = source.slice("@/".length);
+      return this.resolve(`@maipai/ui/src/${rest}`, importer, { ...options, skipSelf: true });
+    },
+  };
+}
+
 // The backend has no CORS and a Strict-SameSite session cookie (see
 // backend/src/middleware/auth.ts), so the dev server proxies /api instead
 // of the browser talking cross-origin to :8787 directly: the browser then
@@ -103,6 +121,7 @@ export default defineConfig({
   plugins: [
     kitAliasPlugin(),
     kitElementsAliasPlugin(),
+    kitSharedSourceAliasPlugin(),
     react(),
     tailwindcss(),
     // Session E step 8, i18n scaffolding: `.po` catalog compile-on-
@@ -230,7 +249,7 @@ export default defineConfig({
     // future Home-authored `@/components/*` import with no path to
     // resolve at all, worse than today's real behavior (Home's own
     // `src/components/*`).
-    alias: [{ find: /^@\/(?!kit\/|elements\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
+    alias: [{ find: /^@\/(?!kit\/|elements\/|primitives\/|ui\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
     // `@maipai/ui`'s files resolve outside `frontend/`'s own tree (via
     // `kitAliasPlugin` above, and via the plain `node_modules/@maipai/ui`
     // symlink for its non-`@/kit` imports too) - a real react-in-a-lazy-

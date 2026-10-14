@@ -48,8 +48,9 @@ describe("mapStackJobToHomeJob", () => {
 
 describe("mapModelDownloadStackJob", () => {
   test("names the job after the model and marks it as system-started", () => {
-    const home = mapModelDownloadStackJob(job({ kind: "model.install", input: { model: "qwen-small" } }));
+    const home = mapModelDownloadStackJob(job({ kind: "model.install", input: { model: "qwen-small" }, bytesPerSecond: 128, items: [{ id: "weights", label: "weights.gguf", completedBytes: 4, totalBytes: 10, state: "running" }] }));
     expect(home).toMatchObject({ id: "stack:job-abc123", kind: "model_download", startedBy: "system", forPerson: null, title: "qwen-small", errorKind: null });
+    expect(home.progress).toMatchObject({ bytesPerSecond: 128, items: [{ id: "weights", label: "weights.gguf", completedBytes: 4, totalBytes: 10, state: "running" }] });
     expect(home.provenance).toMatchObject({ producer: "stack", stackJobId: "job-abc123" });
   });
   test("falls back to the job id when the input has no model name", () => {

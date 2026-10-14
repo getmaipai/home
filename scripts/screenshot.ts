@@ -203,6 +203,7 @@ const chatMissingStatesReview = process.argv.includes("--chat-missing-states-rev
 // above the composer for waiting, running and just-finished work, plus the
 // reply's own in-message working state. Desktop and phone, light and dark.
 const activityCardReview = process.argv.includes("--activity-card-review");
+const downloadProgressReview = process.argv.includes("--download-progress-review");
 const chatMissingStatesOutDirArg = process.argv.find((arg) => arg.startsWith("--chat-missing-states-out-dir="))?.split("=", 2)[1];
 const chatMissingStatesOutDir = chatMissingStatesOutDirArg || process.env.MAIPAI_CHAT_MISSING_STATES_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "chat-missing-states");
 const chatListReview = process.argv.includes("--chat-list-review");
@@ -337,7 +338,7 @@ const chatNoticeDegradedReview = process.argv.includes("--chat-notice-degraded-r
 // These focused page reviews need the fixture Stack too: without a
 // configured household engine, the chat composer is correctly disabled.
 const projectPageReview = process.argv.includes("--projects-page-review");
-const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || librarySourcesReview || chatNoticeDegradedReview || notificationsReview;
+const chatPageScreenshotFixture = nextChatReview || regenerateMenuReview || nextChatHistoryReview || nextChatAnswerImages || nextChatSentPictures || nextChatComposerReview || composerLayoutReview || nextChatQueueReview || nextChatQueueEmptyReview || nextChatQueueBeforeReview || showcaseScrollReview || nextChatScrollReview || nextChatAuditReview || chatStreamGlitchReview || chatMissingStatesReview || activityCardReview || downloadProgressReview || projectPageReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview || librarySourcesReview || chatNoticeDegradedReview || notificationsReview;
 // RAIL-01 (owner's layout, 2026-10-06): the app rail, the chat history
 // column, the conversation header, messages and composer, measured.
 const shellNavReview = process.argv.includes("--shell-nav-review");
@@ -6623,6 +6624,61 @@ async function captureNextChatQueueReview(browser: Browser, sessionValue: string
  * database (the producers need engines a capture does not run); everything
  * shown is read back through GET /api/jobs. Also proves the header carries no
  * Running now button and that the composer's Stop ends a streaming reply. */
+async function captureDownloadProgressReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = process.env.MAIPAI_DOWNLOAD_PROGRESS_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "kit-download-progress");
+  mkdirSync(outDir, { recursive: true });
+  const seed = `import { sqlite } from "./src/db/index.ts";
+const now = new Date().toISOString();
+sqlite.query("DELETE FROM model_download_jobs WHERE model_id = 'small-model-fixture'").run();
+sqlite.query("INSERT INTO model_download_jobs (model_id, status, phase, completed_bytes, total_bytes, error, post_load_check, created_at, updated_at) VALUES ('small-model-fixture', 'downloading_model', 'downloading_model', 2100000000, 9400000000, NULL, NULL, ?, ?)").run(now, now);
+sqlite.close();`;
+  const seeded = Bun.spawnSync({ cmd: ["bun", "-e", seed], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+  if (seeded.exitCode !== 0) throw new Error(`download-progress screenshot seed failed with exit code ${seeded.exitCode}`);
+  const viewports = [VIEWPORTS.find((v) => v.slug === "desktop")!, VIEWPORTS.find((v) => v.slug === "phone")!];
+  for (const viewport of viewports) for (const theme of THEMES) {
+    const context = await newContext(browser, viewport, theme, sessionValue);
+    try {
+      const page = await context.newPage();
+      page.setDefaultTimeout(15000);
+      await page.goto(`${BASE_URL}/settings/home/ai`);
+      const settingsProgress = page.locator('[data-slot="job-progress"]');
+      await settingsProgress.waitFor();
+      await page.getByText("2.1 GB of 9.4 GB", { exact: true }).waitFor();
+      await settingsProgress.scrollIntoViewIfNeeded();
+      await settleAnimations(page);
+      const path = join(outDir, `settings-ai-${viewport.width}-${theme}.png`);
+      await page.screenshot({ path });
+      console.log(`Wrote ${path}`);
+      await page.goto(`${BASE_URL}/chat`);
+      await page.locator('[data-slot="job-progress"]').waitFor();
+      await settleAnimations(page);
+      const chatPath = join(outDir, `chat-${viewport.width}-${theme}.png`);
+      await page.screenshot({ path: chatPath });
+      console.log(`Wrote ${chatPath}`);
+    } finally { await context.close(); }
+  }
+  // Show the same seeded pull on the setup away-from-home step, where model
+  // downloads run in the background while the household continues setup.
+  const setupViewport = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const setupContext = await newContext(browser, setupViewport, "light", sessionValue);
+  try {
+    const page = await setupContext.newPage();
+    page.setDefaultTimeout(15000);
+    const now = new Date().toISOString();
+    const steps = ["welcome", "engine_location", "storage", "checks", "plan"].map((id) => ({ id, status: "done", at: now })).concat([{ id: "away", status: "pending", at: now }]);
+    await page.route("**/api/setup/state", (route) => route.fulfill({ json: { id: "download-progress-review", source: "wizard", steps, phase: "away", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: `${Date.now()}:0:progressreview` } }));
+    await page.goto(`${BASE_URL}/setup?downloadProgressReview=1`);
+    await page.getByText("Reach Home from anywhere", { exact: true }).waitFor();
+    const setupProgress = page.locator('[data-slot="job-progress"]');
+    await setupProgress.waitFor();
+    await page.getByText("2.1 GB of 9.4 GB", { exact: true }).waitFor();
+    await settleAnimations(page);
+    const path = join(outDir, "setup-install-strip-1440-light.png");
+    await page.screenshot({ path, fullPage: true });
+    console.log(`Wrote ${path}`);
+  } finally { await setupContext.close(); }
+}
+
 async function captureActivityCardReview(browser: Browser, sessionValue: string): Promise<void> {
   const outDir = process.env.MAIPAI_ACTIVITY_CARD_OUT_DIR || join(ROOT, "data-scratch", "screenshots", "activity-card");
   mkdirSync(outDir, { recursive: true });
@@ -10053,6 +10109,12 @@ async function main() {
     if (activityCardReview) {
       await captureActivityCardReview(browser, sessionValue);
       console.log("completed named review: --activity-card-review");
+      return;
+    }
+
+    if (downloadProgressReview) {
+      await captureDownloadProgressReview(browser, sessionValue);
+      console.log("completed named review: --download-progress-review");
       return;
     }
 

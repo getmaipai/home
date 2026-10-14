@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
@@ -17,6 +18,7 @@ import { describeFitPlan, describeHomeOwnedRoles, fitBadgeWord, fitSourceSentenc
 import type { ComputerMemoryResponse } from "@/lib/api";
 import type { FitPlanResponse } from "@/lib/api";
 import { summarizeFits } from "@/lib/fitSummary";
+import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } from "@/lib/modelDownloadProgress";
 
 // The model-selection wizard, real half (2026-09-04): docs/SETTINGS.md
 // Rule 3 ("One card per role... with the chosen model... and 'change.'
@@ -31,6 +33,7 @@ import { summarizeFits } from "@/lib/fitSummary";
 // flow is wired for it; image/video stay a single honest line, no
 // pros/cons dump, since there's nothing to choose yet.
 export function ModelsSection() {
+  const downloads = useModelDownloadJobs();
   const [computerMemory, setComputerMemory] = useState<ComputerMemoryResponse | null>(null);
   const [hardware, setHardware] = useState<HardwareInfo | null>(null);
   const [chatFits, setChatFits] = useState<ModelFit[] | null>(null);
@@ -68,28 +71,31 @@ export function ModelsSection() {
   const recommendedFit = useFitPlan(recommendedUrl, recommended?.contextUsed);
 
   return (
-    <div className="flex flex-col gap-4">
-      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
-      {hardware === null ? (
-        <Progress mode="spinner" label="Checking this computer" />
-      ) : (
-        <div className="flex flex-col gap-4">
-          <p className="text-base text-[var(--muted-foreground)]">{describeHardware(hardware)}</p>
-          {computerMemory ? <ComputerMemory response={computerMemory} /> : null}
-          <ChatModelCard
-            fits={chatFits}
-            selectedModelId={selectedModelId}
-            stackName={stackChat.name}
-            stackState={stackChat.state}
-            fitPlan={recommendedFit}
-          />
-          <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
-          {recommended ? <ModelComparison recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
-          <PlannedRoleCard title="Image generation" fits={imageFits} />
-          <PlannedRoleCard title="Video generation" fits={videoFits} />
-        </div>
-      )}
-    </div>
+    <>
+      {downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="full" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}
+      <div className="flex flex-col gap-4">
+        {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+        {hardware === null ? (
+          <Progress mode="spinner" label="Checking this computer" />
+        ) : (
+          <div className="flex flex-col gap-4">
+            <p className="text-base text-[var(--muted-foreground)]">{describeHardware(hardware)}</p>
+            {computerMemory ? <ComputerMemory response={computerMemory} /> : null}
+            <ChatModelCard
+              fits={chatFits}
+              selectedModelId={selectedModelId}
+              stackName={stackChat.name}
+              stackState={stackChat.state}
+              fitPlan={recommendedFit}
+            />
+            <CheckModelCard onChecked={(name, response) => setChecked((items) => [{ name, response }, ...items.filter((item) => item.name !== name)].slice(0, 3))} />
+            {recommended ? <ModelComparison recommended={{ name: recommended.model.label, response: recommendedFit.response?.plan ? recommendedFit.response : null }} checked={checked} hardware={hardware} /> : null}
+            <PlannedRoleCard title="Image generation" fits={imageFits} />
+            <PlannedRoleCard title="Video generation" fits={videoFits} />
+          </div>
+        )}
+      </div>
+    </>
   );
 }
 

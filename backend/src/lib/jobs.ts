@@ -157,7 +157,8 @@ export async function listJobsForViewerLive(actor: PersonRow): Promise<Record<st
   const roles = new Map(allPeople.map((person) => [person.id, person.role]));
   const stack = await listStackModelDownloadJobs();
   const projected = stack.map((job) => visibleJobFor(actor, job, roles)).filter((job): job is Record<string, unknown> => job !== null);
-  return [...local.filter((job) => !String(job.id).startsWith("model:")), ...projected].sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
+  const stackWithActions: Record<string, unknown>[] = projected.map((job) => ({ ...job, actions: ["stop"] }));
+  return [...local, ...stackWithActions].sort((a, b) => String(b.updatedAt ?? "").localeCompare(String(a.updatedAt ?? "")));
 }
 
 /** ACTIVITY-01d (UI-STUDY.md 8.4): a child stops only what they started
