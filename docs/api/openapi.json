@@ -4882,6 +4882,14 @@
             "required": true,
             "name": "scope",
             "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "key",
+            "in": "query"
           }
         ],
         "responses": {
@@ -20171,6 +20179,7 @@
                                 "type": "string",
                                 "enum": [
                                   "welcome",
+                                  "backup_key",
                                   "engine_location",
                                   "storage",
                                   "checks",
@@ -20655,6 +20664,7 @@
                                 "type": "string",
                                 "enum": [
                                   "welcome",
+                                  "backup_key",
                                   "engine_location",
                                   "storage",
                                   "checks",
@@ -21443,6 +21453,7 @@
                             "type": "string",
                             "enum": [
                               "welcome",
+                              "backup_key",
                               "engine_location",
                               "storage",
                               "checks",
