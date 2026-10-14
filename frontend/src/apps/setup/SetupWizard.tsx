@@ -5,12 +5,13 @@ import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
-import { Separator } from "@maipai/ui/src/ui/separator";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Separator } from "@maipai/ui/src/ui/separator";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { List } from "@maipai/ui/src/primitives/List";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Badge } from "@maipai/ui/src/ui/badge";
+import heroContent from "@/content/hero.json";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { api, ApiError } from "@/lib/api";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
@@ -43,6 +44,7 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   done: "You're all set",
 };
 const COPY_HOME = "Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.";
+const PRIVACY_COPY = heroContent.find((item) => item.id === "hero.privacy")!.text;
 const DISCLAIMER = "Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.";
 const OWNER_COPY = "You're the owner. You're in charge of this Home: who's in the family, who helps run it, where things are stored, and the backups. Nobody can remove you.";
 const ADMIN_COPY = "Later you can add admins. An admin is a trusted helper, like another parent. They can add apps and look after settings, but they can't change who's in charge, reset Home or bring back a whole backup.";
@@ -276,7 +278,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
 
   let body;
   switch (screen) {
-    case "welcome": body = <Card><CardHeader><img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" width="280" /><CardTitle>Welcome to MaiPai Home</CardTitle><CardDescription>{COPY_HOME}</CardDescription></CardHeader><CardContent><ul><li>Nothing leaves your house.</li><li>No account with us, no subscription, no tracking.</li><li>Kids get their own safe profiles. Parents decide what they can access.</li></ul><Separator /><p>{DISCLAIMER}</p><Button type="button" variant="link" disabled>Restore from a backup</Button><p className="text-sm text-muted-foreground">Restore from a backup is not available in this setup build.</p></CardContent></Card>; break;
+    case "welcome": body = <Card><CardHeader><img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" width="280" /><CardTitle>Welcome to MaiPai Home</CardTitle><CardDescription>{COPY_HOME}</CardDescription></CardHeader><CardContent><div className="flex flex-col gap-3"><p>{PRIVACY_COPY}</p><p>No account with us, no subscription, no tracking.</p><p>Kids get their own safe profiles. Parents decide what they can access.</p><p>{DISCLAIMER}</p><Button type="button" variant="link" disabled>Restore from a backup</Button><p className="text-sm text-muted-foreground">Restore from a backup is not available in this setup build.</p></div></CardContent></Card>; break;
     case "engine_location": body = renderSetupReviewScreen({ screen: "engine_location", engine, onEngineChange: setEngine }); break;
     case "storage": body = renderSetupReviewScreen({ screen: "storage" }); break;
     case "checks": {

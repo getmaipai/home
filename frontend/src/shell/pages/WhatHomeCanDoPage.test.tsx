@@ -25,7 +25,7 @@ describe("WhatHomeCanDoPage", () => {
     const view = render(<WhatHomeCanDoPage />);
     const slides = view.getAllByRole("group", { name: /.+/ });
     expect(slides.map((slide) => slide.getAttribute("aria-label"))).toEqual([
-      "Your own AI at home", "Nothing leaves your house", "Ask it anything", "Safe for the whole family", "Add apps when you want them", "Works when the internet doesn't",
+      "Your own AI at home", "Your chats, people and memories stay in your house", "Ask it anything", "Safe for the whole family", "Add apps when you want them", "Works when the internet doesn't",
     ]);
     expect(view.queryByText("A robot friend"))?.toBeNull();
     expect(view.getByRole("region", { name: "What Home can do" })).toBeTruthy();
