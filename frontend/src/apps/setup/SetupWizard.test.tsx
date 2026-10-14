@@ -1,292 +1,138 @@
-import { describe, expect, test, mock, afterEach, beforeEach } from "bun:test";
-import { render, cleanup, fireEvent, waitFor, act } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
+import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { SetupWizard } from "@/apps/setup/SetupWizard";
-import type { HardwareInfo } from "@/lib/api";
-import { waitForGone } from "../../../tests/waitForGone";
+import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 
 afterEach(cleanup);
+beforeEach(() => { sessionStorage.clear(); });
 
-beforeEach(() => {
-  sessionStorage.clear();
-});
-
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), { status });
+const IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "done"] as const;
+function freshState(): SetupState {
+  const now = new Date().toISOString();
+  return { id: "setup-test", source: "wizard", steps: IDS.map((id) => ({ id, status: "pending", at: now })), phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: "1790000000000:0:abcdef" };
 }
 
-function stubFetch(byPath: Record<string, unknown | (() => Response)>): () => void {
+function harness(initial = freshState()) {
   const original = globalThis.fetch;
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input.toString();
-    const match = Object.entries(byPath).find(([path]) => url.includes(path));
-    if (!match) throw new Error(`unstubbed fetch: ${url}`);
-    const value = match[1];
-    return Promise.resolve(typeof value === "function" ? value() : jsonResponse(value));
+  let state: SetupState | { done: true } = structuredClone(initial);
+  const posts: string[] = [];
+  globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = String(input);
+    if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
+    if (url.includes("/api/setup/ca")) return new Response(JSON.stringify({ certificate: "public" }), { status: 200 });
+    if (url.includes("/api/backups/emergency-kit")) return new Response(JSON.stringify({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "aabb", generatedAt: new Date().toISOString() }), { status: 200 });
+    if (url.includes("/api/auth/setup")) return new Response(JSON.stringify({ person: { id: "owner-1" } }), { status: 201 });
+    const match = url.match(/\/api\/setup\/([^/?]+)$/);
+    if (match && init?.method === "POST" && !("done" in state)) {
+      const id = decodeURIComponent(match[1]!);
+      posts.push(id);
+      const body = JSON.parse(String(init.body)) as { status: SetupState["steps"][number]["status"] };
+      state.steps = state.steps.map((step) => step.id === id ? { ...step, status: body.status, at: new Date().toISOString() } : step);
+      if (id === "done" && body.status === "done") state = { done: true };
+      return new Response(JSON.stringify(state), { status: 200 });
+    }
+    throw new Error(`Unstubbed request ${url}`);
   }) as unknown as typeof fetch;
-  return () => {
-    globalThis.fetch = original;
-  };
+  return { posts, restore: () => { globalThis.fetch = original; } };
 }
 
-// A no-resume-state render checks `/api/auth/profiles` first (the real
-// fix for a code review finding: `/setup` used to be reachable
-// unconditionally even once a household already had an owner) - every
-// test starting cold needs this stubbed, same as a genuinely empty
-// household's first-ever visit.
-function stubFreshHousehold(extra: Record<string, unknown | (() => Response)> = {}): () => void {
-  return stubFetch({ "/api/auth/profiles": [], ...extra });
+function view(onDone = () => {}) {
+  return render(<MemoryRouter initialEntries={["/setup"]}><Routes><Route path="/setup" element={<SetupWizard onDone={onDone} />} /><Route path="/sign-in" element={<p>Sign in</p>} /></Routes></MemoryRouter>);
 }
 
-function renderWizard(onDone: () => void = () => {}) {
-  return render(
-    <MemoryRouter>
-      <SetupWizard onDone={onDone} />
-    </MemoryRouter>,
-  );
-}
-
-const HARDWARE: HardwareInfo = {
-  platform: "darwin",
-  arch: "arm64",
-  totalRamGb: 16,
-  cpuCount: 8,
-  isAppleSilicon: true,
-  unifiedMemoryGb: 16,
-  cudaDevices: [],
-  osVersion: "test",
-};
-
-async function goToOwnerStep(rendered: ReturnType<typeof render>) {
-  await rendered.findByRole("heading", { name: "Household" });
-  await act(async () => {
-    fireEvent.change(rendered.getByPlaceholderText(/household/i), { target: { value: "The Bramble household" } });
-  });
-  await act(async () => {
-    fireEvent.click(rendered.getByRole("button", { name: "Continue" }));
-  });
+async function advanceTo(viewResult: ReturnType<typeof view>, buttonText: string, expected: string) {
+  await act(async () => { fireEvent.click(viewResult.getByRole("button", { name: buttonText })); });
+  await waitFor(() => expect(viewResult.container.textContent).toContain(expected));
 }
 
 describe("SetupWizard", () => {
-  test("the final screen mints the household certificate", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "9");
-    sessionStorage.setItem("maipai:setup-wizard-completed", "9");
-    let mintCalls = 0;
-    const restore = stubFreshHousehold({
-      "/api/setup/ca": () => {
-        mintCalls += 1;
-        return jsonResponse({ certificate: "public CA certificate" });
-      },
-    });
+  test("resumes at the first pending step from server state and ignores browser storage", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    sessionStorage.setItem("maipai:setup-wizard-step", "0");
+    const h = harness(state);
     try {
-      const rendered = renderWizard();
-      await waitFor(() => expect(mintCalls).toBe(1));
-      expect(rendered.getByRole("heading", { name: "Done" })).toBeTruthy();
-    } finally {
-      restore();
-    }
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Here's the plan for your Home"));
+      expect(rendered.container.textContent).not.toContain("What should we call your household");
+    } finally { h.restore(); }
   });
 
-  test("steps run in order: household, then owner", async () => {
-    const restore = stubFreshHousehold();
+  test("a refresh mid-wizard resumes from the server and each visited screen records its step", async () => {
+    const h = harness();
     try {
-      const rendered = renderWizard();
-      await goToOwnerStep(rendered);
-      expect(rendered.getByRole("heading", { name: "Your profile" })).toBeTruthy();
-    } finally {
-      restore();
-    }
+      let rendered = view();
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
+      await advanceTo(rendered, "Set up my Home", "Where should Home's AI run?");
+      expect(h.posts).toEqual(["welcome"]);
+      rendered.unmount();
+      rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Where should Home's AI run?"));
+      await advanceTo(rendered, "Continue", "Where should Home keep its files?");
+      expect(h.posts).toEqual(["welcome", "engine_location"]);
+    } finally { h.restore(); }
   });
 
-  test("Back returns to the previous step without losing what was entered there", async () => {
-    const restore = stubFreshHousehold();
+  test("every visible screen records its step, including deferred work", async () => {
+    const h = harness();
     try {
-      const rendered = renderWizard();
-      await goToOwnerStep(rendered);
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("button", { name: "Back" }));
-      });
-      expect(rendered.getByRole("heading", { name: "Household" })).toBeTruthy();
-      expect((rendered.getByPlaceholderText(/household/i) as HTMLInputElement).value).toBe("The Bramble household");
-    } finally {
-      restore();
-    }
+      const rendered = view();
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
+      await advanceTo(rendered, "Set up my Home", "Where should Home's AI run?");
+      await advanceTo(rendered, "Continue", "Where should Home keep its files?");
+      await advanceTo(rendered, "Continue", "Checking your computers");
+      await advanceTo(rendered, "Continue", "Here's the plan for your Home");
+      await advanceTo(rendered, "Continue", "Reach Home from anywhere");
+      await advanceTo(rendered, "Set up later", "Create your owner account");
+      fireEvent.change(rendered.getByLabelText("Your name"), { target: { value: "Sage" } });
+      fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
+      await advanceTo(rendered, "Continue", "Let Home recognise you");
+      await advanceTo(rendered, "Do this later", "Hello");
+      await advanceTo(rendered, "Continue", "Your Home is ready");
+      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello"]);
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
+      expect(h.posts.at(-1)).toBe("done");
+      await waitFor(() => expect(rendered.container.textContent).toContain("Sign in"));
+    } finally { h.restore(); }
   });
 
-  test("the owner step creates the household, real API call, then advances", async () => {
-    const restore = stubFreshHousehold({ "/api/auth/setup": { person: { id: "p1" } } });
+  test("screen 1 copy matches the note, including the home pitch and disclaimer", async () => {
+    const h = harness();
     try {
-      const rendered = renderWizard();
-      await goToOwnerStep(rendered);
-      await act(async () => {
-        fireEvent.change(rendered.getByPlaceholderText("Your name"), { target: { value: "Sage" } });
-      });
-      await act(async () => {
-        fireEvent.change(rendered.getByPlaceholderText("Choose a PIN or password"), { target: { value: "correcthorse" } });
-      });
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("button", { name: "Continue" }));
-      });
-      await waitFor(() => expect(rendered.getByRole("heading", { name: "Before you start" })).toBeTruthy());
-    } finally {
-      restore();
-    }
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Welcome to MaiPai Home"));
+      expect(rendered.container.textContent).toContain("Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.");
+      expect(rendered.container.textContent).toContain("Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.");
+      const note = await Bun.file("../../home/docs/plans/install-wizard-2026-10-13.md").text();
+      expect(note).toContain("Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.");
+    } finally { h.restore(); }
   });
 
-  test("a failed owner submission shows the error and does not advance", async () => {
-    const restore = stubFreshHousehold({ "/api/auth/setup": () => jsonResponse({ error: "Name taken" }, 400) });
+  test("screen 11 backup and device copy matches the note", async () => {
+    const state = freshState();
+    for (const step of state.steps) if (step.id !== "done") step.status = "done";
+    const h = harness(state);
     try {
-      const rendered = renderWizard();
-      await goToOwnerStep(rendered);
-      await act(async () => {
-        fireEvent.change(rendered.getByPlaceholderText("Your name"), { target: { value: "Sage" } });
-      });
-      await act(async () => {
-        fireEvent.change(rendered.getByPlaceholderText("Choose a PIN or password"), { target: { value: "correcthorse" } });
-      });
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("button", { name: "Continue" }));
-      });
-      await waitFor(() => expect(rendered.getByText("Name taken")).toBeTruthy());
-      expect(rendered.getByRole("heading", { name: "Your profile" })).toBeTruthy();
-    } finally {
-      restore();
-    }
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Your Home is ready"));
+      expect(rendered.container.textContent).toContain("If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.");
+      expect(rendered.container.textContent).toContain("Add a phone or tablet");
+      expect(rendered.container.textContent).toContain("Install Tailscale on it, sign in with the same account, and scan this.");
+    } finally { h.restore(); }
   });
 
-  test("the acknowledgment gate blocks Continue until checked, and is shown only once per browser", async () => {
-    const restore = stubFreshHousehold({ "/api/auth/setup": { person: { id: "p1" } } });
-    try {
-      const rendered = renderWizard();
-      await goToOwnerStep(rendered);
-      await act(async () => {
-        fireEvent.change(rendered.getByPlaceholderText("Your name"), { target: { value: "Sage" } });
-        fireEvent.change(rendered.getByPlaceholderText("Choose a PIN or password"), { target: { value: "correcthorse" } });
-      });
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("button", { name: "Continue" }));
-      });
-      await waitFor(() => expect(rendered.getByRole("heading", { name: "Before you start" })).toBeTruthy());
-
-      const continueButton = rendered.getByRole("button", { name: "Continue" });
-      expect(continueButton.hasAttribute("disabled")).toBe(true);
-
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("checkbox"));
-      });
-      expect(continueButton.hasAttribute("disabled")).toBe(false);
-
-      expect(sessionStorage.getItem("maipai:unrestricted-acknowledged")).not.toBe("true");
-      await act(async () => {
-        fireEvent.click(continueButton);
-      });
-      expect(sessionStorage.getItem("maipai:unrestricted-acknowledged")).toBe("true");
-    } finally {
-      restore();
-    }
-  });
-
-  test("resuming mid-wizard (a reload) starts back on the step reached, with earlier steps marked done", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "2");
-    sessionStorage.setItem("maipai:setup-wizard-completed", "2");
-    const rendered = renderWizard();
-    expect(rendered.getByRole("heading", { name: "Before you start" })).toBeTruthy();
-    // Both earlier steps are done and jumpable.
-    fireEvent.click(rendered.getByRole("button", { name: /Household/ }));
-    expect(rendered.getByRole("heading", { name: "Household" })).toBeTruthy();
-  });
-
-  test("jumping back to review a completed step and reloading does not re-lock later completed steps", async () => {
-    // Simulates: finished through hardware (completed=4), jumped back to
-    // review "Owner" (index 1) - a code review (2026-09-06) found the
-    // original version only ever persisted the resumed index, so a
-    // reload here re-derived completedCount from it (1) instead of from
-    // what had really finished (4), silently re-locking acknowledgment
-    // and hardware.
-    sessionStorage.setItem("maipai:setup-wizard-step", "1");
-    sessionStorage.setItem("maipai:setup-wizard-completed", "4");
-    const rendered = renderWizard();
-    expect(rendered.getByRole("heading", { name: "Your profile" })).toBeTruthy();
-    fireEvent.click(rendered.getByRole("button", { name: /Hardware/ }));
-    expect(rendered.getByRole("heading", { name: "Hardware" })).toBeTruthy();
-  });
-
-  test("the hardware step shows Stack chat state without offering a Home model picker", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "3");
-    const restore = stubFetch({
-      "/api/host/models/selection": { modelId: "stack-model", name: "Stack Chat Model", state: "ready" },
-      "/api/host/hardware": HARDWARE,
-    });
-    try {
-      const rendered = renderWizard();
-      await rendered.findByText(/Apple Silicon/);
-      expect(await rendered.findByText("Stack Chat Model")).toBeTruthy();
-      expect(rendered.getByText(/Chat models are managed through the MaiPai Stack/)).toBeTruthy();
-      expect(rendered.getByText(/Chat state: ready/)).toBeTruthy();
-      expect(rendered.queryByRole("button", { name: "Small Chat Model" })).toBeNull();
-      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  test("the hardware step reports when Stack chat is offline", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "3");
-    const restore = stubFetch({
-      "/api/host/models/selection": { modelId: null, name: null, state: "offline" },
-      "/api/host/hardware": HARDWARE,
-    });
-    try {
-      const rendered = renderWizard();
-      await rendered.findByText(/Apple Silicon/);
-      expect(await rendered.findByText("No chat model is currently selected in the MaiPai Stack")).toBeTruthy();
-      expect(rendered.getByText(/Chat state: offline/)).toBeTruthy();
-      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  test("a not-yet-built step (trust) is skippable and says why, and cannot be completed with Continue", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "4");
-    const rendered = renderWizard();
-    expect(rendered.getByRole("heading", { name: "Trust this hub" })).toBeTruthy();
-    expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
-    await act(async () => {
-      fireEvent.click(rendered.getByRole("button", { name: "Skip - not built yet" }));
-    });
-    expect(rendered.getByRole("heading", { name: "Packages" })).toBeTruthy();
-  });
-
-  test("the done step calls onDone and navigates away, so the app cannot get stuck on /setup", async () => {
-    sessionStorage.setItem("maipai:setup-wizard-step", "9");
-    sessionStorage.setItem("maipai:setup-wizard-completed", "9");
-    const restore = stubFreshHousehold({ "/api/setup/ca": { certificate: "public CA certificate" } });
+  test("after completion the setup route redirects to sign-in", async () => {
+    const state = freshState();
+    for (const step of state.steps) if (step.id !== "done") step.status = "done";
+    const h = harness(state);
     const onDone = mock(() => {});
     try {
-      const rendered = renderWizard(onDone);
-      expect(rendered.getByRole("heading", { name: "Done" })).toBeTruthy();
-      await waitFor(() => expect(rendered.getByRole("button", { name: "Go to MaiPai Home" }).hasAttribute("disabled")).toBe(false));
-      await act(async () => {
-        fireEvent.click(rendered.getByRole("button", { name: "Go to MaiPai Home" }));
-      });
+      const rendered = view(onDone);
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Open my Home" })).toBeTruthy());
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
       expect(onDone).toHaveBeenCalledTimes(1);
-      // Resume state is cleared once the wizard is genuinely finished, so a
-      // later fresh visit to /setup does not resume a done wizard forever.
-      expect(sessionStorage.getItem("maipai:setup-wizard-step")).toBeNull();
-      expect(sessionStorage.getItem("maipai:setup-wizard-completed")).toBeNull();
-    } finally {
-      restore();
-    }
-  });
-
-  test("a fresh visit to /setup with an existing household redirects away instead of re-running setup", async () => {
-    const restore = stubFetch({ "/api/auth/profiles": [{ id: "p1", display_name: "Sage", hasSecret: true }] });
-    try {
-      const rendered = renderWizard();
-      await waitForGone(() => rendered.container.querySelector("h1"));
-    } finally {
-      restore();
-    }
+      await waitFor(() => expect(rendered.container.textContent).toContain("Sign in"));
+    } finally { h.restore(); }
   });
 });

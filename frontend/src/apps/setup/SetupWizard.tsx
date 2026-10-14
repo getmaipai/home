@@ -1,447 +1,222 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
-import { Input } from "@maipai/ui/src/ui/input";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Checkbox } from "@maipai/ui/src/ui/checkbox";
-import { Progress } from "@maipai/ui/src/primitives/Progress";
-import { describeHardware } from "@/apps/settings/ModelsSection";
-import { api, ApiError, type HardwareInfo, type BackupInfo } from "@/lib/api";
+import { Input } from "@maipai/ui/src/ui/input";
+import { Label } from "@maipai/ui/src/ui/label";
+import { Separator } from "@maipai/ui/src/ui/separator";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
+import { api, ApiError } from "@/lib/api";
+import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 
-interface SetupWizardProps {
-  /** Fires once the owner account exists and the wizard is done (or the
-   * person backs all the way out past step 0, though nothing here offers
-   * that once an owner is created - the same "no way to undo the first
-   * person" shape the sign-in page has too). */
-  onDone: () => void;
-}
+interface SetupWizardProps { onDone: () => void }
 
-// Resume-after-reload (platform plan 6.4's Wizard pattern): which step a
-// fresh household has reached, kept client-side only. `GET /api/setup/
-// state`/`POST /api/setup/:step` (docs/plans/wave-2.md's F-to-E contract)
-// is the real, per-household, server-side version of this - not built
-// yet, so this is the mock wave-2.md's own protocol calls for ("build
-// against the contract with a mock until the route lands"). Once it
-// lands, this becomes a thin wrapper around it instead of localStorage.
-const RESUME_KEY = "maipai:setup-wizard-step";
-// Persisted alongside RESUME_KEY, not derived from it: a code review
-// (2026-09-06) found that jumping back to review a completed step (real
-// jump-back UX plan 6.4 asks for - "a check-answers step with Change
-// links") and reloading there re-derived `completedCount` from the
-// resumed index alone, silently re-locking every later step that had
-// already finished (including one, hardware, that had already made a
-// real `POST /api/host/models/:id/select` call).
-const COMPLETED_KEY = "maipai:setup-wizard-completed";
-// The one-time acknowledgment itself (getmaipai/.github/CLAUDE.md > Safety
-// invariants: "never repeated") - also a placeholder, and a more
-// consequential one: nothing server-side reads this key today, so
-// completing this step does not yet gate unrestricted mode on anything.
-// The real, spec-shaped field (on Person or a settings key) is a backend/
-// spec change outside this session's frontend-only ownership - flagged in
-// docs/BACKLOG.md, not silently treated as done.
-const ACKNOWLEDGED_KEY = "maipai:unrestricted-acknowledged";
-
-const STEPS: WizardStep[] = [
-  { id: "household", title: "Household" },
-  { id: "owner", title: "Your profile" },
-  { id: "acknowledgment", title: "Before you start" },
-  { id: "hardware", title: "Hardware" },
-  { id: "trust", title: "Trust this hub" },
-  { id: "packages", title: "Packages" },
-  { id: "remote", title: "Remote access" },
-  { id: "emergency_kit", title: "Emergency kit" },
-  { id: "backup", title: "Backups" },
-  { id: "done", title: "Done" },
+const PHASES: WizardStep[] = [
+  { id: "computers", title: "Your computers" },
+  { id: "away", title: "Away from home" },
+  { id: "meet", title: "Meet your Home" },
 ];
-
-function StepFields({ children }: { children: ReactNode }) {
-  return <div className="flex max-w-md flex-col gap-4">{children}</div>;
-}
-
-function ErrorText({ error }: { error: string | null }) {
-  if (!error) return null;
-  return <p className="text-base text-[var(--destructive)]">{error}</p>;
-}
+const SCREEN_IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "hello", "done"] as const;
+type ScreenId = (typeof SCREEN_IDS)[number];
+const SCREEN_TITLE: Record<ScreenId, string> = {
+  welcome: "Welcome to MaiPai Home",
+  engine_location: "Where should Home's AI run?",
+  storage: "Where should Home keep its files?",
+  checks: "Checking your computers",
+  plan: "Here's the plan for your Home",
+  away: "Reach Home from anywhere",
+  owner: "Create your owner account",
+  face: "Let Home recognise you",
+  hello: "Hello",
+  done: "You're all set",
+};
+const COPY_HOME = "Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.";
+const DISCLAIMER = "Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.";
+const OWNER_COPY = "You're the owner. You're in charge of this Home: who's in the family, who helps run it, where things are stored, and the backups. Nobody can remove you.";
+const ADMIN_COPY = "Later you can add admins. An admin is a trusted helper, like another parent. They can add apps and look after settings, but they can't change who's in charge, reset Home or bring back a whole backup.";
+const stepIsDone = (state: SetupState, id: string) => state.steps.find((step) => step.id === id)?.status === "done";
 
 export function SetupWizard({ onDone }: SetupWizardProps) {
   const navigate = useNavigate();
-  const [stepIndex, setStepIndex] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
+  const [state, setState] = useState<SetupState | null>(null);
+  const [screen, setScreen] = useState<ScreenId>("welcome");
+  const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // A code review (2026-09-06) found `/setup` reachable unconditionally,
-  // with no check for whether the household already has an owner - an
-  // already-signed-in person (or anyone else on the LAN) navigating here
-  // directly could re-run real, mutating steps (select a different
-  // model, run another backup) with no gate at all. `null` while the
-  // check is in flight, so the wizard renders nothing rather than
-  // flashing its first step before redirecting away.
-  const [gateChecked, setGateChecked] = useState(false);
-
-  // Household (step 0) - collected for the "done" screen's own greeting;
-  // not yet persisted anywhere real (no `household.name` setting key
-  // exists today - core settings keys are Session F's ownership, flagged
-  // in docs/BACKLOG.md rather than added here).
-  const [householdName, setHouseholdName] = useState("");
-
-  // Owner (step 1)
+  const [engine, setEngine] = useState<"this_computer" | "another_computer">("this_computer");
   const [ownerName, setOwnerName] = useState("");
   const [ownerSecret, setOwnerSecret] = useState("");
+  const [certificate, setCertificate] = useState<"loading" | "ready" | "error">("loading");
+  const [backupKey, setBackupKey] = useState<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string } | null>(null);
+  const [backupKeyError, setBackupKeyError] = useState(false);
 
-  // Acknowledgment (step 2)
-  const [acknowledged, setAcknowledged] = useState(false);
-
-  // Hardware (step 3)
-  const [hardware, setHardware] = useState<HardwareInfo | null>(null);
-  const [stackChat, setStackChat] = useState<{ name: string | null; state: string }>({ name: null, state: "offline" });
-
-  // Backups (step 8)
-  const [backups, setBackups] = useState<BackupInfo[] | null>(null);
-  const [certificateState, setCertificateState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const refresh = async () => {
+    const result = await api.setupState();
+    if ("done" in result || result.completed_at !== null || stepIsDone(result, "done")) {
+      navigate("/sign-in", { replace: true });
+      return null;
+    }
+    setState(result);
+    const firstPending = result.steps.find((step) => step.status === "pending" || step.status === "running" || step.status === "failed")?.id;
+    // The common new-person profile flow is not built. The plan explicitly
+    // removes screen 9 until it exists, so its server record is not a UI step.
+    const next = firstPending === "profile" ? "hello" : firstPending;
+    if (next && (SCREEN_IDS as readonly string[]).includes(next)) setScreen(next as ScreenId);
+    setEngine(result.engine.where);
+    return result;
+  };
 
   useEffect(() => {
-    const savedStep = sessionStorage.getItem(RESUME_KEY);
-    if (savedStep !== null) {
-      // Actively resuming a wizard run already in progress in this
-      // browser (even one that already created the owner account a few
-      // steps back, so `api.profiles()` below would otherwise look
-      // identical to "setup is long done") - never gated.
-      const saved = Number(savedStep);
-      if (Number.isFinite(saved) && saved > 0 && saved < STEPS.length) setStepIndex(saved);
-      const savedCompleted = Number(sessionStorage.getItem(COMPLETED_KEY) ?? "0");
-      if (Number.isFinite(savedCompleted)) setCompletedCount(savedCompleted);
-      setAcknowledged(sessionStorage.getItem(ACKNOWLEDGED_KEY) === "true");
-      setGateChecked(true);
-      return;
-    }
-    // A fresh visit with no resume state at all: real first-run only if
-    // nobody exists yet. Fail open on a network error (same posture
-    // the sign-in page's profiles load takes) rather than trap a genuine
-    // first-run household behind a spurious redirect.
-    api
-      .profiles()
-      .then((profiles) => {
-        if (profiles.length > 0) navigate("/", { replace: true });
-        else setGateChecked(true);
-      })
-      .catch(() => setGateChecked(true));
+    void refresh().catch(() => setError("Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again.")).finally(() => setLoading(false));
+    // State is loaded once on mount. Every mutation below refreshes it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function goTo(index: number) {
-    setStepIndex(index);
+  useEffect(() => {
+    if (screen !== "done") return;
+    void api.setupCa().then(() => setCertificate("ready"), () => setCertificate("error"));
+    void api.emergencyKit().then((kit) => { setBackupKey(kit); setBackupKeyError(false); }, () => setBackupKeyError(true));
+  }, [screen]);
+
+  async function loadEmergencyKit() {
+    try {
+      const kit = await api.emergencyKit();
+      setBackupKey(kit);
+      setBackupKeyError(false);
+      return kit;
+    } catch {
+      setBackupKeyError(true);
+      return null;
+    }
+  }
+
+  async function downloadEmergencyKit() {
+    const kit = backupKey ?? await loadEmergencyKit();
+    if (!kit) return;
+    const file = `MaiPai Home emergency kit\nHome: ${kit.hubName}\nHome id: ${kit.hubInstanceId}\nBackup key: ${kit.backupKeyHex}\nCreated: ${kit.generatedAt}\n`;
+    const url = URL.createObjectURL(new Blob([file], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "maipai-home-emergency-kit.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function printEmergencyKit() {
+    const popup = window.open("", "maipai-emergency-kit");
+    if (!popup) { setBackupKeyError(true); return; }
+    const kit = backupKey ?? await loadEmergencyKit();
+    if (!kit) { popup.close(); return; }
+    const title = popup.document.createElement("h1");
+    title.textContent = "MaiPai Home emergency kit";
+    const details = popup.document.createElement("p");
+    details.textContent = `Home: ${kit.hubName} · Home id: ${kit.hubInstanceId}`;
+    const key = popup.document.createElement("pre");
+    key.textContent = kit.backupKeyHex;
+    const storage = popup.document.createElement("p");
+    storage.textContent = "Keep this key somewhere other than this computer.";
+    popup.document.body.replaceChildren(title, details, key, storage);
+    popup.document.title = "MaiPai Home emergency kit";
+    popup.focus();
+    popup.print();
+  }
+
+  const phase = screen === "away" ? "away" : screen === "owner" || screen === "face" || screen === "hello" || screen === "done" ? "meet" : "computers";
+  const completedCount = phase === "away" ? 1 : phase === "meet" ? 2 : 0;
+  const pendingThings = state && (stepIsDone(state, "face") || state.steps.find((step) => step.id === "face")?.status === "deferred") ? 1 : 2;
+
+  async function record(id: string, status: "done" | "skipped" | "deferred" = "done") {
+    setBusy(true);
     setError(null);
-    sessionStorage.setItem(RESUME_KEY, String(index));
+    try {
+      const updated = await api.setupStep(id, { status, phase: phaseFor(id) });
+      if (!("done" in updated)) setState(updated);
+      return updated;
+    } catch (reason) {
+      const message = reason instanceof ApiError && reason.status === 409 ? "Home is already set up. Sign in instead." : reason instanceof Error ? reason.message : "Home couldn't save this step. Try again.";
+      setError(message);
+      if (message === "Home is already set up. Sign in instead.") navigate("/sign-in", { replace: true });
+      return null;
+    } finally { setBusy(false); }
   }
 
-  function advance() {
-    const next = Math.max(completedCount, stepIndex + 1);
-    setCompletedCount(next);
-    sessionStorage.setItem(COMPLETED_KEY, String(next));
-    if (stepIndex === STEPS.length - 1) {
-      sessionStorage.removeItem(RESUME_KEY);
-      sessionStorage.removeItem(COMPLETED_KEY);
-      onDone();
-      navigate("/", { replace: true });
-      return;
-    }
-    goTo(stepIndex + 1);
+  async function next() {
+    const deferred = ["storage", "checks", "plan", "away", "hello"].includes(screen) || (screen === "engine_location" && engine === "another_computer");
+    const updated = await record(screen, deferred ? "deferred" : "done");
+    if (!updated) return;
+    if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
+    const index = SCREEN_IDS.indexOf(screen);
+    const following = SCREEN_IDS[index + 1];
+    if (following) setScreen(following);
   }
 
-  async function handleOwnerSubmit() {
-    if (!ownerName.trim() || !ownerSecret) {
-      setError("Enter a name and a PIN or password.");
-      return;
-    }
+  async function defer() {
+    const updated = await record(screen, "deferred");
+    if (!updated) return;
+    if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
+    setScreen(SCREEN_IDS[SCREEN_IDS.indexOf(screen) + 1] ?? "done");
+  }
+
+  async function submitOwner() {
+    if (!ownerName.trim() || !ownerSecret) return;
     setBusy(true);
     setError(null);
     try {
       await api.setup(ownerName.trim(), ownerSecret);
-      advance();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not create the owner profile.");
-    } finally {
-      setBusy(false);
-    }
+      const updated = await api.setupStep("owner", { status: "done", phase: "meet" });
+      setState(updated);
+      setScreen("face");
+    } catch (reason) {
+      const message = reason instanceof ApiError && reason.status === 409 ? "Home is already set up. Sign in instead." : reason instanceof Error ? reason.message : "Home couldn't save your account. Press Continue again.";
+      setError(message);
+      if (message === "Home is already set up. Sign in instead.") navigate("/sign-in", { replace: true });
+    } finally { setBusy(false); }
   }
 
-  async function loadHardwareStep() {
-    setBusy(true);
-    setError(null);
-    try {
-      const [hw, selection] = await Promise.all([api.hardware(), api.modelSelection()]);
-      setHardware(hw);
-      setStackChat({ name: selection.name, state: selection.state });
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not detect hardware.");
-    } finally {
-      setBusy(false);
-    }
+  async function finish() {
+    const updated = await record("done");
+    if (!updated) return;
+    onDone();
+    navigate("/sign-in", { replace: true });
   }
 
-  async function loadBackupsStep() {
-    setBusy(true);
-    setError(null);
-    try {
-      setBackups(await api.backups());
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Could not list backups.");
-    } finally {
-      setBusy(false);
-    }
+  function moveToPhase(id: string) {
+    if (id === "computers") setScreen("welcome");
+    if (id === "away") setScreen("away");
+    if (id === "meet") setScreen("owner");
+  }
+  const back = () => {
+    const index = SCREEN_IDS.indexOf(screen);
+    if (index > 0) setScreen(SCREEN_IDS[index - 1]!);
+  };
+
+  if (loading) return null;
+  if (!state) return <main><Card><CardHeader><CardTitle>Setup progress unavailable</CardTitle></CardHeader><CardContent><p role="alert">{error ?? "Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again."}</p><Button type="button" onClick={() => { setLoading(true); setError(null); void refresh().catch(() => setError("Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again.")).finally(() => setLoading(false)); }}>Try again</Button></CardContent></Card></main>;
+
+  let body;
+  switch (screen) {
+    case "welcome": body = <Card><CardHeader><img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" width="280" /><CardTitle>Welcome to MaiPai Home</CardTitle><CardDescription>{COPY_HOME}</CardDescription></CardHeader><CardContent><ul><li>Nothing leaves your house.</li><li>No account with us, no subscription, no tracking.</li><li>Kids get their own safe profiles. Parents decide what they can access.</li></ul><Separator /><p>{DISCLAIMER}</p><Button type="button" variant="link" disabled>Restore from a backup</Button><p className="text-sm text-muted-foreground">Restore from a backup is not available in this setup build.</p></CardContent></Card>; break;
+    case "engine_location": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><RadioGroup value={engine} onValueChange={(v) => setEngine(v as typeof engine)}><div className="flex items-start gap-3"><RadioGroupItem value="this_computer" id="engine-local" /><div><Label htmlFor="engine-local">This computer</Label><p>Simplest. Home and its AI share this computer.</p></div></div><div className="flex items-start gap-3"><RadioGroupItem value="another_computer" id="engine-remote" /><div><Label htmlFor="engine-remote">Another computer on my network</Label><p>For a bigger computer elsewhere in the house, like a gaming PC or a Mac Studio.</p></div></div></RadioGroup>{engine === "another_computer" ? <p role="status">The engine-link pairing flow is available in Home settings, AI. Pairing and saving an engine link during first-run setup is not supported by the current setup API.</p> : null}</CardContent></Card>; break;
+    case "storage": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle><CardDescription>AI models are big (7 to 10 GB). Pick a disk with room to spare.</CardDescription></CardHeader><CardContent><p>Home's data-location disk picker is not available in this build. No disk has been selected or recorded.</p></CardContent></Card>; break;
+    case "checks": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><p>Setup checks are not built yet. Home has not checked this computer, the engine computer, or the selected disk. Downloads have not started.</p></CardContent></Card>; break;
+    case "plan": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><p>Hardware checks and the Stack's plan recommendations are not built into setup yet. No plan has been installed or selected.</p></CardContent></Card>; break;
+    case "away": body = <Card><CardHeader><CardTitle>Reach Home from anywhere</CardTitle><CardDescription>Tailscale connects your family's devices to Home away from home.</CardDescription></CardHeader><CardContent><p>The Tailscale setup and status checks are not built yet. Home has not contacted Tailscale or enabled remote access.</p><p>Set up later. Home works only at home until then.</p><p className="text-sm text-muted-foreground">You can finish this later in Home settings.</p></CardContent></Card>; break;
+    case "owner": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><Card><CardHeader><CardTitle>Owner or admin?</CardTitle></CardHeader><CardContent><p>{OWNER_COPY}</p><p>{ADMIN_COPY}</p></CardContent></Card><Separator /><form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void submitOwner(); }}><Label htmlFor="owner-name">Your name</Label><Input id="owner-name" value={ownerName} onChange={(event) => setOwnerName(event.target.value)} autoComplete="name" /><Label htmlFor="owner-secret">PIN or password</Label><Input id="owner-secret" type="password" inputMode="numeric" value={ownerSecret} onChange={(event) => setOwnerSecret(event.target.value)} autoComplete="new-password" /><p className="text-sm text-muted-foreground">You'll use this to sign in and to change Home's settings.</p>{error ? <p role="alert">{error}</p> : null}</form></CardContent></Card>; break;
+    case "face": body = <Card><CardHeader><CardTitle>Let Home recognise you</CardTitle><CardDescription>Home can greet you by face. Your face is stored as numbers on this computer only.</CardDescription></CardHeader><CardContent><p>Face enrollment is available from your profile after setup.</p></CardContent></Card>; break;
+    case "hello": body = <Card><CardHeader><CardTitle>Hello</CardTitle></CardHeader><CardContent><p>The first greeting is not built yet. No greeting has been generated.</p></CardContent></Card>; break;
+    case "done": body = <Card><CardHeader><CardTitle>Your Home is ready</CardTitle><CardDescription>Try these first:</CardDescription></CardHeader><CardContent><ul><li>Ask Home a question</li><li>Add your family</li><li>Add apps</li></ul><Separator /><div><h2>Save your backup key</h2><p>If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.</p><Button type="button" variant="secondary" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button><Button type="button" variant="secondary" disabled={!backupKey} onClick={() => void printEmergencyKit()}>Print</Button>{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</div><Separator /><div><h2>Add a phone or tablet</h2><p>Install Tailscale on it, sign in with the same account, and scan this.</p><p>Phone setup and secure address QR codes are not available yet.</p></div><p>{pendingThings} things left to finish setting up. You'll find them in Home settings.</p>{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
-  async function runBackupNow() {
-    setBusy(true);
-    setError(null);
-    try {
-      const created = await api.runBackup();
-      setBackups((prev) => [created, ...(prev ?? [])]);
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "Backup failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
+  const phaseStep = PHASES.find((item) => item.id === phase)!.id;
+  const screenIndex = SCREEN_IDS.indexOf(screen);
+  const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "away" ? "Set up later" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : "Continue"} nextDisabled={screen === "owner" && (!ownerName.trim() || !ownerSecret)} busy={busy || (screen === "done" && certificate === "loading")} phaseMode>{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+}
 
-  async function mintHouseholdCertificate() {
-    setCertificateState("loading");
-    try {
-      // The existing CA route returns the installable authority and also
-      // mints the leaf certificate. On this final screen that brings up
-      // HTTPS for other devices without interrupting localhost HTTP.
-      await api.setupCa();
-      setCertificateState("ready");
-    } catch {
-      setCertificateState("error");
-    }
-  }
-
-  const currentId = STEPS[stepIndex]?.id;
-
-  useEffect(() => {
-    if (currentId === "hardware" && hardware === null) void loadHardwareStep();
-    if (currentId === "backup" && backups === null) void loadBackupsStep();
-    if (currentId === "done" && certificateState === "idle") void mintHouseholdCertificate();
-    // Only when the step is first reached, not on every busy/error change.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentId]);
-
-  // Every hook above must run unconditionally on every render (React's
-  // rules of hooks); this is the first point it's safe to bail out -
-  // rendering nothing while the "does an owner already exist" check is
-  // in flight, rather than flashing the wizard's first step before a
-  // redirect lands.
-  if (!gateChecked) return null;
-
-  function submitOnEnter(handler: () => void) {
-    return (e: FormEvent) => {
-      e.preventDefault();
-      handler();
-    };
-  }
-
-  let content: ReactNode;
-  let onNext = advance;
-  let nextDisabled = false;
-  let skipLabel: string | undefined;
-  let onSkip: (() => void) | undefined;
-
-  switch (currentId) {
-    case "household":
-      content = (
-        <form onSubmit={submitOnEnter(advance)}>
-          <StepFields>
-            <p className="text-base text-muted-foreground">What should we call your household? You can change this later.</p>
-            <Input placeholder="e.g. The Bramble household" value={householdName} onChange={(e) => setHouseholdName(e.target.value)} />
-          </StepFields>
-        </form>
-      );
-      nextDisabled = householdName.trim() === "";
-      break;
-
-    case "owner":
-      content = (
-        <form onSubmit={submitOnEnter(() => void handleOwnerSubmit())}>
-          <StepFields>
-            <p className="text-base text-muted-foreground">
-              Create your own profile. You'll be the household's owner, with full access to settings and everyone else's account.
-            </p>
-            <Input placeholder="Your name" value={ownerName} onChange={(e) => setOwnerName(e.target.value)} />
-            <Input type="password" placeholder="Choose a PIN or password" value={ownerSecret} onChange={(e) => setOwnerSecret(e.target.value)} />
-            <ErrorText error={error} />
-          </StepFields>
-        </form>
-      );
-      onNext = () => void handleOwnerSubmit();
-      nextDisabled = !ownerName.trim() || !ownerSecret;
-      break;
-
-    case "acknowledgment":
-      content = (
-        <StepFields>
-          <p className="text-base text-muted-foreground">
-            MaiPai's answers come from AI models you choose to download. They can be wrong, offensive, or harmful, and are never
-            medical, legal, or professional advice - you're responsible for how you and your household use them.
-          </p>
-          <p className="text-base text-muted-foreground">
-            As the owner, you can unlock unrestricted mode for your own account later in Settings: it answers without the
-            filters kid profiles always keep, and what you do with it is your own responsibility. This is a one-time notice -
-            you won't see it again.
-          </p>
-          <div className="flex items-start gap-2 text-base">
-            <Checkbox
-              id="acknowledge-unrestricted"
-              checked={acknowledged}
-              onCheckedChange={(v) => setAcknowledged(v === true)}
-            />
-            <label htmlFor="acknowledge-unrestricted">I understand and agree.</label>
-          </div>
-        </StepFields>
-      );
-      onNext = () => {
-        sessionStorage.setItem(ACKNOWLEDGED_KEY, "true");
-        advance();
-      };
-      nextDisabled = !acknowledged;
-      break;
-
-    case "hardware": {
-      content = (
-        <StepFields>
-          {busy && !hardware ? (
-            <Progress mode="spinner" label="Detecting hardware" />
-          ) : hardware ? (
-            <>
-              <p className="text-base text-muted-foreground">{describeHardware(hardware)}</p>
-              <p className="text-base font-medium">{stackChat.name ?? "No chat model is currently selected in the MaiPai Stack"}</p>
-              <p className="text-base text-muted-foreground">Chat models are managed through the MaiPai Stack. Chat state: {stackChat.state}.</p>
-            </>
-          ) : null}
-          <ErrorText error={error} />
-        </StepFields>
-      );
-      nextDisabled = false;
-      break;
-    }
-
-    case "trust":
-      content = (
-        <StepFields>
-          <p className="text-base text-muted-foreground">
-            MaiPai Home can secure connections on your home network with its own certificate, so other devices trust it with no
-            browser warning. This step isn't built yet - you can set it up later once it's ready.
-          </p>
-        </StepFields>
-      );
-      skipLabel = "Skip - not built yet";
-      onSkip = advance;
-      nextDisabled = true;
-      break;
-
-    case "packages":
-      content = (
-        <StepFields>
-          <p className="text-base text-muted-foreground">
-            MaiPai comes with a default set of apps and skills. The package store isn't built yet - once it is, you'll be able
-            to browse and choose what your household uses here.
-          </p>
-        </StepFields>
-      );
-      skipLabel = "Skip - set this up later";
-      onSkip = advance;
-      nextDisabled = true;
-      break;
-
-    case "remote":
-      content = (
-        <StepFields>
-          <p className="text-base text-muted-foreground">
-            You can optionally set up secure remote access to your hub away from home. This isn't built yet - skip it for now.
-          </p>
-        </StepFields>
-      );
-      skipLabel = "Skip - not built yet";
-      onSkip = advance;
-      nextDisabled = true;
-      break;
-
-    case "emergency_kit":
-      content = (
-        <StepFields>
-          <p className="text-base text-muted-foreground">
-            Once backups are set up, MaiPai will give you an emergency kit: a printable page with the key to restore your
-            household's data if this hub is ever lost. That page isn't generated yet - you'll see it for real once backups are
-            configured in the next step.
-          </p>
-        </StepFields>
-      );
-      break;
-
-    case "backup":
-      content = (
-        <StepFields>
-          {busy && backups === null ? (
-            <Progress mode="spinner" label="Checking backups" />
-          ) : (
-            <>
-              <p className="text-base text-muted-foreground">
-                {backups && backups.length > 0
-                  ? `${backups.length} backup${backups.length === 1 ? "" : "s"} saved on this hub.`
-                  : "No backups yet. Run one now, then set a schedule later in Settings."}
-              </p>
-              <Button type="button" variant="outline" onClick={() => void runBackupNow()} disabled={busy} className="self-start">
-                {busy ? "Backing up…" : "Run a backup now"}
-              </Button>
-              <ErrorText error={error} />
-            </>
-          )}
-        </StepFields>
-      );
-      break;
-
-    case "done":
-      content = (
-        <StepFields>
-          <p className="text-base text-muted-foreground">
-            {householdName.trim() ? `Welcome to ${householdName.trim()}.` : "You're all set."} Here's what to try first:
-          </p>
-          <ul className="list-inside list-disc text-base text-muted-foreground">
-            <li>Ask MaiPai something from the Home screen</li>
-            <li>Add the rest of your household under People</li>
-            <li>Check Health to see everything is running well</li>
-          </ul>
-          {certificateState === "loading" ? <Progress mode="spinner" label="Preparing secure connections" /> : null}
-          {certificateState === "error" ? (
-            <>
-              <ErrorText error="Home couldn't make the certificate for your other devices. Try again, or open Home settings, Repairs to fix it." />
-              <Button type="button" variant="outline" onClick={() => void mintHouseholdCertificate()}>Try again</Button>
-            </>
-          ) : null}
-        </StepFields>
-      );
-      nextDisabled = certificateState === "loading";
-      break;
-
-    default:
-      content = null;
-  }
-
-  return (
-    <Wizard
-      steps={STEPS}
-      currentStepId={currentId ?? "household"}
-      completedCount={completedCount}
-      onJumpTo={(id) => goTo(STEPS.findIndex((s) => s.id === id))}
-      onBack={stepIndex > 0 ? () => goTo(stepIndex - 1) : undefined}
-      onNext={onNext}
-      nextDisabled={nextDisabled}
-      nextLabel={currentId === "done" ? "Go to MaiPai Home" : "Continue"}
-      skipLabel={skipLabel}
-      onSkip={onSkip}
-      busy={busy || certificateState === "loading"}
-    >
-      {content}
-    </Wizard>
-  );
+function phaseFor(id: string): SetupState["phase"] {
+  if (id === "done") return "done";
+  if (id === "away") return "away";
+  if (["owner", "face", "profile", "hello"].includes(id)) return "meet";
+  return "computers";
 }

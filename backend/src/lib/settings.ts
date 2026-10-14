@@ -174,6 +174,11 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       break;
     case "select": {
       const options = range?.options as unknown[] | undefined;
+      // Dynamic option sets can be empty during first-run setup (for
+      // example, before any chat model is installed). Their declared
+      // default sentinel remains a valid choice while the live options
+      // are unavailable.
+      if (range?.options_from && value === keyDef.default) break;
       if (range?.multiple === true) {
         const labels = (keyDef.copy as { option_labels?: Record<string, string> } | undefined)?.option_labels;
         // SEARCH-SOURCES-01: a multi-select stores a list of the declared options, each at most once.

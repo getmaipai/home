@@ -17,6 +17,7 @@ import type { Relationship } from "@maipai/spec/gen/ts/relationship.js";
 import type { TurnArtifact } from "@maipai/spec/gen/ts/turn-artifact.js";
 import type { Artifact } from "@maipai/spec/gen/ts/artifact.js";
 import type { Project } from "@maipai/spec/gen/ts/project.js";
+import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { Share } from "@maipai/spec/gen/ts/share.js";
 import type { SttStatusResponse } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -642,6 +643,12 @@ export interface HomeJobView {
 }
 
 export const api = {
+  setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
+  setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"] }) =>
+    request<SetupState>(`/api/setup/${encodeURIComponent(step)}`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    }),
   profiles: () => request<Roster[]>("/api/auth/profiles"),
   setup: (displayName: string, secret: string) =>
     request<{ person: unknown }>("/api/auth/setup", {
@@ -649,6 +656,7 @@ export const api = {
       body: JSON.stringify({ displayName, secret }),
     }),
   setupCa: () => request<{ certificate: string }>("/api/setup/ca"),
+  emergencyKit: () => request<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string }>("/api/backups/emergency-kit"),
   select: (personId: string) =>
     request<{ success: true }>("/api/auth/select", {
       method: "POST",

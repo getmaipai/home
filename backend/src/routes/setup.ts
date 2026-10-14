@@ -85,34 +85,7 @@ const setupStepRoute = createRoute({
     409: { content: { "application/json": { schema: SetupErrorSchema } }, description: "Setup is closed or a prerequisite is incomplete." },
   },
 });
-setupRoutes.openapi(setupStepRoute, (c) => {
-  const rawStep = c.req.valid("param").step;
-  const parsedStep = SetupStepIdSchema.safeParse(rawStep);
-  if (!parsedStep.success) {
-    return c.json({ error: "Unknown setup step.", next: "Use one of the documented setup step ids." }, 400);
-  }
-  const step = parsedStep.data as SetupStepId;
-  const body = c.req.valid("json");
-  const anyone = db.select({ id: people.id }).from(people).limit(1).get();
-  if (anyone && PRE_OWNER_STEPS.has(step)) {
-    return c.json({ error: "Home is already set up. Sign in instead.", next: "Sign in to continue." }, 409);
-  }
-  if (anyone || step === "owner") {
-    const token = getCookie(c, "session");
-    const person = token ? resolveHumanSession(token) : null;
-    if (!person) return c.json({ error: "Sign in as the owner to continue setup.", next: "Sign in with the owner account." }, 401);
-    if (person.role !== "owner") return c.json({ error: "Only the owner can continue setup.", next: "Sign in with the owner account." }, 403);
-  }
-  if (step === "checks") {
-    const state = getSetupState();
-    const answered = (id: SetupStepId) => state.steps.some((entry) => entry.id === id && entry.status === "done");
-    if (!answered("engine_location") || !answered("storage")) {
-      return c.json({ error: "The engine location and storage questions are not both complete.", next: "Complete engine_location and storage before checks." }, 409);
-    }
-  }
-  const updated = replaceSetupStep(step, body);
-  return c.json(updated, 200);
-});
+
 
 // Public (unauthenticated) by design, the same reason GET /api/auth/profiles
 // is: a household member trusting the hub's CA is exactly the step that
@@ -259,4 +232,35 @@ setupRoutes.openapi(hardwareRoute, async (c) => {
     },
     200,
   );
+});
+
+// Register the parameter route after the fixed setup paths so `/hardware`
+// reaches its dedicated handler instead of being parsed as a setup step.
+setupRoutes.openapi(setupStepRoute, (c) => {
+  const rawStep = c.req.valid("param").step;
+  const parsedStep = SetupStepIdSchema.safeParse(rawStep);
+  if (!parsedStep.success) {
+    return c.json({ error: "Unknown setup step.", next: "Use one of the documented setup step ids." }, 400);
+  }
+  const step = parsedStep.data as SetupStepId;
+  const body = c.req.valid("json");
+  const anyone = db.select({ id: people.id }).from(people).limit(1).get();
+  if (anyone && PRE_OWNER_STEPS.has(step)) {
+    return c.json({ error: "Home is already set up. Sign in instead.", next: "Sign in to continue." }, 409);
+  }
+  if (anyone || step === "owner") {
+    const token = getCookie(c, "session");
+    const person = token ? resolveHumanSession(token) : null;
+    if (!person) return c.json({ error: "Sign in as the owner to continue setup.", next: "Sign in with the owner account." }, 401);
+    if (person.role !== "owner") return c.json({ error: "Only the owner can continue setup.", next: "Sign in with the owner account." }, 403);
+  }
+  if (step === "checks") {
+    const state = getSetupState();
+    const answered = (id: SetupStepId) => state.steps.some((entry) => entry.id === id && entry.status === "done");
+    if (!answered("engine_location") || !answered("storage")) {
+      return c.json({ error: "The engine location and storage questions are not both complete.", next: "Complete engine_location and storage before checks." }, 409);
+    }
+  }
+  const updated = replaceSetupStep(step, body);
+  return c.json(updated, 200);
 });
