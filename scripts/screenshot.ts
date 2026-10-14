@@ -94,6 +94,7 @@ const useWebkit = process.argv.includes("--webkit");
 const useFirefox = process.argv.includes("--firefox") || process.env.BROWSER?.toLowerCase() === "firefox";
 const chatIncognitoAudit = process.argv.includes("--chat-incognito-audit");
 const setupChecksReview = process.argv.includes("--setup-checks-review");
+const voiceBrowserReview = process.argv.includes("--voice-browser-review");
 const setupReviewCaptures = process.argv.includes("--setup-review-captures");
 // MOBILE-LIVE-01: `bun run screenshots --mobile-smoke` - sign in and walk
 // every main-menu item at 390x844 with touch; see scripts/mobileSmoke.ts.
@@ -4494,6 +4495,43 @@ async function captureChatListReview(browser: Browser, sessionValue: string): Pr
       } finally {
         await context.close();
       }
+    }
+  }
+}
+
+/** VOICE-BROWSER-01B: real Settings > Voices page, with a deterministic
+ * Stack response matching the seeded Stack's current preset-only,
+ * unknown-metadata catalog. The community row makes the source filter
+ * visibly narrow the table in every capture. */
+async function captureVoiceBrowserReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "docs", "assets", "screens");
+  mkdirSync(outDir, { recursive: true });
+  const fixture = [
+    { id: "voice-alba", name: "Alba", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "preset", onDisk: true, licence: null, revision: "" },
+    { id: "voice-community", name: "Community voice", description: "unknown", language: "unknown", country: "unknown", gender: "unknown", source: "community", onDisk: true, licence: null, revision: "" },
+  ];
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+        await page.route("**/api/voice/voices", (route) => route.fulfill({ json: { voices: fixture } }));
+        await page.goto(`${BASE_URL}/settings/home/voices`);
+        const rows = page.locator(slug === "phone" ? "[data-slot='data-table-cards']" : "[data-slot='data-table-body']");
+        await rows.getByText("Alba", { exact: true }).first().waitFor();
+        const sourceFilter = page.getByRole("combobox", { name: "Filter by source" });
+        await sourceFilter.click();
+        await page.getByRole("option", { name: "preset", exact: true }).click();
+        await rows.getByText("Alba", { exact: true }).first().waitFor();
+        if (await rows.getByText("Community voice", { exact: true }).count()) throw new Error("source filter did not narrow voice rows");
+        await settleAnimations(page);
+        const file = `voice-browser-${slug}-${theme}.png`;
+        await page.screenshot({ path: join(outDir, file), fullPage: true });
+        console.log(`Wrote ${join(outDir, file)}`);
+        dedicatedScreenshots.push({ file, route: "/settings/home/voices", viewport: slug, theme });
+      } finally { await context.close(); }
     }
   }
 }
@@ -9831,6 +9869,11 @@ async function main() {
       for (const finding of result.findings) console.error(`mobile-smoke FAIL [${finding.step}] ${finding.kind}: ${finding.detail}`);
       if (result.findings.length > 0) throw new Error(`mobile-smoke: ${result.findings.length} finding(s)`);
       console.log("completed named review: --mobile-smoke");
+      return;
+    }
+    if (voiceBrowserReview) {
+      await captureVoiceBrowserReview(browser, sessionValue);
+      console.log("completed named review: --voice-browser-review");
       return;
     }
     if (traceReview) {

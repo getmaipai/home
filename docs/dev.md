@@ -36848,6 +36848,12 @@ Verdict: not shipped, working tree reverted. The 40 percent token bar is not met
 - Screen: `useEase` (`frontend/src/shell/useEase.ts`, pure part in `easeResolve.ts`) resolves `preset` against `@maipai/spec/ease/presets.json` and sets `data-ease-text|spacing|targets|contrast|motion` on `<html>`. The card is drawn from the spec's `profile.ease` group; no Home component.
 - Open: ui-v0.5.199 lacks the generated token CSS and the rail change (only the generator and its test are in the tag), so the attributes are set and nothing yet reacts. The kit row cannot show a lock or a "Large + N changes" summary.
 - Captures: `bun run scripts/screenshotEase.ts` (phone, 320 reflow, desktop, Standard and Large).
+
+## VOICE-BROWSER-01B (2026-10-14)
+
+The Settings > Voices browser reads `GET /api/voice/voices` and the signed-in person's resolved `tts.voice_id` options/value. It shows unknown metadata as “unknown”, searches names, and filters language, country, gender and source. The filters are kit `Select`s in the `DataTable` toolbar because the shipped kit has no filter-column part; `DataTable` supplies its toolbar and row-action slots. “Use this voice” writes only through the person's existing settings write and appears for selectable presets when the resolved setting is unlocked. Children see preset rows only. Household Settings > Voices reuses the browser above its existing catalog section.
+
+The screenshot fixture models the current Stack response: preset voices with unknown description, language, country and gender. Captures: `bun run screenshots --voice-browser-review`.
 # Setup preview
 
 From `frontend/`, run `bun run setup:preview`. This starts Vite with

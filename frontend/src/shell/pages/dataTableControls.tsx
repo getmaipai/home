@@ -17,6 +17,7 @@ export function useDataTableControls<Row extends Record<string, unknown>>(
   sourceRows: readonly Row[],
   columns: readonly DataTableColumn<Row>[],
   emptyMessage = "No data available.",
+  searchColumnIds?: readonly string[],
 ) {
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<DataTableSort | null>(null);
@@ -31,11 +32,11 @@ export function useDataTableControls<Row extends Record<string, unknown>>(
     const query = search.trim().toLocaleLowerCase();
     if (!query) return [...sourceRows];
     return sourceRows.filter((row) =>
-      columns.some((column) =>
+      columns.filter((column) => !searchColumnIds || searchColumnIds.includes(column.id)).some((column) =>
         String(row[column.id] ?? "").toLocaleLowerCase().includes(query),
       ),
     );
-  }, [columns, search, sourceRows]);
+  }, [columns, search, searchColumnIds, sourceRows]);
   const sortedRows = useMemo(() => {
     if (!sort) return filteredRows;
     return [...filteredRows].sort((left, right) => {
@@ -137,5 +138,5 @@ export function useDataTableControls<Row extends Record<string, unknown>>(
     </div>
   );
 
-  return { columns: tableColumns, rows, sort, onSortChange: changeSort, toolbar, emptyLabel };
+  return { columns: tableColumns, rows, sort, onSortChange: changeSort, toolbar, emptyLabel, search, onSearchChange: changeSearch };
 }

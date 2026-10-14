@@ -2,6 +2,7 @@ import { CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/ca
 import { getIcon } from "@maipai/ui/src/icons";
 import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
 import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
+import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { useTabItem } from "@/shell/tabIdentity";
 import type { Roster } from "@/lib/api";
 
@@ -16,6 +17,7 @@ export function VoicesPage({ person }: { person: Roster }) {
       <CardHeader>
         <CardTitle><VoicesIcon size={16} className="mr-2 inline text-muted-foreground" />Voices</CardTitle>
       </CardHeader>
+      <VoiceBrowserSection person={person} />
       <VoiceCatalogSection personId={person.id} />
       <ClonedVoicesSection person={person} />
     </div>
