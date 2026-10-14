@@ -8,7 +8,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { beginEnrollment, verifyEnrollment, verifyTotp, isTotpEnabled, disableTotp } from "@/lib/totp";
-import { issueSession } from "@/lib/session";
+import { issueSession, sessionSignInSource } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
 import { db } from "@/db";
@@ -70,7 +70,7 @@ totpRoutes.openapi(challengeRoute, (c) => {
   }
   throttleReset(ip);
   clearFailedAttempts(personId);
-  issueSession(c, personId);
+  issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const }, 200);
 });
 

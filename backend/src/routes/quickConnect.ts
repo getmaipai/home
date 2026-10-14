@@ -5,7 +5,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { issueSession } from "@/lib/session";
+import { issueSession, sessionSignInSource } from "@/lib/session";
 import { issueDeviceToken } from "@/lib/deviceTokens";
 import { createQuickConnect, approveQuickConnect, consumeQuickConnect, isQuickConnectPending } from "@/lib/quickConnect";
 import { isTotpEnabled, verifyTotp } from "@/lib/totp";
@@ -110,7 +110,7 @@ quickConnectRoutes.openapi(pollRoute, (c) => {
     // Connect request. A robot only ever gets a device_token from here;
     // it must redeem it like any other native client (POST
     // /api/auth/devices/redeem), which is where the rotation gate lives.
-    if (approved.kind !== "robot") issueSession(c, approved.personId);
+    if (approved.kind !== "robot") issueSession(c, approved.personId, sessionSignInSource(c));
     const { token, expiresAt } = issueDeviceToken(approved.personId, approved.kind, approved.label, approved.capabilities);
     return c.json({ status: "approved" as const, device_token: token, expires_at: expiresAt }, 200);
   }

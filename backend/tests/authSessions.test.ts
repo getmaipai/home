@@ -34,6 +34,31 @@ describe("GET /api/auth/sessions", () => {
   });
 });
 
+describe("GET /api/auth/sessions/away", () => {
+  test("an admin asking for another person's away sessions is refused", async () => {
+    const admin = new TestClient();
+    const setup = await admin.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const { person } = await setup.json() as { person: { id: string } };
+    const created = await admin.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    await admin.post("/api/auth/verify-secret", { personId: person.id, secret: "correcthorse" }, { host: "home.ts.net", origin: "https://home.ts.net" });
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+
+    expect((await admin.get(`/api/auth/sessions/away?personId=${child.id}`)).status).toBe(403);
+    const adminRows = (await (await admin.get("/api/auth/sessions/away")).json()) as Array<{ id: string }>;
+    expect(adminRows).toHaveLength(1);
+    const childRows = (await (await childClient.get("/api/auth/sessions/away")).json()) as unknown[];
+    expect(childRows).toHaveLength(0);
+  });
+
+  test("returns an empty list when this person has no away sessions", async () => {
+    const client = new TestClient();
+    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    expect(await (await client.get("/api/auth/sessions/away")).json()).toEqual([]);
+  });
+});
+
 describe("DELETE /api/auth/sessions/:id", () => {
   test("revokes my own session - it stops authenticating immediately", async () => {
     const client = new TestClient();
@@ -48,9 +73,15 @@ describe("DELETE /api/auth/sessions/:id", () => {
   });
 
   test("404 for a session that isn't mine", async () => {
-    const client = new TestClient();
-    await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
-    const res = await client.request("/api/auth/sessions/session-doesnotexist", { method: "DELETE" });
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const childClient = new TestClient();
+    await childClient.post("/api/auth/select", { personId: child.id });
+    const [childSession] = (await (await childClient.get("/api/auth/sessions")).json()) as Array<{ id: string }>;
+    const res = await owner.request(`/api/auth/sessions/${childSession!.id}`, { method: "DELETE" });
     expect(res.status).toBe(404);
+    expect((await (await childClient.get("/api/auth/sessions")).json() as unknown[])).toHaveLength(1);
   });
 });

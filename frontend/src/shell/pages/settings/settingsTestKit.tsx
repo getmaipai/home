@@ -65,6 +65,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     // ENGINES-AI-01: Engines and AI now draws the engines console and the model list as its trail view, so the
     // fixture answers what those read (an unconfigured Stack and a small Mac) instead of the bare "{}" below.
     const route = url.split("?")[0]!;
+    if (route.endsWith("/api/auth/sessions/away")) return Promise.resolve(Response.json([]));
     if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));

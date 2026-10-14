@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
+import { AwaySessionsSection } from "@/apps/settings/AwaySessionsSection";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
 import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearanceControl";
@@ -35,6 +36,7 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
           <ProfileForm person={person} canEdit layout="page" onSaved={async (_saved: PersonRosterEntry) => { await Promise.all([queryClient.invalidateQueries({ queryKey: ["people"] }), onPersonChange()]); }} />
         </CardContent>
       </Card>
+      <AwaySessionsSection />
       {canViewFaceEnrollment(person, person) ? <Card><FaceEnrollmentBody profile={person} viewer={person} /></Card> : null}
     </>
   );

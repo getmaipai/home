@@ -731,6 +731,7 @@ export const api = {
   confirmEngineLinkHostKey: (check_code: string) => request<{ paired: boolean }>("/api/engine-link/host-key/confirm", { method: "POST", body: JSON.stringify({ check_code }) }),
   revokeEngineLink: () => request<{ paired: false }>("/api/engine-link/credentials", { method: "DELETE" }),
   sessions: () => request<SessionInfo[]>("/api/auth/sessions"),
+  awaySessions: () => request<SessionInfo[]>("/api/auth/sessions/away"),
   revokeSession: (id: string) =>
     request<{ success: true }>(`/api/auth/sessions/${encodeURIComponent(id)}`, { method: "DELETE" }),
   // GET /api/conversations/turns, not the bare /api/conversations - a

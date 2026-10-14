@@ -1,5 +1,6 @@
 import { sqliteTable, text, integer, real, blob, primaryKey, index, uniqueIndex, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
+import type { SessionSignInSource } from "@maipai/spec/gen/ts/session-sign-in-source.js";
 import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
@@ -78,6 +79,7 @@ export const sessions = sqliteTable("sessions", {
   userAgent: text("user_agent"),
   expiresAt: text("expires_at").notNull(),
   createdAt: text("created_at").notNull(),
+  signInSource: text("sign_in_source").$type<SessionSignInSource>().notNull().default("local"),
   // FACE-03: which device this session was issued to at redeem time
   // (routes/deviceAuth.ts, lib/session.ts's issueSession()), so a
   // robot's session is distinguishable from its pairing admin's

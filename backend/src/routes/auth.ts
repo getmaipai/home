@@ -16,7 +16,7 @@ import { db, sqlite } from "@/db";
 import { people, personCredentials, passkeyCredentials, sessions } from "@/db/schema";
 import { requiresCredential, getAuthMethods, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { isTotpEnabled } from "@/lib/totp";
-import { hashSessionToken, issueSession } from "@/lib/session";
+import { hashSessionToken, issueSession, sessionSignInSource } from "@/lib/session";
 import { hashSecret, verifySecret } from "@/lib/secret";
 import { recordFailedAttempt, clearFailedAttempts, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
@@ -206,7 +206,7 @@ auth.openapi(setupRoute, async (c) => {
   });
   if (!created) return c.json({ error: "Setup already completed" }, 409);
 
-  issueSession(c, id);
+  issueSession(c, id, sessionSignInSource(c));
   return c.json({ person: candidate.data }, 201);
 });
 
@@ -247,7 +247,7 @@ auth.openapi(selectRoute, (c) => {
     return c.json({ error: "This profile needs its PIN, password, or passkey" }, 400);
   }
 
-  issueSession(c, personId);
+  issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const }, 200);
 });
 
@@ -304,7 +304,7 @@ auth.openapi(verifySecretRoute, async (c) => {
   // session once the code checks out.
   if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true }, 200);
 
-  issueSession(c, personId);
+  issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const, totpRequired: false }, 200);
 });
 

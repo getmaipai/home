@@ -4,6 +4,9 @@ import { lt } from "drizzle-orm";
 import { randomBytes, createHash } from "node:crypto";
 import { db } from "@/db";
 import { sessions } from "@/db/schema";
+import { SessionSignInSource } from "@maipai/spec/gen/ts/session-sign-in-source.js";
+import type { SessionSignInSource as SessionSignInSourceType } from "@maipai/spec/gen/ts/session-sign-in-source.js";
+import { isTailscaleRequest } from "@/lib/tailscale";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import type { AppEnv } from "@/types";
 
@@ -23,13 +26,18 @@ export function sessionExpiresAt(): Date {
   return new Date(Date.now() + SESSION_LIFETIME_MS);
 }
 
+/** Select provenance from the server's observed request and redemption path. */
+export function sessionSignInSource(c: Context<AppEnv>, deviceId?: string | null): SessionSignInSourceType {
+  return SessionSignInSource.parse(deviceId ? "paired_device" : isTailscaleRequest(c) ? "away" : "local");
+}
+
 /** Sessions past expiry just stop authenticating; sweep them so the table
  * doesn't grow unbounded. Call from a boot/scheduled sweep. */
 export function pruneExpiredSessions() {
   return db.delete(sessions).where(lt(sessions.expiresAt, new Date().toISOString()));
 }
 
-export function issueSession(c: Context<AppEnv>, personId: string, deviceId?: string | null): void {
+export function issueSession(c: Context<AppEnv>, personId: string, source: SessionSignInSourceType, deviceId?: string | null): void {
   const token = generateSessionToken();
   const expiresAt = sessionExpiresAt();
 
@@ -45,6 +53,7 @@ export function issueSession(c: Context<AppEnv>, personId: string, deviceId?: st
       // redeem (routes/deviceAuth.ts) - null for a plain PIN/password/
       // passkey sign-in, same as the column's own default.
       deviceId: deviceId ?? null,
+      signInSource: SessionSignInSource.parse(source),
     })
     .run();
 

@@ -5,7 +5,7 @@
 // is its device token, not whichever short-lived session cookie it
 // currently holds.
 import { createRoute, z } from "@hono/zod-openapi";
-import { eq, and } from "drizzle-orm";
+import { eq, and, gt } from "drizzle-orm";
 import { getCookie } from "hono/cookie";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
@@ -49,6 +49,36 @@ authSessionsRoutes.openapi(listRoute, (c) => {
     })),
     200,
   );
+});
+
+const awayListRoute = createRoute({
+  method: "get",
+  path: "/away",
+  tags: ["Sessions"],
+  summary: "My own active sessions signed in from away",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.array(SessionSchema) } }, description: "Only the signed-in person's active away sessions." },
+    403: { content: { "application/json": { schema: z.object({ error: z.string() }) } }, description: "A session list cannot be requested for another person." },
+  },
+});
+authSessionsRoutes.openapi(awayListRoute, (c) => {
+  if (c.req.query("personId")) return c.json({ error: "You can only view your own sessions." }, 403);
+  const actor = c.get("person");
+  const currentToken = getCookie(c, "session");
+  const currentHash = currentToken ? hashSessionToken(currentToken) : null;
+  const rows = db.select().from(sessions).where(and(
+    eq(sessions.personId, actor.id),
+    eq(sessions.signInSource, "away"),
+    gt(sessions.expiresAt, new Date().toISOString()),
+  )).all();
+  return c.json(rows.map((r) => ({
+    id: r.id,
+    userAgent: r.userAgent,
+    createdAt: r.createdAt,
+    expiresAt: r.expiresAt,
+    isCurrent: r.tokenHash === currentHash,
+  })), 200);
 });
 
 const deleteRoute = createRoute({

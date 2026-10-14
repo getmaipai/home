@@ -22820,6 +22820,72 @@
         }
       }
     },
+    "/api/auth/sessions/away": {
+      "get": {
+        "tags": [
+          "Sessions"
+        ],
+        "summary": "My own active sessions signed in from away",
+        "responses": {
+          "200": {
+            "description": "Only the signed-in person's active away sessions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "userAgent": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "expiresAt": {
+                        "type": "string"
+                      },
+                      "isCurrent": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "userAgent",
+                      "createdAt",
+                      "expiresAt",
+                      "isCurrent"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "A session list cannot be requested for another person.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/auth/sessions/{id}": {
       "delete": {
         "tags": [

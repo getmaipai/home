@@ -11,7 +11,7 @@ import { requireAuth } from "@/middleware/auth";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
-import { issueSession } from "@/lib/session";
+import { issueSession, sessionSignInSource } from "@/lib/session";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { tryConsume } from "@/lib/rateLimiter";
 import { recordFailedAttempt, clearFailedAttempts, ensureCredentialRowExists, currentLockout, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
@@ -200,6 +200,6 @@ passkeysRoutes.openapi(authVerifyRoute, async (c) => {
   clearFailedAttempts(personId);
 
   if (isTotpEnabled(personId)) return c.json({ success: true as const, totpRequired: true }, 200);
-  issueSession(c, personId);
+  issueSession(c, personId, sessionSignInSource(c));
   return c.json({ success: true as const, totpRequired: false }, 200);
 });

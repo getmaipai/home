@@ -16,6 +16,16 @@ import { encryptSecret, decryptSecret } from "@/lib/secrets";
 const execFileAsync = promisify(execFile);
 const TAILSCALE_APP_STORE_CLI = "/Applications/Tailscale.app/Contents/MacOS/Tailscale";
 
+/** Home's away listener is identified by its Tailscale MagicDNS Host name. */
+export function isTailscaleRequest(c: { req: { header(name: string): string | undefined } }): boolean {
+  const host = c.req.header("host")?.split(":")[0]?.replace(/\.$/, "").toLowerCase();
+  if (!host) return false;
+  if (host.endsWith(".ts.net")) return true;
+  const parts = host.split(".").map(Number);
+  return parts.length === 4 && parts.every((part) => Number.isInteger(part) && part >= 0 && part <= 255)
+    && parts[0] === 100 && parts[1]! >= 64 && parts[1]! <= 127;
+}
+
 function tailscaleBinary(): string {
   return process.platform === "darwin" && existsSync(TAILSCALE_APP_STORE_CLI) ? TAILSCALE_APP_STORE_CLI : "tailscale";
 }

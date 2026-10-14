@@ -24,7 +24,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { eq, and, isNull } from "drizzle-orm";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { issueSession } from "@/lib/session";
+import { issueSession, sessionSignInSource } from "@/lib/session";
 import { redeemDeviceToken } from "@/lib/deviceTokens";
 import { getDeviceById } from "@/lib/devices";
 import { hasRotatedRobotCredential } from "@/lib/robotCredentials";
@@ -83,6 +83,6 @@ deviceAuthRoutes.openapi(redeemRoute, (c) => {
     );
   }
 
-  issueSession(c, redeemed.personId, redeemed.deviceId);
+  issueSession(c, redeemed.personId, sessionSignInSource(c, redeemed.deviceId), redeemed.deviceId);
   return c.json({ success: true as const }, 200);
 });
