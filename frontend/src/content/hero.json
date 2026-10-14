@@ -1,0 +1,73 @@
+[
+  {
+    "id": "hero.home",
+    "image": "maipai-home-logo-light.png",
+    "heading": "Your own AI at home",
+    "copy_ref": "home",
+    "copy_source": "copy:home",
+    "teaches": "What Home is",
+    "audience": "all",
+    "order": 0
+  },
+  {
+    "id": "hero.privacy",
+    "image": "maipai-home-icon-light.png",
+    "heading": "Nothing leaves your house",
+    "text": "What your family says, asks and makes stays in your house. No account with us, and nothing is tracked.",
+    "copy_source": "proposed",
+    "teaches": "Privacy promise",
+    "audience": "all",
+    "order": 1
+  },
+  {
+    "id": "hero.try",
+    "image": "maipai-brand-icon.png",
+    "heading": "Ask it anything",
+    "text": "Try \"What can you do?\" or \"What's a quick dinner with eggs and rice?\" when Home says hello.",
+    "copy_source": "proposed",
+    "teaches": "What to try first",
+    "audience": "all",
+    "order": 2
+  },
+  {
+    "id": "hero.kids",
+    "image": "maipai-brand-logo-light.png",
+    "heading": "Safe for the whole family",
+    "text": "Everyone gets their own profile. Kids get gentle answers by default, and parents decide what kids can access.",
+    "copy_source": "proposed",
+    "teaches": "Kids' protections",
+    "audience": "all",
+    "order": 3
+  },
+  {
+    "id": "hero.apps",
+    "image": "maipai-ecosystem.png",
+    "heading": "Add apps when you want them",
+    "copy_ref": "catalog",
+    "copy_source": "copy:catalog",
+    "teaches": "How to add apps",
+    "audience": "all",
+    "order": 4
+  },
+  {
+    "id": "hero.offline",
+    "image": "maipai-stack-icon-light.png",
+    "heading": "Works when the internet doesn't",
+    "text": "Chat and voice run in your house, so they keep working when your internet is down.",
+    "copy_source": "proposed",
+    "teaches": "Offline",
+    "audience": "all",
+    "order": 5
+  },
+  {
+    "id": "hero.bot",
+    "image": "maipai-bot-logo-light.png",
+    "heading": "Meet MaiPai Bot",
+    "copy_ref": "bot",
+    "copy_source": "copy:bot",
+    "teaches": "The robot, once it ships",
+    "audience": "all",
+    "available_when": "robot-package",
+    "order": 6
+  }
+]
