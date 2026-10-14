@@ -37,9 +37,12 @@ interface Stub {
   pending?: PendingRestore | null;
   stageStatus?: number;
   stageError?: string;
+  emergencyKitStatus?: number;
+  emergencyKitSavedAt?: string | null;
+  settingsStatus?: number;
 }
 
-function stubApi({ pending = null, stageStatus = 200, stageError }: Stub = {}) {
+function stubApi({ pending = null, stageStatus = 200, stageError, emergencyKitStatus = 200, emergencyKitSavedAt = null, settingsStatus = 200 }: Stub = {}) {
   const calls: string[] = [];
   const original = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
@@ -51,7 +54,19 @@ function stubApi({ pending = null, stageStatus = 200, stageError }: Stub = {}) {
     if (url.includes("/restore/cancel")) {
       return Promise.resolve(new Response(JSON.stringify({ cancelled: true }), { status: 200 }));
     }
-    if (url.includes("/restore")) {
+    if (url === "/api/backups/emergency-kit" && (init?.method ?? "GET") === "GET") {
+      if (emergencyKitStatus !== 200) return Promise.resolve(new Response(JSON.stringify({ error: "failure" }), { status: emergencyKitStatus }));
+      return Promise.resolve(new Response(JSON.stringify({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "secret-backup-key", generatedAt: "2026-10-13T10:00:00.000Z" }), { status: 200 }));
+    }
+    if (url === "/api/settings" && init?.method === "PUT") {
+      const body = JSON.parse(String(init.body)) as { value: string };
+      if (body.value === "secret-backup-key") throw new Error("the key must not be stored in the completion fact");
+      return Promise.resolve(new Response(JSON.stringify({ key: "backups.emergency_kit_saved_at", value: body.value }), { status: settingsStatus }));
+    }
+    if (url.includes("/api/settings?scope=household")) {
+      return Promise.resolve(new Response(JSON.stringify([{ key: "backups.emergency_kit_saved_at", value: emergencyKitSavedAt }]), { status: settingsStatus }));
+    }
+    if (url.endsWith("/restore")) {
       if (stageStatus !== 200) {
         return Promise.resolve(new Response(JSON.stringify({ error: stageError }), { status: stageStatus }));
       }
@@ -182,6 +197,111 @@ describe("restoring a backup", () => {
       await findByText(/4(\.0)? KB|4096/);
       expect(queryByRole("button", { name: /Restore the backup from/ })).toBeNull();
     } finally {
+      restore();
+    }
+  });
+});
+
+describe("emergency backup key", () => {
+  test("the owner can download the key file and save the completion fact", async () => {
+    const { calls, restore } = stubApi();
+    const createObjectURL = URL.createObjectURL;
+    const revokeObjectURL = URL.revokeObjectURL;
+    const click = HTMLAnchorElement.prototype.click;
+    let downloadedText = "";
+    URL.createObjectURL = mock((blob: Blob) => {
+      void blob.text().then((text) => { downloadedText = text; });
+      return "blob:test";
+    }) as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = mock(() => {}) as unknown as typeof URL.revokeObjectURL;
+    HTMLAnchorElement.prototype.click = mock(() => {});
+    try {
+      const { findByRole, findByText } = render(<BackupsSection person={makePerson("owner")} />);
+      fireEvent.click(await findByRole("button", { name: "Download" }));
+      await waitFor(() => expect(downloadedText).toContain("secret-backup-key"));
+      expect(downloadedText).toContain("Hub: Home");
+      expect(downloadedText).toContain("Hub ID: hub-1");
+      expect(downloadedText).toContain("Backup key: secret-backup-key");
+      expect(downloadedText).not.toContain("generatedAt");
+      await waitFor(() => expect(calls.some((call) => call.startsWith("PUT") && call.includes("/api/settings"))).toBe(true));
+      expect(await findByText(/Saved on/)).toBeInTheDocument();
+    } finally {
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = revokeObjectURL;
+      HTMLAnchorElement.prototype.click = click;
+      restore();
+    }
+  });
+
+  test("an admin sees no emergency key row", async () => {
+    const { restore } = stubApi();
+    try {
+      const { findByText, queryByRole } = render(<BackupsSection person={makePerson("admin")} />);
+      await findByText(/Back up now/);
+      expect(queryByRole("button", { name: "Download" })).toBeNull();
+      expect(queryByRole("button", { name: "Print" })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a failed emergency key fetch shows the plan text and does not save the fact", async () => {
+    const { calls, restore } = stubApi({ emergencyKitStatus: 500 });
+    try {
+      const { findByRole, findByText } = render(<BackupsSection person={makePerson("owner")} />);
+      fireEvent.click(await findByRole("button", { name: "Download" }));
+      expect(await findByText(/Home couldn't make your backup key\. Press Download again\./)).toBeInTheDocument();
+      expect(calls.some((call) => call.startsWith("PUT"))).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
+  test("printing saves the completion fact only after print succeeds", async () => {
+    const { calls, restore } = stubApi();
+    const originalOpen = window.open;
+    const print = window.print;
+    window.open = mock(() => ({ document: { write: () => {}, close: () => {} }, focus: () => {}, print: () => {} })) as unknown as typeof window.open;
+    window.print = mock(() => {});
+    try {
+      const { findByRole } = render(<BackupsSection person={makePerson("owner")} />);
+      fireEvent.click(await findByRole("button", { name: "Print" }));
+      await waitFor(() => expect(calls.some((call) => call.startsWith("PUT"))).toBe(true));
+    } finally {
+      window.open = originalOpen;
+      window.print = print;
+      restore();
+    }
+  });
+
+  test("the row displays the household completion date already saved", async () => {
+    const { restore } = stubApi({ emergencyKitSavedAt: "2026-10-10T12:00:00.000Z" });
+    try {
+      const { findByText, queryByText } = render(<BackupsSection person={makePerson("owner")} />);
+      expect(await findByText(/Saved on/)).toBeInTheDocument();
+      expect(queryByText(/If this computer breaks/)).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a failed completion-fact write does not show the saved date", async () => {
+    const { restore } = stubApi({ emergencyKitSavedAt: null, settingsStatus: 500 });
+    const createObjectURL = URL.createObjectURL;
+    const revokeObjectURL = URL.revokeObjectURL;
+    const click = HTMLAnchorElement.prototype.click;
+    URL.createObjectURL = mock(() => "blob:test") as unknown as typeof URL.createObjectURL;
+    URL.revokeObjectURL = mock(() => {}) as unknown as typeof URL.revokeObjectURL;
+    HTMLAnchorElement.prototype.click = mock(() => {});
+    try {
+      const { findByRole, findByText, queryByText } = render(<BackupsSection person={makePerson("owner")} />);
+      fireEvent.click(await findByRole("button", { name: "Download" }));
+      expect(await findByText(/Home couldn't make your backup key/)).toBeInTheDocument();
+      expect(queryByText(/Saved on/)).toBeNull();
+    } finally {
+      URL.createObjectURL = createObjectURL;
+      URL.revokeObjectURL = revokeObjectURL;
+      HTMLAnchorElement.prototype.click = click;
       restore();
     }
   });

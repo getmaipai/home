@@ -9,6 +9,87 @@ interface BackupsSectionProps {
   person: Roster;
 }
 
+const EMERGENCY_KIT_SAVED_KEY = "backups.emergency_kit_saved_at";
+const EMERGENCY_KIT_ERROR = "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.";
+
+function EmergencyBackupKeyRow() {
+  const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    api.settingsValues("household").then((values) => {
+      const value = values.find((entry) => entry.key === EMERGENCY_KIT_SAVED_KEY)?.value;
+      setSavedAt(typeof value === "string" ? value : null);
+    }).catch(() => setSavedAt(null));
+  }, []);
+
+  async function saveFact(): Promise<void> {
+    const date = new Date().toISOString();
+    await api.setSetting("household", EMERGENCY_KIT_SAVED_KEY, date);
+    setSavedAt(date);
+  }
+
+  function kitContents(kit: Awaited<ReturnType<typeof api.emergencyKit>>): string {
+    return `MaiPai Home emergency backup key\n\nHub: ${kit.hubName}\nHub ID: ${kit.hubInstanceId}\nBackup key: ${kit.backupKeyHex}\n`;
+  }
+
+  async function download(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const kit = await api.emergencyKit();
+      const url = URL.createObjectURL(new Blob([kitContents(kit)], { type: "text/plain;charset=utf-8" }));
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = "maipai-home-emergency-backup-key.txt";
+      anchor.click();
+      URL.revokeObjectURL(url);
+      await saveFact();
+    } catch {
+      setError(EMERGENCY_KIT_ERROR);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function print(): Promise<void> {
+    setBusy(true);
+    setError(null);
+    try {
+      const kit = await api.emergencyKit();
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) throw new Error("Printing is unavailable");
+      const escaped = kitContents(kit).replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+      printWindow.document.write(`<pre>${escaped}</pre>`);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+      await saveFact();
+    } catch {
+      setError(EMERGENCY_KIT_ERROR);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div>
+      <p className="text-base font-medium">Save your backup key</p>
+      {savedAt ? (
+        <p className="text-base text-[var(--muted-foreground)]">Saved on {whenText(savedAt)}</p>
+      ) : (
+        <p className="text-base text-[var(--muted-foreground)]">If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.</p>
+      )}
+      {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" onClick={download} disabled={busy}>Download</Button>
+        <Button variant="secondary" onClick={print} disabled={busy}>Print</Button>
+      </div>
+    </div>
+  );
+}
+
 function whenText(iso: string): string {
   return new Date(iso).toLocaleString();
 }
@@ -110,6 +191,10 @@ export function BackupsSection({ person }: BackupsSectionProps) {
   return (
     <Section heading="Backups">
       {error ? <p className="text-base text-[var(--destructive)]">{error}</p> : null}
+
+      {canRestore ? (
+        <EmergencyBackupKeyRow />
+      ) : null}
 
       {pending ? (
         <div className="flex flex-col gap-2 rounded-[var(--radius)] border border-[var(--primary)] p-3">

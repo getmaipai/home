@@ -9,6 +9,12 @@ import { getSettingsAreas } from "@/lib/settingsAreas";
 import { SPEC_DIR } from "@/lib/specDir";
 
 describe("settings registry and the spec's areas", () => {
+  test("the emergency key completion fact is household-scoped and contains no key material", () => {
+    const key = getRegistry().find((entry) => entry.key === "backups.emergency_kit_saved_at");
+    expect(key).toMatchObject({ scope: "household", selector: "text", default: null, secret: false });
+    expect(key?.help).toContain("key itself is never stored");
+  });
+
   test("every key's group is the one the pinned spec's keys.json carries", () => {
     const spec = JSON.parse(readFileSync(join(SPEC_DIR, "settings", "keys.json"), "utf-8")) as { key: string; scope: string; lives_in: string }[];
     const home = new Map(getRegistry().map((k) => [`${k.scope}:${k.key}`, k.lives_in]));

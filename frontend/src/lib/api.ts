@@ -850,6 +850,7 @@ export const api = {
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
   settingsValues: (scope: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),
+  emergencyKit: () => request<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string }>("/api/backups/emergency-kit"),
   setSetting: (scope: string, key: string, value: unknown) =>
     request<ResolvedSetting>("/api/settings", {
       method: "PUT",
