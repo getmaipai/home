@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Button } from "@maipai/ui/src/ui/button";
-import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Separator } from "@maipai/ui/src/ui/separator";
@@ -17,6 +16,7 @@ import { api, ApiError } from "@/lib/api";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } from "@/lib/modelDownloadProgress";
 import { SetupPreviewBar } from "./preview/SetupPreviewBar";
+import { NewPersonForm } from "@/apps/people/NewPersonForm";
 
 interface SetupWizardProps { onDone: () => void; initialScreen?: ScreenId }
 
@@ -71,6 +71,7 @@ export function renderSetupReviewScreen({ screen, engine = "this_computer", onEn
 }
 
 export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
+  const ownerFormRef = useRef<HTMLFormElement>(null);
   const navigate = useNavigate();
   const downloads = useModelDownloadJobs();
   const [state, setState] = useState<SetupState | null>(null);
@@ -79,8 +80,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [engine, setEngine] = useState<"this_computer" | "another_computer">("this_computer");
-  const [ownerName, setOwnerName] = useState("");
-  const [ownerSecret, setOwnerSecret] = useState("");
+  const [ownerName] = useState("");
+  const [ownerSecret] = useState("");
   const [certificate, setCertificate] = useState<"loading" | "ready" | "error">("loading");
   const [backupKey, setBackupKey] = useState<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string } | null>(null);
   const [backupKeyError, setBackupKeyError] = useState(false);
@@ -219,12 +220,12 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     setScreen(SCREEN_IDS[SCREEN_IDS.indexOf(screen) + 1] ?? "done");
   }
 
-  async function submitOwner() {
-    if (!ownerName.trim() || !ownerSecret) return;
+  async function submitOwner(name = ownerName, secret = ownerSecret) {
+    if (!name.trim() || !secret) return;
     setBusy(true);
     setError(null);
     try {
-      await api.setup(ownerName.trim(), ownerSecret);
+      await api.setup(name.trim(), secret);
       const updated = await api.setupStep("owner", { status: "done", phase: "meet" });
       setState(updated);
       setScreen("face");
@@ -298,7 +299,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
     case "plan": body = renderSetupReviewScreen({ screen: "plan", searchCandidate, onChooseSearchCandidate: () => void chooseSearchCandidate(), searchError, busy }); break;
     case "away": body = <Card><CardHeader><CardTitle>Reach Home from anywhere</CardTitle><CardDescription>Tailscale connects your family's devices to Home away from home.</CardDescription></CardHeader><CardContent><p>The Tailscale setup and status checks are not built yet. Home has not contacted Tailscale or enabled remote access.</p><p>Set up later. Home works only at home until then.</p><p className="text-sm text-muted-foreground">You can finish this later in Home settings.</p></CardContent></Card>; break;
-    case "owner": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><Card><CardHeader><CardTitle>Owner or admin?</CardTitle></CardHeader><CardContent><p>{OWNER_COPY}</p><p>{ADMIN_COPY}</p></CardContent></Card><Separator /><form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void submitOwner(); }}><Label htmlFor="owner-name">Your name</Label><Input id="owner-name" value={ownerName} onChange={(event) => setOwnerName(event.target.value)} autoComplete="name" /><Label htmlFor="owner-secret">PIN or password</Label><Input id="owner-secret" type="password" inputMode="numeric" value={ownerSecret} onChange={(event) => setOwnerSecret(event.target.value)} autoComplete="new-password" /><p className="text-sm text-muted-foreground">You'll use this to sign in and to change Home's settings.</p>{error ? <p role="alert">{error}</p> : null}</form></CardContent></Card>; break;
+    case "owner": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><Card><CardHeader><CardTitle>Owner or admin?</CardTitle></CardHeader><CardContent><p>{OWNER_COPY}</p><p>{ADMIN_COPY}</p></CardContent></Card><Separator /><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} /></CardContent></Card>; break;
     case "face": body = <Card><CardHeader><CardTitle>Let Home recognise you</CardTitle><CardDescription>Home can greet you by face. Your face is stored as numbers on this computer only.</CardDescription></CardHeader><CardContent><p>Face enrollment is available from your profile after setup.</p></CardContent></Card>; break;
     case "hello": body = <Card><CardHeader><CardTitle>Hello</CardTitle></CardHeader><CardContent><p>The first greeting is not built yet. No greeting has been generated.</p></CardContent></Card>; break;
     case "done": body = <Card><CardHeader><CardTitle>Your Home is ready</CardTitle><CardDescription>Try these first:</CardDescription></CardHeader><CardContent><ul><li>Ask Home a question</li><li>Add your family</li><li>Add apps</li></ul><Separator /><div><h2>Save your backup key</h2><p>If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.</p><Button type="button" variant="secondary" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button><Button type="button" variant="secondary" disabled={!backupKey} onClick={() => void printEmergencyKit()}>Print</Button>{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</div><Separator /><div><h2>Add a phone or tablet</h2><p>Install Tailscale on it, sign in with the same account, and scan this.</p><p>Phone setup and secure address QR codes are not available yet.</p></div><p>{pendingThings} things left to finish setting up. You'll find them in Home settings.</p>{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
@@ -308,7 +309,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const screenIndex = SCREEN_IDS.indexOf(screen);
   const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
   const previewBanner = window.__setupPreview ? <SetupPreviewBar currentScreen={screenIndex + 1} onJump={(index) => setScreen(SCREEN_IDS[Math.max(0, Math.min(SCREEN_IDS.length - 1, index))]!)} /> : undefined;
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "away" ? "Set up later" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" && (!ownerName.trim() || !ownerSecret) || screen === "checks" && (checksFetching || !!checkRows?.some((row) => row.state === "red") || !!checkRows?.every((row) => row.state === "green" || row.state === "idle"))} busy={busy || (screen === "done" && certificate === "loading")} phaseMode banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : void submit()} nextLabel={screen === "welcome" ? "Set up my Home" : screen === "away" ? "Set up later" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "checks" && (checksFetching || !!checkRows?.some((row) => row.state === "red") || !!checkRows?.every((row) => row.state === "green" || row.state === "idle"))} busy={busy || (screen === "done" && certificate === "loading")} phaseMode banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {

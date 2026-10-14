@@ -50,6 +50,21 @@ export function creatableRoles(actorRole: Role): Role[] {
   return CREATABLE_BY[actorRole] ?? [];
 }
 
+export type NewPersonRole = Exclude<Role, "admin">;
+export interface RoleAdminChoice {
+  role: NewPersonRole;
+  admin: boolean;
+}
+
+export function roleAdminToServerRole({ role, admin }: RoleAdminChoice): Role {
+  return role === "owner" ? "owner" : role === "adult" && admin ? "admin" : role;
+}
+
+export function serverRoleToRoleAdmin(role: Role): RoleAdminChoice {
+  if (role === "admin") return { role: "adult", admin: true };
+  return { role, admin: role === "owner" };
+}
+
 export function canManagePeople(actorRole: Role): boolean {
   return creatableRoles(actorRole).length > 0;
 }

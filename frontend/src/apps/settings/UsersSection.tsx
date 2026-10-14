@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Section } from "@maipai/ui/src/primitives/Section";
 import { List } from "@maipai/ui/src/primitives/List";
@@ -11,8 +11,9 @@ import { Checkbox } from "@maipai/ui/src/ui/checkbox";
 import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { SiteBlocksSection } from "./SiteBlocksSection";
+import { NewPersonForm, type NewPersonValues } from "@/apps/people/NewPersonForm";
 import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
-import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles, requiresSecret } from "@/apps/people/roles";
+import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles } from "@/apps/people/roles";
 
 interface UsersSectionProps {
   person: Roster;
@@ -41,9 +42,6 @@ export function UsersSection({ person }: UsersSectionProps) {
     return queryClient.invalidateQueries({ queryKey: ["people"] });
   }
 
-  const [displayName, setDisplayName] = useState("");
-  const [role, setRole] = useState<Role>("adult");
-  const [secret, setSecret] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -75,8 +73,6 @@ export function UsersSection({ person }: UsersSectionProps) {
   // `canManage ? ... : []`/`canManage &&` branches below were dead,
   // unreachable-false conditionals left over from when this rendered for
   // every role inline on PeoplePage.tsx.
-  const roleOptions = creatableRoles(actorRole);
-
   const deletable = (roster ?? []).filter((p) =>
     canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }),
   );
@@ -88,23 +84,21 @@ export function UsersSection({ person }: UsersSectionProps) {
     setConfirmingDelete(null);
   }
 
-  async function handleAdd(e: FormEvent) {
-    e.preventDefault();
+  async function handleAdd(values: NewPersonValues) {
     setFormError(null);
     setSubmitting(true);
     try {
       await api.createPerson({
-        displayName,
-        role,
-        secret: requiresSecret(role) ? secret : undefined,
+        displayName: values.displayName,
+        role: values.role,
+        secret: values.secret,
       });
-      setDisplayName("");
-      setSecret("");
       await invalidateRoster();
     } catch (err) {
       setFormError(err instanceof ApiError && /profile requires a secret/i.test(err.message)
         ? "This role requires a PIN or password. Enter one above, then try again."
         : err instanceof ApiError ? err.message : "Could not add that person.");
+      throw err;
     } finally {
       setSubmitting(false);
     }
@@ -389,44 +383,7 @@ export function UsersSection({ person }: UsersSectionProps) {
       ) : null}
 
       <Section heading="Add someone">
-        <form onSubmit={handleAdd} className="flex max-w-sm flex-col gap-3">
-          <Input
-            placeholder="Name"
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-            disabled={submitting}
-            required
-          />
-          <Select
-            value={role}
-            onValueChange={(v) => setRole(v as Role)}
-            options={roleOptions}
-            getLabel={(v) => ROLE_LABELS[v as Role]}
-            disabled={submitting}
-            aria-label="Role"
-          />
-          {requiresSecret(role) ? (
-            <>
-              <label className="flex flex-col gap-1 text-sm">
-                <span>PIN or password (required for {ROLE_LABELS[role].toLowerCase()})</span>
-                <Input
-                  type="password"
-                  aria-label="PIN or password"
-                  placeholder="Enter a PIN or password"
-                  value={secret}
-                  onChange={(e) => setSecret(e.target.value)}
-                  disabled={submitting}
-                  required
-                />
-              </label>
-              <p className="text-sm text-muted-foreground">This person will use it to sign in.</p>
-            </>
-          ) : null}
-          {formError ? <p className="text-base text-[var(--destructive)]">{formError}</p> : null}
-          <Button type="submit" disabled={submitting}>
-            {submitting ? "Adding…" : "Add to household"}
-          </Button>
-        </form>
+        <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel="Add to household" busy={submitting} error={formError} />
       </Section>
     </>
   );

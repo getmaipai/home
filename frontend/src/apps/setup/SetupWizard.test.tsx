@@ -104,7 +104,7 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Continue", "Here's the plan for your Home");
       await advanceTo(rendered, "Continue", "Reach Home from anywhere");
       await advanceTo(rendered, "Set up later", "Create your owner account");
-      fireEvent.change(rendered.getByLabelText("Your name"), { target: { value: "Sage" } });
+      fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
       await advanceTo(rendered, "Continue", "Let Home recognise you");
       await advanceTo(rendered, "Do this later", "Hello");
