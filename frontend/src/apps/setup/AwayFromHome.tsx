@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
+import { QrCode } from "@maipai/ui/src/ui/qr-code";
 import { api, type TailscaleStatus } from "@/lib/api";
 
 export function AwayFromHome({ onContinue }: { onContinue: () => void }) {
   const [status, setStatus] = useState<TailscaleStatus | null>(null);
   const [url, setUrl] = useState<string | null>(null);
+  const [qrPayload, setQrPayload] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -17,7 +19,7 @@ export function AwayFromHome({ onContinue }: { onContinue: () => void }) {
   const ready = Boolean(status?.installed && status.signedIn && status.httpsEnabled);
   async function turnOn() {
     setBusy(true); setError(null);
-    try { const result = await api.enableTailscale(); setUrl(result.url); }
+    try { const result = await api.enableTailscale(); setUrl(result.url); setQrPayload(result.qrPayload); }
     catch (e) { setError(e instanceof Error ? e.message : "Could not turn on away access."); }
     finally { setBusy(false); }
   }
@@ -30,7 +32,7 @@ export function AwayFromHome({ onContinue }: { onContinue: () => void }) {
     </ul>
     <p className="text-sm text-muted-foreground">Turning this on publishes this computer's Tailscale name in public certificate logs. Pick a plain computer name, not a family name. <a href="https://tailscale.com/kb/rename" target="_blank" rel="noreferrer">How to rename it</a></p>
     <p className="text-sm text-muted-foreground">This setup uses Tailscale's DNS and HTTPS certificate service. Headscale is not supported by this setup flow.</p>
-    {url ? <div className="flex flex-col gap-3"><p>On your phone: install Tailscale, sign in with the same account, then open this address.</p><a href={url}>{url}</a><Button onClick={onContinue}>Continue</Button></div> : <div className="flex gap-3"><Button disabled={!ready || busy} onClick={() => void turnOn()}>{busy ? "Turning on…" : "Turn on"}</Button><Button variant="outline" onClick={onContinue}>Set up later</Button><span className="text-sm text-muted-foreground">Until you do, Home works only on your home Wi-Fi.</span></div>}
+    {url ? <div className="flex flex-col gap-3"><p>On your phone: install Tailscale, sign in with the same account, then open this address.</p>{qrPayload ? <QrCode value={qrPayload} size={176} label="QR code for your Home address away from home" /> : null}<a href={url}>{url}</a><Button onClick={onContinue}>Continue</Button></div> : <div className="flex gap-3"><Button disabled={!ready || busy} onClick={() => void turnOn()}>{busy ? "Turning on…" : "Turn on"}</Button><Button variant="outline" onClick={onContinue}>Set up later</Button><span className="text-sm text-muted-foreground">Until you do, Home works only on your home Wi-Fi.</span></div>}
     {error ? <p role="alert" className="text-destructive">{error}</p> : null}
   </div>;
 }

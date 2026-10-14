@@ -649,7 +649,6 @@ export interface HomeJobView {
 }
 
 export interface TailscaleStatus { state: "not_installed" | "stopped" | "running"; dnsName: string | null; ips: string[]; installed: boolean; signedIn: boolean; httpsEnabled: boolean; machineName: string | null; enabled: boolean; url: string | null }
-export interface SetupChecklistItem { id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }
 
 export const api = {
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
@@ -667,8 +666,6 @@ export const api = {
   setupCa: () => request<{ certificate: string }>("/api/setup/ca"),
   tailscaleStatus: () => request<TailscaleStatus>("/api/tailscale/status"),
   enableTailscale: () => request<{ url: string; qrPayload: string }>("/api/tailscale/enable", { method: "POST" }),
-  setupChecklist: () => request<SetupChecklistItem[]>("/api/setup-checklist"),
-  emergencyKit: () => request<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string }>("/api/backups/emergency-kit"),
   select: (personId: string) =>
     request<{ success: true }>("/api/auth/select", {
       method: "POST",

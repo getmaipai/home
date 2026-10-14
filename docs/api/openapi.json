@@ -20773,6 +20773,239 @@
         }
       }
     },
+    "/api/setup-checklist": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Setup checklist from household facts",
+        "description": "Read-only checklist for the signed-in owner or admin.",
+        "responses": {
+          "200": {
+            "description": "The current setup checklist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string"
+                      },
+                      "done": {
+                        "type": "boolean"
+                      },
+                      "open": {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "href"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "reason",
+                      "done",
+                      "open"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner and admins may read this checklist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tailscale/status": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Tailscale setup status",
+        "responses": {
+          "200": {
+            "description": "This hub's Tailscale state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "installed": {
+                      "type": "boolean"
+                    },
+                    "signedIn": {
+                      "type": "boolean"
+                    },
+                    "httpsEnabled": {
+                      "type": "boolean"
+                    },
+                    "machineName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "dnsName": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "not_installed",
+                        "stopped",
+                        "running"
+                      ]
+                    },
+                    "ips": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "url": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "installed",
+                    "signedIn",
+                    "httpsEnabled",
+                    "machineName",
+                    "dnsName",
+                    "state",
+                    "ips",
+                    "enabled",
+                    "url"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owner/admin may view away setup",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/tailscale/enable": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Enable Home's Tailscale HTTPS address",
+        "responses": {
+          "200": {
+            "description": "Away address and QR payload.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string"
+                    },
+                    "qrPayload": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "qrPayload"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tailscale is not ready",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owner or admin may enable away access",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices": {
       "get": {
         "tags": [
@@ -27415,86 +27648,6 @@
           },
           "401": {
             "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/setup-checklist": {
-      "get": {
-        "tags": [
-          "Setup"
-        ],
-        "summary": "Setup checklist from household facts",
-        "description": "Read-only checklist for the signed-in owner or admin.",
-        "responses": {
-          "200": {
-            "description": "The current setup checklist.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "title": {
-                        "type": "string"
-                      },
-                      "reason": {
-                        "type": "string"
-                      },
-                      "done": {
-                        "type": "boolean"
-                      },
-                      "open": {
-                        "type": "object",
-                        "properties": {
-                          "label": {
-                            "type": "string"
-                          },
-                          "href": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "label",
-                          "href"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "title",
-                      "reason",
-                      "done",
-                      "open"
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only the owner and admins may read this checklist",
             "content": {
               "application/json": {
                 "schema": {
