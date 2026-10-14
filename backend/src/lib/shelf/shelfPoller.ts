@@ -52,28 +52,15 @@ export interface PollDeps {
 export type PollOutcome = "ok" | "not_modified" | "backoff" | "rate_limited" | "blocked";
 
 const platformFetch = globalThis.fetch;
+import { backoffSeconds as sharedBackoffSeconds, parseRetryAfter, maxAgeSeconds } from "@/lib/httpCachePolicy";
 
 /** The wait after a failure: the interval doubled per failure so far, capped
  * at 24 h; a Retry-After longer than that wait wins (also capped at 24 h). */
 export function backoffSeconds(intervalS: number, failCount: number, retryAfterS: number | null): number {
-  const base = Math.min(MAX_BACKOFF_S, Math.max(MIN_POLL_INTERVAL_S, intervalS) * 2 ** Math.max(1, failCount));
-  const asked = retryAfterS !== null && Number.isFinite(retryAfterS) && retryAfterS > 0 ? retryAfterS : 0;
-  return Math.min(MAX_BACKOFF_S, Math.max(base, asked));
+  return sharedBackoffSeconds(intervalS, failCount, retryAfterS, MIN_POLL_INTERVAL_S, MAX_BACKOFF_S);
 }
-
-export function parseRetryAfter(value: string | null, nowMs: number): number | null {
-  if (!value) return null;
-  const seconds = Number(value.trim());
-  if (Number.isFinite(seconds) && seconds >= 0) return Math.ceil(seconds);
-  const at = Date.parse(value);
-  return Number.isNaN(at) ? null : Math.max(0, Math.ceil((at - nowMs) / 1000));
-}
-
-/** Seconds a server asks caches to keep the feed, when it asks. */
-function maxAgeSeconds(cacheControl: string | null): number | null {
-  const match = cacheControl ? /max-age=(\d+)/i.exec(cacheControl) : null;
-  return match ? Number(match[1]) : null;
-}
+export { parseRetryAfter };
+function feedMaxAgeSeconds(cacheControl: string | null): number | null { return maxAgeSeconds(cacheControl); }
 
 class RateLimited extends Error {}
 
@@ -267,7 +254,7 @@ export async function pollFeed(feed: FeedRecord, deps: PollDeps = {}): Promise<P
     bumpShelfCounter("feeds_polled");
     const response = await request(feed, deps, now, controller.signal);
     const interval = (): number => {
-      const age = maxAgeSeconds(response.headers.get("cache-control"));
+      const age = feedMaxAgeSeconds(response.headers.get("cache-control"));
       return Math.min(MAX_BACKOFF_S, Math.max(MIN_POLL_INTERVAL_S, feed.poll_interval_s, age ?? 0));
     };
     if (response.status === 304) {

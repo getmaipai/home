@@ -1,10 +1,12 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "@/lib/paths";
 import {
   cachedFetch,
+  CACHE_NOT_MODIFIED,
+  packageCacheResponse,
   getCacheStats,
   getCacheEnvelope,
   __resetPackageCacheForTests,
@@ -13,6 +15,7 @@ import {
   sweepPackageCache,
   LEGACY_ENTRY_GRACE_S,
 } from "@/lib/packageCache";
+import { backoffSeconds, effectiveTtlSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
 
 const PKG = "test-cache-pkg";
 
@@ -125,6 +128,96 @@ function counter() {
 }
 
 describe("cachedFetch", () => {
+  test("expired validators are passed to doFetch and a 304 refreshes metadata without replacing the body", async () => {
+    const url = "https://example.com/revalidate";
+    let entryPath = "";
+    await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 0 }, url, undefined, async () => ({ value: 1 }), { source: "old:source", attribution: "Old credit" });
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    entryPath = join(cacheDir, PKG, `${key}.json`);
+    const prior = JSON.parse(readFileSync(entryPath, "utf8"));
+    prior.etag = '"v1"'; prior.lastModified = "date";
+    prior.fetchedAt = new Date(Date.now() - 5000).toISOString(); prior.expiresAt = prior.fetchedAt; prior.staleUntil = prior.fetchedAt;
+    writeFileSync(entryPath, JSON.stringify(prior));
+    let context: any;
+    await cachedFetch(PKG, { ttl_s: 60, stale_ok_s: 30 }, url, undefined, (async (ctx: any) => { context = ctx; return { marker: CACHE_NOT_MODIFIED }; }) as any, { source: "new:source", attribution: "New credit" });
+    expect(context).toEqual({ etag: '"v1"', lastModified: "date" });
+    const refreshed = JSON.parse(readFileSync(entryPath, "utf8"));
+    expect(refreshed.value).toEqual(prior.value);
+    expect(Date.parse(refreshed.fetchedAt)).toBeGreaterThan(Date.parse(prior.fetchedAt));
+    expect(Date.parse(refreshed.expiresAt)).toBeGreaterThan(Date.now());
+    expect(Date.parse(refreshed.staleUntil)).toBeGreaterThan(Date.parse(refreshed.expiresAt));
+    expect(refreshed.source).toBe("old:source");
+    expect(refreshed.attribution).toBe("Old credit");
+  });
+
+  test("fresh response validators are stored for the next conditional request", async () => {
+    const url = "https://example.com/stored-validators";
+    await cachedFetch(PKG, { ttl_s: 1 }, url, undefined, async () => packageCacheResponse(
+      { value: 5 },
+      { etag: '"v5"', lastModified: "Wed, 21 Oct 2015 07:28:00 GMT" },
+    ));
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const entry = JSON.parse(readFileSync(join(cacheDir, PKG, `${key}.json`), "utf8"));
+    expect(entry.etag).toBe('"v5"');
+    expect(entry.lastModified).toBe("Wed, 21 Oct 2015 07:28:00 GMT");
+  });
+
+  test("a 304 after a stale entry is swept triggers one full fetch without validators", async () => {
+    const url = "https://example.com/swept-during-revalidation";
+    await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 60 }, url, undefined, async () => ({ old: true }));
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const path = join(cacheDir, PKG, `${key}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8"));
+    entry.etag = '"old"';
+    entry.fetchedAt = new Date(Date.now() - 10_000).toISOString();
+    entry.expiresAt = new Date(Date.now() - 1_000).toISOString();
+    entry.staleUntil = new Date(Date.now() + 60_000).toISOString();
+    writeFileSync(path, JSON.stringify(entry));
+
+    let finish!: (value: unknown) => void;
+    const contexts: unknown[] = [];
+    let calls = 0;
+    const stale = await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 60 }, url, undefined, (async (ctx: unknown) => {
+      contexts.push(ctx);
+      calls++;
+      if (calls === 1) return await new Promise((resolve) => { finish = resolve; });
+      return { fresh: true };
+    }) as any);
+    expect(stale).toEqual({ old: true });
+    unlinkSync(path);
+    finish({ marker: CACHE_NOT_MODIFIED });
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(contexts).toEqual([{ etag: '"old"', lastModified: undefined }, undefined]);
+    expect(calls).toBe(2);
+    expect(JSON.parse(readFileSync(path, "utf8")).value).toEqual({ fresh: true });
+  });
+
+  test("a miss whose entry disappears during 304 refetches once without validators", async () => {
+    const url = "https://example.com/miss-swept-during-revalidation";
+    await cachedFetch(PKG, { ttl_s: 1 }, url, undefined, async () => ({ old: true }));
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const path = join(cacheDir, PKG, `${key}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8"));
+    entry.etag = '"old"';
+    entry.fetchedAt = new Date(Date.now() - 10_000).toISOString();
+    entry.expiresAt = new Date(Date.now() - 1_000).toISOString();
+    entry.staleUntil = entry.expiresAt;
+    writeFileSync(path, JSON.stringify(entry));
+    const contexts: unknown[] = [];
+    const value = await cachedFetch(PKG, { ttl_s: 1 }, url, undefined, async (ctx) => {
+      contexts.push(ctx);
+      if (ctx) {
+        unlinkSync(path);
+        return { marker: CACHE_NOT_MODIFIED };
+      }
+      return { fresh: true };
+    });
+    expect(value).toEqual({ fresh: true });
+    expect(contexts).toEqual([{ etag: '"old"', lastModified: undefined }, undefined]);
+    expect(getCacheStats().find((row) => row.packageId === PKG)?.misses).toBe(2);
+    expect(JSON.parse(readFileSync(path, "utf8")).value).toEqual({ fresh: true });
+  });
+
   test("no cache policy declared: always calls through, never caches", async () => {
     const { fn, count } = counter();
     await cachedFetch(PKG, undefined, "https://example.com/a", undefined, fn);
@@ -157,6 +250,9 @@ describe("cachedFetch", () => {
   test("past ttl_s with no stale_ok_s, a call is a real miss again", async () => {
     const { fn, count } = counter();
     await cachedFetch(PKG, { ttl_s: -1 }, "https://example.com/a", undefined, fn); // already expired the instant it's written
+    const key = createHash("sha256").update("GET\nhttps://example.com/a\n\n").digest("hex");
+    const path = join(cacheDir, PKG, `${key}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8")); delete entry.expiresAt; delete entry.staleUntil; writeFileSync(path, JSON.stringify(entry));
     await cachedFetch(PKG, { ttl_s: -1 }, "https://example.com/a", undefined, fn);
     expect(count()).toBe(2);
   });
@@ -249,12 +345,16 @@ describe("cachedFetch", () => {
     expect(calls).toBe(1);
 
     writeFileSync(path, JSON.stringify({ url, method: "GET", fetchedAt: new Date(Date.now() - 120_000).toISOString(), value: { expired: true } }));
-    const missed = await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 1 }, url, undefined, async () => { calls++; return { new: true }; });
+    let missCalls = 0;
+    const missed = await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 1 }, url, undefined, async () => { missCalls++; return { new: true }; });
     expect(missed).toEqual({ new: true });
-    expect(calls).toBe(2);
+    expect(missCalls).toBe(1);
+    const stats = getCacheStats().find((row) => row.packageId === PKG);
+    expect(stats?.hits).toBe(2);
+    expect(stats?.misses).toBe(1);
   });
 
-  test("live ttl_s controls hit decisions even when an entry has stored expiresAt", async () => {
+  test("stored expiresAt controls hit decisions when present", async () => {
     const url = "https://example.com/live-ttl";
     await cachedFetch(PKG, { ttl_s: 3600 }, url, undefined, async () => ({ n: 1 }), { source: "test:row", attribution: null });
     const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
@@ -264,24 +364,79 @@ describe("cachedFetch", () => {
     writeFileSync(path, JSON.stringify(entry));
     let calls = 0;
     await cachedFetch(PKG, { ttl_s: -1 }, url, undefined, async () => { calls++; return { n: 2 }; }, { source: "test:row", attribution: null });
+    expect(calls).toBe(0);
+  });
+
+  test("an entry past its stored staleUntil is never served even with a later expiresAt", async () => {
+    const url = "https://example.com/stale-boundary";
+    await cachedFetch(PKG, { ttl_s: 3600, stale_ok_s: 3600 }, url, undefined, async () => ({ old: true }));
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const path = join(cacheDir, PKG, `${key}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8"));
+    entry.expiresAt = new Date(Date.now() + 3_600_000).toISOString();
+    entry.staleUntil = new Date(Date.now() - 1_000).toISOString();
+    writeFileSync(path, JSON.stringify(entry));
+    let calls = 0;
+    expect(await cachedFetch(PKG, { ttl_s: 3600, stale_ok_s: 3600 }, url, undefined, async () => { calls++; return { fresh: true }; })).toEqual({ fresh: true });
     expect(calls).toBe(1);
   });
 
   test("a stale-while-revalidate refresh writes source, expiry and attribution", async () => {
     const url = "https://example.com/stale-provenance";
-    const first = { source: "pkg:source", attribution: "Credit line" };
+    const first = { source: "pkg:source-old", attribution: "Credit line" };
     await cachedFetch(PKG, { ttl_s: 60 }, url, undefined, async () => ({ v: 1 }), first);
     const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
     const path = join(cacheDir, PKG, `${key}.json`);
     const oldEntry = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
     oldEntry.fetchedAt = new Date(Date.now() - 10_000).toISOString();
+    oldEntry.expiresAt = new Date(Date.parse(oldEntry.fetchedAt as string) + 1_000).toISOString();
+    oldEntry.staleUntil = new Date(Date.parse(oldEntry.fetchedAt as string) + 61_000).toISOString();
     writeFileSync(path, JSON.stringify(oldEntry));
-    await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 60 }, url, undefined, async () => ({ v: 2 }), { source: "pkg:source", attribution: "Updated credit" });
+    await cachedFetch(PKG, { ttl_s: 1, stale_ok_s: 60 }, url, undefined, async () => ({ v: 2 }), { source: "pkg:source-new", attribution: "Updated credit" });
     await new Promise((resolve) => setTimeout(resolve, 10));
     const envelope = getCacheEnvelope(PKG, url, { ttl_s: 1, stale_ok_s: 60 })!;
-    expect(envelope.source).toBe("pkg:source");
+    expect(envelope.source).toBe("pkg:source-new");
     expect(envelope.attribution).toBe("Updated credit");
     expect(Date.parse(envelope.expiresAt) - Date.parse(envelope.fetchedAt)).toBe(1_000);
+  });
+
+  test("server cache hints shorten ttl, account for Age, and no-store skips writes", async () => {
+    const hints = (url: string, ttl_s: number, cacheControl: string, age?: string, expires?: string) => cachedFetch(
+      PKG,
+      { ttl_s },
+      url,
+      undefined,
+      async () => packageCacheResponse({ ok: true }, { cacheControl, age, expires }),
+    );
+    const maxAgeUrl = "https://example.com/hint-max-age";
+    await hints(maxAgeUrl, 3600, "public, max-age=60", "10");
+    const maxAgeEnvelope = getCacheEnvelope(PKG, maxAgeUrl, { ttl_s: 3600 })!;
+    expect(Date.parse(maxAgeEnvelope.expiresAt) - Date.parse(maxAgeEnvelope.fetchedAt)).toBe(50_000);
+
+    const cappedUrl = "https://example.com/hint-capped";
+    await hints(cappedUrl, 60, "max-age=3600");
+    const cappedEnvelope = getCacheEnvelope(PKG, cappedUrl, { ttl_s: 60 })!;
+    expect(Date.parse(cappedEnvelope.expiresAt) - Date.parse(cappedEnvelope.fetchedAt)).toBe(60_000);
+
+    const pastUrl = "https://example.com/hint-past";
+    await hints(pastUrl, 3600, "public", undefined, "Wed, 21 Oct 2015 07:28:00 GMT");
+    const pastEnvelope = getCacheEnvelope(PKG, pastUrl, { ttl_s: 3600 })!;
+    expect(pastEnvelope.expiresAt).toBe(pastEnvelope.fetchedAt);
+
+    const noStoreUrl = "https://example.com/hint-no-store";
+    await hints(noStoreUrl, 3600, "private, no-store");
+    expect(getCacheEnvelope(PKG, noStoreUrl, { ttl_s: 3600 })).toBeNull();
+  });
+
+  test("quiet-window helper uses bounded exponential backoff and parses Retry-After", () => {
+    const now = Date.parse("2026-10-14T12:00:00Z");
+    expect(backoffSeconds(60, 1, null, 60, 3600)).toBe(120);
+    expect(backoffSeconds(60, 2, null, 60, 3600)).toBe(240);
+    expect(backoffSeconds(60, 8, null, 60, 3600)).toBe(3600);
+    expect(backoffSeconds(60, 1, 90000, 60, 3600)).toBe(86400);
+    expect(parseRetryAfter("30", now)).toBe(30);
+    expect(parseRetryAfter("Wed, 14 Oct 2026 12:02:00 GMT", now)).toBe(120);
+    expect(effectiveTtlSeconds(3600, { cacheControl: "no-cache" }, now)).toBe(0);
   });
 });
 

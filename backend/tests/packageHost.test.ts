@@ -1,8 +1,11 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
+import { createHash } from "node:crypto";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
+import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { cachedFetch, getCacheEnvelope, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -22,6 +25,7 @@ import { PackageManifest as ManifestSchema } from "@maipai/spec/gen/ts/manifest.
 import { useDefaultScriptedStack } from "./stackFixture";
 import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
 import { retryDeadlineMs } from "@/lib/turnMachine/deadline";
+import { cacheDir } from "@/lib/paths";
 
 beforeEach(() => {
   resetDb();
@@ -36,6 +40,7 @@ beforeEach(() => {
   // right before it needs to (a no-op, called twice); this just makes
   // every test start with a full bucket regardless of run order.
   __resetRateLimiterForTests();
+  __resetPackageQuietWindowsForTests();
   __resetSearchCacheForTests();
   __resetSearchRotationForTests();
 });
@@ -306,6 +311,157 @@ describe("packageHost fetch", () => {
 });
 
 describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3)", () => {
+  test("uncached and non-GET package fetches return the response body unchanged", async () => {
+    __resetRateLimiterForTests();
+    let requests = 0;
+    __setPackageFetchForTests(async () => { requests++; return Response.json({ __packageCacheValue: "ordinary response" }); });
+    const actor = await owner();
+    const uncached = createHost(actor, manifest({ permissions: ["net:example.com"] }));
+    const cachedPolicy = createHost(actor, manifest({ cache: { ttl_s: 60 }, permissions: ["net:example.com"] }));
+    try {
+      expect(await uncached.fetch("https://example.com/uncached")).toEqual({ __packageCacheValue: "ordinary response" });
+      expect(await cachedPolicy.fetch("https://example.com/post", { method: "POST", body: { action: "read" } })).toEqual({ __packageCacheValue: "ordinary response" });
+      expect(requests).toBe(2);
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  });
+
+  test("429 quiet window suppresses requests and serves stale only through staleUntil", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageQuietWindowsForTests();
+    __resetPackageCacheForTests();
+    __clearPackageCacheDirForTests("test-pkg");
+    let requests = 0;
+    __setPackageFetchForTests(async (input) => {
+      requests++;
+      return String(input).includes("trigger=1")
+        ? new Response("", { status: 429, headers: { "retry-after": "300" } })
+        : Response.json({ value: "cached answer" });
+    });
+    const actor = await owner();
+    const url = "https://example.com/data?private=marker";
+    const host = createHost(actor, manifest({ cache: { ttl_s: 3600, stale_ok_s: 60 }, permissions: ["net:example.com"] }));
+    try {
+      expect(await host.fetch(url)).toEqual({ value: "cached answer" });
+      await expect(host.fetch("https://example.com/data?trigger=1")).rejects.toMatchObject({ code: "network_unreachable" });
+      expect(requests).toBe(2);
+
+      const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+      const path = join(cacheDir, "test-pkg", `${key}.json`);
+      const entry = JSON.parse(readFileSync(path, "utf8"));
+      entry.fetchedAt = new Date(Date.now() - 10_000).toISOString();
+      entry.expiresAt = new Date(Date.now() - 1_000).toISOString();
+      entry.staleUntil = new Date(Date.now() + 60_000).toISOString();
+      writeFileSync(path, JSON.stringify(entry));
+      expect(await host.fetch(url)).toEqual({ value: "cached answer" });
+      await __drainBackgroundWorkForTests();
+      expect(requests).toBe(2);
+
+      entry.staleUntil = new Date(Date.now() - 1_000).toISOString();
+      writeFileSync(path, JSON.stringify(entry));
+      let quietError: HostError | null = null;
+      try { await host.fetch(url); } catch (err) { quietError = err as HostError; }
+      expect(quietError?.code).toBe("rate_limited");
+      expect(quietError?.message).toContain("5 minutes");
+      expect(quietError?.message).toContain("example.com");
+      expect(quietError?.message).not.toContain("private=marker");
+      expect(requests).toBe(2);
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  });
+
+  test("success resets consecutive 5xx failures; other hosts keep their own window", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageQuietWindowsForTests();
+    let requests = 0;
+    const statuses = [500, 200, 500, 500, 200];
+    __setPackageFetchForTests(async () => {
+      const status = statuses[requests++] ?? 200;
+      return status === 200 ? Response.json({ ok: true }) : new Response("", { status });
+    });
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:example.com", "net:example.com:8443"] }));
+    try {
+      await expect(host.fetch("https://example.com/one")).rejects.toMatchObject({ code: "network_unreachable" });
+      expect(await host.fetch("https://example.com/two")).toEqual({ ok: true });
+      await expect(host.fetch("https://example.com/three")).rejects.toMatchObject({ code: "network_unreachable" });
+      await expect(host.fetch("https://example.com/four")).rejects.toMatchObject({ code: "network_unreachable" });
+      let quietError: HostError | null = null;
+      try { await host.fetch("https://example.com/five"); } catch (err) { quietError = err as HostError; }
+      expect(quietError?.code).toBe("rate_limited");
+      expect(quietError?.message).toContain("4 minutes");
+      expect(requests).toBe(4);
+
+      expect(await host.fetch("https://example.com:8443/other-host")).toEqual({ ok: true });
+      expect(requests).toBe(5);
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  });
+
+  test("an HTTP-date Retry-After controls the package host quiet window", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageQuietWindowsForTests();
+    let requests = 0;
+    const retryAt = new Date(Date.now() + 180_000).toUTCString();
+    __setPackageFetchForTests(async () => {
+      requests++;
+      return new Response("", { status: 429, headers: { "retry-after": retryAt } });
+    });
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:example.com"] }));
+    try {
+      await expect(host.fetch("https://example.com/date-one")).rejects.toMatchObject({ code: "network_unreachable" });
+      let quietError: HostError | null = null;
+      try { await host.fetch("https://example.com/date-two"); } catch (err) { quietError = err as HostError; }
+      expect(quietError?.code).toBe("rate_limited");
+      expect(quietError?.message).toContain("3 minutes");
+      expect(requests).toBe(1);
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  });
+
+  test("503 opens a quiet window on its first response", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageQuietWindowsForTests();
+    let requests = 0;
+    __setPackageFetchForTests(async () => { requests++; return new Response("", { status: 503 }); });
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:example.com"] }));
+    try {
+      await expect(host.fetch("https://example.com/unavailable")).rejects.toMatchObject({ code: "network_unreachable" });
+      await expect(host.fetch("https://example.com/again")).rejects.toMatchObject({ code: "rate_limited" });
+      expect(requests).toBe(1);
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  });
+
+  test("404 and network timeouts do not open a quiet window", async () => {
+    __resetRateLimiterForTests();
+    __resetPackageQuietWindowsForTests();
+    let requests = 0;
+    __setPackageFetchForTests(async () => {
+      requests++;
+      if (requests <= 2) return new Response("", { status: 404 });
+      throw new TypeError("timeout");
+    });
+    const actor = await owner();
+    const host = createHost(actor, manifest({ permissions: ["net:example.com"] }));
+    try {
+      await expect(host.fetch("https://example.com/missing-a")).rejects.toMatchObject({ code: "not_found" });
+      await expect(host.fetch("https://example.com/missing-b")).rejects.toMatchObject({ code: "not_found" });
+      await expect(host.fetch("https://example.com/timeout-a")).rejects.toMatchObject({ code: "network_unreachable" });
+      await expect(host.fetch("https://example.com/timeout-b")).rejects.toMatchObject({ code: "network_unreachable" });
+      expect(requests).toBe(6);
+    } finally {
+      __setPackageFetchForTests(null);
+    }
+  });
+
   test("source resolution selects exact case-insensitive hosts, with single-row fallback only", async () => {
     const { resolveDataSourceProvenance } = await import("@/lib/packageHost");
     const multi = manifest({ id: "media-lookup", data_sources: [
@@ -473,6 +629,50 @@ describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3
 });
 
 describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-limit concern of its own)", () => {
+  test("conditional headers and response metadata support cache revalidation", async () => {
+    let seen: [string | null, string | null][] = [];
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => {
+      seen.push([req.headers.get("if-none-match"), req.headers.get("if-modified-since")]);
+      return new Response(null, { status: 304, headers: { etag: '"v1"', "last-modified": "Wed, 21 Oct 2015 07:28:00 GMT", "cache-control": "max-age=60", expires: "Wed, 21 Oct 2015 07:29:00 GMT", "retry-after": "120" } });
+    } });
+    try {
+      const meta: any[] = [];
+      const result: any = await performHttpFetch(`http://127.0.0.1:${server.port}/`, { revalidate: { etag: '"v1"', lastModified: "Wed, 21 Oct 2015 07:28:00 GMT" } }, undefined, (row) => meta.push(row));
+      expect(seen).toEqual([['"v1"', "Wed, 21 Oct 2015 07:28:00 GMT"]]);
+      expect(result.__packageCacheNotModified).toBe(true);
+      expect(meta[0]).toMatchObject({
+        status: 304,
+        etag: '"v1"',
+        lastModified: "Wed, 21 Oct 2015 07:28:00 GMT",
+        cacheControl: "max-age=60",
+        expires: "Wed, 21 Oct 2015 07:29:00 GMT",
+        retryAfter: "120",
+      });
+    } finally { server.stop(true); }
+  });
+
+  test("without cache validators, headers stay omitted and 304 remains an HTTP error", async () => {
+    const seen: [string | null, string | null][] = [];
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => {
+      seen.push([req.headers.get("if-none-match"), req.headers.get("if-modified-since")]);
+      return new Response(null, { status: 304 });
+    } });
+    try {
+      await expect(performHttpFetch(`http://127.0.0.1:${server.port}/`)).rejects.toThrow("HTTP 304");
+      expect(seen).toEqual([[null, null]]);
+    } finally { server.stop(true); }
+  });
+
+  test("a package-owned conditional header keeps 304 as an HTTP error", async () => {
+    const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => new Response(null, { status: 304 }) });
+    try {
+      await expect(performHttpFetch(`http://127.0.0.1:${server.port}/`, {
+        headers: { "If-None-Match": '"package-validator"' },
+        revalidate: { etag: '"cache-validator"' },
+      })).rejects.toThrow("HTTP 304");
+    } finally { server.stop(true); }
+  });
+
   test("a successful JSON response is parsed and returned", async () => {
     const server = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ tempF: 72 }) });
     try {
@@ -637,6 +837,36 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
   // assertNotPrivateHost + requirePermission) against every hop's target
   // before following it.
   describe("redirects (SEC-3)", () => {
+    test("cross-host redirects drop validators and a later 304 remains an error", async () => {
+      const targetHeaders: [string | null, string | null][] = [];
+      const target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => {
+        targetHeaders.push([req.headers.get("if-none-match"), req.headers.get("if-modified-since")]);
+        return new Response(null, { status: 304 });
+      } });
+      const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,
+        fetch: () => new Response(null, { status: 302, headers: { Location: `http://127.0.0.1:${target.port}/` } }),
+      });
+      try {
+        await expect(performHttpFetch(`http://127.0.0.1:${origin.port}/`, { revalidate: { etag: '"origin"', lastModified: "origin-date" } })).rejects.toThrow("HTTP 304");
+        expect(targetHeaders).toEqual([[null, null]]);
+      } finally { origin.stop(true); target.stop(true); }
+    });
+
+    test("package-owned validators are also dropped on a cross-host hop", async () => {
+      const targetHeaders: string[] = [];
+      const target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: (req) => {
+        targetHeaders.push(req.headers.get("if-none-match") ?? "missing");
+        return Response.json({ ok: true });
+      } });
+      const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,
+        fetch: () => new Response(null, { status: 302, headers: { Location: `http://127.0.0.1:${target.port}/` } }),
+      });
+      try {
+        await performHttpFetch(`http://127.0.0.1:${origin.port}/`, { headers: { "If-None-Match": '"package-validator"' } });
+        expect(targetHeaders).toEqual(["missing"]);
+      } finally { origin.stop(true); target.stop(true); }
+    });
+
     test("a redirect is still followed end to end when nothing blocks it", async () => {
       const target = Bun.serve({ hostname: "127.0.0.1", port: 0, fetch: () => Response.json({ ok: true }) });
       const origin = Bun.serve({ hostname: "127.0.0.1", port: 0,

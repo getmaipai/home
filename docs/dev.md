@@ -162,6 +162,10 @@ backend's owner route.
 
 Package-cache entries carry an optional `staleUntil` timestamp recorded from the package's `ttl_s` and `stale_ok_s`. A daily core job deletes entries strictly past that timestamp, then trims to the existing shared byte budget. Legacy entries without `staleUntil` expire seven days after `expiresAt`, or seven days after the default TTL from `fetchedAt` when `expiresAt` is absent.
 
+GET entries can also keep an `ETag` and `Last-Modified` validator. An expired entry with a validator is revalidated with a conditional GET; a 304 keeps the cached body and provenance while moving its fetch and expiry timestamps forward. `Cache-Control: max-age` (reduced by `Age`) and `Expires` can shorten the manifest TTL; `no-cache` makes an entry stale at once and `no-store` prevents a write. Server hints do not extend the manifest TTL. Stored `expiresAt` and `staleUntil` control serving when present; legacy files derive those times from `fetchedAt` and the current policy.
+
+Package fetches keep an in-memory quiet window per destination host after a 429 or 503, or after the second consecutive other 5xx. The base is 60 seconds, doubled per consecutive failure, so a 429 or 503 starts with a two-minute window; the base caps at one hour. A longer `Retry-After` wins up to 24 hours. A 2xx or 304 clears the failure count. A quiet host receives no package request; a cached value can still serve through its own `staleUntil`, but never past it. These windows reset on restart and are not persisted.
+
 `createHost().fetch()` observes the HTTP outcome after the existing per-host
 rate limiter and cache have allowed an actual outbound request. The bounded
 in-memory service window stores timestamps, outcome class, last success, and

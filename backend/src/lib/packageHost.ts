@@ -82,7 +82,8 @@ import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
 import { parseReminder, parseTimerDuration } from "@/lib/reminderParsing";
 import type { BlockCapture } from "@/lib/packageBlocks";
-import { cachedFetch } from "@/lib/packageCache";
+import { cachedFetch, CACHE_NOT_MODIFIED, packageCacheResponse } from "@/lib/packageCache";
+import { backoffSeconds, parseRetryAfter } from "@/lib/httpCachePolicy";
 import { topicMessages } from "@/lib/topicPrompt";
 import { complete as llmComplete, type LlmMessage } from "@/lib/llm";
 import { runRapidOcr } from "@/lib/documentExtraction";
@@ -106,6 +107,9 @@ import { ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_
 // enough for any real JSON API, small enough that one broken integration
 // can't hang a turn or exhaust memory.
 const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
+const packageQuietUntil = new Map<string, number>();
+const packageFailureCounts = new Map<string, number>();
+export function __resetPackageQuietWindowsForTests(): void { packageQuietUntil.clear(); packageFailureCounts.clear(); }
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 export const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
@@ -308,7 +312,10 @@ export interface AttemptResult {
    * gets, without hand-rolling its own copy of this function's fetch/
    * timeout/abort/body-limit sequence just to see the status code. */
   status?: number;
+  notModified?: boolean;
+  meta?: { etag: string | null; lastModified: string | null; cacheControl: string | null; expires: string | null; retryAfter: string | null; age: string | null };
 }
+const packageResponseMeta = new WeakMap<HostError, AttemptResult["meta"] & { status: number }>();
 
 // SEC-3 (code review, 2026-09-06): fetch's default redirect: "follow"
 // meant the SSRF/permission check the caller ran against the ORIGINAL
@@ -340,7 +347,7 @@ async function attemptHttpFetch(
   body: string | undefined,
   timeoutMs: number = FETCH_TIMEOUT_MS,
   validateHop?: (hopUrl: string) => Promise<void>,
-  options: { signal?: AbortSignal; connectTimeoutMs?: number } = {},
+  options: { signal?: AbortSignal; connectTimeoutMs?: number; conditional?: boolean; conditionalHeaders?: boolean; onResponse?: (meta: NonNullable<AttemptResult["meta"]> & { status: number }) => void } = {},
 ): Promise<AttemptResult> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -349,6 +356,7 @@ async function attemptHttpFetch(
   else options.signal?.addEventListener("abort", onParentAbort, { once: true });
   try {
     let currentUrl = url;
+    let previousHost = new URL(url).host;
     let currentMethod = method;
     let currentBody = body;
     for (let hop = 0; ; hop++) {
@@ -356,9 +364,14 @@ async function attemptHttpFetch(
       const connectTimer = options.connectTimeoutMs === undefined ? undefined : setTimeout(() => controller.abort(), options.connectTimeoutMs);
       let response: Response;
       try {
+        const hopHeaders = { ...headers };
+        if (options.conditionalHeaders && new URL(currentUrl).host !== previousHost) {
+          for (const name of Object.keys(hopHeaders)) if (["if-none-match", "if-modified-since"].includes(name.toLowerCase())) delete hopHeaders[name];
+          options.conditional = false;
+        }
         response = packageFetch === globalThis.fetch
-          ? await guardedFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" })
-          : await packageFetch(currentUrl, { method: currentMethod, headers, body: currentBody, signal: controller.signal, redirect: "manual" });
+          ? await guardedFetch(currentUrl, { method: currentMethod, headers: hopHeaders, body: currentBody, signal: controller.signal, redirect: "manual" })
+          : await packageFetch(currentUrl, { method: currentMethod, headers: hopHeaders, body: currentBody, signal: controller.signal, redirect: "manual" });
       } finally {
         clearTimeout(connectTimer);
       }
@@ -381,10 +394,17 @@ async function attemptHttpFetch(
             throw err;
           }
         }
+        previousHost = new URL(currentUrl).host;
         currentMethod = redirectedMethod(response.status, currentMethod);
         if (currentMethod === "GET") currentBody = undefined;
         currentUrl = nextUrl;
         continue;
+      }
+      const meta = { etag: response.headers.get("etag"), lastModified: response.headers.get("last-modified"), cacheControl: response.headers.get("cache-control"), expires: response.headers.get("expires"), retryAfter: response.headers.get("retry-after"), age: response.headers.get("age") };
+      options.onResponse?.({ status: response.status, ...meta });
+      if (response.status === 304 && options.conditional && new URL(currentUrl).host === new URL(url).host) {
+        await response.body?.cancel().catch(() => undefined);
+        return { ok: true, notModified: true, meta, status: 304 };
       }
       if (!response.ok) {
         // #92: a 404 (or a 410) is the typed "not found" of
@@ -398,6 +418,7 @@ async function attemptHttpFetch(
           ok: false,
           networkFailure: false,
           status: response.status,
+          meta,
           error: new HostError(code, `${url} returned HTTP ${response.status}`),
         };
       }
@@ -449,21 +470,27 @@ export async function withOneRetry(attempt: () => Promise<AttemptResult>, retrya
  * hop 1 did. Omitted by every direct test of this function's own HTTP
  * mechanics (packageHost.test.ts's own header on that describe block) -
  * those exercise a real local server with no SSRF concern of its own. */
-export async function performHttpFetch(url: string, opts?: FetchOptions, validateHop?: (hopUrl: string) => Promise<void>): Promise<unknown> {
+export async function performHttpFetch(url: string, opts?: FetchOptions & { revalidate?: { etag?: string; lastModified?: string } }, validateHop?: (hopUrl: string) => Promise<void>, onResponse?: (meta: { status: number; etag: string | null; lastModified: string | null; cacheControl: string | null; expires: string | null; retryAfter: string | null; age: string | null }) => void): Promise<unknown> {
   const method = opts?.method ?? "GET";
   let body: string | undefined;
   if (opts?.body !== undefined) body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
   const headers: Record<string, string> = { "user-agent": FETCH_USER_AGENT, ...opts?.headers };
+  const packageOwnsValidators = Object.keys(opts?.headers ?? {}).some((name) => ["if-none-match", "if-modified-since"].includes(name.toLowerCase()));
+  const conditional = Boolean(!packageOwnsValidators && opts?.revalidate && (opts.revalidate.etag || opts.revalidate.lastModified));
+  const conditionalHeaders = conditional || packageOwnsValidators;
+  if (conditional && opts?.revalidate?.etag) headers["if-none-match"] = opts.revalidate.etag;
+  if (conditional && opts?.revalidate?.lastModified) headers["if-modified-since"] = opts.revalidate.lastModified;
   if (body !== undefined && typeof opts?.body !== "string" && !hasHeaderCaseInsensitive(headers, "content-type")) {
     headers["content-type"] = "application/json";
   }
 
   const result = await withOneRetry(
-    () => attemptHttpFetch(url, method, headers, body, FETCH_TIMEOUT_MS, validateHop),
+    () => attemptHttpFetch(url, method, headers, body, FETCH_TIMEOUT_MS, validateHop, { conditional, conditionalHeaders, onResponse }),
     method === "GET",
     RETRY_DELAY_MS,
   );
-  if (result.ok) return result.value;
+  if (result.ok) return result.notModified ? { __packageCacheNotModified: true, meta: result.meta } : result.value;
+  if (result.meta && result.status !== undefined) packageResponseMeta.set(result.error!, { ...result.meta, status: result.status });
   throw result.error;
 }
 
@@ -1999,7 +2026,13 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
       // token nor a DNS lookup - only a real doFetch() (below) reaches
       // either. A package with no `cache` declared skips straight
       // through, unaffected.
-      return cachedFetch(manifest.id, manifest.cache, url, opts, async () => {
+      return cachedFetch(manifest.id, manifest.cache, url, opts, async (ctx) => {
+        const now = Date.now();
+        const quietUntil = packageQuietUntil.get(parsed.host) ?? 0;
+        if (now < quietUntil) {
+          const minutes = Math.max(1, Math.ceil((quietUntil - now) / 60_000));
+          throw new HostError("rate_limited", `${parsed.host} asked Home to slow down. Home will try it again in about ${minutes} minute${minutes === 1 ? "" : "s"}.`);
+        }
         // Rate limit BEFORE the SSRF/DNS check, not after: a package
         // hammering host.fetch against a host that turns out to be blocked
         // (or invalid) still costs a real DNS lookup and connection attempt
@@ -2017,12 +2050,27 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           throw new HostError("network_unreachable", `could not resolve ${parsed.hostname}`);
         }
 
+        let responseMeta: any;
         try {
-          const value = await performHttpFetch(url, opts, validateHop);
+          const value = await performHttpFetch(url, { ...opts, revalidate: ctx }, validateHop, (meta) => { responseMeta = meta; });
+          if (responseMeta?.status === 304 || (responseMeta?.status >= 200 && responseMeta.status < 300)) {
+            packageFailureCounts.delete(parsed.host); packageQuietUntil.delete(parsed.host);
+          }
           await recordServiceOutcome(parsed.host, { ok: true });
+          if (responseMeta?.status === 304) return { marker: CACHE_NOT_MODIFIED, meta: responseMeta };
+          if (manifest.cache && (opts?.method ?? "GET").toUpperCase() === "GET" && responseMeta) return packageCacheResponse(value, { ...responseMeta, noStore: /\bno-store\b/i.test(responseMeta.cacheControl ?? "") });
           return value;
         } catch (err) {
           const status = err instanceof HostError ? Number(err.message.match(/returned HTTP (\d+)/)?.[1]) : undefined;
+          const failureMeta = err instanceof HostError ? packageResponseMeta.get(err) : undefined;
+          const actualStatus = failureMeta?.status ?? status;
+          if (actualStatus === 429 || actualStatus === 503 || (actualStatus !== undefined && actualStatus >= 500 && (packageFailureCounts.get(parsed.host) ?? 0) >= 1)) {
+            const count = (packageFailureCounts.get(parsed.host) ?? 0) + 1;
+            packageFailureCounts.set(parsed.host, count);
+            const retryAfter = parseRetryAfter(failureMeta?.retryAfter ?? responseMeta?.retryAfter ?? null, Date.now());
+            const wait = backoffSeconds(60, count, retryAfter, 60, 3600);
+            packageQuietUntil.set(parsed.host, Date.now() + wait * 1000);
+          } else if (actualStatus !== undefined && actualStatus >= 500) packageFailureCounts.set(parsed.host, (packageFailureCounts.get(parsed.host) ?? 0) + 1);
           const classified = classifyServiceOutcome(err, Number.isFinite(status) ? status : undefined);
           await recordServiceOutcome(parsed.host, { ok: false, status: Number.isFinite(status) ? status : undefined, error: classified.outcome === "limited" ? new Error("captcha or sign-in access wall") : err });
           throw err;

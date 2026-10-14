@@ -28,6 +28,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import { cacheDir, dataDir, ensureDataDir } from "@/lib/paths";
+import { effectiveTtlSeconds } from "@/lib/httpCachePolicy";
 
 export interface CacheFetchOptions {
   method?: string;
@@ -44,6 +45,8 @@ interface CacheEntryFile {
   source?: string | null;
   expiresAt?: string;
   staleUntil?: string;
+  etag?: string;
+  lastModified?: string;
   attribution?: string | null;
   value: unknown;
 }
@@ -51,7 +54,17 @@ interface CacheEntryFile {
 const DEFAULT_TTL_S = 300; // 5 minutes, if a package declares `cache` with no ttl_s
 const DEFAULT_STALE_OK_S = 0; // no stale-while-revalidate window unless declared
 export const LEGACY_ENTRY_GRACE_S = 7 * 24 * 60 * 60;
+export const CACHE_NOT_MODIFIED = Symbol("package-cache-not-modified");
+export const PACKAGE_CACHE_RESPONSE = Symbol("package-cache-response");
+export function packageCacheResponse(value: unknown, meta: Record<string, unknown>): object {
+  return { [PACKAGE_CACHE_RESPONSE]: true, value, meta };
+}
 const DEFAULT_MAX_BYTES = 1_000_000; // 1 MB per entry, if unset
+
+function unpackCacheResponse(value: unknown): { value: unknown; meta: Record<string, any> } | null {
+  if (!value || typeof value !== "object" || (value as any)[PACKAGE_CACHE_RESPONSE] !== true) return null;
+  return { value: (value as any).value, meta: (value as any).meta ?? {} };
+}
 
 // The total budget across every package's cache combined, scaled to free
 // disk rather than a single fixed number a tiny SBC and a beefy NUC would
@@ -279,7 +292,7 @@ export async function cachedFetch(
   cachePolicy: CachePolicy | undefined,
   url: string,
   opts: CacheFetchOptions | undefined,
-  doFetch: () => Promise<unknown>,
+  doFetch: (ctx?: { etag?: string; lastModified?: string }) => Promise<unknown>,
   provenance: { source: string | null; attribution: string | null } = { source: null, attribution: null },
 ): Promise<unknown> {
   if (!cachePolicy) return doFetch();
@@ -289,21 +302,27 @@ export async function cachedFetch(
   const ttlS = cachePolicy.ttl_s ?? DEFAULT_TTL_S;
   const staleOkS = cachePolicy.stale_ok_s ?? DEFAULT_STALE_OK_S;
   const maxBytes = cachePolicy.max_bytes ?? DEFAULT_MAX_BYTES;
-  const makeEntry = (value: unknown): CacheEntryFile => {
+  const makeEntry = (value: unknown, meta?: { etag?: string | null; lastModified?: string | null; cacheControl?: string | null; expires?: string | null; age?: string | null; noStore?: boolean; source?: string | null; attribution?: string | null }): CacheEntryFile | null => {
+    if (meta?.noStore || /\bno-store\b/i.test(meta?.cacheControl ?? "")) return null;
     const fetchedAt = new Date().toISOString();
-    return { url, method, fetchedAt, expiresAt: new Date(Date.parse(fetchedAt) + ttlS * 1000).toISOString(), staleUntil: new Date(Date.parse(fetchedAt) + (ttlS + staleOkS) * 1000).toISOString(), source: provenance.source, attribution: provenance.attribution, value };
+    const effectiveTtl = meta ? effectiveTtlSeconds(ttlS, meta, Date.parse(fetchedAt)) : ttlS;
+    const source = meta && Object.hasOwn(meta, "source") ? meta.source ?? null : provenance.source;
+    const attribution = meta && Object.hasOwn(meta, "attribution") ? meta.attribution ?? null : provenance.attribution;
+    return { url, method, fetchedAt, expiresAt: new Date(Date.parse(fetchedAt) + effectiveTtl * 1000).toISOString(), staleUntil: new Date(Date.parse(fetchedAt) + (effectiveTtl + staleOkS) * 1000).toISOString(), ...(meta?.etag ? { etag: meta.etag } : {}), ...(meta?.lastModified ? { lastModified: meta.lastModified } : {}), source, attribution, value };
   };
   const key = cacheKey(url, opts);
+  const writeFetched = (value: unknown, meta?: Parameters<typeof makeEntry>[1]): void => { const entry = makeEntry(value, meta); if (entry) writeEntry(packageId, key, entry, maxBytes); };
   const existing = readEntry(packageId, key);
 
   if (existing) {
-    const ageS = (Date.now() - new Date(existing.fetchedAt).getTime()) / 1000;
-    if (ageS <= ttlS) {
+    const effectiveExpires = existing.expiresAt ? Date.parse(existing.expiresAt) : Date.parse(existing.fetchedAt) + ttlS * 1000;
+    const effectiveStaleUntil = existing.staleUntil ? Date.parse(existing.staleUntil) : Date.parse(existing.fetchedAt) + (ttlS + staleOkS) * 1000;
+    if (Date.now() < effectiveExpires && Date.now() <= effectiveStaleUntil) {
       recordHit(packageId);
       touch(entryPath(packageId, key));
       return existing.value;
     }
-    if (ageS <= ttlS + staleOkS) {
+    if (effectiveStaleUntil > effectiveExpires && Date.now() <= effectiveStaleUntil) {
       recordHit(packageId);
       touch(entryPath(packageId, key));
       // Stale-while-revalidate: the caller gets the stale value right
@@ -312,17 +331,50 @@ export async function cachedFetch(
       // caller already has their answer, and the next call past ttl_s
       // (with no fresher entry) will surface the real error the ordinary
       // way, through doFetch() itself.
-      void doFetch()
-        .then((value) => writeEntry(packageId, key, makeEntry(value), maxBytes))
+      void doFetch({ etag: existing.etag, lastModified: existing.lastModified })
+        .then((value: any) => {
+          if (value?.marker === CACHE_NOT_MODIFIED) {
+            const current = readEntry(packageId, key);
+            if (!current) {
+              return doFetch().then((fresh: any) => {
+                if (fresh?.marker !== CACHE_NOT_MODIFIED) {
+                  const response = unpackCacheResponse(fresh);
+                  const meta = response?.meta ?? {};
+                  writeFetched(response ? response.value : fresh, { ...meta, source: provenance.source, attribution: provenance.attribution });
+                }
+              });
+            }
+            const updated = makeEntry(current.value, { etag: value.meta?.etag ?? current.etag, lastModified: value.meta?.lastModified ?? current.lastModified, cacheControl: value.meta?.cacheControl, expires: value.meta?.expires, age: value.meta?.age, source: current.source ?? null, attribution: current.attribution ?? null });
+            if (updated) writeEntry(packageId, key, updated, maxBytes);
+          } else {
+            const response = unpackCacheResponse(value);
+            const meta = response?.meta ?? {};
+            writeFetched(response ? response.value : value, { ...meta, etag: meta.etag ?? existing.etag, lastModified: meta.lastModified ?? existing.lastModified, source: provenance.source, attribution: provenance.attribution });
+          }
+        })
         .catch(() => {});
       return existing.value;
     }
   }
 
   recordMiss(packageId);
-  const value = await doFetch();
-  writeEntry(packageId, key, makeEntry(value), maxBytes);
-  return value;
+  const value: any = await doFetch(existing ? { etag: existing.etag, lastModified: existing.lastModified } : undefined);
+  if (value?.marker === CACHE_NOT_MODIFIED) {
+    const current = readEntry(packageId, key);
+    if (!current || !existing) {
+      const fresh: any = await doFetch();
+      if (fresh?.marker === CACHE_NOT_MODIFIED) throw new Error("package fetch returned 304 without a cache entry");
+      const response = unpackCacheResponse(fresh);
+      writeFetched(response ? response.value : fresh, response?.meta ?? { source: provenance.source, attribution: provenance.attribution });
+      return response ? response.value : fresh;
+    }
+    const updated = makeEntry(current.value, { etag: value.meta?.etag ?? current.etag, lastModified: value.meta?.lastModified ?? current.lastModified, cacheControl: value.meta?.cacheControl, expires: value.meta?.expires, age: value.meta?.age, source: current.source ?? null, attribution: current.attribution ?? null });
+    if (updated) writeEntry(packageId, key, updated, maxBytes);
+    return current.value;
+  }
+  const response = unpackCacheResponse(value);
+  writeFetched(response ? response.value : value, response?.meta ?? { source: provenance.source, attribution: provenance.attribution });
+  return response ? response.value : value;
 }
 
 export function sweepPackageCache(nowMs: number = Date.now()): { expired: number; bytes: number; packages: number } {
