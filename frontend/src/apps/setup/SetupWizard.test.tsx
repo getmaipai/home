@@ -136,7 +136,7 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.container.textContent).toContain("Welcome to MaiPai Home"));
       expect(rendered.container.textContent).toContain("Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.");
       expect(rendered.container.textContent).toContain("Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.");
-      const note = await Bun.file("../../home/docs/plans/install-wizard-2026-10-13.md").text();
+      const note = await Bun.file(new URL("../../../../docs/plans/install-wizard-2026-10-13.md", import.meta.url)).text();
       expect(note).toContain("Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.");
     } finally { h.restore(); }
   });
