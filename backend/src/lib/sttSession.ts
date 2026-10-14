@@ -22,6 +22,16 @@ export interface SttSessionConfig {
   sampleRate: number;
   silenceTimeoutS: number;
   partialIntervalS: number;
+  endpointing?: { endpointer: Endpointer; holdS: number };
+}
+
+export interface Endpointer {
+  isComplete(audio: Float32Array, sampleRate: number): Promise<boolean>;
+}
+
+/** Production lookup remains empty until the Stack-served endpointer client lands. */
+export async function getEndpointer(): Promise<Endpointer | null> {
+  return null;
 }
 
 let sileroLoader: typeof getSileroStream = getSileroStream;
@@ -94,6 +104,11 @@ export class SttSession {
   private lastVoicedLen = 0;
   private reusablePartial: { text: string; voicedLen: number } | null = null;
   private redecodeAtEdge = false;
+  private endpointAsked = false;
+  private endpointPending = false;
+  private endpointDecision: boolean | null = null;
+  private endpointGeneration = 0;
+  private endpointCheckScheduled = false;
   private chain: Promise<void> = Promise.resolve();
 
   constructor(cfg: SttSessionConfig, send: (msg: SttWireEvent) => void) {
@@ -145,6 +160,11 @@ export class SttSession {
         this.send({ t: "vad", speaking: true, rms });
       }
       this.silenceSamples = 0;
+      this.endpointCheckScheduled = false;
+      this.endpointGeneration++;
+      this.endpointAsked = false;
+      this.endpointPending = false;
+      this.endpointDecision = null;
       this.speech.push(samples.slice());
       this.speechLen += samples.length;
       this.lastVoicedLen = this.speechLen;
@@ -159,10 +179,20 @@ export class SttSession {
       this.speechLen += samples.length;
       this.silenceSamples += samples.length;
       if (firstSilenceFrame) {
-        if (this.partialInFlight) this.redecodeAtEdge = true;
-        else void this.emitPartial();
+        if (!this.cfg.endpointing) {
+          if (this.partialInFlight) this.redecodeAtEdge = true;
+          else void this.emitPartial();
+        }
       }
-      if (this.silenceSamples >= this.cfg.silenceTimeoutS * this.cfg.sampleRate) {
+      const endpointing = this.cfg.endpointing;
+      const baseSamples = this.cfg.silenceTimeoutS * this.cfg.sampleRate;
+      if (endpointing && this.silenceSamples >= baseSamples) {
+        if (!this.endpointAsked) this.askEndpointer(endpointing.endpointer);
+        if (this.endpointDecision === true ||
+          this.silenceSamples >= (this.cfg.silenceTimeoutS + endpointing.holdS) * this.cfg.sampleRate) {
+          void this.finalize();
+        }
+      } else if (this.silenceSamples >= baseSamples) {
         void this.finalize();
       }
     } else if (silero) {
@@ -179,6 +209,21 @@ export class SttSession {
     }
   }
 
+  private scheduleEndpointCheck(): void {
+    if (this.endpointCheckScheduled || this.finalizing || this.closed) return;
+    this.endpointCheckScheduled = true;
+    const checkGeneration = this.endpointGeneration;
+    setTimeout(() => {
+      this.endpointCheckScheduled = false;
+      if (this.closed || this.finalizing || !this.speaking || !this.cfg.endpointing || checkGeneration !== this.endpointGeneration) return;
+      if (this.endpointDecision === true && this.silenceSamples >= this.cfg.silenceTimeoutS * this.cfg.sampleRate) {
+        void this.finalize();
+      } else if (this.endpointDecision === false && this.silenceSamples >= (this.cfg.silenceTimeoutS + this.cfg.endpointing.holdS) * this.cfg.sampleRate) {
+        void this.finalize();
+      }
+    }, 10);
+  }
+
   /** Client asked to flush (e.g. end of turn) - finalize whatever we
    * have. Routed through the chain so a queued frame can't race it. */
   end(): void {
@@ -187,6 +232,35 @@ export class SttSession {
         if (!this.closed && this.speaking) void this.finalize();
       })
       .catch(() => {});
+  }
+
+  private askEndpointer(endpointer: Endpointer): void {
+    this.endpointAsked = true;
+    this.endpointPending = true;
+    const generation = this.endpointGeneration;
+    let timeoutId: ReturnType<typeof setTimeout>;
+    let timedOut = false;
+    const result = Promise.resolve().then(() => endpointer.isComplete(this.flatten(), this.cfg.sampleRate));
+    const timeout = new Promise<boolean>((resolve) => {
+      timeoutId = setTimeout(() => { timedOut = true; resolve(true); }, 250);
+    });
+    void Promise.race([result, timeout])
+      .then((complete) => {
+        if (this.closed || this.finalizing || generation !== this.endpointGeneration) return;
+        clearTimeout(timeoutId!);
+        this.endpointDecision = timedOut ? true : complete;
+        this.endpointPending = false;
+        if (timedOut) console.info("STT endpointer timed out; finalizing at base silence");
+        this.scheduleEndpointCheck();
+      })
+      .catch(() => {
+        if (this.closed || this.finalizing || generation !== this.endpointGeneration) return;
+        clearTimeout(timeoutId!);
+        console.info("STT endpointer failed; finalizing at base silence");
+        this.endpointDecision = true;
+        this.endpointPending = false;
+        this.scheduleEndpointCheck();
+      });
   }
 
   close(): void {
@@ -310,6 +384,11 @@ export class SttSession {
     this.lastVoicedLen = 0;
     this.reusablePartial = null;
     this.redecodeAtEdge = false;
+    this.endpointAsked = false;
+    this.endpointPending = false;
+    this.endpointDecision = null;
+    this.endpointGeneration++;
+    this.endpointCheckScheduled = false;
     this.silero?.reset();
   }
 }

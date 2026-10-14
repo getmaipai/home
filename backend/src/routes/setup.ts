@@ -78,7 +78,7 @@ setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
   const status = await checkSearchInstance({ candidateBaseUrl: url });
   if (!status.checks.length || status.checks.some((check) => check.state !== "pass")) return c.json({ error: status.checks.find((check) => check.state !== "pass")?.fix ?? "Web search isn't ready yet." }, 400);
   const saved = setHouseholdSettingValue("search.searxng_url", parsed.toString().replace(/\/$/, ""));
-  return saved.ok ? c.json({ saved: true }, 200) : c.json({ error: saved.error }, 400);
+  return saved.ok ? c.json({ saved: true as const }, 200) : c.json({ error: saved.error }, 400);
 });
 
 const allowTailnetRoute = createRoute({

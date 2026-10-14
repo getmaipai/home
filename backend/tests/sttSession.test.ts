@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-import { SttSession, encodeWav, decodeWav, isLikelySpeech, __setSileroLoaderForTests, __resetSileroLoaderForTests } from "@/lib/sttSession";
+import { SttSession, encodeWav, decodeWav, isLikelySpeech, __setSileroLoaderForTests, __resetSileroLoaderForTests, type Endpointer } from "@/lib/sttSession";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { startStackFixture, type StackFixture } from "./stackFixture";
@@ -41,6 +41,11 @@ async function flush(): Promise<void> {
   await new Promise((r) => setTimeout(r, 10));
 }
 
+async function settleEndpoint(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 280));
+  await flush();
+}
+
 afterEach(() => {
   fixture?.stop();
   fixture = undefined;
@@ -57,7 +62,149 @@ function scriptTranscript(text: string): void {
   __setStackClientForTests(fixture.client);
 }
 
+async function pushPause(session: SttSession, pauseMs: number): Promise<void> {
+  for (let i = 0; i < pauseMs / 10; i++) session.pushPcm(silenceFrame());
+  await flush();
+}
+
+async function pushSentence(session: SttSession, pauseMs: number): Promise<void> {
+  for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+  await flush();
+  await pushPause(session, pauseMs);
+  for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+  await flush();
+  for (let i = 0; i < 40; i++) session.pushPcm(silenceFrame());
+  await flush();
+  await flush();
+}
+
+function finals(events: SttWireEvent[]): SttWireEvent[] {
+  return events.filter((event) => event.t === "final");
+}
+
+function endpointConfig(endpointer: Endpointer, holdS = 0.8) {
+  return { ...config(), endpointing: { endpointer, holdS } };
+}
+
 describe("SttSession - RMS fallback VAD (no Silero model installed in tests)", () => {
+  test("with no endpointer, a 600 ms pause ends the utterance as before", async () => {
+    scriptTranscript("one utterance");
+    const events: SttWireEvent[] = [];
+    const session = new SttSession(config(), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 600);
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 30; i++) session.pushPcm(silenceFrame());
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    expect(finals(events)).toHaveLength(2);
+    expect(transcriptionCalls()).toBe(2);
+    session.close();
+  });
+
+  test("with the endpointer on and answering not finished, a 600 ms mid-sentence pause does not end the utterance", async () => {
+    scriptTranscript("whole sentence");
+    const events: SttWireEvent[] = [];
+    let endpointCalls = 0;
+    const endpointer = { isComplete: async () => endpointCalls++ === 0 ? false : true };
+    const session = new SttSession(endpointConfig(endpointer), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 600);
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    for (let i = 0; i < 30; i++) session.pushPcm(silenceFrame());
+    await flush();
+    await flush();
+
+    expect(endpointCalls).toBe(2);
+    expect(finals(events)).toHaveLength(1);
+    expect(transcriptionCalls()).toBe(1);
+    session.close();
+  });
+
+  test("with the endpointer on and answering finished, the utterance ends at the base silence", async () => {
+    scriptTranscript("finished");
+    const events: SttWireEvent[] = [];
+    const session = new SttSession(endpointConfig({ isComplete: async () => true }), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 300);
+    await flush();
+
+    expect(finals(events)).toHaveLength(1);
+    expect(transcriptionCalls()).toBe(1);
+    session.close();
+  });
+
+  test("a pause longer than the hold still ends the utterance", async () => {
+    scriptTranscript("held sentence");
+    const events: SttWireEvent[] = [];
+    let calls = 0;
+    const session = new SttSession(endpointConfig({ isComplete: async () => { calls++; return false; } }, 0.2), (e) => events.push(e));
+
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 500);
+
+    expect(finals(events)).toHaveLength(1);
+    expect(calls).toBe(1);
+    session.close();
+  });
+
+  test("an endpointer that throws or hangs fails open to the normal end", async () => {
+    for (const endpointer of [
+      { isComplete: async () => { throw new Error("private transcript must not appear"); } },
+      { isComplete: () => new Promise<boolean>(() => {}) },
+    ]) {
+      scriptTranscript("fail open");
+      const events: SttWireEvent[] = [];
+      const session = new SttSession(endpointConfig(endpointer), (e) => events.push(e));
+      for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+      await flush();
+      await pushPause(session, 300);
+      await settleEndpoint();
+      await flush();
+      expect(finals(events)).toHaveLength(1);
+      session.close();
+      fixture?.stop();
+      fixture = undefined;
+      __resetStackEngineForTests();
+      __setStackClientForTests(null);
+    }
+  });
+
+  test("the endpointer is asked once per silence run, not once per frame", async () => {
+    scriptTranscript("one silence");
+    const events: SttWireEvent[] = [];
+    let calls = 0;
+    const session = new SttSession(endpointConfig({ isComplete: async () => { calls++; return false; } }, 1), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 300);
+    await settleEndpoint();
+    expect(calls).toBe(1);
+    session.close();
+  });
+
+  test("vad speaking false is sent when the utterance ends, not at the first silent frame, in hold mode", async () => {
+    scriptTranscript("held");
+    const events: SttWireEvent[] = [];
+    const session = new SttSession(endpointConfig({ isComplete: async () => false }, 0.2), (e) => events.push(e));
+    for (let i = 0; i < 30; i++) session.pushPcm(loudFrame());
+    await flush();
+    await pushPause(session, 350);
+    expect(events.some((e) => e.t === "vad" && e.speaking === false)).toBe(false);
+    await pushPause(session, 200);
+    expect(events.some((e) => e.t === "vad" && e.speaking === false)).toBe(true);
+    session.close();
+  });
+
   test("silence alone never opens an utterance or calls transcribe", async () => {
     const events: SttWireEvent[] = [];
     const session = new SttSession(config(), (e) => events.push(e));

@@ -5,7 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { upgradeWebSocket } from "hono/bun";
 import { requireAuth } from "@/middleware/auth";
-import { SttSession, decodeWav } from "@/lib/sttSession";
+import { SttSession, decodeWav, getEndpointer } from "@/lib/sttSession";
 import { transcribeUtterance } from "@/lib/stt";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import type { SttStatusResponse, SttTranscribeResponse } from "@maipai/spec/voice/ts/sttTypes.js";
@@ -25,12 +25,29 @@ sttRoutes.get(
   requireAuth,
   upgradeWebSocket(() => {
     let session: SttSession | null = null;
+    let ended = false;
+    const pendingPcm: Float32Array[] = [];
     return {
       onOpen(_evt, ws) {
-        session = new SttSession(SESSION_CONFIG, (msg) => ws.send(JSON.stringify(msg)));
-        ws.send(JSON.stringify({ t: "ready" }));
+        void getEndpointer().then((endpointer) => {
+          if (ended) return;
+          const config = endpointer
+            ? { ...SESSION_CONFIG, silenceTimeoutS: 0.4, endpointing: { endpointer, holdS: 0.8 } }
+            : SESSION_CONFIG;
+          session = new SttSession(config, (msg) => ws.send(JSON.stringify(msg)));
+          for (const frame of pendingPcm) session.pushPcm(frame);
+          pendingPcm.length = 0;
+          ws.send(JSON.stringify({ t: "ready" }));
+        });
       },
       onMessage(evt, ws) {
+        if (!session && (typeof evt.data === "string" || evt.data instanceof ArrayBuffer)) {
+          // Hold messages that arrive before the optional lookup settles.
+          if (evt.data instanceof ArrayBuffer && evt.data.byteLength % 4 === 0) {
+            pendingPcm.push(new Float32Array(evt.data));
+          }
+          return;
+        }
         if (!session) return;
         if (typeof evt.data === "string") {
           try {
@@ -61,6 +78,8 @@ sttRoutes.get(
         session.pushPcm(new Float32Array(evt.data));
       },
       onClose() {
+        ended = true;
+        pendingPcm.length = 0;
         session?.close();
         session = null;
       },
