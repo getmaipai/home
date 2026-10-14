@@ -43,6 +43,12 @@ function stubFetch(config: unknown, searchResponse: Response = Response.json(sea
 }
 
 describe("search instance checks", () => {
+  test("a candidate check bypasses a previously configured host and never caches or repairs it", async () => {
+    const { fetcher, paths } = stubFetch(configFull);
+    await checkSearchInstance({ candidateBaseUrl: "http://127.0.0.1:8080", fetcher, now: FIXED_NOW });
+    expect(paths.length).toBeGreaterThan(0);
+    expect(paths.every((path) => ["/healthz", "/config", "/search", "/stats/errors"].includes(path))).toBe(true);
+  });
   test("an instance with JSON turned off fails the readable-results check and the snippet adds json to search.formats", async () => {
     const { fetcher } = stubFetch(configFull, new Response("Forbidden", { status: 403 }));
     const status = await checkSearchInstance({ force: true, fetcher, now: FIXED_NOW });

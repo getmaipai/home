@@ -20067,11 +20067,86 @@
                       ],
                       "additionalProperties": false,
                       "description": "The household-scope setup progress record for one hub. Choices reference existing settings; the record does not duplicate them."
+                    },
+                    "searchCandidate": {
+                      "type": "string",
+                      "nullable": true
                     }
                   },
                   "required": [
                     "rows",
-                    "state"
+                    "state",
+                    "searchCandidate"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/search/use-candidate": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Choose a discovered local SearXNG",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  }
+                },
+                "required": [
+                  "url"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The chosen SearXNG address was saved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "saved": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "saved"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The address is not a passing loopback SearXNG.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "next": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }

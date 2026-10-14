@@ -61,6 +61,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [checkError, setCheckError] = useState(false);
   const [checksFetching, setChecksFetching] = useState(false);
   const [tailnetError, setTailnetError] = useState<string | null>(null);
+  const [searchCandidate, setSearchCandidate] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
 
   const refresh = async () => {
     const result = await api.setupState();
@@ -102,8 +104,9 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       if (!active) return;
       setCheckRows(result.rows);
       setState(result.state);
+      setSearchCandidate(result.searchCandidate);
       setCheckError(false);
-      if (result.rows.every((row) => row.state === "green" || row.state === "idle")) {
+      if (result.rows.every((row) => row.state === "green" || row.state === "idle" || (row.id === "web-search" && row.state === "amber"))) {
         window.setTimeout(() => { if (active) setScreen("plan"); }, 1500);
       }
     }, () => { if (active) setCheckError(true); }).finally(() => { if (active) setChecksFetching(false); });
@@ -219,9 +222,17 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       const action = checkRows?.find((row) => row.action === "allow_tailnet");
       if (action?.actionRoute === "settings") await api.setSetting("household", "engines.stack.remote.allow_tailnet", true);
       else await api.setupAllowEngineTailnet();
-      const result = await api.setupChecks(); setCheckRows(result.rows); setState(result.state);
+      const result = await api.setupChecks(); setCheckRows(result.rows); setState(result.state); setSearchCandidate(result.searchCandidate);
     }
     catch (reason) { setTailnetError(reason instanceof Error ? reason.message : "Home couldn't allow Tailscale for the engine link. Sign in as an owner or admin, then try again."); }
+    finally { setBusy(false); }
+  }
+
+  async function chooseSearchCandidate() {
+    if (!searchCandidate) return;
+    setBusy(true); setSearchError(null);
+    try { await api.setupUseSearchCandidate(searchCandidate); setSearchCandidate(null); }
+    catch (reason) { setSearchError(reason instanceof Error ? reason.message : "Home couldn't choose this search service."); }
     finally { setBusy(false); }
   }
 
@@ -247,7 +258,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       const blocking = checkRows?.some((row) => row.state === "red") ?? false;
       const warnings = checkRows?.some((row) => row.state === "amber") ?? false;
       body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent>
-        <AsyncState data={checkRows} error={checkError} isFetching={checksFetching} onRetry={() => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); }} errorMessage="Home couldn't check these computers." loadingLabel="Checking your computers">
+        <AsyncState data={checkRows} error={checkError} isFetching={checksFetching} onRetry={() => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); setSearchCandidate(result.searchCandidate); if (result.rows.every((row) => row.state === "green" || row.state === "idle" || (row.id === "web-search" && row.state === "amber"))) window.setTimeout(() => setScreen("plan"), 1500); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); }} errorMessage="Home couldn't check these computers." loadingLabel="Checking your computers">
           {(rows) => <List items={rows} getKey={(row) => row.id} label="Setup checks" renderItem={(row) => <div className="flex min-w-0 flex-1 flex-col gap-1 py-1"><div className="flex items-center gap-2"><Badge variant={row.state === "red" ? "destructive" : row.state === "amber" ? "outline" : "secondary"}>{row.state}</Badge><span className="font-medium">{row.title}</span></div><p className="text-sm text-muted-foreground">{row.text}</p>{row.action === "allow_tailnet" ? <Button type="button" variant="secondary" disabled={busy} onClick={() => void allowEngineTailnet()}>{row.actionLabel ?? "Allow"}</Button> : null}</div>} />}
         </AsyncState>
         {tailnetError ? <p role="alert">{tailnetError}</p> : null}
@@ -258,7 +269,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       </CardContent></Card>;
       break;
     }
-    case "plan": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><p>Hardware checks and the Stack's plan recommendations are not built into setup yet. No plan has been installed or selected.</p></CardContent></Card>; break;
+    case "plan": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><p>Hardware checks and the Stack's plan recommendations are not built into setup yet. No plan has been installed or selected.</p><p>Web search: Home's own private search.</p>{searchCandidate ? <><p>Found a SearXNG on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void chooseSearchCandidate()}>Use it</Button></> : null}{searchError ? <p role="alert">{searchError}</p> : null}</CardContent></Card>; break;
     case "away": body = <Card><CardHeader><CardTitle>Reach Home from anywhere</CardTitle><CardDescription>Tailscale connects your family's devices to Home away from home.</CardDescription></CardHeader><CardContent><p>The Tailscale setup and status checks are not built yet. Home has not contacted Tailscale or enabled remote access.</p><p>Set up later. Home works only at home until then.</p><p className="text-sm text-muted-foreground">You can finish this later in Home settings.</p></CardContent></Card>; break;
     case "owner": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><Card><CardHeader><CardTitle>Owner or admin?</CardTitle></CardHeader><CardContent><p>{OWNER_COPY}</p><p>{ADMIN_COPY}</p></CardContent></Card><Separator /><form className="flex flex-col gap-3" onSubmit={(event) => { event.preventDefault(); void submitOwner(); }}><Label htmlFor="owner-name">Your name</Label><Input id="owner-name" value={ownerName} onChange={(event) => setOwnerName(event.target.value)} autoComplete="name" /><Label htmlFor="owner-secret">PIN or password</Label><Input id="owner-secret" type="password" inputMode="numeric" value={ownerSecret} onChange={(event) => setOwnerSecret(event.target.value)} autoComplete="new-password" /><p className="text-sm text-muted-foreground">You'll use this to sign in and to change Home's settings.</p>{error ? <p role="alert">{error}</p> : null}</form></CardContent></Card>; break;
     case "face": body = <Card><CardHeader><CardTitle>Let Home recognise you</CardTitle><CardDescription>Home can greet you by face. Your face is stored as numbers on this computer only.</CardDescription></CardHeader><CardContent><p>Face enrollment is available from your profile after setup.</p></CardContent></Card>; break;

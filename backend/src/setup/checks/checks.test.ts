@@ -3,9 +3,42 @@ import { isSupportedInstallPlatform } from "@/lib/installPreflight";
 import { checkNvidiaSysmemFallback } from "./nvidiaSysmemFallback";
 import { interpretTailscaleStatusJson } from "@/lib/tailscale";
 import { runSetupChecks } from "./checks";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { resetDb } from "../../../tests/reset-db";
 
 describe("setup check row helpers", () => {
+  test("web search discovery is amber and does not choose its candidate", async () => {
+    const candidatesOut: Array<{ url: string; status: "pass" | "fail" }> = [];
+    const rows = await runSetupChecks({
+      health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "arm64" }, proposed: { level: "Minimal" } }), catalog: async () => ({ models: [] }),
+      modelDisk: async () => ({ status: "green" }), hubDisk: async () => ({ status: "green" }), homeNetwork: async () => true,
+      searchCandidates: async () => [{ url: "http://127.0.0.1:8080", status: "pass" }], candidatesOut, stackSearchState: () => "ready",
+    });
+    expect(rows.find((row) => row.id === "web-search")?.state).toBe("amber");
+    expect(candidatesOut).toEqual([{ url: "http://127.0.0.1:8080", status: "pass" }]);
+    expect(getHouseholdSettingValue("search.searxng_url")).toBe("");
+  });
+  test("web search row fixtures cover green and amber, and never red", async () => {
+    resetDb();
+    const common = { health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "arm64" }, proposed: { level: "Minimal" } }), catalog: async () => ({ models: [] }), modelDisk: async () => ({ status: "green" as const }), hubDisk: async () => ({ status: "green" as const }), homeNetwork: async () => true };
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:8080");
+    const green = await runSetupChecks({ ...common, configuredSearchStatus: async () => "pass" });
+    expect(green.find((row) => row.id === "web-search")?.state).toBe("green");
+    const unhealthy = await runSetupChecks({ ...common, configuredSearchStatus: async () => "fail" });
+    expect(unhealthy.find((row) => row.id === "web-search")?.state).toBe("amber");
+    setHouseholdSettingValue("search.searxng_url", "");
+    const ready = await runSetupChecks({ ...common, stackSearchState: () => "ready", searchCandidates: async () => [{ url: "http://127.0.0.1:8888", status: "pass" }] });
+    expect(ready.find((row) => row.id === "web-search")?.state).toBe("amber");
+    const noStack = await runSetupChecks({ ...common, stackSearchState: () => "absent" });
+    expect(noStack.find((row) => row.id === "web-search")?.text).toContain("isn't ready yet");
+    const installing = await runSetupChecks({ ...common, stackSearchState: () => "installing" });
+    expect(installing.find((row) => row.id === "web-search")?.text).toBe("Web search is still installing...");
+    const candidate = await runSetupChecks({ ...common, searchCandidates: async () => [{ url: "http://127.0.0.1:8080", status: "fail" }] });
+    expect(candidate.find((row) => row.id === "web-search")?.state).toBe("amber");
+    expect([ready, noStack, installing, candidate].flatMap((rows) => rows.filter((row) => row.id === "web-search")).every((row) => row.state !== "red")).toBe(true);
+  });
   test("synthetic Tailscale states produce matching peer and route rows", async () => {
+    setHouseholdSettingValue("engines.stack.where", "another_computer");
     const status = (state: string, peer?: Record<string, unknown>) => ({ state: state as "running" | "stopped" | "not_installed", dnsName: null, ips: [], installed: state !== "not_installed", signedIn: state === "running", httpsEnabled: false, machineName: null, peers: peer ? interpretTailscaleStatusJson(JSON.stringify({ BackendState: "Running", Peer: { engine: peer } })).peers : [] });
     const setup = async (tailscale: ReturnType<typeof status>, allowed = true) => runSetupChecks({
       health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "arm64" }, proposed: { level: "Minimal" } }),

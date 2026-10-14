@@ -12,6 +12,7 @@ Rough size tags: **S** (a session or less), **M** (a real slice, days),
 
 ## Engines: another computer at home
 
+- [ ] **SETUP-SEARCH-REMOTE-PROBE-01: Stack-side search probe for a remote engine** (S, after STACK-SEARCH-01). The hub cannot reach the remote engine computer's loopback. Add a Stack-side probe through the Stack's supported interface; do not scan the network. Reuse the one SearXNG checker semantics without adding a second Home checker.
 - [ ] **SETUP-CHECKS-01 follow-ups:** persist the first-run storage choice as the Stack's model destination; expose a Stack-side NVIDIA sysmem-fallback read and engine clock measurement; add a remote Stack model-host reach probe listed in `/stack/v1/privacy`; add the missing main-board seeded-household visual capture path. **INSTALL-DL-BENCH-01:** measure download speed on initial bytes before showing a slow-link warning. Checks screen implementation is in progress on `lane/checks-SETUP-CHECKS-01`.
 
 - [x] **CLOSED-CHAT-01: closed conversations remain readable and resume before their next turn** (S, owner bug 2026-10-08). Selecting an older chat reads its history; its first send uses the explicit resume route, and a failed resume shows plain copy without the id. Backend closed-conversation guard unchanged. Regression: `chatThreadListAdapter.test.ts` with `conv-19fp5aqgmr`. (landed 2026-10-08; 3fa3de3d)

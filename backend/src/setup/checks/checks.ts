@@ -9,11 +9,13 @@ import { checkNvidiaSysmemFallback, type NvidiaSysmemFallbackReader } from "./nv
 import { getSetupState } from "@/lib/setupState";
 import { minimum, defaultModelBytes } from "@/lib/placement";
 import { getTailscaleStatus } from "@/lib/tailscale";
-import { getHouseholdSettingValue } from "@/lib/settings";
 import { REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY } from "@/lib/remoteStackSettings";
 import { getEngineLink } from "@/lib/stack/link";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { checkSearchInstance } from "@/lib/searchInstanceCheck";
+import { isStackConfigured } from "@/lib/stackEngine";
+import { getHouseholdSettingValue } from "@/lib/settings";
 
 export type CheckState = "green" | "amber" | "red" | "idle";
 export type SetupCheck = { id: string; title: string; state: CheckState; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup"; item?: { code: string; severity: "critical" | "error" | "warning"; title: string; text: string; since: string; cause: string; fix?: { label: string; action: "retry_download" | "reinstall_engine" } } };
@@ -34,7 +36,39 @@ export type CheckDeps = {
   tailnetAllowed?: () => boolean;
   engineHost?: () => string;
   link?: () => { state: string; reason?: string | null; slow?: boolean } | null;
+  searchCandidates?: () => Promise<Array<{ url: string; status: "pass" | "fail" }>>;
+  candidatesOut?: Array<{ url: string; status: "pass" | "fail" }>;
+  stackSearchState?: () => "installing" | "ready" | "absent";
+  configuredSearchStatus?: () => Promise<"pass" | "fail">;
 };
+
+async function searchRows(deps: CheckDeps, now: Date): Promise<SetupCheck[]> {
+  const configured = getHouseholdSettingValue("search.searxng_url");
+  if (typeof configured === "string" && configured.trim()) {
+    const status = deps.configuredSearchStatus ? null : await checkSearchInstance({ updateRepairs: false });
+    const passing = deps.configuredSearchStatus ? await deps.configuredSearchStatus() === "pass" : Boolean(status?.checks.length && status.checks.every((check) => check.state === "pass"));
+    return [makeRow("web-search", "Web search", passing ? "green" : "amber", passing ? "Web search is ready." : status?.checks.find((check) => check.state !== "pass")?.fix ?? "Web search isn't ready yet. Home can continue without it.", "The configured SearXNG check.", undefined, now)];
+  }
+  const stackState = deps.stackSearchState?.() ?? (isStackConfigured() ? "absent" : "ready");
+  if (stackState === "installing") return [makeRow("web-search", "Web search", "amber", "Web search is still installing...", "The Stack reports its search service installing.", undefined, now)];
+  if (stackState === "absent") return [makeRow("web-search", "Web search", "amber", "Web search isn't ready yet. Home can continue without it.", "The Stack has no ready search service.", undefined, now)];
+  const candidates: Array<{ url: string; status: "pass" | "fail" }> = await (deps.searchCandidates ? deps.searchCandidates() : (async () => {
+    const found: Array<{ url: string; status: "pass" | "fail" }> = [];
+    for (const port of [8888, 8080]) {
+      const url = `http://127.0.0.1:${port}`;
+      try {
+        const response = await fetch(`${url}/healthz`, { signal: AbortSignal.timeout(1_000), redirect: "manual" });
+        if (response.status !== 200 || (await response.text()).trim().toUpperCase() !== "OK") continue;
+        const status = await checkSearchInstance({ candidateBaseUrl: url });
+        const isSearxng = status.version !== null && status.checks.some((check) => check.id === "json-format") && status.checks.some((check) => check.id === "web-engines");
+        if (isSearxng) found.push({ url, status: status.checks.length && status.checks.every((check) => check.state === "pass") ? "pass" : "fail" });
+      } catch { /* closed port or non-SearXNG */ }
+    }
+    return found;
+  })());
+  if (deps.candidatesOut) deps.candidatesOut.push(...candidates);
+  return [makeRow("web-search", "Web search", "amber", candidates.some((item) => item.status === "pass") ? "Found a SearXNG on this computer. You can choose it in the plan." : "Web search isn't ready yet. Home can continue without it.", "No configured search address; any loopback instance is only offered.", undefined, now)];
+}
 
 function tcp(host: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -142,6 +176,7 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     }
   }
   rows.push(makeRow("camera", "Camera and microphone", "idle", "Checked when you set up your face.", "Camera and microphone permissions are requested only during face setup.", undefined, now));
+  rows.push(...await searchRows(deps, now));
   return rows;
 }
 

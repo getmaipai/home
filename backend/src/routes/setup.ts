@@ -43,11 +43,12 @@ setupRoutes.use("*", setupLocalOnly);
 
 const checksRoute = createRoute({
   method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",
-  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState }) } }, description: "The ordered check rows and updated setup state." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState, searchCandidate: z.string().nullable() }) } }, description: "The ordered check rows and updated setup state." } },
 });
 const allowTailnetErrorSchema = z.object({ error: z.string(), next: z.string().optional() });
 setupRoutes.openapi(checksRoute, async (c) => {
-  const rows = await runSetupChecks();
+  const candidatesOut: Array<{ url: string; status: "pass" | "fail" }> = [];
+  const rows = await runSetupChecks({ candidatesOut });
   const passed = rows.every((row) => row.state === "green" || row.state === "idle");
   const current = getSetupState();
   let engine = current.engine;
@@ -59,7 +60,25 @@ setupRoutes.openapi(checksRoute, async (c) => {
   }
   const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows), engine });
   if (passed) void startSetupDownloads().catch(() => {});
-  return c.json({ rows: rows.map(({ id, title, state, text, action, actionLabel, actionRoute }) => ({ id, title, state, text, ...(action ? { action, actionLabel, actionRoute } : {}) })), state }, 200);
+  return c.json({ rows: rows.map(({ id, title, state, text, action, actionLabel, actionRoute }) => ({ id, title, state, text, ...(action ? { action, actionLabel, actionRoute } : {}) })), state, searchCandidate: candidatesOut.find((item) => item.status === "pass")?.url ?? null }, 200);
+});
+
+const useSearchCandidateRoute = createRoute({
+  method: "post", path: "/search/use-candidate", tags: ["Setup"], summary: "Choose a discovered local SearXNG",
+  request: { body: { content: { "application/json": { schema: z.object({ url: z.string().url() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.literal(true) }) } }, description: "The chosen SearXNG address was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not a passing loopback SearXNG." } },
+});
+setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
+  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead." }, 400);
+  const { url } = c.req.valid("json");
+  let parsed: URL;
+  try { parsed = new URL(url); } catch { return c.json({ error: "Choose a SearXNG found on this computer." }, 400); }
+  if (parsed.protocol !== "http:" || parsed.hostname !== "127.0.0.1" || ![8888, 8080].includes(Number(parsed.port))) return c.json({ error: "Choose a SearXNG found on this computer." }, 400);
+  const { checkSearchInstance } = await import("@/lib/searchInstanceCheck");
+  const status = await checkSearchInstance({ candidateBaseUrl: url });
+  if (!status.checks.length || status.checks.some((check) => check.state !== "pass")) return c.json({ error: status.checks.find((check) => check.state !== "pass")?.fix ?? "Web search isn't ready yet." }, 400);
+  const saved = setHouseholdSettingValue("search.searxng_url", parsed.toString().replace(/\/$/, ""));
+  return saved.ok ? c.json({ saved: true }, 200) : c.json({ error: saved.error }, 400);
 });
 
 const allowTailnetRoute = createRoute({

@@ -31,6 +31,8 @@ export type SearchInstanceStatus = {
 };
 
 type CheckerOptions = {
+  /** Check an unchosen address without using configured-setting cache or Repairs. */
+  candidateBaseUrl?: string;
   force?: boolean;
   respectCooldown?: boolean;
   updateRepairs?: boolean;
@@ -371,14 +373,25 @@ export function buildSearchInstanceSnippet(status: SearchInstanceStatus): { sett
 
 export async function checkSearchInstance(options: CheckerOptions = {}): Promise<SearchInstanceStatus> {
   const now = options.now ?? Date.now();
-  const configured = configuredUrl();
-  if (!configured.configured) return emptyStatus(now);
+  const candidate = options.candidateBaseUrl?.trim();
+  let configured: { configured: boolean; baseUrl: string | null };
+  if (candidate) {
+    try {
+      const parsed = new URL(candidate);
+      const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost" || parsed.hostname === "[::1]";
+      configured = parsed.protocol === "http:" && loopback && !parsed.username && !parsed.password
+        ? { configured: true, baseUrl: parsed.toString().replace(/\/$/, "") }
+        : { configured: true, baseUrl: null };
+    } catch { configured = { configured: true, baseUrl: null }; }
+  } else configured = configuredUrl();
+  if (!candidate && !configured.configured) return emptyStatus(now);
   const baseUrl = configured.baseUrl;
   if (!baseUrl) return invalidAddressStatus(now);
 
-  const cached = cache.get(baseUrl);
-  if (!options.force && cached && now - cached.storedAt < CHECK_CACHE_MS) return cached.status;
-  if (options.force && options.respectCooldown) {
+  const useCandidate = Boolean(candidate);
+  const cached = useCandidate ? undefined : cache.get(baseUrl);
+  if (!useCandidate && !options.force && cached && now - cached.storedAt < CHECK_CACHE_MS) return cached.status;
+  if (!useCandidate && options.force && options.respectCooldown) {
     const last = lastManualRefresh.get(baseUrl) ?? 0;
     const elapsed = now - last;
     if (elapsed < MANUAL_REFRESH_COOLDOWN_MS) throw new SearchInstanceRefreshCooldownError(Math.ceil((MANUAL_REFRESH_COOLDOWN_MS - elapsed) / 1000));
@@ -418,7 +431,7 @@ export async function checkSearchInstance(options: CheckerOptions = {}): Promise
     groups: result.groups,
     engineErrors: result.engineErrors,
   };
-  if (options.updateRepairs !== false) {
+  if (!useCandidate && options.updateRepairs !== false) {
     await updateSafeSearchRepair(result.hasUnsafeMinorEngines);
     cache.set(baseUrl, { storedAt: now, status });
   }
