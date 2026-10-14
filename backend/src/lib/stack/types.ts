@@ -4,8 +4,31 @@
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
+import { z } from "zod";
 export type { StackFitPlan };
 export type { StackJob };
+
+export interface StackVoice {
+  id: string; name: string; description: string; language: string; country: string;
+  gender: "female" | "male" | "neutral" | "unknown";
+  source: "preset" | "community" | "cloned" | "unknown";
+  engine?: string; onDisk: boolean; licence: string | null; revision: string;
+}
+
+// Mirrors stack/backend/src/wire/voice.ts; move to @maipai/spec when a spec tag carries the voice shape.
+export const StackVoiceSchema = z.object({
+  id: z.string().trim().min(1),
+  name: z.preprocess((v) => typeof v === "string" && v.trim() ? v.trim() : "unknown", z.string()),
+  description: z.preprocess((v) => typeof v === "string" && v.trim() ? v.trim() : "unknown", z.string()),
+  language: z.preprocess((v) => typeof v === "string" && v.trim() ? v.trim() : "unknown", z.string()),
+  country: z.preprocess((v) => typeof v === "string" && v.trim() ? v.trim() : "unknown", z.string()),
+  gender: z.preprocess((v) => ["female", "male", "neutral"].includes(String(v)) ? v : "unknown", z.enum(["female", "male", "neutral", "unknown"])).default("unknown"),
+  source: z.preprocess((v) => ["preset", "community", "cloned"].includes(String(v)) ? v : "unknown", z.enum(["preset", "community", "cloned", "unknown"])).default("unknown"),
+  engine: z.preprocess((v) => typeof v === "string" ? v : undefined, z.string().optional()),
+  onDisk: z.preprocess((v) => typeof v === "boolean" ? v : false, z.boolean()),
+  licence: z.preprocess((v) => typeof v === "string" || v === null ? v : null, z.string().nullable()),
+  revision: z.preprocess((v) => typeof v === "string" && v.trim() ? v.trim() : "unknown", z.string()),
+}).strip();
 
 export interface FitPlanRequest {
   source: { url: string } | { path: string } | { repo: string; revision?: string };

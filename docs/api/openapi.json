@@ -13937,6 +13937,118 @@
         }
       }
     },
+    "/api/voice/voices": {
+      "get": {
+        "tags": [
+          "Voice"
+        ],
+        "summary": "List voices available from the Stack",
+        "description": "Lists every voice the Stack can render, with friendly metadata when available.",
+        "responses": {
+          "200": {
+            "description": "The voices available from the Stack.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "voices": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string"
+                          },
+                          "country": {
+                            "type": "string"
+                          },
+                          "gender": {
+                            "type": "string",
+                            "enum": [
+                              "female",
+                              "male",
+                              "neutral",
+                              "unknown"
+                            ]
+                          },
+                          "source": {
+                            "type": "string",
+                            "enum": [
+                              "preset",
+                              "community",
+                              "cloned",
+                              "unknown"
+                            ]
+                          },
+                          "engine": {
+                            "type": "string"
+                          },
+                          "onDisk": {
+                            "type": "boolean"
+                          },
+                          "licence": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "revision": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "description",
+                          "language",
+                          "country",
+                          "gender",
+                          "source",
+                          "onDisk",
+                          "licence",
+                          "revision"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "voices"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The Stack is required or did not answer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/voice/wakewords": {
       "get": {
         "tags": [

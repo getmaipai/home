@@ -102,6 +102,7 @@ const ROUTES: Array<[string, string, (body: unknown, form: FormData | null) => {
       },
     }),
   ],
+  ["/stack/v1/voices", "GET", () => ({ status: 200, body: { voices: [{ id: "v-1", name: "Plain" }, { id: "v-2", name: "Two", gender: "male", source: "preset", onDisk: true, licence: null, revision: "r1" }] } })],
   [
     "/stack/v1/engines/llama/install",
     "POST",
@@ -469,6 +470,7 @@ describe("createStackClient", () => {
 
   test("roles, engines, models, health, settings, budget, hardware, updates all answer", async () => {
     const client = createStackClient({ baseUrl });
+    expect((await client.voices()).map((voice) => voice.id)).toEqual(["v-1", "v-2"]);
     expect((await client.roles()).roles[0]!.id).toBe("chat");
     expect((await client.engines()).engines[0]!.name).toBe("llama.cpp");
     expect(((await client.engineAction("llama", "start")) as { ok: boolean }).ok).toBe(true);

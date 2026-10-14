@@ -7,6 +7,7 @@ import { withTimeout } from "@maipai/core/src/withTimeout";
 import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
+import { StackVoiceSchema } from "./types";
 import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
 import type {
   RoleRequest,
@@ -25,6 +26,7 @@ import type {
   StackCheckRun,
   FitPlanRequest,
   StackFitPlan,
+  StackVoice,
 } from "./types";
 
 const DEFAULT_BASE_URL = "http://127.0.0.1:8770";
@@ -61,6 +63,7 @@ export interface StackClient {
   cancelJob(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   roles(opts?: { signal?: AbortSignal }): Promise<RolesListResponse>;
   engines(opts?: { signal?: AbortSignal }): Promise<EnginesListResponse>;
+  voices(opts?: { signal?: AbortSignal }): Promise<StackVoice[]>;
   engineAction(
     name: string,
     action: "start" | "stop" | "restart" | "install",
@@ -327,6 +330,19 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     cancelJob: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     roles: (opts) => call("/stack/v1/roles", { method: "GET" }, json<RolesListResponse>, opts),
     engines: (opts) => call("/stack/v1/engines", { method: "GET" }, json<EnginesListResponse>, opts),
+    voices: (opts) => call("/stack/v1/voices", { method: "GET" }, async (res) => {
+      const body = await json<{ voices: unknown[] }>(res);
+      if (!Array.isArray(body.voices)) throw new Error("the Stack returned an invalid voices list");
+      let skipped = 0;
+      const voices: StackVoice[] = [];
+      for (const row of body.voices) {
+        const parsed = StackVoiceSchema.safeParse(row);
+        if (parsed.success) voices.push(parsed.data);
+        else skipped++;
+      }
+      if (skipped) console.warn(`the Stack voices list contained ${skipped} row(s) without a usable id`);
+      return voices;
+    }, opts),
     engineAction: (name, action, opts) =>
       call(`/stack/v1/engines/${encodeURIComponent(name)}/${action}`, { method: "POST" }, json<Record<string, unknown>>, opts),
     models: (opts) => call("/stack/v1/models", { method: "GET" }, json<Record<string, unknown>>, opts),

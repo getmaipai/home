@@ -41,6 +41,7 @@ import type {
   EngineStatus,
   EngineStatsSample,
   ClonedVoiceInfo,
+  StackVoice,
   RoutingStats,
   PrivacyConnection,
   PendingRestore,
@@ -162,7 +163,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // re-export the types here so the rest of the frontend imports from one
 // place.
 export type { TurnErrorDetail };
-export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
+export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, ClonedVoiceInfo, StackVoice, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -883,6 +884,7 @@ export const api = {
   // The community voice catalog (2026-09-04): every real file in
   // `kyutai/tts-voices`, not just the 26 bundled presets.
   voiceCatalog: () => request<{ entries: { path: string; collection: string }[] }>("/api/voice/catalog"),
+  stackVoices: () => request<{ voices: StackVoice[] }>("/api/voice/voices"),
   selectVoiceFromCatalog: (path: string) =>
     request<ResolvedSetting>("/api/voice/catalog/select", {
       method: "POST",

@@ -601,6 +601,13 @@ export interface ClonedVoiceInfo {
   createdAt: string;
 }
 
+export interface StackVoice {
+  id: string; name: string; description: string; language: string; country: string;
+  gender: "female" | "male" | "neutral" | "unknown";
+  source: "preset" | "community" | "cloned" | "unknown";
+  engine?: string; onDisk: boolean; licence: string | null; revision: string;
+}
+
 // Inlined rather than re-exported from lib/modelCatalog.ts (which uses
 // "@/"-aliased imports internally, unlike lib/hardware.ts above): the
 // same reason BackupInfo is a hand-copy of backup.ts's shape.

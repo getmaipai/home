@@ -30,8 +30,37 @@ import {
 } from "@/lib/clonedVoices";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import type { StackVoice } from "@/lib/stack/types";
 
 export const voiceRoutes = apiRouter();
+
+const stackVoicesRoute = createRoute({
+  method: "get", path: "/voices", tags: ["Voice"], summary: "List voices available from the Stack",
+  description: "Lists every voice the Stack can render, with friendly metadata when available.",
+  middleware: [requireAuth] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ voices: z.array(z.object({
+      id: z.string(), name: z.string(), description: z.string(), language: z.string(), country: z.string(),
+      gender: z.enum(["female", "male", "neutral", "unknown"]), source: z.enum(["preset", "community", "cloned", "unknown"]),
+      engine: z.string().optional(), onDisk: z.boolean(), licence: z.string().nullable(), revision: z.string(),
+    })) }) } }, description: "The voices available from the Stack." },
+    ...errorResponses({ 401: "Not signed in", 503: "The Stack is required or did not answer" }),
+  },
+});
+
+voiceRoutes.openapi(stackVoicesRoute, async (c) => {
+  const outageHelp = isOwnerOrAdmin(c.get("person"))
+    ? "Open Settings, then Engines, and start it."
+    : "Ask the person who manages Home to start it in Settings, then Engines.";
+  if (!isStackConfigured()) return c.json({ error: `The Stack that speaks for Home is not running. ${outageHelp}` }, 503);
+  try {
+    const voices: StackVoice[] = await getStackClient().voices();
+    return c.json({ voices }, 200);
+  } catch (err) {
+    const failure = stackFailureResult(err, "tts");
+    return c.json({ error: `${failure.error}. ${outageHelp}` }, failure.status);
+  }
+});
 
 // What the browser pipeline should load: the shared stage file names plus
 // every available per-phrase detector, and whether the complete stock
