@@ -353,6 +353,11 @@ export interface InstalledPackage extends Omit<PackageManifest, "smoke"> {
   smoke: { last_run_at: string | null; ok: boolean | null; message: string | null };
 }
 
+export interface TourProgressRecord {
+  id: string; person_id: string; tour_id: string; package_id: string; version: number;
+  status: "completed" | "skipped" | "dismissed"; step_reached: string; at: string; source: string; hlc: string; provenance: string;
+}
+
 // GET /api/plugins/skills's row (backend/src/routes/plugins.ts, SKILLS-PAGE-01).
 export interface SkillRow {
   id: string;
@@ -1146,6 +1151,12 @@ export const api = {
   // state suggested prompts (step 4) are drawn from these rather than
   // invented, so they're always real things MaiPai can actually do.
   plugins: () => request<InstalledPackage[]>("/api/plugins"),
+  tourProgress: () => request<TourProgressRecord[]>("/api/tours/progress"),
+  saveTourProgress: (record: Pick<TourProgressRecord, "tour_id" | "package_id" | "version" | "status" | "step_reached">) =>
+    request<TourProgressRecord>("/api/tours/progress", { method: "POST", body: JSON.stringify(record) }),
+  countMissingTourTarget: (record: { tour_id: string; package_id: string; step_id: string }) =>
+    request<{ success: true }>("/api/tours/missing-target", { method: "POST", body: JSON.stringify(record) }),
+  missingTourTargets: () => request<Array<{ key: string; count: number }>>("/api/tours/missing-targets"),
   // SKILLS-PAGE-01: every installed plugin, skill and project package this
   // person may use, with whether their written chat offers it today.
   skills: () => request<SkillRow[]>("/api/plugins/skills"),

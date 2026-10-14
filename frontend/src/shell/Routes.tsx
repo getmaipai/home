@@ -46,6 +46,8 @@ import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
 import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
+import { Tour } from "@maipai/ui/src/primitives/Tour";
+import { useTourRunner } from "@/shell/useTourRunner";
 
 // NOTIF-ROUTE-01: the thirty-day history page, reached from the bell's
 // "View history" link and the phone header's bell. Lazy so it stays out
@@ -132,6 +134,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
+  const activeTour = useTourRunner(person);
 
   useEffect(() => {
     rememberLastAppRoute(`${location.pathname}${location.search}${location.hash}`);
@@ -161,6 +164,19 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
+      {activeTour ? (
+        <Tour
+          steps={activeTour.tour.steps.map((step) => ({
+            target: step.target ? `[data-tour="${CSS.escape(step.target)}"]` : undefined,
+            title: (person.age_band && person.age_band !== "adult" ? step.title_by_audience?.[person.age_band] : undefined) ?? step.title ?? activeTour.tour.title,
+            body: (person.age_band && person.age_band !== "adult" ? step.body_by_audience?.[person.age_band] : undefined) ?? step.body ?? "",
+            placement: step.placement,
+          }))}
+          onFinish={() => activeTour.progress("completed", activeTour.tour.steps.at(-1)?.id)}
+          onSkip={() => activeTour.progress("skipped")}
+          onTargetMissing={activeTour.missing}
+        />
+      ) : null}
       <RouterRoutes>
         {/* HOME-UI-02d: the old Memories page now lives on the signed-in
             person's own profile. Preserve both old bookmarks and deep

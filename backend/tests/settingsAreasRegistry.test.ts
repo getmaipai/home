@@ -24,7 +24,13 @@ describe("settings registry and the spec's areas", () => {
     const notPlaced = new Set(not_placed.map((n) => `${n.scope}:${n.group}`));
     const cards = new Map<string, number>();
     for (const area of areas) for (const s of area.sections as { cards?: { group?: string; scope?: string; levels?: string[] }[] }[]) {
-      for (const c of s.cards ?? []) if (c.group && !c.levels) cards.set(`${c.scope}:${c.group}`, (cards.get(`${c.scope}:${c.group}`) ?? 0) + 1);
+      for (const c of s.cards ?? []) if (c.group) {
+        const levels = c.levels ?? ["*"];
+        for (const level of levels) {
+          const id = `${c.scope}:${c.group}:${level}`;
+          cards.set(id, (cards.get(id) ?? 0) + 1);
+        }
+      }
     }
     for (const key of getRegistry()) {
       // The current kit has no location selector renderer. These keys are
@@ -33,7 +39,7 @@ describe("settings registry and the spec's areas", () => {
       if (key.level === "expert" || key.selector === "location" || !key.honoured_by.includes("home")) continue;
       const id = `${key.scope}:${key.lives_in}`;
       if (notPlaced.has(id)) continue;
-      expect({ id, cards: cards.get(id) ?? 0 }).toEqual({ id, cards: 1 });
+      expect({ id, cards: cards.get(`${id}:${key.level}`) ?? cards.get(`${id}:*`) ?? 0 }).toEqual({ id, cards: 1 });
     }
   });
 });

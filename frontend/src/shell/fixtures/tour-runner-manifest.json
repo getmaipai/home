@@ -1,0 +1,17 @@
+{
+  "id": "tour-fixture",
+  "contributes": {
+    "tours": [
+      {
+        "id": "fixture.first-open",
+        "version": 1,
+        "title": "A test tour",
+        "starts_on": "page:chat",
+        "audience": ["adult"],
+        "steps": [
+          { "id": "composer", "target": "chat.composer", "title": "Ask", "body": "Type here.", "placement": "bottom", "order": 10 }
+        ]
+      }
+    ]
+  }
+}
