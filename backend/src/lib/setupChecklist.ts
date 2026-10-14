@@ -20,18 +20,15 @@ export const SETUP_CHECKLIST_ITEMS = [
 
 export type SetupChecklist = SetupChecklistItem[];
 
-export const SETUP_CHECKLIST_DISMISS_PREFIX = "setup-checklist:dismissed:";
-const PINNED_APPS_KEY = "ui.pinned_apps";
+const DISMISSED_CHECKLIST_KEY = "setup.checklist_dismissed";
 
 function dismissedIds(actor: PersonRow): Set<string> {
-  const raw = getPersonSettingValue(actor, PINNED_APPS_KEY);
+  const raw = getPersonSettingValue(actor, DISMISSED_CHECKLIST_KEY);
   if (typeof raw !== "string") return new Set();
   try {
     const values: unknown = JSON.parse(raw);
     if (!Array.isArray(values)) return new Set();
-    return new Set(values.flatMap((value) => typeof value === "string" && value.startsWith(SETUP_CHECKLIST_DISMISS_PREFIX)
-      ? [value.slice(SETUP_CHECKLIST_DISMISS_PREFIX.length)]
-      : []));
+    return new Set(values.filter((value): value is string => typeof value === "string"));
   } catch {
     return new Set();
   }

@@ -85,7 +85,7 @@ describe("GET /api/setup-checklist", () => {
     expect((await checklist(client)).find((item) => item.id === "apps")?.done).toBe(true);
   });
 
-  test("Not now hides an item for that person and leaves it visible to another admin", async () => {
+  test("Not now uses its own per-person setting and leaves pinned apps byte-identical", async () => {
     const { client: ownerClient } = await owner();
     const created = await ownerClient.post("/api/people", { displayName: "Marlow", role: "admin", secret: "correcthorse2" });
     expect(created.status).toBe(201);
@@ -93,13 +93,24 @@ describe("GET /api/setup-checklist", () => {
     const adminClient = new TestClient();
     await adminClient.post("/api/auth/verify-secret", { personId: id, secret: "correcthorse2" });
 
-    const setting = await adminClient.put("/api/settings", {
+    const pinnedAppsBefore = '[ "existing-app", "home" ]';
+    const pinnedApps = await adminClient.put("/api/settings", {
       scope: `person:${id}`,
       key: "ui.pinned_apps",
-      value: JSON.stringify(["setup-checklist:dismissed:family"]),
+      value: pinnedAppsBefore,
     });
-    expect(setting.status).toBe(200);
+    expect(pinnedApps.status).toBe(200);
+    const dismissed = await adminClient.put("/api/settings", {
+      scope: `person:${id}`,
+      key: "setup.checklist_dismissed",
+      value: JSON.stringify(["family"]),
+    });
+    expect(dismissed.status).toBe(200);
     expect((await checklist(adminClient)).some((item) => item.id === "family")).toBe(false);
     expect((await checklist(ownerClient)).some((item) => item.id === "family")).toBe(true);
+    const saved = await adminClient.get(`/api/settings?scope=person:${id}`);
+    expect(saved.status).toBe(200);
+    const values = await saved.json() as Array<{ key: string; value: unknown }>;
+    expect(values.find((setting) => setting.key === "ui.pinned_apps")?.value).toBe(pinnedAppsBefore);
   });
 });

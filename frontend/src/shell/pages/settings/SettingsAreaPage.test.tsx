@@ -66,7 +66,7 @@ const column = (_view: ReturnType<typeof open>) => document.body.querySelector<H
 const rows = (view: ReturnType<typeof open>) => [...within(column(view)).queryAllByRole("link")].map((link) => link.textContent?.trim());
 
 describe("the settings route", () => {
-  test("the checklist count matches open items and Not now writes only this person's setting", async () => {
+  test("Not now writes the dismissal setting and leaves pinned apps byte-identical", async () => {
     const view = open(makePerson("owner"), "/settings/home/general", {
       pinnedApps: ["existing-app"],
       setupChecklist: [
@@ -76,12 +76,15 @@ describe("the settings route", () => {
     });
     await waitFor(() => expect(view.getByText("1 thing left to finish setting up.")).toBeTruthy());
     expect(view.getByText("Done")).toBeTruthy();
+    const pinnedAppsBefore = fixture!.pinnedAppsValue();
     fireEvent.click(view.getByRole("button", { name: "Not now" }));
     await waitFor(() => expect(fixture!.puts).toContainEqual({
       scope: "person:person-owner",
-      key: "ui.pinned_apps",
-      value: JSON.stringify(["existing-app", "setup-checklist:dismissed:family"]),
+      key: "setup.checklist_dismissed",
+      value: JSON.stringify(["family"]),
     }));
+    expect(fixture!.puts.some((setting) => setting.key === "ui.pinned_apps")).toBe(false);
+    expect(fixture!.pinnedAppsValue()).toBe(pinnedAppsBefore);
   });
 
   test("nothing open means the checklist card is absent", async () => {
@@ -108,7 +111,7 @@ describe("the settings route", () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
-    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Maintenance", "Privacy", "Developer tools"]);
+    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Maintenance", "Privacy", "Developer tools", "Network and access"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
   });
 

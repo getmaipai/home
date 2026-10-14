@@ -38,6 +38,8 @@ export interface HomeFixture {
   scopes: string[];
   /** Every settings write, as the page sent it. */
   puts: Array<{ scope: string; key: string; value: unknown }>;
+  /** The exact serialized pinned-apps value returned by settings reads. */
+  pinnedAppsValue: () => string;
   restore: () => void;
 }
 
@@ -46,6 +48,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
   const requests: string[] = [];
   const scopes: string[] = [];
   const puts: HomeFixture["puts"] = [];
+  let pinnedAppsSerialized = JSON.stringify(pinnedApps);
   const registry = REGISTRY.filter((key) => wakeword || key.key !== "voice.wakeword.enabled");
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -53,6 +56,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     if (url.endsWith("/api/settings") && init?.method === "PUT") {
       const body = JSON.parse(String(init.body)) as { scope: string; key: string; value: unknown };
       puts.push(body);
+      if (body.key === "ui.pinned_apps") pinnedAppsSerialized = String(body.value);
       const def = registry.find((k) => k.key === body.key)!;
       return Promise.resolve(Response.json({ key: def.key, value: body.value, source: "user", label: def.label, help: def.help, level: def.level, secret: def.secret ?? false }));
     }
@@ -73,7 +77,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       scopes.push(scope);
       const kind = scope.split(":")[0];
-      return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.key === "ui.pinned_apps" ? JSON.stringify(pinnedApps) : k.default ?? null, source: "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
+      return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.key === "ui.pinned_apps" ? pinnedAppsSerialized : k.default ?? null, source: "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
     }
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
     if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));
@@ -84,5 +88,5 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
-  return { requests, scopes, puts, restore: () => { globalThis.fetch = original; } };
+  return { requests, scopes, puts, pinnedAppsValue: () => pinnedAppsSerialized, restore: () => { globalThis.fetch = original; } };
 }

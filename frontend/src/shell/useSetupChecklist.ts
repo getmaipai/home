@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type Roster, type SetupChecklistItem } from "@/lib/api";
 
-const DISMISS_PREFIX = "setup-checklist:dismissed:";
+const DISMISSED_CHECKLIST_KEY = "setup.checklist_dismissed";
 const CHECKLIST_KEY = (personId: string) => ["setup-checklist", personId] as const;
 const SETTINGS_KEY = (personId: string) => ["setup-checklist-settings", personId] as const;
 
@@ -24,7 +24,7 @@ export function useSetupChecklist(person: Roster) {
         queryFn: () => api.settingsValues(`person:${person.id}`),
         staleTime: 0,
       });
-      const raw = currentSettings.find((setting) => setting.key === "ui.pinned_apps")?.value;
+      const raw = currentSettings.find((setting) => setting.key === DISMISSED_CHECKLIST_KEY)?.value;
       let values: string[] = [];
       if (typeof raw === "string") {
         try {
@@ -34,15 +34,14 @@ export function useSetupChecklist(person: Roster) {
           values = [];
         }
       }
-      const id = `${DISMISS_PREFIX}${itemId}`;
-      if (!values.includes(id)) values.push(id);
-      return api.setSetting(`person:${person.id}`, "ui.pinned_apps", JSON.stringify(values));
+      if (!values.includes(itemId)) values.push(itemId);
+      return api.setSetting(`person:${person.id}`, DISMISSED_CHECKLIST_KEY, JSON.stringify(values));
     },
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: CHECKLIST_KEY(person.id) }),
         queryClient.invalidateQueries({ queryKey: SETTINGS_KEY(person.id) }),
-        queryClient.invalidateQueries({ queryKey: ["settings", "person", person.id, "ui.pinned_apps"] }),
+        queryClient.invalidateQueries({ queryKey: ["settings", "person", person.id, DISMISSED_CHECKLIST_KEY] }),
       ]);
     },
   });
