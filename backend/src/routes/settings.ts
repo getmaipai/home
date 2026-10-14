@@ -74,6 +74,7 @@ const listRoute = createRoute({
   request: {
     query: z.object({
       scope: z.string().openapi({ param: { name: "scope", in: "query" }, example: "household" }),
+      key: z.string().optional(),
     }),
   },
   responses: {
@@ -83,7 +84,8 @@ const listRoute = createRoute({
 });
 settingsRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
-  const result = listValues(actor, c.req.valid("query").scope);
+  const query = c.req.valid("query");
+  const result = listValues(actor, query.scope, query.key);
   // A code review (2026-09-06) found a "settingsErrorResponse(result)"
   // helper here that every call site immediately destructured back into
   // an identical c.json(...) call - pure indirection removed in favor of

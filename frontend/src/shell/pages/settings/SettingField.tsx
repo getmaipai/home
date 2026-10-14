@@ -10,6 +10,7 @@ import { ItemDescription } from "@maipai/ui/src/dashboard/components/ui/item";
 import { OptionMultiSelect } from "@maipai/ui/src/settings/OptionMultiSelect";
 import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 
 /** SHELL-05's own per-key control: the registry-selector-to-primitive
  * mapping docs/SETTINGS.md's generic renderer calls for, pointed at the
@@ -55,6 +56,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
   const [secretDraft, setSecretDraft] = useState("");
   const [secretSaving, setSecretSaving] = useState(false);
   const [permissionMessage, setPermissionMessage] = useState<string | null>(null);
+  const [companionsOffOpen, setCompanionsOffOpen] = useState(false);
 
   async function commitSecret() {
     if (!secretDraft) return;
@@ -91,6 +93,10 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
   }
 
   async function handleSwitchChange(value: boolean) {
+    if (def.key === "companions.allowed" && !value) {
+      setCompanionsOffOpen(true);
+      return;
+    }
     setPermissionMessage(null);
     if (def.key === "notifications.browser.enabled" && value) {
       if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
@@ -148,7 +154,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       </div>
     );
   } else if (def.selector === "boolean") {
-    control = <><Switch checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
+    control = <><Switch size={def.key === "companions.allowed" ? "md" : "default"} checked={Boolean(resolved.value)} onCheckedChange={handleSwitchChange} disabled={disabled} aria-label={def.label} />{permissionMessage ? <span role="status" className="text-sm text-muted-foreground">{permissionMessage}</span> : null}</>;
   } else if (def.selector === "select" && (def.range as { multiple?: boolean } | undefined)?.multiple) {
     control = (
       <OptionMultiSelect
@@ -228,9 +234,10 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
   }
 
   return (
+    <>
     <div className="flex flex-col items-start gap-2 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-sm">{def.label}</span>
+        {def.key === "companions.allowed" ? <span className="flex min-h-12 items-center text-sm">{def.label}</span> : <span className="text-sm">{def.label}</span>}
         {resolved.does ? <ItemDescription clamp={false}>{resolved.does}</ItemDescription> : null}
         {resolved.state ? <ItemDescription clamp={false}>{resolved.state}</ItemDescription> : null}
         {resolved.reason ? <ItemDescription clamp={false}>{resolved.reason}</ItemDescription> : null}
@@ -242,5 +249,18 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
       </div>
       <div className="w-full min-w-0 sm:w-auto sm:shrink-0">{control}</div>
     </div>
+    <AlertDialog open={companionsOffOpen} onOpenChange={setCompanionsOffOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{def.label}</AlertDialogTitle>
+          <AlertDialogDescription>The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction variant="destructive" onClick={() => { void onChange(false); }}>Turn off</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

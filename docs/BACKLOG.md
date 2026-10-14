@@ -2454,7 +2454,7 @@ stats item text above.
 
 <a id="comp-04"></a>
 
-- [ ] **COMP-04: Per-person companion sets, the kid-safe rule, and the voice per turn** (M, after COMP-03, spec first)
+- [ ] **COMP-04: Per-person companion sets, the kid-safe rule, and the voice per turn** (M, after COMP-03, spec first). The per-person set is filtered by `companions.allowed`; `companions.enabled` (the list) stays a separate key.
 
     Objective: each person has their own companions; a child's set is
     chosen by an adult from the kid-safe ones; a message may name the

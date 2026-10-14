@@ -24,6 +24,7 @@ import { classifyTurnSignal } from "@/lib/turnSignal";
 import { speakerIsAnonymous, turnAgeBand } from "./speaker";
 import { carriesCrisisSignal } from "@/lib/safety";
 import { resolvePersona, DEFAULT_PERSONA } from "@/lib/persona";
+import { companionsAllowed } from "@/lib/companions";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { sourcesForChild, structuredPartForBand } from "@/lib/childLinks";
@@ -486,7 +487,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const loaded = loadAllManifests();
   const signal = classifyTurnSignal({ text, ageBand: band, commandOpeners: commandOpeners(loaded), computedPatternMatch: (t) => computedPatternMatch(loaded, t) });
   const bare = opts.bare === true;
-  const persona = temporary || bare ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
+  const persona = temporary || bare || !companionsAllowed(actor.id) ? DEFAULT_PERSONA : resolvePersona(getPersonSettingValue(actor, "persona.active_id"));
   // U4/RESP-01: computed once, the register's only length authority -
   // never recomputed by a later node, the same "decided once" shape
   // `reasoning.emit` already follows in `context`. U4c: everything

@@ -7,10 +7,12 @@ import {
   assertCanAccessScope,
   resolveForResponse,
   getPersonSettingValue,
+  getSettingValueForPerson,
   getHouseholdSettingValue,
   setHouseholdSettingValue,
 } from "@/lib/settings";
 import { nextHlc, compareHlc, seedHlc, __resetHlcForTests } from "@/lib/hlc";
+import { companionsAllowed } from "@/lib/companions";
 import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { people, settingsValues } from "@/db/schema";
@@ -27,6 +29,91 @@ test("internet probe settings are household general controls and default on", ()
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
+});
+
+describe("companions.allowed", () => {
+  test("companions are allowed for every role by default", async () => {
+    const owner = new TestClient();
+    const setup = await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const ownerPerson = ((await setup.json()) as { person: { id: string } }).person;
+    const roles = [
+      { role: "admin", secret: "correcthorse2" },
+      { role: "adult", secret: "correcthorse3" },
+      { role: "teen" },
+      { role: "child" },
+      { role: "guest", guestExpiresAt: new Date(Date.now() + 86_400_000).toISOString() },
+    ] as const;
+    const personIds = [ownerPerson.id];
+    for (const [index, input] of roles.entries()) {
+      const created = await owner.post("/api/people", { displayName: `Profile ${index}`, ...input });
+      expect(created.status).toBe(201);
+      personIds.push(((await created.json()) as { id: string }).id);
+    }
+    for (const personId of personIds) {
+      const row = db.select().from(people).where(eq(people.id, personId)).get()!;
+      expect(getSettingValueForPerson(personId, "companions.allowed")).toBe(true);
+      expect(getPersonSettingValue(row, "companions.allowed")).toBe(true);
+    }
+  });
+
+  test("an owner or admin can turn companions off for one person and for the household", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Marlow", role: "teen" });
+    const teen = (await created.json()) as { id: string };
+    const personSetting = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${teen.id}`, key: "companions.allowed", value: false } });
+    expect(personSetting.status).toBe(200);
+    expect(getSettingValueForPerson(teen.id, "companions.allowed")).toBe(false);
+    const adminCreated = await owner.post("/api/people", { displayName: "Marlow", role: "admin", secret: "adminsecret" });
+    const admin = (await adminCreated.json()) as { id: string };
+    const adminClient = new TestClient();
+    await adminClient.post("/api/auth/verify-secret", { personId: admin.id, secret: "adminsecret" });
+    expect((await adminClient.get(`/api/settings?scope=person:${teen.id}&key=companions.allowed`)).status).toBe(200);
+    expect((await adminClient.get(`/api/settings?scope=person:${teen.id}`)).status).toBe(403);
+    const householdSetting = await adminClient.request("/api/settings", { method: "PUT", body: { scope: "household", key: "companions.allowed", value: false } });
+    expect(householdSetting.status).toBe(200);
+    const newPerson = await owner.post("/api/people", { displayName: "Fern", role: "child" });
+    const child = (await newPerson.json()) as { id: string };
+    expect(getSettingValueForPerson(child.id, "companions.allowed")).toBe(false);
+    expect(companionsAllowed(child.id)).toBe(false);
+  });
+
+  test("an adult, teen, or child cannot change their own companions switch", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const targets: Array<{ id: string; client: TestClient }> = [];
+    const adultResponse = await owner.post("/api/people", { displayName: "Adult", role: "adult", secret: "adultsecret" });
+    const adult = (await adultResponse.json()) as { id: string };
+    const adultClient = new TestClient();
+    await adultClient.post("/api/auth/verify-secret", { personId: adult.id, secret: "adultsecret" });
+    targets.push({ id: adult.id, client: adultClient });
+    for (const role of ["teen", "child"] as const) {
+      const created = await owner.post("/api/people", { displayName: role, role });
+      const row = (await created.json()) as { id: string };
+      const client = new TestClient();
+      await client.post("/api/auth/select", { personId: row.id });
+      targets.push({ id: row.id, client });
+    }
+    for (const target of targets) {
+      const res = await target.client.request("/api/settings", { method: "PUT", body: { scope: `person:${target.id}`, key: "companions.allowed", value: false } });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toMatchObject({ error: "Only a household owner or admin chooses who can use AI companions. Ask one of them." });
+    }
+  });
+
+  test("turning companions off keeps the person's saved personality setting", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const created = await owner.post("/api/people", { displayName: "Bramble", role: "child" });
+    const child = (await created.json()) as { id: string };
+    const choice = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${child.id}`, key: "persona.active_id", value: "tutor" } });
+    expect(choice.status).toBe(200);
+    const off = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${child.id}`, key: "companions.allowed", value: false } });
+    expect(off.status).toBe(200);
+    const stored = db.select().from(settingsValues).where(and(eq(settingsValues.scope, `person:${child.id}`), eq(settingsValues.key, "persona.active_id"))).get();
+    expect(stored?.value).toBe('"tutor"');
+    expect(getSettingValueForPerson(child.id, "companions.allowed")).toBe(false);
+  });
 });
 
 async function ownerAndChild() {

@@ -1,5 +1,5 @@
-import { expect, test } from "bun:test";
-import { render } from "@testing-library/react";
+import { expect, test, mock } from "bun:test";
+import { fireEvent, render, waitFor } from "@testing-library/react";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import type { MergedSetting } from "@maipai/ui/src/settings/groupSettings";
 import { SettingField } from "./SettingField";
@@ -57,4 +57,20 @@ test("a select shows the plain-word option labels from the key's copy", () => {
   const view = render(<SettingField setting={setting} onChange={async () => true} onReset={() => {}} />);
   expect(view.getByText("Answer simply with correct body words")).toBeTruthy();
   expect(view.queryByText("Gentle")).toBeNull();
+});
+
+test("turning companions off requires confirmation and cancel changes nothing", async () => {
+  const onChange = mock(async () => true);
+  const setting = {
+    def: SettingsKey.parse({ key: "companions.allowed", scope: "person", selector: "boolean", layers: ["household", "person"], merge: "override", default: true, label: "AI companions", help: "They are on by default.", level: "basic", lives_in: "person.companions", honoured_by: ["home"] }),
+    resolved: { key: "companions.allowed", value: true, source: "user", label: "AI companions", level: "basic", secret: false },
+  } as MergedSetting;
+  const view = render(<SettingField setting={setting} onChange={onChange} onReset={() => {}} />);
+  fireEvent.click(view.getByRole("switch", { name: "AI companions" }));
+  expect(await view.findByRole("alertdialog")).toBeTruthy();
+  fireEvent.click(view.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(onChange).not.toHaveBeenCalled());
+  fireEvent.click(view.getByRole("switch", { name: "AI companions" }));
+  fireEvent.click(await view.findByRole("button", { name: "Turn off" }));
+  await waitFor(() => expect(onChange).toHaveBeenCalledWith(false));
 });

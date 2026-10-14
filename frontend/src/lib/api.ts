@@ -874,8 +874,8 @@ export const api = {
   search: (q: string) => request<{ groups: SearchGroup[] }>(`/api/search?q=${encodeURIComponent(q)}`).then((r) => r.groups),
   settingsRegistry: () => request<SettingsKey[]>("/api/settings/registry"),
   wakewordStatus: () => request<{ detectors: { id: string; label: string; file: string }[]; installed: boolean }>("/api/voice/wakewords"),
-  settingsValues: (scope: string) =>
-    request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}`),
+  settingsValues: (scope: string, key?: string) =>
+    request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}${key ? `&key=${encodeURIComponent(key)}` : ""}`),
   emergencyKit: () => request<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string }>("/api/backups/emergency-kit"),
   setSetting: (scope: string, key: string, value: unknown) =>
     request<ResolvedSetting>("/api/settings", {

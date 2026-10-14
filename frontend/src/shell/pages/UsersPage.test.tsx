@@ -46,6 +46,8 @@ describe("UsersPage", () => {
     const fetchMock = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url.includes("/api/people")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings?")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
     });
     globalThis.fetch = fetchMock as unknown as typeof fetch;
@@ -70,6 +72,8 @@ describe("UsersPage", () => {
         return Promise.resolve(Response.json(member("person-added", String(body.displayName), "adult"), { status: 201 }));
       }
       if (url.includes("/api/people")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/settings?")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
     });
     globalThis.fetch = fetchMock as unknown as typeof fetch;

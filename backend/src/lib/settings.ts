@@ -28,6 +28,8 @@ import { createEntity, updateEntity } from "@/lib/entities";
 
 const LEGACY_HOME_PLACE_KEY = "household.home_place";
 const HOUSEHOLD_HOME_KEY = "household.home";
+const COMPANIONS_ALLOWED_KEY = "companions.allowed";
+const COMPANIONS_PERMISSION_ERROR = "Only a household owner or admin chooses who can use AI companions. Ask one of them.";
 
 // `CLAUDE.md` > Credentials and secrets: "Any reversible secret the app
 // stores... is encrypted with the keystore... never plaintext in a
@@ -350,12 +352,18 @@ function responseContext(viewer: PersonRow, subject: PersonRow, scopeKind: Parse
 /** Every registered key whose scope kind matches, each resolved to its
  * stored value or the registry default (4.6: a setting always has a
  * value, even before anyone customizes it). */
-export function listValues(actor: PersonRow, scope: string): SettingsOpResult<ResolvedSetting[]> {
+export function listValues(actor: PersonRow, scope: string, onlyKey?: string): SettingsOpResult<ResolvedSetting[]> {
   const parsed = parseScope(scope);
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
+  const companionsOnly = onlyKey === COMPANIONS_ALLOWED_KEY;
+  if (onlyKey && !companionsOnly) return { ok: false, status: 400, error: `unsupported settings key filter: ${onlyKey}` };
   const adultWakewordRead = parsed.kind === "device" && actor.role === "adult"
     && getRegistry().some((keyDef) => keyDef.key === WAKEWORD_SETTING_KEY);
-  const auth = adultWakewordRead
+  const auth = companionsOnly
+    ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
+      ? { ok: true as const, value: true as const }
+      : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
+    : adultWakewordRead
     ? assertCanAccessWakewordDeviceSetting(actor)
     : assertCanAccessScope(actor, parsed, "read");
   if (!auth.ok) return auth;
@@ -366,7 +374,7 @@ export function listValues(actor: PersonRow, scope: string): SettingsOpResult<Re
   const descriptionContext = responseContext(actor, subject, parsed.kind);
 
   const results: ResolvedSetting[] = getRegistry()
-    .filter((k) => k.scope === parsed.kind && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY))
+    .filter((k) => (k.scope === parsed.kind || (companionsOnly && parsed.kind === "household" && isLayeredScalar(k) && k.key === COMPANIONS_ALLOWED_KEY && k.layers?.includes("household"))) && (!adultWakewordRead || k.key === WAKEWORD_SETTING_KEY) && (!onlyKey || k.key === onlyKey))
     // Location settings and their values are private to their person even
     // where the general People settings page canAccessPerson() permits a
     // guardian to inspect other settings for a child.
@@ -597,7 +605,9 @@ export function setValue(
 
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
-  if (keyDef.scope !== parsed.kind) {
+  const companionsLayer = key === COMPANIONS_ALLOWED_KEY && isLayeredScalar(keyDef)
+    && (parsed.kind === "household" || parsed.kind === "person") && keyDef.layers?.includes(parsed.kind);
+  if (keyDef.scope !== parsed.kind && !companionsLayer) {
     return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
   }
 
@@ -614,8 +624,11 @@ export function setValue(
     return written.ok ? { ok: true, value: { ...written.value, layer: "person", locked: gate.setBy !== "self" } } : written;
   }
 
-  const auth =
-    key === SAFE_SEARCH_KEY && parsed.kind === "person"
+  const auth = key === COMPANIONS_ALLOWED_KEY
+      ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
+        ? { ok: true as const, value: true as const }
+        : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
+    : key === SAFE_SEARCH_KEY && parsed.kind === "person"
       ? assertCanSetSafeSearch(actor, parsed.id!, value)
       : key === SESSION_LOCK_REQUIRED_KEY || key === SESSION_LOCK_TIMEOUT_KEY
         ? assertCanSetSessionLock(actor, parsed.id!)
@@ -872,6 +885,9 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!parsed) return { ok: false, status: 400, error: `invalid scope: ${scope}` };
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
+  const companionsLayer = key === COMPANIONS_ALLOWED_KEY && isLayeredScalar(keyDef)
+    && (parsed.kind === "household" || parsed.kind === "person") && keyDef.layers?.includes(parsed.kind);
+  if (keyDef.scope !== parsed.kind && !companionsLayer) return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not ${parsed.kind}` };
   if (keyDef.selector === "location" && parsed.kind === "person" && parsed.id !== actor.id) {
     return { ok: false, status: 403, error: "location settings are private to each person" };
   }
@@ -887,7 +903,11 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
     return { ok: true, value: { ...resolveForResponse(keyDef, layered.value, layered.layer === "person" ? "user" : "default", responseContext(actor, subject, parsed.kind)), layer: layered.layer, locked: false } };
   }
 
-  const auth = key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
+  const auth = key === COMPANIONS_ALLOWED_KEY
+    ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
+      ? { ok: true as const, value: true as const }
+      : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
+    : key === WAKEWORD_SETTING_KEY && parsed.kind === "device"
     ? assertCanAccessWakewordDeviceSetting(actor)
     : key === "search.page_text_cleaning" && parsed.kind === "person"
       ? assertCanSetPageTextCleaning(actor, parsed.id!)
@@ -906,7 +926,10 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
-  return { ok: true, value: resolveForResponse(keyDef, keyDef.default, "default", responseContext(actor, responseSubject(actor, parsed), parsed.kind)) };
+  const restored = key === COMPANIONS_ALLOWED_KEY && parsed.kind === "person" && parsed.id
+    ? resolveLayeredScalar(keyDef, parsed.id, speakerAgeBand(responseSubject(actor, parsed), new Date()))
+    : { value: keyDef.default, layer: "default" as const };
+  return { ok: true, value: resolveForResponse(keyDef, restored.value, restored.layer === "person" || restored.layer === "household" ? "user" : "default", responseContext(actor, responseSubject(actor, parsed), parsed.kind)) };
 }
 
 /** SETTINGS-LAYERS-01b: raw access to a user-overrides row of a layered list key (a

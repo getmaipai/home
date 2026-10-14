@@ -27,6 +27,8 @@ interface SettingsRendererProps {
   titleOverrides?: Readonly<Record<string, string>>;
   plainRows?: boolean;
   mergeGroups?: boolean;
+  /** Read one narrowly authorized setting when embedding a person control. */
+  settingKey?: string;
 }
 
 const REGISTRY_QUERY_KEY = ["settings-registry"];
@@ -46,7 +48,7 @@ const REGISTRY_QUERY_KEY = ["settings-registry"];
  * `Section` primitive `SettingsRenderer.tsx` renders with. `honouredBy`
  * is always "home": this repo is Home, the same constant `SettingsPage.
  * tsx`'s own instances already pass. */
-export function SettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false }: SettingsRendererProps) {
+export function SettingsRenderer({ scope, scopeValue, only, includeKeys, includeKeysByGroup, expandAdvanced = false, titleOverrides = {}, plainRows = false, mergeGroups = false, settingKey }: SettingsRendererProps) {
   // NOTIFY-SHARE-02: SettingField's own PersonMultiSelect control
   // needs the viewer's own id to drop from its option list -
   // `scopeValue` is already exactly "person:<id>" for a person-scope
@@ -80,8 +82,8 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
     staleTime: Infinity,
   });
   const valuesQuery = useQuery<ResolvedSetting[]>({
-    queryKey: ["settings-values", scopeValue],
-    queryFn: () => api.settingsValues(scopeValue),
+    queryKey: settingKey ? ["settings-values", scopeValue, settingKey] : ["settings-values", scopeValue],
+    queryFn: () => api.settingsValues(scopeValue, settingKey),
   });
 
   const [writeError, setWriteError] = useState<string | null>(null);
@@ -89,7 +91,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
   const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({});
 
   function replaceValue(next: ResolvedSetting) {
-    queryClient.setQueryData<ResolvedSetting[]>(["settings-values", scopeValue], (prev) => (prev ?? []).map((v) => (v.key === next.key ? next : v)));
+    queryClient.setQueryData<ResolvedSetting[]>(settingKey ? ["settings-values", scopeValue, settingKey] : ["settings-values", scopeValue], (prev) => (prev ?? []).map((v) => (v.key === next.key ? next : v)));
   }
 
   async function handleChange(key: string, value: unknown): Promise<boolean> {
@@ -157,8 +159,14 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
           const renderableRegistry = registry.filter((key) => key.selector !== "location") as KitSettingsKey[];
           const allGroups: SettingsGroup[] = groupSettings(renderableRegistry, values, scope, "home");
           let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => {
+            const companionsVisible = values.find((value) => value.key === "companions.allowed")?.value !== false;
+            const eligible = (item: (typeof group.basic)[number]) =>
+              (item.def.key !== "companions.allowed" || settingKey === "companions.allowed")
+              && (companionsVisible || item.def.key !== "persona.active_id");
             const keys = includeKeysByGroup?.[group.id] ?? includeKeys;
-            return keys ? { ...group, basic: group.basic.filter((item) => keys.includes(item.def.key)), advanced: group.advanced.filter((item) => keys.includes(item.def.key)) } : group;
+            const basic = group.basic.filter(eligible);
+            const advanced = group.advanced.filter(eligible);
+            return keys ? { ...group, basic: basic.filter((item) => keys.includes(item.def.key)), advanced: advanced.filter((item) => keys.includes(item.def.key)) } : { ...group, basic, advanced };
           }).filter((group) => group.basic.length + group.advanced.length > 0);
           if (mergeGroups && groups.length > 1) {
             const first = groups[0];

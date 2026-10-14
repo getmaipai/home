@@ -18,7 +18,8 @@ import { conversations, conversationTurns, people } from "@/db/schema";
 import { buildConversationWindow, toConversationRecord } from "@/lib/conversationHistory";
 import { startBareCompare } from "@/lib/turnMachine/bareCompare";
 import { StreamSafetyRefusal } from "@/lib/turnShared";
-import { resolvePersona, composePersonaPrompt } from "@/lib/persona";
+import { resolvePersona, composePersonaPrompt, DEFAULT_PERSONA } from "@/lib/persona";
+import { companionsAllowed } from "@/lib/companions";
 import { getPersonSettingValue } from "@/lib/settings";
 import { apiRouter } from "@/lib/openapi";
 import type { BareCompareEvent, BareCompareTrace, TurnStats } from "@/wire";
@@ -103,7 +104,7 @@ turnBareRoutes.post("/", requireAuth, async (c) => {
     plugin_id: turnRow.pluginId,
     command_id: turnRow.commandId,
     stats: statsForViewer(parseStats(turnRow.stats) ?? undefined, actor) ?? null,
-    persona_fragments: composePersonaPrompt(resolvePersona(getPersonSettingValue(speakerRow, "persona.active_id"))),
+    persona_fragments: composePersonaPrompt(companionsAllowed(speakerRow.id) ? resolvePersona(getPersonSettingValue(speakerRow, "persona.active_id")) : DEFAULT_PERSONA),
   };
 
   const stream = new ReadableStream<Uint8Array>({

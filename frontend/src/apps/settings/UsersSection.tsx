@@ -8,12 +8,16 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
+import { Switch } from "@maipai/ui/src/dashboard/components/ui/switch";
+import { Field, FieldDescription, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { BatchBar, SelectModeToggle } from "@maipai/ui/src/primitives/BatchBar";
 import { useSelectMode } from "@/kit/hooks/useSelectMode";
 import { SiteBlocksSection } from "./SiteBlocksSection";
 import { NewPersonForm, type NewPersonValues } from "@/apps/people/NewPersonForm";
 import { api, ApiError, type PersonDeletionPreview, type PersonRosterEntry, type Role, type Roster } from "@/lib/api";
 import { ROLE_LABELS, canDeletePerson, canManagePerson, creatableRoles } from "@/apps/people/roles";
+import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
 
 interface UsersSectionProps {
   person: Roster;
@@ -54,6 +58,13 @@ export function UsersSection({ person }: UsersSectionProps) {
 
   const [confirmingDelete, setConfirmingDelete] = useState<"batch" | string | null>(null);
   const [busy, setBusy] = useState(false);
+  const settingsRegistryQuery = useQuery({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
+  const householdSettingsQuery = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
+  const companionKey = settingsRegistryQuery.data?.find((entry) => entry.key === "companions.allowed");
+  const householdCompanionsAllowed = householdSettingsQuery.data?.find((entry) => entry.key === "companions.allowed")?.value ?? companionKey?.default;
+  const [newPersonCompanionsAllowed, setNewPersonCompanionsAllowed] = useState<boolean | null>(null);
+  const [companionsConfirm, setCompanionsConfirm] = useState<"household" | "new-person" | null>(null);
+  const [companionsSaving, setCompanionsSaving] = useState(false);
 
   // STORE-DELETE-01 (decision 5): the export is offered before a person's
   // files are purged, so the single-person confirmation reads what would
@@ -88,11 +99,13 @@ export function UsersSection({ person }: UsersSectionProps) {
     setFormError(null);
     setSubmitting(true);
     try {
-      await api.createPerson({
+      const created = await api.createPerson({
         displayName: values.displayName,
         role: values.role,
         secret: values.secret,
       });
+      const allowed = newPersonCompanionsAllowed ?? Boolean(householdCompanionsAllowed);
+      if (allowed !== Boolean(householdCompanionsAllowed)) await api.setSetting(`person:${created.id}`, "companions.allowed", allowed);
       await invalidateRoster();
     } catch (err) {
       setFormError(err instanceof ApiError && /profile requires a secret/i.test(err.message)
@@ -102,6 +115,31 @@ export function UsersSection({ person }: UsersSectionProps) {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function setHouseholdCompanionsAllowed(allowed: boolean) {
+    if (!allowed) { setCompanionsConfirm("household"); return; }
+    setCompanionsSaving(true);
+    try {
+      const updated = await api.setSetting("household", "companions.allowed", true);
+      queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not save the AI companions setting.");
+    } finally { setCompanionsSaving(false); }
+  }
+
+  async function confirmCompanionsOff() {
+    if (!companionsConfirm) return;
+    const target = companionsConfirm;
+    setCompanionsConfirm(null);
+    if (target === "new-person") { setNewPersonCompanionsAllowed(false); return; }
+    setCompanionsSaving(true);
+    try {
+      const updated = await api.setSetting("household", "companions.allowed", false);
+      queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
+    } catch (err) {
+      setActionError(err instanceof ApiError ? err.message : "Could not save the AI companions setting.");
+    } finally { setCompanionsSaving(false); }
   }
 
   async function handleSaveEdit(id: string) {
@@ -182,6 +220,10 @@ export function UsersSection({ person }: UsersSectionProps) {
       >
         {(loadedRoster) => (
         <Section heading="Users">
+          {companionKey ? <Field>
+            <FieldLabel htmlFor="household-companions-allowed"><Switch size="md" id="household-companions-allowed" checked={Boolean(householdCompanionsAllowed)} disabled={companionsSaving} onCheckedChange={(checked) => setHouseholdCompanionsAllowed(checked === true)} />{companionKey.label}</FieldLabel>
+            <FieldDescription>{companionKey.help}</FieldDescription>
+          </Field> : null}
           {deletable.length > 0 ? (
             selectMode.active ? (
               <BatchBar count={selectMode.count} onExit={leaveSelectMode}>
@@ -284,26 +326,29 @@ export function UsersSection({ person }: UsersSectionProps) {
                 );
               }
               return (
-                <div className="flex min-w-0 flex-1 items-center gap-3">
-                  {selectMode.active && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
-                    // The box stays its designed 16px; `kit/ui/checkbox.tsx`
-                    // already carries its own 48px hit area (docs/UI.md's
-                    // floor - the fix a code review (2026-09-05) applied
-                    // here before Checkbox existed, now the kit's own), so
-                    // no wrapping div is needed to reach it (a second code
-                    // review, same night, caught one left behind here).
-                    <Checkbox
-                      checked={selectMode.isSelected(p.id)}
-                      onCheckedChange={() => selectMode.toggle(p.id)}
-                      aria-label={`Select ${p.display_name}`}
-                      className="shrink-0"
-                    />
-                  ) : null}
-                  <Avatar name={p.display_name} className="h-10 w-10 shrink-0" />
-                  <div className="flex min-w-0 flex-col">
-                    <span className="truncate text-base">{p.display_name}</span>
-                    <span className="text-sm text-[var(--muted-foreground)]">{ROLE_LABELS[p.role]}</span>
+                <div className="flex min-w-0 flex-1 flex-col items-stretch gap-2 py-2">
+                  <div className="flex min-w-0 items-center gap-3">
+                    {selectMode.active && canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role }) ? (
+                      // The box stays its designed 16px; `kit/ui/checkbox.tsx`
+                      // already carries its own 48px hit area (docs/UI.md's
+                      // floor - the fix a code review (2026-09-05) applied
+                      // here before Checkbox existed, now the kit's own), so
+                      // no wrapping div is needed to reach it (a second code
+                      // review, same night, caught one left behind here).
+                      <Checkbox
+                        checked={selectMode.isSelected(p.id)}
+                        onCheckedChange={() => selectMode.toggle(p.id)}
+                        aria-label={`Select ${p.display_name}`}
+                        className="shrink-0"
+                      />
+                    ) : null}
+                    <Avatar name={p.display_name} className="h-10 w-10 shrink-0" />
+                    <div className="flex min-w-0 flex-col">
+                      <span className="truncate text-base">{p.display_name}</span>
+                      <span className="text-sm text-[var(--muted-foreground)]">{ROLE_LABELS[p.role]}</span>
+                    </div>
                   </div>
+                  <SettingsRenderer scope="person" scopeValue={`person:${p.id}`} settingKey="companions.allowed" only={["person.companions"]} plainRows />
                 </div>
               );
             }}
@@ -343,7 +388,7 @@ export function UsersSection({ person }: UsersSectionProps) {
               const mayDelete = canDeletePerson(actorRole, person.id, { id: p.id, role: p.role as Role });
               if (!mayEdit && !mayDelete) return null;
               return (
-                <div className="flex gap-1">
+                <div className="flex flex-col items-stretch gap-1">
                   {mayEdit ? (
                     <Button
                       variant="ghost"
@@ -383,7 +428,16 @@ export function UsersSection({ person }: UsersSectionProps) {
       ) : null}
 
       <Section heading="Add someone">
-        <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel="Add to household" busy={submitting} error={formError} />
+        <NewPersonForm actorRole={actorRole} onSubmit={handleAdd} submitLabel="Add to household" busy={submitting} error={formError} extra={companionKey ? <Field>
+          <FieldLabel htmlFor="new-person-companions-allowed"><Checkbox id="new-person-companions-allowed" checked={newPersonCompanionsAllowed ?? Boolean(householdCompanionsAllowed)} disabled={submitting} onCheckedChange={(checked) => { if (checked === true) setNewPersonCompanionsAllowed(true); else setCompanionsConfirm("new-person"); }} />{companionKey.label}</FieldLabel>
+          <FieldDescription>{companionKey.help}</FieldDescription>
+        </Field> : null} />
+        <AlertDialog open={companionsConfirm !== null} onOpenChange={(open) => { if (!open) setCompanionsConfirm(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader><AlertDialogTitle>{companionKey?.label}</AlertDialogTitle><AlertDialogDescription>The person may have grown attached to their AI companions. Turn them off with care. Their companion and personality data will be kept.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction variant="destructive" onClick={() => { void confirmCompanionsOff(); }}>Turn off</AlertDialogAction></AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </Section>
     </>
   );
