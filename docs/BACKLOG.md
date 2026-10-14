@@ -9,6 +9,8 @@ platform standard in `getmaipai/.github`. Update this file whenever a gap
 closes or a new one is found; don't let it drift from what `main` actually
 does.
 
+- [ ] **DATA-WEATHER-CATALOG-01:** Port Home's weather package updates (0.1.1, model-selected routing, household home-place warming and privacy copy, and current/hourly/7-day forecast blocks) to `getmaipai/catalog/plugins/utilities/weather`, verify the package there, then refresh Home's bundled copy from catalog.
+
 - [x] **SETUP-REVIEW-01: run setup again in review mode from Repairs** (small M). Repairs actions are owner/admin only. Review shows the four production screens, never writes setup state, and only saves a changed existing engine location. Storage and plan remain read only until DATA-LOCATION keys and a working plan screen land; see the setup plan note and the review report.
 
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
