@@ -5,6 +5,7 @@ import { api, type ResolvedSetting } from "@/lib/api";
 import { readShellCache, writeShellCache } from "@/shell/shellCache";
 import { pickAppearance, resolveAppearance, resolveDark, type Appearance } from "@/shell/appearanceResolve";
 import { readDeviceAppearancePreference, subscribeDeviceAppearancePreference } from "@/shell/deviceAppearancePreference";
+import { DEFAULT_LOOK } from "@/shell/useLookSetting";
 
 /** `ui.appearance` (person scope, backend/src/settings/uiKeys.ts) fed
  * into the vendored template's own ThemeProvider on `/`
@@ -115,6 +116,6 @@ export function useAppearance(personId: string): void {
     const dark = resolveDark(effectiveAppearance, window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", dark);
     document.documentElement.classList.toggle("light", !dark);
-    writeShellCache({ look: cached?.look ?? "neutral", dark });
+    writeShellCache({ look: cached?.look ?? DEFAULT_LOOK, dark });
   }, [effectiveAppearance, cached?.look]);
 }

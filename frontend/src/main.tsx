@@ -3,21 +3,11 @@ import { createRoot } from "react-dom/client";
 import { App } from "@/App";
 import { installHiddenReloadOnNewServiceWorker, installStaleChunkRetry, runBootWatchdog } from "@/lib/pwaBoot";
 import "@/shell/tokens.css";
-import { readShellCache } from "@/shell/shellCache";
+import { applyFirstPaintPalette } from "@/shell/firstPaintPalette";
 
 installStaleChunkRetry(window, sessionStorage);
 if ("serviceWorker" in navigator) {
   installHiddenReloadOnNewServiceWorker(navigator.serviceWorker, document, window);
-}
-
-/** Paint the migrated shell's palette before React mounts from the
- * per-browser cache. Its appearance hooks reconcile after loading. */
-function applyCachedPalette(): void {
-  const cached = readShellCache();
-  if (!cached) return;
-  document.body.classList.add(`style-${cached.look}`);
-  document.documentElement.classList.toggle("dark", cached.dark);
-  document.documentElement.classList.toggle("light", !cached.dark);
 }
 
 /** Fires `onConfirmed` after the first real render commits, not just after
@@ -53,7 +43,7 @@ runBootWatchdog(
   (confirmBooted) => {
     const rootEl = document.getElementById("root");
     if (!rootEl) throw new Error("#root element missing from index.html");
-    applyCachedPalette();
+    applyFirstPaintPalette();
     createRoot(rootEl).render(
       <StrictMode>
         <BootConfirm onConfirmed={confirmBooted} />

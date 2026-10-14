@@ -3,6 +3,7 @@ import { api } from "@/lib/api";
 
 export const LOOKS = ["neutral", "stone", "zinc", "mauve", "olive", "mist", "taupe", "navy"] as const;
 export type Look = (typeof LOOKS)[number];
+export const DEFAULT_LOOK: Look = "neutral";
 
 function isLook(value: unknown): value is Look {
   return (LOOKS as readonly unknown[]).includes(value);
@@ -17,5 +18,5 @@ export function useLookValue(personId: string): Look {
     queryFn: () => api.settingsValues(scopeValue),
   });
   const found = query.data?.find((value) => value.key === "ui.look")?.value;
-  return isLook(found) ? found : "neutral";
+  return isLook(found) ? found : DEFAULT_LOOK;
 }
