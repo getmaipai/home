@@ -41,7 +41,7 @@ export interface HomeFixture {
   restore: () => void;
 }
 
-export function mockHome({ robots = false, wakeword = false, hasChild = false }: { robots?: boolean; wakeword?: boolean; hasChild?: boolean } = {}): HomeFixture {
+export function mockHome({ robots = false, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps = [] }: { robots?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
   const original = globalThis.fetch;
   const requests: string[] = [];
   const scopes: string[] = [];
@@ -61,6 +61,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false }:
     // ENGINES-AI-01: Engines and AI now draws the engines console and the model list as its trail view, so the
     // fixture answers what those read (an unconfigured Stack and a small Mac) instead of the bare "{}" below.
     const route = url.split("?")[0]!;
+    if (route.endsWith("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     if (route.endsWith("/api/engine-link/credentials")) return Promise.resolve(Response.json({ paired: false }));
     if (route.endsWith("/api/engines/health")) return Promise.resolve(Response.json({ configured: false, health: [] }));
     if (route.endsWith("/api/engines")) return Promise.resolve(Response.json({ configured: false, roles: [], engines: [], budget: null }));
@@ -72,7 +73,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false }:
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       scopes.push(scope);
       const kind = scope.split(":")[0];
-      return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.default ?? null, source: "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
+      return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.key === "ui.pinned_apps" ? JSON.stringify(pinnedApps) : k.default ?? null, source: "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
     }
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
     if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));

@@ -935,6 +935,14 @@ export interface Dashboard {
   engines?: DashboardEngineCounts | null;
 }
 
+export interface SetupChecklistItem {
+  id: string;
+  title: string;
+  reason: string;
+  done: boolean;
+  open: { label: string; href: string };
+}
+
 // GET /api/engines and GET /api/engines/health (SHELL-06, HOME-STACK-04a):
 // hand-copied from routes/engines.ts's own zod schemas (RoleInfoSchema,
 // EngineInfoSchema, BudgetSchema, HealthItemSchema) for the same reason

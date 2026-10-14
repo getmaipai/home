@@ -33,6 +33,7 @@ export type SearchInstanceStatus = {
 type CheckerOptions = {
   force?: boolean;
   respectCooldown?: boolean;
+  updateRepairs?: boolean;
   fetcher?: SearchInstanceFetch;
   now?: number;
 };
@@ -417,7 +418,9 @@ export async function checkSearchInstance(options: CheckerOptions = {}): Promise
     groups: result.groups,
     engineErrors: result.engineErrors,
   };
-  await updateSafeSearchRepair(result.hasUnsafeMinorEngines);
-  cache.set(baseUrl, { storedAt: now, status });
+  if (options.updateRepairs !== false) {
+    await updateSafeSearchRepair(result.hasUnsafeMinorEngines);
+    cache.set(baseUrl, { storedAt: now, status });
+  }
   return status;
 }

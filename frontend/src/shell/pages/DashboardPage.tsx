@@ -1,15 +1,18 @@
+import { Link } from "react-router-dom";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Timeline } from "@maipai/ui/src/elements/timeline";
 import { ApiError, type Roster, type Dashboard } from "@/lib/api";
 import { useDashboard } from "@/shell/useDashboard";
 import { Greeting } from "@/shell/pages/dashboard/Greeting";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { getIcon } from "@maipai/ui/src/icons";
 import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
 import { StatBody, StatLink } from "@/shell/pages/dashboard/StatCard";
 import { UpdatesStat } from "@/shell/pages/dashboard/UpdatesCard";
 import { recentActivityEvents } from "@/shell/pages/dashboard/recentActivityEvents";
 import { useTabItem } from "@/shell/tabIdentity";
+import { setupChecklistCountLine, useSetupChecklist } from "@/shell/useSetupChecklist";
 
 const UsersIcon = getIcon("users");
 const WrenchIcon = getIcon("wrench");
@@ -20,6 +23,7 @@ const WrenchIcon = getIcon("wrench");
 export function DashboardPage({ person }: { person: Roster }) {
   useTabItem("Home");
   const query = useDashboard();
+  const setupChecklist = useSetupChecklist(person);
 
   return (
     <AsyncState
@@ -37,10 +41,13 @@ export function DashboardPage({ person }: { person: Roster }) {
         // client-side role check invented.
         const showRepairs = data.repairs_open !== undefined;
         const activityEvents = recentActivityEvents(data.recent_activity);
+        const setupCount = (setupChecklist.checklist.data ?? []).filter((item) => !item.done).length;
+        const setupLine = setupChecklistCountLine(setupCount);
 
         return (
           <div className="pb-4">
             <h1 className="sr-only">Home</h1>
+            {setupLine ? <p className="pb-3 text-sm text-muted-foreground"><Button variant="link" size="row" render={<Link to="/settings/home/general" />}>{setupLine}</Button></p> : null}
             <div className="pb-4">
               <Greeting displayName={person.display_name} />
             </div>

@@ -49,6 +49,7 @@ import type {
   HealthStatus,
   EngineHealthEntry,
   Dashboard,
+  SetupChecklistItem,
   DashboardActivityRow,
   DashboardTurnsPerDay,
   DashboardEngineCounts,
@@ -160,7 +161,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // re-export the types here so the rest of the frontend imports from one
 // place.
 export type { TurnErrorDetail };
-export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
+export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, ClonedVoiceInfo, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -908,6 +909,7 @@ export const api = {
   // fields present only for owner/admin (absent, not null/zero, for
   // anyone else - backend/src/lib/dashboard.ts's own header).
   dashboard: () => request<Dashboard>("/api/dashboard"),
+  setupChecklist: () => request<SetupChecklistItem[]>("/api/setup-checklist"),
   // GET /api/engines, GET /api/engines/health (SHELL-06, HOME-STACK-04a):
   // owner/admin only. `configured: false` (empty roles/engines, null
   // budget or an empty health list) is a normal, common household state

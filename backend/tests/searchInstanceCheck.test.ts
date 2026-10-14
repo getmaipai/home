@@ -127,6 +127,24 @@ describe("search instance checks", () => {
     expect(listIssues()).toEqual(expect.arrayContaining([expect.objectContaining({ source: "websearch", key: "searxng_safe_search_engines", severity: "error" })]));
   });
 
+  test("a read-only check reports unsafe engines without changing Repairs", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    await owner.post("/api/people", { displayName: "Marlow", role: "child" });
+    const noSafeImages = {
+      ...configFull,
+      engines: configFull.engines.map((engine) => engine.categories[0] === "images" ? { ...engine, enabled: false } : engine),
+    };
+    const { fetcher } = stubFetch(noSafeImages);
+    const status = await checkSearchInstance({ force: true, fetcher, now: FIXED_NOW, updateRepairs: false });
+
+    expect(status.checks.find((check) => check.id === "safe-search")).toMatchObject({ state: "fail" });
+    expect(listIssues()).not.toEqual(expect.arrayContaining([expect.objectContaining({ source: "websearch", key: "searxng_safe_search_engines" })]));
+    __setRateLimiterClockForTests(() => FIXED_NOW + 120_000);
+    await checkSearchInstance({ fetcher, now: FIXED_NOW + 120_000 });
+    expect(listIssues()).toEqual(expect.arrayContaining([expect.objectContaining({ source: "websearch", key: "searxng_safe_search_engines" })]));
+  });
+
   test("the snippet never includes a secret key or the SearXNG address", async () => {
     const { fetcher } = stubFetch({ ...configFull, engines: configFull.engines.filter((engine) => engine.categories[0] !== "images") });
     const status = await checkSearchInstance({ force: true, fetcher, now: FIXED_NOW });

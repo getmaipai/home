@@ -3,7 +3,7 @@ import { cleanup, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { Dashboard, Roster } from "@/lib/api";
+import type { Dashboard, Roster, SetupChecklistItem } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
@@ -29,11 +29,12 @@ function makePerson(): Roster {
   };
 }
 
-function mockDashboardFetch(body: Dashboard) {
+function mockDashboardFetch(body: Dashboard, setupChecklist: SetupChecklistItem[] = []) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/dashboard")) return Promise.resolve(Response.json(body));
+    if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
   return () => {
@@ -42,6 +43,50 @@ function mockDashboardFetch(body: Dashboard) {
 }
 
 describe("DashboardPage", () => {
+  test("the home count line matches open checklist items and links to General", async () => {
+    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
+      { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
+      { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", done: true, open: { label: "Open Storage", href: "/settings/home/storage" } },
+    ]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={makePerson()} /></MemoryRouter>);
+      const line = await view.findByRole("link", { name: "1 thing left to finish setting up" });
+      expect(line.getAttribute("href")).toBe("/settings/home/general");
+    } finally {
+      restore();
+    }
+  });
+
+  test("nothing open means there is no home count line", async () => {
+    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
+      { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: true, open: { label: "Open People", href: "/settings/home/people" } },
+    ]);
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={makePerson()} /></MemoryRouter>);
+      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
+      expect(view.queryByRole("link", { name: /left to finish setting up/ })).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a regular adult sees no checklist line and makes no checklist request", async () => {
+    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
+      { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
+    ]);
+    try {
+      const person = { ...makePerson(), role: "adult" as const };
+      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={person} /></MemoryRouter>);
+      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
+      expect(view.queryByRole("link", { name: /left to finish setting up/ })).toBeNull();
+      const requested = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
+        .map(([input]) => typeof input === "string" ? input : String(input));
+      expect(requested.some((url) => url.includes("/api/setup-checklist"))).toBe(false);
+    } finally {
+      restore();
+    }
+  });
+
   // A review finding: the first cut checked only `isLoading`, so a
   // failed fetch left the loading skeleton showing forever - AsyncState
   // (the kit's own shared triad) is what actually surfaces the error
