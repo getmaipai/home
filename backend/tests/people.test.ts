@@ -141,10 +141,12 @@ describe("creating people", () => {
     expect(res.status).toBe(403);
   });
 
-  test("an owner or admin profile without a secret is refused", async () => {
+  test("owner, admin, and adult profiles without a secret are refused", async () => {
     const owner = await ownerClient();
-    const res = await owner.post("/api/people", { displayName: "Nova", role: "admin" });
-    expect(res.status).toBe(400);
+    for (const role of ["owner", "admin", "adult"]) {
+      const res = await owner.post("/api/people", { displayName: `No secret ${role}`, role });
+      expect(res.status).toBe(400);
+    }
   });
 
   test("an invalid role is refused", async () => {
