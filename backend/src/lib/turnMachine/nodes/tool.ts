@@ -154,6 +154,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // test predate any renderer for it), so this is always a generic
     // phrase today; the seam is here so a real label wins the moment
     // one exists, with no further change at this call site.
+    state.status?.emit({ type: "tool_start", package_id: tool });
     state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "searching", state.persona), stage: "tool" });
 
     // PROJECT-START-01: start_project never goes through runPlugin() -

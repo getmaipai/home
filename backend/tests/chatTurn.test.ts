@@ -1313,6 +1313,51 @@ describe("CHAT-15: the direct paths retain the same outcome evidence, and the ro
     const texts = db.select({ text: memoryRecords.text }).from(memoryRecords).all().map((r) => r.text);
     expect(texts.sort()).toEqual(["pizza night is Friday", "the recital is Friday"]);
   });
+
+  test("package latency uses the median of recent successful tool calls and ignores failed calls", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const turnIds: string[] = [];
+    for (let index = 0; index < 8; index++) {
+      const turn = await runTurnNext(actor, "chat", `remember that latency fixture ${index}`, { conversationId: conv.value.id });
+      if (!turn.ok) throw new Error(turn.error);
+      turnIds.push(turn.value.turn_id);
+    }
+    const rows = [
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 100 },
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 200 },
+      { packageId: "fixture-package", status: "failed", via: "tool_call", durationMs: 9999 },
+      { packageId: "fixture-package", status: "failed", via: "tool_call", failureKind: "timed_out", durationMs: 99999 },
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 300 },
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 400 },
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 500 },
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 600 },
+    ];
+    for (let index = 0; index < rows.length; index++) {
+      db.update(conversationTurns).set({ outcomes: JSON.stringify([rows[index]]) }).where(eq(conversationTurns.id, turnIds[index]!)).run();
+    }
+    const { packageLatencyFromRecentOutcomes } = await import("@/lib/conversationHistory");
+    expect(packageLatencyFromRecentOutcomes("fixture-package")).toEqual({ count: 6, medianMs: 350 });
+  });
+
+  test("package latency skips outcomes without durationMs and failed calls", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    const calls = [
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call" },
+      { packageId: "fixture-package", status: "failed", via: "tool_call", durationMs: 1400 },
+      { packageId: "fixture-package", status: "succeeded", via: "tool_call", durationMs: 800 },
+    ];
+    for (let index = 0; index < calls.length; index++) {
+      const turn = await runTurnNext(actor, "chat", `remember duration fixture ${index}`, { conversationId: conv.value.id });
+      if (!turn.ok) throw new Error(turn.error);
+      db.update(conversationTurns).set({ outcomes: JSON.stringify([calls[index]]) }).where(eq(conversationTurns.id, turn.value.turn_id)).run();
+    }
+    const { packageLatencyFromRecentOutcomes } = await import("@/lib/conversationHistory");
+    expect(packageLatencyFromRecentOutcomes("fixture-package")).toEqual({ count: 1, medianMs: 800 });
+  });
 });
 
 // Item 4b (docs/plans/baseline-fixes-2026-09-13.md): telling the hub to
@@ -2383,6 +2428,16 @@ describe("per-person turn rate limiting (Session C step 0, wave-2.md)", () => {
 
 describe("routes/turn.ts streamTurnEvents()", () => {
   function closedStatus(): StatusChannel { const channel = new StatusChannel(); channel.close(); return channel; }
+  async function seedPackageLatency(packageId: string, durations: number[]) {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    for (const [index, durationMs] of durations.entries()) {
+      const turn = await runTurnNext(actor, "chat", `what is two plus ${index}`, { conversationId: conv.value.id });
+      if (!turn.ok) throw new Error(turn.error);
+      db.update(conversationTurns).set({ outcomes: JSON.stringify([{ packageId, status: "succeeded", via: "tool_call", durationMs }]) }).where(eq(conversationTurns.id, turn.value.turn_id)).run();
+    }
+  }
   // A code review (2026-09-04) found the route's catch block emitted an
   // "error" event but never called result.finalize() - the partial reply
   // a household member had already seen and heard stream in was never
@@ -2538,6 +2593,125 @@ describe("routes/turn.ts streamTurnEvents()", () => {
 
     expect(events.some((e) => e.type === "spoken_cue")).toBe(false);
     expect(events[0]).toEqual({ type: "delta", text: "Instant reply." });
+  });
+
+  test("a spoken turn with a slow package median gets one cue as the tool starts", async () => {
+    await seedPackageLatency("fixture-slow", [1100, 1200, 1300, 1400, 1500]);
+    const { surfaceClassOf } = await import("@/lib/surfaceClass");
+    const spokenTurn = surfaceClassOf("robot", false) === "spoken";
+    expect(spokenTurn).toBe(true);
+    const status = new StatusChannel();
+    async function* delayedTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((resolve) => setTimeout(resolve, 140));
+      yield "The answer.";
+      status.close();
+      return undefined;
+    }
+    const result = fakeResult(delayedTokens());
+    result.status = status;
+    result.status.emit({ type: "tool_start", package_id: "fixture-slow" });
+    const startedAt = Date.now();
+    let cueAt: number | null = null;
+    const events: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(result, "test-person", 90, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn })) {
+      if (event.type === "spoken_cue") cueAt = Date.now();
+      events.push(event);
+    }
+    expect(events[0]?.type).toBe("spoken_cue");
+    expect(events.filter((event) => event.type === "spoken_cue")).toHaveLength(1);
+    expect(cueAt! - startedAt).toBeLessThan(90);
+    expect(events.findIndex((event) => event.type === "spoken_cue")).toBeLessThan(events.findIndex((event) => event.type === "delta"));
+    expect(events.some((event) => (event as { type: string }).type === "tool_start")).toBe(false);
+    expect(events.every((event) => !("package_id" in event))).toBe(true);
+    expect(events.every((event) => event.type !== "spoken_cue" || Object.keys(event).sort().join(",") === "text,type")).toBe(true);
+  });
+
+  test("fast and cold package history do not cue early; the existing timer remains the fallback", async () => {
+    await seedPackageLatency("fixture-fast", [100, 200, 300, 400, 500]);
+    await seedPackageLatency("fixture-cold", [1200, 1300, 1400, 1500]);
+    for (const packageId of ["fixture-fast", "fixture-cold"]) {
+      const status = new StatusChannel();
+      async function* delayedTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+        await new Promise((resolve) => setTimeout(resolve, 45));
+        yield "The answer.";
+        status.close();
+        return undefined;
+      }
+      const result = fakeResult(delayedTokens());
+      result.status = status;
+      result.status.emit({ type: "tool_start", package_id: packageId });
+      const startedAt = Date.now();
+      let cueAt: number | null = null;
+      const events: TurnStreamEvent[] = [];
+      for await (const event of streamTurnEvents(result, "test-person", 20, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true })) {
+        if (event.type === "spoken_cue") cueAt = Date.now();
+        events.push(event);
+      }
+      expect(events.filter((event) => event.type === "spoken_cue")).toHaveLength(1);
+      expect(events[0]?.type).toBe("spoken_cue");
+      expect(cueAt! - startedAt).toBeGreaterThanOrEqual(18);
+    }
+    const status = new StatusChannel();
+    async function* instantTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      yield "Instant answer.";
+      status.close();
+      return undefined;
+    }
+    const fast = fakeResult(instantTokens());
+    fast.status = status;
+    status.emit({ type: "tool_start", package_id: "fixture-fast" });
+    const fastEvents: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(fast, "test-person", 90, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true })) fastEvents.push(event);
+    expect(fastEvents[0]).toEqual({ type: "delta", text: "Instant answer." });
+    expect(fastEvents.some((event) => event.type === "spoken_cue")).toBe(false);
+  });
+
+  test("a written turn never gets the early cue and a suppressed early cue stays suppressed", async () => {
+    await seedPackageLatency("fixture-slow", [1100, 1200, 1300, 1400, 1500]);
+    const writtenStatus = new StatusChannel();
+    async function* delayedTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      yield "The answer.";
+      writtenStatus.close();
+      return undefined;
+    }
+    const written = fakeResult(delayedTokens());
+    written.status = writtenStatus;
+    written.status.emit({ type: "tool_start", package_id: "fixture-slow" });
+    const writtenEvents: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(written, "test-person", 90, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: false })) writtenEvents.push(event);
+    expect(writtenEvents.some((event) => event.type === "spoken_cue")).toBe(false);
+
+    const suppressedStatus = new StatusChannel();
+    async function* suppressedTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      yield "The answer.";
+      suppressedStatus.close();
+      return undefined;
+    }
+    const suppressed = fakeResult(suppressedTokens());
+    suppressed.cueSuppressed = true;
+    suppressed.status = suppressedStatus;
+    suppressed.status.emit({ type: "tool_start", package_id: "fixture-slow" });
+    const suppressedEvents: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(suppressed, "test-person", 90, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true })) suppressedEvents.push(event);
+    expect(suppressedEvents.some((event) => event.type === "spoken_cue")).toBe(false);
+
+    // Hand-built result: production currently passes an empty bannedPhrases list.
+    const bannedStatus = new StatusChannel();
+    async function* bannedTokens(): AsyncGenerator<string, SafetyResult | undefined, void> {
+      await new Promise((resolve) => setTimeout(resolve, 15));
+      yield "The answer.";
+      bannedStatus.close();
+      return undefined;
+    }
+    const banned = fakeResult(bannedTokens());
+    banned.bannedPhrases = ["e"];
+    banned.status = bannedStatus;
+    banned.status.emit({ type: "tool_start", package_id: "fixture-slow" });
+    const bannedEvents: TurnStreamEvent[] = [];
+    for await (const event of streamTurnEvents(banned, "test-person", 90, undefined, false, undefined, "adult", undefined, undefined, { spokenTurn: true })) bannedEvents.push(event);
+    expect(bannedEvents.some((event) => event.type === "spoken_cue")).toBe(false);
   });
 
   test("the spoken_cue is never logged: it isn't part of the finalized reply text", async () => {

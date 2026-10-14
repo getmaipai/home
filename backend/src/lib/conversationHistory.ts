@@ -219,6 +219,33 @@ export function outcomesForConversation(conversationId: string, limit = 50): { t
   return out;
 }
 
+/** VOICE-01d: bounded prediction input for the spoken tool cue. Read at
+ * most the newest 200 turns carrying outcomes (rowid is indexed by SQLite),
+ * then use at most the 20 newest successful calls for this package. */
+export function packageLatencyFromRecentOutcomes(packageId: string): { count: number; medianMs: number | null } {
+  const rows = sqlite.query(
+    "SELECT outcomes FROM conversation_turns WHERE outcomes IS NOT NULL ORDER BY rowid DESC LIMIT 200",
+  ).all() as { outcomes: string }[];
+  const durations: number[] = [];
+  for (const row of rows) {
+    try {
+      const outcomes = JSON.parse(row.outcomes) as unknown;
+      if (!Array.isArray(outcomes)) continue;
+      for (const value of outcomes.reverse()) {
+        if (!value || typeof value !== "object") continue;
+        const outcome = value as Partial<ToolExecutionOutcome>;
+        if (outcome.packageId !== packageId || outcome.status !== "succeeded" || outcome.via !== "tool_call") continue;
+        if (typeof outcome.durationMs !== "number" || !Number.isFinite(outcome.durationMs)) continue;
+        durations.push(outcome.durationMs);
+      }
+    } catch { /* malformed retained outcomes do not make a cue prediction */ }
+  }
+  const recent = durations.slice(0, 20).sort((a, b) => a - b);
+  const middle = Math.floor(recent.length / 2);
+  const medianMs = recent.length === 0 ? null : recent.length % 2 ? recent[middle]! : (recent[middle - 1]! + recent[middle]!) / 2;
+  return { count: recent.length, medianMs };
+}
+
 /** Writes one row for a completed turn, any source, refusals included: a
  * parent reviewing a child's history should be able to see that a request
  * was made and refused, the same oversight motive `notify_parent` serves.

@@ -20,7 +20,8 @@ import type { TurnStreamEvent as ToolStreamEvent } from "@maipai/spec/stack/ts/t
 import type { AppEnv, PersonRow } from "@/types";
 import { streamEventForViewer, valueForViewer } from "@/lib/turnErrorDetail";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { turnOwnerId, isTemporaryConversation } from "@/lib/conversationHistory";
+import { turnOwnerId, isTemporaryConversation, packageLatencyFromRecentOutcomes } from "@/lib/conversationHistory";
+import { surfaceClassOf } from "@/lib/surfaceClass";
 import { attachments } from "@/db/schema";
 import { db } from "@/db";
 import { readAttachment, getTemporaryChatImage } from "@/lib/attachments";
@@ -96,6 +97,7 @@ interface ResumeSession {
   // session-construction time, since streamTurnEvents() itself only ever
   // sees `ownerId`, a bare string.
   dropReasoning: boolean;
+  spokenTurn: boolean;
   modelStatus?: ModelSelectionStatus;
   conversationId: string;
   turnId: string;
@@ -456,7 +458,7 @@ function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars)) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn })) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -540,6 +542,7 @@ export async function* streamTurnEvents(
   speakerBand: "adult" | "teen" | "child" = "child",
   releasedText?: () => string,
   heardChars?: () => number | undefined,
+  options: { spokenTurn?: boolean; onToolStart?: (packageId: string) => void } = {},
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -550,6 +553,7 @@ export async function* streamTurnEvents(
   // UNSPLIT original chunks, so `finalize()` and the stored row are
   // unaffected either way (docs/dev.md's own "smallest change" section).
   const thinkSplit = newThinkSplitState();
+  let earlyCueSent = false;
   // Sequence numbers are stamped by the caller (startResumeSession(), one
   // shared counter for `delta` and `reasoning` alike, so a resuming
   // client's replay filter works identically for both) - this function
@@ -571,7 +575,18 @@ export async function* streamTurnEvents(
   // THIN-5B: live reasoning rides the status channel (turnNext.ts); the
   // same minor/surface gate that filters the think-split path filters it.
   function* sideEvents(): Generator<TurnStreamEvent, void, void> {
-    for (const event of result.status.drain()) if (!(dropReasoning && event.type === "reasoning")) yield event;
+    for (const event of result.status.drain()) {
+      if (event.type === "tool_start") {
+        options.onToolStart?.(event.package_id);
+        const latency = options.spokenTurn && !earlyCueSent && !result.cueSuppressed
+          ? packageLatencyFromRecentOutcomes(event.package_id)
+          : null;
+        if (latency && latency.count >= 5 && latency.medianMs !== null && latency.medianMs > 1_000) {
+          const cue = pickThinkingCue(actorId, result.bannedPhrases);
+          if (cue) { earlyCueSent = true; yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; }
+        }
+      } else if (!(dropReasoning && event.type === "reasoning")) yield event;
+    }
   }
   function* splitEvents(text: string): Generator<TurnStreamEvent, void, void> {
     yield* spanEvents(feedThinkSplit(thinkSplit, text));
@@ -608,7 +623,7 @@ export async function* streamTurnEvents(
       race = await Promise.race([firstStep, pendingStatus, timer.promise]);
     }
     timer.cancel();
-    if (race === "timeout" && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
+    if (race === "timeout" && !earlyCueSent && !result.cueSuppressed) { const cue = pickThinkingCue(actorId, result.bannedPhrases); if (cue) yield { type: "spoken_cue", text: normalizeForSpeech(cue) }; } // SPEECH-ROBOT-01: every spoken text passes the one normalizer
     // THIN-5B: while the first answer piece is still coming, side events
     // (live reasoning, status lines) keep going out as they are emitted, so
     // an adult's reasoning is shown while the model is still thinking
@@ -857,6 +872,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
   const parsedEvidence = z.object({ speaker_evidence: evidence.optional(), present: present.optional(), ask_answer: askAnswer.optional() }).safeParse(body);
   if (!parsedEvidence.success) return c.json({ error: "Invalid turn request", code: "invalid_input" }, 400);
   const surface = (body.surface ?? "chat") as Surface;
+  const spokenTurn = surfaceClassOf(body.bare === true ? "chat" : surface, body.spoken === true) === "spoken";
   // getmaipai/home#91 (a code review of the original ephemeral fix,
   // 2026-09-13): honoring the flag for whatever text a caller sends
   // would let a household member skip their own chat-history/episode
@@ -1000,6 +1016,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // decision on this same turn (host.ts's chat-models gate, the retired turn engine's
     // withholdSensitive/mayDefer, composer.ts's child-only projection).
     dropReasoning,
+    spokenTurn,
     modelStatus: modelSelection.status,
     conversationId: result.conversationId,
     turnId: result.turnId,

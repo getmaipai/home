@@ -3,7 +3,7 @@ import type { TurnStreamEvent } from "@/wire";
 export type StatusEvent = Extract<TurnStreamEvent, { type: "status" }>;
 /** THIN-5B: the live `reasoning` events ride the same ordered channel as
  * status lines, so they reach the wire ahead of the answer's first delta. */
-export type TurnSideEvent = StatusEvent | Extract<TurnStreamEvent, { type: "reasoning" }>;
+export type TurnSideEvent = StatusEvent | Extract<TurnStreamEvent, { type: "reasoning" }> | { type: "tool_start"; package_id: string };
 
 /** A push-now-pull-later queue: `emit()` is called eagerly, from
  * anywhere, independent of whether a consumer is reading yet; `drain()`

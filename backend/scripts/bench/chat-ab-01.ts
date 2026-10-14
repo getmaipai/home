@@ -125,7 +125,7 @@ interface RunRecord {
   factsRecalled: { id: string; recalled: boolean }[] | null; // multi-turn turns 8 and 9 only
   error: string | null;
   /** Streamed arms (C, S): the wire events the route would send. */
-  stream?: { firstWordMs: number | null; spokenCueMs: number | null; firstStatusMs: number | null; searched: boolean; searchQueries: SearchQuery[]; engineRequests: { promptTokens: number | null; cachedTokens: number | null; tools: number; toolChoice: string | null }[] };
+  stream?: { firstWordMs: number | null; spokenCueMs: number | null; toolStartMs?: number | null; firstStatusMs: number | null; searched: boolean; searchQueries: SearchQuery[]; engineRequests: { promptTokens: number | null; cachedTokens: number | null; tools: number; toolChoice: string | null }[] };
   // arm B only
   b?: {
     engineRequests: number;
@@ -548,10 +548,11 @@ async function runPipeline(id: string, prompts: string[]): Promise<{ turns: Omit
  * streamTurnEvents (the route's own event generator, 900 ms cue included).
  * The clock starts before the turn begins, so first word is what a person
  * waits from the moment they finish asking. */
-async function streamTurn(actor: { id: string; role?: string }, surface: "chat" | "robot", text: string, spoken: boolean, dropReasoning: boolean): Promise<{ reply: string; error: string | null; firstWordMs: number | null; spokenCueMs: number | null; firstStatusMs: number | null; totalMs: number }> {
+async function streamTurn(actor: { id: string; role?: string }, surface: "chat" | "robot", text: string, spoken: boolean, dropReasoning: boolean): Promise<{ reply: string; error: string | null; firstWordMs: number | null; spokenCueMs: number | null; toolStartMs: number | null; firstStatusMs: number | null; totalMs: number }> {
   const { createConversation } = await import("@/lib/conversationHistory");
   const { runTurnNextStream } = await import("@/lib/turnMachine/turnNext");
   const { streamTurnEvents } = await import("@/routes/turn");
+  const { surfaceClassOf } = await import("@/lib/surfaceClass");
   const created = createConversation(actor as never, { surface });
   if (!created.ok) throw new Error(`createConversation: ${created.error}`);
   const t0 = performance.now();
@@ -559,15 +560,16 @@ async function streamTurn(actor: { id: string; role?: string }, surface: "chat" 
   let reply = "";
   let firstWordMs: number | null = null;
   let spokenCueMs: number | null = null;
+  let toolStartMs: number | null = null;
   let firstStatusMs: number | null = null;
   try {
     const result = await runTurnNextStream(actor as never, surface, text, { conversationId: created.value.id, spoken, thinking: dropReasoning ? false : undefined });
-    if (!result.ok) return { reply: "", error: result.error, firstWordMs, spokenCueMs, firstStatusMs, totalMs: at() };
+    if (!result.ok) return { reply: "", error: result.error, firstWordMs, spokenCueMs, toolStartMs, firstStatusMs, totalMs: at() };
     if (result.kind === "immediate") {
       reply = result.value.reply.text;
-      return { reply, error: null, firstWordMs: at(), spokenCueMs, firstStatusMs, totalMs: at() };
+      return { reply, error: null, firstWordMs: at(), spokenCueMs, toolStartMs, firstStatusMs, totalMs: at() };
     }
-    for await (const event of streamTurnEvents(result, actor.id, 900, undefined, dropReasoning)) {
+    for await (const event of streamTurnEvents(result, actor.id, 900, undefined, dropReasoning, undefined, "adult", undefined, undefined, { spokenTurn: surfaceClassOf(surface, spoken) === "spoken", onToolStart: () => { toolStartMs ??= at(); } })) {
       if (event.type === "delta") {
         reply += event.text;
         if (firstWordMs === null && event.text.trim()) firstWordMs = at();
@@ -579,12 +581,12 @@ async function streamTurn(actor: { id: string; role?: string }, surface: "chat" 
         if (reply.trim() === "") reply = event.value.reply.text; // a resolved or refused turn streams no deltas
         if (firstWordMs === null && reply.trim()) firstWordMs = at();
       } else if (event.type === "error") {
-        return { reply, error: JSON.stringify(event).slice(0, 300), firstWordMs, spokenCueMs, firstStatusMs, totalMs: at() };
+        return { reply, error: JSON.stringify(event).slice(0, 300), firstWordMs, spokenCueMs, toolStartMs, firstStatusMs, totalMs: at() };
       }
     }
-    return { reply, error: null, firstWordMs, spokenCueMs, firstStatusMs, totalMs: at() };
+    return { reply, error: null, firstWordMs, spokenCueMs, toolStartMs, firstStatusMs, totalMs: at() };
   } catch (err) {
-    return { reply, error: (err as Error).message, firstWordMs, spokenCueMs, firstStatusMs, totalMs: at() };
+    return { reply, error: (err as Error).message, firstWordMs, spokenCueMs, toolStartMs, firstStatusMs, totalMs: at() };
   }
 }
 
@@ -703,7 +705,7 @@ async function main(): Promise<void> {
         proxy.reset();
         const r = await streamTurn(people.owner, "chat", found.prompt, true, true);
         const queries = tee.queries.slice(mark);
-        runs.push({ ...base, arm: "S", item: row.id, category, rep, turn: null, prompt: found.prompt, reply: r.error ? "" : r.reply, words: r.error ? 0 : words(r.reply), ttftMs: r.firstWordMs, totalMs: r.totalMs, promptTokens: null, completionTokens: null, finishReason: null, correct: "expectedAll" in found && found.expectedAll ? containsExpected(r.reply, found.expectedAll as string[]) : null, factsRecalled: null, error: r.error, stream: { firstWordMs: r.firstWordMs, spokenCueMs: r.spokenCueMs, firstStatusMs: r.firstStatusMs, searched: queries.length > 0, searchQueries: queries, engineRequests: proxy.requests.map((q) => ({ promptTokens: q.promptTokens ?? null, cachedTokens: q.cachedTokens ?? null, tools: q.tools.length, toolChoice: q.toolChoice ?? null })) } });
+        runs.push({ ...base, arm: "S", item: row.id, category, rep, turn: null, prompt: found.prompt, reply: r.error ? "" : r.reply, words: r.error ? 0 : words(r.reply), ttftMs: r.firstWordMs, totalMs: r.totalMs, promptTokens: null, completionTokens: null, finishReason: null, correct: "expectedAll" in found && found.expectedAll ? containsExpected(r.reply, found.expectedAll as string[]) : null, factsRecalled: null, error: r.error, stream: { firstWordMs: r.firstWordMs, spokenCueMs: r.spokenCueMs, toolStartMs: r.toolStartMs, firstStatusMs: r.firstStatusMs, searched: queries.length > 0, searchQueries: queries, engineRequests: proxy.requests.map((q) => ({ promptTokens: q.promptTokens ?? null, cachedTokens: q.cachedTokens ?? null, tools: q.tools.length, toolChoice: q.toolChoice ?? null })) } });
         save(runs, env);
       }
     }

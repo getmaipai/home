@@ -5325,6 +5325,7 @@ and enforce the composer-owned register rule for disfluencies.
       even by accident, the exact non-negotiable home-legacy.git's own
       research named ("a small model that saw its own cue in its history
       would start opening every reply with it").
+      On spoken turns, a package whose last successful calls have a median above 1000 ms also gets this same cue when its tool starts; the unchanged 900 ms timer remains the fallback for all turns.
     - Real regression tests, not just the mechanism read by eye: a hand-
       built slow `tokens` generator proves the cue arrives before any
       delta and only once even across two slow gaps; a fast generator
