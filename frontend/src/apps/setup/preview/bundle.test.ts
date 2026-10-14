@@ -6,13 +6,15 @@ import { spawnSync } from "node:child_process";
 
 const root = process.cwd();
 function buildAndAssertAbsent() {
-  const result = spawnSync("bun", ["run", "build"], { cwd: root, encoding: "utf8" });
-  if (result.status !== 0) throw new Error(`${result.stdout}\n${result.stderr}`);
-  const dist = join(root, "dist");
-  const files = readdirSync(dist, { recursive: true }).map(String);
-  expect(files.some((file) => file.endsWith("mockServiceWorker.js"))).toBe(false);
-  const js = files.filter((file) => file.endsWith(".js")).map((file) => readFileSync(join(dist, file), "utf8")).join("\n");
-  expect(js).not.toContain("SETUP_PREVIEW_ONLY_MARKER_20261014");
+  const outputDir = mkdtempSync(join(tmpdir(), "setup-preview-build-"));
+  try {
+    const result = spawnSync("bunx", ["vite", "build", "--outDir", outputDir, "--emptyOutDir"], { cwd: root, encoding: "utf8" });
+    if (result.status !== 0) throw new Error(`${result.stdout}\n${result.stderr}`);
+    const files = readdirSync(outputDir, { recursive: true }).map(String);
+    expect(files.some((file) => file.endsWith("mockServiceWorker.js"))).toBe(false);
+    const js = files.filter((file) => file.endsWith(".js")).map((file) => readFileSync(join(outputDir, file), "utf8")).join("\n");
+    expect(js).not.toContain("SETUP_PREVIEW_ONLY_MARKER_20261014");
+  } finally { rmSync(outputDir, { recursive: true, force: true }); }
 }
 
 describe("production bundle excludes setup preview", () => {

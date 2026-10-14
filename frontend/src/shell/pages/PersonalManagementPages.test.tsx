@@ -24,7 +24,7 @@ function mockApi() {
     const url = String(input);
     if (url.includes("/api/voice/catalog")) return Promise.resolve(Response.json({ entries: [] }));
     if (url.includes("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
-    if (url.includes("/api/settings")) return Promise.resolve(Response.json({ settings: [] }));
+    if (url.includes("/api/settings")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/commands")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/devices")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/auth/sessions")) return Promise.resolve(Response.json([]));
