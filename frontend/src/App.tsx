@@ -101,7 +101,7 @@ export function App() {
                       path="/setup"
                       element={
                         <Suspense fallback={<RouteSkeleton />}>
-                          <SetupWizard onDone={loadPerson} />
+                          <SetupWizard onDone={loadPerson} initialScreen={new URLSearchParams(window.location.search).get("checksReview") === "1" ? "checks" : undefined} />
                         </Suspense>
                       }
                     />

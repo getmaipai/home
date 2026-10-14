@@ -22,6 +22,8 @@ import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, type 
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems } from "@/setup/checks/checks";
+import { startSetupDownloads } from "@/setup/checks/setupDownloads";
+import { getStackClient } from "@/lib/stackEngine";
 
 // A person on the household's own LAN hits this a handful of times while
 // working through the trust step, never dozens of times a second - the
@@ -43,7 +45,17 @@ const checksRoute = createRoute({
 });
 setupRoutes.openapi(checksRoute, async (c) => {
   const rows = await runSetupChecks();
-  const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows) });
+  const passed = rows.every((row) => row.state === "green" || row.state === "idle");
+  const current = getSetupState();
+  let engine = current.engine;
+  if (passed) {
+    try {
+      const facts = await getStackClient().hardware();
+      engine = { ...current.engine, hardware: facts };
+    } catch { /* Keep the last known facts if Stack went away after the checks. */ }
+  }
+  const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows), engine });
+  if (passed) void startSetupDownloads().catch(() => {});
   return c.json({ rows: rows.map(({ id, title, state, text }) => ({ id, title, state, text })), state }, 200);
 });
 

@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/
 import { api, ApiError } from "@/lib/api";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 
-interface SetupWizardProps { onDone: () => void }
+interface SetupWizardProps { onDone: () => void; initialScreen?: ScreenId }
 
 const PHASES: WizardStep[] = [
   { id: "computers", title: "Your computers" },
@@ -41,10 +41,10 @@ const OWNER_COPY = "You're the owner. You're in charge of this Home: who's in th
 const ADMIN_COPY = "Later you can add admins. An admin is a trusted helper, like another parent. They can add apps and look after settings, but they can't change who's in charge, reset Home or bring back a whole backup.";
 const stepIsDone = (state: SetupState, id: string) => state.steps.find((step) => step.id === id)?.status === "done";
 
-export function SetupWizard({ onDone }: SetupWizardProps) {
+export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const navigate = useNavigate();
   const [state, setState] = useState<SetupState | null>(null);
-  const [screen, setScreen] = useState<ScreenId>("welcome");
+  const [screen, setScreen] = useState<ScreenId>(initialScreen ?? "welcome");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +60,11 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
 
   const refresh = async () => {
     const result = await api.setupState();
-    if ("done" in result || result.completed_at !== null || stepIsDone(result, "done")) {
+    if ("done" in result) {
+      if (!initialScreen) navigate("/sign-in", { replace: true });
+      return null;
+    }
+    if (!initialScreen && (result.completed_at !== null || stepIsDone(result, "done"))) {
       navigate("/sign-in", { replace: true });
       return null;
     }
@@ -165,7 +169,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
   }
 
   async function next() {
-    const deferred = ["storage", "checks", "plan", "away", "hello"].includes(screen) || (screen === "engine_location" && engine === "another_computer");
+    const deferred = ["checks", "plan", "away", "hello"].includes(screen) || (screen === "engine_location" && engine === "another_computer");
     const updated = await record(screen, deferred ? "deferred" : "done");
     if (!updated) return;
     if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
@@ -221,7 +225,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
   switch (screen) {
     case "welcome": body = <Card><CardHeader><img src="/brand/maipai-home-logo-light.png" alt="MaiPai Home" width="280" /><CardTitle>Welcome to MaiPai Home</CardTitle><CardDescription>{COPY_HOME}</CardDescription></CardHeader><CardContent><ul><li>Nothing leaves your house.</li><li>No account with us, no subscription, no tracking.</li><li>Kids get their own safe profiles. Parents decide what they can access.</li></ul><Separator /><p>{DISCLAIMER}</p><Button type="button" variant="link" disabled>Restore from a backup</Button><p className="text-sm text-muted-foreground">Restore from a backup is not available in this setup build.</p></CardContent></Card>; break;
     case "engine_location": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle></CardHeader><CardContent><RadioGroup value={engine} onValueChange={(v) => setEngine(v as typeof engine)}><div className="flex items-start gap-3"><RadioGroupItem value="this_computer" id="engine-local" /><div><Label htmlFor="engine-local">This computer</Label><p>Simplest. Home and its AI share this computer.</p></div></div><div className="flex items-start gap-3"><RadioGroupItem value="another_computer" id="engine-remote" /><div><Label htmlFor="engine-remote">Another computer on my network</Label><p>For a bigger computer elsewhere in the house, like a gaming PC or a Mac Studio.</p></div></div></RadioGroup>{engine === "another_computer" ? <p role="status">The engine-link pairing flow is available in Home settings, AI. Pairing and saving an engine link during first-run setup is not supported by the current setup API.</p> : null}</CardContent></Card>; break;
-    case "storage": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle><CardDescription>AI models are big (7 to 10 GB). Pick a disk with room to spare.</CardDescription></CardHeader><CardContent><p>Home's data-location disk picker is not available in this build. No disk has been selected or recorded.</p></CardContent></Card>; break;
+    case "storage": body = <Card><CardHeader><CardTitle>{SCREEN_TITLE[screen]}</CardTitle><CardDescription>AI models are big (7 to 10 GB). The Stack's default location is ready to use.</CardDescription></CardHeader><CardContent><p>Use the default location on the engine computer.</p><p className="text-sm text-muted-foreground">Choosing another location is not available yet.</p></CardContent></Card>; break;
     case "checks": {
       const blocking = checkRows?.some((row) => row.state === "red") ?? false;
       const warnings = checkRows?.some((row) => row.state === "amber") ?? false;

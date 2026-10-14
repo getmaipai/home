@@ -93,6 +93,7 @@ const useWebkit = process.argv.includes("--webkit");
 // rule), Playwright's own firefox channel.
 const useFirefox = process.argv.includes("--firefox") || process.env.BROWSER?.toLowerCase() === "firefox";
 const chatIncognitoAudit = process.argv.includes("--chat-incognito-audit");
+const setupChecksReview = process.argv.includes("--setup-checks-review");
 // MOBILE-LIVE-01: `bun run screenshots --mobile-smoke` - sign in and walk
 // every main-menu item at 390x844 with touch; see scripts/mobileSmoke.ts.
 const mobileSmoke = process.argv.includes("--mobile-smoke");
@@ -155,7 +156,9 @@ async function runPool<T, R>(items: readonly T[], poolSize: number, worker: (ite
 // path is the one that must never move; every other browser writes under
 // its own gitignored subdirectory instead; `bun run screenshots` (default,
 // no `--webkit`) is unaffected by any of this.
-const SCREENS_DIR = chatIncognitoAudit
+const SCREENS_DIR = setupChecksReview
+  ? join(ROOT, "data-scratch", "screenshots", "setup-checks")
+  : chatIncognitoAudit
   ? "/Users/jessetorres/Developer/github.com/getmaipai/home/data-scratch/chat-ab/incognito-shots"
   : useWebkit ? join(ROOT, "docs", "assets", "screens", "webkit") : join(ROOT, "docs", "assets", "screens");
 const HERO_PATH = useWebkit ? join(ROOT, "docs", "assets", "webkit", "hero.png") : join(ROOT, "docs", "assets", "hero.png");
@@ -9490,6 +9493,7 @@ async function main() {
   sweepStaleDemoDataDirs();
   DATA_OWNER = { pid: process.pid, startedAt: processStartTime(process.pid) ?? null, token: crypto.randomUUID() };
   DATA_DIR = createOwnedDemoDataDir(ROOT, DATA_OWNER);
+  process.env.MAIPAI_DATA_DIR = DATA_DIR;
   try {
     seedWeatherCache(DATA_DIR);
     seedWriteDocumentRoutingStats();
@@ -9715,6 +9719,13 @@ async function main() {
   try {
     await waitForHealth();
     const sessionValue = await seedHousehold();
+    if (setupChecksReview) {
+      const checks = ["engine", "memory", "system", "model-disk", "graphics-driver", "download-host", "download-destination", "hub-disk", "clock", "home-network", "engine-link", "camera"].map((id) => ({ code: `setup.${id}`, severity: "warning", title: id, text: id === "graphics-driver" ? "This check needs attention but can continue." : "This check passed.", since: new Date().toISOString(), cause: "Seeded screenshot scenario." }));
+      const payload = { id: "screenshot-checks", source: "wizard", steps: ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "done"].map((id) => ({ id, status: id === "checks" ? "pending" : "done", at: new Date().toISOString() })), phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks, started_at: new Date().toISOString(), completed_at: null, hlc: `${Date.now()}:0:screenshotchecks` };
+      const source = `import { sqlite } from "./src/db/index.ts"; sqlite.query("INSERT INTO setup_state (slot,value) VALUES (1,?) ON CONFLICT(slot) DO UPDATE SET value=excluded.value").run(${JSON.stringify(JSON.stringify(payload))}); sqlite.close();`;
+      const seeded = Bun.spawnSync({ cmd: ["bun", "-e", source], cwd: join(ROOT, "backend"), env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR }, stdout: "inherit", stderr: "inherit" });
+      if (seeded.exitCode !== 0) throw new Error("setup checks screenshot seed failed");
+    }
     if (pictureReview) {
       startPictureSearchFixture();
       const searchSetting = await fetch(`${BASE_URL}/api/settings`, {
@@ -10284,6 +10295,25 @@ async function main() {
     if (!a11yOnly && chatMobileSheetReview) {
       await captureChatMobileSheetReview(browser, sessionValue);
       console.log("completed named review: --chat-mobile-sheet-review");
+      return;
+    }
+
+    if (setupChecksReview) {
+      const outDir = join(ROOT, "data-scratch", "screenshots", "setup-checks");
+      mkdirSync(outDir, { recursive: true });
+      for (const [viewport, slug] of [[VIEWPORTS.find((v) => v.slug === "desktop")!, "1440"], [VIEWPORTS.find((v) => v.slug === "phone")!, "390"]] as const) {
+        for (const theme of THEMES) {
+          const context = await newContext(launchedBrowser, viewport, theme, sessionValue);
+          try {
+            const page = await context.newPage();
+            await page.route("**/api/setup/checks/run", (route) => route.fulfill({ json: { rows: ["engine", "memory", "system", "model-disk", "graphics-driver", "download-host", "download-destination", "hub-disk", "clock", "home-network", "engine-link", "camera"].map((id) => ({ id, title: id, state: id === "graphics-driver" ? "amber" : "green", text: id === "graphics-driver" ? "This check needs attention but can continue." : "This check passed." })), state: { id: "screenshot-checks", source: "wizard", steps: [], phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: new Date().toISOString(), completed_at: null, hlc: `${Date.now()}:0:screenshotchecks` } } }));
+            await page.goto(`${BASE_URL}/setup?checksReview=1`);
+            await page.getByText("Checking your computers").waitFor();
+            await page.screenshot({ path: join(outDir, `checks-${slug}-${theme}.png`), fullPage: true });
+          } finally { await context.close(); }
+        }
+      }
+      console.log(`Wrote setup Checks review captures to ${outDir}`);
       return;
     }
 

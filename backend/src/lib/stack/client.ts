@@ -67,6 +67,7 @@ export interface StackClient {
     opts?: { signal?: AbortSignal },
   ): Promise<Record<string, unknown>>;
   models(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  modelCatalog(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   /** POST /stack/v1/models: install a pinned model and start its download job. */
   pullModel(body: { id: string; role: string; repo?: string; url: string; sha256: string; approx_bytes?: number; licence: string; revision: string; engine?: string; archive?: boolean; hub_file?: string; component?: string }, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   modelAction(id: string, action: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
@@ -80,6 +81,7 @@ export interface StackClient {
   budget(opts?: { signal?: AbortSignal }): Promise<BudgetResponse>;
   fitPlan(body: FitPlanRequest, opts?: { signal?: AbortSignal }): Promise<StackFitPlan>;
   hardware(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  /** GET /stack/v1/models/catalog: shipped model pins with verified provenance. */
   updates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
   checkUpdates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
   /** POST /stack/v1/updates/engines/{name}/apply - stage, drain, swap and check. */
@@ -328,6 +330,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     engineAction: (name, action, opts) =>
       call(`/stack/v1/engines/${encodeURIComponent(name)}/${action}`, { method: "POST" }, json<Record<string, unknown>>, opts),
     models: (opts) => call("/stack/v1/models", { method: "GET" }, json<Record<string, unknown>>, opts),
+    modelCatalog: (opts) => call("/stack/v1/models/catalog", { method: "GET" }, json<Record<string, unknown>>, opts),
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),

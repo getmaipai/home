@@ -27,7 +27,7 @@ function row(cls: string, check: string, kind: PlacementRow["kind"], text: strin
   return { class: cls, kind, id: `${check}:${cls}`, text, fix };
 }
 
-function defaultModelBytes(opts: PlacementOptions): number {
+export function defaultModelBytes(opts: PlacementOptions = {}): number {
   try {
     const index = JSON.parse(readFileSync(CATALOG_MODEL_INDEX, "utf8")) as { models?: Array<{ id: string; profile?: string; download?: { approx_bytes?: number } }> };
     const chosen = opts.models?.length ? new Set(opts.models) : null;
@@ -44,7 +44,7 @@ function defaultModelBytes(opts: PlacementOptions): number {
   }
 }
 
-function minimum(id: string, opts: PlacementOptions): number {
+export function minimum(id: string, opts: PlacementOptions = {}): number {
   if (id === "records") return 2 * GB;
   if (id === "models") return Math.ceil(defaultModelBytes(opts) * 1.1);
   if (id === "reference") return opts.reference?.length ? opts.reference.reduce((n, item) => n + (item.sizeBytes ?? item.approx_bytes ?? 0), 0) : GB;
