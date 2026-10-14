@@ -110,6 +110,22 @@ describe("GET /api/settings (list)", () => {
 });
 
 describe("PUT /api/settings (write)", () => {
+  test("accepts engines.chat.choice = auto and leaves crisis behavior intact", async () => {
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const write = await owner.request("/api/settings", {
+      method: "PUT",
+      body: { scope: "household", key: "engines.chat.choice", value: "auto" },
+    });
+    expect(write.status).toBe(200);
+
+    const safety = await owner.post("/api/safety/check", { text: "I want to kill myself" });
+    expect(safety.status).toBe(200);
+    const safetyBody = (await safety.json()) as Record<string, unknown>;
+    expect(safetyBody).toMatchObject({ flagged: true, action: "allow_with_resources" });
+    expect(safetyBody.crisis_resources).toContain("988");
+  });
+
   test("owner can set a household value; list reflects it with source=user", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });

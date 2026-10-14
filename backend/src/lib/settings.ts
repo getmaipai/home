@@ -174,6 +174,17 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       break;
     case "select": {
       const options = range?.options as unknown[] | undefined;
+      // Engine model choices are populated by the Stack's live model
+      // inventory, so the shared declaration names an options_from source
+      // instead of copying a static enum into Home. "auto" is the stable
+      // sentinel that delegates selection to the Stack; specific ids are
+      // checked by the Stack when applying its setup plan.
+      if (typeof range?.options_from === "string" && range.options_from.startsWith("models.")) {
+        if (typeof value !== "string" || (value !== "auto" && value.length === 0)) {
+          return { ok: false, status: 400, error: "expected auto or a model id" };
+        }
+        break;
+      }
       if (range?.multiple === true) {
         const labels = (keyDef.copy as { option_labels?: Record<string, string> } | undefined)?.option_labels;
         // SEARCH-SOURCES-01: a multi-select stores a list of the declared options, each at most once.
