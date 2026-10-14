@@ -38,6 +38,7 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
   (globalThis as unknown as { AudioContext: unknown }).AudioContext = FakeAudioContext;
   const originalFetch = globalThis.fetch;
   const ttsCalls: string[] = [];
+  const ttsBodies: Array<{ text?: string; turn_id?: string; generation?: number }> = [];
   const turnBodies: unknown[] = [];
   const imageUploads: FormData[] = [];
   const turnAccepts: (string | null)[] = [];
@@ -57,14 +58,16 @@ function stubEnvironment(streamBody: ReadableStream<Uint8Array> | (() => Promise
       return Promise.resolve(new Response(body, { status: 200, headers: ASSISTANT_STREAM_HEADERS }));
     }
     if (url.includes("/api/tts")) {
-      const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string };
+      const body = JSON.parse(String(init?.body ?? "{}")) as { text?: string; turn_id?: string; generation?: number };
       ttsCalls.push(body.text ?? "");
+      ttsBodies.push(body);
       return Promise.resolve(new Response(fakeWavBody().buffer as ArrayBuffer, { status: 200, headers: { "content-type": "audio/wav" } }));
     }
     return Promise.reject(new Error(`unstubbed fetch: ${url}`));
   }) as unknown as typeof fetch;
   return {
     ttsCalls,
+    ttsBodies,
     turnBodies,
     imageUploads,
     turnAccepts,
@@ -395,6 +398,22 @@ describe("createChatModelAdapter streaming", () => {
       expect(lastText(yields)).toBe("First sentence. Second sentence.");
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(env.ttsCalls).toEqual(["First sentence.", "Second sentence."]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("sentence speech requests carry the live turn id and generation", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "turn_meta", conversation_id: "c1", turn_id: "t-speech", resume_token: "r1" },
+      { type: "signal", signal: {} as never, generation: 4 },
+      { type: "delta", text: "First sentence." },
+      { type: "done", value: { turn_id: "t-speech", reply: { text: "First sentence." }, source: "model", safety: SAFETY } },
+    ]));
+    try {
+      await collect([fakeUserMessage("hi there")]);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(env.ttsBodies[0]).toMatchObject({ text: "First sentence.", turn_id: "t-speech", generation: 4 });
     } finally {
       env.restore();
     }
@@ -1753,6 +1772,26 @@ describe("the chat asks for the assistant-stream wire", () => {
       expect(error).toBeUndefined();
       expect(lastText(yields)).toBe("Hi there");
       expect(env.turnAccepts).toEqual(["application/x-assistant-stream", "application/x-assistant-stream"]);
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("activeTurnRef holds the turn id after turn_meta and is cleared when the run ends", async () => {
+    const env = stubEnvironment(ndjsonStream([
+      { type: "turn_meta", conversation_id: "c1", turn_id: "t-live", resume_token: "r1" },
+      { type: "delta", text: "Hi", sequence: 1, generation: 2 },
+      { type: "done", value: { turn_id: "t-live", reply: { text: "Hi" }, source: "model", safety: SAFETY } },
+    ]));
+    const activeTurnRef = { current: null as { turnId: string } | null };
+    try {
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null }, activeTurnRef, speakReplies: false });
+      const messages = [fakeUserMessage("hello")];
+      const iterator = runAdapter(adapter, { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions);
+      await iterator.next();
+      expect(activeTurnRef.current?.turnId).toBe("t-live");
+      while (!(await iterator.next()).done) { /* drain */ }
+      expect(activeTurnRef.current).toBeNull();
     } finally {
       env.restore();
     }

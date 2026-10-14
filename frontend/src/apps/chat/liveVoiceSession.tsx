@@ -17,9 +17,9 @@
 // nothing computed here is sent anywhere (the owner's ruling,
 // 2026-09-23).
 //
-// The loop is driven by `listenGeneration`, bumped once at open and
-// again every time speaking ends: one effect (re)connects and listens
-// whenever it changes, a second effect watches `isSpeaking` (relayed
+// Child and teen calls retain the original `listenGeneration` loop;
+// adult calls keep their socket live between turns. One effect handles
+// connection setup, and a second watches `isSpeaking` (relayed
 // from chatModelAdapter.ts's own onSpeakingChange, since a live
 // SentenceSpeechScheduler's start/end events happen inside
 // useChatRuntime, not here) and bumps the generation once a reply
@@ -31,6 +31,7 @@ import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/v
 import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { api } from "@/lib/api";
 
 export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
@@ -42,6 +43,9 @@ export interface LiveVoiceSessionProps {
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
   liveVoiceActiveRef: { current: boolean };
   pendingSpeechRef: { current: boolean };
+  activeTurnRef: { current: { turnId: string } | null };
+  cancelRun: () => void;
+  voiceBargeIn?: boolean;
   /** sttDictationAdapter.ts's own established shape: `createSttSocket`
    * (the default, real `WS /api/stt/stream`) or `createMockSttSocket`
    * with a fixture in a test - this file never knows or cares which. */
@@ -67,22 +71,39 @@ export interface LiveVoiceSessionProps {
 }
 
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
+export const BARGE_IN_ARM_DELAY_MS = 400;
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
+export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
   const [listenGeneration, setListenGeneration] = useState(0);
+  const [idleActivity, setIdleActivity] = useState(0);
+  const modeRef = useRef<VoiceMode>("connecting");
+  const speakingStartedAtRef = useRef(0);
+  const activeSpeechRef = useRef(false);
+  const interruptedTurnRef = useRef<string | null>(null);
   const mutedRef = useRef(false);
   mutedRef.current = muted;
-  const idleCloseMsRef = useRef<number | null>(idleCloseMs);
-  idleCloseMsRef.current = idleCloseMs;
+  const setCurrentMode = (next: VoiceMode) => { modeRef.current = next; setMode(next); };
+  const interrupt = (_reason: "voice" | "tap") => {
+    const active = activeTurnRef.current;
+    if (active && interruptedTurnRef.current !== active.turnId) {
+      interruptedTurnRef.current = active.turnId;
+      void api.cancelTurn(active.turnId).catch(() => {});
+    }
+    turnSchedulerRef.current?.stop();
+    cancelRun();
+    if (!voiceBargeIn) setListenGeneration((value) => value + 1);
+    setCurrentMode("listening");
+    setAmplitude(0);
+  };
 
   // Reset all local display state the moment the overlay opens, so a
   // second call never shows the previous one's mode.
   useEffect(() => {
     if (!open) return;
-    setMode("connecting");
+    setCurrentMode("connecting");
     setAmplitude(0);
     setListenGeneration(0);
   }, [open]);
@@ -106,13 +127,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
     // silently blocking the mock socket's own setTimeout-based fixture
     // delivery forever.
     let levelTimer: ReturnType<typeof setInterval> | undefined;
-    let idleCloseTimer: ReturnType<typeof setTimeout> | undefined;
-    const clearIdleCloseTimer = () => {
-      clearTimeout(idleCloseTimer);
-      idleCloseTimer = undefined;
-    };
-
-    setMode("connecting");
+    setCurrentMode("connecting");
     const socket = createSocket({
       onMessage(message) {
         if (cancelled) return;
@@ -123,14 +138,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
         // rather than live.
         switch (message.t) {
           case "ready":
-            setMode("listening");
-            clearIdleCloseTimer();
-            if (typeof idleCloseMsRef.current === "number") {
-              idleCloseTimer = setTimeout(() => {
-                idleCloseTimer = undefined;
-                if (!cancelled) onOpenChange(false);
-              }, idleCloseMsRef.current);
-            }
+            setCurrentMode("listening");
             void startCapture({
               onFrame: (frame) => {
                 if (!mutedRef.current) socket.sendAudio(frame);
@@ -154,44 +162,55 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
               });
             break;
           case "partial":
-            clearIdleCloseTimer();
+            activeSpeechRef.current = true;
+            setIdleActivity((value) => value + 1);
+            if (voiceBargeIn && !mutedRef.current && (modeRef.current === "thinking" || modeRef.current === "speaking")) {
+              if (modeRef.current !== "speaking" || Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS) interrupt("voice");
+            }
             // Not shown: a partial can revise itself several times a
             // second (interim ASR hypotheses) - the listening ring's
             // own movement (the level meter) is already the "it's
             // hearing you" signal while this is live.
             break;
           case "vad":
-            if (message.speaking) clearIdleCloseTimer();
+            if (message.speaking) { activeSpeechRef.current = true; setIdleActivity((value) => value + 1); }
             break;
           case "final": {
-            clearIdleCloseTimer();
+            activeSpeechRef.current = false;
+            setIdleActivity((value) => value + 1);
+            const duringReply = modeRef.current === "thinking" || modeRef.current === "speaking";
+            if (voiceBargeIn && modeRef.current === "speaking" && Date.now() - speakingStartedAtRef.current < BARGE_IN_ARM_DELAY_MS) break;
+            if (voiceBargeIn && duringReply && !mutedRef.current && (modeRef.current !== "speaking" || Date.now() - speakingStartedAtRef.current >= BARGE_IN_ARM_DELAY_MS)) interrupt("voice");
             const text = message.v.trim();
-            micHandle?.stop();
-            micHandle = null;
-            levelMeter?.stop();
-            levelMeter = null;
-            clearInterval(levelTimer);
-            setAmplitude(0);
+            if (!voiceBargeIn) {
+              micHandle?.stop();
+              micHandle = null;
+              levelMeter?.stop();
+              levelMeter = null;
+              clearInterval(levelTimer);
+              setAmplitude(0);
+            }
             if (!text) {
               // Nothing usable - listen again rather than send an empty
               // turn.
-              setListenGeneration((g) => g + 1);
+              if (!voiceBargeIn) setListenGeneration((g) => g + 1);
               break;
             }
-            setMode("thinking");
+            setCurrentMode("thinking");
             pendingSpeechRef.current = true;
             composer.setText(text);
             void Promise.resolve(composer.send());
             break;
           }
           case "no_speech":
-            clearIdleCloseTimer();
+            activeSpeechRef.current = false;
             micHandle?.stop();
             micHandle = null;
             levelMeter?.stop();
             levelMeter = null;
             clearInterval(levelTimer);
             setAmplitude(0);
+            setCurrentMode("listening");
             setListenGeneration((g) => g + 1);
             break;
           // A real server-side STT failure (the spec's own `{ t: "error",
@@ -201,7 +220,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
           // way a connection-level failure does rather than looping on a
           // broken session.
           case "error":
-            clearIdleCloseTimer();
+            setCurrentMode("connecting");
             micHandle?.stop();
             levelMeter?.stop();
             clearInterval(levelTimer);
@@ -210,14 +229,12 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
         }
       },
       onError() {
-        clearIdleCloseTimer();
         if (!cancelled) onOpenChange(false);
       },
     });
 
     return () => {
       cancelled = true;
-      clearIdleCloseTimer();
       clearInterval(levelTimer);
       micHandle?.stop();
       levelMeter?.stop();
@@ -235,6 +252,8 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
   useEffect(() => {
     if (!open) return;
     if (isSpeaking) {
+      modeRef.current = "speaking";
+      speakingStartedAtRef.current = Date.now();
       setMode("speaking");
       const timer = setInterval(() => setAmplitude(turnSchedulerRef.current?.readLevel() ?? 0), 60);
       return () => clearInterval(timer);
@@ -242,11 +261,18 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
     setMode((current) => {
       if (current !== "speaking" && current !== "thinking") return current;
       setAmplitude(0);
-      setListenGeneration((g) => g + 1);
+      if (!voiceBargeIn) setListenGeneration((g) => g + 1);
+      modeRef.current = "listening";
       return "listening";
     });
     return undefined;
-  }, [isSpeaking, speakingEndedAt, open, turnSchedulerRef]);
+  }, [isSpeaking, speakingEndedAt, open, turnSchedulerRef, voiceBargeIn]);
+
+  useEffect(() => {
+    if (!open || mode !== "listening" || activeSpeechRef.current || typeof idleCloseMs !== "number") return;
+    const timer = setTimeout(() => { if (modeRef.current === "listening") onOpenChange(false); }, idleCloseMs);
+    return () => clearTimeout(timer);
+  }, [open, mode, idleCloseMs, idleActivity, onOpenChange]);
 
   // Arms/disarms the "this send speaks" flag chatModelAdapter.ts reads
   // (speakReplies) for the whole time the overlay is open, and tears
@@ -267,5 +293,6 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, idleCloseMs 
     muted,
     onToggleMute: () => setMuted((value) => !value),
     onEnd: () => onOpenChange(false),
+    onInterrupt: () => interrupt("tap"),
   };
 }

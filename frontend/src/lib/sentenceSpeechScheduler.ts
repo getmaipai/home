@@ -25,6 +25,8 @@ import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 
 const MAX_PARALLEL_FETCHES = 2;
 
+export interface SpeechSentenceMeta { turnId?: string; generation?: number }
+
 /** Pocket TTS's real /tts response ships a bogus placeholder WAV header
  * size (~2,000,000,000 bytes, spec/voice/README.md) regardless of the
  * real, much shorter body. streamingWavPlayer.ts never reads the header's
@@ -59,6 +61,8 @@ export class SentenceSpeechScheduler {
   private activeFetches = 0;
   private readonly waiters: Array<() => void> = [];
   private dispatchTail: Promise<void> = Promise.resolve();
+  private readonly abortController = new AbortController();
+  private readonly speechStream: typeof api.streamSpeech;
 
   /** Fires once, the moment the first sentence is actually scheduled to
    * play - the real "time to first audio" signal. */
@@ -68,14 +72,15 @@ export class SentenceSpeechScheduler {
   onEnded?: () => void;
   onError?: () => void;
 
-  constructor() {
+  constructor(audioContext?: AudioContext, speechStream: typeof api.streamSpeech = api.streamSpeech) {
     // Created synchronously by the caller, in the same click/submit
     // handler that triggers the turn: an AudioContext only counts as
     // unlocked by a real user gesture if it exists before that call
     // stack returns (streamingWavPlayer.ts's own constructor comment;
     // a code review, 2026-09-04, flagged the risk of creating one after
     // an awaited fetch instead).
-    this.audioContext = new AudioContext({ latencyHint: "interactive" });
+    this.audioContext = audioContext ?? new AudioContext({ latencyHint: "interactive" });
+    this.speechStream = speechStream;
     this.playbackBus = this.audioContext.createGain();
     this.playbackBus.connect(this.audioContext.destination);
     this.meter = createLevelMeter(this.audioContext, this.playbackBus);
@@ -107,27 +112,28 @@ export class SentenceSpeechScheduler {
    * parallel with any other in-flight sentence), then schedules it right
    * after whatever's already queued - strictly in enqueue order, even if
    * a later sentence's fetch finishes first, via `dispatchTail`. */
-  enqueueSentence(text: string): void {
+  enqueueSentence(text: string, meta?: SpeechSentenceMeta): void {
     if (this.stopped) return;
     const predecessorDone = this.dispatchTail;
     let resolveThis!: () => void;
     this.dispatchTail = new Promise<void>((resolve) => {
       resolveThis = resolve;
     });
-    void this.fetchAndSchedule(text, predecessorDone).finally(resolveThis);
+    void this.fetchAndSchedule(text, predecessorDone, meta).finally(resolveThis);
   }
 
-  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>): Promise<void> {
+  private async fetchAndSchedule(text: string, predecessorDone: Promise<void>, meta?: SpeechSentenceMeta): Promise<void> {
     await this.acquireFetchSlot();
     let audioBuffer: AudioBuffer | null = null;
     try {
-      const response = await api.streamSpeech(text);
+      if (this.stopped) return;
+      const response = await this.speechStream(text, this.abortController.signal, meta?.turnId && meta.generation !== undefined ? { turnId: meta.turnId, generation: meta.generation } : undefined);
       const bytes = new Uint8Array(await response.arrayBuffer());
       if (this.stopped) return;
       fixWavHeaderSize(bytes);
       audioBuffer = await this.audioContext.decodeAudioData(bytes.buffer as ArrayBuffer);
-    } catch {
-      if (!this.stopped) this.onError?.();
+    } catch (error) {
+      if (!this.stopped && !(error instanceof DOMException && error.name === "AbortError")) this.onError?.();
       // A failed sentence just doesn't speak - the reply's TEXT already
       // rendered regardless of TTS (ChatPage.tsx treats them as
       // independent), so one bad sentence never blocks or breaks the rest
@@ -179,6 +185,8 @@ export class SentenceSpeechScheduler {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.abortController.abort();
+    for (const wake of this.waiters.splice(0)) wake();
     this.meter.stop();
     this.audioContext.close().catch(() => {});
   }

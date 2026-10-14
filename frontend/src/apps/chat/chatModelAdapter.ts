@@ -148,6 +148,7 @@ export interface ChatModelAdapterDeps {
   // ChatPage.tsx so a manual "Listen" click can stop it too - never let
   // two voices overlap.
   turnSchedulerRef: { current: SentenceSpeechScheduler | null };
+  activeTurnRef?: { current: { turnId: string } | null };
   // Jesse, 2026-09-06: the composer's Send/Stop toggle tracks only
   // `thread.isRunning` (text generation) - text almost always finishes
   // streaming well before its speech has finished playing (inherent to
@@ -254,6 +255,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       let sawTerminalEvent = false;
       let resumeToken: string | undefined;
       let resumeTurnId: string | undefined;
+      let resumeGeneration: number | undefined;
       let crisisSupport: CrisisSupport | undefined;
       let lastAcknowledgedSequence = 0;
       let reconnectAttempts = 0;
@@ -446,9 +448,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             conversationId = event.conversation_id;
             resumeToken = event.resume_token;
             resumeTurnId = event.turn_id;
+            if (deps.activeTurnRef) deps.activeTurnRef.current = { turnId: event.turn_id };
             continue;
           }
-          if (event.type === "signal") continue;
+          if (event.type === "signal") { if (event.generation !== undefined) resumeGeneration = event.generation; continue; }
           if (event.type === "delta") {
             if (event.sequence !== undefined) {
               if (event.sequence <= lastAcknowledgedSequence) continue;
@@ -461,6 +464,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             }
             deps.onReplyState?.("responding");
             visible += event.text;
+            if (event.generation !== undefined) resumeGeneration = event.generation;
             if (activityShown) {
               // Lane 11 item 1's own acceptance: "the first delta removes
               // it" - a real content update can still be empty this same
@@ -486,7 +490,9 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // Each chunk speaks its normalized form, never the displayed
               // one: `visible` (yielded just above) keeps the model's own
               // written text - the chat bubble - completely untouched.
-              for (const chunk of chunks) scheduler.enqueueSentence(normalizeForSpeech(chunk));
+              for (const chunk of chunks) {
+                scheduler.enqueueSentence(normalizeForSpeech(chunk), { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}) });
+              }
               spokenLength += consumed;
             }
           } else if (event.type === "spoken_cue") {
@@ -499,7 +505,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // scheduler is a plain FIFO queue, so it plays first and the
             // real reply's sentences (enqueued above as they arrive) follow
             // right after.
-            if (speakReplies) scheduler.enqueueSentence(event.text);
+            if (speakReplies) scheduler.enqueueSentence(event.text, { ...(resumeTurnId && event.generation !== undefined ? { turnId: resumeTurnId, generation: event.generation } : {}) });
             // Lane 11 item 1's own decision (chatTurnActivity.ts): a
             // spoken_cue also drives the same transient activity line a
             // `status` event does below - this file's own older comment on
@@ -544,8 +550,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
               // per-chunk normalizer above is the only correct option left.
               scheduler.enqueueSentence(
                 spokenLength === 0 ? (event.value.reply.speech ?? normalizeForSpeech(trailing)) : normalizeForSpeech(trailing),
+                { ...(resumeTurnId && resumeGeneration !== undefined ? { turnId: resumeTurnId, generation: resumeGeneration } : {}) },
               );
             }
+            if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
             scheduler.finish();
             if (event.value.document_available === true) deps.onResearchDocument?.(event.value.turn_id);
             // THIN-3G: the offer of a new chat that carries the summary.
@@ -771,6 +779,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         }
       } catch (e) {
         if (abortSignal.aborted) {
+          if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
           deps.onReplyState?.("idle");
           // The runtime's own stop button (ComposerPrimitive.Cancel):
           // rawStreamPost merges this same abortSignal into the fetch's
@@ -792,6 +801,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           deps.onSpeakingChange?.(false); // stop() never fires onEnded itself
           throw new DOMException("The run was stopped.", "AbortError");
         }
+        if (deps.activeTurnRef && deps.activeTurnRef.current?.turnId === resumeTurnId) deps.activeTurnRef.current = null;
         deps.onReplyState?.("error");
         scheduler.finish(); // a genuine failure, not a user stop - let whatever already started speaking finish naturally, enqueue nothing more
         // Show the generic banner for generic "unavailable" code; pass backend's

@@ -2,7 +2,7 @@ import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { conversationTurns, people } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -56,6 +56,39 @@ describe("turn cancellation generations", () => {
     expect(remaining.filter((event) => event.type === "delta" || event.type === "reasoning" || event.type === "status" || event.type === "spoken_cue").filter((event) => event.generation === 0)).toEqual([]);
     expect(remaining.at(-1)).toMatchObject({ type: "error", code: "turn_cancelled" });
   }, 10_000);
+
+  test("a cancel stores only text that reached the wire", async () => {
+    const { client } = await owner();
+    const response = await client.post("/api/turn/stream", { text: "say a short answer" });
+    const reader = response.body!.getReader();
+    let turnId = "";
+    let released = "";
+    for (;;) {
+      const item = await reader.read();
+      if (item.done) break;
+      for (const line of new TextDecoder().decode(item.value).trim().split("\n")) {
+        if (!line) continue;
+        const event = JSON.parse(line) as { type: string; turn_id?: string; text?: string };
+        if (event.type === "turn_meta") turnId = event.turn_id!;
+        if (event.type === "delta") { released += event.text ?? ""; break; }
+      }
+      if (released) break;
+    }
+    expect(released.length).toBeGreaterThan(0);
+    await client.post(`/api/turn/${turnId}/cancel`, {});
+    await new Response(new ReadableStream({ async start(controller) { for (;;) { const item = await reader.read(); if (item.done) break; controller.enqueue(item.value); } controller.close(); } })).text();
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored?.replyText).toBe(released.trim());
+  }, 10_000);
+
+  test("a turn that is not cancelled stores byte-identical text to before", async () => {
+    const { client } = await owner();
+    const events = await readNdjson(await client.post("/api/turn/stream", { text: "say a short answer" }));
+    const turnId = events.find((event) => event.type === "turn_meta")!.turn_id as string;
+    const reply = events.find((event) => event.type === "done")!.value.reply.text as string;
+    const stored = db.select().from(conversationTurns).where(eq(conversationTurns.id, turnId)).get();
+    expect(stored?.replyText).toBe(reply);
+  });
 
   test("a second cancel is a no-op", async () => {
     const { client } = await owner();

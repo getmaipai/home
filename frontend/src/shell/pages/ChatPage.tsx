@@ -230,6 +230,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const ttsAvailableRef = useRef(ttsAvailable);
   ttsAvailableRef.current = ttsAvailable;
   const pendingSpeechRef = useRef(false);
+  const activeTurnRef = useRef<{ turnId: string } | null>(null);
   // APPROVE-CARD-01: armed by ConfirmAskAnswerProvider's own `respond`
   // callback (ConfirmToolRender's Allow once/Deny handlers, via
   // ConfirmAskAnswerContext), the same single-shot shape as
@@ -539,6 +540,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
             if (!speaking) setSpeakingEndedAt((n) => n + 1);
           },
           turnSchedulerRef,
+          activeTurnRef,
           // VOICE-LIVE-02: on only for the one send the live voice
           // session itself makes (liveVoiceActiveRef, set while the
           // session is open) - a typed message never speaks, unchanged
@@ -673,7 +675,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
     },
   });
 
-  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
+  return { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies: setConversationAutoReadReplies, ttsAvailable, packageScope, setPackageScope, temporaryNext, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter };
 }
 
 /** Mounted inside AssistantRuntimeProvider only for its side effect: a
@@ -1176,7 +1178,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // inside useChatRuntime) left a previous thread's artifact
   // canvas open over the newly-loaded one - the panel has to close on
   // the same signal the phone/tablet Sheet already does.
-  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
+  const { runtime, photoUploadsEnabled, imagePartsAvailable, unopenableConversationId, forgetUnopenableConversation, connection, setConnection, thinking, setThinking, thinkingModeVisible, thinkingModeCapability, bareMode, setBareMode, autoReadReplies, setAutoReadReplies, ttsAvailable, packageScope, setPackageScope, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, askAnswerRef, isSpeaking, speakingEndedAt, dictationLevelMeter } = useChatRuntime(person, () => {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
@@ -1291,6 +1293,9 @@ export function ChatPage({ person }: { person: Roster }) {
     turnSchedulerRef,
     liveVoiceActiveRef,
     pendingSpeechRef,
+    activeTurnRef,
+    cancelRun: runtime.thread.cancelRun,
+    voiceBargeIn: person.age_band === "adult",
     isSpeaking,
     speakingEndedAt,
   });
@@ -1419,6 +1424,7 @@ export function ChatPage({ person }: { person: Roster }) {
               muted={voiceSession.muted}
               onToggleMute={voiceSession.onToggleMute}
               onEnd={voiceSession.onEnd}
+              onInterrupt={voiceSession.onInterrupt}
               extra={(
                 <TooltipIconButton asChild tooltip="Voice settings">
                   <Link to="/settings/voices" aria-label="Voice settings">

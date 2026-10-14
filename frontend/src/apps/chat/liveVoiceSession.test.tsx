@@ -5,7 +5,7 @@
 // own established shape), so this exercises the actual listen -> send ->
 // speak -> listen-again loop with a scripted STT fixture and a trivial
 // runtime adapter that just records what it received.
-import { describe, expect, test, afterEach, mock } from "bun:test";
+import { describe, expect, test, afterEach, mock, spyOn } from "bun:test";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import { useRef } from "react";
 import { Link, MemoryRouter } from "react-router-dom";
@@ -18,6 +18,7 @@ import { useLiveVoiceSession } from "@/apps/chat/liveVoiceSession";
 import { createMockSttSocket, type SttFixtureStep } from "@/lib/voice/sttSocket";
 import type { MicCaptureHandle, MicCaptureOptions } from "@/lib/voice/mic-capture";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
+import { api } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -35,7 +36,7 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sentTexts, idleCloseMs }: { open: boolean; onOpenChange: (open: boolean) => void; isSpeaking: boolean; speakingEndedAt: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null }) {
+function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test" }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections }: { open: boolean; onOpenChange: (open: boolean) => void; isSpeaking: boolean; speakingEndedAt: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[] }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -49,6 +50,9 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
   const turnSchedulerRef = useRef<SentenceSpeechScheduler | null>(null);
   const liveVoiceActiveRef = useRef(false);
   const pendingSpeechRef = useRef(false);
+  const activeTurnRef = useRef<{ turnId: string } | null>(activeTurn);
+  activeTurnRef.current = activeTurn;
+  turnSchedulerRef.current = { stop: stopScheduler, readLevel: () => 0 } as unknown as SentenceSpeechScheduler;
   const connectionCount = useRef(0);
   const session = useLiveVoiceSession({
     composer: runtime.thread.composer,
@@ -57,11 +61,15 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
     turnSchedulerRef,
     liveVoiceActiveRef,
     pendingSpeechRef,
+    activeTurnRef,
+    cancelRun,
+    voiceBargeIn,
     isSpeaking,
     speakingEndedAt,
     idleCloseMs,
     createSocket: (handlers) => {
       const connection = connectionCount.current++;
+      socketConnections?.push(connection);
       return createMockSttSocket(typeof fixture === "function" ? fixture(connection) : fixture, handlers);
     },
     startCapture: fakeStartCapture(),
@@ -77,6 +85,7 @@ function Harness({ open, onOpenChange, isSpeaking, speakingEndedAt, fixture, sen
               muted={session.muted}
               onToggleMute={session.onToggleMute}
               onEnd={session.onEnd}
+              onInterrupt={session.onInterrupt}
               extra={(
                 <TooltipIconButton asChild tooltip="Voice settings">
                   <Link to="/settings/voices" aria-label="Voice settings">
@@ -164,6 +173,7 @@ describe("live voice session", () => {
 
   test("listens, sends the final transcript through the real composer, and shows listening then speaking then listening again", async () => {
     const sentTexts: string[] = [];
+    const socketConnections: number[] = [];
     let isSpeaking = false;
     let speakingEndedAt = 0;
     const setSpeaking = (speaking: boolean) => {
@@ -175,7 +185,7 @@ describe("live voice session", () => {
       { delayMs: 0, message: { t: "ready" } },
       { delayMs: 150, message: { t: "final", v: "what's the weather" } },
     ];
-    const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
+    const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} socketConnections={socketConnections} />);
     expect(voiceRuntime!.thread.getState().capabilities.queue).toBe(false);
 
     // "Listening" - the mock socket's own "ready" step.
@@ -184,15 +194,127 @@ describe("live voice session", () => {
     // The final transcript sent the real turn.
     await waitFor(() => expect(sentTexts).toEqual(["what's the weather"]));
     await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    expect(socketConnections).toEqual([0]);
 
     // chatModelAdapter.ts's own onSpeakingChange, relayed as a prop.
     act(() => setSpeaking(true));
     await waitFor(() => expect(view.getByText("Speaking")).toBeTruthy());
+    expect(socketConnections).toEqual([0]);
 
     act(() => setSpeaking(false));
-    // Looping back: a fresh mock socket session opens (the same fixture
-    // replays), so "Listening" shows again without the overlay closing.
+    // The same socket stays open, so a quick follow-up cannot lose its first words.
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    expect(socketConnections).toEqual([0]);
+  });
+
+  test("talking over a spoken reply cancels once and stops speech", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const cancelRun = mock();
+    const stopScheduler = mock();
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 40, message: { t: "final", v: "first request" } },
+      { delayMs: 700, message: { t: "partial", v: "wait" } },
+    ];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    expect(cancel).toHaveBeenCalledTimes(1);
+    expect(cancel).toHaveBeenCalledWith("turn-test");
+    expect(stopScheduler).toHaveBeenCalledTimes(1);
+    expect(cancelRun).toHaveBeenCalledTimes(1);
+    cancel.mockRestore();
+  });
+
+  test("a vad blip with no partial does not interrupt", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }, { delayMs: 100, message: { t: "vad", speaking: true, rms: 0.2 } }];
+    render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    expect(cancel).not.toHaveBeenCalled();
+    cancel.mockRestore();
+  });
+
+  test("speech in the first 400 ms of a reply does not interrupt", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 40, message: { t: "final", v: "first request" } },
+      { delayMs: 250, message: { t: "partial", v: "wait" } },
+    ];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await new Promise((resolve) => setTimeout(resolve, 320));
+    expect(cancel).not.toHaveBeenCalled();
+    cancel.mockRestore();
+  });
+
+  test("a muted microphone never interrupts by voice", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const fixture: SttFixtureStep[] = [{ delayMs: 0, message: { t: "ready" } }, { delayMs: 500, message: { t: "partial", v: "echo" } }];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
+    act(() => view.getByRole("button", { name: "Turn the microphone off" }).click());
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} />);
+    await new Promise((resolve) => setTimeout(resolve, 550));
+    expect(cancel).not.toHaveBeenCalled();
+    cancel.mockRestore();
+  });
+
+  test("what was said over the reply becomes the next turn and duplicate interruption cancels once", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const sentTexts: string[] = [];
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 40, message: { t: "final", v: "first request" } },
+      { delayMs: 700, message: { t: "partial", v: "wait" } },
+      { delayMs: 800, message: { t: "final", v: "make it shorter" } },
+    ];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
+    await waitFor(() => expect(sentTexts).toEqual(["first request", "make it shorter"]), { timeout: 2500 });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    cancel.mockRestore();
+  });
+
+  test("a child's call still closes the microphone while Home speaks", async () => {
+    const connections: number[] = [];
+    const fixture = (connection: number): readonly SttFixtureStep[] => connection === 0
+      ? [{ delayMs: 0, message: { t: "ready" } }, { delayMs: 40, message: { t: "final", v: "hello" } }]
+      : [{ delayMs: 0, message: { t: "ready" } }];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} voiceBargeIn={false} socketConnections={connections} />);
+    await waitFor(() => expect(view.getByText("Thinking")).toBeTruthy());
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={fixture} sentTexts={[]} voiceBargeIn={false} socketConnections={connections} />);
+    view.rerender(<Harness open onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={1} fixture={fixture} sentTexts={[]} voiceBargeIn={false} socketConnections={connections} />);
+    await waitFor(() => expect(connections).toEqual([0, 1]));
+  });
+
+  test("tapping the interrupt control stops speech without a transcript", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const cancelRun = mock();
+    const stopScheduler = mock();
+    const sentTexts: string[] = [];
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={sentTexts} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
+    act(() => view.getByRole("button", { name: "Interrupt the assistant" }).click());
+    expect(cancel).toHaveBeenCalledWith("turn-test");
+    expect(stopScheduler).toHaveBeenCalledTimes(1);
+    expect(cancelRun).toHaveBeenCalledTimes(1);
+    expect(sentTexts).toEqual([]);
+    cancel.mockRestore();
+  });
+
+  test("interrupting twice sends one cancel for the turn", async () => {
+    const cancel = spyOn(api, "cancelTurn").mockResolvedValue({ cancelled: true });
+    const cancelRun = mock();
+    const stopScheduler = mock();
+    const view = render(<Harness open onOpenChange={() => {}} isSpeaking={true} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "ready" } }]} sentTexts={[]} cancelRun={cancelRun} stopScheduler={stopScheduler} />);
+    const interrupt = view.getByRole("button", { name: "Interrupt the assistant" });
+    act(() => { interrupt.click(); interrupt.click(); });
+    expect(cancel).toHaveBeenCalledTimes(1);
+    cancel.mockRestore();
   });
 
   // A code review caught this: a reply that never speaks at all (empty,

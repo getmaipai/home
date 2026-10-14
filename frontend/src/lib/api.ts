@@ -1268,8 +1268,9 @@ export const api = {
   // in-flight fetch/reader loop. Optional so the sentence scheduler's
   // existing calls (which have no per-sentence abort concept) are
   // unaffected.
-  streamSpeech: (text: string, signal?: AbortSignal) =>
-    rawStreamPost("/api/tts", { text }, 185_000, "Timed out waiting for voice", signal),
+  streamSpeech: (text: string, signal?: AbortSignal, turn?: { turnId: string; generation: number }) =>
+    rawStreamPost("/api/tts", { text, ...(turn ? { turn_id: turn.turnId, generation: turn.generation } : {}) }, 185_000, "Timed out waiting for voice", signal),
+  cancelTurn: (turnId: string) => request<{ cancelled: boolean }>(`/api/turn/${encodeURIComponent(turnId)}/cancel`, { method: "POST" }),
   // A first preview can include the Stack's pinned voice download, so let
   // the Stack response complete without Home guessing a timeout.
   previewVoice: (id: string, signal?: AbortSignal) =>

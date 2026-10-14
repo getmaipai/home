@@ -107,6 +107,7 @@ interface ResumeSession {
   terminal: boolean;
   terminalDelivered: boolean;
   cancelled: boolean;
+  releasedText: string;
   expired: boolean;
   expiryTimer: ReturnType<typeof setTimeout>;
 }
@@ -437,7 +438,7 @@ function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()))) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText)) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -450,7 +451,9 @@ function startResumeSession(session: ResumeSession): void {
         const withLatency = "type" in event && event.type === "done" ? { ...event, value: { ...event.value, latency: { stt_ms: session.sttMs, first_token_ms: event.value.stats?.time_to_first_token_ms ?? null, tts_ttfa_ms: null, e2e_ms: Date.now() - session.startedAtMs } } } : event;
         // THIN-1E and CHAT-CALM-ERRORS-01b (rule 6): the done value and the
         // error event's admin detail pass the one viewer filter.
-        appendSessionEvent(session, streamEventForViewer(withLatency as TurnStreamEvent, session.viewer));
+        const delivered = streamEventForViewer(withLatency as TurnStreamEvent, session.viewer);
+        appendSessionEvent(session, delivered);
+        if ("type" in delivered && delivered.type === "delta") session.releasedText += delivered.text;
       }
     } catch (err) {
       // streamTurnEvents() maps generation failures to a terminal event. This
@@ -517,6 +520,7 @@ export async function* streamTurnEvents(
   // SAFETY-NOTICE-01: whose words a safety refusal's line is in. The
   // strictest band when a caller does not say.
   speakerBand: "adult" | "teen" | "child" = "child",
+  releasedText?: () => string,
 ): AsyncGenerator<TurnStreamEvent, void, void> {
   let fullText = "";
   // REASONING-01: splits each chunk of the pipeline's own combined text
@@ -709,7 +713,7 @@ export async function* streamTurnEvents(
     // after turn_meta is out, so it carries the same code on the error
     // event instead.
     if (signal?.aborted) {
-      result.finalize(fullText.trim());
+      result.finalize((releasedText?.() ?? fullText).trim());
       yield { type: "error", error: "cancelled", code: "turn_cancelled" };
       return;
     }
@@ -986,6 +990,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     terminal: false,
     terminalDelivered: false,
     cancelled: false,
+    releasedText: "",
     expired: false,
     expiryTimer: setTimeout(() => {
       if (session.terminal) {

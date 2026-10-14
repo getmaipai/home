@@ -55,6 +55,8 @@ Sometimes MaiPai's AI stops for a while, for example while the computer restarts
 
 Tap the microphone icon next to the message box and start speaking. MaiPai listens, turns your words into text, and sends it once you stop talking.
 
+You can talk over Home or tap Stop, and it will stop speaking and listen.
+
 ## Wake word (experimental)
 
 Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. Saying the wake word opens a voice conversation. Home stops listening by itself if nobody speaks for a few seconds.
