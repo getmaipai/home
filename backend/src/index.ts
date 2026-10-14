@@ -17,16 +17,16 @@ import { turnWarmupPrompt } from "@/lib/turnMachine/warmup";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
-import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, onLeafRenewed, registerRenewFixHandler } from "@/lib/householdCa";
+import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
-import { rebindWithRetry } from "@/lib/serverRebind";
-import { SERVER_IDLE_TIMEOUT_SECONDS } from "@/lib/serverConfig";
+import { startHomeListeners, attachHouseholdTlsRebind } from "@/lib/homeListeners";
 import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
 import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
+import { detectLanIps } from "@/lib/hubEndpoints";
 import { installConsoleFileMirror, installFatalErrorHandlers, appendLogLine } from "@/lib/log";
 import { shutdownEngines } from "@/lib/hubShutdown";
 import { ensureSecretPepperReady } from "@/lib/secret";
@@ -307,54 +307,23 @@ ensureCoreJob("fetch_cache.sweep", "every:1d");
 // closes that gap.
 registerRenewFixHandler();
 
-// Session F, step 5: TLS only when a leaf certificate already exists on
-// THIS install's own data directory - nothing here ever mints one
-// automatically, so every other worktree/session's dev server (and every
-// test run, which never calls GET /api/setup/ca) keeps serving plain
-// HTTP exactly as before. A household that has been through the trust
-// step gets real TLS from the very next restart; one that hasn't is
-// completely unaffected.
+// TLS is enabled only when this install already has its own household
+// leaf. Before the first mint, HTTP serves all interfaces. After a mint,
+// the same configured port has loopback-only HTTP and HTTPS listeners on
+// detected non-loopback addresses.
 const initialTls = hasHouseholdLeaf() ? getHouseholdLeafForServer() : null;
 
-// An explicit Bun.serve() call, not the `export default { port, fetch }`
-// shape used before this step, so a `server` handle exists to rebind
-// later. A code review (2026-09-06) first tried `server.reload({ tls })`
-// to pick up a renewed leaf, then a SECOND review pass caught that this
-// doesn't actually work: Bun's own bundled types document reload() as
-// swapping only the fetch/error handlers ("passing other options...has
-// no effect"), confirmed empirically here (a reload with a different
-// cert kept serving the original one - see tests/tlsHotSwap.test.ts). The
-// real fix, also verified empirically there: a graceful server.stop(true)
-// (finishes in-flight requests, refuses new ones) followed by a fresh
-// Bun.serve() on the same port picks up new TLS immediately. This is a
-// genuine, if brief, connection interruption at renewal time (roughly
-// once every ~11 months in the ordinary case, or the moment a "Renew
-// now" fix runs) - there's no process supervisor yet to hand a full
-// restart to (that lands with step 11's install/service work), so an
-// in-process rebind is the honest option available today, and far better
-// than either a silent no-op or exiting the process with nothing
-// configured to bring it back up.
-//
-// idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS (lib/serverConfig.ts) keeps
-// the listener's response window above Bun's short default.
-let server = Bun.serve({
+let listeners = startHomeListeners({
   port: configuredPort,
   fetch: app.fetch,
-  // Session C step 5: routes/stt.ts's WS /api/stt/stream, hono/bun's own
-  // adapter (upgradeWebSocket() calls server.upgrade() internally; this
-  // handler is what actually processes the open/message/close lifecycle
-  // Bun's upgrade alone doesn't). Harmless to every other route: Bun
-  // only ever invokes it for a connection an upgradeWebSocket() call
-  // accepted, never for a plain HTTP request.
   websocket,
-  idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS,
-  ...(initialTls ? { tls: initialTls } : {}),
+  ...(initialTls ? { tls: { certPem: initialTls.cert, keyPem: initialTls.key } } : {}),
 });
 
-instanceLock.setPort(server.port!);
+instanceLock.setPort(listeners.port);
 let servingTls = initialTls !== null;
 function printStartupUrls(): void {
-  for (const url of startupUrls(server.port!, servingTls)) {
+  for (const url of startupUrls(listeners.port, servingTls)) {
     console.log(`Home URL: ${url}`);
   }
   console.log("Home server ready.");
@@ -367,47 +336,33 @@ printStartupUrls();
 // household on a network that filters multicast just doesn't get
 // auto-discovery, the same "never a false alarm, never a hard failure"
 // posture this step's other guards already take.
-void advertiseMdns({ port: server.port!, tls: initialTls !== null });
+void advertiseMdns({ port: listeners.port, tls: initialTls !== null });
 
-// Fires only when ensureHouseholdLeaf() actually regenerated a leaf
-// (never on every call) - rebinds the live server with the new
-// certificate and re-advertises mDNS with the now-current `tls` TXT
-// value, closing both gaps the code review found: a renewed certificate
-// the running process never actually picked up, and an mDNS
-// advertisement stuck claiming `tls: 0` (or `1`) forever after the state
-// that produced it changed.
-// COR-3 (code review, 2026-09-06): the rebind used to run with no
-// try/catch, synchronously inside ensureHouseholdLeaf()'s own listener
-// loop - a bind failure (port briefly held, EADDRINUSE, or a bad PEM)
-// threw straight out of whichever caller awaited ensureHouseholdLeaf()
-// (GET /api/setup/ca, unauthenticated), leaving the hub with no listener
-// at all. rebindWithRetry() (lib/serverRebind.ts) retries a few times
-// (the port the just-stopped server held usually frees up within one or
-// two hundred ms) before this raises a Repairs issue instead - honest
-// about the fact that a genuinely bad certificate still leaves the hub
-// down until a manual restart (no process supervisor exists yet to hand
-// a real restart to, this file's own header above already names that
-// gap), but no longer a silent, uncaught exception either.
-onLeafRenewed((leaf) => {
-  server.stop(true);
-  void rebindWithRetry(() => Bun.serve({ port: server.port!, fetch: app.fetch, websocket, idleTimeout: SERVER_IDLE_TIMEOUT_SECONDS, tls: { cert: leaf.certPem, key: leaf.keyPem } }))
-    .then(({ server: newServer }) => {
-      server = newServer;
-      servingTls = true;
-      printStartupUrls();
-      void advertiseMdns({ port: newServer.port!, tls: true });
-    })
-    .catch((err: unknown) => {
-      const message = (err as Error).message;
-      console.error(`[index] TLS rebind after leaf renewal failed after retries, the hub has no listener: ${message}`);
-      void raiseIssue({
-        source: "householdCa",
-        key: "tls_rebind_failed",
-        severity: "error",
-        title: "The hub's web server failed to restart after renewing its certificate",
-        detail: message,
-      });
+// A first mint or renewal rebinds the listener group in place. A failure
+// is reported as a Repairs issue rather than escaping the unauthenticated
+// setup route.
+attachHouseholdTlsRebind({
+  initial: listeners,
+  fetch: app.fetch,
+  websocket,
+  networkAddresses: detectLanIps,
+  onBound: (next) => {
+    listeners = next;
+    servingTls = true;
+    printStartupUrls();
+    void advertiseMdns({ port: next.port, tls: true });
+  },
+  onFailure: (err) => {
+    const message = (err as Error).message;
+    console.error(`[index] TLS rebind after leaf renewal failed after retries, the hub has no listener: ${message}`);
+    void raiseIssue({
+      source: "householdCa",
+      key: "tls_rebind_failed",
+      severity: "error",
+      title: "The hub's web server failed to restart after renewing its certificate",
+      detail: message,
     });
+  },
 });
 
 // The Wyoming satellite server (session-c-brain-and-voice.md step 8): a

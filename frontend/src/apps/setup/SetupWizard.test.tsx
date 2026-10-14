@@ -68,6 +68,25 @@ async function goToOwnerStep(rendered: ReturnType<typeof render>) {
 }
 
 describe("SetupWizard", () => {
+  test("the final screen mints the household certificate", async () => {
+    sessionStorage.setItem("maipai:setup-wizard-step", "9");
+    sessionStorage.setItem("maipai:setup-wizard-completed", "9");
+    let mintCalls = 0;
+    const restore = stubFreshHousehold({
+      "/api/setup/ca": () => {
+        mintCalls += 1;
+        return jsonResponse({ certificate: "public CA certificate" });
+      },
+    });
+    try {
+      const rendered = renderWizard();
+      await waitFor(() => expect(mintCalls).toBe(1));
+      expect(rendered.getByRole("heading", { name: "Done" })).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
   test("steps run in order: household, then owner", async () => {
     const restore = stubFreshHousehold();
     try {
@@ -242,17 +261,23 @@ describe("SetupWizard", () => {
   test("the done step calls onDone and navigates away, so the app cannot get stuck on /setup", async () => {
     sessionStorage.setItem("maipai:setup-wizard-step", "9");
     sessionStorage.setItem("maipai:setup-wizard-completed", "9");
+    const restore = stubFreshHousehold({ "/api/setup/ca": { certificate: "public CA certificate" } });
     const onDone = mock(() => {});
-    const rendered = renderWizard(onDone);
-    expect(rendered.getByRole("heading", { name: "Done" })).toBeTruthy();
-    await act(async () => {
-      fireEvent.click(rendered.getByRole("button", { name: "Go to MaiPai Home" }));
-    });
-    expect(onDone).toHaveBeenCalledTimes(1);
-    // Resume state is cleared once the wizard is genuinely finished, so a
-    // later fresh visit to /setup does not resume a done wizard forever.
-    expect(sessionStorage.getItem("maipai:setup-wizard-step")).toBeNull();
-    expect(sessionStorage.getItem("maipai:setup-wizard-completed")).toBeNull();
+    try {
+      const rendered = renderWizard(onDone);
+      expect(rendered.getByRole("heading", { name: "Done" })).toBeTruthy();
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Go to MaiPai Home" }).hasAttribute("disabled")).toBe(false));
+      await act(async () => {
+        fireEvent.click(rendered.getByRole("button", { name: "Go to MaiPai Home" }));
+      });
+      expect(onDone).toHaveBeenCalledTimes(1);
+      // Resume state is cleared once the wizard is genuinely finished, so a
+      // later fresh visit to /setup does not resume a done wizard forever.
+      expect(sessionStorage.getItem("maipai:setup-wizard-step")).toBeNull();
+      expect(sessionStorage.getItem("maipai:setup-wizard-completed")).toBeNull();
+    } finally {
+      restore();
+    }
   });
 
   test("a fresh visit to /setup with an existing household redirects away instead of re-running setup", async () => {
