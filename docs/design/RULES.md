@@ -152,7 +152,9 @@ and no setting reaches them. Web search runs without a parent's approval when th
    `spoken_cue`, `done`, `error` with crisis resources) stay available
    to the robot, the satellites, Go and other clients, with additions
    only. The stored reply is the concatenation of released text,
-   whatever the wire. Custom code in the chat path needs a named gap in
+   whatever the wire; for a voice reply the person interrupts, it is the
+   part they actually heard (the heard prefix), and the full generated
+   text is not stored as if heard (owner's rule, 2026-10-14). Custom code in the chat path needs a named gap in
    this record first. Named gaps today: sentence-gated speech scheduling
    with the spoken cue, the `[n]` citation mapper, the output gate, the
    prose tool-call fallback.
