@@ -33,7 +33,34 @@
   "notifications": [],
   "backup": "exclude",
   "background": false,
-  "contributes": {},
+  "contributes": {
+    "tours": [
+      {
+        "id": "tour.home.first-run",
+        "version": 1,
+        "title": "Show me around Home",
+        "starts_on": "page:home",
+        "audience": [
+          "adult",
+          "teen",
+          "child"
+        ],
+        "steps": [
+          {
+            "id": "profile",
+            "target": "shell.profile-menu",
+            "title": "Your profile",
+            "body": "Switch people, change how Home looks, or get help here. The owner and admins find Home settings here too.",
+            "body_by_audience": {
+              "child": "Change your colours or ask for help here."
+            },
+            "placement": "right",
+            "order": 10
+          }
+        ]
+      }
+    ]
+  },
   "min_app": "0.1.0",
   "tier": 0,
   "quality_scale": "bronze"

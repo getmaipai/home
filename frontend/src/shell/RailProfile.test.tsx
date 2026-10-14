@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { Tour } from "@maipai/spec/gen/ts/tour.js";
+import defaultManifest from "../../../backend/packages/default/manifest.json";
 import type { Roster } from "@/lib/api";
 import { RailProfile, homeSettingsRow } from "@/shell/RailProfile";
 import { renderWithQueryClient } from "../../tests/renderWithQueryClient";
@@ -53,6 +55,7 @@ describe("RailProfile status by age", () => {
 
 describe("Home first-run tour target", () => {
   test("the profile menu renders the shell target passed by Home", async () => {
+    expect(Tour.safeParse(defaultManifest.contributes.tours[0]).success).toBe(true);
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
