@@ -1,5 +1,6 @@
 import type { Person } from "@maipai/spec/gen/ts/person.js";
-import { isOwnerOrAdminRole, type Role } from "@/lib/api";
+import { ROLE_REQUIRES_CREDENTIAL } from "@maipai/home-backend/src/wire";
+import type { Role } from "@/lib/api";
 
 type Accent = NonNullable<Person["accent"]>;
 
@@ -53,15 +54,11 @@ export function canManagePeople(actorRole: Role): boolean {
   return creatableRoles(actorRole).length > 0;
 }
 
-// 4.1: an owner or admin profile requires a secret (a PIN-free owner/
-// admin is a one-request takeover for anyone who can reach the API) -
-// matches routes/people.ts's own check exactly. Shares the real
-// definition (backend/src/wire.ts's isOwnerOrAdminRole) with
-// backend/src/lib/access.ts's isOwnerOrAdmin and with
-// the settings backups gate, rather than a third hand-copy of the
-// same expression (a code review, 2026-09-04, found exactly that).
+// The backend's personAuthMethods.ts is the authority and checks this
+// decision again when creating a profile. Keep the frontend behavior in
+// sync via roles.test.ts, which compares every role against that helper.
 export function requiresSecret(role: Role): boolean {
-  return isOwnerOrAdminRole(role);
+  return (ROLE_REQUIRES_CREDENTIAL as readonly string[]).includes(role);
 }
 
 

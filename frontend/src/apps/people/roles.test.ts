@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { ROLE_REQUIRES_CREDENTIAL } from "@maipai/home-backend/src/wire";
 import { creatableRoles, canManagePeople, requiresSecret } from "@/apps/people/roles";
 
 describe("creatableRoles", () => {
@@ -34,13 +35,20 @@ describe("canManagePeople", () => {
 });
 
 describe("requiresSecret", () => {
-  test("owner and admin require a secret", () => {
+  test("owner, admin, and adult require a secret", () => {
     expect(requiresSecret("owner")).toBe(true);
     expect(requiresSecret("admin")).toBe(true);
+    expect(requiresSecret("adult")).toBe(true);
   });
 
-  test("everyone else does not", () => {
-    expect(requiresSecret("adult")).toBe(false);
+  test("stays aligned with the backend credential rule for every role", () => {
+    const roles = ["owner", "admin", "adult", "teen", "child", "guest"] as const;
+    for (const role of roles) {
+      expect(requiresSecret(role)).toBe((ROLE_REQUIRES_CREDENTIAL as readonly string[]).includes(role));
+    }
+  });
+
+  test("teen, child, and guest do not require a secret", () => {
     expect(requiresSecret("teen")).toBe(false);
     expect(requiresSecret("child")).toBe(false);
     expect(requiresSecret("guest")).toBe(false);

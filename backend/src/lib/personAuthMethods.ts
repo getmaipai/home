@@ -6,6 +6,7 @@
 // refused the same bare-tap /select a PIN-free child profile gets - a
 // passkey-only owner is not a credential-free profile.
 import { eq } from "drizzle-orm";
+import { roleRequiresCredential } from "@/wire";
 import { db } from "@/db";
 import { personCredentials, passkeyCredentials } from "@/db/schema";
 
@@ -31,7 +32,7 @@ export function getAuthMethods(personId: string): AuthMethods {
 /** True if a bare-tap /select must be refused for this person because
  * they currently HOLD a credential - either kind requires proving it
  * first. Says nothing about whether they're SUPPOSED to have one; see
- * ROLE_REQUIRES_CREDENTIAL below for that. */
+ * ROLE_REQUIRES_CREDENTIAL in wire.ts for that. */
 export function requiresCredential(personId: string): boolean {
   const methods = getAuthMethods(personId);
   return methods.hasSecret || methods.hasPasskeys;
@@ -54,8 +55,4 @@ export function requiresCredential(personId: string): boolean {
  * and, being automatic, never will reliably be remembered for the next
  * one either. Checking it here closes every current and future path at
  * once. */
-export const ROLE_REQUIRES_CREDENTIAL = new Set(["owner", "admin", "adult"]);
-
-export function roleRequiresCredential(role: string): boolean {
-  return ROLE_REQUIRES_CREDENTIAL.has(role);
-}
+export { roleRequiresCredential };

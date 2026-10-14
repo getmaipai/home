@@ -802,6 +802,15 @@ export function isOwnerOrAdminRole(role: string): boolean {
   return role === "owner" || role === "admin";
 }
 
+/** Roles that must prove a PIN/password before a bare-tap profile
+ * selection is allowed. Shared with the browser so profile creation
+ * never offers a credential-free adult profile. */
+export const ROLE_REQUIRES_CREDENTIAL = ["owner", "admin", "adult"] as const;
+
+export function roleRequiresCredential(role: string): boolean {
+  return (ROLE_REQUIRES_CREDENTIAL as readonly string[]).includes(role);
+}
+
 // TEMP-CHAT-01: the same role floor conversationHistory.ts's
 // createConversation() already checked for mode: "temporary" (Chat 55,
 // 2026-09-16) - factored out here, alongside isOwnerOrAdminRole, once a
