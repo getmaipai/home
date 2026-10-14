@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
-import { __resetRateLimiterForTests, __setRateLimiterClockForTests } from "@/lib/rateLimiter";
+import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, FETCH_USER_AGENT, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
+import { __resetRateLimiterForTests, __setRateLimiterClockForTests, tryConsume } from "@/lib/rateLimiter";
 import { cachedFetch, getCacheEnvelope, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { invalidateScopeCache, setHouseholdSettingValue, setValue } from "@/lib/settings";
@@ -464,6 +464,34 @@ describe("packageHost fetch, cache-aware (session-d-packages-and-store.md step 3
     }
   });
 
+  test("new catalog hosts use the shared strict budgets and one-hour block floor", async () => {
+    expect(__getHostRateLimitsForTests()["nominatim.openstreetmap.org"]).toEqual({ capacity: 1, refillPerSecond: 1 / 3 });
+    expect(__getHostRateLimitsForTests()["www.loc.gov"]).toEqual({ capacity: 1, refillPerSecond: 1 / 4 });
+    expect(__getHostBlockFloorsForTests()["nominatim.openstreetmap.org"]).toBe(3600);
+    expect(__getHostBlockFloorsForTests()["www.loc.gov"]).toBe(3600);
+    __resetRateLimiterForTests(); let now = 1_000; __setRateLimiterClockForTests(() => now);
+    let requests = 0; __setPackageFetchForTests(async () => { requests++; return Response.json({ results: [] }); });
+    const actor = await owner(); const host = createHost(actor, manifest({ permissions: ["net:nominatim.openstreetmap.org"] }));
+    try {
+      await host.fetch("https://nominatim.openstreetmap.org/search?q=one");
+      await expect(host.fetch("https://nominatim.openstreetmap.org/search?q=two")).rejects.toMatchObject({ code: "rate_limited" });
+      expect(requests).toBe(1); now += 3000;
+      await host.fetch("https://nominatim.openstreetmap.org/search?q=three"); expect(requests).toBe(2);
+    } finally { __setPackageFetchForTests(null); __resetRateLimiterForTests(); }
+  });
+
+  test.each([429, 403, 200])( "%i and HTML responses trigger the 3600 second block for loc.gov", async (status) => {
+    __resetRateLimiterForTests(); __resetPackageQuietWindowsForTests();
+    const clock = spyOn(Date, "now").mockReturnValue(1_000);
+    __setPackageFetchForTests(async () => status === 200 ? new Response("<html>captcha</html>", { status }) : new Response("", { status }));
+    const actor = await owner(); const host = createHost(actor, manifest({ permissions: ["net:www.loc.gov"] }));
+    try {
+      await expect(host.fetch("https://www.loc.gov/books/?fo=json&c=1&q=fixture")).rejects.toBeInstanceOf(HostError);
+      expect(__getQuietUntilForTests("www.loc.gov") - Date.now()).toBe(3600_000);
+      await expect(host.fetch("https://www.loc.gov/books/?fo=json&c=1&q=fixture2")).rejects.toMatchObject({ code: "rate_limited" });
+    } finally { __setPackageFetchForTests(null); clock.mockRestore(); }
+  });
+
   test("404 and network timeouts do not open a quiet window", async () => {
     __resetRateLimiterForTests();
     __resetPackageQuietWindowsForTests();
@@ -729,7 +757,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     });
     try {
       await performHttpFetch(`http://127.0.0.1:${server.port}/`, { headers: { "x-custom": "value" } });
-      expect(seenUserAgent).toContain("MaiPai-Home");
+      expect(seenUserAgent).toBe(FETCH_USER_AGENT);
       expect(seenCustom).toBe("value");
     } finally {
       server.stop(true);
@@ -3029,5 +3057,57 @@ describe("search tiers: wikipedia only widens a thin result (SEARCH-TIER-02)", (
       expect(out.rows).toHaveLength(2);
       expect(asked).toHaveLength(2);
     } finally { server.stop(true); }
+  });
+});
+
+describe("DATA-REF-02 host privacy and cache", () => {
+  test("the configured buckets stay within each provider's rolling limits", () => {
+    const nominatim = __getHostRateLimitsForTests()["nominatim.openstreetmap.org"]!;
+    const loc = __getHostRateLimitsForTests()["www.loc.gov"]!;
+    let accepted = 0; const nomTimes: number[] = [];
+    __resetRateLimiterForTests();
+    for (let ms = 0; ms <= 60_000; ms += 100) {
+      if (tryConsume("www.loc.gov", loc, ms)) accepted++;
+      if (tryConsume("nominatim.openstreetmap.org", nominatim, ms)) nomTimes.push(ms);
+    }
+    expect(accepted).toBeLessThanOrEqual(20);
+    for (let i = 1; i < nomTimes.length; i++) expect(nomTimes[i]! - nomTimes[i - 1]!).toBeGreaterThanOrEqual(1000);
+    __resetRateLimiterForTests();
+  });
+
+  test("a spoken place is excluded from Nominatim failure text", async () => {
+    __resetRateLimiterForTests(); __resetPackageQuietWindowsForTests();
+    let call = 0;
+    __setPackageFetchForTests(async () => { call++; if (call === 1) return new Response("", { status: 500 }); throw new TypeError("Central Park secret query timeout"); });
+    const actor = await owner();
+    const host = createHost(actor, manifest({ id: "place-lookup", permissions: ["net:nominatim.openstreetmap.org"] }));
+    try {
+      let first: HostError | undefined; try { await host.fetch("https://nominatim.openstreetmap.org/search?q=Central%20Park"); } catch (e) { first = e as HostError; }
+      expect(first?.message).toContain("nominatim.openstreetmap.org returned HTTP 500");
+      expect(first?.message).not.toContain("Central Park");
+      __resetRateLimiterForTests();
+      let second: HostError | undefined; try { await host.fetch("https://nominatim.openstreetmap.org/search?q=Central%20Park"); } catch (e) { second = e as HostError; }
+      expect(second?.message).toContain("nominatim.openstreetmap.org");
+      expect(second?.message).not.toContain("Central Park");
+    } finally { __setPackageFetchForTests(null); }
+  });
+
+  test("a longer loc.gov Retry-After wins within the shared 24 hour cap", async () => {
+    __resetRateLimiterForTests(); __resetPackageQuietWindowsForTests();
+    const clock = spyOn(Date, "now").mockReturnValue(10_000);
+    __setPackageFetchForTests(async () => new Response("", { status: 429, headers: { "retry-after": "7200" } }));
+    const actor = await owner(); const host = createHost(actor, manifest({ permissions: ["net:www.loc.gov"] }));
+    try {
+      await expect(host.fetch("https://www.loc.gov/books/?fo=json&c=1&q=fixture")).rejects.toBeInstanceOf(HostError);
+      expect(__getQuietUntilForTests("www.loc.gov") - 10_000).toBe(7_200_000);
+    } finally { __setPackageFetchForTests(null); clock.mockRestore(); }
+  });
+
+  test("a repeated spoken place is served from the package cache", async () => {
+    __resetRateLimiterForTests(); __resetPackageCacheForTests(); __clearPackageCacheDirForTests("place-lookup");
+    let requests = 0; __setPackageFetchForTests(async () => { requests++; return Response.json([{ name: "Central Park", lat: "40.78", lon: "-73.96" }]); });
+    const actor = await owner(); const host = createHost(actor, manifest({ id: "place-lookup", cache: { ttl_s: 604800, stale_ok_s: 604800, max_bytes: 100000 }, permissions: ["net:nominatim.openstreetmap.org"] }));
+    try { await host.fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=Central%20Park"); await host.fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=Central%20Park"); expect(requests).toBe(1); }
+    finally { __setPackageFetchForTests(null); __resetPackageCacheForTests(); __clearPackageCacheDirForTests("place-lookup"); }
   });
 });

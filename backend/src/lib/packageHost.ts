@@ -112,7 +112,19 @@ const packageFailureCounts = new Map<string, number>();
 export function __resetPackageQuietWindowsForTests(): void { packageQuietUntil.clear(); packageFailureCounts.clear(); }
 const HOST_RATE_LIMITS: Record<string, { capacity: number; refillPerSecond: number }> = {
   "opentdb.com": { capacity: 1, refillPerSecond: 0.2 },
+  "nominatim.openstreetmap.org": { capacity: 1, refillPerSecond: 1 / 3 },
+  "www.loc.gov": { capacity: 1, refillPerSecond: 1 / 4 },
 };
+const HOST_BLOCK_FLOOR_S: Record<string, number> = {
+  "nominatim.openstreetmap.org": 3600,
+  "www.loc.gov": 3600,
+};
+function errorUrlLabel(url: string): string {
+  try { const parsed = new URL(url); return HOST_BLOCK_FLOOR_S[parsed.host] ? parsed.host : url; } catch { return "unknown host"; }
+}
+export const __getHostRateLimitsForTests = () => HOST_RATE_LIMITS;
+export const __getHostBlockFloorsForTests = () => HOST_BLOCK_FLOOR_S;
+export const __getQuietUntilForTests = (host: string) => packageQuietUntil.get(host) ?? 0;
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 export const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
@@ -272,7 +284,7 @@ async function readBodyWithLimit(response: Response, url: string): Promise<strin
     totalBytes += value.byteLength;
     if (totalBytes > FETCH_MAX_RESPONSE_BYTES) {
       await reader.cancel();
-      throw new HostError("network_unreachable", `${url}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`);
+      throw new HostError("network_unreachable", `${errorUrlLabel(url)}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`);
     }
     chunks.push(value);
   }
@@ -381,13 +393,13 @@ async function attemptHttpFetch(
       const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
       if (location) {
         if (hop >= MAX_FETCH_REDIRECTS) {
-          return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url} redirected more than ${MAX_FETCH_REDIRECTS} times`) };
+          return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${errorUrlLabel(url)} redirected more than ${MAX_FETCH_REDIRECTS} times`) };
         }
         let nextUrl: string;
         try {
           nextUrl = new URL(location, currentUrl).toString();
         } catch {
-          return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${currentUrl} redirected to an invalid url`) };
+          return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${errorUrlLabel(currentUrl)} redirected to an invalid url`) };
         }
         if (validateHop) {
           try {
@@ -422,7 +434,7 @@ async function attemptHttpFetch(
           networkFailure: false,
           status: response.status,
           meta,
-          error: new HostError(code, `${url} returned HTTP ${response.status}`),
+          error: new HostError(code, `${errorUrlLabel(url)} returned HTTP ${response.status}`),
         };
       }
       const text = await readBodyWithLimit(response, currentUrl);
@@ -435,7 +447,7 @@ async function attemptHttpFetch(
   } catch (err) {
     if (err instanceof HostError) return { ok: false, networkFailure: false, error: err }; // e.g. readBodyWithLimit's own size-cap error
     const message = (err as Error).name === "AbortError" ? "timed out" : (err as Error).message;
-    return { ok: false, networkFailure: true, error: new HostError("network_unreachable", `could not reach ${url}: ${message}`) };
+    return { ok: false, networkFailure: true, error: new HostError("network_unreachable", `could not reach ${errorUrlLabel(url)}: ${HOST_BLOCK_FLOOR_S[new URL(url).host] ? ((err as Error).name === "AbortError" ? "timed out" : "request failed") : message}`) };
   } finally {
     clearTimeout(timer);
     options.signal?.removeEventListener("abort", onParentAbort);
@@ -1739,7 +1751,7 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
         await validatePublicPageUrl(current);
       }
     }
-    if (!response.ok) return { ok: false, status: response.status, error: new HostError("network_unreachable", `${url} returned HTTP ${response.status}`) };
+    if (!response.ok) return { ok: false, status: response.status, error: new HostError("network_unreachable", `${errorUrlLabel(url)} returned HTTP ${response.status}`) };
     const text = await response.text();
     if (new TextEncoder().encode(text).byteLength > FETCH_MAX_RESPONSE_BYTES) return { ok: false, networkFailure: false, error: new HostError("network_unreachable", `${url}'s response exceeded the ${FETCH_MAX_RESPONSE_BYTES}-byte limit`) };
     return { ok: true, value: text, status: response.status };
@@ -2056,6 +2068,12 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         let responseMeta: any;
         try {
           const value = await performHttpFetch(url, { ...opts, revalidate: ctx }, validateHop, (meta) => { responseMeta = meta; });
+          if (HOST_BLOCK_FLOOR_S[parsed.host] && responseMeta?.status >= 200 && responseMeta.status < 300 && typeof value === "string") {
+            packageFailureCounts.set(parsed.host, 1);
+            packageQuietUntil.set(parsed.host, Date.now() + HOST_BLOCK_FLOOR_S[parsed.host]! * 1000);
+            await recordServiceOutcome(parsed.host, { ok: false, status: responseMeta.status, error: new Error("captcha or sign-in access wall") });
+            throw new HostError("rate_limited", `${parsed.host} asked Home to slow down. Home will try it again in about 60 minutes.`);
+          }
           if (responseMeta?.status === 304 || (responseMeta?.status >= 200 && responseMeta.status < 300)) {
             packageFailureCounts.delete(parsed.host); packageQuietUntil.delete(parsed.host);
           }
@@ -2067,11 +2085,12 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
           const status = err instanceof HostError ? Number(err.message.match(/returned HTTP (\d+)/)?.[1]) : undefined;
           const failureMeta = err instanceof HostError ? packageResponseMeta.get(err) : undefined;
           const actualStatus = failureMeta?.status ?? status;
-          if (actualStatus === 429 || actualStatus === 503 || (actualStatus !== undefined && actualStatus >= 500 && (packageFailureCounts.get(parsed.host) ?? 0) >= 1)) {
+          const blockFloor = HOST_BLOCK_FLOOR_S[parsed.host];
+          if (actualStatus === 429 || actualStatus === 503 || (actualStatus !== undefined && actualStatus >= 500 && (packageFailureCounts.get(parsed.host) ?? 0) >= 1) || (blockFloor !== undefined && actualStatus === 403)) {
             const count = (packageFailureCounts.get(parsed.host) ?? 0) + 1;
             packageFailureCounts.set(parsed.host, count);
             const retryAfter = parseRetryAfter(failureMeta?.retryAfter ?? responseMeta?.retryAfter ?? null, Date.now());
-            const wait = backoffSeconds(60, count, retryAfter, 60, 3600);
+            const wait = backoffSeconds(blockFloor ? blockFloor / 2 : 60, count, retryAfter, blockFloor ? blockFloor / 2 : 60, blockFloor ? 86_400 : 3600);
             packageQuietUntil.set(parsed.host, Date.now() + wait * 1000);
           } else if (actualStatus !== undefined && actualStatus >= 500) packageFailureCounts.set(parsed.host, (packageFailureCounts.get(parsed.host) ?? 0) + 1);
           const classified = classifyServiceOutcome(err, Number.isFinite(status) ? status : undefined);

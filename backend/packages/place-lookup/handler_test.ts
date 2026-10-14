@@ -1,0 +1,5 @@
+import { assertEquals } from "jsr:@std/assert@1";
+import { handlePlace } from "./handler.ts";
+import manifest from "./manifest.json" with { type: "json" };
+Deno.test("place lookup sends only spoken query and returns rounded coordinates",async()=>{const urls:string[]=[];const extra={sendRequest:async(req:any)=>{urls.push(req.params.url);return {value:[{name:"Central Park",type:"park",display_name:"Central Park, Manhattan, New York",lat:"40.785091",lon:"-73.968285"}]}}};const result=JSON.parse((await handlePlace({place:"Central Park",__attribution:manifest.data_sources[0].attribution},extra)).content[0].text).data;assertEquals(result.items[0].latitude,40.79);assertEquals(result.items[0].longitude,-73.97);assertEquals(new URL(urls[0]).searchParams.get("q"),"Central Park");assertEquals(result.attribution,manifest.data_sources[0].attribution);});
+Deno.test("place lookup failure and empty response are plain data",async()=>{const x=JSON.parse((await handlePlace({place:"not a place"},{sendRequest:async()=>({value:[]})})).content[0].text).data;assertEquals(x.ok,true);assertEquals(x.items,[]);});

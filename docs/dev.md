@@ -36903,3 +36903,6 @@ The browser's installed preset rows write to the normal person settings route. C
 ### Trivia by age band
 
 Home reads the trivia question bank from the bundled package. A child gets a bank question without running the recipe or making a network request. A teen can use Open Trivia Database only after the existing minor safety floor passes; adults can use it directly. Any failed or limited request falls back to the bank. The shared host fetch limiter gives `opentdb.com` one request every five seconds; other hosts keep the usual burst budget. Open Trivia Database replies include the CC BY-SA 4.0 credit from the package manifest. The checked-in bank is a sourced draft while `reviewed.by` is `pending`.
+
+
+Book lookup connects to `www.loc.gov` at one request per four seconds. Place lookup connects to `nominatim.openstreetmap.org` at one request per three seconds. Both hosts get a 3600-second minimum quiet window after a 429, 403 or non-JSON response; a longer Retry-After wins up to 24 hours. See https://www.loc.gov/apis/json-and-yaml/working-within-limits/ and https://operations.osmfoundation.org/policies/nominatim/.

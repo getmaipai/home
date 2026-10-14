@@ -26,6 +26,8 @@ import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/l
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
+import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
+import { checkSafety } from "@maipai/spec/safety/ts/classifier.js";
 import { checkedOpenTdbHost, runTrivia } from "@/lib/triviaSource";
 import { shelfNewsResult } from "@/lib/shelf/shelfNews";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
@@ -47,6 +49,7 @@ import type { PersonRow } from "@/types";
 // $ref into spec's own dialect), and codegen leaves it typed `z.any()`
 // since it can't be known at generation time.
 const ajv = new Ajv2020({ strict: false });
+const MINOR_QUERY_CHECK_PACKAGE_IDS = new Set(["book-lookup", "place-lookup"]);
 
 function localClockInput(now: Date): string {
   const pad = (value: number, width = 2) => String(value).padStart(width, "0");
@@ -564,12 +567,34 @@ export async function runPlugin(
     // argument. The production path gets the real current instant from
     // promptNow(); the bench pins that same source without changing Date.
     const handlerInputs = id.startsWith("almanac-") ? { ...inputs, __now: localClockInput(promptNow()), ...(id === "almanac-holiday" ? { __home_country: householdHomeCountryName() } : {}) } : inputs;
+    if (id === "book-lookup" || id === "place-lookup") {
+      (handlerInputs as Record<string, unknown>).__attribution = manifest.data_sources?.[0]?.attribution ?? "";
+    }
+    if (MINOR_QUERY_CHECK_PACKAGE_IDS.has(id)) {
+      const band = speakerAgeBand(actor, new Date());
+      const argumentKey = id === "book-lookup" ? "query" : "place";
+      const argument = typeof inputs[argumentKey] === "string" ? inputs[argumentKey] as string : "";
+      if (band !== "adult" && minorQueryHit(argument, band)) {
+        return { ok: false, status: 403, error: MINOR_QUERY_PERSONAL_NOTE, code: "policy_refusal" };
+      }
+    }
     const result = await callTier1Handle(id, manifest, actor, handlerInputs);
     if (!result.ok) {
       return { ok: false, status: 502, error: result.message, code: result.code, fallback_reply: result.fallback };
     }
     // MINOR-SEARCH-01g: the news headlines pass the minor floor one by one; a child gets them through the model.
     if (id === "news") return { ok: true, value: applyNewsMinorFloor(result.value, speakerAgeBand(actor, new Date())) };
+    if (id === "book-lookup" && speakerAgeBand(actor, new Date()) !== "adult") {
+      const data = result.value.data as Record<string, unknown> | undefined;
+      const books = Array.isArray(data?.items) ? data.items.map((item) => {
+        if (!item || typeof item !== "object") return item;
+        const book = item as Record<string, unknown>;
+        if (typeof book.description !== "string" || !checkSafety(book.description, { isMinor: true }).flagged) return book;
+        const { description: _description, ...safe } = book;
+        return safe;
+      }) : data?.items;
+      return { ok: true, value: { ...result.value, data: { ...data, items: books } } };
+    }
     return { ok: true, value: result.value };
   }
 

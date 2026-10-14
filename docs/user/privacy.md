@@ -37,3 +37,8 @@ When a child's conversation seems to weigh on them, the adults get a note saying
 ## Still need help?
 
 Something on this page can look unfamiliar. You might not be sure why a connection is listed. Either way, see [Fix a problem](fix-a-problem.md).
+
+
+## Book and place lookups
+
+When you ask for a book, Home sends the title or author you said to the Library of Congress. When you ask for a place, Home sends the place name you said to OpenStreetMap Nominatim. Teen and adult profiles can use these lookups. Child profiles cannot. Temporary chats can leave the lookup result in this computer's local cache until it expires.

@@ -76,6 +76,14 @@ describe("the what-leaves-the-house table", () => {
     expect(row?.optIn).toBe(true);
   });
 
+  test("book and place lookup manifest rows appear in the privacy list", () => {
+    const rows = pluginConnections();
+    expect(rows.find((r) => r.id === "book-lookup:loc")?.destination).toContain("www.loc.gov");
+    expect(rows.find((r) => r.id === "place-lookup:osm")?.destination).toContain("nominatim.openstreetmap.org");
+    expect(rows.find((r) => r.id === "book-lookup:loc")?.what).toContain("title or author");
+    expect(rows.find((r) => r.id === "place-lookup:osm")?.what).toContain("place name");
+  });
+
   test("trivia privacy credit comes from its catalog manifest", () => {
     const row = pluginConnections().find((r) => r.id === "trivia:opentdb");
     expect(row?.when).toContain("a child's questions come from a list stored at home");

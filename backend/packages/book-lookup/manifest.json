@@ -1,0 +1,79 @@
+{
+  "id": "book-lookup",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Book Lookup",
+  "description": "Look up a book by title or author.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "find the book The Hobbit",
+      "who wrote Frankenstein",
+      "look up books by Octavia Butler",
+      "search books by Mary Shelley",
+      "find the book Dune"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "query"
+    ],
+    "properties": {
+      "query": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "teen",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "loc",
+      "destination": "Library of Congress API (www.loc.gov)",
+      "when": "once after a spoken query is complete",
+      "what": "the title or author as you said it",
+      "who": "Library of Congress (loc.gov)",
+      "opt_in": true,
+      "retention": "unknown, see the provider's own policy",
+      "attribution": "A citation acknowledging the institution and assisting further scholarship is appreciated. https://www.loc.gov/duplicationservices/copyright/",
+      "hosts": [
+        "www.loc.gov"
+      ]
+    }
+  ],
+  "permissions": [
+    "net:www.loc.gov"
+  ],
+  "notifications": [],
+  "cache": {
+    "key_template": "book-lookup:{query}",
+    "ttl_s": 86400,
+    "stale_ok_s": 86400,
+    "max_bytes": 100000
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "timeout_ms": 12000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "deno_test"
+  },
+  "incognito": "unaffected"
+}

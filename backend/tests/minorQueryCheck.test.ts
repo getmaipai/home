@@ -5,7 +5,11 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { createHost } from "@/lib/packageHost";
+import { createHost, __setPackageFetchForTests } from "@/lib/packageHost";
+import { runPlugin } from "@/lib/plugins";
+import { __resetDenoHostForTests } from "@/lib/denoHost";
+import { __resetRateLimiterForTests, __setRateLimiterClockForTests } from "@/lib/rateLimiter";
+import { __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { createEntity } from "@/lib/entities";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
@@ -83,6 +87,50 @@ describe("minor search path", () => {
     const actor = await owner();
     expect(minorQueryHit("how hot is the sun", "child")).toBeNull();
     expect(actor.displayName).toBe("Sage");
+  });
+
+  test("teen and adult book lookups return a recorded result", async () => {
+    const ownerRow = await owner(); let requests = 0;
+    __resetDenoHostForTests(); __resetPackageCacheForTests(); __clearPackageCacheDirForTests("book-lookup");
+    __resetRateLimiterForTests(); let now = 1_000; __setRateLimiterClockForTests(() => now);
+    __setPackageFetchForTests(async () => { requests++; return Response.json({ results: [{ title: "Frankenstein", contributors: ["Mary Shelley"], date: "1818", description: "A novel by Mary Shelley", id: "https://www.loc.gov/item/fixture/" }] }); });
+    try {
+      for (const actor of [{ ...ownerRow, role: "teen" as const }, ownerRow]) {
+        const result = await runPlugin("book-lookup", actor, { query: actor.role === "teen" ? "Frankenstein" : "Pride and Prejudice" });
+        expect(result.ok).toBe(true);
+        if (result.ok) expect((result.value.data?.items as Record<string, unknown>[])[0]?.title).toBe("Frankenstein");
+        now += 4_000;
+      }
+      expect(requests).toBe(2);
+    } finally { __setPackageFetchForTests(null); __resetDenoHostForTests(); __resetPackageCacheForTests(); __clearPackageCacheDirForTests("book-lookup"); __resetRateLimiterForTests(); }
+  });
+
+  test.each(["book-lookup", "place-lookup"])("a child cannot call %s and no fetch starts", async (id) => {
+    const actor = await owner(); let fetches = 0;
+    __setPackageFetchForTests(async () => { fetches++; return Response.json([]); });
+    try {
+      const child = { ...actor, role: "child" as const };
+      const input = id === "book-lookup" ? { query: "The Hobbit" } : { place: "Central Park" };
+      expect(await runPlugin(id, child, input)).toMatchObject({ ok: false, status: 403 });
+      expect(fetches).toBe(0);
+    } finally { __setPackageFetchForTests(null); }
+  });
+
+  test("a teen's household home address is refused before either new lookup fetches", async () => {
+    const actor = await owner();
+    const home = createEntity(actor, { kind: "place", place_kind: "map", name: "12 Maple Street", scope: "household", geo: { lat: 47.6, lon: -122.3, precision: "area", area: "Seattle", from: "typed" } });
+    expect(home.ok).toBe(true);
+    expect(setHouseholdSettingValue("household.home", (home as { value: { id: string } }).value.id).ok).toBe(true);
+    const teen = { ...actor, role: "teen" as const };
+    let fetches = 0;
+    __setPackageFetchForTests(async () => { fetches++; return Response.json([]); });
+    try {
+      const place = await runPlugin("place-lookup", teen, { place: "12 Maple Street" });
+      expect(place).toMatchObject({ ok: false, status: 403 });
+      const book = await runPlugin("book-lookup", teen, { query: "12 Maple Street" });
+      expect(book).toMatchObject({ ok: false, status: 403 });
+      expect(fetches).toBe(0);
+    } finally { __setPackageFetchForTests(null); }
   });
 
   test("the stored household address is refused, a bare place name is not", async () => {

@@ -1,0 +1,79 @@
+{
+  "id": "place-lookup",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Info",
+  "display": "Place Lookup",
+  "description": "Look up a named place.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "look up Central Park",
+      "where is the Eiffel Tower",
+      "find places called Springfield",
+      "find the Golden Gate Bridge",
+      "where is Times Square"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "place"
+    ],
+    "properties": {
+      "place": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 300
+      }
+    }
+  },
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "teen",
+  "consequential": false,
+  "offline": "unavailable",
+  "config": [],
+  "data_sources": [
+    {
+      "id": "osm",
+      "destination": "OpenStreetMap Nominatim (nominatim.openstreetmap.org)",
+      "when": "once after a spoken query is complete",
+      "what": "the place name as you said it",
+      "who": "OpenStreetMap Nominatim (nominatim.openstreetmap.org)",
+      "opt_in": true,
+      "retention": "unknown, see the provider's own policy",
+      "attribution": "Data (c) OpenStreetMap contributors, ODbL 1.0. https://osm.org/copyright",
+      "hosts": [
+        "nominatim.openstreetmap.org"
+      ]
+    }
+  ],
+  "permissions": [
+    "net:nominatim.openstreetmap.org"
+  ],
+  "notifications": [],
+  "cache": {
+    "key_template": "place-lookup:{place}",
+    "ttl_s": 604800,
+    "stale_ok_s": 604800,
+    "max_bytes": 100000
+  },
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "timeout_ms": 12000,
+  "tier": 1,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "deno_test"
+  },
+  "incognito": "unaffected"
+}

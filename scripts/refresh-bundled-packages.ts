@@ -26,6 +26,8 @@ import { hashPackageDir, isDirectory, type BundledProvenance } from "../backend/
 const BUNDLED: { id: string; catalogPath: string }[] = [
   { id: "joke", catalogPath: "plugins/fun/joke" },
   { id: "media-lookup", catalogPath: "plugins/info/media-lookup" },
+  { id: "book-lookup", catalogPath: "plugins/info/book-lookup" },
+  { id: "place-lookup", catalogPath: "plugins/info/place-lookup" },
   { id: "trivia", catalogPath: "plugins/fun/trivia" },
   { id: "weather", catalogPath: "plugins/utilities/weather" },
   { id: "storytime-style", catalogPath: "skills/family/storytime-style" },

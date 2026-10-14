@@ -1,0 +1,31 @@
+package: place-lookup
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: "handler tests cover recorded Nominatim results and no-match data"
+  routing_examples:
+    met: true
+    note: "5 spoken query examples"
+  privacy_row_per_data_source:
+    met: true
+    note: "one data source row with the host and attribution"
+  offline_behavior_stated:
+    met: true
+    note: "offline: unavailable"
+  smoke_test:
+    met: true
+    note: "handler_test.ts uses recorded fixtures"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+    note: "Deno-native TypeScript; checked by package tests"
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: "no auth"
+gold:
+  real_service_verified:
+    met: false
+    note: "not live-verified"
