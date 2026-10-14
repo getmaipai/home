@@ -648,6 +648,7 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ displayName, secret }),
     }),
+  setupCa: () => request<{ certificate: string }>("/api/setup/ca"),
   select: (personId: string) =>
     request<{ success: true }>("/api/auth/select", {
       method: "POST",

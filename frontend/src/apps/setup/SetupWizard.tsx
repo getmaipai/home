@@ -97,6 +97,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
 
   // Backups (step 8)
   const [backups, setBackups] = useState<BackupInfo[] | null>(null);
+  const [certificateState, setCertificateState] = useState<"idle" | "loading" | "ready" | "error">("idle");
 
   useEffect(() => {
     const savedStep = sessionStorage.getItem(RESUME_KEY);
@@ -203,11 +204,25 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
     }
   }
 
+  async function mintHouseholdCertificate() {
+    setCertificateState("loading");
+    try {
+      // The existing CA route returns the installable authority and also
+      // mints the leaf certificate. On this final screen that brings up
+      // HTTPS for other devices without interrupting localhost HTTP.
+      await api.setupCa();
+      setCertificateState("ready");
+    } catch {
+      setCertificateState("error");
+    }
+  }
+
   const currentId = STEPS[stepIndex]?.id;
 
   useEffect(() => {
     if (currentId === "hardware" && hardware === null) void loadHardwareStep();
     if (currentId === "backup" && backups === null) void loadBackupsStep();
+    if (currentId === "done" && certificateState === "idle") void mintHouseholdCertificate();
     // Only when the step is first reached, not on every busy/error change.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentId]);
@@ -396,8 +411,16 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
             <li>Add the rest of your household under People</li>
             <li>Check Health to see everything is running well</li>
           </ul>
+          {certificateState === "loading" ? <Progress mode="spinner" label="Preparing secure connections" /> : null}
+          {certificateState === "error" ? (
+            <>
+              <ErrorText error="Home couldn't make the certificate for your other devices. Try again, or open Home settings, Repairs to fix it." />
+              <Button type="button" variant="outline" onClick={() => void mintHouseholdCertificate()}>Try again</Button>
+            </>
+          ) : null}
         </StepFields>
       );
+      nextDisabled = certificateState === "loading";
       break;
 
     default:
@@ -416,7 +439,7 @@ export function SetupWizard({ onDone }: SetupWizardProps) {
       nextLabel={currentId === "done" ? "Go to MaiPai Home" : "Continue"}
       skipLabel={skipLabel}
       onSkip={onSkip}
-      busy={busy}
+      busy={busy || certificateState === "loading"}
     >
       {content}
     </Wizard>
