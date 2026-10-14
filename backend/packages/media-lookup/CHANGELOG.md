@@ -6,6 +6,11 @@ All notable changes to the Media Lookup package, in [Keep a Changelog](https://k
 
 ### Changed
 
+- Data source rows now name their destination hosts and attribution for cache provenance.
+- Package version is 0.2.0.
+
+### Changed
+
 - All eight `routing.patterns` entries are gone (every one opened with a
   question word - "what's the runtime of \*", "who directed \*", "what
   is \* about", "is \* any good", "when did \* come out", "who's in \*",

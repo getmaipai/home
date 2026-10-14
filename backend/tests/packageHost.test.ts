@@ -6,7 +6,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
-import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { __resetRateLimiterForTests, __setRateLimiterClockForTests } from "@/lib/rateLimiter";
 import { cachedFetch, getCacheEnvelope, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
 import { invalidateScopeCache, setHouseholdSettingValue, setValue } from "@/lib/settings";
@@ -307,6 +307,30 @@ describe("packageHost fetch", () => {
       }
     }
     expect(codes).toContain("rate_limited");
+  });
+
+  test("OpenTDB allows one request per five seconds while other hosts keep their burst", async () => {
+    __resetRateLimiterForTests();
+    let now = 10_000;
+    __setRateLimiterClockForTests(() => now);
+    let requests = 0;
+    __setPackageFetchForTests(async () => { requests++; return Response.json({ ok: true }); });
+    try {
+      const actor = await owner();
+      const triviaHost = createHost(actor, manifest({ id: "trivia", permissions: ["net:opentdb.com"] }));
+      await triviaHost.fetch("https://opentdb.com/api.php?amount=1&type=multiple");
+      await expect(triviaHost.fetch("https://opentdb.com/api.php?amount=1&type=multiple")).rejects.toMatchObject({ code: "rate_limited" });
+      expect(requests).toBe(1);
+      now += 5_000;
+      await triviaHost.fetch("https://opentdb.com/api.php?amount=1&type=multiple");
+      expect(requests).toBe(2);
+      const otherHost = createHost(actor, manifest({ permissions: ["net:example.com"] }));
+      for (let i = 0; i < 5; i++) await otherHost.fetch("https://example.com/");
+      expect(requests).toBe(7);
+    } finally {
+      __setPackageFetchForTests(null);
+      __resetRateLimiterForTests();
+    }
   });
 });
 

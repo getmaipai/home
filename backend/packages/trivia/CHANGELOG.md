@@ -4,6 +4,12 @@ All notable changes to the Trivia package, in [Keep a Changelog](https://keepach
 
 ## [Unreleased]
 
+- Children use questions stored at home. Teens pass a safety check before
+  an internet question is used. Adults and teens get a saved question if
+  Open Trivia Database is unavailable.
+- Open Trivia Database answers show the CC BY-SA 4.0 credit.
+- Package version is 0.2.0.
+
 ### Changed
 
 - The one-line description now says what the package does for the

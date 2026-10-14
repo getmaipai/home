@@ -76,6 +76,12 @@ describe("the what-leaves-the-house table", () => {
     expect(row?.optIn).toBe(true);
   });
 
+  test("trivia privacy credit comes from its catalog manifest", () => {
+    const row = pluginConnections().find((r) => r.id === "trivia:opentdb");
+    expect(row?.when).toContain("a child's questions come from a list stored at home");
+    expect(row?.what).toContain("Question from the Open Trivia Database (CC BY-SA 4.0).");
+  });
+
   test("the offline holiday package has no generated privacy connection row", () => {
     expect(pluginConnections().some((row) => row.id.startsWith("almanac-holiday:"))).toBe(false);
   });

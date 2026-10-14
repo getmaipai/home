@@ -26,6 +26,7 @@ import { blocksForRecipeRun, withoutBlockOnlyData, type BlockCapture } from "@/l
 import { callTier1Handle } from "@/lib/denoHost";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { applyNewsMinorFloor } from "@/lib/newsMinorFloor";
+import { checkedOpenTdbHost, runTrivia } from "@/lib/triviaSource";
 import { shelfNewsResult } from "@/lib/shelf/shelfNews";
 import { registerPackageNotificationTypes } from "@/lib/notificationTypes";
 import { registerProjectType } from "@/lib/projects/projectTypes";
@@ -570,6 +571,24 @@ export async function runPlugin(
     // MINOR-SEARCH-01g: the news headlines pass the minor floor one by one; a child gets them through the model.
     if (id === "news") return { ok: true, value: applyNewsMinorFloor(result.value, speakerAgeBand(actor, new Date())) };
     return { ok: true, value: result.value };
+  }
+
+  if (id === "trivia") {
+    const band = speakerAgeBand(actor, new Date());
+    const result = await runTrivia(actor, band, manifest, async (capture) => {
+      const loaded = loadPackage(id);
+      if (!loaded.ok) throw new Error(loaded.error);
+      const host = createHost(actor, manifest, [], turn, options);
+      return runRecipe(loaded.value.recipe, inputs, checkedOpenTdbHost(host, capture));
+    });
+    if (result) return { ok: true, value: result };
+    return {
+      ok: false,
+      status: 502,
+      error: "No trivia question is available. Try again later.",
+      code: "no_question",
+      fallback_reply: { actions: [], error: { code: "no_question", message: "No trivia question is available. Try again later." } },
+    };
   }
 
   const loaded = loadPackage(id);

@@ -1,6 +1,6 @@
 {
   "id": "trivia",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Fun",
   "display": "Trivia",
@@ -31,17 +31,21 @@
   ],
   "min_role": "child",
   "consequential": false,
-  "offline": "unavailable",
+  "offline": "degraded",
   "config": [],
   "data_sources": [
     {
       "id": "opentdb",
       "destination": "opentdb.com, the free Open Trivia Database",
-      "when": "each time the family asks for trivia",
+      "when": "when a teen or adult asks for trivia; a child's questions come from a list stored at home",
       "what": "nothing personal - a plain request for a random question",
       "who": "opentdb.com",
       "opt_in": true,
-      "retention": "unknown, see opentdb.com's own policy"
+      "retention": "unknown, see opentdb.com's own policy",
+      "attribution": "Question from the Open Trivia Database (CC BY-SA 4.0).",
+      "hosts": [
+        "opentdb.com"
+      ]
     }
   ],
   "permissions": [

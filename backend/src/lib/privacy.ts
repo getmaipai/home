@@ -295,7 +295,7 @@ export function pluginConnections(manifests = loadedManifests()): PrivacyConnect
         sourceKind: "plugin",
         destination: source.destination,
         when: source.when,
-        what: source.what,
+        what: source.attribution ? `${source.what} Credit: ${source.attribution}` : source.what,
         who: source.who,
         optIn: source.opt_in,
         retention: source.retention,

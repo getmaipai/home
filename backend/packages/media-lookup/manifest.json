@@ -1,6 +1,6 @@
 {
   "id": "media-lookup",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Info",
   "display": "Media Lookup",
@@ -45,25 +45,29 @@
   "data_sources": [
     {
       "id": "wikidata",
-      "attribution": "Data from Wikidata",
-      "hosts": ["www.wikidata.org"],
       "destination": "Wikidata's own public API (www.wikidata.org)",
       "when": "each time the family asks about a film or TV show's director, cast, runtime, rating, or release date",
       "what": "the title spoken in the request (e.g. 'Cobra'), and a release year when one was given",
       "who": "the Wikimedia Foundation",
       "opt_in": true,
-      "retention": "unknown, see Wikimedia's own policy"
+      "retention": "unknown, see Wikimedia's own policy",
+      "attribution": "Data from Wikidata",
+      "hosts": [
+        "www.wikidata.org"
+      ]
     },
     {
       "id": "wikipedia",
-      "attribution": "Wikipedia content is available under CC BY-SA 4.0",
-      "hosts": ["en.wikipedia.org"],
       "destination": "Wikipedia's own public REST summary API (en.wikipedia.org)",
       "when": "each time a Wikidata match is found, to read its plain-language summary",
       "what": "the film or TV show's own Wikipedia page title, resolved from Wikidata, never anything typed by the family",
       "who": "the Wikimedia Foundation",
       "opt_in": true,
-      "retention": "unknown, see Wikimedia's own policy"
+      "retention": "unknown, see Wikimedia's own policy",
+      "attribution": "Wikipedia content is available under CC BY-SA 4.0",
+      "hosts": [
+        "en.wikipedia.org"
+      ]
     }
   ],
   "permissions": [

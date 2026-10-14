@@ -15,14 +15,16 @@ Nothing to set up. Works as soon as it's installed.
 
 ## What it uses
 
-Trivia fetches one question from the free Open Trivia Database each time
-you ask. Nothing personal is sent - just a plain request for a random
-question. See the household's Privacy page for the full "what leaves the
-house" row.
+Children get questions from a list stored at home. Their questions never
+go to the internet. Teens and adults can get one question from the Open
+Trivia Database. A teen's question passes a safety check first. The home
+hub sends no personal details with that request. See the household's
+Privacy page for the full "what leaves the house" row.
 
 ## Offline
 
-Trivia needs the internet - it can't answer without it.
+The saved question list works without the internet. Teens and adults get
+a saved question if the Open Trivia Database is not available.
 
 ## License
 

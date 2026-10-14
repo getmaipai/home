@@ -110,6 +110,9 @@ const FETCH_RATE_LIMIT = { capacity: 5, refillPerSecond: 0.2 };
 const packageQuietUntil = new Map<string, number>();
 const packageFailureCounts = new Map<string, number>();
 export function __resetPackageQuietWindowsForTests(): void { packageQuietUntil.clear(); packageFailureCounts.clear(); }
+const HOST_RATE_LIMITS: Record<string, { capacity: number; refillPerSecond: number }> = {
+  "opentdb.com": { capacity: 1, refillPerSecond: 0.2 },
+};
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
 export const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
@@ -2039,7 +2042,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
         // per call, and the household's own hub deserves protection from
         // that regardless of whether the target was ever going to be
         // allowed - not just the destination service's own budget.
-        if (!tryConsume(parsed.host, FETCH_RATE_LIMIT)) {
+        if (!tryConsume(parsed.host, HOST_RATE_LIMITS[parsed.host] ?? FETCH_RATE_LIMIT)) {
           throw new HostError("rate_limited", `host.fetch is rate-limited for ${parsed.host} - try again shortly`);
         }
 
