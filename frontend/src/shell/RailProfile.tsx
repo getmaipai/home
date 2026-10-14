@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
+import RailProfileMenu, { type RailProfileMenuProps } from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
 import { api, isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { ROLE_LABELS } from "@/apps/people/roles";
 import { NotificationBell, useNotificationsQuery } from "@/shell/NotificationBell";
@@ -28,11 +28,13 @@ export function RailProfile({
   incognito,
   onIncognitoChange,
   onSignedOut,
+  helpEntries,
 }: {
   person: Roster;
   incognito: boolean;
   onIncognitoChange: (on: boolean) => void;
   onSignedOut: () => void;
+  helpEntries?: RailProfileMenuProps["helpEntries"];
 }) {
   const items = useNotificationsQuery().data;
   const pending = Array.isArray(items) ? items.length : 0;
@@ -57,6 +59,7 @@ export function RailProfile({
       settingsHref="/settings"
       homeSettings={homeSettingsRow(person)}
       helpHref={HELP_URL}
+      helpEntries={helpEntries}
       onLogout={() => {
         // The next person on this browser must never see this person's
         // cached answers, so the whole query cache goes with the session.

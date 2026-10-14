@@ -134,7 +134,17 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
-  const activeTour = useTourRunner(person);
+  const tourRunner = useTourRunner(person);
+  const activeTour = tourRunner.active;
+  const helpEntries = tourRunner.availableTours.length
+    ? {
+        label: "Show me around",
+        items: tourRunner.availableTours.map(({ packageId, tour }) => ({
+          label: tour.title,
+          onSelect: () => { tourRunner.replay(packageId, tour.id); },
+        })),
+      }
+    : undefined;
 
   useEffect(() => {
     rememberLastAppRoute(`${location.pathname}${location.search}${location.hash}`);
@@ -201,7 +211,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail activeAppHref={selectedAppHref} headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail activeAppHref={selectedAppHref} headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />

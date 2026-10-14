@@ -53,6 +53,37 @@ describe("RailProfile status by age", () => {
   });
 });
 
+describe("RailProfile Show me around", () => {
+  test("lists a current page tour and replays it when chosen", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/notifications") || url.includes("/api/status/apps")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    const replayed: string[] = [];
+    try {
+      const view = renderWithQueryClient(
+        <MemoryRouter>
+          <RailProfile
+            person={person("adult")}
+            incognito={false}
+            onIncognitoChange={() => {}}
+            onSignedOut={() => {}}
+            helpEntries={{ label: "Show me around", items: [{ label: "Show me around chat", onSelect: () => replayed.push("tour.chat.first-run") }] }}
+          />
+        </MemoryRouter>,
+      );
+      fireEvent.click(view.getByRole("button", { name: /Open profile menu for Juniper/ }));
+      const item = await view.findByRole("menuitem", { name: "Show me around: Show me around chat" });
+      fireEvent.click(item);
+      expect(replayed).toEqual(["tour.chat.first-run"]);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 describe("Home first-run tour target", () => {
   test("the profile menu renders the shell target passed by Home", async () => {
     expect(Tour.safeParse(defaultManifest.contributes.tours[0]).success).toBe(true);

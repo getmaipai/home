@@ -10,6 +10,40 @@ export interface ActiveTour {
   missing: (index: number) => void;
 }
 
+export interface AvailableTour {
+  packageId: string;
+  tour: ManifestTour;
+}
+
+export function toursForPage(
+  packages: InstalledPackage[],
+  page: string,
+  age: string,
+): AvailableTour[] {
+  const available: AvailableTour[] = [];
+  const audience = age as ManifestTour["audience"][number];
+  for (const pkg of packages) {
+    for (const tour of pkg.contributes?.tours ?? []) {
+      if (tour.starts_on === `page:${page}` && tour.audience.includes(audience)) {
+        available.push({ packageId: pkg.id, tour: tour as ManifestTour });
+      }
+    }
+  }
+  return available;
+}
+
+export function replayTour(
+  available: AvailableTour[],
+  packageId: string,
+  tourId: string,
+  start: (selected: AvailableTour) => void,
+): boolean {
+  const selected = available.find((item) => item.packageId === packageId && item.tour.id === tourId);
+  if (!selected) return false;
+  start(selected);
+  return true;
+}
+
 function pageId(pathname: string): string {
   if (pathname === "/") return "home";
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return "chat";
@@ -26,7 +60,9 @@ function isBusy() {
 export function useTourRunner(person: Roster) {
   const { pathname } = useLocation();
   const [active, setActive] = useState<ActiveTour | null>(null);
+  const [tourListing, setTourListing] = useState<{ page: string; tours: AvailableTour[] }>({ page: "", tours: [] });
   const sequence = useRef(0);
+  const replayRef = useRef<(packageId: string, tourId: string) => boolean>(() => false);
   const key = pageId(pathname);
 
   useEffect(() => {
@@ -58,35 +94,24 @@ export function useTourRunner(person: Roster) {
       if (cancelled || currentSequence !== sequence.current) return;
       const role = person.role;
       const age = person.age_band ?? "adult";
-      const available: Array<{ packageId: string; tour: ManifestTour }> = [];
-      for (const pkg of packages as InstalledPackage[]) {
-        const tours = pkg.contributes?.tours ?? [];
-        for (const tour of tours as ManifestTour[]) {
-          if (tour.starts_on === `page:${key}` && tour.audience.includes(age)) {
-            const isPhone = window.matchMedia?.("(max-width: 639px)").matches ?? window.innerWidth < 640;
-            const steps = tour.steps.filter((step) => {
-              const condition = step.condition;
-              if (condition?.roles && !condition.roles.includes(role)) return false;
-              if (condition?.surface && condition.surface !== (isPhone ? "phone" : "desktop")) return false;
-              if (condition?.capability) return false;
-              if (condition?.setting) {
-                const value = settings.find((item) => item.key === condition.setting?.key)?.value;
-                if (value !== condition.setting.value) return false;
-              }
-              return true;
-            });
-            if (steps.length) available.push({ packageId: pkg.id, tour: { ...tour, steps } });
+      const isPhone = window.matchMedia?.("(max-width: 639px)").matches ?? window.innerWidth < 640;
+      const available = toursForPage(packages as InstalledPackage[], key, age).flatMap(({ packageId, tour }) => {
+        const steps = tour.steps.filter((step) => {
+          const condition = step.condition;
+          if (condition?.roles && !condition.roles.includes(role)) return false;
+          if (condition?.surface && condition.surface !== (isPhone ? "phone" : "desktop")) return false;
+          if (condition?.capability) return false;
+          if (condition?.setting) {
+            const value = settings.find((item) => item.key === condition.setting?.key)?.value;
+            if (value !== condition.setting.value) return false;
           }
-        }
-      }
-      const autostart = settings.find((item) => item.key === "tours.autostart.enabled")?.value !== false;
-      if (!autostart) return;
-      const unseen = available.filter(({ packageId, tour }) => !records.some((record) => record.package_id === packageId && record.tour_id === tour.id && record.version === tour.version));
-      unseen.sort((a, b) => Number(b.packageId === "home") - Number(a.packageId === "home"));
-      if (!unseen.length) return;
-      timeout = setTimeout(() => {
-        if (cancelled || currentSequence !== sequence.current || isBusy()) return;
-        const next = unseen[0]!;
+          return true;
+        });
+        return steps.length ? [{ packageId, tour: { ...tour, steps } }] : [];
+      });
+      setTourListing({ page: key, tours: available });
+      const activate = (next: AvailableTour) => {
+        missingCount = 0;
         selected = {
           ...next,
           progress: (status, stepId) => finish(status, stepId),
@@ -99,16 +124,32 @@ export function useTourRunner(person: Roster) {
           },
         };
         setActive(selected);
+      };
+      replayRef.current = (packageId, tourId) => replayTour(available, packageId, tourId, activate);
+      const autostart = settings.find((item) => item.key === "tours.autostart.enabled")?.value !== false;
+      if (!autostart) return;
+      const unseen = available.filter(({ packageId, tour }) => !records.some((record) => record.package_id === packageId && record.tour_id === tour.id && record.version === tour.version));
+      unseen.sort((a, b) => Number(b.packageId === "home") - Number(a.packageId === "home"));
+      if (!unseen.length) return;
+      timeout = setTimeout(() => {
+        if (cancelled || currentSequence !== sequence.current || isBusy()) return;
+        const next = unseen[0]!;
+        activate(next);
       }, 1000);
     }).catch(() => {});
 
     return () => {
       cancelled = true;
+      replayRef.current = () => false;
       window.removeEventListener("pagehide", onPageHide);
       if (timeout) clearTimeout(timeout);
       if (selected) finish("dismissed");
     };
   }, [key, person.age_band, person.id, person.role, pathname]);
 
-  return active;
+  return {
+    active,
+    availableTours: tourListing.page === key ? tourListing.tours : [],
+    replay: (packageId: string, tourId: string) => replayRef.current(packageId, tourId),
+  };
 }
