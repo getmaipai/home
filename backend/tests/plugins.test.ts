@@ -295,7 +295,7 @@ describe("GET /api/plugins", () => {
     const childClient = await child(ownerClient);
     const childResponse = await childClient.get("/api/plugins");
     const childPackages = (await childResponse.json()) as Array<{ id: string }>;
-    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => id !== "lock-doors" && id !== "feeds-household"));
+    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup"].includes(id)));
 
     const teenClient = await teen(ownerClient);
     const teenResponse = await teenClient.get("/api/plugins");
