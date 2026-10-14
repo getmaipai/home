@@ -47,16 +47,17 @@ describe("interpretTailscaleStatusJson()", () => {
       signedIn: false,
       httpsEnabled: true,
       machineName: "hub",
+      peers: [],
     });
   });
 
   test("a stopped backend reports stopped with no addresses", () => {
     const json = JSON.stringify({ BackendState: "Stopped" });
-    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "stopped", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null });
+    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "stopped", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null, peers: [] });
   });
 
   test("a running backend with no Self block still reports running, with empty addresses", () => {
     const json = JSON.stringify({ BackendState: "Running" });
-    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "running", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null });
+    expect(interpretTailscaleStatusJson(json)).toEqual({ state: "running", dnsName: null, ips: [], installed: true, signedIn: false, httpsEnabled: false, machineName: null, peers: [] });
   });
 });
