@@ -85,7 +85,7 @@ async function hostFetch(
   const result = await extra.sendRequest(
     {
       method: "host/fetch",
-      params: { url, opts: { headers: { "User-Agent": "MaiPaiHome/0.1.0 (https://github.com/getmaipai/home)" } } },
+      params: { url, opts: {} },
     },
     z.object({ value: z.unknown() }),
   );

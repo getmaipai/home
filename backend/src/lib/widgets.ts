@@ -19,7 +19,7 @@
 // function per package, the same "one definition, one implementation"
 // reasoning the org's own standards state outright.
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
-import { resolvePlace } from "@/lib/places";
+import { householdHomePlaceName } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import type { PersonRow } from "@/types";
 
@@ -92,10 +92,10 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   if (!meetsMinRole(actor.role, manifest.min_role)) return { ok: false, status: 403, error: `${packageId} needs role ${manifest.min_role} or higher` };
 
   const inputs = { ...((widget.inputs ?? {}) as Record<string, unknown>) };
-  if (packageId === "weather" && "place" in inputs) {
-    const place = await resolvePlace({ person: null, surface: "weather" });
-    if (place.from === "none" || !place.label) return { ok: false, status: 404, error: "household home is not set" };
-    inputs.place = place.label;
+  if (packageId === "weather") {
+    const place = householdHomePlaceName();
+    if (!place) return { ok: false, status: 404, error: "household home is not set" };
+    inputs.place = place;
   }
   const result = await runPlugin(packageId, actor, inputs);
   if (!result.ok) {

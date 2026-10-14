@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { fetchAnswerImages, __setAnswerImageDnsLookupForTests, __resetAnswerImageFetchForTests } from "@/lib/answerImages/fetch";
 import { ANSWER_IMAGES_MAX_CANDIDATES } from "@/lib/answerImages/gallery";
 import { syntheticPhoto } from "./answerImagesFixture";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 
 afterEach(() => { __setAnswerImageDnsLookupForTests(null); __resetAnswerImageFetchForTests(); });
 
@@ -38,7 +39,7 @@ describe("answer image fetch", () => {
     await fetchAnswerImages([{ id: "one", url: "https://other-public.example/image" }], { fetch: fetcher as unknown as typeof fetch, dnsLookup: async () => ({ address: "93.184.216.34", family: 4 }) });
     expect(seen?.has("cookie")).toBe(false);
     expect(seen?.has("referer")).toBe(false);
-    expect(seen?.get("user-agent")).toMatch(/MaiPai-Home/i);
+    expect(seen?.get("user-agent")).toBe(HOME_USER_AGENT);
   });
 
   test("bounds candidate count, parallelism, bytes, and wall time", async () => {

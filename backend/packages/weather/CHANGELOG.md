@@ -4,6 +4,12 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Changed
+
+- The hourly warm uses only the household home place, and its privacy row
+  describes the background refresh.
+- The manifest placeholder is replaced by Home before the hourly warm runs.
+
 ### Added
 
 - Answers now come with a card for the current conditions, a chart of

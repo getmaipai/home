@@ -3,8 +3,8 @@ import { tryConsume, __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { filterAnswerImages, type QualityResult, type ValidatedAnswerImage } from "./quality";
 import { warmGeometry } from "@/lib/imageSimilarity";
 import { ANSWER_IMAGES_MAX_CANDIDATES } from "./gallery";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 
-export const ANSWER_IMAGE_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
 const MAX_BYTES = 8 * 1024 * 1024;
 const SET_DEADLINE_MS = 2_500;
 const MAX_REDIRECTS = 3;
@@ -96,10 +96,10 @@ async function fetchOne(source: AnswerImageSource, options: Options, deadline: n
         }
         response = pinned ? await guardedFetch(url, {
           method: "GET", redirect: "manual", signal: controller.signal, maxRedirects: MAX_REDIRECTS,
-          headers: { "User-Agent": ANSWER_IMAGE_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
+          headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
         }) : await fetcher(url, {
           method: "GET", redirect: "manual", signal: controller.signal,
-          headers: { "User-Agent": ANSWER_IMAGE_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
+          headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
           credentials: "omit", referrerPolicy: "no-referrer",
         });
         if ([403, 429].includes(response.status)) { quiet(url.hostname.toLowerCase(), now() + QUIET_MS, now()); return null; }

@@ -1,6 +1,6 @@
 {
   "id": "music",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "plugin",
   "category": "Info",
   "display": "Music Lookup",

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
-import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, FETCH_USER_AGENT, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
+import { answerImageSearch, createHost, performHttpFetch, withOneRetry, formatSearxngResults, parseReadablePage, searxngSearch, __resetSearxngEnginesCacheForTests, __resetSearchCacheForTests, __resetSearchRotationForTests, __setPackageFetchForTests, __resetPackageQuietWindowsForTests, __getHostRateLimitsForTests, __getHostBlockFloorsForTests, __getQuietUntilForTests, SEARCH_PAGES_MAX_SPOKEN, SEARCH_PAGE_TEXT_CHARS_SPOKEN, type AttemptResult } from "@/lib/packageHost";
 import { __resetRateLimiterForTests, __setRateLimiterClockForTests, tryConsume } from "@/lib/rateLimiter";
 import { cachedFetch, getCacheEnvelope, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { assertNotPrivateHost } from "@maipai/core/src/ssrfGuard";
@@ -26,6 +26,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { SEARXNG_ATTEMPT_LIMIT_MS, SEARXNG_CONNECT_LIMIT_MS, ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS, webSearchToolDeadlineMs } from "@/lib/webSearchBudget";
 import { retryDeadlineMs } from "@/lib/turnMachine/deadline";
 import { cacheDir } from "@/lib/paths";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 
 beforeEach(() => {
   resetDb();
@@ -757,7 +758,7 @@ describe("performHttpFetch (the real HTTP mechanics, no SSRF/permission/rate-lim
     });
     try {
       await performHttpFetch(`http://127.0.0.1:${server.port}/`, { headers: { "x-custom": "value" } });
-      expect(seenUserAgent).toBe(FETCH_USER_AGENT);
+      expect(seenUserAgent).toBe(HOME_USER_AGENT);
       expect(seenCustom).toBe("value");
     } finally {
       server.stop(true);

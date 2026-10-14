@@ -2,7 +2,11 @@
 
 All notable changes to the Music Lookup package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
-## [0.1.0] - 2026-09-06
+## [0.1.1] - 2026-10-14
+
+### Changed
+
+- Use Home's shared User-Agent for external music lookups.
 
 ### Added
 

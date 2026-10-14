@@ -29,7 +29,7 @@ import { feedIsWanted } from "./shelfPolicy";
 import { MIN_POLL_INTERVAL_S, listFeeds, updateFeed, type FeedRecord } from "./feedStore";
 import { sharedShelfStore, type ShelfStore } from "./shelfStore";
 
-export const SHELF_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 export const MAX_BACKOFF_S = 86_400;
 export const MAX_FEEDS_PER_TICK = 10;
 const MAX_BYTES = 2 * 1024 * 1024;
@@ -97,7 +97,7 @@ async function request(feed: FeedRecord, deps: PollDeps, now: () => number, sign
   const fetcher = deps.fetch ?? fetch;
   const pinned = fetcher === platformFetch;
   const headers: Record<string, string> = {
-    "User-Agent": SHELF_USER_AGENT,
+    "User-Agent": HOME_USER_AGENT,
     Accept: "application/atom+xml, application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, application/feed+json;q=0.8",
   };
   if (feed.etag) headers["If-None-Match"] = feed.etag;

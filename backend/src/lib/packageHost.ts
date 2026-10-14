@@ -127,7 +127,7 @@ export const __getHostBlockFloorsForTests = () => HOST_BLOCK_FLOOR_S;
 export const __getQuietUntilForTests = (host: string) => packageQuietUntil.get(host) ?? 0;
 const FETCH_TIMEOUT_MS = 10_000;
 const FETCH_MAX_RESPONSE_BYTES = 2_000_000;
-export const FETCH_USER_AGENT = "MaiPai-Home/1.0 (+https://github.com/getmaipai/home)";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 export function resolveDataSourceProvenance(manifest: PackageManifest, requestUrl: string): { source: string | null; attribution: string | null } {
   let hostname: string;
   try {
@@ -489,7 +489,7 @@ export async function performHttpFetch(url: string, opts?: FetchOptions & { reva
   const method = opts?.method ?? "GET";
   let body: string | undefined;
   if (opts?.body !== undefined) body = typeof opts.body === "string" ? opts.body : JSON.stringify(opts.body);
-  const headers: Record<string, string> = { "user-agent": FETCH_USER_AGENT, ...opts?.headers };
+  const headers: Record<string, string> = { "user-agent": HOME_USER_AGENT, ...opts?.headers };
   const packageOwnsValidators = Object.keys(opts?.headers ?? {}).some((name) => ["if-none-match", "if-modified-since"].includes(name.toLowerCase()));
   const conditional = Boolean(!packageOwnsValidators && opts?.revalidate && (opts.revalidate.etag || opts.revalidate.lastModified));
   const conditionalHeaders = conditional || packageOwnsValidators;
@@ -726,7 +726,7 @@ export async function answerImageSearch(query: string, actor: PersonRow, band: A
     const engines = safeEngines ? `&engines=${encodeURIComponent(safeEngines.join(","))}` : "";
     const url = `${baseUrl.replace(/\/+$/, "")}/search?q=${encodeURIComponent(query)}&format=json&categories=images&safesearch=${safeSearchNumericLevel(level)}${engines}`;
     if (!consumeSearxngRequestToken()) return [];
-    const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, 2_000, undefined, { signal, connectTimeoutMs: SEARXNG_CONNECT_LIMIT_MS });
+    const result = await attemptHttpFetch(url, "GET", { "user-agent": HOME_USER_AGENT }, undefined, 2_000, undefined, { signal, connectTimeoutMs: SEARXNG_CONNECT_LIMIT_MS });
     if (!result.ok) return [];
     return imageRowsFromResponse(expectJsonObject(result.value, baseUrl, "SearXNG image results were not JSON"));
   } catch {
@@ -834,8 +834,7 @@ type SearxngSearchResult = { text: string; rows: SearxngRow[]; page?: PageReadRe
  * an unparseable response, an empty extract) - the caller's own signal
  * to fall back to `searxngSearch()`'s original outcome unchanged, never
  * masking a real SearXNG problem with a worse, silent Wikipedia miss.
- * `FETCH_USER_AGENT` (already `"MaiPai-Home/1.0 (+https://github.com/
- * getmaipai/home)"`, the org's own product URL, no personal contact)
+ * `HOME_USER_AGENT` (the org's own product URL, no personal contact)
  * matches Wikimedia's own User-Agent policy (`foundation.wikimedia.org/
  * wiki/Policy:User-Agent_policy`, verified 2026-09-24): "<client name>/
  * <version> (<contact information>)", a website URL being one of its
@@ -855,7 +854,7 @@ async function wikipediaGetJson(url: string, base: string, hint: string, signal?
   if (!tryConsume(WIKIPEDIA_RATE_LIMIT_KEY, WIKIPEDIA_RATE_LIMIT)) return null;
   const remaining = deadlineAt === undefined ? ADULT_WRITTEN_WEBSEARCH_DEADLINE_MS : deadlineAt - Date.now();
   if (remaining <= 0 || signal?.aborted) return null;
-  const result = await attemptHttpFetch(url, "GET", { "user-agent": FETCH_USER_AGENT }, undefined, remaining, undefined, { signal });
+  const result = await attemptHttpFetch(url, "GET", { "user-agent": HOME_USER_AGENT }, undefined, remaining, undefined, { signal });
   if (!result.ok) return null;
   try {
     return expectJsonObject(result.value, base, hint);

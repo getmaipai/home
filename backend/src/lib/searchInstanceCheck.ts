@@ -4,7 +4,8 @@ import { SearxngEngines } from "@maipai/spec/gen/ts/searxng-engines.js";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { consumeSearxngCheckToken, FETCH_USER_AGENT } from "@/lib/packageHost";
+import { consumeSearxngCheckToken } from "@/lib/packageHost";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 import { lastSearxngCanaryResult } from "@/lib/searxngHealth";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isStackConfigured } from "@/lib/stackEngine";
@@ -135,7 +136,7 @@ async function request(baseUrl: string, path: string, fetcher: SearchInstanceFet
   try {
     const response = await fetcher(`${baseUrl}${path}`, {
       method: "GET",
-      headers: { accept: path.endsWith("/search") ? "application/json" : "application/json, text/plain", "user-agent": FETCH_USER_AGENT },
+      headers: { accept: path.endsWith("/search") ? "application/json" : "application/json, text/plain", "user-agent": HOME_USER_AGENT },
       redirect: "manual",
       signal: controller.signal,
     });

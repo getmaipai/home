@@ -10,7 +10,7 @@ import type { AgeBand } from "@/lib/ageBand";
 import { tryConsume } from "@/lib/rateLimiter";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 import { effectiveMode } from "@/lib/retrieval/sourceMode";
-import { ANSWER_IMAGE_USER_AGENT } from "./fetch";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 
 export type WikimediaEntity = {
   id: string;
@@ -89,7 +89,7 @@ export const wikimediaFetchJson: FetchJson = async (url) => {
   const host = new URL(url).hostname;
   if (!tryConsume(`net:${host}`, WIKIMEDIA_PACE)) throw new Error(`paced: ${host}`);
   const response = await fetch(url, {
-    headers: { "User-Agent": ANSWER_IMAGE_USER_AGENT, Accept: "application/json" },
+    headers: { "User-Agent": HOME_USER_AGENT, Accept: "application/json" },
     credentials: "omit",
     referrerPolicy: "no-referrer",
     redirect: "error",

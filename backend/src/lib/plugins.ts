@@ -36,7 +36,7 @@ import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
 import type { ProjectPlan } from "@/lib/projects/types";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
-import { householdHomeCountryName, householdHomeSkyInput, resolvePlace } from "@/lib/places";
+import { householdHomeCountryName, householdHomePlaceName, householdHomeSkyInput } from "@/lib/places";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow } from "@/lib/benchSampling";
@@ -718,22 +718,37 @@ export async function warmPackage(id: string, manifest: PackageManifest): Promis
   if (keys.length === 0) return;
   const actor = warmActor();
   if (!actor) return;
+  if (id === "weather") {
+    const place = householdHomePlaceName();
+    if (!place) {
+      console.info(`[warm] ${id} skipped: no home place`);
+      return;
+    }
+    try {
+      const result = await runPlugin(id, actor, { place });
+      if (!result.ok) console.error(`[warm] ${id} failed: ${warmErrorCode(result)}`);
+    } catch (err) {
+      console.error(`[warm] ${id} failed: ${warmErrorCode(err)}`);
+    }
+    return;
+  }
   for (const key of keys) {
     try {
       const inputs = { ...(key as Record<string, unknown>) };
-      if (id === "weather" && "place" in inputs) {
-        const place = await resolvePlace({ person: null, surface: "weather" });
-        if (place.from === "none" || !place.label) continue;
-        inputs.place = place.label;
-      }
       const result = await runPlugin(id, actor, inputs);
       if (!result.ok) {
-        console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${result.error}`);
+        console.error(`[warm] ${id} failed: ${warmErrorCode(result)}`);
       }
     } catch (err) {
-      console.error(`[warm] ${id} failed to warm key ${JSON.stringify(key)}: ${(err as Error).message}`);
+      console.error(`[warm] ${id} failed: ${warmErrorCode(err)}`);
     }
   }
+}
+
+function warmErrorCode(error: unknown): string {
+  if (typeof error === "object" && error !== null && "code" in error && typeof error.code === "string") return error.code;
+  if (typeof error === "object" && error !== null && "status" in error && typeof error.status === "number") return `HTTP ${error.status}`;
+  return "error";
 }
 
 /** The body of the `packages.warm` core job (index.ts): every bundled

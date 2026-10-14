@@ -8,7 +8,8 @@ import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { canonicalUrl } from "@/lib/shelf/canonicalUrl";
 import { createFeed, getFeed, listFeeds, updateFeed } from "@/lib/shelf/feedStore";
-import { backoffSeconds, parseRetryAfter, pollDueFeeds, pollFeed, SHELF_USER_AGENT, MAX_FEEDS_PER_TICK } from "@/lib/shelf/shelfPoller";
+import { backoffSeconds, parseRetryAfter, pollDueFeeds, pollFeed, MAX_FEEDS_PER_TICK } from "@/lib/shelf/shelfPoller";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 import { openShelfStore, type ShelfStore } from "@/lib/shelf/shelfStore";
 import { __resetShelfCountersForTests, shelfCounters } from "@/lib/shelf/shelfCounters";
 import { releaseShelfItems } from "@/lib/shelf/shelfRead";
@@ -87,7 +88,7 @@ describe("pollFeed", () => {
     const feed = mkFeed();
     const s = stub(() => new Response(rss([{ title: "Bridge reopens", link: "https://news.example.com/a?utm_source=rss", desc: "<p>Open today</p>" }]), { status: 200, headers: { etag: '"v1"', "last-modified": "Mon, 12 Oct 2026 11:00:00 GMT" } }));
     expect(await pollFeed(feed, { fetch: s.fetch, dnsLookup: publicDns, now: () => NOW, store })).toBe("ok");
-    expect(s.calls[0]!.headers["User-Agent"]).toBe(SHELF_USER_AGENT);
+    expect(s.calls[0]!.headers["User-Agent"]).toBe(HOME_USER_AGENT);
     const items = store.list([feed.id], ["child", "teen", "adult"], 10);
     expect(items).toHaveLength(1);
     expect(items[0]!.canonical_url).toBe("https://news.example.com/a");

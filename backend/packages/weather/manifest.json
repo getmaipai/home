@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
@@ -48,8 +48,8 @@
       "attribution": "Weather data by Open-Meteo.com (CC BY 4.0)",
       "hosts": ["geocoding-api.open-meteo.com", "api.open-meteo.com"],
       "destination": "Open-Meteo (open-meteo.com), a free public weather API",
-      "when": "each time the family asks for the weather somewhere",
-      "what": "the place name spoken in the request (e.g. 'Seattle')",
+      "when": "each time the family asks for the weather somewhere, and about once an hour in the background for your home place",
+      "what": "the place name (the one spoken in the request, or your home place for the hourly refresh)",
       "who": "Open-Meteo",
       "opt_in": true,
       "retention": "unknown, see Open-Meteo's own policy"
@@ -70,7 +70,7 @@
     "schedule": "every:1h",
     "keys": [
       {
-        "place": "Seattle"
+        "place": "__HOME_PLACE__"
       }
     ]
   },
@@ -84,7 +84,7 @@
         "size": "card",
         "refresh_s": 1800,
         "inputs": {
-          "place": "Seattle"
+          "place": "__HOME_PLACE__"
         }
       }
     ]

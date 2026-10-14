@@ -36906,3 +36906,9 @@ Home reads the trivia question bank from the bundled package. A child gets a ban
 
 
 Book lookup connects to `www.loc.gov` at one request per four seconds. Place lookup connects to `nominatim.openstreetmap.org` at one request per three seconds. Both hosts get a 3600-second minimum quiet window after a 429, 403 or non-JSON response; a longer Retry-After wins up to 24 hours. See https://www.loc.gov/apis/json-and-yaml/working-within-limits/ and https://operations.osmfoundation.org/policies/nominatim/.
+
+## DATA-LIFE-06: hourly weather warm privacy
+
+The hourly weather warm runs only when the household has a home place. The weather manifest keeps one `__HOME_PLACE__` placeholder because the warm runner skips packages with no warm keys; it replaces that value with the household home name and ignores all manifest key fields. The widget uses the same home-name helper. A weather warm performs the recipe's geocoding and forecast calls only. It does not geocode the home before running the recipe.
+
+Outbound requests that identify Home share `HOME_USER_AGENT` from `backend/src/lib/outbound.ts`. It is the only User-Agent string definition in `backend/src` and `backend/packages`; public outbound paths that set a User-Agent import it. Local and owner-configured destinations keep their existing behavior. The chosen value is `MaiPai-Home/1.0 (+https://github.com/getmaipai/home)`, with no household name or personal contact. The warm stays enabled for the household home place, with no fixed city, as decided in owner questions 9 and 10.

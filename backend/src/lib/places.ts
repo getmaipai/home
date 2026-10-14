@@ -3,6 +3,7 @@ import type { Entity as EntityT } from "@maipai/spec/gen/ts/entity.js";
 import { db } from "@/db";
 import { entities } from "@/db/schema";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 import { getEntity, listEntities } from "@/lib/entities";
 import type { PersonRow } from "@/types";
 import { childSafeAreaLabel } from "@/lib/placePrivacy";
@@ -31,7 +32,7 @@ async function geocode(name: string): Promise<{ lat: number; lon: number; area: 
     const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
     url.searchParams.set("count", "1");
     url.searchParams.set("name", name);
-    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { "user-agent": HOME_USER_AGENT } });
     if (!response.ok) return null;
     const body = await response.json() as { results?: Array<{ latitude?: number; longitude?: number; name?: string; admin1?: string; country?: string }> };
     const result = body.results?.[0];
@@ -69,6 +70,11 @@ export function householdHomeSkyInput(): { lat: number; lon: number } | null {
   const geo = householdHomeEntity()?.geo;
   if (typeof geo?.lat !== "number" || !Number.isFinite(geo.lat) || typeof geo.lon !== "number" || !Number.isFinite(geo.lon)) return null;
   return { lat: Number(geo.lat.toFixed(2)), lon: Number(geo.lon.toFixed(2)) };
+}
+
+/** Returns the configured household home name without geocoding it. */
+export function householdHomePlaceName(): string | null {
+  return householdHomeEntity()?.name.trim() || null;
 }
 
 async function withGeocode(place: ResolvedPlace, name: string): Promise<ResolvedPlace> {
@@ -112,12 +118,17 @@ export async function resolvePlace(input: {
     }
   }
 
-  const homeId = getHouseholdSettingValue("household.home");
-  if (typeof homeId === "string") {
-    const row = db.select().from(entities).where(and(eq(entities.id, homeId), isNull(entities.deletedAt))).get();
-    if (row && row.kind === "place" && row.scope === "household") {
-      const home = getEntity(person ?? { id: "system", role: "adult" } as PersonRow, homeId);
-      if (home.ok && home.value) return childSafe(await withGeocode(entityResult(home.value, "household"), home.value.name), person);
+  if (!person) {
+    const homeName = householdHomePlaceName();
+    if (homeName) return { ...emptyPlace(), label: homeName, from: "household" };
+  } else {
+    const homeId = getHouseholdSettingValue("household.home");
+    if (typeof homeId === "string") {
+      const row = db.select().from(entities).where(and(eq(entities.id, homeId), isNull(entities.deletedAt))).get();
+      if (row && row.kind === "place" && row.scope === "household") {
+        const home = getEntity(person, homeId);
+        if (home.ok && home.value) return childSafe(await withGeocode(entityResult(home.value, "household"), home.value.name), person);
+      }
     }
   }
   return emptyPlace();
@@ -139,7 +150,7 @@ async function geocodeMany(name: string): Promise<Array<{ name: string; area: st
     const url = new URL("https://geocoding-api.open-meteo.com/v1/search");
     url.searchParams.set("count", "5");
     url.searchParams.set("name", name);
-    const response = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    const response = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { "user-agent": HOME_USER_AGENT } });
     if (!response.ok) return [];
     const body = await response.json() as { results?: Array<{ latitude?: number; longitude?: number; name?: string; admin1?: string; country?: string }> };
     return (body.results ?? []).filter((row) => typeof row.latitude === "number" && typeof row.longitude === "number" && typeof row.name === "string")

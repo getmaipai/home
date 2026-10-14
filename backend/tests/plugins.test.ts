@@ -1,11 +1,11 @@
 import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test";
-import { mkdirSync, writeFileSync, utimesSync, rmSync } from "node:fs";
+import { readFileSync, readdirSync, mkdirSync, writeFileSync, utimesSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
-import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, setHouseholdSettingValue, __resetSettingsCacheForTests } from "@/lib/settings";
 import {
   listPackageIds,
   loadPackage,
@@ -14,20 +14,23 @@ import {
   registerAllPackageNotificationTypes,
   registerAllPackageProjectTypes,
   warmPackage,
+  __resetWarmStateForTests,
   __resetPackageCachesForTests,
 } from "@/lib/plugins";
 import { getProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
-import { installedPackageVersionDir } from "@/lib/paths";
+import { installedPackageVersionDir, PACKAGES_DIR } from "@/lib/paths";
 import { db } from "@/db";
 import { scheduledJobs, packageInstalls } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import { useDefaultScriptedStack } from "./stackFixture";
+import { HOME_USER_AGENT } from "@/lib/outbound";
 
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
   __resetLlmSupervisorForTests();
+  __resetWarmStateForTests();
   useDefaultScriptedStack();
 });
 
@@ -246,7 +249,10 @@ describe("SEC-2: PACKAGES_DIR readers reject a malformed/traversal id before any
 
 async function owner() {
   const client = new TestClient();
-  await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  const response = await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  expect(response.status).toBe(201);
+  const me = await client.get("/api/auth/me");
+  expect(me.status).toBe(200);
   return client;
 }
 
@@ -657,47 +663,93 @@ describe("transitional household.home_place setting alias", () => {
   });
 });
 
-describe("warmPackage (session-d-packages-and-store.md step 3)", () => {
-  test("weather warming skips when the household home is unset", async () => {
+describe("warmPackage weather privacy", () => {
+  async function householdHome(name: string): Promise<TestClient> {
+    const client = await owner();
+    const created = await client.post("/api/entities", { kind: "place", place_kind: "map", name, scope: "household", geo: null });
+    expect(created.status).toBe(201);
+    const place = await created.json() as { id: string };
+    expect((await client.put("/api/settings", { scope: "household", key: "household.home", value: place.id })).status).toBe(200);
+    __resetSettingsCacheForTests();
+    expect(getHouseholdSettingValue("household.home")).toBe(place.id);
+    __resetWarmStateForTests();
+    return client;
+  }
+
+  test("no home means no request and no place in the skip log", async () => {
     await owner();
     const weather = loadPackage("weather");
     expect(weather.ok).toBe(true);
     if (!weather.ok) return;
-    const originalError = console.error;
+    const oldFetch = globalThis.fetch, oldInfo = console.info;
+    const lines: string[] = []; let calls = 0;
+    globalThis.fetch = (async () => { calls++; return new Response(); }) as unknown as typeof fetch;
+    console.info = (line: string) => lines.push(line);
+    try { await warmPackage("weather", weather.value.manifest); }
+    finally { globalThis.fetch = oldFetch; console.info = oldInfo; }
+    expect(calls).toBe(0);
+    expect(lines).toEqual(["[warm] weather skipped: no home place"]);
+    expect(lines.join(" ")).not.toContain("Seattle");
+  });
+
+  test("warm ignores missing, extra, and non-home manifest key values", async () => {
+    await householdHome("Portland, Oregon");
+    const weather = loadPackage("weather");
+    expect(weather.ok).toBe(true);
+    if (!weather.ok) return;
+    const calls: Array<{ url: string; headers: Headers }> = [];
+    const oldFetch = globalThis.fetch;
+    globalThis.fetch = (async (input: URL | Request | string, init?: RequestInit) => {
+      const url = String(input); calls.push({ url, headers: new Headers(init?.headers) });
+      if (url.includes("geocoding-api.open-meteo.com")) return Response.json({ results: [{ latitude: 45.52, longitude: -122.68, name: "Portland", admin1: "Oregon", country: "United States" }] });
+      return Response.json({ current: { temperature_2m: 60, weather_code: 0 }, hourly: { time: [], temperature_2m: [] }, daily: { time: [], temperature_2m_max: [], temperature_2m_min: [], precipitation_probability_max: [] } });
+    }) as unknown as typeof fetch;
+    try { await warmPackage("weather", { ...weather.value.manifest, warm: { keys: [{ surprise: "Another City" }, { place: "Seattle", extra: "ignored" }] } }); }
+    finally { globalThis.fetch = oldFetch; }
+    expect(calls).toHaveLength(2);
+    expect(calls[0]!.url).toContain("name=Portland");
+    expect(calls.map((call) => call.url).join(" ")).not.toMatch(/Seattle|Another%20City|__HOME_PLACE__/);
+    expect(calls.every((call) => call.headers.get("user-agent") === HOME_USER_AGENT)).toBe(true);
+  });
+
+
+  test("failed warm log contains no place, URL, or query", async () => {
+    await householdHome("Secret Place");
+    const weather = loadPackage("weather");
+    expect(weather.ok).toBe(true);
+    if (!weather.ok) return;
+    const oldFetch = globalThis.fetch, oldError = console.error;
     const lines: string[] = [];
+    globalThis.fetch = (async () => new Response("failure", { status: 503 })) as unknown as typeof fetch;
     console.error = (line: string) => lines.push(line);
     try { await warmPackage("weather", weather.value.manifest); }
-    finally { console.error = originalError; }
-    expect(lines).toEqual([]);
+    finally { globalThis.fetch = oldFetch; console.error = oldError; }
+    expect(lines).toHaveLength(1);
+    expect(lines.join(" ")).not.toMatch(/Secret Place|https?:|[?&](name|latitude|longitude)=/i);
   });
 
-  test("a runPlugin failure (here: a key missing weather's own required 'place') is logged, never thrown or silent", async () => {
-    await owner(); // warmActor() needs at least one active person to run at all
-    const weather = loadPackage("weather");
-    expect(weather.ok).toBe(true);
-    if (!weather.ok) return;
-    const originalError = console.error;
-    const lines: string[] = [];
-    console.error = (line: string) => lines.push(line);
-    try {
-      // A deliberately invalid warm key (weather's real args schema
-      // requires "place") - runPlugin() fails ajv validation and
-      // returns { ok: false } before ever reaching host.fetch, so this
-      // never touches the network. Found by review: the first version
-      // of warmPackage() never inspected runPlugin()'s own returned
-      // failure shape at all, so this exact case failed silently.
-      await warmPackage("weather", { ...weather.value.manifest, warm: { keys: [{}] } });
-    } finally {
-      console.error = originalError;
-    }
-    expect(lines.some((l) => l.includes("weather") && l.includes("failed to warm"))).toBe(true);
+  test("manifest privacy row names the background refresh", () => {
+    const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, "weather", "manifest.json"), "utf8"));
+    expect(manifest.data_sources[0].when).toContain("about once an hour in the background");
   });
+});
 
-  test("no warm.keys declared: a no-op, no actor lookup, nothing logged", async () => {
-    const weather = loadPackage("weather");
-    expect(weather.ok).toBe(true);
-    if (!weather.ok) return;
-    await expect(warmPackage("weather", { ...weather.value.manifest, warm: undefined })).resolves.toBeUndefined();
+describe("shared outbound User-Agent", () => {
+  test("the Home User-Agent literal is defined in one source file across src and packages", () => {
+    const roots = [join(PACKAGES_DIR, "..", "src"), PACKAGES_DIR];
+    const hits: string[] = [];
+    const visit = (dir: string) => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const path = join(dir, entry.name);
+        if (entry.isDirectory()) visit(path);
+        else if (/\.(?:ts|tsx|js|mjs|cjs)$/.test(entry.name)) {
+          const source = readFileSync(path, "utf8");
+          if (/MaiPai-Home\/1\.0/.test(source) || /MaiPaiHome\//.test(source)) hits.push(path);
+        }
+      }
+    };
+    roots.forEach(visit);
+    expect(hits).toEqual([join(PACKAGES_DIR, "..", "src", "lib", "outbound.ts")]);
   });
 });
 
