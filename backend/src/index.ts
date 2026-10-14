@@ -301,6 +301,8 @@ ensureCoreJob("favicons.sweep", "every:1d");
 ensureCoreJob("answer_images.sweep", "every:1d");
 // KS-07: the search fetch cache (lib/retrieval/fetchCache.ts), same daily cadence.
 ensureCoreJob("fetch_cache.sweep", "every:1d");
+// DATA-LIFE-02: remove package-cache entries past their stale window daily.
+ensureCoreJob("package_cache.sweep", "every:1d");
 
 // A code review (2026-09-06) found the "Renew now" Repairs fix silently
 // broken across a restart: registerRenewFixHandler() was only ever

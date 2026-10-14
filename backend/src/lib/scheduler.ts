@@ -52,6 +52,7 @@ import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { sweepFavicons } from "@/lib/favicons";
 import { sweepAnswerImages } from "@/lib/answerImages/cache";
 import { sweepFetchCache } from "@/lib/retrieval/fetchCache";
+import { sweepPackageCache } from "@/lib/packageCache";
 import { runShelfTick, pruneShelf } from "@/lib/shelf/shelfJobs";
 import { withTimeout } from "@maipai/core/src/withTimeout";
 import type { PluginOpResult } from "@/lib/plugins";
@@ -357,6 +358,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // fits search.fetch_cache_gb.
   "fetch_cache.sweep": () => {
     sweepFetchCache();
+  },
+  "package_cache.sweep": () => {
+    sweepPackageCache();
   },
   // Step 8: reminders/timers (packageHost.ts's `reminders.set`/
   // `timers.set`, scheduled via scheduleCoreJob above) fire by raising

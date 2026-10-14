@@ -23,7 +23,7 @@
 // have a side effect on the third-party service (or is at least not
 // provably idempotent from here), and caching one could serve a stale
 // result for what looks like a fresh action.
-import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, utimesSync, statfsSync, rmSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, writeFileSync, unlinkSync, statSync, utimesSync, statfsSync, rmSync, rmdirSync } from "node:fs";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -43,12 +43,14 @@ interface CacheEntryFile {
   fetchedAt: string; // ISO
   source?: string | null;
   expiresAt?: string;
+  staleUntil?: string;
   attribution?: string | null;
   value: unknown;
 }
 
 const DEFAULT_TTL_S = 300; // 5 minutes, if a package declares `cache` with no ttl_s
 const DEFAULT_STALE_OK_S = 0; // no stale-while-revalidate window unless declared
+export const LEGACY_ENTRY_GRACE_S = 7 * 24 * 60 * 60;
 const DEFAULT_MAX_BYTES = 1_000_000; // 1 MB per entry, if unset
 
 // The total budget across every package's cache combined, scaled to free
@@ -289,7 +291,7 @@ export async function cachedFetch(
   const maxBytes = cachePolicy.max_bytes ?? DEFAULT_MAX_BYTES;
   const makeEntry = (value: unknown): CacheEntryFile => {
     const fetchedAt = new Date().toISOString();
-    return { url, method, fetchedAt, expiresAt: new Date(Date.parse(fetchedAt) + ttlS * 1000).toISOString(), source: provenance.source, attribution: provenance.attribution, value };
+    return { url, method, fetchedAt, expiresAt: new Date(Date.parse(fetchedAt) + ttlS * 1000).toISOString(), staleUntil: new Date(Date.parse(fetchedAt) + (ttlS + staleOkS) * 1000).toISOString(), source: provenance.source, attribution: provenance.attribution, value };
   };
   const key = cacheKey(url, opts);
   const existing = readEntry(packageId, key);
@@ -321,6 +323,42 @@ export async function cachedFetch(
   const value = await doFetch();
   writeEntry(packageId, key, makeEntry(value), maxBytes);
   return value;
+}
+
+export function sweepPackageCache(nowMs: number = Date.now()): { expired: number; bytes: number; packages: number } {
+  const entries = walkAllEntries();
+  let expired = 0;
+  let bytes = 0;
+  const packages = new Set<string>();
+  for (const entry of entries) {
+    let remove = false;
+    try {
+      const parsed = JSON.parse(readFileSync(entry.path, "utf-8")) as CacheEntryFile;
+      if (!parsed || typeof parsed.fetchedAt !== "string") remove = true;
+      else if (parsed.staleUntil !== undefined) remove = Date.parse(parsed.staleUntil) < nowMs;
+      else {
+        const expiresAt = parsed.expiresAt ? Date.parse(parsed.expiresAt) : Date.parse(parsed.fetchedAt) + DEFAULT_TTL_S * 1000;
+        remove = expiresAt + LEGACY_ENTRY_GRACE_S * 1000 < nowMs;
+      }
+    } catch {
+      remove = true;
+    }
+    if (!remove) continue;
+    try {
+      unlinkSync(entry.path);
+      expired++;
+      bytes += entry.size;
+      packages.add(entry.packageId);
+    } catch {
+      // An unreadable or concurrently removed entry is skipped.
+    }
+  }
+  for (const packageId of packages) {
+    try { rmdirSync(packageDir(packageId)); } catch { /* non-empty or changed concurrently */ }
+  }
+  runningTotalBytes = null;
+  evictIfOverBudget();
+  return { expired, bytes, packages: packages.size };
 }
 
 export interface CacheEnvelope {

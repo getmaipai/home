@@ -13,6 +13,11 @@ import { listIssues } from "@/lib/issues";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { startStackFixture, IDENTITY_HEADERS, type StackFixture, restoreDefaultScriptedStack } from "./stackFixture";
+import { cachedFetch } from "@/lib/packageCache";
+import { cacheDir } from "@/lib/paths";
+import { createHash } from "node:crypto";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 
 beforeEach(() => {
   resetDb();
@@ -210,6 +215,24 @@ describe("runDueJobs", () => {
     const result = await runDueJobs(runPlugin);
     expect(result.ran).toBe(2);
     expect(result.errors).toBe(0);
+  });
+
+  test("fires package_cache.sweep as a daily core job", async () => {
+    const packageId = "scheduler-package-cache";
+    const url = "https://example.com/scheduler-expired";
+    await cachedFetch(packageId, { ttl_s: 60 }, url, undefined, async () => ({ v: 1 }));
+    const key = createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+    const path = join(cacheDir, packageId, `${key}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8"));
+    entry.staleUntil = new Date(Date.now() - 1000).toISOString();
+    writeFileSync(path, JSON.stringify(entry));
+
+    ensureCoreJob("package_cache.sweep", "every:1d");
+    db.update(scheduledJobs).set({ nextRunAt: new Date(0).toISOString() }).where(eq(scheduledJobs.job, "package_cache.sweep")).run();
+    const result = await runDueJobs(runPlugin);
+    expect(result.ran).toBe(1);
+    expect(result.errors).toBe(0);
+    expect(existsSync(path)).toBe(false);
   });
 
   test("fires a due plugin job and marks a one-shot job done", async () => {

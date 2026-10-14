@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "@/lib/paths";
 import {
@@ -10,6 +10,8 @@ import {
   __resetPackageCacheForTests,
   __setTestCacheBudgetBytes,
   __clearPackageCacheDirForTests,
+  sweepPackageCache,
+  LEGACY_ENTRY_GRACE_S,
 } from "@/lib/packageCache";
 
 const PKG = "test-cache-pkg";
@@ -27,6 +29,90 @@ beforeEach(() => {
 // handoff to whichever test file runs next.
 afterEach(() => {
   __resetPackageCacheForTests();
+});
+
+describe("sweepPackageCache", () => {
+  const keyFor = (url: string) => createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
+
+  test("removes entries strictly past staleUntil and preserves the exact boundary", async () => {
+    const url = "https://example.com/sweep-expired";
+    await cachedFetch(PKG, { ttl_s: 60, stale_ok_s: 30 }, url, undefined, async () => ({ v: 1 }));
+    const path = join(cacheDir, PKG, `${keyFor(url)}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8"));
+    const staleUntil = Date.now() - 1;
+    entry.staleUntil = new Date(staleUntil).toISOString();
+    writeFileSync(path, JSON.stringify(entry));
+    expect(sweepPackageCache(staleUntil + 1).expired).toBe(1);
+    expect(existsSync(path)).toBe(false);
+
+    const boundaryUrl = "https://example.com/sweep-boundary";
+    await cachedFetch(PKG, { ttl_s: 60, stale_ok_s: 30 }, boundaryUrl, undefined, async () => ({ v: 2 }));
+    const boundaryPath = join(cacheDir, PKG, `${keyFor(boundaryUrl)}.json`);
+    const boundaryEntry = JSON.parse(readFileSync(boundaryPath, "utf8"));
+    boundaryEntry.staleUntil = new Date(staleUntil).toISOString();
+    writeFileSync(boundaryPath, JSON.stringify(boundaryEntry));
+    sweepPackageCache(staleUntil);
+    expect(existsSync(boundaryPath)).toBe(true);
+  });
+
+  test("fresh and stale-but-servable entries remain usable", async () => {
+    const freshUrl = "https://example.com/sweep-fresh";
+    let calls = 0;
+    await cachedFetch(PKG, { ttl_s: 60, stale_ok_s: 60 }, freshUrl, undefined, async () => ({ n: ++calls }));
+    sweepPackageCache(Date.now());
+    expect(await cachedFetch(PKG, { ttl_s: 60, stale_ok_s: 60 }, freshUrl, undefined, async () => ({ n: ++calls }))).toEqual({ n: 1 });
+    expect(calls).toBe(1);
+
+    const staleUrl = "https://example.com/sweep-stale";
+    const staleFirst = await cachedFetch(PKG, { ttl_s: -1, stale_ok_s: 60 }, staleUrl, undefined, async () => ({ n: ++calls }));
+    sweepPackageCache(Date.now());
+    expect(await cachedFetch(PKG, { ttl_s: -1, stale_ok_s: 60 }, staleUrl, undefined, async () => ({ n: ++calls }))).toEqual(staleFirst);
+  });
+
+  test("applies legacy grace, cleans corrupt files and empty package directories", async () => {
+    const dir = join(cacheDir, PKG);
+    mkdirSync(dir, { recursive: true });
+    const base = { url: "https://example.com/legacy", method: "GET", fetchedAt: new Date(Date.now() - 100_000).toISOString(), value: 1 };
+    const legacyPath = join(dir, "legacy.json");
+    writeFileSync(legacyPath, JSON.stringify({ ...base, expiresAt: new Date(10_000).toISOString() }));
+    expect(sweepPackageCache(10_000 + LEGACY_ENTRY_GRACE_S * 1000).expired).toBe(0);
+    expect(existsSync(legacyPath)).toBe(true);
+    expect(sweepPackageCache(10_001 + LEGACY_ENTRY_GRACE_S * 1000).expired).toBe(1);
+    expect(existsSync(dir)).toBe(false);
+
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(join(dir, "broken.json"), "{");
+    writeFileSync(join(dir, "neighbor.json"), JSON.stringify({ ...base, fetchedAt: new Date().toISOString(), staleUntil: new Date(Date.now() + 60_000).toISOString() }));
+    expect(sweepPackageCache(Date.now()).expired).toBe(1);
+    expect(readdirSync(dir)).toEqual(["neighbor.json"]);
+  });
+
+  test("trims byte budget once after sweep and keeps stats for emptied packages", async () => {
+    __setTestCacheBudgetBytes(10_000_000);
+    const url = "https://example.com/sweep-budget";
+    await cachedFetch(PKG, { ttl_s: 60 }, url, undefined, async () => ({ v: 1 }));
+    const path = join(cacheDir, PKG, `${keyFor(url)}.json`);
+    const entry = JSON.parse(readFileSync(path, "utf8"));
+    entry.staleUntil = new Date(Date.now() - 10_000).toISOString();
+    writeFileSync(path, JSON.stringify(entry));
+    sweepPackageCache(Date.now());
+    expect(getCacheStats().find((row) => row.packageId === PKG)?.entryCount).toBe(0);
+    expect(getCacheStats().find((row) => row.packageId === PKG)?.misses).toBe(1);
+    __setTestCacheBudgetBytes(1);
+    await cachedFetch(PKG, { ttl_s: 60 }, "https://example.com/sweep-new-write", undefined, async () => ({ v: 2 }));
+    expect(getCacheStats().find((row) => row.packageId === PKG)?.entryCount).toBeLessThanOrEqual(1);
+    expect(getCacheStats().some((row) => row.packageId === PKG)).toBe(true);
+  });
+
+  test("legacy grace covers every bundled cache stale window", () => {
+    const manifests = new Bun.Glob("backend/packages/*/manifest.json").scanSync({ cwd: process.cwd() });
+    const maxStale = [...manifests].reduce((max, file) => {
+      const manifest = JSON.parse(readFileSync(file, "utf8"));
+      const caches = [manifest.cache, ...(manifest.steps ?? []).flatMap((step: any) => [step.cache, ...(step.actions ?? []).map((action: any) => action.cache)])];
+      return Math.max(max, ...caches.map((cache: any) => Number(cache?.stale_ok_s ?? 0)));
+    }, 0);
+    expect(LEGACY_ENTRY_GRACE_S).toBeGreaterThanOrEqual(maxStale);
+  });
 });
 
 function counter() {

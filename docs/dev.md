@@ -158,6 +158,10 @@ backend's owner route.
 
 ## STATUS-SVC-03
 
+### Package cache retention
+
+Package-cache entries carry an optional `staleUntil` timestamp recorded from the package's `ttl_s` and `stale_ok_s`. A daily core job deletes entries strictly past that timestamp, then trims to the existing shared byte budget. Legacy entries without `staleUntil` expire seven days after `expiresAt`, or seven days after the default TTL from `fetchedAt` when `expiresAt` is absent.
+
 `createHost().fetch()` observes the HTTP outcome after the existing per-host
 rate limiter and cache have allowed an actual outbound request. The bounded
 in-memory service window stores timestamps, outcome class, last success, and
