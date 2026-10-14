@@ -11,6 +11,7 @@ import type { ChatCapabilities } from "@/wire";
 import { chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { HUB_RESTART_EXIT_CODE, scheduleHubRestart } from "@/lib/hubRestart";
 
 export const hostRoutes = new Hono<AppEnv>();
 
@@ -129,13 +130,13 @@ hostRoutes.post("/engine/restart", requireRole("owner", "admin"), async (c) => {
 // denoHost.ts's registerGracefulExit() and index.ts's own Wyoming
 // shutdown all hook `process.on("exit", ...)`, which runs no matter how
 // the process ends - so nothing extra needs calling here.
-export const RESTART_EXIT_CODE = 75;
+export const RESTART_EXIT_CODE = HUB_RESTART_EXIT_CODE;
 
 hostRoutes.post("/restart", requireRole("owner", "admin"), async (c) => {
   const response = c.json({ ok: true as const, restarting: true as const });
   // Delayed past this handler's return so the response above actually
   // reaches the browser before the process exits, the same reasoning as
   // any "tell the client, then do the disruptive thing" action.
-  setTimeout(() => process.exit(RESTART_EXIT_CODE), 200);
+  scheduleHubRestart();
   return response;
 });

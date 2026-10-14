@@ -64,7 +64,9 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   const registryQuery = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
   const { capabilities, ready } = useSettingsCapabilities(person);
   const viewer: SettingsViewer = { ...baseViewer(person), capabilities };
-  const registry = registryQuery.data ? visibleRegistry(registryQuery.data, viewer.band) : undefined;
+  const registry = registryQuery.data
+    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "home" && sectionId === "network" ? ["network.hub_port"] : [])
+    : undefined;
 
   const scopes = scopesOf(area, viewer);
   const valueQueries = useQueries({

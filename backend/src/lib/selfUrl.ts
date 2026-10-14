@@ -4,7 +4,8 @@
 // (routes/voice.ts's `GET /cloned/:id/file`), so that URL has to point
 // back at wherever THIS process is actually listening, not an assumed
 // constant - index.ts's own `port` reads the identical env var.
+import { configuredHubPort } from "@/lib/networkSettings";
+
 export function selfBaseUrl(): string {
-  const port = Number(process.env.PORT ?? 8787);
-  return `http://127.0.0.1:${port}`;
+  return `http://127.0.0.1:${configuredHubPort()}`;
 }

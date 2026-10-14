@@ -27,6 +27,7 @@ import { seedHlcFromDatabase } from "@/lib/hlc";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
 import { detectLanIps } from "@/lib/hubEndpoints";
+import { configuredHubPort, configuredLanExposure } from "@/lib/networkSettings";
 import { installConsoleFileMirror, installFatalErrorHandlers, appendLogLine } from "@/lib/log";
 import { shutdownEngines } from "@/lib/hubShutdown";
 import { ensureSecretPepperReady } from "@/lib/secret";
@@ -40,7 +41,7 @@ import { migrateWikipediaFallbackToSourceMode } from "@/lib/retrieval/sourceMode
 import { purgeLegacyHubLogs } from "@/lib/legacyHubLogPurge";
 import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@/lib/remoteStackSettings";
 
-const configuredPort = Number(process.env.PORT ?? 8787);
+const configuredPort = configuredHubPort();
 purgeLegacyHubLogs();
 initSafetyAlarm();
 installConsoleFileMirror();
@@ -312,11 +313,13 @@ registerRenewFixHandler();
 // the same configured port has loopback-only HTTP and HTTPS listeners on
 // detected non-loopback addresses.
 const initialTls = hasHouseholdLeaf() ? getHouseholdLeafForServer() : null;
+const networkExposure = configuredLanExposure();
 
 let listeners = startHomeListeners({
   port: configuredPort,
   fetch: app.fetch,
   websocket,
+  exposure: networkExposure,
   ...(initialTls ? { tls: { certPem: initialTls.cert, keyPem: initialTls.key } } : {}),
 });
 
@@ -336,7 +339,7 @@ printStartupUrls();
 // household on a network that filters multicast just doesn't get
 // auto-discovery, the same "never a false alarm, never a hard failure"
 // posture this step's other guards already take.
-void advertiseMdns({ port: listeners.port, tls: initialTls !== null });
+void advertiseMdns({ port: listeners.port, tls: initialTls !== null, enabled: networkExposure === "lan" });
 
 // A first mint or renewal rebinds the listener group in place. A failure
 // is reported as a Repairs issue rather than escaping the unauthenticated
@@ -346,11 +349,12 @@ attachHouseholdTlsRebind({
   fetch: app.fetch,
   websocket,
   networkAddresses: detectLanIps,
+  exposure: networkExposure,
   onBound: (next) => {
     listeners = next;
     servingTls = true;
     printStartupUrls();
-    void advertiseMdns({ port: next.port, tls: true });
+    void advertiseMdns({ port: next.port, tls: true, enabled: networkExposure === "lan" });
   },
   onFailure: (err) => {
     const message = (err as Error).message;

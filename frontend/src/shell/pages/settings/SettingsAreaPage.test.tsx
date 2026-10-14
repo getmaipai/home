@@ -90,6 +90,22 @@ describe("the settings route", () => {
     await waitFor(() => expect(document.body.textContent).toContain("No commands yet."));
   });
 
+  test("the network area renders the expert port from the spec registry and confirms its new address", async () => {
+    const originalConfirm = window.confirm;
+    const confirm = mock(() => true);
+    window.confirm = confirm;
+    try {
+      const view = open(makePerson("owner"), "/settings/home/network");
+      const port = await view.findByLabelText("Home network port");
+      fireEvent.change(port, { target: { value: "4555" } });
+      fireEvent.blur(port);
+      await waitFor(() => expect(confirm).toHaveBeenCalledWith("Home will restart after this is saved. Devices will use maipai.local:4555. Continue?"));
+      await waitFor(() => expect(fixture!.puts).toContainEqual({ scope: "household", key: "network.hub_port", value: 4555 }));
+    } finally {
+      window.confirm = originalConfirm;
+    }
+  });
+
   test("an admin opens the household voice catalog in Home settings", async () => {
     const view = open(makePerson("admin"), "/settings/home/voices");
     await waitFor(() => expect(where(view)).toBe("/settings/home/voices"));

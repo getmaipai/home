@@ -18,6 +18,7 @@ import { hubEndpoints } from "@/db/schema";
 import { getTailscaleStatus } from "@/lib/tailscale";
 import { newEndpointId } from "@/lib/id";
 import { isPrivateOrLoopbackIpv4, isCgnatIpv4 } from "@maipai/core/src/ssrfGuard";
+import { configuredHubPort, configuredLanExposure } from "@/lib/networkSettings";
 
 export type EndpointKind = "lan" | "overlay" | "public";
 export type EndpointSource = "detected" | "managed";
@@ -32,7 +33,7 @@ export interface HubEndpoint {
   source: EndpointSource;
 }
 
-const port = Number(process.env.PORT ?? 8787);
+const port = () => configuredHubPort();
 
 // Detected addresses sort ahead of typed ones by default: on the home
 // network the LAN IP is the fastest path and the one least likely to
@@ -136,7 +137,7 @@ export function detectLanIps(): string[] {
 }
 
 function detectLanUrls(): string[] {
-  return detectLanIps().map((ip) => `http://${ip}:${port}`);
+  return detectLanIps().map((ip) => `http://${ip}:${port()}`);
 }
 
 async function detectTailnetUrls(): Promise<string[]> {
@@ -144,7 +145,7 @@ async function detectTailnetUrls(): Promise<string[]> {
   if (status.state !== "running") return [];
   // MagicDNS name first (stable across reconnects), the tailnet IP as backup.
   const hosts = [status.dnsName, ...status.ips].filter((h): h is string => !!h);
-  return hosts.map((h) => `http://${h.includes(":") ? `[${h}]` : h}:${port}`);
+  return hosts.map((h) => `http://${h.includes(":") ? `[${h}]` : h}:${port()}`);
 }
 
 function toHubEndpoint(row: typeof hubEndpoints.$inferSelect): HubEndpoint {
@@ -169,11 +170,12 @@ export function listManagedEndpoints(): HubEndpoint[] {
  * admin chose) and sorted by priority. Disabled rows are dropped here,
  * not shipped to clients. */
 export async function listHubEndpoints(opts: { includeDisabled?: boolean } = {}): Promise<HubEndpoint[]> {
-  const managed = listManagedEndpoints();
+  const localOnly = configuredLanExposure() === "loopback";
+  const managed = localOnly ? [] : listManagedEndpoints();
   const claimed = new Set(managed.map((e) => e.url));
 
   const detected: HubEndpoint[] = [];
-  for (const url of detectLanUrls()) {
+  for (const url of localOnly ? [] : detectLanUrls()) {
     if (claimed.has(url)) continue;
     claimed.add(url);
     // Every non-internal interface shows up here, including a Tailscale
@@ -191,7 +193,7 @@ export async function listHubEndpoints(opts: { includeDisabled?: boolean } = {})
       source: "detected",
     });
   }
-  for (const url of await detectTailnetUrls()) {
+  for (const url of localOnly ? [] : await detectTailnetUrls()) {
     if (claimed.has(url)) continue;
     claimed.add(url);
     detected.push({

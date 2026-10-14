@@ -32,12 +32,12 @@ import { db } from "@/db";
 import { passkeyCredentials } from "@/db/schema";
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { ensureCredentialRowExists } from "@/lib/credentialLockout";
+import { configuredHubPort } from "@/lib/networkSettings";
 
 const RP_ID = "maipai.local";
 const RP_NAME = "MaiPai Home";
-const port = Number(process.env.PORT ?? 8787);
-
 function acceptedOrigins(): string[] {
+  const port = configuredHubPort();
   const origins = [`https://${RP_ID}:${port}`, ...detectLanIps().map((ip) => `https://${ip}:${port}`)];
   // A dev instance without a household CA leaf yet still needs to be
   // able to exercise this locally over plain HTTP - WebAuthn treats

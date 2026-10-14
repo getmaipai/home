@@ -24,6 +24,18 @@ export const beforeSettingChange: BeforeChange = async (key, value) => {
     if (typeof Notification === "undefined" || !("serviceWorker" in navigator)) return "This browser cannot show system alerts.";
     if (!(await requestBrowserAlertPermission(() => Notification.requestPermission(), true))) return "Browser permission was not granted, so alerts are off.";
   }
+  if (key === "network.hub_port") {
+    const port = Number(value);
+    return window.confirm(`Home will restart after this is saved. Devices will use maipai.local:${port}. Continue?`)
+      ? true
+      : "No change was made.";
+  }
+  if (key === "network.lan_exposure") {
+    const reach = value === "loopback" ? "Only this computer will be able to reach Home." : "Devices on your home network will be able to reach Home.";
+    return window.confirm(`Home will restart after this is saved. ${reach} Continue?`)
+      ? true
+      : "No change was made.";
+  }
   return true;
 };
 
@@ -72,6 +84,7 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     beforeChange: beforeSettingChange,
     focusKey: props.focusKey,
     matrix: card.matrix,
+    includeExpert: props.section.id === "network",
   };
   const renderer = group === "profile.ease" ? <EaseCardRenderer viewingSelf={viewer.selfId === props.person.id} {...rendererProps} /> : <SettingsRenderer {...rendererProps} />;
   if (!card.collapsed) return renderer;

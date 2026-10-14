@@ -59,6 +59,7 @@ let service: Service | null = null;
 export interface AdvertiseOptions {
   port: number;
   tls: boolean;
+  enabled?: boolean;
 }
 
 /** This hub's DNS-SD instance name: the display name plus the first four
@@ -106,7 +107,7 @@ export async function advertiseMdns(opts: AdvertiseOptions): Promise<void> {
   let mine: Bonjour | null = null;
   try {
     await stopMdnsAdvertisement();
-    if (!mdnsEnabled()) {
+    if (!mdnsEnabled() || opts.enabled === false) {
       resolveIssue(ISSUE_SOURCE, ISSUE_KEY); // nothing is trying to advertise, so an old warning is stale
       return;
     }
