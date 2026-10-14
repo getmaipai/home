@@ -21,8 +21,8 @@ test("the add form's companions box defaults to the household value", async () =
   const people = spyOn(api, "people").mockResolvedValue([rosterEntry("kid", "child", "Robin")] as never);
   const registry = spyOn(api, "settingsRegistry").mockResolvedValue([companionKey] as never);
   const values = spyOn(api, "settingsValues").mockImplementation(async (scope, key) => {
-    if (key) return [{ key, value: true, source: "default", label: "AI companions", help: companionKey.help, level: "basic", secret: false }];
     if (scope === "household") return [{ key: "companions.allowed", value: false, source: "user", label: "AI companions", help: companionKey.help, level: "basic", secret: false }];
+    if (key) return [{ key, value: true, source: "default", label: "AI companions", help: companionKey.help, level: "basic", secret: false }];
     return [];
   });
   try {

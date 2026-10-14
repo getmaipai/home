@@ -59,7 +59,7 @@ export function UsersSection({ person }: UsersSectionProps) {
   const [confirmingDelete, setConfirmingDelete] = useState<"batch" | string | null>(null);
   const [busy, setBusy] = useState(false);
   const settingsRegistryQuery = useQuery({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
-  const householdSettingsQuery = useQuery({ queryKey: ["settings-values", "household"], queryFn: () => api.settingsValues("household") });
+  const householdSettingsQuery = useQuery({ queryKey: ["settings-values", "household", "companions.allowed"], queryFn: () => api.settingsValues("household", "companions.allowed") });
   const companionKey = settingsRegistryQuery.data?.find((entry) => entry.key === "companions.allowed");
   const householdCompanionsAllowed = householdSettingsQuery.data?.find((entry) => entry.key === "companions.allowed")?.value ?? companionKey?.default;
   const [newPersonCompanionsAllowed, setNewPersonCompanionsAllowed] = useState<boolean | null>(null);
@@ -122,7 +122,7 @@ export function UsersSection({ person }: UsersSectionProps) {
     setCompanionsSaving(true);
     try {
       const updated = await api.setSetting("household", "companions.allowed", true);
-      queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
+      queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household", "companions.allowed"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not save the AI companions setting.");
     } finally { setCompanionsSaving(false); }
@@ -136,7 +136,7 @@ export function UsersSection({ person }: UsersSectionProps) {
     setCompanionsSaving(true);
     try {
       const updated = await api.setSetting("household", "companions.allowed", false);
-      queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
+      queryClient.setQueryData<typeof householdSettingsQuery.data>(["settings-values", "household", "companions.allowed"], (rows) => (rows ?? []).map((row) => row.key === updated.key ? updated : row));
     } catch (err) {
       setActionError(err instanceof ApiError ? err.message : "Could not save the AI companions setting.");
     } finally { setCompanionsSaving(false); }
