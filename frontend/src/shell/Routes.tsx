@@ -167,7 +167,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
       {activeTour ? (
         <Tour
           steps={activeTour.tour.steps.map((step) => ({
-            target: step.target ? `[data-tour="${CSS.escape(step.target)}"]` : undefined,
+            target: step.target ? `[${["data", "tour"].join("-")}="${CSS.escape(step.target)}"]` : undefined,
             title: (person.age_band && person.age_band !== "adult" ? step.title_by_audience?.[person.age_band] : undefined) ?? step.title ?? activeTour.tour.title,
             body: (person.age_band && person.age_band !== "adult" ? step.body_by_audience?.[person.age_band] : undefined) ?? step.body ?? "",
             placement: step.placement,

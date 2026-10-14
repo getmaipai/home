@@ -173,6 +173,9 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
       ) : null}
       <ChatExtrasContext.Provider value={extraContext}>
         <Thread
+          tourId="chat.thread"
+          composerTourId="chat.composer"
+          sendButtonTourId="chat.send"
           temporary={temporary}
           scrollToBottomOffset={56}
           components={{

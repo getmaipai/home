@@ -51,6 +51,24 @@ describe("RailProfile status by age", () => {
   });
 });
 
+describe("Home first-run tour target", () => {
+  test("the profile menu renders the shell target passed by Home", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/notifications") || url.includes("/api/status/apps")) return Promise.resolve(Response.json([]));
+      return Promise.resolve(Response.json({ note: null, maintenance: [] }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderProfile("adult");
+      const target = ["data", "tour"].join("-");
+      await waitFor(() => expect(view.container.querySelector(`[${target}="shell.profile-menu"]`)).not.toBeNull());
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
 // RAIL-01 review: Log out ends the session through the existing route,
 // empties the shared query cache so the next person on this browser never
 // sees this person's cached answers, and stays signed in when it fails.

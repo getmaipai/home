@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   classNameOverrideFindings,
@@ -131,6 +132,21 @@ describe("className overrides on kit Elements (ELEMENTS-LINT-02)", () => {
     for (const token of ["text-sm", "text-muted-foreground", "flex-1", "shrink-0", "self-end", "order-2", "col-span-2", "hidden", "md:block", "truncate", "font-medium"]) {
       expect(forbiddenFamily(token), token).toBeUndefined();
     }
+  });
+});
+
+describe("tour target props (TOUR-TARGETS-01)", () => {
+  test("Home passes target ids through kit props and does not write raw tour attributes", () => {
+    const attribute = ["data", "tour"].join("-");
+    const files = (dir: string): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      return entry.isDirectory() ? files(path) : /\.[jt]sx?$/.test(entry.name) ? [path] : [];
+    });
+    const offenders = files(SRC).flatMap((path) => {
+      const source = readFileSync(path, "utf8");
+      return new RegExp(`\\b${attribute}\\s*=`, "g").test(source) ? [path.replace(`${SRC}/`, "")] : [];
+    });
+    expect(offenders).toEqual([]);
   });
 });
 

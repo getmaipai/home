@@ -199,6 +199,24 @@ async function sendMessage(view: ReturnType<typeof render>, text: string): Promi
 }
 
 describe("ChatPage (SHELL-02's first slice)", () => {
+  test("the chat thread, composer, and send targets render", async () => {
+    const restore = stubFetch();
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <ChatPage person={makePerson()} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      const target = ["data", "tour"].join("-");
+      for (const id of ["chat.thread", "chat.composer", "chat.send"]) {
+        await waitFor(() => expect(view.container.querySelector(`[${target}="${id}"]`)).not.toBeNull());
+      }
+    } finally {
+      restore();
+    }
+  });
+
   test("ordinary new chat shows the greeting and generic starter chips, with no where-it-runs or can-make-mistakes line", async () => {
     const restore = stubFetch();
     try {

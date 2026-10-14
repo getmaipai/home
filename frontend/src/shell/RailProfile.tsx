@@ -48,6 +48,7 @@ export function RailProfile({
 
   return (
     <RailProfileMenu
+      tourId="shell.profile-menu"
       displayName={person.display_name}
       subtitle={ROLE_LABELS[person.role]}
       notifications={{ count: pending, urgent, onOpen: () => setNotificationsOpen(true) }}
