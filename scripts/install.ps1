@@ -19,6 +19,7 @@
 
   Usage (elevated PowerShell):
     irm https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.ps1 | iex
+    $env:MAIPAI_PLAN = 'recommended' # also accepts moderate or minimal
 
   Idempotent: re-running upgrades an existing install in place (stop,
   replace the source tree, keep data/backups untouched, restart).
@@ -30,6 +31,48 @@ $Repo = 'getmaipai/home'
 $InstallRoot = 'C:\ProgramData\MaiPai Home'
 $ServiceName = 'MaiPaiHome'
 $AppPort = if ($env:MAIPAI_PORT) { [int]$env:MAIPAI_PORT } else { 3000 }
+$script:PlanArgument = ''
+for ($i = 0; $i -lt $args.Count; $i++) {
+  if ($args[$i] -eq '--plan') {
+    if ($i + 1 -ge $args.Count) { throw 'Use --plan recommended, --plan moderate, or --plan minimal. Then run the installer again.' }
+    $script:PlanArgument = [string]$args[$i + 1]
+    $i++
+  } elseif ($args[$i] -like '--*') {
+    throw "Unknown option '$($args[$i])'. Allowed options are --plan recommended, --plan moderate, and --plan minimal. Use one and run the installer again."
+  } else {
+    throw "Unexpected argument '$($args[$i])'. Use --plan recommended, --plan moderate, or --plan minimal, then run the installer again."
+  }
+}
+
+function Resolve-SetupPlan {
+  if ($script:PlanArgument) {
+    if ($script:PlanArgument -notin @('recommended', 'moderate', 'minimal')) {
+      throw "Invalid plan '$script:PlanArgument'. Allowed values are recommended, moderate, and minimal. Choose one and run the installer again."
+    }
+    if ($env:MAIPAI_PLAN -and $env:MAIPAI_PLAN -ne $script:PlanArgument) {
+      Write-Host "Both --plan and MAIPAI_PLAN were set; using --plan $script:PlanArgument."
+    }
+    return $script:PlanArgument
+  }
+  if ($env:MAIPAI_PLAN) {
+    if ($env:MAIPAI_PLAN -notin @('recommended', 'moderate', 'minimal')) {
+      throw "Invalid MAIPAI_PLAN '$env:MAIPAI_PLAN'. Allowed values are recommended, moderate, and minimal. Set it to one of those values and run the installer again."
+    }
+    return $env:MAIPAI_PLAN
+  }
+  return ''
+}
+
+function Save-SetupPlan([string]$Dir, [string]$Plan) {
+  $record = Join-Path $Dir 'data\setup-plan'
+  if ($Plan) {
+    New-Item -ItemType Directory -Force (Split-Path $record) | Out-Null
+    Set-Content -Path $record -Value $Plan -NoNewline -Encoding ascii
+    Write-Host "Recorded setup plan $Plan. The setup wizard will use it after its checks."
+  } elseif (Test-Path $record) {
+    Write-Host "Keeping the saved setup plan $((Get-Content $record -Raw).Trim())."
+  }
+}
 
 # Pinned to a specific WinSW release, verified by hash below - never
 # "latest", so an upstream compromise or a bad release there can't
@@ -184,6 +227,7 @@ function Install-Service([string]$Dir, [string]$BunExe, [int]$Port) {
 }
 
 function Main {
+  $plan = Resolve-SetupPlan
   Assert-Admin
   $tag = Get-LatestTag
   $port = Find-FreePort $AppPort
@@ -205,6 +249,8 @@ function Main {
   } else {
     Fetch-ReleaseSource $tag $InstallRoot
   }
+
+  Save-SetupPlan $InstallRoot $plan
 
   $bunHome = Join-Path $InstallRoot '.bun'
   $bunExe = Ensure-Bun $bunHome
