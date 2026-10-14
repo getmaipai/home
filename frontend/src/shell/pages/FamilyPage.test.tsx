@@ -4,6 +4,8 @@ import { MemoryRouter, useLocation } from "react-router-dom";
 import { fetchFamilyBots, FamilyPage } from "@/shell/pages/FamilyPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
+import { Tour } from "@maipai/spec/gen/ts/tour.js";
+import defaultManifest from "../../../../backend/packages/default/manifest.json";
 
 afterEach(() => {
   cleanup();
@@ -63,6 +65,20 @@ function renderFamilyPage(person: Roster, path = "/people") {
 }
 
 describe("FamilyPage", () => {
+  test("the People tour validates and opens on the real family directory", async () => {
+    const tour = defaultManifest.contributes.tours[2]!;
+    expect(Tour.safeParse(tour).success).toBe(true);
+    expect(tour.steps[0]?.placement).toBe("center");
+    const restore = mockFamilyFetch([makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" })]);
+    try {
+      const view = renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role: "owner" }));
+      await waitFor(() => expect(view.getByText("Family")).toBeVisible());
+      expect(view.getByText("Nova")).toBeVisible();
+    } finally {
+      restore();
+    }
+  });
+
   test("the directory is a card grid: every household member gets a card with their real name and role", async () => {
     const restore = mockFamilyFetch([
       makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" }),

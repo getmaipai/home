@@ -104,6 +104,24 @@
             "order": 30
           }
         ]
+      },
+      {
+        "id": "tour.people.first-run",
+        "version": 1,
+        "title": "Show me around People",
+        "starts_on": "page:people",
+        "audience": [
+          "adult"
+        ],
+        "steps": [
+          {
+            "id": "directory",
+            "title": "Your family",
+            "body": "This is your family directory. Choose a person to see their profile.",
+            "placement": "center",
+            "order": 10
+          }
+        ]
       }
     ]
   },
