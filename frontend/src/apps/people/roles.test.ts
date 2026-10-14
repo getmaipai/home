@@ -34,13 +34,13 @@ describe("canManagePeople", () => {
 });
 
 describe("requiresSecret", () => {
-  test("owner and admin require a secret", () => {
+  test("owner, admin, and adult require a secret", () => {
     expect(requiresSecret("owner")).toBe(true);
     expect(requiresSecret("admin")).toBe(true);
+    expect(requiresSecret("adult")).toBe(true);
   });
 
-  test("everyone else does not", () => {
-    expect(requiresSecret("adult")).toBe(false);
+  test("teens, children, and guests do not require a secret", () => {
     expect(requiresSecret("teen")).toBe(false);
     expect(requiresSecret("child")).toBe(false);
     expect(requiresSecret("guest")).toBe(false);

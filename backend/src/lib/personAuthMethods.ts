@@ -8,6 +8,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { personCredentials, passkeyCredentials } from "@/db/schema";
+import { ROLE_REQUIRES_CREDENTIAL } from "../../../shared/personCredentialRoles";
 
 export interface AuthMethods {
   hasSecret: boolean;
@@ -54,7 +55,7 @@ export function requiresCredential(personId: string): boolean {
  * and, being automatic, never will reliably be remembered for the next
  * one either. Checking it here closes every current and future path at
  * once. */
-export const ROLE_REQUIRES_CREDENTIAL = new Set(["owner", "admin", "adult"]);
+export { ROLE_REQUIRES_CREDENTIAL };
 
 export function roleRequiresCredential(role: string): boolean {
   return ROLE_REQUIRES_CREDENTIAL.has(role);
