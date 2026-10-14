@@ -1,6 +1,6 @@
 {
   "id": "almanac-holiday",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Info",
   "display": "Next Holiday",
@@ -25,22 +25,11 @@
   "platforms": ["home"],
   "min_role": "child",
   "consequential": false,
-  "offline": "unavailable",
+  "offline": "full",
   "config": [],
-  "data_sources": [
-    {
-      "id": "nager-date",
-      "destination": "date.nager.at's free public holiday API",
-      "when": "the household asks about an upcoming holiday",
-      "what": "a two-letter country code, hardcoded to US for now",
-      "who": "Nager.Date",
-      "opt_in": true,
-      "retention": "unknown, see Nager.Date's own policy"
-    }
-  ],
-  "permissions": ["net:date.nager.at"],
+  "data_sources": [],
+  "permissions": [],
   "notifications": [],
-  "cache": { "key_template": "almanac-holiday:us", "ttl_s": 43200, "stale_ok_s": 86400, "max_bytes": 20000 },
   "fallback_reply": {
     "text": "Sorry, I'm having trouble looking that up right now.",
     "speech": "Sorry, I'm having trouble looking that up right now."

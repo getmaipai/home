@@ -2,6 +2,13 @@
 
 All notable changes to the Next Holiday package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.0] - 2026-10-14
+
+### Changed
+
+- Generate US and Canadian holiday dates into a checked-in yearly file. The household's Home place selects the country, and the lookup works offline.
+- Remove the hosted holiday request, its network permission, and its response cache.
+
 ## [0.1.0] - 2026-09-06
 
 ### Added

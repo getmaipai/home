@@ -80,7 +80,7 @@ Counts: 35 packages. Tier 0: 24. Tier 1: 11. Kind: plugin 29, companion 4, proje
 
 | id | permissions | data_sources (all `opt_in: true`) | leaves the house |
 |---|---|---|---|
-| almanac-holiday | net:date.nager.at | nager-date | the country or year asked for, to Nager.Date |
+| almanac-holiday | offline yearly data | none | generated US and Canadian holidays selected by the household Home place (updated 2026-10-14) |
 | almanac-onthisday | net:en.wikipedia.org | wikipedia | the date, to Wikipedia |
 | currency | net:api.frankfurter.dev | frankfurter | currency codes and amount, to Frankfurter |
 | define | net:api.dictionaryapi.dev | dictionaryapi-dev | the word, to dictionaryapi.dev |

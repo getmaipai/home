@@ -46,6 +46,19 @@ function entityResult(entity: EntityT, from: ResolvedPlace["from"]): ResolvedPla
   return { label: entity.name, area: entity.geo?.area ?? null, lat: entity.geo?.lat ?? null, lon: entity.geo?.lon ?? null, precision: entity.geo?.precision ?? null, from };
 }
 
+/** Country label for the offline holiday package. Reads the configured
+ * household home directly and passes only the final area segment onward. */
+export function householdHomeCountryName(): string | null {
+  const homeId = getHouseholdSettingValue("household.home");
+  if (typeof homeId !== "string") return null;
+  const home = getEntity({ id: "system", role: "adult" }, homeId);
+  if (!home.ok || !home.value || home.value.kind !== "place" || home.value.scope !== "household") return null;
+  const area = home.value.geo?.area;
+  if (typeof area !== "string" || !area.trim()) return null;
+  const country = area.split(",").at(-1)?.trim();
+  return country || null;
+}
+
 async function withGeocode(place: ResolvedPlace, name: string): Promise<ResolvedPlace> {
   if (place.lat !== null && place.lon !== null) return place;
   const found = await geocode(name);

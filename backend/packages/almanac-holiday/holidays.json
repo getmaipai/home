@@ -1,0 +1,1849 @@
+{
+  "generated_by": "backend/scripts/gen-almanac-holidays.ts",
+  "year_range": {
+    "first": 2026,
+    "last": 2045
+  },
+  "country_codes": {
+    "United States": "US",
+    "Canada": "CA",
+    "United Kingdom": "GB",
+    "Australia": "AU"
+  },
+  "sources": {
+    "US": "https://www.opm.gov/policy-data-oversight/pay-leave/federal-holidays/",
+    "CA": "https://www.canada.ca/en/services/jobs/workplace/federal-labour-standards/vacations-holidays.html"
+  },
+  "years": {
+    "2026": {
+      "US": [
+        {
+          "date": "2026-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2026-01-19",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2026-02-16",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2026-05-25",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2026-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2026-07-04",
+          "name": "Independence Day",
+          "observed": "2026-07-03"
+        },
+        {
+          "date": "2026-09-07",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2026-10-12",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2026-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2026-11-26",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2026-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2026-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2026-04-03",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2026-05-18",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2026-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2026-09-07",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2026-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2026-10-12",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2026-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2026-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2026-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2027": {
+      "US": [
+        {
+          "date": "2027-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2027-01-18",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2027-02-15",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2027-05-31",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2027-06-19",
+          "name": "Juneteenth National Independence Day",
+          "observed": "2027-06-18"
+        },
+        {
+          "date": "2027-07-04",
+          "name": "Independence Day",
+          "observed": "2027-07-05"
+        },
+        {
+          "date": "2027-09-06",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2027-10-11",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2027-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2027-11-25",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2027-12-25",
+          "name": "Christmas Day",
+          "observed": "2027-12-24"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2027-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2027-03-26",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2027-05-24",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2027-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2027-09-06",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2027-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2027-10-11",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2027-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2027-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2027-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2028": {
+      "US": [
+        {
+          "date": "2028-01-01",
+          "name": "New Year's Day",
+          "observed": "2027-12-31"
+        },
+        {
+          "date": "2028-01-17",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2028-02-21",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2028-05-29",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2028-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2028-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2028-09-04",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2028-10-09",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2028-11-11",
+          "name": "Veterans Day",
+          "observed": "2028-11-10"
+        },
+        {
+          "date": "2028-11-23",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2028-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2028-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2028-04-14",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2028-05-22",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2028-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2028-09-04",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2028-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2028-10-09",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2028-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2028-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2028-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2029": {
+      "US": [
+        {
+          "date": "2029-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2029-01-15",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2029-02-19",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2029-05-28",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2029-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2029-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2029-09-03",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2029-10-08",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2029-11-11",
+          "name": "Veterans Day",
+          "observed": "2029-11-12"
+        },
+        {
+          "date": "2029-11-22",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2029-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2029-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2029-03-30",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2029-05-21",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2029-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2029-09-03",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2029-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2029-10-08",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2029-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2029-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2029-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2030": {
+      "US": [
+        {
+          "date": "2030-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2030-01-21",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2030-02-18",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2030-05-27",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2030-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2030-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2030-09-02",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2030-10-14",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2030-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2030-11-28",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2030-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2030-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2030-04-19",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2030-05-20",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2030-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2030-09-02",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2030-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2030-10-14",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2030-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2030-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2030-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2031": {
+      "US": [
+        {
+          "date": "2031-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2031-01-20",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2031-02-17",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2031-05-26",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2031-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2031-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2031-09-01",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2031-10-13",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2031-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2031-11-27",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2031-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2031-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2031-04-11",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2031-05-19",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2031-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2031-09-01",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2031-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2031-10-13",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2031-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2031-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2031-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2032": {
+      "US": [
+        {
+          "date": "2032-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2032-01-19",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2032-02-16",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2032-05-31",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2032-06-19",
+          "name": "Juneteenth National Independence Day",
+          "observed": "2032-06-18"
+        },
+        {
+          "date": "2032-07-04",
+          "name": "Independence Day",
+          "observed": "2032-07-05"
+        },
+        {
+          "date": "2032-09-06",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2032-10-11",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2032-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2032-11-25",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2032-12-25",
+          "name": "Christmas Day",
+          "observed": "2032-12-24"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2032-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2032-03-26",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2032-05-24",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2032-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2032-09-06",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2032-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2032-10-11",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2032-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2032-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2032-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2033": {
+      "US": [
+        {
+          "date": "2033-01-01",
+          "name": "New Year's Day",
+          "observed": "2032-12-31"
+        },
+        {
+          "date": "2033-01-17",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2033-02-21",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2033-05-30",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2033-06-19",
+          "name": "Juneteenth National Independence Day",
+          "observed": "2033-06-20"
+        },
+        {
+          "date": "2033-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2033-09-05",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2033-10-10",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2033-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2033-11-24",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2033-12-25",
+          "name": "Christmas Day",
+          "observed": "2033-12-26"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2033-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2033-04-15",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2033-05-23",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2033-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2033-09-05",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2033-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2033-10-10",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2033-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2033-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2033-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2034": {
+      "US": [
+        {
+          "date": "2034-01-01",
+          "name": "New Year's Day",
+          "observed": "2034-01-02"
+        },
+        {
+          "date": "2034-01-16",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2034-02-20",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2034-05-29",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2034-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2034-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2034-09-04",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2034-10-09",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2034-11-11",
+          "name": "Veterans Day",
+          "observed": "2034-11-10"
+        },
+        {
+          "date": "2034-11-23",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2034-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2034-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2034-04-07",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2034-05-22",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2034-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2034-09-04",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2034-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2034-10-09",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2034-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2034-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2034-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2035": {
+      "US": [
+        {
+          "date": "2035-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2035-01-15",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2035-02-19",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2035-05-28",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2035-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2035-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2035-09-03",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2035-10-08",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2035-11-11",
+          "name": "Veterans Day",
+          "observed": "2035-11-12"
+        },
+        {
+          "date": "2035-11-22",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2035-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2035-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2035-03-23",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2035-05-21",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2035-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2035-09-03",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2035-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2035-10-08",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2035-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2035-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2035-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2036": {
+      "US": [
+        {
+          "date": "2036-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2036-01-21",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2036-02-18",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2036-05-26",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2036-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2036-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2036-09-01",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2036-10-13",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2036-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2036-11-27",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2036-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2036-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2036-04-11",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2036-05-19",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2036-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2036-09-01",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2036-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2036-10-13",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2036-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2036-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2036-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2037": {
+      "US": [
+        {
+          "date": "2037-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2037-01-19",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2037-02-16",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2037-05-25",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2037-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2037-07-04",
+          "name": "Independence Day",
+          "observed": "2037-07-03"
+        },
+        {
+          "date": "2037-09-07",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2037-10-12",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2037-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2037-11-26",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2037-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2037-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2037-04-03",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2037-05-18",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2037-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2037-09-07",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2037-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2037-10-12",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2037-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2037-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2037-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2038": {
+      "US": [
+        {
+          "date": "2038-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2038-01-18",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2038-02-15",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2038-05-31",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2038-06-19",
+          "name": "Juneteenth National Independence Day",
+          "observed": "2038-06-18"
+        },
+        {
+          "date": "2038-07-04",
+          "name": "Independence Day",
+          "observed": "2038-07-05"
+        },
+        {
+          "date": "2038-09-06",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2038-10-11",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2038-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2038-11-25",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2038-12-25",
+          "name": "Christmas Day",
+          "observed": "2038-12-24"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2038-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2038-04-23",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2038-05-24",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2038-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2038-09-06",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2038-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2038-10-11",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2038-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2038-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2038-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2039": {
+      "US": [
+        {
+          "date": "2039-01-01",
+          "name": "New Year's Day",
+          "observed": "2038-12-31"
+        },
+        {
+          "date": "2039-01-17",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2039-02-21",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2039-05-30",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2039-06-19",
+          "name": "Juneteenth National Independence Day",
+          "observed": "2039-06-20"
+        },
+        {
+          "date": "2039-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2039-09-05",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2039-10-10",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2039-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2039-11-24",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2039-12-25",
+          "name": "Christmas Day",
+          "observed": "2039-12-26"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2039-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2039-04-08",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2039-05-23",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2039-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2039-09-05",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2039-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2039-10-10",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2039-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2039-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2039-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2040": {
+      "US": [
+        {
+          "date": "2040-01-01",
+          "name": "New Year's Day",
+          "observed": "2040-01-02"
+        },
+        {
+          "date": "2040-01-16",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2040-02-20",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2040-05-28",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2040-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2040-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2040-09-03",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2040-10-08",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2040-11-11",
+          "name": "Veterans Day",
+          "observed": "2040-11-12"
+        },
+        {
+          "date": "2040-11-22",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2040-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2040-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2040-03-30",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2040-05-21",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2040-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2040-09-03",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2040-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2040-10-08",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2040-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2040-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2040-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2041": {
+      "US": [
+        {
+          "date": "2041-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2041-01-21",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2041-02-18",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2041-05-27",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2041-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2041-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2041-09-02",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2041-10-14",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2041-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2041-11-28",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2041-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2041-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2041-04-19",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2041-05-20",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2041-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2041-09-02",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2041-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2041-10-14",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2041-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2041-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2041-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2042": {
+      "US": [
+        {
+          "date": "2042-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2042-01-20",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2042-02-17",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2042-05-26",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2042-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2042-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2042-09-01",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2042-10-13",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2042-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2042-11-27",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2042-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2042-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2042-04-04",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2042-05-19",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2042-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2042-09-01",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2042-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2042-10-13",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2042-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2042-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2042-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2043": {
+      "US": [
+        {
+          "date": "2043-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2043-01-19",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2043-02-16",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2043-05-25",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2043-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2043-07-04",
+          "name": "Independence Day",
+          "observed": "2043-07-03"
+        },
+        {
+          "date": "2043-09-07",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2043-10-12",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2043-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2043-11-26",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2043-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2043-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2043-03-27",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2043-05-18",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2043-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2043-09-07",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2043-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2043-10-12",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2043-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2043-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2043-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2044": {
+      "US": [
+        {
+          "date": "2044-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2044-01-18",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2044-02-15",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2044-05-30",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2044-06-19",
+          "name": "Juneteenth National Independence Day",
+          "observed": "2044-06-20"
+        },
+        {
+          "date": "2044-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2044-09-05",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2044-10-10",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2044-11-11",
+          "name": "Veterans Day"
+        },
+        {
+          "date": "2044-11-24",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2044-12-25",
+          "name": "Christmas Day",
+          "observed": "2044-12-26"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2044-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2044-04-15",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2044-05-23",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2044-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2044-09-05",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2044-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2044-10-10",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2044-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2044-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2044-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    },
+    "2045": {
+      "US": [
+        {
+          "date": "2045-01-01",
+          "name": "New Year's Day",
+          "observed": "2045-01-02"
+        },
+        {
+          "date": "2045-01-16",
+          "name": "Birthday of Martin Luther King, Jr."
+        },
+        {
+          "date": "2045-02-20",
+          "name": "Washington's Birthday"
+        },
+        {
+          "date": "2045-05-29",
+          "name": "Memorial Day"
+        },
+        {
+          "date": "2045-06-19",
+          "name": "Juneteenth National Independence Day"
+        },
+        {
+          "date": "2045-07-04",
+          "name": "Independence Day"
+        },
+        {
+          "date": "2045-09-04",
+          "name": "Labor Day"
+        },
+        {
+          "date": "2045-10-09",
+          "name": "Columbus Day"
+        },
+        {
+          "date": "2045-11-11",
+          "name": "Veterans Day",
+          "observed": "2045-11-10"
+        },
+        {
+          "date": "2045-11-23",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2045-12-25",
+          "name": "Christmas Day"
+        }
+      ],
+      "CA": [
+        {
+          "date": "2045-01-01",
+          "name": "New Year's Day"
+        },
+        {
+          "date": "2045-04-07",
+          "name": "Good Friday"
+        },
+        {
+          "date": "2045-05-22",
+          "name": "Victoria Day"
+        },
+        {
+          "date": "2045-07-01",
+          "name": "Canada Day"
+        },
+        {
+          "date": "2045-09-04",
+          "name": "Labour Day"
+        },
+        {
+          "date": "2045-09-30",
+          "name": "National Day for Truth and Reconciliation"
+        },
+        {
+          "date": "2045-10-09",
+          "name": "Thanksgiving Day"
+        },
+        {
+          "date": "2045-11-11",
+          "name": "Remembrance Day"
+        },
+        {
+          "date": "2045-12-25",
+          "name": "Christmas Day"
+        },
+        {
+          "date": "2045-12-26",
+          "name": "Boxing Day"
+        }
+      ]
+    }
+  }
+}

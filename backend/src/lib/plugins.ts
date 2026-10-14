@@ -33,7 +33,7 @@ import { buildProjectTypeFromManifest } from "@/lib/projects/fromManifest";
 import type { ProjectPlan } from "@/lib/projects/types";
 import { parseWhen } from "@/lib/scheduler";
 import { listActivePeople } from "@/lib/access";
-import { resolvePlace } from "@/lib/places";
+import { householdHomeCountryName, resolvePlace } from "@/lib/places";
 import { PACKAGES_DIR, statMtimeMs, isValidPackageId } from "@/lib/paths";
 import { resolvePackageDir, listInstalledPackageIds } from "@/lib/packageResolve";
 import { promptNow } from "@/lib/benchSampling";
@@ -562,7 +562,7 @@ export async function runPlugin(
     // turn's already-frozen clock crosses the MCP boundary as an internal
     // argument. The production path gets the real current instant from
     // promptNow(); the bench pins that same source without changing Date.
-    const handlerInputs = id.startsWith("almanac-") ? { ...inputs, __now: localClockInput(promptNow()) } : inputs;
+    const handlerInputs = id.startsWith("almanac-") ? { ...inputs, __now: localClockInput(promptNow()), ...(id === "almanac-holiday" ? { __home_country: householdHomeCountryName() } : {}) } : inputs;
     const result = await callTier1Handle(id, manifest, actor, handlerInputs);
     if (!result.ok) {
       return { ok: false, status: 502, error: result.message, code: result.code, fallback_reply: result.fallback };

@@ -76,6 +76,10 @@ describe("the what-leaves-the-house table", () => {
     expect(row?.optIn).toBe(true);
   });
 
+  test("the offline holiday package has no generated privacy connection row", () => {
+    expect(pluginConnections().some((row) => row.id.startsWith("almanac-holiday:"))).toBe(false);
+  });
+
   test("the remote engine row says chat pauses when it cannot be reached", () => {
     setHouseholdSettingValue("engines.stack.where", "another_computer");
     const row = privacyConnections().find((r) => r.id === "platform:engine-computer");

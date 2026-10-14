@@ -1,39 +1,59 @@
-import { assertEquals, assert } from "jsr:@std/assert@1";
-import { summarizeNextHoliday, nextHolidayData } from "./handler.ts";
+import { assert, assertEquals, assertStringIncludes } from "jsr:@std/assert@1";
+import { nextHolidayData, summarizeNextHoliday } from "./handler.ts";
 
-Deno.test("names the first (soonest) holiday in the list", () => {
-  const result = summarizeNextHoliday([
-    { date: "2026-12-25", localName: "Christmas Day", name: "Christmas Day" },
-    { date: "2027-01-01", localName: "New Year's Day", name: "New Year's Day" },
-  ]);
-  assert(result.text.includes("Christmas Day"));
-  assert(result.text.includes("December"));
-  const fixture = [{ date: "2026-12-25", localName: "Christmas Day", name: "Christmas Day" }];
-  const data = nextHolidayData(fixture)!;
-  assertEquals(data, { date: "2026-12-25", name: "Christmas Day" });
-  assertEquals(result.text.includes(data.name), true);
-  assertEquals("synopsis" in data, false);
+const holidays = JSON.parse(await Deno.readTextFile(new URL("./holidays.json", import.meta.url)));
+const now = "2026-07-02T12:30:00.000";
+
+Deno.test("an American home place gets the next US holiday with no network", () => {
+  const result = summarizeNextHoliday(holidays, "United States", now);
+  assertStringIncludes(result.text, "Independence Day");
+  assertEquals(nextHolidayData(holidays, "United States", now), { date: "2026-07-04", name: "Independence Day" });
+  const source = Deno.readTextFileSync(new URL("./handler.ts", import.meta.url));
+  assert(!source.includes("fetch("));
+  assert(!source.includes("https://"));
 });
 
-Deno.test("reads an empty list as not found, not a wrong answer", () => {
-  const result = summarizeNextHoliday([]);
-  assertEquals(result.text, "I couldn't find an upcoming holiday.");
+Deno.test("a Canadian home place gets the Canadian list, not the American one", () => {
+  assertStringIncludes(summarizeNextHoliday(holidays, "Canada", now).text, "Labour Day");
+  assertEquals(summarizeNextHoliday(holidays, "United States", now).text.includes("Labour Day"), false);
 });
 
-Deno.test("reads a malformed response as not found, not a throw", () => {
-  const result = summarizeNextHoliday(null);
-  assertEquals(result.text, "I couldn't find an upcoming holiday.");
+Deno.test("the next holiday after the last one of the year is the first of next year", () => {
+  const result = summarizeNextHoliday(holidays, "United States", "2026-12-26T12:00:00.000");
+  assertStringIncludes(result.text, "New Year's Day");
+  assertStringIncludes(result.text, "January 1");
 });
 
-// A real gap found by code review: a NON-EMPTY array whose first
-// element is itself malformed used to slip past the old "does an
-// element exist" check and interpolate straight into the reply.
-Deno.test("reads a non-empty list with a missing name as not found, not a wrong answer", () => {
-  const result = summarizeNextHoliday([{ date: "2026-12-25", localName: "x" }]);
-  assertEquals(result.text, "I couldn't find an upcoming holiday.");
+Deno.test("a fixed-date holiday on a weekend names the observed day off", () => {
+  assertStringIncludes(summarizeNextHoliday(holidays, "United States", "2026-07-04T12:00:00.000").text, "observed on Friday, July 3");
 });
 
-Deno.test("reads a non-empty list with an unparseable date as not found, not 'Invalid Date'", () => {
-  const result = summarizeNextHoliday([{ date: "not-a-date", localName: "x", name: "Mystery Day" }]);
-  assertEquals(result.text, "I couldn't find an upcoming holiday.");
+Deno.test("no home place gives the set-the-home-place answer, not an error", () => {
+  assertEquals(summarizeNextHoliday(holidays, null, now).text, "I don't know which country's holidays to use. An owner or admin can set the home place in Settings.");
+});
+
+Deno.test("a country the file does not cover is named in a plain two-sentence answer", () => {
+  const result = summarizeNextHoliday(holidays, "United Kingdom", now);
+  assertEquals(result.text, "I don't have holiday dates for United Kingdom yet. Ask an owner or admin to check for a Home update.");
+  assertEquals(result.text.split(".").length - 1, 2);
+});
+
+Deno.test("a year outside the file gives the update-Home answer, not an error or a stale date", () => {
+  assertEquals(summarizeNextHoliday(holidays, "Canada", "2046-01-01T12:00:00.000").text, "I don't have holiday dates for 2046 yet. Update Home to get newer dates.");
+});
+
+Deno.test("the country name is matched exactly and null is unknown", () => {
+  assertStringIncludes(summarizeNextHoliday(holidays, "Canada", now).text, "Labour Day");
+  assertStringIncludes(summarizeNextHoliday(holidays, "United Kingdom", now).text, "United Kingdom");
+  assertEquals(summarizeNextHoliday(holidays, "Canada Street", now).text, "I don't know which country's holidays to use. An owner or admin can set the home place in Settings.");
+  assertEquals(summarizeNextHoliday(holidays, null, now).text.startsWith("I don't know"), true);
+});
+
+Deno.test("malformed holidays data gives the not-found answer, not a throw", () => {
+  assertEquals(summarizeNextHoliday({ bad: true }, "United States", now).text, "I couldn't find an upcoming holiday.");
+  assertEquals(summarizeNextHoliday({ ...holidays, years: { "2026": { US: [{ date: "bad", name: "bad" }] } } }, "United States", now).text, "I couldn't find an upcoming holiday.");
+});
+
+Deno.test("the result data stays date and name only", () => {
+  assertEquals(Object.keys(nextHolidayData(holidays, "United States", now)!).sort(), ["date", "name"]);
 });
