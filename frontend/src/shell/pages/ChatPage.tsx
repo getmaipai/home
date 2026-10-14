@@ -1471,6 +1471,7 @@ export function ChatPage({ person }: { person: Roster }) {
               )}
             >
             <ThreadListSidebar
+              tourId="chat.history"
               variant="compact"
               header={chatColumnHeader(false, <TooltipIconButton
                 ref={column.columnToggleRef}
@@ -1662,6 +1663,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <SheetDescription>Past conversations</SheetDescription>
             </SheetHeader>
             <ThreadListSidebar
+              tourId="chat.history"
               data-chat-column-mobile=""
               aria-label="Conversations"
               role="region"

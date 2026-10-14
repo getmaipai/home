@@ -56,6 +56,36 @@
             },
             "placement": "right",
             "order": 10
+          },
+          {
+            "id": "rail",
+            "target": "shell.rail",
+            "title": "Your apps",
+            "body": "Use this rail to move between Home, Chat and the other parts of your hub.",
+            "body_by_audience": {
+              "child": "Use these buttons to move around Home."
+            },
+            "placement": "right",
+            "order": 20
+          },
+          {
+            "id": "chat-app",
+            "target": "rail.chat",
+            "title": "Open Chat",
+            "body": "Choose Chat whenever you want to talk with Home.",
+            "body_by_audience": {
+              "child": "Tap Chat to talk with Home."
+            },
+            "placement": "right",
+            "order": 30
+          },
+          {
+            "id": "incognito",
+            "target": "shell.incognito",
+            "title": "Incognito",
+            "body": "Use Incognito for a chat that is not saved in your history.",
+            "placement": "right",
+            "order": 40
           }
         ]
       },
@@ -102,6 +132,31 @@
             },
             "placement": "top",
             "order": 30
+          },
+          {
+            "id": "history",
+            "target": "chat.history",
+            "title": "Past chats",
+            "body": "Find your earlier conversations in this list.",
+            "body_by_audience": {
+              "child": "Your earlier chats are in this list."
+            },
+            "placement": "right",
+            "order": 40,
+            "condition": {
+              "surface": "desktop"
+            }
+          },
+          {
+            "id": "cited-sources",
+            "target": "chat.citation",
+            "title": "Sources",
+            "body": "Tap a citation to see where this answer came from.",
+            "body_by_audience": {
+              "child": "Tap a number to see where this answer came from."
+            },
+            "placement": "top",
+            "order": 50
           }
         ]
       },
