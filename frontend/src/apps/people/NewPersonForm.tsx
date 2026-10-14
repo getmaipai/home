@@ -22,17 +22,28 @@ interface NewPersonFormProps {
   error: string | null;
   extra?: ReactNode;
   formRef?: Ref<HTMLFormElement>;
+  /** Check the PIN or password (4 to 128 characters) before submitting. */
+  checkSecret?: boolean;
+  /** Hide the form's own submit button when the page supplies one. */
+  hideSubmit?: boolean;
 }
 
 const ROLE_OPTIONS: NewPersonRole[] = ["owner", "adult", "teen", "child", "guest"];
 const NAME_ERROR = "Type a name for this person.";
-export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, busy, error, extra, formRef }: NewPersonFormProps) {
+const SECRET_EMPTY_ERROR = "Type a PIN or password for this person so they can sign in.";
+const SECRET_LENGTH_ERROR = "Use 4 to 128 characters for the PIN or password.";
+function secretProblem(value: string): string | null {
+  if (value.length === 0) return SECRET_EMPTY_ERROR;
+  return value.length < 4 || value.length > 128 ? SECRET_LENGTH_ERROR : null;
+}
+export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, busy, error, extra, formRef, checkSecret = false, hideSubmit = false }: NewPersonFormProps) {
   const choices = [...new Set(creatableRoles(actorRole).map((role) => serverRoleToRoleAdmin(role).role))];
   const [role, setRole] = useState<NewPersonRole>(fixedRole ?? (choices.includes("adult") ? "adult" : choices[0] ?? "adult"));
   const [admin, setAdmin] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [secret, setSecret] = useState("");
   const [nameError, setNameError] = useState(false);
+  const [secretError, setSecretError] = useState<string | null>(null);
   const mayCreateAdmin = creatableRoles(actorRole).includes("admin");
   const owner = role === "owner";
   const secretRequired = requiresSecret(roleAdminToServerRole({ role, admin }));
@@ -45,7 +56,10 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!validateName()) return;
+    const nameOk = validateName();
+    const problem = checkSecret && secretRequired ? secretProblem(secret) : null;
+    setSecretError(problem);
+    if (!nameOk || problem) return;
     try {
       await onSubmit({ displayName, role: roleAdminToServerRole({ role, admin }), ...(secretRequired ? { secret } : {}) });
       setDisplayName("");
@@ -53,6 +67,7 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
       setAdmin(false);
       setRole(fixedRole ?? (choices.includes("adult") ? "adult" : choices[0] ?? "adult"));
       setNameError(false);
+      setSecretError(null);
     } catch {
       // The caller owns the visible error and keeps the entered values for correction.
     }
@@ -85,12 +100,15 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
         {secretRequired ? <Field>
           <FieldLabel htmlFor="new-person-secret">PIN or password (required for {ROLE_LABELS[roleAdminToServerRole({ role, admin })].toLowerCase()})</FieldLabel>
           <Input id="new-person-secret" type="password" placeholder="Enter a PIN or password" value={secret} disabled={busy}
-            aria-label="PIN or password" required onChange={(event) => setSecret(event.target.value)} />
+            aria-label="PIN or password" required={!checkSecret}
+            aria-invalid={secretError !== null} aria-describedby={secretError ? "new-person-secret-error" : undefined}
+            onChange={(event) => { setSecret(event.target.value); if (secretError) setSecretError(secretProblem(event.target.value)); }} />
+          {secretError ? <FieldError id="new-person-secret-error">{secretError}</FieldError> : null}
           <FieldDescription>This person will use it to sign in.</FieldDescription>
         </Field> : null}
         {error ? <FieldError>{error}</FieldError> : null}
         {extra}
-        <Button type="submit" disabled={busy}>{busy ? "Adding…" : submitLabel}</Button>
+        {hideSubmit ? null : <Button type="submit" disabled={busy}>{busy ? "Adding…" : submitLabel}</Button>}
       </FieldGroup>
     </form>
   );

@@ -54,7 +54,7 @@ describe("SetupReviewPage", () => {
     try {
       await waitFor(() => expect(h.container.textContent).toContain("Where should Home's AI run?"));
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
-      expect(h.container.textContent).toContain("Choosing another location is not available yet.");
+      expect(h.container.textContent).toContain("Home will use the default folder.");
       expect(h.container.querySelector("input,button[role=radio]")).toBeNull();
     } finally { h.restore(); }
   });

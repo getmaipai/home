@@ -13,13 +13,17 @@ function freshState(): SetupState {
   return { id: "setup-test", source: "wizard", steps: IDS.map((id) => ({ id, status: "pending", at: now })), phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: "1790000000000:0:abcdef" };
 }
 
-function harness(initial = freshState()) {
+const GREEN_ROWS = [{ id: "engine", title: "Engine service", state: "green", text: "Home's AI is answering." }];
+let checklistOpen = 3;
+function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS) {
   const original = globalThis.fetch;
   let state: SetupState | { done: true } = structuredClone(initial);
   const posts: string[] = [];
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
+    if (url.includes("/api/setup/checks/run")) return new Response(JSON.stringify({ rows: checkRows, state }), { status: 200 });
+    if (url.includes("/api/setup-checklist")) return new Response(JSON.stringify(Array.from({ length: 5 }, (_, i) => ({ id: `item-${i}`, title: "Item", reason: "", done: i >= checklistOpen, open: { label: "Open", href: "/" } }))), { status: 200 });
     if (url.includes("/api/setup/ca")) return new Response(JSON.stringify({ certificate: "public" }), { status: 200 });
     if (url.includes("/api/backups/emergency-kit")) return new Response(JSON.stringify({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "aabb", generatedAt: new Date().toISOString() }), { status: 200 });
     if (url.includes("/api/auth/setup")) return new Response(JSON.stringify({ person: { id: "owner-1" } }), { status: 201 });
@@ -60,9 +64,8 @@ describe("SetupWizard", () => {
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("The engine is slow."));
-      expect(rendered.getAllByRole("alert").some((alert) => alert.textContent?.includes("Unsupported system."))).toBe(true);
-      expect(rendered.getByRole("button", { name: "Try again" }).textContent).toContain("Try again");
-      expect(rendered.getByRole("button", { name: "Try again" }).hasAttribute("disabled")).toBe(true);
+      expect(rendered.container.textContent).toContain("Unsupported system.");
+      expect(rendered.getByRole("button", { name: "Try again" }).hasAttribute("disabled")).toBe(false);
     } finally { globalThis.fetch = original; }
   });
 
@@ -116,7 +119,7 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Continue", "Create your owner account");
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
-      await advanceTo(rendered, "Continue", "Let Home recognise you");
+      await advanceTo(rendered, "Create owner account", "Let Home recognise you");
       await advanceTo(rendered, "Do this later", "Hello");
       await advanceTo(rendered, "Continue", "Your Home is ready");
       expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile", "hello"]);
@@ -147,7 +150,94 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.container.textContent).toContain("Your Home is ready"));
       expect(rendered.container.textContent).toContain("If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.");
       expect(rendered.container.textContent).toContain("Add a phone or tablet");
-      expect(rendered.container.textContent).toContain("Install Tailscale on it, sign in with the same account, and scan this.");
+      expect(rendered.container.textContent).toContain("Install Tailscale on it and sign in with the same account.");
+    } finally { h.restore(); }
+  });
+
+  test("a red check row keeps Try again clickable and pressing it checks again", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state, [{ id: "engine", title: "Engine service", state: "red", text: "Home's AI isn't running." }]);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Needs fixing"));
+      const calls = () => (globalThis.fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.filter((call) => String(call[0]).includes("/api/setup/checks/run")).length;
+      const before = calls();
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Try again" })); });
+      await waitFor(() => expect(calls()).toBe(before + 1));
+      expect(rendered.container.textContent).not.toMatch(/\b(red|green|amber|idle)\b/);
+    } finally { h.restore(); }
+  });
+
+  test("going Back from the plan reaches Checks and stays there instead of jumping forward", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Here's the plan for your Home"));
+      await advanceTo(rendered, "Back", "Checking your computers");
+      await waitFor(() => expect(rendered.container.textContent).toContain("Home's AI is answering."));
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      expect(rendered.container.textContent).toContain("Checking your computers");
+      await advanceTo(rendered, "Back", "Where should Home keep its files?");
+    } finally { h.restore(); }
+  });
+
+  test("a PIN that is empty or too short shows plain copy, keeps the name and sends nothing", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Create your owner account"));
+      expect(rendered.getAllByRole("button", { name: /Create owner account|Continue/ })).toHaveLength(1);
+      fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Create owner account" })); });
+      expect(rendered.container.textContent).toContain("Type a PIN or password for this person so they can sign in.");
+      fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "12" } });
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Create owner account" })); });
+      expect(rendered.container.textContent).toContain("Use 4 to 128 characters for the PIN or password.");
+      expect((rendered.getByLabelText("Name") as HTMLInputElement).value).toBe("Sage");
+      expect(h.posts).toEqual([]);
+    } finally { h.restore(); }
+  });
+
+  test("Back from Face skips the owner form once the owner account exists", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Let Home recognise you"));
+      await advanceTo(rendered, "Back", "Here's the plan for your Home");
+      await advanceTo(rendered, "Continue", "Let Home recognise you");
+    } finally { h.restore(); }
+  });
+
+  test("setup screens never show build-state placeholder copy", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Hello"));
+      expect(rendered.container.textContent).not.toMatch(/not built|not available|isn't available|not supported/i);
+    } finally { h.restore(); }
+  });
+
+  test("the Done screen's things-left number is the hub checklist's own count", async () => {
+    const state = freshState();
+    for (const step of state.steps) if (step.id !== "done") step.status = "done";
+    checklistOpen = 3;
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("3 things left to finish setting up"));
+      checklistOpen = 1;
+      rendered.unmount();
+      const again = view();
+      await waitFor(() => expect(again.container.textContent).toContain("1 thing left to finish setting up"));
     } finally { h.restore(); }
   });
 
