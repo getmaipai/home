@@ -9180,7 +9180,7 @@ async function captureNextPerformanceReview(browser: Browser, sessionValue: stri
  * default per-person cap (20 GB) are real, non-zero settings values
  * though, so the capture isn't only zeros. */
 async function captureNextStorageReview(browser: Browser, sessionValue: string): Promise<void> {
-  const outDir = join(ROOT, "data-scratch", "screenshots");
+  const outDir = join(ROOT, "docs", "assets", "screens");
   mkdirSync(outDir, { recursive: true });
   const cap = await fetch(`${BASE_URL}/api/settings`, {
     method: "PUT",
@@ -9188,15 +9188,6 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
     body: JSON.stringify({ scope: "household", key: "storage.household.cap_bytes", value: 20 * 1024 ** 3 }),
   });
   if (!cap.ok) throw new Error(`storage review: setting the screenshot household cap failed: ${cap.status} ${await cap.text()}`);
-  const cacheSeed = Bun.spawnSync({
-    cmd: ["bun", "run", "scripts/seed-storage-package-cache.ts"],
-    cwd: join(ROOT, "backend"),
-    env: { ...process.env, MAIPAI_DATA_DIR: DATA_DIR },
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  if (cacheSeed.exitCode !== 0) throw new Error(`storage review: seeded cache entries failed with exit ${cacheSeed.exitCode}`);
-
   for (const slug of ["desktop", "phone"] as const) {
     const viewport = VIEWPORTS.find((v) => v.slug === slug)!;
     for (const theme of THEMES) {
@@ -9207,11 +9198,10 @@ async function captureNextStorageReview(browser: Browser, sessionValue: string):
         await page.locator("text=Household total").first().waitFor({ timeout: 15000 });
         await page.getByRole("meter", { name: "bytes used" }).waitFor({ timeout: 15000 });
         await page.locator("text=Household storage cap").first().waitFor({ timeout: 15000 });
-        await page.getByRole("table", { name: "Saved data by source" }).getByRole("cell", { name: "Weather · Open-Meteo" }).first().waitFor({ timeout: 15000 });
-        await page.getByRole("table", { name: "Saved data by source" }).getByRole("cell", { name: /currency/i }).first().waitFor({ timeout: 15000 });
+        await page.getByRole("table", { name: "Saved data by source" }).waitFor({ timeout: 15000 });
         await assertNoLegacyDataTableChrome(page, "Storage");
         await settleAnimations(page);
-        const path = join(outDir, `next-storage-${viewport.width}-${theme}.png`);
+        const path = join(outDir, `storage-${slug}-${theme}.png`);
         await page.screenshot({ path, fullPage: true, animations: "disabled" });
         console.log(`Wrote ${path}`);
         await page.close();

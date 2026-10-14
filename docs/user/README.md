@@ -18,6 +18,7 @@ day the hub arrives; the rest are for when you need them.
 
 - [Notifications](notifications.md): see MaiPai's alerts, and set up Telegram notifications.
 - [Privacy](privacy.md): see exactly what, if anything, leaves your house.
+- [What Home looks up for you](what-home-looks-up.md): every outside service a feature can ask, what it sends, and how to clear what it saved.
 - [Set up web search](web-search.md): connect MaiPai to your own SearXNG search server, use it away from home, and fix it if it stops.
 - [Blocked sites](blocked-sites.md): see which lists of bad sites web search checks, and choose them.
 - [The news shelf](news-shelf.md): how MaiPai keeps recent headlines for the news answer, and how to choose which lists each person sees.
