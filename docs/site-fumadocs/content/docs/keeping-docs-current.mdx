@@ -1,47 +1,27 @@
 ---
 title: Keeping the docs current
-description: "Plan. How the guides and screenshots update when code changes."
+description: "How the guides and screenshots update at release time, and only for what changed."
 ---
-
-<Callout type="warn" title="Plan for approval">Nothing here is built yet. It is the design for your approval.</Callout>
 
 ## The idea in one line
 
-A page either **comes from code** (rebuilt by a script), or **names the code it describes** (the check tells you when that code changed and the page did not).
+Docs are updated when you cut a release, never on a push, and only the pages and pictures whose code changed.
 
-## 1. Pages generated from code
+## How it works
 
-These cannot drift because nobody types them:
+- One file, `docs/site-fumadocs/docs-covers.json`, says which code each guide page and each screenshot describes.
+- At release time `bun scripts/docsDrift.ts` compares the code changed since the last `v*` tag with that file. It prints the pages to re-check and the pictures to retake.
+- The release step then updates only that list. Pictures from the docs run are retaken with `DOCS_SHOTS_ONLY`, so nothing else is regenerated.
+- Edits to tests, locale files and the docs themselves never mark a page as changed.
+- Before the first release tag exists, the window starts at the commit the docs were last verified against.
 
-- The settings reference, the roles table, the privacy "what leaves" list, install facts, the API reference, the design-note index.
-- A script writes them into the pages. The docs check fails if someone edits a generated block by hand.
-- Several already exist: the settings reference, the privacy table and the OpenAPI file. Install facts and the roles table are new.
+## What a contributor does
 
-## 2. Screenshots that rebuild themselves, with captions
-
-- Every picture is declared once in a screenshot list: an id, the screen, the phone or desktop size, light or dark, any state to set up, and the **caption**.
-- The existing `bun run screenshots` takes them from the seeded demo household. Nobody takes a picture by hand.
-- A page uses a picture by id. Its caption comes from the list, so it is the same on every page and in the app's help.
-- The check fails when a page names a picture that is not in the list, and flags a picture whose screen code changed since it was taken.
-- Each new picture is opened and judged once, as the org rule requires.
-
-## 3. Pages that say which code they describe
-
-- Every page has a short header: which files or settings it covers, and the commit it was last checked against.
-- On every code change, the docs check lists pages whose code changed. Fix the page, or mark it "still correct" with a one-line reason. It never silently passes.
-- Docs-only changes keep the fast check.
-
-## 4. Release and publishing
-
-- The site is rebuilt from the tagged release, so each version has matching docs, bundled in the app for the Help assistant.
-- Publishing the public site is a local script, because private repos get no push-triggered workflows.
-- Search, the AI index and the in-app copy all come from the same build.
-
-## 5. A drift report for you
-
-- One command prints "pages that may be out of date, with the code that changed", newest first. A Codex lane can run it each week and file the fixes as small items.
+- A new page or picture gets its entry in `docs-covers.json` in the same commit. A test fails if one is missing or points at nothing.
+- `bun scripts/docsDrift.ts --check` runs the same completeness check by hand.
 
 ## What this does not solve
 
-- A change in meaning that touches no listed file (a new rule). Page headers help, but a person still has to say "this affects the docs".
+- A change in meaning that touches no listed file (a new rule). Someone still has to say "this affects the docs".
 - Screenshots of a feature that has no demo data yet. The seeded household must gain that data first.
+- Pages generated from code, and a hand-edit guard for them, are not part of this step.

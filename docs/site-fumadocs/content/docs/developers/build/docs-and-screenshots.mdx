@@ -1,18 +1,33 @@
 ---
 title: Write docs and screenshots
-description: "Planned page. How a page declares its code and screenshots, and the docs gate."
+description: "How a page declares the code it covers, and how the release-time drift check works."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+## Declare what a page covers
 
-## What this page will cover
+Every page under `content/docs` and every key in `screenshots.json` has an entry in `docs/site-fumadocs/docs-covers.json`:
 
-How a page declares its code and screenshots, and the docs gate.
+```json
+"user/everyday-use/use-incognito": { "areas": ["incognito"] }
+```
 
-## Screenshots it will have (each with a caption)
+- `areas` names code groups defined once at the top of the file, each a list of globs.
+- `covers` adds extra globs for one page (for example `docs/design/RULES.md`).
+- `ignore` lists globs that never count as a change: tests, locales, docs.
+- `baseline` is the commit the docs were last verified at, used until a `v*` tag exists.
 
-- None. Text only.
+## Check what changed
+
+```bash
+bun scripts/docsDrift.ts
+```
+
+It lists the pages to re-check and the pictures to retake since the last release tag. `--since <ref>` picks another start, `--json` gives machine output, `--check` fails if a page or picture has no entry.
+
+## Screenshots
+
+Pictures come only from the screenshot script. The drift output prints the `DOCS_SHOTS_ONLY=...` line that retakes just the affected docs pictures. A picture whose file does not start with `docs-` comes from the general screenshot run. Open every retaken picture before using it.
 
 ## Kept current by
 
-This is the page that explains the system on the "Keeping docs current" plan.
+[Keeping the docs current](/docs/keeping-docs-current) explains the release step. The test `scripts/docsDrift.test.ts` fails if the map falls out of step with the pages.

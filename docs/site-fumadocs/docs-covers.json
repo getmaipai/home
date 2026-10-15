@@ -1,0 +1,672 @@
+{
+  "baseline": "ea6806a5",
+  "ignore": [
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "docs/**",
+    "data-scratch/**",
+    "**/locales/**",
+    "**/*.md"
+  ],
+  "areas": {
+    "chat": [
+      "frontend/src/apps/chat/**",
+      "frontend/src/shell/pages/Chat*.tsx",
+      "backend/src/routes/turn*.ts",
+      "backend/src/routes/conversations.ts",
+      "backend/src/lib/turnMachine/**"
+    ],
+    "incognito": [
+      "backend/src/wire.ts",
+      "frontend/src/apps/chat/chatThreadSlots.tsx",
+      "backend/src/routes/conversations.ts"
+    ],
+    "voice": [
+      "frontend/src/apps/chat/Composer*.tsx",
+      "frontend/src/apps/chat/WakeWord*.tsx",
+      "frontend/src/apps/chat/composerVoice*",
+      "frontend/src/apps/chat/composerDictation*",
+      "backend/src/routes/stt.ts",
+      "backend/src/routes/tts.ts",
+      "backend/src/routes/voice.ts",
+      "backend/src/settings/voiceKeys.ts",
+      "backend/src/settings/wakewordKeys.ts",
+      "backend/src/lib/stt*.ts",
+      "backend/src/lib/tts.ts",
+      "backend/src/lib/wakewordAssets.ts",
+      "backend/src/lib/voiceCatalog.ts",
+      "frontend/src/shell/pages/VoicesPage.tsx"
+    ],
+    "memory": [
+      "frontend/src/apps/memory/**",
+      "backend/src/routes/memory.ts",
+      "backend/src/lib/memory*.ts",
+      "backend/src/lib/forgetCommand.ts"
+    ],
+    "notifications": [
+      "frontend/src/apps/notifications/**",
+      "backend/src/routes/notifications.ts",
+      "backend/src/lib/notifications.ts",
+      "backend/src/lib/notificationTypes.ts",
+      "backend/src/lib/telegramChannel.ts",
+      "backend/src/settings/notificationKeys.ts"
+    ],
+    "people": [
+      "frontend/src/apps/people/**",
+      "frontend/src/shell/pages/FamilyPage.tsx",
+      "frontend/src/shell/pages/PersonProfilePage.tsx",
+      "frontend/src/shell/pages/UsersPage.tsx",
+      "frontend/src/shell/pages/SignInPage.tsx",
+      "backend/src/routes/people.ts",
+      "backend/src/routes/auth*.ts",
+      "backend/src/routes/passkeys.ts",
+      "backend/src/routes/totp.ts",
+      "backend/src/lib/access.ts",
+      "backend/src/lib/permissions.ts",
+      "backend/src/lib/personLifecycle.ts",
+      "backend/src/lib/ageBand.ts",
+      "backend/src/lib/session.ts"
+    ],
+    "safety": [
+      "backend/src/routes/safety.ts",
+      "backend/src/lib/safety*.ts",
+      "backend/src/lib/contentCeiling.ts",
+      "backend/src/lib/topic*.ts",
+      "backend/src/lib/childDisclosure.ts",
+      "backend/src/lib/childLinks.ts",
+      "backend/src/lib/blocklists/**",
+      "backend/src/lib/newsMinorFloor.ts",
+      "backend/src/lib/safeSearch.ts",
+      "backend/src/lib/allowance.ts",
+      "backend/src/settings/allowanceKeys.ts"
+    ],
+    "privacy": [
+      "frontend/src/apps/privacy/**",
+      "frontend/src/shell/pages/PrivacyPage.tsx",
+      "backend/src/routes/privacy.ts",
+      "backend/src/lib/privacy.ts",
+      "backend/src/lib/internetProbe.ts"
+    ],
+    "files-projects": [
+      "frontend/src/apps/library/**",
+      "frontend/src/shell/pages/FilesPage.tsx",
+      "frontend/src/shell/pages/ProjectsPage.tsx",
+      "backend/src/routes/files.ts",
+      "backend/src/routes/projects.ts",
+      "backend/src/routes/attachments.ts",
+      "backend/src/lib/projects/**"
+    ],
+    "settings": [
+      "frontend/src/apps/settings/**",
+      "backend/src/settings/**",
+      "backend/src/lib/settingsRegistry.ts",
+      "backend/src/lib/settings*.ts",
+      "backend/src/routes/settings.ts"
+    ],
+    "setup": [
+      "frontend/src/apps/setup/**",
+      "backend/src/setup/**",
+      "backend/src/routes/setup*.ts",
+      "backend/src/lib/setup*.ts"
+    ],
+    "engines": [
+      "frontend/src/shell/pages/EnginesPage.tsx",
+      "backend/src/routes/engines.ts",
+      "backend/src/routes/engineLink.ts",
+      "backend/src/routes/engineRoles.ts",
+      "backend/src/routes/fitPlan.ts",
+      "backend/src/lib/engine*.ts",
+      "backend/src/lib/fitWording.ts",
+      "backend/src/lib/computerMemory.ts",
+      "backend/src/lib/hardware.ts",
+      "backend/src/lib/modelCatalog.ts",
+      "backend/src/lib/stack*.ts",
+      "backend/src/lib/remoteStackSettings.ts"
+    ],
+    "backups": [
+      "frontend/src/shell/pages/BackupsPage.tsx",
+      "backend/src/routes/backups.ts",
+      "backend/src/lib/backup*.ts",
+      "backend/src/lib/restore*.ts",
+      "backend/src/lib/partialRestore.ts",
+      "backend/src/lib/emergencyKit.ts",
+      "backend/src/lib/receivedBackups.ts"
+    ],
+    "updates": [
+      "frontend/src/shell/pages/UpdatesPage.tsx",
+      "backend/src/routes/updates.ts",
+      "backend/src/lib/updates.ts",
+      "backend/src/lib/stackUpdates.ts"
+    ],
+    "devices": [
+      "frontend/src/shell/pages/DevicesPage.tsx",
+      "backend/src/routes/devices.ts",
+      "backend/src/routes/deviceAuth.ts",
+      "backend/src/lib/device*.ts"
+    ],
+    "performance": [
+      "frontend/src/shell/pages/PerformancePage.tsx",
+      "backend/src/routes/performance.ts",
+      "backend/src/lib/performance.ts"
+    ],
+    "trace-repairs": [
+      "frontend/src/shell/pages/TurnTracePage.tsx",
+      "backend/src/routes/turnTrace.ts",
+      "frontend/src/shell/pages/RepairsPage.tsx",
+      "backend/src/routes/repairs.ts",
+      "backend/src/lib/diagnostics.ts",
+      "frontend/src/shell/pages/StatusPage.tsx"
+    ],
+    "packages": [
+      "backend/src/routes/plugins.ts",
+      "backend/src/lib/packageHost.ts",
+      "backend/src/lib/plugins.ts",
+      "backend/src/lib/bundledPackages.ts",
+      "backend/src/lib/manifestLint.ts",
+      "backend/src/lib/packageResolve.ts",
+      "frontend/src/shell/pages/CommandsPage.tsx",
+      "backend/src/routes/commands.ts",
+      "backend/src/lib/commands.ts"
+    ],
+    "remote-access": [
+      "backend/src/routes/tailscale.ts",
+      "backend/src/lib/tailscale*.ts",
+      "backend/src/lib/quickConnect.ts",
+      "backend/src/routes/quickConnect.ts",
+      "backend/src/lib/mdns.ts",
+      "backend/src/lib/householdCa.ts",
+      "backend/src/lib/hubEndpoints.ts"
+    ],
+    "search": [
+      "backend/src/routes/search.ts",
+      "backend/src/lib/search/**",
+      "backend/src/lib/searchEngines.ts",
+      "backend/src/lib/hostedSearch.ts",
+      "backend/src/lib/webSearchBudget.ts",
+      "backend/src/settings/searchKeys.ts",
+      "backend/src/settings/hostedSearchKeys.ts"
+    ],
+    "storage": [
+      "frontend/src/shell/pages/StoragePage.tsx",
+      "backend/src/routes/storage.ts",
+      "backend/src/lib/storage/**",
+      "backend/src/lib/storage.ts",
+      "backend/src/lib/nasMounts.ts",
+      "backend/src/lib/paths.ts"
+    ],
+    "install": [
+      "scripts/install.sh",
+      "scripts/install.ps1",
+      "scripts/uninstall.sh",
+      "scripts/app.sh",
+      "package.json"
+    ],
+    "shell": [
+      "frontend/src/shell/**",
+      "frontend/src/App.tsx",
+      "frontend/src/apps/home/**"
+    ],
+    "api": [
+      "backend/src/openapi.ts",
+      "backend/src/routes/**",
+      "backend/src/wire.ts"
+    ],
+    "design": [
+      "docs/design/**",
+      "docs/dev.md",
+      "AGENTS.md"
+    ],
+    "dev-tooling": [
+      "scripts/check.sh",
+      "scripts/screenshot.ts",
+      "scripts/gate/**",
+      "docs/site-fumadocs/scripts/**",
+      "docs/site-fumadocs/src/**",
+      "frontend/src/dev/**",
+      "frontend/src/kit/**",
+      "AGENTS.md"
+    ]
+  },
+  "pages": {
+    "index": {
+      "areas": [
+        "shell"
+      ]
+    },
+    "user/index": {
+      "areas": []
+    },
+    "user/start-here/what-maipai-home-is": {
+      "areas": [
+        "privacy"
+      ]
+    },
+    "user/start-here/your-first-minutes": {
+      "areas": [
+        "setup",
+        "people",
+        "chat"
+      ]
+    },
+    "user/start-here/find-your-way-around": {
+      "areas": [
+        "shell"
+      ]
+    },
+    "user/everyday-use/send-a-message": {
+      "areas": [
+        "chat"
+      ]
+    },
+    "user/everyday-use/ask-it-to-look-something-up": {
+      "areas": [
+        "search",
+        "chat"
+      ]
+    },
+    "user/everyday-use/talk-instead-of-type": {
+      "areas": [
+        "voice"
+      ]
+    },
+    "user/everyday-use/use-incognito": {
+      "areas": [
+        "incognito"
+      ]
+    },
+    "user/everyday-use/see-what-it-remembered": {
+      "areas": [
+        "memory"
+      ]
+    },
+    "user/everyday-use/see-your-notifications": {
+      "areas": [
+        "notifications"
+      ]
+    },
+    "user/everyday-use/rate-or-fix-a-reply": {
+      "areas": [
+        "chat"
+      ]
+    },
+    "user/everyday-use/keep-chats-in-a-project": {
+      "areas": [
+        "files-projects"
+      ]
+    },
+    "user/everyday-use/find-and-share-your-files": {
+      "areas": [
+        "files-projects"
+      ]
+    },
+    "user/everyday-use/make-it-easier-to-read": {
+      "areas": [
+        "settings"
+      ]
+    },
+    "user/fix-a-problem/a-setting-will-not-save": {
+      "areas": [
+        "settings"
+      ]
+    },
+    "user/fix-a-problem/cannot-sign-in": {
+      "areas": [
+        "people"
+      ]
+    },
+    "user/fix-a-problem/chat-does-not-answer": {
+      "areas": [
+        "chat",
+        "engines"
+      ]
+    },
+    "user/fix-a-problem/page-will-not-load": {
+      "areas": [
+        "shell",
+        "remote-access"
+      ]
+    },
+    "user/fix-a-problem/still-stuck": {
+      "areas": [
+        "trace-repairs"
+      ]
+    },
+    "user/fix-a-problem/voice-does-not-work": {
+      "areas": [
+        "voice"
+      ]
+    },
+    "user/privacy-and-safety/forget-something": {
+      "areas": [
+        "memory"
+      ]
+    },
+    "user/privacy-and-safety/what-never-leaves": {
+      "areas": [
+        "privacy"
+      ]
+    },
+    "user/privacy-and-safety/what-stays-in-the-house": {
+      "areas": [
+        "privacy",
+        "storage"
+      ]
+    },
+    "user/your-family/who-is-in-the-house": {
+      "areas": [
+        "people"
+      ]
+    },
+    "user/your-family/what-each-role-can-do": {
+      "areas": [
+        "people"
+      ]
+    },
+    "user/your-family/check-in-on-a-child": {
+      "areas": [
+        "people",
+        "safety"
+      ]
+    },
+    "user/your-family/sensitive-subjects": {
+      "areas": [
+        "safety"
+      ]
+    },
+    "user/your-family/sites-and-news-a-child-sees": {
+      "areas": [
+        "safety"
+      ]
+    },
+    "admin/index": {
+      "areas": []
+    },
+    "admin/install-and-set-up/choose-hardware": {
+      "areas": [
+        "engines"
+      ]
+    },
+    "admin/install-and-set-up/install-and-start": {
+      "areas": [
+        "install"
+      ]
+    },
+    "admin/install-and-set-up/first-run-setup": {
+      "areas": [
+        "setup"
+      ]
+    },
+    "admin/install-and-set-up/settings-reference": {
+      "areas": [
+        "settings"
+      ]
+    },
+    "admin/install-and-set-up/use-another-computer-for-the-ai": {
+      "areas": [
+        "engines"
+      ]
+    },
+    "admin/how-it-works/how-home-works": {
+      "areas": [
+        "design"
+      ]
+    },
+    "admin/how-it-works/people-roles-and-permissions": {
+      "areas": [
+        "people"
+      ]
+    },
+    "admin/how-it-works/where-your-data-lives": {
+      "areas": [
+        "storage"
+      ]
+    },
+    "admin/people-and-safety/add-people-and-parental-controls": {
+      "areas": [
+        "people",
+        "safety"
+      ]
+    },
+    "admin/people-and-safety/blocked-sites-and-news-feeds": {
+      "areas": [
+        "safety"
+      ]
+    },
+    "admin/people-and-safety/safety-settings": {
+      "areas": [
+        "safety"
+      ]
+    },
+    "admin/look-after-it/backups-and-restore": {
+      "areas": [
+        "backups"
+      ]
+    },
+    "admin/look-after-it/devices-and-sessions": {
+      "areas": [
+        "devices"
+      ]
+    },
+    "admin/look-after-it/performance": {
+      "areas": [
+        "performance"
+      ]
+    },
+    "admin/look-after-it/privacy-audit": {
+      "areas": [
+        "privacy"
+      ]
+    },
+    "admin/look-after-it/troubleshooting-and-support-report": {
+      "areas": [
+        "trace-repairs"
+      ]
+    },
+    "admin/look-after-it/turn-trace": {
+      "areas": [
+        "trace-repairs"
+      ]
+    },
+    "admin/look-after-it/updates-and-rollback": {
+      "areas": [
+        "updates"
+      ]
+    },
+    "admin/connect-and-extend/commands": {
+      "areas": [
+        "packages"
+      ]
+    },
+    "admin/connect-and-extend/notifications-and-telegram": {
+      "areas": [
+        "notifications"
+      ]
+    },
+    "admin/connect-and-extend/packages": {
+      "areas": [
+        "packages"
+      ]
+    },
+    "admin/connect-and-extend/remote-access": {
+      "areas": [
+        "remote-access"
+      ]
+    },
+    "admin/connect-and-extend/web-search": {
+      "areas": [
+        "search"
+      ]
+    },
+    "developers/index": {
+      "areas": []
+    },
+    "developers/start/architecture-map": {
+      "areas": [
+        "design"
+      ]
+    },
+    "developers/start/repo-layout": {
+      "areas": [
+        "design",
+        "install"
+      ]
+    },
+    "developers/start/run-it-locally": {
+      "areas": [
+        "install"
+      ]
+    },
+    "developers/build/build-a-package": {
+      "areas": [
+        "packages"
+      ]
+    },
+    "developers/build/docs-and-screenshots": {
+      "areas": [
+        "dev-tooling"
+      ]
+    },
+    "developers/build/ui-rules": {
+      "areas": [
+        "dev-tooling"
+      ],
+      "covers": [
+        "docs/design/RULES.md"
+      ]
+    },
+    "developers/reference/api-reference": {
+      "areas": [
+        "api"
+      ]
+    },
+    "developers/reference/design-record": {
+      "areas": [
+        "design"
+      ]
+    },
+    "developers/reference/design-rules": {
+      "covers": [
+        "docs/design/RULES.md"
+      ]
+    },
+    "keeping-docs-current": {
+      "areas": [
+        "dev-tooling"
+      ]
+    }
+  },
+  "shots": {
+    "home": {
+      "areas": [
+        "shell"
+      ]
+    },
+    "chat-empty": {
+      "areas": [
+        "chat"
+      ]
+    },
+    "people": {
+      "areas": [
+        "people"
+      ]
+    },
+    "memory": {
+      "areas": [
+        "memory"
+      ]
+    },
+    "notifications": {
+      "areas": [
+        "notifications"
+      ]
+    },
+    "repairs": {
+      "areas": [
+        "trace-repairs"
+      ]
+    },
+    "roles-users": {
+      "areas": [
+        "people"
+      ]
+    },
+    "updates": {
+      "areas": [
+        "updates"
+      ]
+    },
+    "fit-check": {
+      "areas": [
+        "engines"
+      ]
+    },
+    "sign-in-picker": {
+      "areas": [
+        "people"
+      ]
+    },
+    "sign-in-pin": {
+      "areas": [
+        "people"
+      ]
+    },
+    "sign-in-wrong-pin": {
+      "areas": [
+        "people"
+      ]
+    },
+    "child-topics": {
+      "areas": [
+        "safety",
+        "people"
+      ]
+    },
+    "settings-ease": {
+      "areas": [
+        "settings"
+      ]
+    },
+    "settings-search": {
+      "areas": [
+        "search"
+      ]
+    },
+    "settings-network": {
+      "areas": [
+        "remote-access",
+        "settings"
+      ]
+    },
+    "settings-engines": {
+      "areas": [
+        "engines"
+      ]
+    },
+    "backups": {
+      "areas": [
+        "backups"
+      ]
+    },
+    "main-menu-desktop": {
+      "areas": [
+        "shell"
+      ]
+    },
+    "main-menu-phone": {
+      "areas": [
+        "shell"
+      ]
+    },
+    "setup-wizard": {
+      "areas": [
+        "setup"
+      ]
+    },
+    "notifications-history": {
+      "areas": [
+        "notifications"
+      ]
+    }
+  }
+}
