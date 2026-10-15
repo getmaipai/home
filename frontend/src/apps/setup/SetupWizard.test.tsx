@@ -9,6 +9,7 @@ beforeEach(() => { sessionStorage.clear(); });
 
 const IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "done"] as const;
 function freshState(): SetupState {
+  sessionStorage.setItem("maipai:setup-before-start-read", "true");
   const now = new Date().toISOString();
   return { id: "setup-test", source: "wizard", steps: IDS.map((id) => ({ id, status: "pending", at: now })), phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: "1790000000000:0:abcdef" };
 }
@@ -76,7 +77,7 @@ describe("SetupWizard", () => {
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Here's the plan for your Home"));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Your setup plan"));
       expect(rendered.container.textContent).not.toContain("What should we call your household");
     } finally { h.restore(); }
   });
@@ -97,12 +98,14 @@ describe("SetupWizard", () => {
     try {
       let rendered = view();
       await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
-      await advanceTo(rendered, "Set up my Home", "Where should Home's AI run?");
+      await advanceTo(rendered, "Set up my Home", "Before you start");
+      expect(h.posts).toEqual([]);
+      await advanceTo(rendered, "I understand", "How should Home run?");
       expect(h.posts).toEqual(["welcome"]);
       rendered.unmount();
       rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Where should Home's AI run?"));
-      await advanceTo(rendered, "Continue", "Where should Home keep its files?");
+      await waitFor(() => expect(rendered.container.textContent).toContain("How should Home run?"));
+      await advanceTo(rendered, "Continue", "Choose Home's file folder");
       expect(h.posts).toEqual(["welcome", "engine_location"]);
     } finally { h.restore(); }
   });
@@ -112,16 +115,18 @@ describe("SetupWizard", () => {
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
-      await advanceTo(rendered, "Set up my Home", "Where should Home's AI run?");
-      await advanceTo(rendered, "Continue", "Where should Home keep its files?");
+      await advanceTo(rendered, "Set up my Home", "Before you start");
+      await advanceTo(rendered, "I understand", "How should Home run?");
+      await advanceTo(rendered, "Continue", "Choose Home's file folder");
       await advanceTo(rendered, "Continue", "Checking your computers");
-      await advanceTo(rendered, "Continue", "Here's the plan for your Home");
+      await advanceTo(rendered, "Continue", "Your setup plan");
       await advanceTo(rendered, "Continue", "Create your owner account");
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
-      await advanceTo(rendered, "Create owner account", "Let Home recognise you");
+      await advanceTo(rendered, "Create owner account", "Let Home greet you");
       await advanceTo(rendered, "Do this later", "Hello");
-      await advanceTo(rendered, "Continue", "Your Home is ready");
+      await advanceTo(rendered, "Continue", "Save your backup key");
+      await advanceTo(rendered, "Continue", "You're all set");
       expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile", "hello"]);
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
       expect(h.posts.at(-1)).toBe("done");
@@ -129,28 +134,50 @@ describe("SetupWizard", () => {
     } finally { h.restore(); }
   });
 
-  test("screen 1 copy matches the note, including the home pitch and disclaimer", async () => {
+  test("Welcome is brief and the required disclosure is the next step", async () => {
     const h = harness();
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Welcome to MaiPai Home"));
-      expect(rendered.container.textContent).toContain("Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.");
-      expect(rendered.container.textContent).toContain("Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.");
-      const note = await Bun.file(new URL("../../../../docs/plans/install-wizard-2026-10-13.md", import.meta.url)).text();
-      expect(note).toContain("Home's answers come from AI models you choose to download. They can be wrong, offensive or harmful, and they are not medical, legal or professional advice. You are responsible for how you use them.");
+      expect(rendered.container.textContent).toContain("Your family's private AI, in your own home.");
+      expect(rendered.container.textContent).not.toContain("wrong, offensive, or harmful");
+      await advanceTo(rendered, "Set up my Home", "Before you start");
+      expect(rendered.getByRole("button", { name: "I understand" })).toBeTruthy();
+      expect(rendered.container.textContent).toContain("Home is built to protect your family and your data. Like any AI or online tool, it works best when you know a few things.");
+      expect(rendered.container.textContent).toContain("AI can be wrong or say the wrong thing");
+      expect(rendered.container.textContent).toContain("Kids may still see things they shouldn't");
+      expect(rendered.container.textContent).toContain("People can grow attached to AI");
+      expect(rendered.container.textContent).toContain("Home goes online for you");
+      expect(rendered.container.textContent).toContain("Home goes online for you");
+      expect(rendered.queryByText(/Answers can be inaccurate, offensive, or harmful\./)).toBeNull();
+      fireEvent.click(rendered.getByRole("button", { name: "AI can be wrong or say the wrong thing" }));
+      expect(rendered.container.textContent).toContain("Answers can be inaccurate, offensive, or harmful.");
+      expect(rendered.container.textContent).toContain("you are responsible for how you use them.");
     } finally { h.restore(); }
   });
 
-  test("screen 11 backup and device copy matches the note", async () => {
+  test("an unfinished setup also shows the new required disclosure before resuming", async () => {
     const state = freshState();
-    for (const step of state.steps) if (step.id !== "done") step.status = "done";
+    for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    sessionStorage.removeItem("maipai:setup-before-start-read");
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Your Home is ready"));
-      expect(rendered.container.textContent).toContain("If this computer breaks, this file brings your Home back on a new one. Keep it somewhere other than this computer.");
-      expect(rendered.container.textContent).toContain("Add a phone or tablet");
-      expect(rendered.container.textContent).toContain("Install Tailscale on it and sign in with the same account.");
+      await waitFor(() => expect(rendered.container.textContent).toContain("Before you start"));
+      await advanceTo(rendered, "I understand", "Checking your computers");
+      expect(h.posts).toEqual(["welcome"]);
+    } finally { h.restore(); }
+  });
+
+  test("backup key has its own screen before the final step", async () => {
+    const state = freshState();
+    for (const step of state.steps) if (step.id !== "hello" && step.id !== "done") step.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Hello"));
+      await advanceTo(rendered, "Continue", "Save your backup key");
+      expect(rendered.container.textContent).toContain("If this computer breaks, this key restores your Home on a new one.");
     } finally { h.restore(); }
   });
 
@@ -175,12 +202,12 @@ describe("SetupWizard", () => {
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Here's the plan for your Home"));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Your setup plan"));
       await advanceTo(rendered, "Back", "Checking your computers");
       await waitFor(() => expect(rendered.container.textContent).toContain("Home's AI is answering."));
       await new Promise((resolve) => setTimeout(resolve, 1800));
       expect(rendered.container.textContent).toContain("Checking your computers");
-      await advanceTo(rendered, "Back", "Where should Home keep its files?");
+      await advanceTo(rendered, "Back", "Choose Home's file folder");
     } finally { h.restore(); }
   });
 
@@ -209,9 +236,9 @@ describe("SetupWizard", () => {
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Let Home recognise you"));
-      await advanceTo(rendered, "Back", "Here's the plan for your Home");
-      await advanceTo(rendered, "Continue", "Let Home recognise you");
+      await waitFor(() => expect(rendered.container.textContent).toContain("Let Home greet you"));
+      await advanceTo(rendered, "Back", "Your setup plan");
+      await advanceTo(rendered, "Continue", "Let Home greet you");
     } finally { h.restore(); }
   });
 

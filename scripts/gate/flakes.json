@@ -22,6 +22,18 @@
     ],
     "frontend": [
       {
+        "file": "src/shell/NotificationBell.test.tsx",
+        "reason": "Its notification polling and toast assertions use process-global fetch, which other UI test files replace."
+      },
+      {
+        "file": "src/shell/pages/status/StatusComponents.test.tsx",
+        "reason": "Its service restart fetch mock is process-global and can be replaced before the async status query resolves."
+      },
+      {
+        "file": "src/shell/pages/UsersPage.test.tsx",
+        "reason": "Its person deletion-preview fetch is process-global; multi-file workers can replace the stub before the query completes."
+      },
+      {
         "file": "src/shell/pages/NextModelsPage.test.tsx",
         "reason": "The fetch mock observes process-global fetch and has shown cross-file interference."
       }

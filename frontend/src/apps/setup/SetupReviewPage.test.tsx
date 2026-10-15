@@ -23,15 +23,15 @@ describe("SetupReviewPage", () => {
   test("review mode shows exactly the four production screens and no owner step", async () => {
     const h = setupReviewHarness();
     try {
-      await waitFor(() => expect(h.container.textContent).toContain("Where should Home's AI run?"));
+      await waitFor(() => expect(h.container.textContent).toContain("How should Home run?"));
       expect(h.getAllByRole("button", { name: "Continue" })).toHaveLength(1);
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
-      expect(h.container.textContent).toContain("Where should Home keep its files?");
+      expect(h.container.textContent).toContain("Choose Home's file folder");
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
       expect(h.container.textContent).toContain("Checking your computers");
       expect(h.container.textContent).toContain("Engine service");
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
-      expect(h.container.textContent).toContain("Here's the plan for your Home");
+      expect(h.container.textContent).toContain("Your setup plan");
       expect(h.container.textContent).not.toContain("Create your owner account");
       expect(h.container.textContent).not.toContain("Owner or admin?");
     } finally { h.restore(); }
@@ -40,7 +40,7 @@ describe("SetupReviewPage", () => {
   test("review never requests a setup endpoint and an unchanged review writes nothing", async () => {
     const h = setupReviewHarness();
     try {
-      await waitFor(() => expect(h.container.textContent).toContain("Where should Home's AI run?"));
+      await waitFor(() => expect(h.container.textContent).toContain("How should Home run?"));
       for (let i = 0; i < 3; i++) await fireEvent.click(h.getByRole("button", { name: "Continue" }));
       await fireEvent.click(h.getByRole("button", { name: "Done" }));
       await waitFor(() => expect(h.container.textContent).toContain("Repairs"));
@@ -52,9 +52,9 @@ describe("SetupReviewPage", () => {
   test("storage location stays read only", async () => {
     const h = setupReviewHarness();
     try {
-      await waitFor(() => expect(h.container.textContent).toContain("Where should Home's AI run?"));
+      await waitFor(() => expect(h.container.textContent).toContain("How should Home run?"));
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
-      expect(h.container.textContent).toContain("Home will use the default folder.");
+      expect(h.container.textContent).toContain("Home uses its ready-to-use default folder.");
       expect(h.container.querySelector("input,button[role=radio]")).toBeNull();
     } finally { h.restore(); }
   });

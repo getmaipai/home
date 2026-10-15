@@ -60,6 +60,26 @@ describe("findOverflowingPanels", () => {
     expect(findOverflowingPanels()).toEqual([]);
   });
 
+  test("does not count a viewport-fixed footer as overflow of a centered column", () => {
+    document.body.innerHTML = `
+      <main id="wizard-column"><div id="sticky-footer" data-wizard-bar style="position: fixed"></div></main>
+    `;
+    mockRect(document.getElementById("wizard-column")!, { left: 400, right: 1040 });
+    mockRect(document.getElementById("sticky-footer")!, { left: 0, right: 1440 });
+
+    expect(findOverflowingPanels()).toEqual([]);
+  });
+
+  test("still reports unrelated fixed content outside a centered column", () => {
+    document.body.innerHTML = `
+      <main id="wizard-column"><div id="fixed-widget" style="position: fixed"></div></main>
+    `;
+    mockRect(document.getElementById("wizard-column")!, { left: 400, right: 1040 });
+    mockRect(document.getElementById("fixed-widget")!, { left: 0, right: 1440 });
+
+    expect(findOverflowingPanels()).toContain("main#wizard-column");
+  });
+
   test("does not report a child clipped by its own overflow-hidden container", () => {
     document.body.innerHTML = `
       <a id="logo" style="overflow-x: hidden"><img id="wordmark" alt="MaiPai Home" /></a>

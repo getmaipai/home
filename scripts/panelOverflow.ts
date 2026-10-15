@@ -88,7 +88,13 @@ export function findOverflowingPanels(): string[] {
     // gap rather than chased by loosening this for every viewport that
     // does matter.
     const parentRect = el.getBoundingClientRect();
-    const overflowsRight = Array.from(el.children).some((child) => child.getBoundingClientRect().right > parentRect.right + 2);
+    const overflowsRight = Array.from(el.children).some((child) => {
+      // The Wizard's own fixed footer intentionally spans the viewport,
+      // outside a centered column's box. Keep other fixed content in the
+      // overflow check so a real offscreen panel still gets reported.
+      if (child instanceof HTMLElement && child.matches("[data-wizard-bar]") && getComputedStyle(child).position === "fixed") return false;
+      return child.getBoundingClientRect().right > parentRect.right + 2;
+    });
     if (overflowsRight) offending.push(el);
   }
   // One real overflow pushes every ancestor's own scrollWidth past its

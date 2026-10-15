@@ -11,6 +11,8 @@ does.
 
 - [ ] **DATA-WEATHER-CATALOG-01:** Port Home's weather package updates (0.1.1, model-selected routing, household home-place warming and privacy copy, and current/hourly/7-day forecast blocks) to `getmaipai/catalog/plugins/utilities/weather`, verify the package there, then refresh Home's bundled copy from catalog.
 
+- [ ] **WIZ-FOOTER-01: setup content stays reachable above the fixed Wizard footer** (S, Commons first; architect APPROVED in `data-scratch/architect/WIZ-FOOTER-01.verdict`). Objective: fix the setup wizard screens where the fixed footer covers the last content rows. Reuse check: fix the shared `commons/ui` Wizard primitive, then pin its released tag in Home; no Home layout override or wrapper. Pointers: Commons `ui/src/primitives/Wizard.tsx`; Home `frontend/src/apps/setup/SetupWizard.tsx`. Acceptance: at 390x844 and 1440x900 in light and dark themes, the setup content can scroll fully above the fixed footer; regression tests cover the footer clearance and content reachability. Out of scope: changing the Home wizard to an in-flow footer or adding Home-specific layout CSS. Exit: `bash scripts/check.sh` in Commons and Home.
+
 - [x] **SETUP-REVIEW-01: run setup again in review mode from Repairs** (small M). Repairs actions are owner/admin only. Review shows the four production screens, never writes setup state, and only saves a changed existing engine location. Storage and plan remain read only until DATA-LOCATION keys and a working plan screen land; see the setup plan note and the review report.
 
 Rough size tags: **S** (a session or less), **M** (a real slice, days),
