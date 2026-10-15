@@ -160,7 +160,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     const url = URL.createObjectURL(new Blob([file], { type: "text/plain;charset=utf-8" }));
     const link = document.createElement("a");
     link.href = url;
-    link.download = "maipai-home-emergency-kit.txt";
+    link.download = "maipai-home-emergency-backup-key.txt";
     link.click();
     URL.revokeObjectURL(url);
   }

@@ -9706,5 +9706,5 @@ From `docs/plans/docs-vs-reality-2026-10-14.md`. The guides now say only what wo
 - [ ] **DOCS-GAP-03: Admin UI links a teen's profile and shows the Memories tab, though the server refuses** (S). Hide both for admins (ruling 2026-09-30, teens' settings stay private).
 - [ ] **DOCS-GAP-04: `reference.update.mode`, `reference.update.max_mbps`, `reference.pageviews_signal` and `household.family_name` have no code behind them** (S each). Build (KS-REF-00, KS-06) or remove the keys.
 - [ ] **DOCS-GAP-05: Packages page promised a "Your apps" section on Home; no such section exists** (M). Build it or leave the docs as corrected.
-- [ ] **DOCS-GAP-06: Setup wizard and Settings save the backup key under two different file names** (S). Pick one name.
+- [x] **DOCS-GAP-06: Setup wizard and Settings save the backup key under two different file names** (S). Pick one name.
 - [ ] **DOCS-GAP-07: Turn trace page has no link in the app** (S). `/trace/:turnId` is reachable only by address.
