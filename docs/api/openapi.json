@@ -21296,6 +21296,283 @@
         }
       }
     },
+    "/api/setup/install": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "What the AI install is doing, for the wizard footer",
+        "responses": {
+          "200": {
+            "description": "The install summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "downloading",
+                        "starter_ready",
+                        "stalled",
+                        "out_of_space",
+                        "failed",
+                        "ready"
+                      ]
+                    },
+                    "chatReady": {
+                      "type": "boolean"
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    },
+                    "percent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "completedBytes": {
+                      "type": "number"
+                    },
+                    "totalBytes": {
+                      "type": "number"
+                    },
+                    "bytesPerSecond": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "etaSeconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "problem": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "completedBytes": {
+                            "type": "number"
+                          },
+                          "totalBytes": {
+                            "type": "number"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "model",
+                          "role",
+                          "label",
+                          "state",
+                          "completedBytes",
+                          "totalBytes",
+                          "reason"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "chatReady",
+                    "complete",
+                    "percent",
+                    "completedBytes",
+                    "totalBytes",
+                    "bytesPerSecond",
+                    "etaSeconds",
+                    "problem",
+                    "items"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Install the plan: start the downloads and go on",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vram_gb": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The downloads started in the background.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "started": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "models": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "started",
+                    "models"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "There is nothing the AI can install on this computer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "next": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/plan": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "What Home would install on the AI computer",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 512
+            },
+            "required": false,
+            "name": "vram_gb",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Stack's plan and Home's words for it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plan": {
+                      "nullable": true
+                    },
+                    "wording": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string",
+                          "enum": [
+                            "recommended",
+                            "moderate",
+                            "minimal",
+                            "below_minimum",
+                            "unknown"
+                          ]
+                        },
+                        "headline": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "gets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "needsMemoryAnswer": {
+                          "type": "boolean"
+                        },
+                        "sizeLine": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "diskLine": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "headline",
+                        "detail",
+                        "gets",
+                        "needsMemoryAnswer",
+                        "sizeLine",
+                        "diskLine"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "wording"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/setup/search/use-candidate": {
       "post": {
         "tags": [
@@ -22646,6 +22923,325 @@
                     "error"
                   ],
                   "additionalProperties": false
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/install": {
+      "get": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "What the AI install is doing now",
+        "responses": {
+          "200": {
+            "description": "The install summary, from the Stack's download jobs.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "none",
+                        "downloading",
+                        "starter_ready",
+                        "stalled",
+                        "out_of_space",
+                        "failed",
+                        "ready"
+                      ]
+                    },
+                    "chatReady": {
+                      "type": "boolean"
+                    },
+                    "complete": {
+                      "type": "boolean"
+                    },
+                    "percent": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "completedBytes": {
+                      "type": "number"
+                    },
+                    "totalBytes": {
+                      "type": "number"
+                    },
+                    "bytesPerSecond": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "etaSeconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "problem": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "model": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string"
+                          },
+                          "completedBytes": {
+                            "type": "number"
+                          },
+                          "totalBytes": {
+                            "type": "number"
+                          },
+                          "reason": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "model",
+                          "role",
+                          "label",
+                          "state",
+                          "completedBytes",
+                          "totalBytes",
+                          "reason"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "chatReady",
+                    "complete",
+                    "percent",
+                    "completedBytes",
+                    "totalBytes",
+                    "bytesPerSecond",
+                    "etaSeconds",
+                    "problem",
+                    "items"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/install/retry": {
+      "post": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "Start the missing downloads again",
+        "responses": {
+          "202": {
+            "description": "The downloads were started again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "started": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "started"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin may do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/install/plan": {
+      "get": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "What Home would install on the AI computer now",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 512
+            },
+            "required": false,
+            "name": "vram_gb",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The Stack's plan and Home's words for it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "plan": {
+                      "nullable": true
+                    },
+                    "wording": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string",
+                          "enum": [
+                            "recommended",
+                            "moderate",
+                            "minimal",
+                            "below_minimum",
+                            "unknown"
+                          ]
+                        },
+                        "headline": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "gets": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "needsMemoryAnswer": {
+                          "type": "boolean"
+                        },
+                        "sizeLine": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "diskLine": {
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "headline",
+                        "detail",
+                        "gets",
+                        "needsMemoryAnswer",
+                        "sizeLine",
+                        "diskLine"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "wording"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/install/start": {
+      "post": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "Download the plan's AI models (change or add the AI)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vram_gb": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The downloads started in the background.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "started": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "models": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "started",
+                    "models"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin may do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "There is nothing the AI can install on this computer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
                 }
               }
             }
