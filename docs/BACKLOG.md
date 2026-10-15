@@ -9703,7 +9703,7 @@ From `docs/plans/docs-vs-reality-2026-10-14.md`. The guides now say only what wo
 
 - [x] **DOCS-GAP-01: The four `engines.stack.use_*` keys are deprecated, but their help text says to turn them on** (S). `backend/src/settings/aiKeys.ts:117-160`. Reword or hide them.
 - [ ] **DOCS-GAP-02: Daily time allowances are saved but never applied** (M). `dailyMinutesAllowed()` in `backend/src/lib/allowance.ts` has no callers. Enforce it or say so in the Limits tab.
-- [ ] **DOCS-GAP-03: Admin UI links a teen's profile and shows the Memories tab, though the server refuses** (S). Hide both for admins (ruling 2026-09-30, teens' settings stay private).
+- [x] **DOCS-GAP-03: Admin UI links a teen's profile and shows the Memories tab, though the server refuses** (S). Hide both for admins (ruling 2026-09-30, teens' settings stay private).
 - [ ] **DOCS-GAP-04: `reference.update.mode`, `reference.update.max_mbps`, `reference.pageviews_signal` and `household.family_name` have no code behind them** (S each). Build (KS-REF-00, KS-06) or remove the keys.
 - [ ] **DOCS-GAP-05: Packages page promised a "Your apps" section on Home; no such section exists** (M). Build it or leave the docs as corrected.
 - [x] **DOCS-GAP-06: Setup wizard and Settings save the backup key under two different file names** (S). Pick one name.

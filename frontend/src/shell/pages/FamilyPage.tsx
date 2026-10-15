@@ -66,8 +66,8 @@ function personAvatarClass(entry: PersonRosterEntry): string {
  * (`ordered` below) instead of sitting in a separate profile block above
  * it, which is what the old stacked layout's double avatar came from
  * (the design record: "their name shows twice today: once above the
- * table, once as a row in it"). Tapping any card, including your own,
- * opens `/people/:id`, the next-shell profile page for any person. */
+ * table, once as a row in it"). Tapping a card, including your own,
+ * opens `/people/:id`; an owner's or admin's view of a teen's card is not a link (ruling 2026-09-30). */
 export function FamilyPage({ person }: { person: Roster }) {
   useTabItem("Family");
   const [params, setParams] = useSearchParams();
@@ -115,15 +115,22 @@ export function FamilyPage({ person }: { person: Roster }) {
               <CardTitle>Family</CardTitle>
             </CardHeader>
             <div className={`grid gap-4 ${GRID_COLUMNS.default}`}>
-              {ordered.map((entry) => (
-                <Link key={entry.id} to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+              {ordered.map((entry) => {
+                const card = (
                   <Card>
                     <CardContent>
                       <FamilyBody title={entry.display_name} subtitle={ROLE_LABELS[entry.role]} detail={entry.bio} avatarName={entry.display_name} avatarClassName={personAvatarClass(entry)} />
                     </CardContent>
                   </Card>
-                </Link>
-              ))}
+                );
+                // Owners and admins reach only a child's profile, never a teen's (ruling 2026-09-30).
+                if (entry.id !== person.id && entry.role === "teen" && isOwnerOrAdminRole(person.role)) return <div key={entry.id}>{card}</div>;
+                return (
+                  <Link key={entry.id} to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                    {card}
+                  </Link>
+                );
+              })}
             </div>
           </div>
         );

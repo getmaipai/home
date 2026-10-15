@@ -148,6 +148,35 @@ describe("FamilyPage", () => {
     }
   });
 
+  test("an owner or admin gets a link to a child's card but not a teen's; the teen's own card still links", async () => {
+    const roster = [
+      makeRosterEntry({ id: "p1", display_name: "Nova", role: "owner" }),
+      makeRosterEntry({ id: "p2", display_name: "Marlow", role: "teen" }),
+      makeRosterEntry({ id: "p3", display_name: "Sage", role: "child" }),
+    ];
+    for (const role of ["owner", "admin"] as const) {
+      const restore = mockFamilyFetch(roster);
+      try {
+        renderFamilyPage(makePerson({ id: "p1", display_name: "Nova", role }));
+        await waitFor(() => expect(document.body.textContent).toContain("Marlow"));
+        expect(document.querySelector('a[href="/people/p3"]')).not.toBeNull();
+        expect(document.querySelector('a[href="/people/p2"]')).toBeNull();
+        expect(document.querySelector('a[href="/people/p1"]')).not.toBeNull();
+      } finally {
+        restore();
+        cleanup();
+      }
+    }
+    const restore = mockFamilyFetch(roster);
+    try {
+      renderFamilyPage(makePerson({ id: "p2", display_name: "Marlow", role: "teen" }));
+      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
+      expect(document.querySelector('a[href="/people/p2"]')).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   test("a failed household fetch shows an error and a retry button, never a stuck loading state", async () => {
     const originalFetch = globalThis.fetch;
     globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;

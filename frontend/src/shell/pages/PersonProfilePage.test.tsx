@@ -246,6 +246,26 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
+  test("an owner or admin sees no Memories tab on a teen's profile, even by URL, but does on a child's", async () => {
+    const teen = rosterEntry({ id: "person-nova", display_name: "Nova", role: "teen" });
+    const restore = stubFetch({});
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => String(input).includes("/api/people")
+      ? Promise.resolve(Response.json([...people.slice(0, 2), teen]))
+      : Promise.resolve(Response.json([]))) as unknown as typeof fetch;
+    try {
+      for (const role of ["owner", "admin"] as const) {
+        const teenView = renderProfile("/people/person-nova?tab=memories", viewer({ role }));
+        await teenView.findByText("Nova");
+        expect(teenView.queryByRole("tab", { name: "Memories" })).toBeNull();
+        teenView.unmount();
+        const childView = renderProfile("/people/person-bramble", viewer({ role }));
+        expect(await childView.findByRole("tab", { name: "Memories" })).toBeTruthy();
+        childView.unmount();
+      }
+    } finally { globalThis.fetch = original; restore(); }
+  });
+
   test("limits follow the backend age band when an adult role has a child birthdate", async () => {
     const restore = stubFetch({});
     try {

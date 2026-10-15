@@ -35,7 +35,10 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   const queryClient = useQueryClient();
   const rosterQuery = useQuery<PersonRosterEntry[]>({ queryKey: ["people"], queryFn: () => api.people() });
   const viewingSelf = id === person.id;
-  const canViewMemories = viewingSelf || isOwnerOrAdminRole(person.role);
+  // Mirrors the server's canAccessPerson: an owner or admin reaches only a CHILD's memories
+  // (ruling 2026-09-30), never a teen's or another adult's.
+  const canViewMemories = viewingSelf
+    || (isOwnerOrAdminRole(person.role) && rosterQuery.data?.some((entry) => entry.id === id && entry.role === "child") === true);
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
     && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
   const activeTab = params.get("tab") === "memories" && canViewMemories
