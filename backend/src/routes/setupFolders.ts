@@ -73,17 +73,19 @@ setupFolderRoutes.openapi(createRouteDef, (c) => {
 const PlacementRowSchema = z.object({ class: z.string(), kind: z.enum(["refusal", "warning", "unknown"]), id: z.string(), text: z.string(), fix: z.string() });
 const checkRoute = createRoute({
   method: "post", path: "/storage/check", tags: ["Setup"], summary: "Check a proposed storage layout",
-  request: { body: { content: { "application/json": { schema: z.object({ models: z.string().optional(), records: z.string() }).strict() } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ models: z.string().optional(), records: z.string().optional() }).strict() } } } },
   responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(PlacementRowSchema) }) } }, description: "checkPlacement's rows, unchanged." }, ...errs },
 });
 setupFolderRoutes.openapi(checkRoute, async (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
   const { models, records } = c.req.valid("json");
-  for (const path of [records, ...(models ? [models] : [])]) {
+  const layout = { ...(models ? { models } : {}), ...(records ? { records } : {}) };
+  for (const path of Object.values(layout)) {
     const problem = validateProposedPath(path);
     if (problem) return c.json({ error: problem }, 400) as never;
   }
-  const rows = await checkPlacement({ records, ...(models ? { models } : {}) });
+  // A class left out keeps its default folder and is not checked here.
+  const rows = Object.keys(layout).length ? await checkPlacement(layout) : [];
   return c.json({ rows }, 200);
 });

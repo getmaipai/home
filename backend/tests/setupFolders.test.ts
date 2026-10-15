@@ -178,6 +178,8 @@ describe("storage check", () => {
 
   test("a relative or .. path is refused before any check runs", async () => {
     expect((await new TestClient().post("/api/setup/storage/check", { records: "alpha" })).status).toBe(400);
+    const modelsOnly = await new TestClient().post("/api/setup/storage/check", { models: join(root, "alpha") });
+    expect(modelsOnly.status).toBe(200);
     expect((await new TestClient().post("/api/setup/storage/check", { records: `${root}/../x` })).status).toBe(400);
   });
 });

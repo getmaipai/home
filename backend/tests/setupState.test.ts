@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, test } from "bun:test";
 import { app } from "@/app";
-import { getSetupState } from "@/lib/setupState";
+import { getSetupState, getStorageChoice } from "@/lib/setupState";
+import { mkdtempSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { __clearSessionCacheForTests } from "@/middleware/auth";
@@ -108,5 +111,56 @@ describe("setup state routes", () => {
     for (const step of ["owner", "face", "profile", "hello", "done"]) {
       expect((await anon.post(`/api/setup/${step}`, result())).status).toBe(200);
     }
+  });
+});
+
+describe("setup storage step with chosen folders (WIZ-STORAGE-03)", () => {
+  const folder = () => realpathSync(mkdtempSync(join(tmpdir(), "setup-storage-")));
+
+  test("saves the chosen folders in the setup state and keeps them across later steps", async () => {
+    const client = new TestClient();
+    const models = folder();
+    const records = folder();
+    const response = await client.post("/api/setup/storage", { status: "done", models, records });
+    expect(response.status).toBe(200);
+    expect(getStorageChoice()).toEqual({ models, records });
+    await client.post("/api/setup/engine_location", result());
+    expect(getStorageChoice()).toEqual({ models, records });
+    expect(getSetupState().steps.find((step) => step.id === "storage")?.status).toBe("done");
+  });
+
+  test("a split setup saves only the data folder", async () => {
+    const records = folder();
+    expect((await new TestClient().post("/api/setup/storage", { status: "done", records })).status).toBe(200);
+    expect(getStorageChoice()).toEqual({ records });
+  });
+
+  test("keeping the default saves no choice", async () => {
+    expect((await new TestClient().post("/api/setup/storage", result())).status).toBe(200);
+    expect(getStorageChoice()).toBeUndefined();
+  });
+
+  test("a folder the placement check refuses is not saved, and the error says what to do", async () => {
+    const response = await new TestClient().post("/api/setup/storage", { status: "done", records: "/etc" });
+    expect(response.status).toBe(400);
+    const body = await response.json() as { error: string; next: string };
+    expect(body.error.length).toBeGreaterThan(10);
+    expect(body.next.length).toBeGreaterThan(5);
+    expect(getStorageChoice()).toBeUndefined();
+  });
+
+  test("a relative path is refused", async () => {
+    const response = await new TestClient().post("/api/setup/storage", { status: "done", records: "relative/dir" });
+    expect(response.status).toBe(400);
+  });
+
+  test("only the models folder can be chosen, and the data folder keeps its default", async () => {
+    const models = folder();
+    expect((await new TestClient().post("/api/setup/storage", { status: "done", models })).status).toBe(200);
+    expect(getStorageChoice()).toEqual({ models });
+  });
+
+  test("folders on another step are refused", async () => {
+    expect((await new TestClient().post("/api/setup/welcome", { status: "done", records: folder() })).status).toBe(400);
   });
 });

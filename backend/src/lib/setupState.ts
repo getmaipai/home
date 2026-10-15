@@ -16,6 +16,23 @@ export const PRE_OWNER_STEPS = new Set<SetupStepId>([
 
 const timestamp = () => new Date().toISOString();
 
+/** The folders the owner picked on the storage screen (WIZ-STORAGE-03). It
+ * lives in the same row as the setup record but beside it, because the
+ * SetupState spec shape is strict and has no field for it. Nothing reads it
+ * yet: DATA-LOCATION-01a writes the location record from it. */
+export type StorageChoice = { models?: string; records?: string };
+const STORAGE_CHOICE_KEY = "storage_choice";
+
+function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined } {
+  const { [STORAGE_CHOICE_KEY]: storageChoice, ...rest } = JSON.parse(value) as Record<string, unknown>;
+  return { record: SetupState.parse(rest), storageChoice: storageChoice as StorageChoice | undefined };
+}
+
+export function getStorageChoice(): StorageChoice | undefined {
+  const row = db.select().from(setupState).limit(1).get();
+  return row ? splitRow(row.value).storageChoice : undefined;
+}
+
 export function createSetupState(source: "wizard" | "restore" = "wizard"): SetupStateRecord {
   const now = timestamp();
   return SetupState.parse({
@@ -38,17 +55,17 @@ export function getSetupState(): SetupStateRecord {
   if (!row) return ensureSetupState();
   // A corrupt row fails closed and is surfaced as a typed server error;
   // never log setup payloads or step error contents.
-  return SetupState.parse(JSON.parse(row.value));
+  return splitRow(row.value).record;
 }
 
 export function ensureSetupState(source: "wizard" | "restore" = "wizard"): SetupStateRecord {
   const existing = db.select().from(setupState).limit(1).get();
-  if (existing) return SetupState.parse(JSON.parse(existing.value));
+  if (existing) return splitRow(existing.value).record;
   const created = createSetupState(source);
   db.insert(setupState).values({ slot: 1, value: JSON.stringify(created) }).onConflictDoNothing().run();
   const row = db.select().from(setupState).limit(1).get();
   if (!row) throw new Error("Setup state initialization failed.");
-  return SetupState.parse(JSON.parse(row.value));
+  return splitRow(row.value).record;
 }
 
 export function replaceSetupStep(
@@ -62,9 +79,12 @@ export function replaceSetupStep(
     checks?: SetupStateRecord["checks"];
     phase?: SetupStateRecord["phase"];
     completed_at?: string | null;
+    /** Only the storage step sets this; any other call keeps what is saved. */
+    storageChoice?: StorageChoice;
   },
 ): SetupStateRecord {
   const current = getSetupState();
+  const storageChoice = result.storageChoice ?? getStorageChoice();
   const at = timestamp();
   const steps = current.steps.map((step) => {
     if (step.id !== stepId) return step;
@@ -82,6 +102,6 @@ export function replaceSetupStep(
     completed_at: result.completed_at ?? (done ? at : current.completed_at),
     hlc: nextHlc(),
   });
-  db.update(setupState).set({ value: JSON.stringify(next) }).where(eq(setupState.slot, 1)).run();
+  db.update(setupState).set({ value: JSON.stringify(storageChoice ? { ...next, [STORAGE_CHOICE_KEY]: storageChoice } : next) }).where(eq(setupState.slot, 1)).run();
   return next;
 }

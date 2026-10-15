@@ -20438,9 +20438,6 @@
                     "type": "string"
                   }
                 },
-                "required": [
-                  "records"
-                ],
                 "additionalProperties": false
               }
             }
@@ -21895,6 +21892,12 @@
                         "nullable": true
                       }
                     ]
+                  },
+                  "models": {
+                    "type": "string"
+                  },
+                  "records": {
+                    "type": "string"
                   }
                 },
                 "required": [

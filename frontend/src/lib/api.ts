@@ -652,6 +652,9 @@ export interface HomeJobView {
 
 export interface TailscaleStatus { state: "not_installed" | "stopped" | "running"; dnsName: string | null; ips: string[]; installed: boolean; signedIn: boolean; httpsEnabled: boolean; machineName: string | null; enabled: boolean; url: string | null }
 
+export interface SetupFolderListing { path: string; parent: string | null; freeBytes: number | null; writable: boolean; folders: Array<{ name: string; path: string; writable: boolean }> }
+export interface SetupPlacementRow { class: string; kind: "refusal" | "warning" | "unknown"; id: string; text: string; fix: string }
+
 export const api = {
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
   setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null }>("/api/setup/checks/run", { method: "POST" }),
@@ -660,7 +663,10 @@ export const api = {
   setupUseSearchCandidate: (url: string) => request<{ saved: true }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify({ url }) }),
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
-  setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"] }) =>
+  setupFolders: (path?: string) => request<SetupFolderListing>(`/api/setup/folders${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`),
+  setupCreateFolder: (parent: string, name: string) => request<{ name: string; path: string; writable: boolean }>("/api/setup/folders", { method: "POST", body: JSON.stringify({ parent, name }) }),
+  setupStorageCheck: (layout: { models?: string; records?: string }) => request<{ rows: SetupPlacementRow[] }>("/api/setup/storage/check", { method: "POST", body: JSON.stringify(layout) }),
+  setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"]; models?: string; records?: string }) =>
     request<SetupState>(`/api/setup/${encodeURIComponent(step)}`, {
       method: "POST",
       body: JSON.stringify(body),

@@ -16,6 +16,7 @@ import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } f
 import { setupChecklistCountLine } from "@/shell/useSetupChecklist";
 import { SetupPreviewBar } from "./preview/SetupPreviewBar";
 import { useIsDark } from "@/shell/ThemeToggle";
+import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 
 interface SetupWizardProps { onDone: () => void; initialScreen?: ScreenId }
@@ -47,7 +48,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   welcome: "Your family's private AI, in your own home.",
   before_start: "Home is built to protect your family and your data. Like any AI or online tool, it works best when you know a few things.",
   engine_location: "Choose one computer, or add a bigger one for the AI.",
-  storage: "Home uses its ready-to-use default folder.",
+  storage: "Keep the ready-to-use folders, or pick your own.",
   checks: "Home is checking that everything is ready.",
   plan: "Review the steps Home will complete.",
   owner: "Create the account that manages this Home.",
@@ -127,6 +128,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [tailnetError, setTailnetError] = useState<string | null>(null);
   const [searchCandidate, setSearchCandidate] = useState<string | null>(null);
   const [searchError, setSearchError] = useState<string | null>(null);
+  const [storageChoice, setStorageChoice] = useState<StorageChoice>({});
+  const [storageBlocked, setStorageBlocked] = useState(false);
 
   const refresh = async () => {
     const result = await api.setupState();
@@ -231,11 +234,11 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const completedCount = phase === "meet" ? 1 : 0;
   const thingsLeftLine = openThings === null ? null : setupChecklistCountLine(openThings);
 
-  async function record(id: string, status: "done" | "skipped" | "deferred" = "done") {
+  async function record(id: string, status: "done" | "skipped" | "deferred" = "done", extra: { models?: string; records?: string } = {}) {
     setBusy(true);
     setError(null);
     try {
-      const updated = await api.setupStep(id, { status, phase: phaseFor(id) });
+      const updated = await api.setupStep(id, { status, phase: phaseFor(id), ...extra });
       if (!("done" in updated)) setState(updated);
       return updated;
     } catch (reason) {
@@ -257,7 +260,9 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
     const stepId = screen === "before_start" ? "welcome" : screen;
     const deferred = ["checks", "plan", "hello"].includes(stepId) || (screen === "engine_location" && engine === "another_computer");
-    const updated = await record(stepId, deferred ? "deferred" : "done");
+    // The models folder belongs to the engine computer on a split setup, so it is never sent.
+    const folders = screen === "storage" ? { ...(engine === "this_computer" && storageChoice.models ? { models: storageChoice.models } : {}), ...(storageChoice.records ? { records: storageChoice.records } : {}) } : {};
+    const updated = await record(stepId, deferred ? "deferred" : "done", folders);
     if (!updated) return;
     if (screen === "before_start") {
       sessionStorage.setItem("maipai:setup-before-start-read", "true");
@@ -352,7 +357,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "welcome": body = <div className="flex flex-col gap-2"><p className="text-base font-normal text-muted-foreground md:text-lg">Your chats, people, and memories stay on your computers. Home goes online only for downloads, updates, and searches you ask for.</p><a className="inline-flex min-h-12 max-w-full items-center whitespace-normal break-words text-base text-muted-foreground underline underline-offset-4 md:text-lg" href="/backups">Restoring a backup? Finish setup, then open Backups.</a></div>; break;
     case "before_start": body = <Accordion typography="body">{BEFORE_START_DETAILS.map((item) => <AccordionItem key={item.id} value={item.id}><AccordionTrigger>{item.title}</AccordionTrigger><AccordionContent><p>{item.detail}</p></AccordionContent></AccordionItem>)}</Accordion>; break;
     case "engine_location": body = renderSetupReviewScreen({ screen: "engine_location", engine, onEngineChange: setEngine, showTitle: false }); break;
-    case "storage": body = renderSetupReviewScreen({ screen: "storage", showTitle: false }); break;
+    case "storage": body = <StorageStep split={engine === "another_computer"} value={storageChoice} onChange={(value, blocked) => { setStorageChoice(value); setStorageBlocked(blocked); }} />; break;
     case "checks": {
       const blocking = checkRows?.some((row) => row.state === "red") ?? false;
       const warnings = checkRows?.some((row) => row.state === "amber") ?? false;
@@ -380,7 +385,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
   const previewBanner = window.__setupPreview ? <SetupPreviewBar currentScreen={screenIndex + 1} onJump={(index) => setScreen(SCREEN_IDS[Math.max(0, Math.min(SCREEN_IDS.length - 1, index))]!)} /> : undefined;
   const art = SCREEN_ART[screen];
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={!(["checks", "engine_location", "before_start"] as ScreenId[]).includes(screen)} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={!(["checks", "engine_location", "before_start"] as ScreenId[]).includes(screen)} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {

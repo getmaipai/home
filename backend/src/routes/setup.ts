@@ -19,6 +19,8 @@ import { setupFolderRoutes } from "@/routes/setupFolders";
 import { getCookie } from "hono/cookie";
 import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { resolveHumanSession } from "@/middleware/auth";
+import { validateProposedPath } from "@/lib/folderBrowse";
+import { checkPlacement } from "@/lib/placement";
 import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, type SetupStepId } from "@/lib/setupState";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -116,6 +118,9 @@ const SetupStepBodySchema = z.object({
   checks: SetupState.shape.checks.optional(),
   phase: SetupState.shape.phase.optional(),
   completed_at: SetupState.shape.completed_at.optional(),
+  // WIZ-STORAGE-03: only for the storage step. `models` is absent on a split setup.
+  models: z.string().optional(),
+  records: z.string().optional(),
 }).strict();
 const SetupErrorSchema = z.object({ error: z.string(), next: z.string().optional() }).strict();
 
@@ -304,7 +309,7 @@ setupRoutes.openapi(hardwareRoute, async (c) => {
 // Register the catch-all setup step after fixed POST routes such as
 // /hardware. Hono matches routes in registration order, and /{step}
 // would otherwise capture the hardware request before its own handler.
-setupRoutes.openapi(setupStepRoute, (c) => {
+setupRoutes.openapi(setupStepRoute, async (c) => {
   const rawStep = c.req.valid("param").step;
   const parsedStep = SetupStepIdSchema.safeParse(rawStep);
   if (!parsedStep.success) {
@@ -329,6 +334,22 @@ setupRoutes.openapi(setupStepRoute, (c) => {
       return c.json({ error: "The engine location and storage questions are not both complete.", next: "Complete engine_location and storage before checks." }, 409);
     }
   }
-  const updated = replaceSetupStep(step, body);
+  const { models, records, ...stepResult } = body;
+  let storageChoice: { models?: string; records?: string } | undefined;
+  if (models !== undefined || records !== undefined) {
+    if (step !== "storage") return c.json({ error: "Folders can only be saved on the storage step.", next: "Send models and records with the storage step." }, 400);
+    const layout = { ...(models ? { models } : {}), ...(records ? { records } : {}) };
+    if (!models && !records) return c.json({ error: "No folder was chosen.", next: "Choose a folder, or keep the default folders." }, 400);
+    for (const path of Object.values(layout)) {
+      const problem = validateProposedPath(path);
+      if (problem) return c.json({ error: problem, next: "Choose a different folder." }, 400);
+    }
+    const blocked = (await checkPlacement(layout)).find((row) => row.kind === "refusal");
+    if (blocked) return c.json({ error: blocked.text, next: blocked.fix }, 400);
+    // INTEGRATION POINT (DATA-LOCATION-01a): the lane that writes the location
+    // record and restarts Home reads this choice via getStorageChoice().
+    storageChoice = layout;
+  }
+  const updated = replaceSetupStep(step, { ...stepResult, ...(storageChoice ? { storageChoice } : {}) });
   return c.json(updated, 200);
 });
