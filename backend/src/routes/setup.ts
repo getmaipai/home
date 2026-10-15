@@ -26,7 +26,11 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
+import { wordPlan } from "@/lib/installPlanWording";
+import { resetInstallStatusCache } from "@/lib/installStatus";
 import { getStackClient } from "@/lib/stackEngine";
+import { getInstallStatus } from "@/lib/installStatus";
+import { InstallStatusSchema } from "@/routes/install";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { REMOTE_ALLOW_TAILNET_KEY, refreshConfiguredEngineLink, validateRemoteEngineSetting } from "@/lib/remoteStackSettings";
 
@@ -66,6 +70,56 @@ setupRoutes.openapi(checksRoute, async (c) => {
   const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows), engine });
   if (passed) void startSetupDownloads().catch(() => {});
   return c.json({ rows: rows.map(({ id, title, state, text, action, actionLabel, actionRoute }) => ({ id, title, state, text, ...(action ? { action, actionLabel, actionRoute } : {}) })), state, searchCandidate: candidatesOut.find((item) => item.status === "pass")?.url ?? null }, 200);
+});
+
+const installStatusRoute = createRoute({
+  method: "get", path: "/install", tags: ["Setup"], summary: "What the AI install is doing, for the wizard footer",
+  responses: { 200: { content: { "application/json": { schema: InstallStatusSchema } }, description: "The install summary." } },
+});
+setupRoutes.openapi(installStatusRoute, async (c) => c.json(await getInstallStatus(), 200));
+
+const SetupErrorSchemaForInstall = z.object({ error: z.string(), next: z.string().optional() });
+const PlanWordingSchema = z.object({
+  level: z.enum(["recommended", "moderate", "minimal", "below_minimum", "unknown"]), headline: z.string(), detail: z.string(),
+  gets: z.array(z.string()), needsMemoryAnswer: z.boolean(), sizeLine: z.string().nullable(), diskLine: z.string().nullable(),
+});
+const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).optional() });
+const planRoute = createRoute({
+  method: "get", path: "/plan", tags: ["Setup"], summary: "What Home would install on the AI computer",
+  request: { query: planQuery },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema }) } }, description: "The Stack's plan and Home's words for it." } },
+});
+setupRoutes.openapi(planRoute, async (c) => {
+  const { vram_gb: vramGb } = c.req.valid("query");
+  try {
+    const plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined);
+    return c.json({ plan, wording: wordPlan(plan) }, 200);
+  } catch {
+    return c.json({ plan: null, wording: wordPlan(null) }, 200);
+  }
+});
+
+const installStartRoute = createRoute({
+  method: "post", path: "/install", tags: ["Setup"], summary: "Install the plan: start the downloads and go on",
+  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional() }).strict() } } } },
+  responses: {
+    202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number() }) } }, description: "The downloads started in the background." },
+    409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "There is nothing the AI can install on this computer." },
+  },
+});
+setupRoutes.openapi(installStartRoute, async (c) => {
+  const { vram_gb: vramGb } = c.req.valid("json");
+  let plan;
+  try { plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined); }
+  catch { return c.json({ error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }, 409); }
+  const words = wordPlan(plan);
+  if (!plan.level || plan.fits_disk === false) return c.json({ error: words.diskLine ?? words.headline, next: words.needsMemoryAnswer ? "Pick your graphics memory first." : "Free some space or choose another computer for the AI." }, 409);
+  resetInstallStatusCache();
+  const roles = [...new Set(plan.models.map((model) => `engines.${model.role}.choice`))];
+  replaceSetupStep("plan", { status: "done", plan: { option: "recommended", tier: plan.level, roles } });
+  // The downloads run on in the background; the page does not wait for them.
+  void startSetupDownloads(getStackClient(), vramGb ? { vramGb } : {}).catch(() => {});
+  return c.json({ started: true as const, models: plan.models.filter((model) => !model.installed).length }, 202);
 });
 
 const useSearchCandidateRoute = createRoute({

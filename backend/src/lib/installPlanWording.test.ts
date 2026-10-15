@@ -1,0 +1,25 @@
+import { expect, test } from "bun:test";
+import type { StackInstallPlan } from "@/lib/stack/client";
+import { wordPlan } from "./installPlanWording";
+
+const base: StackInstallPlan = { level: "moderate", tier: "p32", label: "L", memory_gb: 32, memory_source: "unified", models: [], total_bytes: 0, remaining_bytes: 0, free_disk_bytes: null, fits_disk: null };
+
+test("each level gets its name and what it can do", () => {
+  expect(wordPlan({ ...base, level: "recommended" }).gets).toContain("Make pictures");
+  expect(wordPlan({ ...base, level: "minimal" }).gets).not.toContain("Make pictures");
+  expect(wordPlan(base).headline).toStartWith("Moderate");
+});
+
+test("unknown memory asks the person; too small says go to two computers", () => {
+  const ask = wordPlan({ ...base, level: null, tier: null, memory_source: "unknown", memory_gb: 0 });
+  expect(ask.needsMemoryAnswer).toBe(true);
+  const small = wordPlan({ ...base, level: null, tier: null, memory_gb: 8 });
+  expect(small.level).toBe("below_minimum");
+  expect(small.detail).toContain("two computers");
+  expect(wordPlan(null).level).toBe("unknown");
+});
+
+test("a full disk is said in plain words", () => {
+  const w = wordPlan({ ...base, remaining_bytes: 20e9, free_disk_bytes: 5e9, fits_disk: false, models: [{ id: "a", role: "chat", url: "u", sha256: "s", licence: "l", revision: "r", starter: true, installed: false }] });
+  expect(w.diskLine).toContain("not enough free disk space");
+});

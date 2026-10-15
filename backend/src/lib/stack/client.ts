@@ -40,6 +40,24 @@ const KIND_BY_STATUS: Record<number, StackErrorKind> = {
   504: "timeout",
 };
 
+export interface StackInstallModel {
+  id: string; role: string; repo?: string; url: string; sha256: string; approx_bytes?: number;
+  licence: string; revision: string; engine?: string; archive?: boolean; hub_file?: string;
+  starter: boolean; installed: boolean;
+}
+export interface StackInstallPlan {
+  level: "minimal" | "moderate" | "recommended" | null;
+  tier: "p16" | "p32" | "p64" | "p128" | null;
+  label: string;
+  memory_gb: number;
+  memory_source: "unified" | "graphics" | "override" | "unknown";
+  models: StackInstallModel[];
+  total_bytes: number;
+  remaining_bytes: number;
+  free_disk_bytes: number | null;
+  fits_disk: boolean | null;
+}
+
 export interface StackClient {
   /** POST /v1/chat/completions. For `stream: true` the Response body reader
    * and its headers come back, not parsed data. */
@@ -86,6 +104,8 @@ export interface StackClient {
   budget(opts?: { signal?: AbortSignal }): Promise<BudgetResponse>;
   fitPlan(body: FitPlanRequest, opts?: { signal?: AbortSignal }): Promise<StackFitPlan>;
   hardware(opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  /** GET /stack/v1/install-plan: the models this computer should install, by hardware level. */
+  installPlan(query?: { vramGb?: number }, opts?: { signal?: AbortSignal }): Promise<StackInstallPlan>;
   /** GET /stack/v1/models/catalog: shipped model pins with verified provenance. */
   updates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
   checkUpdates(opts?: { signal?: AbortSignal }): Promise<StackUpdatesState>;
@@ -372,6 +392,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     searchRevert: (opts) => call("/stack/v1/search/revert", { method: "POST" }, json<Record<string, unknown>>, opts),
     budget: (opts) => call("/stack/v1/hardware/budget", { method: "GET" }, json<BudgetResponse>, opts),
     fitPlan: (body, opts) => call("/stack/v1/fit-plan", jsonInit(body), json<StackFitPlan>, opts),
+    installPlan: (query, opts) => call(`/stack/v1/install-plan${query?.vramGb ? `?vram_gb=${encodeURIComponent(String(query.vramGb))}` : ""}`, { method: "GET" }, json<StackInstallPlan>, opts),
     hardware: (opts) => call("/stack/v1/hardware", { method: "GET" }, json<Record<string, unknown>>, opts),
     updates: (opts) => call("/stack/v1/updates", { method: "GET" }, json<StackUpdatesState>, opts),
     checkUpdates: (opts) => call("/stack/v1/updates/check", { method: "POST" }, json<StackUpdatesState>, opts),

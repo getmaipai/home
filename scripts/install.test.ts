@@ -77,7 +77,7 @@ describe("fetch_stack_commons", () => {
     dependencies: {
       "@hono/zod-openapi": "^1.6.3",
       "@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core",
-      "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.95/spec",
+      "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.136/spec",
       zod: "^4.0.0",
     },
   }, null, 2);
@@ -85,7 +85,7 @@ describe("fetch_stack_commons", () => {
   // One fixture archive per Commons tag, shaped like GitHub's: commons-<tag>/<package>/package.json.
   function commonsFixture(root: string): { digests: Record<string, string>; dir: string } {
     const digests: Record<string, string> = {};
-    for (const [pkg, tag] of [["core", "core-v0.1.0"], ["spec", "spec-v0.1.95"]] as const) {
+    for (const [pkg, tag] of [["core", "core-v0.1.0"], ["spec", "spec-v0.1.136"]] as const) {
       const pkgDir = join(root, "archive", pkg, `commons-${tag}`, pkg);
       mkdirSync(pkgDir, { recursive: true });
       writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: `@maipai/${pkg}`, version: "0.0.1" }));
@@ -100,8 +100,8 @@ describe("fetch_stack_commons", () => {
 
   // The offline run: curl copies the fixture for the tag in the URL, the digest table is the fixture's.
   function runFetch(script: string, root: string, digests: Record<string, string>, workspace: string) {
-    return Bun.spawnSync(["bash", "-c", `source "${script}"; curl() { case "$2" in *core-v0.1.0*) cp "$ROOT/core-v0.1.0.tar.gz" "$4";; *spec-v0.1.95*) cp "$ROOT/spec-v0.1.95.tar.gz" "$4";; *) return 22;; esac; }; commons_archive_sha256() { case "$1" in core-v0.1.0) echo "$CORE_SHA";; spec-v0.1.95) echo "$SPEC_SHA";; *) return 1;; esac; }; fetch_stack_commons "$WORKSPACE" no`], {
-      env: { ...process.env, ROOT: root, CORE_SHA: digests["core-v0.1.0"]!, SPEC_SHA: digests["spec-v0.1.95"]!, WORKSPACE: workspace, TMPDIR: root },
+    return Bun.spawnSync(["bash", "-c", `source "${script}"; curl() { case "$2" in *core-v0.1.0*) cp "$ROOT/core-v0.1.0.tar.gz" "$4";; *spec-v0.1.136*) cp "$ROOT/spec-v0.1.136.tar.gz" "$4";; *) return 22;; esac; }; commons_archive_sha256() { case "$1" in core-v0.1.0) echo "$CORE_SHA";; spec-v0.1.136) echo "$SPEC_SHA";; *) return 1;; esac; }; fetch_stack_commons "$WORKSPACE" no`], {
+      env: { ...process.env, ROOT: root, CORE_SHA: digests["core-v0.1.0"]!, SPEC_SHA: digests["spec-v0.1.136"]!, WORKSPACE: workspace, TMPDIR: root },
     });
   }
 
@@ -172,11 +172,11 @@ describe("fetch_stack_commons", () => {
 
   test("the two scripts carry the same pins and the same helpers (a drift between them fails here)", () => {
     const show = (script: string) =>
-      Bun.spawnSync(["bash", "-c", `source "${script}"; for t in core-v0.1.0 spec-v0.1.95 other; do commons_archive_sha256 $t || echo none; done; declare -f commons_archive_sha256 stack_commons_deps fetch_one_stack_commons fetch_stack_commons`]).stdout.toString();
+      Bun.spawnSync(["bash", "-c", `source "${script}"; for t in core-v0.1.0 spec-v0.1.136 other; do commons_archive_sha256 $t || echo none; done; declare -f commons_archive_sha256 stack_commons_deps fetch_one_stack_commons fetch_stack_commons`]).stdout.toString();
     const install = show(INSTALL_SH);
     const engine = show(ENGINE_HELPER);
     expect(install).toContain("d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
-    expect(install).toContain("42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
+    expect(install).toContain("5dece57ae0495d27f8c3e565b7de14217e0f5d1495b0a09feee7e10b625e4342");
     expect(engine).toBe(install);
   });
 
@@ -210,7 +210,7 @@ describe("fetch_stack_commons", () => {
     const result = bashCall('fetch_stack_commons /tmp/maipai-stack yes');
     expect(result.exitCode).toBe(0);
     expect(result.stdout).toContain("core-v0.1.0 sha256 d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
-    expect(result.stdout).toContain("spec-v0.1.95 sha256 42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
+    expect(result.stdout).toContain("spec-v0.1.136 sha256 5dece57ae0495d27f8c3e565b7de14217e0f5d1495b0a09feee7e10b625e4342");
     expect(result.stdout).toContain("/tmp/maipai-stack/commons-tags/<package>-<tag>/<package>");
   });
 
@@ -219,7 +219,7 @@ describe("fetch_stack_commons", () => {
     expect(result.exitCode).toBe(0);
     const said = result.stdout.toString();
     expect(said).toContain("Would fetch Stack at pinned STACK_TAG");
-    expect(said).toContain("core-v0.1.0 and spec-v0.1.95");
+    expect(said).toContain("core-v0.1.0 and spec-v0.1.136");
     expect(said).toContain("pinned SHA-256");
     expect(said).toContain("Would rebuild and restart maipai-stack");
   });
@@ -359,7 +359,7 @@ describe("--dry-run", () => {
     expect(stdout).toMatch(/would fetch getmaipai\/stack@[0-9a-f]+ into/);
     expect(stdout).toContain("would fetch each getmaipai/commons tag named in");
     expect(stdout).toContain("core-v0.1.0 sha256 d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4");
-    expect(stdout).toContain("spec-v0.1.95 sha256 42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903");
+    expect(stdout).toContain("spec-v0.1.136 sha256 5dece57ae0495d27f8c3e565b7de14217e0f5d1495b0a09feee7e10b625e4342");
     expect(stdout).toContain("scripts/build-binary.sh");
     expect(stdout).toContain("OUT_DIR=");
     expect(stdout).toContain("SKIP_VERIFY=1");
@@ -675,7 +675,7 @@ describe("engine computer installer cleanup", () => {
       `mktemp() { command mktemp -d "${root}/m.XXXXXX"; }`,
       `curl() { :; }`,
       // The mocked unpack: the Stack's package.json (read to learn the Commons packages) and each package's folder.
-      `tar() { case "$*" in *commons-core-v0.1.0*) command mkdir -p "$4/core"; touch "$4/core/package.json";; *commons-spec-v0.1.95*) command mkdir -p "$4/spec"; touch "$4/spec/package.json";; *) command mkdir -p "$4/backend"; printf '%s\\n' '"@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core",' '"@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.95/spec",' > "$4/backend/package.json";; esac; }`,
+      `tar() { case "$*" in *commons-core-v0.1.0*) command mkdir -p "$4/core"; touch "$4/core/package.json";; *commons-spec-v0.1.136*) command mkdir -p "$4/spec"; touch "$4/spec/package.json";; *) command mkdir -p "$4/backend"; printf '%s\\n' '"@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core",' '"@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.136/spec",' > "$4/backend/package.json";; esac; }`,
       `sha256_file() { case "$1" in *commons.tar.gz) echo "FIXTURE";; esac; }`,
       `commons_archive_sha256() { echo FIXTURE; }`,
       `build_stack_binary() { return 0; }`,

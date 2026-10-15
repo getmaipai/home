@@ -35,9 +35,9 @@ STACK_REPO="getmaipai/stack"
 # stack commit that release is meant to carry (docs/dev.md's own "What
 # Home's release carries" paragraph). Today's value adds vision URL
 # binding to the Stack supervisor and runs the embed role on the processor (STACK-EMBED-02).
-STACK_TAG="414ae1b51d89a248baa4086209bd991076a3f2ff"
+STACK_TAG="dbc7bacb5e1b2ad0c74d78b203307a80e1fa0e0f"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
-# file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.95 today). Those
+# file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
 # drift from STACK_TAG. What is pinned here is only the digest of GitHub's archive for each tag
 # (commons_archive_sha256); the digest is verified before anything is extracted. A Stack bump that
@@ -325,7 +325,7 @@ fetch_stack_source() {
 commons_archive_sha256() {
   case "$1" in
     core-v0.1.0) printf '%s\n' "d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4" ;;
-    spec-v0.1.95) printf '%s\n' "42cce9e73007b395cc7f6f742a43f20a6032f7f0baf4da82869affce3c5a9903" ;;
+    spec-v0.1.136) printf '%s\n' "5dece57ae0495d27f8c3e565b7de14217e0f5d1495b0a09feee7e10b625e4342" ;;
     *) return 1 ;;
   esac
 }
@@ -418,7 +418,7 @@ fetch_one_stack_commons() {
 fetch_stack_commons() {
   local work="$1" dry_run="$2"
   if [ "$dry_run" = "yes" ]; then
-    log "[dry-run] would fetch each getmaipai/commons tag named in ${work}/stack/backend/package.json (known: core-v0.1.0 sha256 $(commons_archive_sha256 core-v0.1.0), spec-v0.1.95 sha256 $(commons_archive_sha256 spec-v0.1.95)) into ${work}/commons-tags/<package>-<tag>/<package>"
+    log "[dry-run] would fetch each getmaipai/commons tag named in ${work}/stack/backend/package.json (known: core-v0.1.0 sha256 $(commons_archive_sha256 core-v0.1.0), spec-v0.1.136 sha256 $(commons_archive_sha256 spec-v0.1.136)) into ${work}/commons-tags/<package>-<tag>/<package>"
     return 0
   fi
   local manifest="${work}/stack/backend/package.json" deps pkg dir tag
