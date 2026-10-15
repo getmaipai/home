@@ -66,6 +66,16 @@ describe("setup check row helpers", () => {
     const intel = await runSetupChecks({ ...common, health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "x64" }, proposed: { level: "Minimal" } }) });
     expect(intel.find((row) => row.id === "memory")?.state).toBe("red");
   });
+  test("before the engine is installed there is no engine row and the computer is judged by its own facts", async () => {
+    resetDb();
+    const common = { preInstall: true, catalog: async () => { throw new Error("no engine"); }, modelDisk: async () => ({ status: "green" as const }), hubDisk: async () => ({ status: "green" as const }), homeNetwork: async () => true, hostReach: async () => true };
+    const ok = await runSetupChecks({ ...common, localHardware: () => ({ platform: "darwin", arch: "arm64", totalMemory: 16e9 }) });
+    expect(ok.find((row) => row.id === "engine")).toBeUndefined();
+    expect(ok.find((row) => row.id === "memory")?.state).toBe("green");
+    expect(ok.find((row) => row.id === "download-host")?.state).toBe("green");
+    const small = await runSetupChecks({ ...common, localHardware: () => ({ platform: "darwin", arch: "arm64", totalMemory: 2e9 }) });
+    expect(small.find((row) => row.id === "memory")?.state).toBe("red");
+  });
   test("engine row uses plain words for This computer and says what to do when it fails", async () => {
     resetDb();
     setHouseholdSettingValue("engines.stack.where", "this_computer");

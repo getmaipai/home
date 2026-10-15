@@ -53,7 +53,7 @@ const checksRoute = createRoute({
 const allowTailnetErrorSchema = z.object({ error: z.string(), next: z.string().optional() });
 setupRoutes.openapi(checksRoute, async (c) => {
   const candidatesOut: Array<{ url: string; status: "pass" | "fail" }> = [];
-  const rows = await runSetupChecks({ candidatesOut });
+  const rows = await runSetupChecks({ candidatesOut, preInstall: true });
   const passed = rows.every((row) => row.state === "green" || row.state === "idle");
   const current = getSetupState();
   let engine = current.engine;

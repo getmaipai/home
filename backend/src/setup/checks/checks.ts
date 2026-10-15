@@ -31,6 +31,8 @@ export type CheckDeps = {
   clockOffsetMs?: () => Promise<number | null>;
   homeNetwork?: () => Promise<boolean>;
   now?: () => Date;
+  /** Setup runs before the AI engine is installed: skip the engine check and judge this computer by its own facts. */
+  preInstall?: boolean;
   tailscale?: () => Promise<Awaited<ReturnType<typeof getTailscaleStatus>>>;
   tailnetAllowed?: () => boolean;
   engineHost?: () => string;
@@ -91,8 +93,10 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
   let hardware: Record<string, unknown> | null = null;
   const local = (deps.localHardware ?? localFacts)();
   let engineOk = false;
+  const beforeInstall = Boolean(deps.preInstall) && !remote;
   try {
-    if (remote) {
+    if (beforeInstall) { /* nothing to ask yet: the engine arrives with the install */ }
+    else if (remote) {
       const client = getStackClient();
       const [health, response] = await Promise.all([client.healthz(), client.hardware()]);
       engineOk = health.ok;
@@ -111,13 +115,16 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     : configuredUrl
       ? `The AI engine on this computer isn't answering at ${configuredUrl}. Start it, or check that address, then press Try again.`
       : "The AI engine on this computer isn't answering. Start it, then press Try again.";
-  rows.push(makeRow("engine", "AI engine", engineOk ? "green" : "red", engineOk ? `The AI engine ${where} is answering.` : engineDown, "The Stack health endpoint did not answer.", "Repair", now));
+  if (!beforeInstall) rows.push(makeRow("engine", "AI engine", engineOk ? "green" : "red", engineOk ? `The AI engine ${where} is answering.` : engineDown, "The Stack health endpoint did not answer.", "Repair", now));
 
   const hw = hardware && typeof hardware.hardware === "object" && hardware.hardware ? hardware.hardware as Record<string, unknown> : null;
   const proposed = hardware && typeof hardware.proposed === "object" && hardware.proposed ? hardware.proposed as Record<string, unknown> : null;
   const level = typeof proposed?.level === "string" ? proposed.level : null;
   const supported = isSupportedInstallPlatform(String(hw?.platform ?? local.platform), String(hw?.arch ?? local.arch));
-  rows.push(makeRow("memory", "Computer", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "Home can't check this until the AI engine is answering. Start it, then press Try again." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
+  if (beforeInstall) {
+    const enough = supported && local.totalMemory >= 4_000_000_000;
+    rows.push(makeRow("memory", "Computer", enough ? "green" : "red", enough ? "This computer can run Home's AI." : !supported ? "This computer isn't supported for MaiPai Home's AI." : "This computer has less than the 4 GB of memory Home needs.", !supported ? "The platform is not supported." : "Total memory is under 4 GB.", "Use a supported computer", now));
+  } else rows.push(makeRow("memory", "Computer", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "Home can't check this until the AI engine is answering. Start it, then press Try again." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
 
   let modelDisk: Awaited<ReturnType<NonNullable<CheckDeps["modelDisk"]>>> = { status: "red", message: "Choose a disk for AI models before continuing." };
   if (deps.modelDisk) modelDisk = await deps.modelDisk();
@@ -139,7 +146,12 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     const url = (pin?.download as Record<string, unknown> | undefined)?.url;
     if (typeof url === "string") modelHost = new URL(url).hostname;
   } catch { /* unavailable pins leave the optional reach row idle */ }
-  if (!modelHost) rows.push(makeRow("download-host", "Internet", "idle", "Checked when downloads start.", "The Stack's pinned download host could not be read.", undefined, now));
+  if (!modelHost && beforeInstall) {
+    const preflight = await checkInstallPreflight({ reachReleaseHost: deps.hostReach ?? tcp });
+    const release = preflight.find((row) => row.code.startsWith("install.release."));
+    rows.push(makeRow("download-host", "Internet", release?.severity ? "red" : "green", release?.severity ? "Home can't reach the internet to download its AI. Check the connection, then press Try again." : "Home can reach the internet.", release?.cause ?? "A plain TCP connection to the release host succeeded.", "Check the internet connection", now));
+  }
+  else if (!modelHost) rows.push(makeRow("download-host", "Internet", "idle", "Checked when downloads start.", "The Stack's pinned download host could not be read.", undefined, now));
   else {
     const reachable = await (deps.hostReach ?? tcp)(modelHost);
     const preflight = await checkInstallPreflight({ releaseHost: modelHost, reachReleaseHost: async () => reachable });
