@@ -7,6 +7,7 @@ import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { getInstallStatus, resetInstallStatusCache } from "@/lib/installStatus";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
+import { beginInstall, previewPlan } from "@/lib/installActions";
 
 export const InstallStatusSchema = z.object({
   state: z.enum(["none", "downloading", "starter_ready", "stalled", "out_of_space", "failed", "ready"]),
@@ -46,4 +47,31 @@ installRoutes.openapi(retryRoute, (c) => {
   resetInstallStatusCache();
   void startSetupDownloads().catch(() => {});
   return c.json({ started: true as const }, 202);
+});
+
+const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).optional() });
+const planRoute = createRoute({
+  method: "get", path: "/plan", tags: ["Install"], summary: "What Home would install on the AI computer now",
+  middleware: [requireAuth] as const, request: { query: planQuery },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: z.object({
+    level: z.enum(["recommended", "moderate", "minimal", "below_minimum", "unknown"]), headline: z.string(), detail: z.string(),
+    gets: z.array(z.string()), needsMemoryAnswer: z.boolean(), sizeLine: z.string().nullable(), diskLine: z.string().nullable(),
+  }) }) } }, description: "The Stack's plan and Home's words for it." } },
+});
+installRoutes.openapi(planRoute, async (c) => c.json(await previewPlan(c.req.valid("query").vram_gb), 200));
+
+const startRoute = createRoute({
+  method: "post", path: "/start", tags: ["Install"], summary: "Download the plan's AI models (change or add the AI)",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional() }).strict() } } } },
+  responses: {
+    202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number() }) } }, description: "The downloads started in the background." },
+    ...errorResponses({ 403: "Only an owner or admin may do this", 409: "There is nothing the AI can install on this computer" }),
+  },
+});
+installRoutes.openapi(startRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "Only an owner or admin can change the AI." }, 403);
+  const result = await beginInstall(c.req.valid("json").vram_gb, false);
+  if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
+  return c.json({ started: true as const, models: result.models }, 202);
 });

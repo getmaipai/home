@@ -12,6 +12,7 @@ import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
+import { InstallPlanSection } from "@/apps/settings/InstallPlanSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
@@ -59,7 +60,7 @@ function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("V
 // computer's name and ports) come the pairing wizard, the engines console (roles, installed engines, health, the
 // connection check, formerly /engines), the AI model list (formerly /models) and the Hugging Face token.
 function HomeEngineAdminSettings({ person }: SettingsViewProps) {
-  return <><EngineLinkCredentialSection /><EnginesConsole person={person} /><ModelsSection /><HuggingFaceTokenSection /></>;
+  return <><EngineLinkCredentialSection /><EnginesConsole person={person} /><InstallPlanSection /><ModelsSection /><HuggingFaceTokenSection /></>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }

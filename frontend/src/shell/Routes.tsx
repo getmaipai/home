@@ -39,6 +39,7 @@ import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
+import { InstallStrip } from "@/shell/InstallStrip";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useStatusApps } from "@/shell/useStatusApps";
@@ -106,6 +107,7 @@ function PageHeaderLayout() {
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}
+      <InstallStrip />
       <Outlet />
     </>
   );

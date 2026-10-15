@@ -15,6 +15,8 @@ import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } f
 import { setupChecklistCountLine } from "@/shell/useSetupChecklist";
 import { SetupPreviewBar } from "./preview/SetupPreviewBar";
 import { useIsDark } from "@/shell/ThemeToggle";
+import { InstallStrip } from "@/shell/InstallStrip";
+import { PlanStep } from "./PlanStep";
 import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 
@@ -122,6 +124,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [checksFetching, setChecksFetching] = useState(false);
   const [checksRun, setChecksRun] = useState(0);
   const arrivedByBack = useRef(false);
+  const planInstalled = useRef(false);
   const [openThings, setOpenThings] = useState<number | null>(null);
   const [tailnetError, setTailnetError] = useState<string | null>(null);
   const [searchCandidate, setSearchCandidate] = useState<string | null>(null);
@@ -257,7 +260,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       return;
     }
     const stepId = screen === "before_start" ? "welcome" : screen;
-    const deferred = ["checks", "plan", "hello"].includes(stepId) || (screen === "engine_location" && engine === "another_computer");
+    const deferred = (["checks", "plan", "hello"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
     const folders = screen === "storage" ? { ...(engine === "this_computer" && storageChoice.models ? { models: storageChoice.models } : {}), ...(storageChoice.records ? { records: storageChoice.records } : {}) } : {};
     const updated = await record(stepId, deferred ? "deferred" : "done", folders);
@@ -369,7 +372,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       </div>;
       break;
     }
-    case "plan": body = renderSetupReviewScreen({ screen: "plan", searchCandidate, onChooseSearchCandidate: () => void chooseSearchCandidate(), searchError, busy, showTitle: false }); break;
+    case "plan": body = <><PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} />{searchCandidate ? <Card><CardContent><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void chooseSearchCandidate()}>Use it</Button></CardContent></Card> : null}{searchError ? <p role="alert">{searchError}</p> : null}</>; break;
     case "owner": body = <Card><CardContent><p>{OWNER_COPY}</p><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} checkSecret hideSubmit /></CardContent></Card>; break;
     case "face": body = <Card><CardContent><p>Face data stays on this computer. You can turn on face greetings now or later in your profile.</p></CardContent></Card>; break;
     case "hello": body = <Card><CardContent><p>You can talk with Home as soon as setup is finished.</p></CardContent></Card>; break;
@@ -377,6 +380,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "done": body = <Card><CardContent><p>Start a chat, add people, or choose apps whenever you're ready.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
+  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("plan")) body = <><InstallStrip detailsHref="/settings/ai" read={api.setupInstallStatus} />{body}</>;
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const currentPhaseIndex = phase === "meet" ? 1 : 0;
   const screenIndex = SCREEN_IDS.indexOf(screen);

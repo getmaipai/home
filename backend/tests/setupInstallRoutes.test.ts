@@ -4,6 +4,7 @@ import { resetInstallStatusCache } from "@/lib/installStatus";
 import { getSetupState } from "@/lib/setupState";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
 import { owner } from "./support/testAuth";
+import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
 const model = { id: "qwen3-1.7b-q8-0", role: "chat", url: "https://example.com/m.gguf", sha256: "a".repeat(64), licence: "Apache-2.0", revision: "r1", approx_bytes: 100, starter: true, installed: true };
@@ -36,7 +37,7 @@ describe("setup install routes", () => {
 
   test("POST /api/setup/install records the plan step and starts", async () => {
     __setStackClientForTests(stack(async () => plan()));
-    const { client } = await owner();
+    const client = new TestClient();
     const response = await client.post("/api/setup/install", {});
     expect(response.status).toBe(202);
     const state = getSetupState();
@@ -47,7 +48,7 @@ describe("setup install routes", () => {
 
   test("POST /api/setup/install refuses when no level fits", async () => {
     __setStackClientForTests(stack(async () => plan({ level: null, tier: null, models: [], memory_source: "unknown" })));
-    const { client } = await owner();
+    const client = new TestClient();
     const response = await client.post("/api/setup/install", {});
     expect(response.status).toBe(409);
     expect(Object.keys(await response.json() as object).sort()).toEqual(["error", "next"]);
@@ -55,8 +56,22 @@ describe("setup install routes", () => {
 
   test("POST /api/setup/install refuses when the disk is too small", async () => {
     __setStackClientForTests(stack(async () => plan({ fits_disk: false })));
+    const client = new TestClient();
+    expect((await client.post("/api/setup/install", {})).status).toBe(409);
+  });
+
+  test("POST /api/setup/install is closed once Home has an owner", async () => {
+    __setStackClientForTests(stack(async () => plan()));
     const { client } = await owner();
     expect((await client.post("/api/setup/install", {})).status).toBe(409);
+  });
+
+  test("POST /api/install/start and GET /api/install/plan work for the owner and need sign in", async () => {
+    __setStackClientForTests(stack(async () => plan()));
+    expect((await (await import("@/app")).app.request("/api/install/plan")).status).toBe(401);
+    const { client } = await owner();
+    expect((await client.get("/api/install/plan?vram_gb=16")).status).toBe(200);
+    expect((await client.post("/api/install/start", {})).status).toBe(202);
   });
 
   test("GET /api/install needs sign in and answers an empty install", async () => {

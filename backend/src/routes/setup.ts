@@ -26,8 +26,7 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
-import { wordPlan } from "@/lib/installPlanWording";
-import { resetInstallStatusCache } from "@/lib/installStatus";
+import { beginInstall, previewPlan } from "@/lib/installActions";
 import { getStackClient } from "@/lib/stackEngine";
 import { getInstallStatus } from "@/lib/installStatus";
 import { InstallStatusSchema } from "@/routes/install";
@@ -91,12 +90,7 @@ const planRoute = createRoute({
 });
 setupRoutes.openapi(planRoute, async (c) => {
   const { vram_gb: vramGb } = c.req.valid("query");
-  try {
-    const plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined);
-    return c.json({ plan, wording: wordPlan(plan) }, 200);
-  } catch {
-    return c.json({ plan: null, wording: wordPlan(null) }, 200);
-  }
+  return c.json(await previewPlan(vramGb), 200);
 });
 
 const installStartRoute = createRoute({
@@ -108,18 +102,12 @@ const installStartRoute = createRoute({
   },
 });
 setupRoutes.openapi(installStartRoute, async (c) => {
+  // This router is open on the local network until Home has an owner.
+  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "Change the AI under Home settings." }, 409);
   const { vram_gb: vramGb } = c.req.valid("json");
-  let plan;
-  try { plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined); }
-  catch { return c.json({ error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }, 409); }
-  const words = wordPlan(plan);
-  if (!plan.level || plan.fits_disk === false) return c.json({ error: words.diskLine ?? words.headline, next: words.needsMemoryAnswer ? "Pick your graphics memory first." : "Free some space or choose another computer for the AI." }, 409);
-  resetInstallStatusCache();
-  const roles = [...new Set(plan.models.map((model) => `engines.${model.role}.choice`))];
-  replaceSetupStep("plan", { status: "done", plan: { option: "recommended", tier: plan.level, roles } });
-  // The downloads run on in the background; the page does not wait for them.
-  void startSetupDownloads(getStackClient(), vramGb ? { vramGb } : {}).catch(() => {});
-  return c.json({ started: true as const, models: plan.models.filter((model) => !model.installed).length }, 202);
+  const result = await beginInstall(vramGb, true);
+  if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
+  return c.json({ started: true as const, models: result.models }, 202);
 });
 
 const useSearchCandidateRoute = createRoute({

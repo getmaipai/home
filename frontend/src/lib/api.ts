@@ -655,11 +655,29 @@ export interface TailscaleStatus { state: "not_installed" | "stopped" | "running
 export interface SetupFolderListing { path: string; parent: string | null; freeBytes: number | null; writable: boolean; folders: Array<{ name: string; path: string; writable: boolean }> }
 export interface SetupPlacementRow { class: string; kind: "refusal" | "warning" | "unknown"; id: string; text: string; fix: string }
 
+export interface PlanWording {
+  level: "recommended" | "moderate" | "minimal" | "below_minimum" | "unknown";
+  headline: string; detail: string; gets: string[]; needsMemoryAnswer: boolean; sizeLine: string | null; diskLine: string | null;
+}
+export interface InstallStatusView {
+  state: "none" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
+  chatReady: boolean; complete: boolean; percent: number; completedBytes: number; totalBytes: number;
+  bytesPerSecond: number | null; etaSeconds: number | null; problem: string | null;
+  items: Array<{ id: string; model: string; role: string | null; label: string; state: string; completedBytes: number; totalBytes: number; reason: string | null }>;
+}
+
 export const api = {
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
   setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null }>("/api/setup/checks/run", { method: "POST" }),
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),
   repairsChecks: () => request<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>>("/api/repairs/checks", { method: "POST" }),
+  setupPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/setup/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
+  setupInstall: (vramGb?: number) => request<{ started: true; models: number }>("/api/setup/install", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
+  setupInstallStatus: () => request<InstallStatusView>("/api/setup/install"),
+  installPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/install/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
+  installStart: (vramGb?: number) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
+  installStatus: () => request<InstallStatusView>("/api/install"),
+  installRetry: () => request<{ started: true }>("/api/install/retry", { method: "POST" }),
   setupUseSearchCandidate: (url: string) => request<{ saved: true }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify({ url }) }),
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
