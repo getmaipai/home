@@ -179,7 +179,20 @@ cmd_check() {
         for testfile in "$dir"/*.test.ts "$dir"/*.test.tsx; do [[ -f "$testfile" ]] && tests+=("$testfile"); done
         while IFS= read -r testfile; do [[ -n "$testfile" ]] && tests+=("$testfile"); done < <(cd "$WT_ROOT" && rg -l -F -- "$base_name" backend frontend scripts --glob '*.test.ts' --glob '*.test.tsx' 2>/dev/null || true)
       done
-      if (( ${#tests[@]} )); then (cd "$WT_ROOT" && bun test "${tests[@]}") || rc=$?; fi
+      # Each workspace has its own bunfig preload, so run its tests from inside it.
+      local ws group line
+      for ws in backend frontend scripts; do
+        group=()
+        for testfile in "${tests[@]}"; do
+          [[ "$testfile" == "$ws/"* ]] && group+=("./${testfile#"$ws"/}")
+        done
+        if (( ${#group[@]} )); then
+          local uniq=()
+          while IFS= read -r line; do uniq+=("$line"); done < <(printf '%s\n' "${group[@]}" | sort -u)
+          group=("${uniq[@]}")
+          (cd "$WT_ROOT/$ws" && bun test "${group[@]}") || rc=$?
+        fi
+      done
     fi
   else env "${check_env[@]}" bash "$script" || rc=$?; fi
   sha="$(git -C "$WT_ROOT" rev-parse HEAD)"
