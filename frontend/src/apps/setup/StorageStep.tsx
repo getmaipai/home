@@ -10,7 +10,7 @@ type FolderClass = "models" | "records";
 
 const PICKER_ERROR = "Home couldn't open that folder. Go up a level or pick another folder, then try again.";
 const COPY: Record<FolderClass, { title: string; about: string; pickerTitle: string }> = {
-  models: { title: "AI models folder", about: "Where Home keeps the AI models it downloads. Models are large, so pick a drive with plenty of free space.", pickerTitle: "Choose the AI models folder" },
+  models: { title: "AI models folder (this computer)", about: "Where Home keeps the AI models it downloads on this computer. Models are large, so pick a drive with plenty of free space.", pickerTitle: "Choose the AI models folder" },
   records: { title: "Home's data folder", about: "Where Home keeps your family's chats, people and memories.", pickerTitle: "Choose Home's data folder" },
 };
 const PICKER_COPY = (title: string): FolderPickerCopy => ({
@@ -55,7 +55,7 @@ export function StorageStep({ split, value, onChange }: {
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
 
-  const kinds: FolderClass[] = split ? ["records"] : ["models", "records"];
+  const kinds: FolderClass[] = split ? ["records"] : ["records", "models"];
   const layout: StorageChoice = { ...(!split && value.models ? { models: value.models } : {}), ...(value.records ? { records: value.records } : {}) };
   const layoutKey = JSON.stringify(layout);
   const chosen = Object.keys(layout).length > 0;

@@ -59,7 +59,7 @@ describe("StorageStep", () => {
     try {
       const report = mock((_value: StorageChoice, _blocked: boolean) => {});
       const view = render(<Host report={report} />);
-      await act(async () => { fireEvent.click(view.getAllByRole("button", { name: "Choose a folder" })[0]!); });
+      await act(async () => { fireEvent.click(view.getAllByRole("button", { name: "Choose a folder" })[1]!); });
       await waitFor(() => expect(view.getByRole("button", { name: "Use this folder" })).toBeTruthy());
       await act(async () => { fireEvent.click(view.getByRole("button", { name: /Disks/ })); });
       await waitFor(() => expect(view.container.textContent).toContain("/Disks"));
