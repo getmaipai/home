@@ -83,3 +83,9 @@ backend/scripts/train/out/
 /codex-*.md
 /*-report.md
 .DS_Store
+
+# Local runtime and per-machine files
+/health.json
+/lane-health/
+/.claude/launch.json
+/.claude/settings.local.json
