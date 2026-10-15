@@ -346,13 +346,18 @@ describe("registerGracefulExit", () => {
     await startSidecar("exit-victim");
     expect(getSidecar("exit-victim")!.status).toBe("running");
 
+    const before = new Set(process.listeners("exit"));
     registerGracefulExit();
-    // Synthetic, not a real process exit: this only invokes the
-    // listeners registerGracefulExit() attached to "exit" (a plain
-    // EventEmitter event on `process`), so the test process itself
-    // keeps running - only the child sidecar process this test spawned
-    // is expected to die.
-    process.emit("exit", 0);
+    // Synthetic, not a real process exit: this invokes only the
+    // listeners registerGracefulExit() attached to "exit", so the test
+    // process itself keeps running - only the child sidecar process this
+    // test spawned is expected to die. Never process.emit("exit"): that
+    // also fires the run-temp cleanup listener (scripts/runTemp.ts),
+    // which deletes the test data dir mid-file and fails every later
+    // test with "SQLiteError: disk I/O error" (FLAKY-WATCHENGINE-01).
+    const mine = process.listeners("exit").filter((listener) => !before.has(listener));
+    expect(mine.length).toBeGreaterThan(0);
+    for (const listener of mine) (listener as (code: number) => void)(0);
 
     await waitUntil(async () => {
       const up = await fetch(`http://127.0.0.1:${port}`, { signal: AbortSignal.timeout(300) }).then(() => true, () => false);
