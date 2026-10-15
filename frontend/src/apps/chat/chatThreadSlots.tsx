@@ -326,6 +326,30 @@ export function BareModeSwitchMenuItem() {
 }
 
 const RememberIcon = getIcon("brain");
+const TraceIcon = getIcon("activity");
+
+/** DOCS-GAP-07: "Turn trace" in a reply's More menu opens `/trace/:turnId`,
+ * the step-by-step timing page. Owners and admins only (AdminContext), and
+ * never in Incognito, which keeps no trace. The page is a plain link, so it
+ * also opens in a new tab. */
+export function TurnTraceMenuItem() {
+  const isAdmin = useContext(AdminContext);
+  const temporary = useContext(TemporaryChatContext).on;
+  const turnId = useAuiState((s) => s.message.metadata?.custom?.turnId as string | undefined);
+  if (!isAdmin || temporary || !turnId) return null;
+  return (
+    <ActionBarMorePrimitive.Item
+      asChild
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
+      className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none"
+    >
+      <Link to={`/trace/${encodeURIComponent(turnId)}`}>
+        <TraceIcon className="size-4" />
+        Turn trace
+      </Link>
+    </ActionBarMorePrimitive.Item>
+  );
+}
 
 /** ELEMENTS-ADOPT-02: "Remember this" in a reply's More menu saves the
  * reply as one of the person's own memories, filed under this turn so the
@@ -372,6 +396,7 @@ export function AssistantMoreItems() {
       <CompareWithBareModelMenuItem />
       <BareModeSwitchMenuItem />
       <MessageDetailsMenuItem />
+      <TurnTraceMenuItem />
     </>
   );
 }
