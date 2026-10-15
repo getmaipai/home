@@ -57,15 +57,14 @@ describe("setup check row helpers", () => {
     expect((await setup(status("stopped"))).find((row) => row.id === "tailnet-peer")?.state).toBe("amber");
     expect((await setup(status("running", peer), false)).find((row) => row.id === "tailnet-allow")?.actionLabel).toBe("Allow");
   });
-  test("System row is red only when the platform is unsupported, not when the engine is down", async () => {
+  test("Computer row is red when the platform is unsupported; there is no separate System row", async () => {
     resetDb();
     const common = { catalog: async () => ({ models: [] }), modelDisk: async () => ({ status: "green" as const }), hubDisk: async () => ({ status: "green" as const }), homeNetwork: async () => true };
     const down = await runSetupChecks({ ...common, health: async () => ({ ok: false }), hardware: async () => { throw new Error("down"); }, localHardware: () => ({ platform: "darwin", arch: "arm64", totalMemory: 16e9 }) });
     expect(down.find((row) => row.id === "engine")?.state).toBe("red");
-    expect(down.find((row) => row.id === "system")?.state).toBe("green");
-    expect(down.find((row) => row.id === "system")?.text).toBe("darwin arm64 is supported.");
+    expect(down.find((row) => row.id === "system")).toBeUndefined();
     const intel = await runSetupChecks({ ...common, health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "x64" }, proposed: { level: "Minimal" } }) });
-    expect(intel.find((row) => row.id === "system")?.state).toBe("red");
+    expect(intel.find((row) => row.id === "memory")?.state).toBe("red");
   });
   test("engine row uses plain words for This computer and says what to do when it fails", async () => {
     resetDb();

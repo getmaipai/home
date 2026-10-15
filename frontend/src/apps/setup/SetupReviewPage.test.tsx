@@ -11,7 +11,7 @@ function setupReviewHarness() {
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     requests.push(`${init?.method ?? "GET"} ${url}`);
-    if (url.includes("/api/repairs/review")) return Response.json({ engine: "this_computer", checks: [{ id: "engine", title: "Engine service", state: "idle", text: "Checked by the Stack." }] });
+    if (url.includes("/api/repairs/review")) return Response.json({ engine: "this_computer", checks: [{ id: "engine", title: "Engine service", state: "green", text: "Checked by the Stack." }] });
     if (url.includes("/api/settings")) return Response.json({ key: "engines.stack.where", value: "this_computer" });
     return Response.json({});
   }) as unknown as typeof fetch;

@@ -6,7 +6,6 @@ import { getEngineLinkState } from "@/lib/stack/link";
 import { classDir } from "@/lib/paths";
 import { checkModelDisk, checkHubDisk } from "./placementDiskChecks";
 import { checkNvidiaSysmemFallback, type NvidiaSysmemFallbackReader } from "./nvidiaSysmemFallback";
-import { getSetupState } from "@/lib/setupState";
 import { minimum, defaultModelBytes } from "@/lib/placement";
 import { getTailscaleStatus } from "@/lib/tailscale";
 import { REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY } from "@/lib/remoteStackSettings";
@@ -112,14 +111,13 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     : configuredUrl
       ? `The AI engine on this computer isn't answering at ${configuredUrl}. Start it, or check that address, then press Try again.`
       : "The AI engine on this computer isn't answering. Start it, then press Try again.";
-  rows.push(makeRow("engine", "Engine service", engineOk ? "green" : "red", engineOk ? `The AI engine ${where} is answering.` : engineDown, "The Stack health endpoint did not answer.", "Repair", now));
+  rows.push(makeRow("engine", "AI engine", engineOk ? "green" : "red", engineOk ? `The AI engine ${where} is answering.` : engineDown, "The Stack health endpoint did not answer.", "Repair", now));
 
   const hw = hardware && typeof hardware.hardware === "object" && hardware.hardware ? hardware.hardware as Record<string, unknown> : null;
   const proposed = hardware && typeof hardware.proposed === "object" && hardware.proposed ? hardware.proposed as Record<string, unknown> : null;
   const level = typeof proposed?.level === "string" ? proposed.level : null;
   const supported = isSupportedInstallPlatform(String(hw?.platform ?? local.platform), String(hw?.arch ?? local.arch));
-  rows.push(makeRow("memory", "Memory and graphics", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "Home can't check this until the AI engine is answering. Start it, then press Try again." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
-  rows.push(makeRow("system", "System", !supported ? "red" : "green", !supported ? "This system is not supported for MaiPai Home's AI." : `${String(hw?.platform ?? local.platform)} ${String(hw?.arch ?? local.arch)} is supported.`, "The Stack hardware platform and architecture are checked against installer support.", "Use a supported computer", now));
+  rows.push(makeRow("memory", "Computer", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "Home can't check this until the AI engine is answering. Start it, then press Try again." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
 
   let modelDisk: Awaited<ReturnType<NonNullable<CheckDeps["modelDisk"]>>> = { status: "red", message: "Choose a disk for AI models before continuing." };
   if (deps.modelDisk) modelDisk = await deps.modelDisk();
@@ -141,19 +139,13 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     const url = (pin?.download as Record<string, unknown> | undefined)?.url;
     if (typeof url === "string") modelHost = new URL(url).hostname;
   } catch { /* unavailable pins leave the optional reach row idle */ }
-  if (!modelHost) rows.push(makeRow("download-host", "Download host", "idle", "Checked when downloads start.", "The Stack's pinned download host could not be read.", undefined, now));
+  if (!modelHost) rows.push(makeRow("download-host", "Internet", "idle", "Checked when downloads start.", "The Stack's pinned download host could not be read.", undefined, now));
   else {
     const reachable = await (deps.hostReach ?? tcp)(modelHost);
     const preflight = await checkInstallPreflight({ releaseHost: modelHost, reachReleaseHost: async () => reachable });
     const release = preflight.find((row) => row.code.startsWith("install.release."));
-    rows.push(makeRow("download-host", "Download host", release?.severity ? "red" : "green", release?.severity ? "Home can't reach the internet to download its AI models." : `The pinned model host ${modelHost} can be reached.`, release?.cause ?? `A plain TCP connection to ${modelHost}:443 succeeded.`, "Check the internet connection", now));
+    rows.push(makeRow("download-host", "Internet", release?.severity ? "red" : "green", release?.severity ? "Home can't reach the internet to download its AI models." : `The pinned model host ${modelHost} can be reached.`, release?.cause ?? `A plain TCP connection to ${modelHost}:443 succeeded.`, "Check the internet connection", now));
   }
-
-  const setupState = getSetupState();
-  const storageChoice = setupState.steps.find((step) => step.id === "storage");
-  const recordedDestination = (setupState as unknown as { storage?: { destination?: string }; engine?: { hardware?: { modelDestination?: string } } }).storage?.destination ?? setupState.engine.hardware.modelDestination ?? (storageChoice as unknown as { destination?: string } | undefined)?.destination;
-  const nonDefaultDestination = Boolean(recordedDestination);
-  rows.push(makeRow("download-destination", "Model download destination", nonDefaultDestination ? "red" : "green", nonDefaultDestination ? "Home can't put the AI models there yet. Press Back and choose the default location." : "The AI models will use the default location.", nonDefaultDestination ? "The Stack does not install models at the selected non-default location." : "The Stack's default model location is selected.", nonDefaultDestination ? "Press Back and choose the default location." : undefined, now));
 
   let hubDisk = deps.hubDisk ? await deps.hubDisk() : await checkHubDisk();
   rows.push(makeRow("hub-disk", "Hub disk", hubDisk.status, hubDisk.message ?? "There is enough space for Home's data.", hubDisk.message ?? "The hub disk meets placement requirements.", hubDisk.fix, now));
@@ -182,7 +174,6 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
       if (link) rows.push(makeRow("tailnet-latency", "Engine connection speed", link.state === "ready" || (link.state === "degraded" && !link.slow) ? "green" : link.state === "degraded" && link.slow ? "amber" : "idle", link.state === "degraded" && link.slow ? "Answers may be slow because the connection to the computer running Home's AI is slow." : "The engine link's connection speed is ready.", link.state === "degraded" && !link.slow ? "The engine link is degraded for another reason; its latency is not slow." : "The engine link's own six-probe median is at or below 500 ms.", undefined, now));
     }
   }
-  rows.push(makeRow("camera", "Camera and microphone", "idle", "Checked when you set up your face.", "Camera and microphone permissions are requested only during face setup.", undefined, now));
   rows.push(...await searchRows(deps, now));
   return rows;
 }

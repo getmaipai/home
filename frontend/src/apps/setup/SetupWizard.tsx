@@ -4,9 +4,8 @@ import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
-import { List } from "@maipai/ui/src/primitives/List";
+import { CheckGrid } from "./CheckGrid";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { Badge } from "@maipai/ui/src/ui/badge";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@maipai/ui/src/dashboard/components/ui/accordion";
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
@@ -77,7 +76,6 @@ const BEFORE_START_DETAILS = [
   { id: "internet", title: "Home goes online for you", detail: "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work." },
 ];
 const OWNER_COPY = "You manage this Home, its people, files, and backups. Nobody can remove the owner.";
-const CHECK_BADGE_LABEL: Record<"green" | "amber" | "red" | "idle", string> = { green: "Ready", amber: "Worth a look", red: "Needs fixing", idle: "Not checked yet" };
 const SECRET_SERVER_TEXT = "secret must be 4-128 characters";
 const SECRET_LENGTH_COPY = "Use 4 to 128 characters for your PIN or password, then press Create owner account again.";
 const stepIsDone = (state: SetupState, id: string) => state.steps.find((step) => step.id === id)?.status === "done";
@@ -100,7 +98,7 @@ export function renderSetupReviewScreen({ screen, engine = "this_computer", onEn
   if (screen === "engine_location") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.engine_location}</CardTitle></CardHeader> : null}<CardContent><RadioGroup disabled={readOnly} value={engine} onValueChange={(v) => onEngineChange?.(v as typeof engine)}><FieldLabel htmlFor="engine-local"><Field orientation="horizontal"><RadioGroupItem value="this_computer" id="engine-local" /><FieldContent><span className="text-base font-medium md:text-lg">One computer</span><p className="text-base text-muted-foreground md:text-lg">Home and AI both run on this computer.</p></FieldContent></Field></FieldLabel><FieldLabel htmlFor="engine-remote"><Field orientation="horizontal"><RadioGroupItem value="another_computer" id="engine-remote" /><FieldContent><span className="text-base font-medium md:text-lg">Two computers</span><p className="text-base text-muted-foreground md:text-lg">Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it in Home settings after setup.</p></FieldContent></Field></FieldLabel></RadioGroup></CardContent></Card>;
   if (screen === "storage") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.storage}</CardTitle><CardDescription>Home uses its ready-to-use default folder.</CardDescription></CardHeader> : null}<CardContent>{!showTitle ? <p>Home will use its default folder for AI models.</p> : null}</CardContent></Card>;
   if (screen === "plan") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.plan}</CardTitle></CardHeader> : null}<CardContent><p>After setup, choose and download AI models in Home settings.</p>{searchCandidate ? <><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={onChooseSearchCandidate}>Use it</Button></> : null}{searchError ? <p role="alert">{searchError}</p> : null}</CardContent></Card>;
-  return <div>{showTitle ? <h2 className="mb-4 text-lg font-medium">{SCREEN_TITLE.checks}</h2> : null}<AsyncState data={checkRows ?? null} error={checkError} isFetching={checksFetching} onRetry={onRetryChecks ?? (() => {})} errorMessage="Home couldn't check these computers. Refresh this page and try again." loadingLabel="Checking your computers">{(items) => <List items={items} getKey={(row) => row.id} label="Setup checks" renderItem={(row) => <div className="flex min-w-0 flex-1 flex-col gap-1 py-1"><div className="flex items-center gap-2"><Badge variant={row.state === "red" ? "destructive" : row.state === "amber" ? "outline" : "secondary"}>{CHECK_BADGE_LABEL[row.state]}</Badge><span className="text-base font-medium md:text-lg">{row.title}</span></div>{row.text !== "Ready." ? <p className="text-base text-muted-foreground md:text-lg">{row.text}</p> : null}</div>} />}</AsyncState></div>;
+  return <div>{showTitle ? <h2 className="mb-4 text-lg font-medium">{SCREEN_TITLE.checks}</h2> : null}<AsyncState data={checkRows ?? null} error={checkError} isFetching={checksFetching} onRetry={onRetryChecks ?? (() => {})} errorMessage="Home couldn't check these computers. Refresh this page and try again." loadingLabel="Checking your computers">{(items) => <CheckGrid rows={items} split={engine === "another_computer"} />}</AsyncState></div>;
 }
 
 export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
@@ -363,7 +361,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       const warnings = checkRows?.some((row) => row.state === "amber") ?? false;
       body = initialScreen === "checks" ? renderSetupReviewScreen({ screen: "checks", checkRows, checkError, checksFetching, showTitle: false, onRetryChecks: () => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); setSearchCandidate(result.searchCandidate); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); } }) : <div>
         <AsyncState data={checkRows} error={checkError} isFetching={checksFetching || (checkRows === null && !checkError)} onRetry={retryChecks} errorMessage="Home couldn't check these computers." loadingLabel="Checking your computers">
-          {(rows) => <List items={rows} getKey={(row) => row.id} label="Setup checks" renderItem={(row) => <div className="flex min-w-0 flex-1 flex-col gap-1 py-1"><div className="flex items-center gap-2"><Badge variant={row.state === "red" ? "destructive" : row.state === "amber" ? "outline" : "secondary"}>{CHECK_BADGE_LABEL[row.state]}</Badge><span className="text-base font-medium md:text-lg">{row.title}</span></div>{row.text !== "Ready." ? <p className="text-base text-muted-foreground md:text-lg">{row.text}</p> : null}{row.action === "allow_tailnet" ? <Button type="button" variant="secondary" size="lg" disabled={busy} onClick={() => void allowEngineTailnet()}>{row.actionLabel ?? "Allow"}</Button> : null}</div>} />}
+          {(rows) => <CheckGrid rows={rows} split={engine === "another_computer"} renderAction={(row) => row.action === "allow_tailnet" ? <Button type="button" variant="secondary" size="lg" disabled={busy} onClick={() => void allowEngineTailnet()}>{row.actionLabel ?? "Allow"}</Button> : null} />}
         </AsyncState>
         {tailnetError ? <p role="alert">{tailnetError}</p> : null}
         {blocking ? <p>Fix what is marked Needs fixing, then press Try again.</p> : null}

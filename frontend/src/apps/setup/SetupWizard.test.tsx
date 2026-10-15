@@ -222,7 +222,7 @@ describe("SetupWizard", () => {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Your setup plan"));
       await advanceTo(rendered, "Back", "Checking your computers");
-      await waitFor(() => expect(rendered.container.textContent).toContain("Home's AI is answering."));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Engine service"));
       await new Promise((resolve) => setTimeout(resolve, 1800));
       expect(rendered.container.textContent).toContain("Checking your computers");
       await advanceTo(rendered, "Back", "Choose where to store data");

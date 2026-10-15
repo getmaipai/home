@@ -1,7 +1,7 @@
 export type CheckFixtureState = "green" | "amber" | "red";
 export type CheckFixture = { id: string; title: string; state: CheckFixtureState; text: string };
 export type TailnetFixture = "not_installed" | "stopped" | "direct" | "relay" | "peer_offline" | "allow_off";
-export const CHECK_ROW_IDS = ["engine", "memory", "system", "model-disk", "graphics-driver", "download-host", "download-destination", "hub-disk", "clock", "home-network", "engine-link", "tailnet-allow", "tailnet-peer", "tailnet-route", "tailnet-latency", "camera"] as const;
+export const CHECK_ROW_IDS = ["engine", "memory", "model-disk", "graphics-driver", "download-host", "hub-disk", "clock", "home-network", "engine-link", "tailnet-allow", "tailnet-peer", "tailnet-route", "tailnet-latency"] as const;
 
 export const TAILNET_STATUS_FIXTURES: Record<Exclude<TailnetFixture, "not_installed" | "stopped" | "allow_off">, string> = {
   direct: JSON.stringify({ BackendState: "Running", Self: { UserID: 1 }, User: { "1": { ID: 1 } }, Peer: { key: { DNSName: "engine.example.com.", HostName: "engine", TailscaleIPs: ["100.64.0.20"], Online: true, CurAddr: "192.0.2.20:41641", Relay: "" } } }),
@@ -16,7 +16,7 @@ const rows = (state: CheckFixtureState, exception?: string): CheckFixture[] => C
 export const CHECK_FIXTURES: Record<CheckFixtureState, CheckFixture[]> = {
   green: rows("green"),
   amber: rows("amber", "graphics-driver"),
-  red: rows("red", "download-destination"),
+  red: rows("red", "download-host"),
 };
 
 export const TAILNET_CHECK_FIXTURES: Record<TailnetFixture, CheckFixture[]> = {
