@@ -4,6 +4,7 @@
     "web-search",
     "remote-access",
     "notifications-and-telegram",
-    "packages"
+    "packages",
+    "commands"
   ]
 }

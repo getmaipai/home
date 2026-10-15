@@ -6,7 +6,9 @@ description: "Every household and per-person setting, its default and what it ch
 {/* generated-source: backend/src/settings/*Keys.ts, commons/spec/settings/areas.json, commons/spec/settings/keys.json */}
 
 <Callout type="info" title="How to read this page">
-**Home** settings are set once for the household. **Person** settings belong to one person, and the guardian rules decide who may change them for a child or teen. Level is **basic**, **advanced** or **expert**; the app hides higher levels until asked. A blank "What it does" means the screen explains it in place.
+**Home** settings are set once for the household. **Person** settings belong to one person, and the guardian rules decide who may change them for a child or teen. Level is **basic**, **advanced** or **expert**; the app hides higher levels until asked. A blank "What it does" means the screen explains it in place. Settings marked "Not active yet" are saved but nothing reads them today. Robot and vision settings (keys starting `robot.`, `person.robot.`, `person.vision.` and `vision.`) are used by MaiPai Bot, not by Home itself.
+
+One more setting, **Wake word listening** (`voice.wakeword.enabled`, device scope, default off), appears only when the wake-word files are installed, so it is not in the tables.
 </Callout>
 
 Each table gives the label as shown, the key (useful in a support report), the default, the level and what it does. For the same screens in plain language, see the [user guide](/docs/user).
@@ -44,10 +46,10 @@ Each table gives the label as shown, the key (useful in a support report), the d
 | **Engine computer secure connection port** | `engines.stack.remote.ssh_port` | 22 | advanced | The port Home uses to open its secure connection to the engine computer. Leave it at 22 unless that computer was set up differently. Only an admin can change this. Shown only while the engine runs on another computer. |
 | **MaiPai Stack address** | `engines.stack.url` | empty | expert | Empty uses Home's own built-in engines. With the engine on this computer, set this to the address of the MaiPai Stack installed here to route chat, embeddings and voice through it. With the engine on another computer, Home fills this in for you from the connection settings, so leave it empty. Only an admin can change this. |
 | **Help the chat remember to search the web** | `chat.search_assist` | shadow | advanced | "Off" is the kill switch: nothing is scored. "Shadow" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. "Rescue" is not active yet; for now it behaves like shadow. Children and teens are never scored. |
-| **Use the MaiPai Stack for chat** | `engines.stack.use_chat` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. The memory judge and background worker follow this switch because they share chat's model. |
-| **Use the MaiPai Stack for search (embeddings)** | `engines.stack.use_embeddings` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. |
-| **Use the MaiPai Stack for listening (speech to text)** | `engines.stack.use_stt` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. |
-| **Use the MaiPai Stack for speaking (text to speech)** | `engines.stack.use_tts` | off | expert | Off, Home's own engine does this. Turn on only after the Stack has been proven for it. |
+| **Use the MaiPai Stack for chat** | `engines.stack.use_chat` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Use the MaiPai Stack for search (embeddings)** | `engines.stack.use_embeddings` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Use the MaiPai Stack for listening (speech to text)** | `engines.stack.use_stt` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Use the MaiPai Stack for speaking (text to speech)** | `engines.stack.use_tts` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
 | **Where the engine runs** | `engines.stack.where` | this_computer | basic | "This computer" runs the engine on the machine Home is installed on. "Another computer" runs it on a different computer in your home that you reach over your network. Only an admin can change this. |
 | **Hugging Face token (for voice cloning)** | `voice.hf_token` | empty | advanced | Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a read token at huggingface.co/settings/tokens and paste it here. |
 
@@ -113,9 +115,9 @@ Each table gives the label as shown, the key (useful in a support report), the d
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
 | **Reference library location** | `reference.library_dir` | empty | basic | Where the household's offline knowledge archives live: a local folder, an external drive, or a NAS mount. Empty uses Home's own data folder. Moving this later moves the files and updates the library records. |
-| **Use page views as a news signal** | `reference.pageviews_signal` | off | advanced | Use daily Wikipedia page-view counts to help identify notable news stories. |
-| **Reference update speed limit (MB/s)** | `reference.update.max_mbps` | 20 | advanced | Maximum speed used for automatic reference library updates. |
-| **Reference library update mode** | `reference.update.mode` | ask | advanced | Choose whether reference library updates happen automatically or wait for you. |
+| **Use page views as a news signal** | `reference.pageviews_signal` | off | advanced | Not active yet. Planned; this setting has no effect today. |
+| **Reference update speed limit (MB/s)** | `reference.update.max_mbps` | 20 | advanced | Not active yet. Planned; this setting has no effect today. |
+| **Reference library update mode** | `reference.update.mode` | ask | advanced | Not active yet. Planned; this setting has no effect today. |
 
 ### Home settings > Search > Web search
 
@@ -157,7 +159,7 @@ Each table gives the label as shown, the key (useful in a support report), the d
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
 | **Conversation history retention** | `household.conversation_retention_days` | 90 | advanced | How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting. |
-| **Family name** | `household.family_name` | empty | basic | Shown above your greeting on Home, e.g. "Willow" becomes "Willow Family." |
+| **Family name** | `household.family_name` | empty | basic | Not active yet. The name is saved but Home does not show it yet. |
 | **Home location** | `household.home` | empty | basic | The household place used as the fallback for location-based answers. |
 | **Language and region** | `household.locale` | en-US | basic | Sets the household's date, time, and unit formatting. |
 | **Household location** | `household.home_place` | empty | basic | The place MaiPai uses as the household fallback. |
@@ -201,15 +203,15 @@ Each table gives the label as shown, the key (useful in a support report), the d
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
-| **Daily Family minutes** | `allowance.family.daily_minutes` | 0 | basic | How many minutes of Family packages this person may use per day. 0 means no limit. |
-| **Daily Fun minutes** | `allowance.fun.daily_minutes` | 0 | basic | How many minutes of Fun packages this person may use per day. 0 means no limit. |
-| **Daily Health minutes** | `allowance.health.daily_minutes` | 0 | basic | How many minutes of Health packages this person may use per day. 0 means no limit. |
-| **Daily Home minutes** | `allowance.home.daily_minutes` | 0 | basic | How many minutes of Home packages this person may use per day. 0 means no limit. |
-| **Daily Info minutes** | `allowance.info.daily_minutes` | 0 | basic | How many minutes of Info packages this person may use per day. 0 means no limit. |
-| **Daily Learning minutes** | `allowance.learning.daily_minutes` | 0 | basic | How many minutes of Learning packages this person may use per day. 0 means no limit. |
-| **Daily Media minutes** | `allowance.media.daily_minutes` | 0 | basic | How many minutes of Media packages this person may use per day. 0 means no limit. |
-| **Daily Robot body minutes** | `allowance.robot_body.daily_minutes` | 0 | basic | How many minutes of Robot body packages this person may use per day. 0 means no limit. |
-| **Daily Utilities minutes** | `allowance.utilities.daily_minutes` | 0 | basic | How many minutes of Utilities packages this person may use per day. 0 means no limit. |
+| **Daily Family minutes** | `allowance.family.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Fun minutes** | `allowance.fun.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Health minutes** | `allowance.health.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Home minutes** | `allowance.home.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Info minutes** | `allowance.info.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Learning minutes** | `allowance.learning.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Media minutes** | `allowance.media.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Robot body minutes** | `allowance.robot_body.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Utilities minutes** | `allowance.utilities.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
 
 ### Chat settings
 

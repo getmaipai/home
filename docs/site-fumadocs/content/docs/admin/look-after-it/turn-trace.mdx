@@ -1,0 +1,26 @@
+---
+title: Read a turn trace
+description: See how long each step of one reply took.
+---
+
+This page is for owners and admins.
+
+## ✍️ Steps
+
+1. Get the turn's id.
+2. In the browser, open `/trace/` followed by the id, on your Home address.
+3. Read the **Turn trace** page. The **Trace** card lists each step as a bar, with the total time in milliseconds.
+
+Steps include the pipeline stages, **Model generation** and **Tool call**. Each can be completed, failed, skipped or running.
+
+## 🔒 What it never shows
+
+A trace holds names and timings only. It has no message text, no tool details and no names of people. A turn from a temporary or Incognito chat has no trace.
+
+Nothing in the screens links to this page yet, so it is opened by address.
+
+If it cannot load, it says "Could not load this trace." Tap **Try again**. A not-found answer means the turn is unknown or was private.
+
+## 🙋 Still need help?
+
+For overall timing, use [Performance](/docs/admin/look-after-it/performance).

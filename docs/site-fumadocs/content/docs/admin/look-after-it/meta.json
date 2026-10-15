@@ -4,6 +4,9 @@
     "backups-and-restore",
     "updates-and-rollback",
     "privacy-audit",
-    "troubleshooting-and-support-report"
+    "troubleshooting-and-support-report",
+    "devices-and-sessions",
+    "performance",
+    "turn-trace"
   ]
 }

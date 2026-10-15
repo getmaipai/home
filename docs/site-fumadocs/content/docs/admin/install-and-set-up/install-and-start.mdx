@@ -40,7 +40,7 @@ bun install
 bun start
 ```
 
-Home builds, runs in the background and prints its addresses. Open `http://localhost:8787`. The first person to sign in becomes the **owner**. Running `bun start` again prints the addresses without starting a second copy.
+Home builds, runs in the background and prints its addresses. Open the address Home prints. By default it is `http://localhost:3000`. The first person to sign in becomes the **owner**. Running `bun start` again prints the addresses without starting a second copy.
 
 ## ⏹️ Stop and restart
 
@@ -74,7 +74,7 @@ sudo bash /Users/example/Developer/home/scripts/install.sh
 | Background service | launchd daemon | systemd unit `maipai-home.service` |
 | Service user | `maipai` | `maipai` |
 
-The default port is 3000 (or the number in `MAIPAI_PORT`). If it is taken, the installer picks the next free one. This is different from the 8787 used when you run from source. Use the address the installer prints.
+The default port is 3000 (or the number in `MAIPAI_PORT`). If it is taken, the installer picks the next free one. Use the address the installer prints.
 
 The installer installs the **latest published release**, never the main branch. If no release exists it stops with "could not find a published release ... there is nothing to install". Run from source until one does.
 

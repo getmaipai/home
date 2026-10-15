@@ -9696,3 +9696,15 @@ Plain boolean switches and selects in `/settings` call the save handler immediat
 - [ ] **SEARCH-ANSWER-08: a re-asked, unanswered question searches again instead of citing "earlier results"** (M, bench first per rule 3; same note). Turn turn-4rxa10ml9h made no tool call and invented citations.
 - [x] **SEARCH-ANSWER-09: answer pictures drop drawings and relatives' captions** (S, 2026-10-13; `docs/plans/search-answer-caption-veto-2026-10-13.md`; architect APPROVED). `backend/src/lib/answerImages/relevance.ts` gains a closed art-word veto (drawing, drawn, painting, sketch, caricature, illustration; `caption:<word>`, exempt when the subject's own name or Wikidata description holds the word) and a relative-caption veto (a person named only as "sister/brother/wife/husband/son/daughter/mother/father of X" or "with X"; `caption:<relation> of`). Only removes, no model call. Tests in `backend/tests/answerImagesRelevance.test.ts`. The judged sample (every tile opened, kept and dropped counts) needs a live Commons capture and is not yet run.
 - [ ] **DATA-TRIVIA-02: Codex reviews the 101-question trivia bank** (S, 2026-10-14; architect APPROVED, `data-scratch/architect/DATA-TRIVIA-02.verdict`). Check each row for accuracy, age-band fit, safety and source; fix or remove only clear failures, replace from sources to hold band minimums, write a findings table. The header stays `reviewed: pending`; Jesse marks it reviewed.
+
+## Docs vs code gaps (2026-10-14)
+
+From `docs/plans/docs-vs-reality-2026-10-14.md`. The guides now say only what works today.
+
+- [ ] **DOCS-GAP-01: The four `engines.stack.use_*` keys are deprecated, but their help text says to turn them on** (S). `backend/src/settings/aiKeys.ts:117-160`. Reword or hide them.
+- [ ] **DOCS-GAP-02: Daily time allowances are saved but never applied** (M). `dailyMinutesAllowed()` in `backend/src/lib/allowance.ts` has no callers. Enforce it or say so in the Limits tab.
+- [ ] **DOCS-GAP-03: Admin UI links a teen's profile and shows the Memories tab, though the server refuses** (S). Hide both for admins (ruling 2026-09-30, teens' settings stay private).
+- [ ] **DOCS-GAP-04: `reference.update.mode`, `reference.update.max_mbps`, `reference.pageviews_signal` and `household.family_name` have no code behind them** (S each). Build (KS-REF-00, KS-06) or remove the keys.
+- [ ] **DOCS-GAP-05: Packages page promised a "Your apps" section on Home; no such section exists** (M). Build it or leave the docs as corrected.
+- [ ] **DOCS-GAP-06: Setup wizard and Settings save the backup key under two different file names** (S). Pick one name.
+- [ ] **DOCS-GAP-07: Turn trace page has no link in the app** (S). `/trace/:turnId` is reachable only by address.

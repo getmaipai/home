@@ -2,7 +2,7 @@
   "home": {
     "file": "home-desktop-light.png",
     "alt": "The Home screen with cards for people, updates, repairs and engines",
-    "caption": "Your Home screen: who is here and what needs attention."
+    "caption": "Your Home screen: counts for people, updates and repairs, and recent activity."
   },
   "chat-empty": {
     "file": "docs-chat-empty.png",
