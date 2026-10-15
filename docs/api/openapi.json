@@ -20795,7 +20795,7 @@
         "summary": "The folders Home uses when none is chosen",
         "responses": {
           "200": {
-            "description": "Absolute paths.",
+            "description": "Absolute paths, and the folders already chosen on this setup (empty when none).",
             "content": {
               "application/json": {
                 "schema": {
@@ -20806,11 +20806,23 @@
                     },
                     "models": {
                       "type": "string"
+                    },
+                    "chosen": {
+                      "type": "object",
+                      "properties": {
+                        "records": {
+                          "type": "string"
+                        },
+                        "models": {
+                          "type": "string"
+                        }
+                      }
                     }
                   },
                   "required": [
                     "records",
-                    "models"
+                    "models",
+                    "chosen"
                   ]
                 }
               }

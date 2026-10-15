@@ -60,7 +60,16 @@ export function StorageStep({ split, value, onChange }: {
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
   const [defaults, setDefaults] = useState<{ records: string; models: string } | null>(null);
-  useEffect(() => { api.setupStorageDefaults().then(setDefaults, () => setDefaults(null)); }, []);
+  // A choice already saved on the server (after a reload, or coming Back) is shown again.
+  useEffect(() => {
+    api.setupStorageDefaults().then((result) => {
+      setDefaults(result);
+      const saved = result.chosen ?? {};
+      if (!value.records && !value.models && (saved.records || saved.models)) onChange({ ...(saved.records ? { records: saved.records } : {}), ...(!split && saved.models ? { models: saved.models } : {}) }, true);
+    }, () => setDefaults(null));
+    // Read once on mount; the saved choice only fills an empty one.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const kinds: FolderClass[] = split ? ["records"] : ["records", "models"];
   const layout: StorageChoice = { ...(!split && value.models ? { models: value.models } : {}), ...(value.records ? { records: value.records } : {}) };

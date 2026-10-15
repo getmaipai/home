@@ -9,7 +9,7 @@ import { apiRouter } from "@/lib/openapi";
 import { db } from "@/db";
 import { people } from "@/db/schema";
 import { resolveHumanSession } from "@/middleware/auth";
-import { getSetupState } from "@/lib/setupState";
+import { getSetupState, getStorageChoice } from "@/lib/setupState";
 import { createFolder, listFolder, validateProposedPath } from "@/lib/folderBrowse";
 import { checkPlacement } from "@/lib/placement";
 import { classDir } from "@/lib/paths";
@@ -147,10 +147,10 @@ setupFolderRoutes.openapi(checkRoute, async (c) => {
 
 const defaultsRoute = createRoute({
   method: "get", path: "/storage/defaults", tags: ["Setup"], summary: "The folders Home uses when none is chosen",
-  responses: { 200: { content: { "application/json": { schema: z.object({ records: z.string(), models: z.string() }) } }, description: "Absolute paths." }, ...errs },
+  responses: { 200: { content: { "application/json": { schema: z.object({ records: z.string(), models: z.string(), chosen: z.object({ records: z.string().optional(), models: z.string().optional() }) }) } }, description: "Absolute paths, and the folders already chosen on this setup (empty when none)." }, ...errs },
 });
 setupFolderRoutes.openapi(defaultsRoute, (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
-  return c.json({ records: classDir("records"), models: classDir("models") }, 200);
+  return c.json({ records: classDir("records"), models: classDir("models"), chosen: getStorageChoice() ?? {} }, 200);
 });

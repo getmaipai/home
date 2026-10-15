@@ -164,6 +164,14 @@ describe("new folder", () => {
 });
 
 describe("storage check", () => {
+  test("the defaults answer also carries the folders already chosen on this setup", async () => {
+    const before = await (await new TestClient().get("/api/setup/storage/defaults")).json() as { chosen: unknown };
+    expect(before.chosen).toEqual({});
+    replaceSetupStep("storage", { status: "done", phase: "computers", storageChoice: { records: join(root, "alpha") } } as never);
+    const after = await (await new TestClient().get("/api/setup/storage/defaults")).json() as { chosen: unknown };
+    expect(after.chosen).toEqual({ records: join(root, "alpha") });
+  });
+
   test("returns checkPlacement rows for the proposed layout", async () => {
     const response = await new TestClient().post("/api/setup/storage/check", { records: join(root, "alpha"), models: join(root, "beta") });
     expect(response.status).toBe(200);

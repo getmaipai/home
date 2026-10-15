@@ -26,6 +26,7 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS) {
     if (url.includes("/api/setup/checks/run")) return new Response(JSON.stringify({ rows: checkRows, state }), { status: 200 });
     if (url.includes("/api/setup-checklist")) return new Response(JSON.stringify(Array.from({ length: 5 }, (_, i) => ({ id: `item-${i}`, title: "Item", reason: "", done: i >= checklistOpen, open: { label: "Open", href: "/" } }))), { status: 200 });
     if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/data", models: "/data/models" }), { status: 200 });
+    if (url.includes("/api/setup/folders/native")) return new Response(JSON.stringify({ status: "chosen", path: "/Volumes/Big/home-data" }), { status: 200 });
     if (url.includes("/api/setup/storage/check")) return new Response(JSON.stringify({ rows: [] }), { status: 200 });
     if (url.includes("/api/setup/ca")) return new Response(JSON.stringify({ certificate: "public" }), { status: 200 });
     if (url.includes("/api/backups/emergency-kit")) return new Response(JSON.stringify({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "aabb", generatedAt: new Date().toISOString() }), { status: 200 });
@@ -195,6 +196,21 @@ describe("SetupWizard", () => {
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Try again" })); });
       await waitFor(() => expect(calls()).toBe(before + 1));
       expect(rendered.container.textContent).not.toMatch(/\b(red|green|amber|idle)\b/);
+    } finally { h.restore(); }
+  });
+
+  test("a folder chosen on the storage screen is still chosen after Continue and Back", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Choose where to store data"));
+      await act(async () => { fireEvent.click(rendered.getAllByRole("button", { name: "Choose a folder" })[0]!); });
+      await waitFor(() => expect(rendered.container.textContent).toContain("/Volumes/Big/home-data"));
+      await advanceTo(rendered, "Continue", "Checking your computers");
+      await advanceTo(rendered, "Back", "Choose where to store data");
+      expect(rendered.container.textContent).toContain("/Volumes/Big/home-data");
     } finally { h.restore(); }
   });
 

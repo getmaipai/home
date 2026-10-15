@@ -7,13 +7,13 @@ afterEach(cleanup);
 
 const listing = (path: string, writable = true) => ({ path, parent: path === "/" ? null : "/", freeBytes: 500e9, writable, folders: [{ name: "Disks", path: `${path === "/" ? "" : path}/Disks`, writable: true }, { name: "Locked", path: `${path}/Locked`, writable: false }] });
 
-function setup(rows: unknown[] = [], native: unknown = { status: "unavailable" }) {
+function setup(rows: unknown[] = [], native: unknown = { status: "unavailable" }, chosen: StorageChoice = {}) {
   const original = globalThis.fetch;
   const calls: string[] = [];
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(`${init?.method ?? "GET"} ${url}${init?.body ? ` ${String(init.body)}` : ""}`);
-    if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/Users/me/maipai/data", models: "/Users/me/maipai/data/models" }), { status: 200 });
+    if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/Users/me/maipai/data", models: "/Users/me/maipai/data/models", chosen }), { status: 200 });
     if (url.includes("/api/setup/folders/native")) return new Response(JSON.stringify(native), { status: 200 });
     if (url.includes("/api/setup/storage/check")) return new Response(JSON.stringify({ rows }), { status: 200 });
     if (url.includes("/api/setup/folders") && init?.method === "POST") return new Response(JSON.stringify({ name: "Models", path: "/Disks/Models", writable: true }), { status: 200 });
@@ -45,6 +45,16 @@ describe("StorageStep", () => {
       expect(report.mock.calls.at(-1)).toEqual([{}, false]);
       expect(h.calls.some((call) => call.startsWith("POST /api/setup/storage/check") || call.includes("/api/setup/storage/check"))).toBe(true);
       expect(h.calls.some((call) => call.includes("/api/setup/folders"))).toBe(false);
+    } finally { h.restore(); }
+  });
+
+  test("a folder already saved on the server is shown again when the step opens empty", async () => {
+    const h = setup([], { status: "unavailable" }, { records: "/Volumes/Big/home-data", models: "/Volumes/Big/models" });
+    try {
+      const report = mock((_value: StorageChoice, _blocked: boolean) => {});
+      const view = render(<Host report={report} />);
+      await waitFor(() => expect(view.getByText("/Volumes/Big/home-data")).toBeTruthy());
+      expect(view.getByText("/Volumes/Big/models")).toBeTruthy();
     } finally { h.restore(); }
   });
 

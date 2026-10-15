@@ -664,7 +664,7 @@ export const api = {
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
   setupFolders: (path?: string) => request<SetupFolderListing>(`/api/setup/folders${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`),
-  setupStorageDefaults: () => request<{ records: string; models: string }>("/api/setup/storage/defaults"),
+  setupStorageDefaults: () => request<{ records: string; models: string; chosen?: { records?: string; models?: string } }>("/api/setup/storage/defaults"),
   setupCreateFolder: (parent: string, name: string) => request<{ name: string; path: string; writable: boolean }>("/api/setup/folders", { method: "POST", body: JSON.stringify({ parent, name }) }),
   setupNativeFolder: (folder: "records" | "models") => request<{ status: "chosen"; path: string } | { status: "cancelled" } | { status: "unavailable" } | { status: "refused"; error: string }>("/api/setup/folders/native", { method: "POST", body: JSON.stringify({ folder }) }),
   setupStorageCheck: (layout: { models?: string; records?: string; split?: boolean }) => request<{ rows: SetupPlacementRow[] }>("/api/setup/storage/check", { method: "POST", body: JSON.stringify(layout) }),
