@@ -9,7 +9,7 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import type { Icon } from "@maipai/ui/src/icons";
 import { GRID_COLUMNS } from "@maipai/ui/src/responsive";
-import { ROLE_LABELS, ACCENT_RING_CLASS } from "@/apps/people/roles";
+import { ROLE_LABELS, ACCENT_RING_CLASS, isProfileClosedTo } from "@/apps/people/roles";
 import { api, ApiError, isOwnerOrAdminRole, type DeviceInfo, type Entity, type PersonRosterEntry, type Roster } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -124,7 +124,7 @@ export function FamilyPage({ person }: { person: Roster }) {
                   </Card>
                 );
                 // Owners and admins reach only a child's profile, never a teen's (ruling 2026-09-30).
-                if (entry.id !== person.id && entry.role === "teen" && isOwnerOrAdminRole(person.role)) return <div key={entry.id}>{card}</div>;
+                if (isProfileClosedTo(person, entry)) return <div key={entry.id}>{card}</div>;
                 return (
                   <Link key={entry.id} to={`/people/${entry.id}`} className="block rounded-xl transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
                     {card}

@@ -10,7 +10,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@maipai/ui/src/dashboard/components/ui/dialog";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, isOwnerOrAdminRole, type PersonRosterEntry, type Roster, type VisibleFile } from "@/lib/api";
-import { ACCENT_RING_CLASS, canManagePerson, ROLE_LABELS } from "@/apps/people/roles";
+import { ACCENT_RING_CLASS, canAccessPerson, canManagePerson, isProfileClosedTo, ROLE_LABELS } from "@/apps/people/roles";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { OwnMemories, OtherPersonMemories } from "@/apps/memory/PersonMemories";
@@ -37,8 +37,8 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
   const viewingSelf = id === person.id;
   // Mirrors the server's canAccessPerson: an owner or admin reaches only a CHILD's memories
   // (ruling 2026-09-30), never a teen's or another adult's.
-  const canViewMemories = viewingSelf
-    || (isOwnerOrAdminRole(person.role) && rosterQuery.data?.some((entry) => entry.id === id && entry.role === "child") === true);
+  const target = rosterQuery.data?.find((entry) => entry.id === id);
+  const canViewMemories = viewingSelf || (target !== undefined && canAccessPerson(person, target));
   const canViewLimits = !viewingSelf && isOwnerOrAdminRole(person.role)
     && rosterQuery.data?.some((entry) => entry.id === id && entry.age_band === "child") === true;
   const activeTab = params.get("tab") === "memories" && canViewMemories
@@ -74,6 +74,15 @@ export function PersonProfilePage({ person, onPersonChange }: { person: Roster; 
             return (
               <div className="flex flex-col items-center gap-2 py-12 text-center">
                 <p className="text-base font-medium">No one in this household has that profile.</p>
+                <Link to="/people" className="text-primary underline">Back to Family</Link>
+              </div>
+            );
+          }
+          if (!viewingSelf && isProfileClosedTo(person, profile)) {
+            return (
+              <div className="flex flex-col items-center gap-2 py-12 text-center">
+                <p className="text-base font-medium">You cannot open this profile.</p>
+                <p className="text-sm text-muted-foreground">A teen&rsquo;s profile is private, even from an admin. Go back to Family to open someone else.</p>
                 <Link to="/people" className="text-primary underline">Back to Family</Link>
               </div>
             );

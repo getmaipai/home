@@ -1,5 +1,5 @@
 import type { Person } from "@maipai/spec/gen/ts/person.js";
-import type { Role } from "@/lib/api";
+import { isOwnerOrAdminRole, type Role } from "@/lib/api";
 import { ROLE_REQUIRES_CREDENTIAL } from "../../../../shared/personCredentialRoles";
 
 type Accent = NonNullable<Person["accent"]>;
@@ -130,3 +130,17 @@ export const ACCENT_LABELS: Record<Accent, string> = {
 export const NO_ACCENT = "none" as const;
 export const ACCENT_SELECT_OPTIONS: readonly string[] = [NO_ACCENT, ...(Object.keys(ACCENT_LABELS) as Accent[])];
 export const ACCENT_SELECT_LABELS: Record<string, string> = { [NO_ACCENT]: "No accent", ...ACCENT_LABELS };
+
+/** Mirrors backend/src/lib/access.ts's canAccessPerson (ruling 2026-09-30): you reach your own
+ * data, and an owner or admin also reaches a CHILD's, never a teen's or another adult's. */
+export function canAccessPerson(viewer: { id: string; role: Role }, target: { id: string; role: Role }): boolean {
+  if (viewer.id === target.id) return true;
+  return isOwnerOrAdminRole(viewer.role) && target.role === "child";
+}
+
+/** A teen's profile does not open for an owner or admin at all (ruling 2026-09-30), so Family
+ * shows the card without a link and the profile page shows a blocked state. Adults' cards stay
+ * open: the server refuses an admin their memories, but the page itself is unchanged for now. */
+export function isProfileClosedTo(viewer: { id: string; role: Role }, target: { id: string; role: Role }): boolean {
+  return viewer.id !== target.id && isOwnerOrAdminRole(viewer.role) && target.role === "teen";
+}

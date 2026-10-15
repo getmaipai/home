@@ -231,6 +231,24 @@ describe("PersonProfilePage", () => {
     } finally { restore(); }
   });
 
+  test("a teen opens their own profile and a teen's profile is closed to an admin only", async () => {
+    const teen = rosterEntry({ id: "person-nova", display_name: "Nova", role: "teen" });
+    const restore = stubFetch({});
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => String(input).includes("/api/people")
+      ? Promise.resolve(Response.json([...people.slice(0, 2), teen]))
+      : Promise.resolve(Response.json([]))) as unknown as typeof fetch;
+    try {
+      const self = renderProfile("/people/person-nova", viewer({ id: "person-nova", display_name: "Nova", role: "teen" }));
+      expect(await self.findByText("Nova")).toBeTruthy();
+      expect(self.queryByText("You cannot open this profile.")).toBeNull();
+      self.unmount();
+      const peer = renderProfile("/people/person-nova", viewer({ role: "adult" }));
+      expect(await peer.findByText("Nova")).toBeTruthy();
+      expect(peer.queryByText("You cannot open this profile.")).toBeNull();
+    } finally { globalThis.fetch = original; restore(); }
+  });
+
   test("an owner does not see Limits on a teen's profile", async () => {
     const restore = stubFetch({});
     try {
@@ -240,13 +258,13 @@ describe("PersonProfilePage", () => {
         ? Promise.resolve(Response.json([...people.slice(0, 2), teen]))
         : Promise.resolve(Response.json([]))) as unknown as typeof fetch;
       const view = renderProfile("/people/person-nova", viewer({ role: "owner" }));
-      await view.findByText("Nova");
+      await view.findByText("You cannot open this profile.");
       expect(view.queryByRole("tab", { name: "Limits" })).toBeNull();
       globalThis.fetch = original;
     } finally { restore(); }
   });
 
-  test("an owner or admin sees no Memories tab on a teen's profile, even by URL, but does on a child's", async () => {
+  test("an owner or admin cannot open a teen's profile at all, even by URL, but opens a child's", async () => {
     const teen = rosterEntry({ id: "person-nova", display_name: "Nova", role: "teen" });
     const restore = stubFetch({});
     const original = globalThis.fetch;
@@ -256,8 +274,12 @@ describe("PersonProfilePage", () => {
     try {
       for (const role of ["owner", "admin"] as const) {
         const teenView = renderProfile("/people/person-nova?tab=memories", viewer({ role }));
-        await teenView.findByText("Nova");
+        expect(await teenView.findByText("You cannot open this profile.")).toBeTruthy();
+        expect(teenView.getByText("Back to Family").getAttribute("href")).toBe("/people");
+        expect(teenView.queryByText("Nova")).toBeNull();
         expect(teenView.queryByRole("tab", { name: "Memories" })).toBeNull();
+        expect(teenView.queryByRole("button", { name: "Edit" })).toBeNull();
+        expect(teenView.queryByText("Face recognition")).toBeNull();
         teenView.unmount();
         const childView = renderProfile("/people/person-bramble", viewer({ role }));
         expect(await childView.findByRole("tab", { name: "Memories" })).toBeTruthy();
