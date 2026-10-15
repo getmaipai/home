@@ -10,8 +10,8 @@ type FolderClass = "models" | "records";
 
 const PICKER_ERROR = "Home couldn't open that folder. Go up a level or pick another folder, then try again.";
 const COPY: Record<FolderClass, { title: string; about: string; pickerTitle: string }> = {
-  models: { title: "AI models", about: "", pickerTitle: "Choose the AI models folder" },
-  records: { title: "Home's data", about: "", pickerTitle: "Choose Home's data folder" },
+  models: { title: "AI models", about: "Where the AI models are stored. Plan for about 200 GB.", pickerTitle: "Choose the AI models folder" },
+  records: { title: "Home's data", about: "Your family's chats, people and memories. Small, usually well under 5 GB.", pickerTitle: "Choose Home's data folder" },
 };
 const PICKER_COPY = (title: string): FolderPickerCopy => ({
   title,
@@ -129,6 +129,7 @@ export function StorageStep({ split, value, onChange }: {
           <Card key={which}>
             <CardHeader>
               <h2 className="text-2xl font-semibold md:text-3xl">{copy.title}</h2>
+              <p className="text-base text-muted-foreground md:text-lg">{copy.about}</p>
             </CardHeader>
             <CardContent>
               <p className="break-all text-base md:text-lg">{path ?? defaults?.[which] ?? "Default folder"}</p>
@@ -146,7 +147,7 @@ export function StorageStep({ split, value, onChange }: {
                   chooseDisabled={listing ? !listing.writable : false}
                 />
               ) : (
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 pt-3">
                   <Button type="button" variant="secondary" size="lg" disabled={picking !== null} onClick={() => startPicking(which)}>{path ? "Choose a different folder" : "Choose a folder"}</Button>
                   {path ? <Button type="button" variant="ghost" size="lg" disabled={picking !== null} onClick={() => onChange({ ...value, [which]: undefined }, true)}>Keep the default</Button> : null}
                 </div>
