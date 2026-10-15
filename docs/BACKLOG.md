@@ -9701,7 +9701,7 @@ Plain boolean switches and selects in `/settings` call the save handler immediat
 
 ## Moved off the plan page (2026-10-13)
 
-Chores that were on the Cockpit plan; the plan now holds only the current goal.
+Chores that were on the plan page; the plan now holds only the current goal.
 
 - [ ] **ELEMENTS-MIGRATE-01a: Needs hover variant and captures** (moved off the plan 2026-10-13). 
 - [ ] **RULE9-CLEANUP-01h: Awaiting verdict** (moved off the plan 2026-10-13). 
