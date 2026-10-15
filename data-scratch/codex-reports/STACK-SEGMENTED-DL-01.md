@@ -20,7 +20,7 @@ All rows used the local loopback server with a synthetic deterministic 320 MiB p
 
 | Strategy | Repeat 1 MiB/s | Repeat 2 MiB/s | Repeat 3 MiB/s | Mean MiB/s | Paired difference vs single | Paired 95% interval |
 |---|---:|---:|---:|---:|---:|---:|
-| Single stream | 46.11 | 45.09 | 46.37 | 45.86 | baseline | — |
+| Single stream | 46.11 | 45.09 | 46.37 | 45.86 | baseline | n/a |
 | Four ranges | 46.07 | 45.71 | 45.19 | 45.66 | -0.20 | [-2.47, +2.07] |
 | Eight ranges | 89.25 | 88.26 | 88.14 | 88.55 | +42.69 | [+40.69, +44.69] |
 | Four parallel independent files | 45.06 | 44.42 | 44.20 | 44.56 | -1.30 | [-3.24, +0.64] |
