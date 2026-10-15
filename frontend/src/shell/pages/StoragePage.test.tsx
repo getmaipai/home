@@ -1,9 +1,24 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterAll, afterEach, describe, expect, mock, test } from "bun:test";
+import * as realSonner from "sonner";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 const toastSuccess = mock(() => {});
 const toastError = mock(() => {});
-mock.module("sonner", () => ({ toast: { success: toastSuccess, error: toastError } }));
+// Bun keeps a mock.module registration for the rest of the process, so a
+// later file in the same shard (NotificationBell, via the kit's Toast) would
+// see `toast` as a plain object and throw "toast is not a function". Keep the
+// real module's shape (toast stays callable, every other export stays) and
+// restore the real module in afterAll. FLAKY-NOTIFBELL-01.
+const realToast = realSonner.toast;
+const realSonnerExports = { ...realSonner };
+const mockedToast = Object.assign((...args: Parameters<typeof realToast>) => realToast(...args), realToast, {
+  success: toastSuccess,
+  error: toastError,
+});
+mock.module("sonner", () => ({ ...realSonnerExports, toast: mockedToast }));
+afterAll(() => {
+  mock.module("sonner", () => realSonnerExports);
+});
 import { StoragePage } from "@/shell/pages/StoragePage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { expectHomeTablesWithoutDemoOrActions } from "@/tests/expectHomeTables";
