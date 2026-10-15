@@ -315,11 +315,18 @@ describe("removing a person", () => {
   test("confirming removes them", async () => {
     const { calls, restore } = stubApi();
     try {
-      const { findByRole, getByRole } = renderUsersPage(actor("owner"));
+      const { findByRole, getByRole, getByText } = renderUsersPage(actor("owner"));
       fireEvent.click(await findByRole("button", { name: "Remove Bramble" }));
       // STORE-DELETE-01: the delete waits for the preview that offers the
-      // export, then goes through.
-      await waitFor(() => expect(getByRole("button", { name: "Yes, remove" })).not.toBeDisabled());
+      // export, then goes through. The wait throws a plain Error while the
+      // button is disabled, never a jest-dom matcher: a failed
+      // not.toBeDisabled() dumps the whole happy-dom element into its
+      // message, which blocks the event loop for over a second on its first
+      // failure and made waitFor time out (FLAKY-USERSPAGE-01).
+      await waitFor(() => {
+        if ((getByText("Yes, remove") as HTMLButtonElement).disabled) throw new Error("the Yes, remove button is still disabled");
+      });
+      expect(getByRole("button", { name: "Yes, remove" })).not.toBeDisabled();
       fireEvent.click(getByRole("button", { name: "Yes, remove" }));
 
       await waitFor(() =>
