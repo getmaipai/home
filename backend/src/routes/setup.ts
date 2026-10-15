@@ -15,6 +15,7 @@ import { getClientIp } from "@/lib/secretThrottle";
 import { detectHardware } from "@/lib/hardware";
 import { recommend } from "@/lib/modelCatalog";
 import { setupLocalOnly } from "@/middleware/setupLocalOnly";
+import { setupFolderRoutes } from "@/routes/setupFolders";
 import { getCookie } from "hono/cookie";
 import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { resolveHumanSession } from "@/middleware/auth";
@@ -40,6 +41,8 @@ const SETUP_CA_RATE_LIMIT = { capacity: 10, refillPerSecond: 0.5 };
 
 export const setupRoutes = apiRouter();
 setupRoutes.use("*", setupLocalOnly);
+// WIZ-STORAGE-02: folder picker endpoints; mounted before the `/{step}` catch-all below.
+setupRoutes.route("/", setupFolderRoutes);
 
 const checksRoute = createRoute({
   method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",
