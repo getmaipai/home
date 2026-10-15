@@ -91,6 +91,9 @@ once() {
   else
     git -C "$ROOT" worktree add --detach "$WT" "$origin_main"
   fi
+  if [[ -z "${MAIPAI_MAIN_GATE_SKIP_INSTALL:-}" ]]; then
+    for d in backend frontend; do [[ -d "$WT/$d" ]] && (cd "$WT/$d" && bun install --frozen-lockfile >/dev/null 2>&1); done
+  fi
   base="$(cat "$LAST_GREEN" 2>/dev/null || true)"
   start="$(date +%s)"
   output="$(mktemp)"; status_file="$(mktemp)"

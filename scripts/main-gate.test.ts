@@ -38,6 +38,7 @@ function invoke(gate: string) {
     MAIPAI_MAIN_GATE_ROOT: repo,
     MAIPAI_MAIN_GATE_WT: wt,
     MAIPAI_WT_SESSION: "gentle-tiger-maingate",
+    MAIPAI_MAIN_GATE_SKIP_INSTALL: "1",
     MAIPAI_STANDARDS_DIR: join(sandbox, "standards"),
     MAIPAI_COMMONS_DIR: join(sandbox, "commons"),
   });
