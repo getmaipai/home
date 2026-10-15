@@ -105,7 +105,7 @@ describe("SetupWizard", () => {
       rendered.unmount();
       rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("How should Home run?"));
-      await advanceTo(rendered, "Continue", "Choose where Home stores its data");
+      await advanceTo(rendered, "Continue", "Choose where to store data");
       expect(h.posts).toEqual(["welcome", "engine_location"]);
     } finally { h.restore(); }
   });
@@ -117,7 +117,7 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
       await advanceTo(rendered, "Set up my Home", "Before you start");
       await advanceTo(rendered, "I understand", "How should Home run?");
-      await advanceTo(rendered, "Continue", "Choose where Home stores its data");
+      await advanceTo(rendered, "Continue", "Choose where to store data");
       await advanceTo(rendered, "Continue", "Checking your computers");
       await advanceTo(rendered, "Continue", "Your setup plan");
       await advanceTo(rendered, "Continue", "Create your owner account");
@@ -207,7 +207,7 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.container.textContent).toContain("Home's AI is answering."));
       await new Promise((resolve) => setTimeout(resolve, 1800));
       expect(rendered.container.textContent).toContain("Checking your computers");
-      await advanceTo(rendered, "Back", "Choose where Home stores its data");
+      await advanceTo(rendered, "Back", "Choose where to store data");
     } finally { h.restore(); }
   });
 

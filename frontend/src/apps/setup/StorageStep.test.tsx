@@ -13,6 +13,7 @@ function setup(rows: unknown[] = []) {
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(`${init?.method ?? "GET"} ${url}${init?.body ? ` ${String(init.body)}` : ""}`);
+    if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/Users/me/maipai/data", models: "/Users/me/maipai/data/models" }), { status: 200 });
     if (url.includes("/api/setup/storage/check")) return new Response(JSON.stringify({ rows }), { status: 200 });
     if (url.includes("/api/setup/folders") && init?.method === "POST") return new Response(JSON.stringify({ name: "Models", path: "/Disks/Models", writable: true }), { status: 200 });
     if (url.includes("/api/setup/folders")) {
@@ -35,12 +36,13 @@ describe("StorageStep", () => {
     try {
       const report = mock((_value: StorageChoice, _blocked: boolean) => {});
       const view = render(<Host report={report} />);
-      expect(view.container.textContent).toContain("AI models folder");
-      expect(view.container.textContent).toContain("Home's data folder");
-      expect(view.getAllByText("The ready-to-use folder (recommended)")).toHaveLength(2);
+      expect(view.container.textContent).toContain("AI models");
+      expect(view.container.textContent).toContain("Home's data");
+      await waitFor(() => expect(view.getByText("/Users/me/maipai/data/models")).toBeTruthy());
+      expect(view.getByText("/Users/me/maipai/data")).toBeTruthy();
       await waitFor(() => expect(report).toHaveBeenCalled());
       expect(report.mock.calls.at(-1)).toEqual([{}, false]);
-      expect(h.calls).toEqual([]);
+      expect(h.calls).toEqual(["GET /api/setup/storage/defaults"]);
     } finally { h.restore(); }
   });
 
@@ -48,9 +50,10 @@ describe("StorageStep", () => {
     const h = setup();
     try {
       const view = render(<Host split report={() => {}} />);
-      expect(view.container.textContent).not.toContain("AI models folder");
-      expect(view.container.textContent).toContain("Home's data folder");
-      expect(view.container.textContent).toContain("you choose its models folder there");
+      expect(view.container.textContent).not.toContain("Choose the AI models");
+      expect(view.queryByText("AI models")).toBeNull();
+      expect(view.container.textContent).toContain("Home's data");
+      expect(view.container.textContent).toContain("set on your other computer");
     } finally { h.restore(); }
   });
 

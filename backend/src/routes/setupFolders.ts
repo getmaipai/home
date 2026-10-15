@@ -12,6 +12,7 @@ import { resolveHumanSession } from "@/middleware/auth";
 import { getSetupState } from "@/lib/setupState";
 import { createFolder, listFolder, validateProposedPath } from "@/lib/folderBrowse";
 import { checkPlacement } from "@/lib/placement";
+import { classDir } from "@/lib/paths";
 
 export const setupFolderRoutes = apiRouter();
 
@@ -88,4 +89,14 @@ setupFolderRoutes.openapi(checkRoute, async (c) => {
   // A class left out keeps its default folder and is not checked here.
   const rows = Object.keys(layout).length ? await checkPlacement(layout) : [];
   return c.json({ rows }, 200);
+});
+
+const defaultsRoute = createRoute({
+  method: "get", path: "/storage/defaults", tags: ["Setup"], summary: "The folders Home uses when none is chosen",
+  responses: { 200: { content: { "application/json": { schema: z.object({ records: z.string(), models: z.string() }) } }, description: "Absolute paths." }, ...errs },
+});
+setupFolderRoutes.openapi(defaultsRoute, (c) => {
+  const refusal = accessRefusal(c);
+  if (refusal) return refusal as never;
+  return c.json({ records: classDir("records"), models: classDir("models") }, 200);
 });

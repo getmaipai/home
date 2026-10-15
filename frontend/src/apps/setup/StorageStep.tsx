@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FolderPicker, type FolderPickerCopy } from "@maipai/ui/src/primitives/FolderPicker";
 import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
 
@@ -10,8 +10,8 @@ type FolderClass = "models" | "records";
 
 const PICKER_ERROR = "Home couldn't open that folder. Go up a level or pick another folder, then try again.";
 const COPY: Record<FolderClass, { title: string; about: string; pickerTitle: string }> = {
-  models: { title: "AI models folder (this computer)", about: "Where Home keeps the AI models it downloads on this computer. Models are large, so pick a drive with plenty of free space.", pickerTitle: "Choose the AI models folder" },
-  records: { title: "Home's data folder", about: "Where Home keeps your family's chats, people and memories.", pickerTitle: "Choose Home's data folder" },
+  models: { title: "AI models", about: "", pickerTitle: "Choose the AI models folder" },
+  records: { title: "Home's data", about: "", pickerTitle: "Choose Home's data folder" },
 };
 const PICKER_COPY = (title: string): FolderPickerCopy => ({
   title,
@@ -54,6 +54,8 @@ export function StorageStep({ split, value, onChange }: {
   const [rows, setRows] = useState<SetupPlacementRow[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
+  const [defaults, setDefaults] = useState<{ records: string; models: string } | null>(null);
+  useEffect(() => { api.setupStorageDefaults().then(setDefaults, () => setDefaults(null)); }, []);
 
   const kinds: FolderClass[] = split ? ["records"] : ["records", "models"];
   const layout: StorageChoice = { ...(!split && value.models ? { models: value.models } : {}), ...(value.records ? { records: value.records } : {}) };
@@ -119,18 +121,17 @@ export function StorageStep({ split, value, onChange }: {
   const problems = rows ?? [];
   return (
     <div className="flex flex-col gap-4">
-      {split ? <p className="text-base text-muted-foreground md:text-lg">The AI runs on your other computer, so you choose its models folder there. Here you only choose where Home keeps its own data.</p> : null}
+      {split ? <p className="text-base text-muted-foreground md:text-lg">The AI models folder is set on your other computer.</p> : null}
       {kinds.map((which) => {
         const copy = COPY[which];
         const path = layout[which];
         return (
           <Card key={which}>
             <CardHeader>
-              <CardTitle>{copy.title}</CardTitle>
-              <CardDescription>{copy.about}</CardDescription>
+              <h2 className="text-2xl font-semibold md:text-3xl">{copy.title}</h2>
             </CardHeader>
             <CardContent>
-              <p className="break-all text-base md:text-lg">{path ?? "The ready-to-use folder (recommended)"}</p>
+              <p className="break-all text-base md:text-lg">{path ?? defaults?.[which] ?? "Default folder"}</p>
               {picking === which ? (
                 <FolderPicker
                   listing={listing ? { path: listing.path, parent: listing.parent, freeBytes: listing.freeBytes, rows: listing.folders.map((folder) => ({ name: folder.name, path: folder.path, writable: true })) } : undefined}

@@ -664,6 +664,7 @@ export const api = {
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
   setupFolders: (path?: string) => request<SetupFolderListing>(`/api/setup/folders${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`),
+  setupStorageDefaults: () => request<{ records: string; models: string }>("/api/setup/storage/defaults"),
   setupCreateFolder: (parent: string, name: string) => request<{ name: string; path: string; writable: boolean }>("/api/setup/folders", { method: "POST", body: JSON.stringify({ parent, name }) }),
   setupStorageCheck: (layout: { models?: string; records?: string }) => request<{ rows: SetupPlacementRow[] }>("/api/setup/storage/check", { method: "POST", body: JSON.stringify(layout) }),
   setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"]; models?: string; records?: string }) =>

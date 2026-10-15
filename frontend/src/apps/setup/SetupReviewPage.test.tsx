@@ -26,7 +26,7 @@ describe("SetupReviewPage", () => {
       await waitFor(() => expect(h.container.textContent).toContain("How should Home run?"));
       expect(h.getAllByRole("button", { name: "Continue" })).toHaveLength(1);
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
-      expect(h.container.textContent).toContain("Choose where Home stores its data");
+      expect(h.container.textContent).toContain("Choose where to store data");
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
       expect(h.container.textContent).toContain("Checking your computers");
       expect(h.container.textContent).toContain("Engine service");
