@@ -23,7 +23,8 @@ lint:ui-rules` runs the lints in about a second.
 `backend/` (Bun, Hono, Zod, Drizzle/SQLite), `frontend/` (React, Vite). Shared shapes live in `getmaipai/commons`'s `spec/`
 (`@maipai/spec`, pinned by tag). Stack standard: STACK.md in `getmaipai/.github`.
 
-From the repo root: `bun start` / `bun stop` / `bun restart` run the local app on 8787. `bun test` in `backend/` or `frontend/`.
+From the repo root: `bun start` / `bun stop` / `bun restart` run the local app: the main checkout serves 8787 and `bun restart` there
+fast-forwards from origin first; a worktree leases a free 88xx port from `scripts/wt.sh port` (set `MAIPAI_MAIN_CHECKOUT=1` to take 8787). `bun test` in `backend/` or `frontend/`.
 Lint: `tsc --noEmit` (backend); `tsc --noEmit && eslint .` (frontend). `bash scripts/check.sh --docs` for docs-only changes,
 `--pre` for the cheap preflight, plain `check.sh` for the full gate (it takes the machine-wide lock; never hand-roll a wait).
 

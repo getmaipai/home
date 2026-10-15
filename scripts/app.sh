@@ -34,7 +34,33 @@ running() {
 # (backend/src/lib/instanceLock.ts, hubLockPath), so a hub on another port or
 # another data directory is found there first; the port check stays as the
 # fallback for a hub old enough to predate the lock.
-port="${PORT:-8787}"
+# PORTS-01 (workflow step 11): 8787 belongs to the main checkout's hub. A
+# worktree leases a port from `wt.sh port` (8800-8899), remembers it in
+# $state/port so stop and restart find the same hub, and keeps its own
+# machine lock beside its own data directory so it never fights the main hub.
+# MAIPAI_MAIN_CHECKOUT=1 lets a worktree take 8787 on purpose.
+in_worktree=0
+git_dir=""
+git_common=""
+if git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+  git_dir="$(git -C "$root" rev-parse --path-format=absolute --git-dir 2>/dev/null || true)"
+  git_common="$(git -C "$root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null || true)"
+  if [ -n "$git_dir" ] && [ "$git_dir" != "$git_common" ] && [ "${MAIPAI_MAIN_CHECKOUT:-}" != "1" ]; then
+    in_worktree=1
+  fi
+fi
+port_file="$state/port"
+lease_dir="$(dirname "${git_common:-$root/.git}")/data-scratch/ports"
+[ -z "${MAIPAI_WT_DATA:-}" ] || lease_dir="$MAIPAI_WT_DATA/ports"
+if [ "$in_worktree" = 1 ]; then
+  : "${MAIPAI_HUB_LOCK_PATH:=$state/hub.lock}"
+  export MAIPAI_HUB_LOCK_PATH
+  port="${PORT:-}"
+  if [ -z "$port" ] && [ -f "$port_file" ]; then read -r port < "$port_file" || true; fi
+  case "$port" in ''|*[!0-9]*) port=0 ;; esac
+else
+  port="${PORT:-8787}"
+fi
 lock_file="${MAIPAI_HUB_LOCK_PATH:-$HOME/.maipai/home/hub.lock}"
 lock_num() { grep -o "\"$1\":[0-9]*" "$lock_file" 2>/dev/null | head -n 1 | sed 's/^[^:]*://' || true; }
 lock_str() { grep -o "\"$1\":\"[^\"]*\"" "$lock_file" 2>/dev/null | head -n 1 | sed 's/^[^:]*:"//; s/"$//' || true; }
@@ -124,6 +150,21 @@ case "${1:-}" in
       exit 0
     fi
     rm -f "$state/pid"
+    if [ "$in_worktree" = 1 ]; then
+      if [ "${PORT:-}" = "8787" ]; then
+        echo "Port 8787 belongs to the main checkout's hub, and this is a worktree ($root)." >&2
+        echo "Run bun start without PORT to lease a free 88xx port, or set MAIPAI_MAIN_CHECKOUT=1 to take 8787 on purpose. Nothing was changed." >&2
+        exit 1
+      fi
+      if [ -z "${PORT:-}" ]; then
+        port="$(cd "$root" && MAIPAI_WT_PID="$$" bash scripts/wt.sh port)" || {
+          echo "Could not lease a port from scripts/wt.sh port. Free a stale 88xx server, then run bun start again." >&2
+          exit 1
+        }
+      fi
+      echo "$port" > "$port_file"
+      export PORT="$port"
+    fi
     if foreign_hub; then
       report_foreign_hub
       exit 1
@@ -133,6 +174,11 @@ case "${1:-}" in
     nohup bun "$entry" </dev/null >"$state/app.log" 2>&1 &
     pid=$!
     echo "$pid" > "$state/pid"
+    if [ "$in_worktree" = 1 ] && [ -f "$lease_dir/$port.lease" ]; then
+      # The lease named this script's pid; hand it to the hub so it lives as long as the hub.
+      read -r _ lease_session < "$lease_dir/$port.lease" || true
+      echo "$pid $lease_session" > "$lease_dir/$port.lease"
+    fi
     sleep 1
     for ((attempt=0; attempt<60; attempt++)); do
       running || break
@@ -155,6 +201,9 @@ case "${1:-}" in
   stop)
     if ! running; then
       rm -f "$state/pid"
+      if [ "$in_worktree" = 1 ]; then
+        rm -f "$lease_dir/$port.lease" "$port_file"
+      fi
       if foreign_hub; then
         report_foreign_hub
         exit 1
@@ -166,6 +215,9 @@ case "${1:-}" in
     for ((attempt=0; attempt<30; attempt++)); do
       if ! running; then
         rm -f "$state/pid"
+        if [ "$in_worktree" = 1 ]; then
+          rm -f "$lease_dir/$port.lease" "$port_file"
+        fi
         echo "Home stopped."
         exit 0
       fi
@@ -173,6 +225,19 @@ case "${1:-}" in
     done
     echo "Home has not stopped after 30 seconds. Check $state/app.log" >&2
     exit 1
+    ;;
+  pull)
+    # bun restart runs this first. Only the main checkout is the runtime that
+    # follows origin; a worktree restarts its own code as it is. A directory
+    # that is not a Git checkout (a test fixture, an unpacked release) is left alone.
+    if [ "$in_worktree" = 1 ] || ! git -C "$root" rev-parse --git-dir >/dev/null 2>&1; then
+      exit 0
+    fi
+    if ! git -C "$root" pull --ff-only; then
+      echo "Restart stopped before touching the running hub: $root could not fast-forward to origin." >&2
+      echo "It has local commits or edits that conflict with origin/main. Inspect it with git -C $root status, move that work into a worktree, then run bun restart again." >&2
+      exit 1
+    fi
     ;;
   *)
     echo "Usage: bun start | bun stop | bun restart" >&2
