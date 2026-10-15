@@ -9699,6 +9699,30 @@ Plain boolean switches and selects in `/settings` call the save handler immediat
 - [x] **SEARCH-ANSWER-09: answer pictures drop drawings and relatives' captions** (S, 2026-10-13; `docs/plans/search-answer-caption-veto-2026-10-13.md`; architect APPROVED). `backend/src/lib/answerImages/relevance.ts` gains a closed art-word veto (drawing, drawn, painting, sketch, caricature, illustration; `caption:<word>`, exempt when the subject's own name or Wikidata description holds the word) and a relative-caption veto (a person named only as "sister/brother/wife/husband/son/daughter/mother/father of X" or "with X"; `caption:<relation> of`). Only removes, no model call. Tests in `backend/tests/answerImagesRelevance.test.ts`. The judged sample (every tile opened, kept and dropped counts) needs a live Commons capture and is not yet run.
 - [ ] **DATA-TRIVIA-02: Codex reviews the 101-question trivia bank** (S, 2026-10-14; architect APPROVED, `data-scratch/architect/DATA-TRIVIA-02.verdict`). Check each row for accuracy, age-band fit, safety and source; fix or remove only clear failures, replace from sources to hold band minimums, write a findings table. The header stays `reviewed: pending`; Jesse marks it reviewed.
 
+## Moved off the plan page (2026-10-13)
+
+Chores that were on the Cockpit plan; the plan now holds only the current goal.
+
+- [ ] **ELEMENTS-MIGRATE-01a: Needs hover variant and captures** (moved off the plan 2026-10-13). 
+- [ ] **RULE9-CLEANUP-01h: Awaiting verdict** (moved off the plan 2026-10-13). 
+- [ ] **BRANCH-TEMPDIRS-01: Land the test temp-directory cleanup (34 files)** (moved off the plan 2026-10-13). Lane idle, no work found
+- [ ] **BRANCH-WRAPDIV-02: Land the session-lock dialog from the bell branch** (moved off the plan 2026-10-13). keep/home--agent-a1f6f3bdd5867cfa8 cc23b4de; held for UI-ALERTDIALOG-OPAQUE-01
+- [ ] **BRANCH-OFFLINE-01: Land the offline boot test and unavailable wording** (moved off the plan 2026-10-13). Stopped mid-edit, staged changes in worktree
+- [ ] **BRANCH-SEC1-01: Land machine protection checks and sign-in slowdown** (moved off the plan 2026-10-13). keep/home--home-codex-a-sec1 (19f12bab, ce58f59a) and -sec1-rate (9137951e); security review needed
+- [ ] **BRANCH-APPEAR-01: Compare the appearance branch to what landed** (moved off the plan 2026-10-13). keep/home--home-codex-a-h1-appearance 108b4f80 vs SETTINGS-APPEARANCE-01; land the delta or drop
+- [ ] **BRANCH-MCP-01: Land the MCP client manager** (moved off the plan 2026-10-13). codex/d-prep 6 commits; check against current design rules first
+- [ ] **BRANCH-D111-01: Land picture offers for adult visual requests** (moved off the plan 2026-10-13). keep/home--home-codex-d-D111 d82be931; adult gate and safety review
+- [ ] **BRANCH-E12-01: Land feedback dialog capture seeding** (moved off the plan 2026-10-13). Lane idle, no work found
+- [ ] **FLAKY-TIMING-01: Loosen timing-sensitive flaky tests (conversationHistory link-drop fold, GATE-01 50 ms, rateLimiter, THIN-7C)** (moved off the plan 2026-10-13). Committed in worktree, not landed on main
+- [ ] **LOCALCODER-LIFT-01: Raise coding-agent bench pass rate (Pi and Reika, same model): verify-before-done prompt, loop guard, 3-run pass^k, 35B-A3B model comparison** (moved off the plan 2026-10-13). Issue/oMLX research done 2026-10-11: check swap (6 GB used on 24 GB Mac), pi tool-timeout + output-length limits, oMLX A/B vs llama.cpp (omlx-env already exists in ~/Models/local-coder)
+- [ ] **STATUS-NAME-01: Rename the status part called Understanding to a plain name (embeddings: finds related things by meaning); Jesse picks the name** (moved off the plan 2026-10-13). Jesse asked why it is not called Memories; Memory is a separate part (judge)
+- [ ] **MOBILE-SETTINGS-FIX-01: Phone layout fixes: blocked-sites table second column cut off, users rows overlap, logo clipped, news shelf footnote wording** (moved off the plan 2026-10-13). add: Large+320px Appearance select chevron clipped
+- [ ] **NO-OWNER-ROLE-01: Remove the owner role: admin is the top household role** (moved off the plan 2026-10-13). 
+- [ ] **SEARCH-PROMPT-01: Make the model itself search more: better search tool wording plus examples, measured on the recency bench** (moved off the plan 2026-10-13). 
+- [ ] **SEARCH-PASSAGES-01: Rank page text into the best passages (embeddings plus keywords, size budget, minimum score) before the model sees it** (moved off the plan 2026-10-13). Architect APPROVED; needs a Stack embedding endpoint first
+- [ ] **TOOLS-RECALL-02: Tools: variant arms (descriptions, few-shot, thinking, renderer) vs same-session base; verify child-search violations** (moved off the plan 2026-10-13). From `data-scratch/chat-ab/tools-recall-01/REPORT.md`
+- [ ] **STUDIO-COMPARE-01: Rerun the search benches on the Mac Studio and compare model sizes** (moved off the plan 2026-10-13). Parked 2026-10-13 until the Mac Studio arrives; harness ready in `data-scratch/chat-ab/ssa02`, `ssa03`, `ssa08`; same 22 items x 3 reps on the big model against the 9B baselines
+
 ## Docs vs code gaps (2026-10-14)
 
 From `docs/plans/docs-vs-reality-2026-10-14.md`. The guides now say only what works today.
