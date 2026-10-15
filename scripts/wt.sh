@@ -177,13 +177,13 @@ cmd_check() {
         dir="$(dirname "$f")"
         base_name="$(basename "$f")"; base_name="${base_name%.*}"
         for testfile in "$dir"/*.test.ts "$dir"/*.test.tsx; do [[ -f "$testfile" ]] && tests+=("$testfile"); done
-        while IFS= read -r testfile; do [[ -n "$testfile" ]] && tests+=("$testfile"); done < <(cd "$WT_ROOT" && rg -l -F -- "$base_name" backend frontend scripts --glob '*.test.ts' --glob '*.test.tsx' 2>/dev/null || true)
+        while IFS= read -r testfile; do [[ -n "$testfile" ]] && tests+=("$testfile"); done < <(cd "$WT_ROOT" && rg -l -F --glob '*.test.ts' --glob '*.test.tsx' -e "$base_name" backend frontend scripts 2>/dev/null || true)
       done
       # Each workspace has its own bunfig preload, so run its tests from inside it.
       local ws group line
       for ws in backend frontend scripts; do
         group=()
-        for testfile in "${tests[@]}"; do
+        for testfile in ${tests[@]+"${tests[@]}"}; do
           [[ "$testfile" == "$ws/"* ]] && group+=("./${testfile#"$ws"/}")
         done
         if (( ${#group[@]} )); then
@@ -263,6 +263,45 @@ cmd_reap() {
   done
 }
 
+# Refuse to push unless this session's gate stamp is green, at least as strong as the
+# changed files need, fresh (default 30 minutes), and about exactly the committed content.
+require_gate_stamp() {
+  local name="$1" stamp files=() f required tag="MAIPAI_WT_SESSION=$1 bash scripts/wt.sh check"
+  stamp="$WT_STAMP_DIR/$name.json"
+  [[ -f "$stamp" ]] || err "no gate stamp for session '$name' at $stamp, so nothing proves these commits were checked. Run: $tag"
+  while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done < <(git -C "$WT_ROOT" diff --name-only origin/main...HEAD | sort -u)
+  required="$(classify_tier "${files[@]}")"
+  local verdict
+  verdict="$(node - "$stamp" "$required" "${MAIPAI_WT_STAMP_MAX_AGE:-1800}" "$WT_ROOT" "${files[@]}" <<'NODE'
+const cp = require("child_process"), fs = require("fs");
+const [stampPath, required, maxAge, root, ...files] = process.argv.slice(2);
+let s;
+try { s = JSON.parse(fs.readFileSync(stampPath, "utf8")); } catch { console.log("unreadable"); process.exit(0); }
+if (s.exitCode !== 0) { console.log("failed:" + s.exitCode); process.exit(0); }
+const rank = { T0: 0, T1: 1, T2: 2 };
+if (!(s.tier in rank) || rank[s.tier] < rank[required]) { console.log(`tier:${s.tier}:${required}`); process.exit(0); }
+const age = (Date.now() - Date.parse(s.created)) / 1000;
+if (!(age >= -60) || age > Number(maxAge)) { console.log("stale:" + Math.round(age)); process.exit(0); }
+const manifest = s.manifest || {};
+const stampFiles = Object.keys(manifest).sort(), want = [...files].sort();
+const blob = (p) => { try { return cp.execFileSync("git", ["-C", root, "rev-parse", `HEAD:${p}`], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim(); } catch { return "0000000000000000000000000000000000000000"; } };
+const drift = new Set(stampFiles.filter((p) => !want.includes(p)).concat(want.filter((p) => !stampFiles.includes(p))));
+for (const p of stampFiles) if (want.includes(p) && manifest[p] !== blob(p)) drift.add(p);
+if (drift.size) { console.log("content:" + [...drift].slice(0, 5).join(",")); process.exit(0); }
+console.log("ok");
+NODE
+)"
+  case "$verdict" in
+    ok) return 0;;
+    unreadable) err "gate stamp $stamp is not valid JSON, so it proves nothing. Run: $tag";;
+    failed:*) err "the last check for session '$name' failed (exit code ${verdict#failed:}), so these commits are not safe to land. Fix the failures, then run: $tag";;
+    tier:*) local pair="${verdict#tier:}"; err "the gate stamp covers tier ${pair%%:*} but the changed files need tier ${pair##*:}. Run: $tag ${pair##*:}";;
+    stale:*) err "the gate stamp for session '$name' is ${verdict#stale:} seconds old and only 30 minutes counts. Run: $tag";;
+    content:*) err "the committed files changed since the gate stamp was written (${verdict#content:}). Run: $tag";;
+    *) err "could not verify the gate stamp ($verdict). Run: $tag";;
+  esac
+}
+
 cmd_land() {
   [[ $# == 0 ]] || err "land takes no arguments; run it from the active worktree." 2
   need_cmd git
@@ -273,6 +312,8 @@ cmd_land() {
     git -C "$WT_ROOT" rebase origin/main || { git -C "$WT_ROOT" rebase --abort >/dev/null 2>&1 || true; err "rebase onto origin/main failed; resolve the conflict and rerun wt.sh land."; }
     after="$(git -C "$WT_ROOT" rev-parse HEAD)"
     if [[ "$after" != "$before" ]]; then cmd_check || err "checks failed after rebase; fix the failures before landing."; fi
+    name="${MAIPAI_WT_SESSION:-$(current_session_name)}"
+    require_gate_stamp "$name"
     changed_pkg="$(git -C "$WT_ROOT" diff --name-only origin/main...HEAD | grep -E '(^|/)(package\.json|bun\.lock)$' || true)"
     changed_pin="$(git -C "$WT_ROOT" diff origin/main...HEAD -- scripts/check.sh backend/package.json frontend/package.json | grep -E '^[+-].*(core-v|ui-v|spec-v|std-v)' || true)"
     if git -C "$WT_ROOT" push origin HEAD:main; then
