@@ -176,6 +176,14 @@ describe("storage check", () => {
     expect(rows.some((row) => row.kind === "refusal" && row.id.startsWith("nesting"))).toBe(true);
   });
 
+  test("a split setup never asks the models folder for space, and the body takes `split`", async () => {
+    const response = await new TestClient().post("/api/setup/storage/check", { records: join(root, "alpha"), split: true });
+    expect(response.status).toBe(200);
+    const { rows } = await response.json() as { rows: Array<{ class: string; id: string }> };
+    expect(rows.some((row) => row.class === "models")).toBe(false);
+    expect(rows.some((row) => row.id.startsWith("space-wizard:records"))).toBe(false);
+  });
+
   test("a relative or .. path is refused before any check runs", async () => {
     expect((await new TestClient().post("/api/setup/storage/check", { records: "alpha" })).status).toBe(400);
     const modelsOnly = await new TestClient().post("/api/setup/storage/check", { models: join(root, "alpha") });

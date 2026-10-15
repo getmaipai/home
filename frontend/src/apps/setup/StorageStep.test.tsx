@@ -42,7 +42,18 @@ describe("StorageStep", () => {
       expect(view.getByText("/Users/me/maipai/data")).toBeTruthy();
       await waitFor(() => expect(report).toHaveBeenCalled());
       expect(report.mock.calls.at(-1)).toEqual([{}, false]);
-      expect(h.calls).toEqual(["GET /api/setup/storage/defaults"]);
+      expect(h.calls.some((call) => call.startsWith("POST /api/setup/storage/check") || call.includes("/api/setup/storage/check"))).toBe(true);
+      expect(h.calls.some((call) => call.includes("/api/setup/folders"))).toBe(false);
+    } finally { h.restore(); }
+  });
+
+  test("a drive without enough space keeps Continue blocked and says how much is needed", async () => {
+    const h = setup([{ class: "models", kind: "refusal", id: "space-wizard:models", text: "The AI models needs about 200 GB, and this drive has 40 GB free. Choose a folder on a drive with more room.", fix: "Choose a folder on a drive with more free space." }]);
+    try {
+      const report = mock((_value: StorageChoice, _blocked: boolean) => {});
+      const view = render(<Host report={report} />);
+      await waitFor(() => expect(view.container.textContent).toContain("needs about 200 GB"));
+      expect(report.mock.calls.at(-1)?.[1]).toBe(true);
     } finally { h.restore(); }
   });
 

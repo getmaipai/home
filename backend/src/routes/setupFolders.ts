@@ -13,6 +13,31 @@ import { getSetupState } from "@/lib/setupState";
 import { createFolder, listFolder, validateProposedPath } from "@/lib/folderBrowse";
 import { checkPlacement } from "@/lib/placement";
 import { classDir } from "@/lib/paths";
+import { statfsSync, existsSync } from "node:fs";
+import { dirname } from "node:path";
+
+const GB = 1_000_000_000;
+/** What the wizard asks of a drive: Home's data is small; the AI models are about 200 GB. */
+const NEEDED = { records: { bytes: 2 * GB, name: "Home's data" }, models: { bytes: 200 * GB, name: "The AI models" } } as const;
+
+function freeBytesAt(path: string): number | null {
+  let at = path;
+  while (!existsSync(at) && dirname(at) !== at) at = dirname(at);
+  try { const s = statfsSync(at); return Number(s.bavail) * Number(s.bsize); } catch { return null; }
+}
+
+/** One plain refusal per folder, chosen or default, whose drive is too small. */
+function spaceRows(layout: { models?: string; records?: string }, split: boolean) {
+  const rows: Array<{ class: string; kind: "refusal"; id: string; text: string; fix: string }> = [];
+  for (const id of (split ? ["records"] : ["records", "models"]) as Array<keyof typeof NEEDED>) {
+    const free = freeBytesAt(layout[id] ?? classDir(id));
+    if (free === null || free >= NEEDED[id].bytes) continue;
+    const need = Math.round(NEEDED[id].bytes / GB);
+    const have = Math.floor(free / GB);
+    rows.push({ class: id, kind: "refusal", id: `space-wizard:${id}`, text: `${NEEDED[id].name} needs about ${need} GB, and this drive has ${have} GB free. Choose a folder on a drive with more room.`, fix: "Choose a folder on a drive with more free space." });
+  }
+  return rows;
+}
 
 export const setupFolderRoutes = apiRouter();
 
@@ -74,20 +99,23 @@ setupFolderRoutes.openapi(createRouteDef, (c) => {
 const PlacementRowSchema = z.object({ class: z.string(), kind: z.enum(["refusal", "warning", "unknown"]), id: z.string(), text: z.string(), fix: z.string() });
 const checkRoute = createRoute({
   method: "post", path: "/storage/check", tags: ["Setup"], summary: "Check a proposed storage layout",
-  request: { body: { content: { "application/json": { schema: z.object({ models: z.string().optional(), records: z.string().optional() }).strict() } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ models: z.string().optional(), records: z.string().optional(), split: z.boolean().optional() }).strict() } } } },
   responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(PlacementRowSchema) }) } }, description: "checkPlacement's rows, unchanged." }, ...errs },
 });
 setupFolderRoutes.openapi(checkRoute, async (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
-  const { models, records } = c.req.valid("json");
+  const { models, records, split } = c.req.valid("json");
   const layout = { ...(models ? { models } : {}), ...(records ? { records } : {}) };
   for (const path of Object.values(layout)) {
     const problem = validateProposedPath(path);
     if (problem) return c.json({ error: problem }, 400) as never;
   }
   // A class left out keeps its default folder and is not checked here.
-  const rows = Object.keys(layout).length ? await checkPlacement(layout) : [];
+  const space = spaceRows(layout, split === true);
+  const placed = Object.keys(layout).length ? await checkPlacement(layout) : [];
+  // The wizard's own space row says how much is needed, so the generic one is dropped.
+  const rows = [...space, ...placed.filter((row) => !(row.id.startsWith("space:") && space.some((s) => s.class === row.class)))];
   return c.json({ rows }, 200);
 });
 

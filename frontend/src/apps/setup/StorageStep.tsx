@@ -63,11 +63,10 @@ export function StorageStep({ split, value, onChange }: {
   const chosen = Object.keys(layout).length > 0;
 
   useEffect(() => {
-    if (!chosen) { setRows(null); setCheckError(null); setChecking(false); return; }
     let active = true;
     setChecking(true);
     setCheckError(null);
-    void api.setupStorageCheck(layout).then(
+    void api.setupStorageCheck({ ...layout, split }).then(
       (result) => { if (active) setRows(result.rows); },
       (reason) => { if (active) { setRows(null); setCheckError(reason instanceof ApiError ? reason.message : "Home couldn't check that folder. Choose it again, or keep the default folder."); } },
     ).finally(() => { if (active) setChecking(false); });

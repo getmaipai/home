@@ -20436,6 +20436,9 @@
                   },
                   "records": {
                     "type": "string"
+                  },
+                  "split": {
+                    "type": "boolean"
                   }
                 },
                 "additionalProperties": false
