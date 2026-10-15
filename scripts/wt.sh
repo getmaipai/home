@@ -128,22 +128,31 @@ changed_files() {
   git -C "$WT_ROOT" ls-files --others --exclude-standard
 }
 
+classify_tier() {
+  local files=() f t2=0 all_docs=1
+  if (( $# )); then files=("$@")
+  else
+    local base
+    base="$(git -C "$WT_ROOT" merge-base HEAD origin/main 2>/dev/null)" || err "cannot find merge-base with origin/main; fetch origin/main and retry."
+    while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done < <({ git -C "$WT_ROOT" diff --cached --name-only; changed_files "$base"; } | sort -u)
+  fi
+  for f in "${files[@]}"; do
+    case "$f" in *.md|docs/*|screenshots/*|*.png|*.jpg|*.jpeg|*.webp|*.avif|*.gif) :;; *) all_docs=0;; esac
+    case "$f" in docs/design/RULES.md|docs/plans/*|backend/src/auth/*|backend/src/credentials*|backend/src/consent*|backend/src/people/*child*|backend/src/people/*teen*|backend/src/db/migrations/*|scripts/check.sh|package.json|bun.lock|backend/package.json|frontend/package.json|backend/src/wire.ts|backend/src/turn*|backend/src/llm/*|backend/src/composer/*|backend/src/websearch/*|backend/src/shell/*|backend/src/settings/*|frontend/src/*chat*|spec/*) t2=1;; esac
+  done
+  if (( t2 )); then echo T2; elif (( all_docs )) && (( ${#files[@]} )); then echo T0; else echo T1; fi
+}
+
+cmd_tier() { printf '%s\n' "$(classify_tier "$@")"; }
+
 cmd_check() {
   local requested="${1:-}" base name tier auto_tier rc=0 sha
   [[ $# -le 1 ]] || err "check accepts at most one tier; use: wt.sh check [T0|T1|T2]." 2
   base="$(git -C "$WT_ROOT" merge-base HEAD origin/main 2>/dev/null)" || err "cannot find merge-base with origin/main; fetch origin/main and retry."
   name="${MAIPAI_WT_SESSION:-$(current_session_name)}"; [[ -n "$name" ]] || name="$(git -C "$WT_ROOT" branch --show-current | sed 's#^wt/##')"
-  local files=() f t2=0 all_docs=1
-  while IFS= read -r f; do
-    [[ -n "$f" ]] || continue; files+=("$f")
-    case "$f" in *.md|docs/*|screenshots/*|*.png|*.jpg|*.jpeg|*.webp|*.avif|*.gif) :;; *) all_docs=0;; esac
-    case "$f" in
-      docs/design/RULES.md|docs/plans/*|backend/src/auth/*|backend/src/credentials*|backend/src/consent*|backend/src/people/*child*|backend/src/people/*teen*|backend/src/db/migrations/*|scripts/check.sh|package.json|bun.lock|backend/package.json|frontend/package.json|backend/src/wire.ts|backend/src/turn*|backend/src/llm/*|backend/src/composer/*|backend/src/websearch/*|backend/src/shell/*|backend/src/settings/*|frontend/src/*chat*|spec/*) t2=1;;
-    esac
-  done < <(changed_files "$base" | sort -u)
-  if (( t2 )); then auto_tier=T2
-  elif (( all_docs )) && (( ${#files[@]} )); then auto_tier=T0
-  else auto_tier=T1; fi
+  local files=() f
+  while IFS= read -r f; do [[ -n "$f" ]] && files+=("$f"); done < <(changed_files "$base" | sort -u)
+  auto_tier="$(classify_tier "${files[@]}")"
   tier="$auto_tier"
   if [[ -n "$requested" ]]; then
     requested="$(printf '%s' "$requested" | tr '[:lower:]' '[:upper:]')"
@@ -175,8 +184,11 @@ cmd_check() {
   else env "${check_env[@]}" bash "$script" || rc=$?; fi
   sha="$(git -C "$WT_ROOT" rev-parse HEAD)"
   mkdir -p "$WT_STAMP_DIR"
-  node - "$tier" "$sha" "$rc" <<'NODE' > "$WT_STAMP_DIR/$name.json"
-const [tier, head, code] = process.argv.slice(2); console.log(JSON.stringify({tier, head, exitCode:Number(code), created:new Date().toISOString()}, null, 2));
+  node - "$tier" "$sha" "$rc" "$WT_ROOT" "${files[@]}" <<'NODE' > "$WT_STAMP_DIR/$name.json"
+const cp=require("child_process");
+const [tier, head, code, root, ...files] = process.argv.slice(2);
+const manifest=Object.fromEntries(files.map(p=>{try{return [p,cp.execFileSync("git",["-C",root,"hash-object","--",p],{encoding:"utf8"}).trim()]}catch{return [p,"0000000000000000000000000000000000000000"]}}));
+console.log(JSON.stringify({tier, head, exitCode:Number(code), created:new Date().toISOString(), manifest}, null, 2));
 NODE
   return "$rc"
 }
@@ -266,6 +278,7 @@ case "${1:-}" in
   tmux) shift; cmd_tmux "$@";;
   port) shift; [[ $# == 0 ]] || err "port takes no arguments; use: wt.sh port." 2; cmd_port;;
   check) shift; cmd_check "$@";;
+  tier) shift; cmd_tier "$@";;
   land) shift; cmd_land "$@";;
   done) shift; cmd_done "$@";;
   reap) shift; [[ $# == 0 ]] || err "reap takes no arguments; use: wt.sh reap." 2; cmd_reap;;

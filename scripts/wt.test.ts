@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const scratch = mkdtempSync(join(tmpdir(), "maipai-wt-test-"));
-const repoRoot = process.cwd();
+const repoRoot = join(import.meta.dir, "..");
 const script = join(repoRoot, "scripts/wt.sh");
 const fixture = join(scratch, "home");
 const bare = join(scratch, "origin.git");
@@ -73,6 +73,18 @@ describe("wt.sh worktree lifecycle", () => {
     expect(stamp.tier).toBe("T0");
     expect(stamp.head).toBe(spawnSync("git", ["-C", path, "rev-parse", "HEAD"], { encoding: "utf8" }).stdout.trim());
     expect(run(["done"], { MAIPAI_WT_SESSION: name }).status).toBe(0);
+  });
+
+  test("tier classifies explicit paths and the branch diff", () => {
+    expect(run(["tier", "README.md", "docs/guide.md"]).stdout.trim()).toBe("T0");
+    expect(run(["tier", "backend/src/auth/session.ts"]).stdout.trim()).toBe("T2");
+    expect(run(["tier", "backend/src/other.ts"]).stdout.trim()).toBe("T1");
+    const started = run(["start", "tier"]);
+    const path = started.stdout.trim();
+    writeFileSync(join(path, "backend-change.ts"), "code\n");
+    expect(spawnSync("bash", [script, "tier"], { cwd: path, encoding: "utf8", env: { ...process.env, MAIPAI_WT_DATA: data } }).stdout.trim()).toBe("T1");
+    const name = path.split("/").at(-1)!.replace(/^home-/, "");
+    run(["done"], { MAIPAI_WT_SESSION: name });
   });
 
   test("tmux creates only a session on its private socket and done kills it", () => {
