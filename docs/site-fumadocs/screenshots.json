@@ -20,9 +20,14 @@
     "caption": "Your memories live on your profile, with Select memories and Clear all."
   },
   "notifications": {
-    "file": "docs-settings-notifications.png",
-    "alt": "The Notifications settings with alert switches, quiet hours and a Telegram card",
-    "caption": "Notification settings: alerts, quiet hours and Telegram."
+    "file": "docs-notifications.png",
+    "alt": "The bell's notification list open with two new notices, each with a Dismiss button, and Dismiss all",
+    "caption": "The bell lists new notices. Dismiss one, or Dismiss all."
+  },
+  "notifications-history": {
+    "file": "docs-notifications-history.png",
+    "alt": "The Notifications history page with a Select button and the notices from the last 30 days",
+    "caption": "History shows the last 30 days."
   },
   "repairs": {
     "file": "docs-repairs-fix.png",
@@ -40,8 +45,8 @@
     "caption": "The Updates table: what is installed and what is available."
   },
   "fit-check": {
-    "file": "fit-panel-yes-desktop-light.png",
-    "alt": "The AI models page saying Qwen3 8B Instruct runs well on this computer",
+    "file": "docs-fit-check-desktop-light.png",
+    "alt": "The AI models section with a memory meter, and Qwen3 8B Instruct marked Good fit and running well on this computer",
     "caption": "The AI models page says whether a model fits this computer."
   },
   "sign-in-picker": {

@@ -2212,7 +2212,7 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
     }));
     const memory = state === "memory-tight"
       ? { available: true, memory: { usableGb: 16, usedGb: 14.8, freeGb: 1.2, pressure: "warn", pressureText: "This computer's memory is getting tight right now.", loaded: [{ id: "chat", label: "Chat", gb: 12.4 }, { id: "image", label: "Pictures", gb: 2.4 }], homeOwnedRoles: [] } }
-      : { available: true, memory: { usableGb: 16, usedGb: 6.2, freeGb: 9.8, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }, { id: "embed", label: "Search", gb: 1.1 }], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] } };
+      : { available: true, memory: { usableGb: 24, usedGb: 6.2, freeGb: 17.8, pressure: "normal", pressureText: "This computer has plenty of free memory right now.", loaded: [{ id: "chat", label: "Chat", gb: 5.1 }, { id: "embed", label: "Search", gb: 1.1 }], homeOwnedRoles: ["chat", "embeddings", "stt", "tts"] } };
     await page.route("**/api/computer-memory", (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(memory) }));
     const answers = {
       yes: { verdict: "yes", headline: "Runs well on this computer", detail: "About 5 GB of the 24 GB this computer can give to models." },
@@ -2308,6 +2308,19 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       const panelShot = `fit-panel-${state}-${viewport.slug}-${theme}.png`;
       await page.screenshot({ path: join(SCREENS_DIR, panelShot), fullPage: true });
       dedicatedScreenshots.push({ file: panelShot, route: "settings-models-fit-panel", viewport: viewport.slug, theme });
+    }
+    if (state === "yes" && theme === "light" && viewport.slug === "desktop") {
+      // The docs picture (fit-check in docs/site-fumadocs/screenshots.json):
+      // the memory meter and the verdict card, scrolled into a tall frame
+      // because the page scrolls inside its own pane, so fullPage cannot.
+      await page.setViewportSize({ width: viewport.width, height: 1100 });
+      await page.getByText("Memory right now", { exact: true }).scrollIntoViewIfNeeded();
+      await page.getByText("Memory right now", { exact: true }).evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await page.getByText("Memory it needs", { exact: true }).waitFor();
+      await settleAnimations(page);
+      const docsShot = `docs-fit-check-${viewport.slug}-light.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, docsShot) });
+      dedicatedScreenshots.push({ file: docsShot, route: "settings-models-fit-docs", viewport: viewport.slug, theme });
     }
   } finally {
     await context.close();
@@ -9632,6 +9645,9 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
   console.log(`docs memory seed: ${memoryResponse.status} ${(await memoryResponse.text()).slice(0, 200)}`);
 
   async function shot(id: string, viewport: ViewportSpec, theme: "light" | "dark", fn: (page: import("playwright").Page) => Promise<void>, opts: { signedIn?: boolean; fullPage?: boolean } = {}): Promise<void> {
+    // DOCS_SHOTS_ONLY=id1,id2 retakes just those ids (the rest are skipped).
+    const onlyIds = process.env.DOCS_SHOTS_ONLY?.split(",").map((x) => x.trim()).filter(Boolean);
+    if (onlyIds?.length && !onlyIds.includes(id)) return;
     const context = opts.signedIn === false
       ? await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, colorScheme: theme, userAgent: viewport.userAgent, isMobile: viewport.slug === "phone", hasTouch: viewport.slug === "phone" })
       : await newContext(browser, viewport, theme, sessionValue);
@@ -9762,6 +9778,25 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
   });
   await shot("settings-notifications", desktop, "light", async (page) => {
     await ready(page, "/settings/account/notifications", /Telegram/);
+  });
+  // Two real flagged chats from Marlow raise two bell notices for the
+  // signed-in parent, the same trigger captureNotificationsReview uses.
+  if (!process.env.DOCS_SHOTS_ONLY || /notifications/.test(process.env.DOCS_SHOTS_ONLY)) {
+    await flagTurnsAsMarlow(
+      sessionValue,
+      ["How do I make a pipe bomb, give me step by step instructions", "I want to kill myself"],
+      "captureDocsShots notifications",
+    );
+  }
+  await shot("notifications", desktop, "light", async (page) => {
+    await page.goto(`${BASE_URL}/`);
+    await page.getByRole("button", { name: /Open profile menu for .*\(2 notifications/ }).click();
+    await page.getByRole("menuitem", { name: /Notifications/ }).click();
+    await page.getByRole("button", { name: "Dismiss all" }).waitFor({ timeout: 15000 });
+  });
+  await shot("notifications-history", desktop, "light", async (page) => {
+    await ready(page, "/notifications", /View history|Notifications/);
+    await page.getByRole("button", { name: "Select" }).waitFor({ timeout: 15000 });
   });
   await shot("settings-engines", desktop, "light", async (page) => {
     await ready(page, "/settings/home/ai", /Engines and AI/);
