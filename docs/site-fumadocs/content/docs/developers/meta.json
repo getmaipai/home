@@ -1,0 +1,11 @@
+{
+  "title": "For developers",
+  "description": "Contributors",
+  "root": true,
+  "pages": [
+    "index",
+    "start",
+    "build",
+    "reference"
+  ]
+}

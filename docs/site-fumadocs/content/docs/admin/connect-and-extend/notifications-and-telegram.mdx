@@ -1,0 +1,46 @@
+---
+title: Notifications and Telegram
+description: Send alerts to browsers and Telegram, and set quiet hours.
+---
+
+Home can tell people about things that matter: a backup failing, an update waiting, a new repair. Telegram and browser alerts stay off until a person turns them on.
+
+## 🔔 Where alerts go
+
+| Channel | Who sets it up | Default |
+|---|---|---|
+| **Show alerts on this device** | Each person, under Settings, Notifications, Alerts | Off |
+| Telegram | Owner or admin sets the bot, each person links a chat | Off |
+| A robot | **Send time-sensitive notifications to a robot** | Off |
+
+## 🤖 Set up Telegram
+
+Telegram uses one bot for the whole household. Messages go through Telegram's servers, so they leave your house. The [privacy page](/docs/admin/look-after-it/privacy-audit) lists the row.
+
+1. In Telegram, message @BotFather and create a bot. Copy its token.
+2. In Home, open **Settings**, **Home settings**, **Integrations**, then the **Telegram** card. Paste the token in **Telegram bot token**. It is stored encrypted.
+3. Each person messages the bot once. The bot replies with a chat id.
+4. Each person opens **Settings**, **Notifications**, **Telegram** and pastes it in **Your Telegram chat id**.
+5. Each person ticks the **Telegram me when** switches they want.
+
+All switches default to off. Examples, one per event:
+
+- **Telegram me about new Repairs items**
+- **Telegram me when backups start failing**
+- **Telegram me when a MaiPai Home update is available**
+- **Telegram me when a Stack engine reports an open warning or critical problem**
+- **Telegram me when a model download fails**
+
+Owners and admins will want the first three.
+
+## 🌙 Quiet hours
+
+Alerts wait during quiet hours, default 21:00 to 07:00. Set the household times with **Quiet hours start** and **Quiet hours end** on the **Telegram** card under Integrations. A person can set their own with **Personal quiet hours start** and **end**. A parent sets a child's. Safety alarms ignore quiet hours.
+
+## 🔧 If nothing arrives
+
+1. Check the token has no spaces and the person messaged the bot first.
+2. Check the chat id belongs to that person.
+3. Check the event switch is on for that person.
+
+No test-message button exists yet. Trigger a real alert to check, such as a model download.

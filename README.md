@@ -7,113 +7,38 @@
 
 <h3 align="center">A private, self-hosted AI hub for families.</h3>
 
-<p align="center"><a href="docs/dev.md">Documentation</a> · <a href="https://github.com/getmaipai/home/releases">Releases</a></p>
+<p align="center"><a href="https://github.com/getmaipai/home/releases">Releases</a></p>
 
 Your chats, people and memories stay in your house. Home goes online only to do what you ask: downloads, updates and web searches.
 
-<p align="center">
-  <img src="docs/assets/hero.png" alt="Chat, People, and Settings running in a browser, dark theme">
-</p>
+## What you get
 
-## Features
+- **A private chat** with an AI that runs on your own hardware, with sources you can check.
+- **A real household:** one profile per person, safe by default for children and private for teens.
+- **Memory you control:** see what it remembered, correct it, or make it forget.
+- **Backups and updates** you start yourself, and a privacy page that lists every outside connection.
 
-- **Chat**: talk with your own AI, running entirely on your hardware.
-- **People**: a real household roster with PIN/password sign-in per person,
-  including kid-safe profiles that need no password at all.
-- **Memory**: see what your household's AI has actually learned, and
-  archive anything you'd rather it forget.
-- **Voice**: pick from 26 built-in voices, browse a 2,000+ voice community
-  catalog, or clone a voice from your own recording.
-- **Backups**: automatic, encrypted, on a schedule, with old ones pruned
-  for you.
-- **Settings**: household preferences like conversation retention and
-  language, changed live, no restart.
+## Read the guides
 
-## Getting started
-
-No packaged installer yet: MaiPai Home is pre-alpha and only runs from
-source today. With [Bun](https://bun.sh) installed:
-
-```
-git clone https://github.com/getmaipai/home.git
-cd home && bun install
-bun start
-```
-
-The hub listens on `http://localhost:8787`. The first person who signs in
-becomes the household owner.
-
-### Start, stop, and restart
-
-Run these commands inside the `home` folder created by `git clone`. This
-is the folder that contains `package.json`, `backend`, and `frontend`.
-For example, if you cloned Home inside `~/Developer`, enter:
-
-```bash
-cd ~/Developer/home
-```
-
-Start Home:
-
-```bash
-bun start
-```
-
-Stop Home:
-
-```bash
-bun stop
-```
-
-Restart Home:
-
-```bash
-bun restart
-```
-
-Start builds the frontend and runs Home in the background. Restart calls
-stop, then start, rebuilding the frontend. These commands manage the local
-source checkout; installed services use the operating system's service manager.
-Startup logs are in `data/local-app/app.log`.
-Start prints the local URL, detected LAN IP URLs, and enabled addresses
-configured in Settings. Configured vanity addresses keep their own scheme
-and port; direct URLs use the server's current HTTP or HTTPS mode.
-Running start again prints the current addresses without starting a second
-copy. It picks up changes to HTTPS and configured vanity addresses.
-
-### Development mode
-
-For active development, run the backend and frontend as two hot-reloading
-processes instead of building once:
-
-```
-# terminal 1
-cd backend && bun run dev
-
-# terminal 2
-cd frontend && bun run dev
-```
-
-The frontend dev server proxies `/api` to the backend on port `8787` by
-default; set `VITE_BACKEND_PORT` before starting it if the backend is on a
-different port (a parallel worktree, for instance). Stop either process
-with Ctrl-C in its terminal, or `kill <pid>` if it was started in the
-background.
+| Guide | For | Start here |
+|---|---|---|
+| **User guide** | Everyone in the house. Short pages, one task each. | [Open the User guide](docs/site-fumadocs/content/docs/user/index.mdx) |
+| **Admin guide** | The person who runs the house: setup, settings, backups, support. | [Open the Admin guide](docs/site-fumadocs/content/docs/admin/index.mdx) |
+| **Developer guide** | Contributors: architecture, building, reference. | [Open the Developer guide](docs/site-fumadocs/content/docs/developers/index.mdx) |
 
 ## Status
 
-Pre-alpha. The shell, sign-in, a household roster, Chat, and basic
-settings are real and running end to end, verified in a real browser
-against the real backend - but nothing is deployed to a real household
-yet, and Chat answers with a placeholder until you point it at a real
-local model. See [docs/dev.md](docs/dev.md) for exactly what's built and
-what's deliberately deferred.
+Pre-alpha. MaiPai Home has no packaged installer yet and runs from source
+today. It is not deployed to a real household yet. The Admin guide covers
+[install and start](docs/site-fumadocs/content/docs/admin/install-and-set-up/install-and-start.mdx),
+including start, stop and restart.
 
-## Development
+## Contributing
 
-See [docs/dev.md](docs/dev.md) for the design record and the current
-step-0 checklist. `scripts/check.sh` runs the pinned `@maipai/standards`
-core; it needs a sibling checkout of `getmaipai/.github`.
+The [Developer guide](docs/site-fumadocs/content/docs/developers/index.mdx)
+is the front door. `docs/dev.md` is the long design record and
+`scripts/check.sh` is the gate; it needs a sibling checkout of
+`getmaipai/.github`.
 
 ---
 

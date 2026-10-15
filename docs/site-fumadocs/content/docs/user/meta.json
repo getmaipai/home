@@ -1,0 +1,13 @@
+{
+  "title": "User guide",
+  "description": "For everyone in the house",
+  "root": true,
+  "pages": [
+    "index",
+    "start-here",
+    "everyday-use",
+    "your-family",
+    "privacy-and-safety",
+    "fix-a-problem"
+  ]
+}

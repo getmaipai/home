@@ -1,0 +1,9 @@
+{
+  "pages": [
+    "index",
+    "user",
+    "admin",
+    "developers",
+    "keeping-docs-current"
+  ]
+}

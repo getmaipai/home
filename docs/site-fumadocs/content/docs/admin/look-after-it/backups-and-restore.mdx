@@ -1,0 +1,56 @@
+---
+title: Backups and restore
+description: How Home backs itself up, how to take one now, and how to restore.
+---
+
+{/* generated-source: backend/src/lib/backup.ts, backend/src/lib/restoreStaging.ts, backend/src/lib/emergencyKit.ts, backend/src/lib/backupTargets.ts, backend/src/routes/backups.ts, frontend/src/shell/pages/BackupsPage.tsx */}
+
+A backup is one encrypted copy of Home's household database: people, memories, conversations and settings. Models, engines, the reference library and uploaded files are not in it. Those are downloaded or copied again after a restore.
+
+<Shot id="backups" />
+
+## ⏰ What happens on its own
+
+- Home takes a backup **every day**.
+- It keeps **7 daily**, **4 weekly** and **3 monthly** copies, and deletes older ones.
+- **Backup storage limit (GB)** under Storage and backups is 0 by default, which means no limit. Set a number and Home deletes the oldest first to stay under it.
+- Backups go in the `backups` folder beside the data folder. Files are named `backup-<time>-<suffix>.db.enc`.
+
+A backup on the same disk as Home does not survive that disk failing. Copy the `backups` folder to another disk or computer regularly.
+
+## 🔑 Save your backup key
+
+Backups are encrypted. The **backup key** is what lets a new computer read them. The setup wizard offers **Save your backup key** at the end, with **Download** and **Print**. The file is `maipai-home-emergency-kit.txt`.
+
+Keep it somewhere other than the Home computer, such as a password manager or a printed page in a drawer. Without it, a restore on a new computer cannot read the backups.
+
+If Home fails to make the key, it says "Home couldn't make your backup key. Press Download again." If it fails again, open Repairs.
+
+## 💾 Back up now
+
+1. Open **Settings**, then **Home settings**, then **Storage and backups**, then **Backups**.
+2. Press **Back up now**.
+3. The new copy appears in the table with its date and size.
+
+Owners and admins can do this. A new household shows "No backups yet." until the first run.
+
+## ♻️ Restore
+
+Only the owner can restore.
+
+1. Open **Backups**.
+2. Press **Restore** on the row you want and confirm.
+3. A **Ready to restore** banner appears. Restart Home.
+4. At the next start Home swaps in the restored database.
+
+Before it swaps, Home takes a fresh backup and checks the archive. If the file cannot be read, Home says "that backup could not be read. Try another one." Press **Cancel restore** on the banner to change your mind before restarting.
+
+The database you replaced is kept as `hub.db.pre-restore`. Keep it until you are sure the restore is right.
+
+## 🗄️ A second copy
+
+Home can also copy backups to a mounted folder, such as a NAS share. Planned, not in the app yet: a screen for it. Today the folder is set through the Home API by an owner or admin. If that copy starts failing, Home raises a **Repairs** item and can message you on Telegram. See [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram).
+
+## 🧪 Practice
+
+A restore you have never tried is a guess. Once, on a spare computer, install Home, restore a backup with your saved key and sign in.

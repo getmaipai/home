@@ -1,0 +1,95 @@
+---
+title: Install and start Home
+description: Run Home from source today, or use the installer for a background service. Stop, restart and uninstall.
+---
+
+<Callout type="info" title="Pre-alpha">
+Home has no packaged installer yet. It runs from source, and an installer script exists for a service install. Nothing is deployed to a real household yet.
+</Callout>
+
+## 🧰 What you need
+
+- macOS or Linux on x64 or arm64
+- [Bun](https://bun.sh), the JavaScript runtime
+- Git
+- Internet for the first install
+
+## ▶️ Run from source
+
+1. Get the code.
+
+```bash
+git clone https://github.com/getmaipai/home.git
+```
+
+2. Go into the folder. Use the full path where you cloned it.
+
+```bash
+cd /Users/example/Developer/home
+```
+
+3. Install the packages.
+
+```bash
+bun install
+```
+
+4. Start Home.
+
+```bash
+bun start
+```
+
+Home builds, runs in the background and prints its addresses. Open `http://localhost:8787`. The first person to sign in becomes the **owner**. Running `bun start` again prints the addresses without starting a second copy.
+
+## ⏹️ Stop and restart
+
+Run these in the same folder.
+
+```bash
+bun stop
+```
+
+```bash
+bun restart
+```
+
+The log is `data/local-app/app.log`.
+
+## 🛎️ Install as a service
+
+The installer runs Home in the background so it survives a reboot with nobody signed in.
+
+1. Run the installer as root.
+
+```bash
+sudo bash /Users/example/Developer/home/scripts/install.sh
+```
+
+2. To see what it would do first, add `--dry-run`.
+
+| Item | macOS | Linux |
+|---|---|---|
+| Install folder | `/usr/local/maipai-home` | `/opt/maipai-home` |
+| Background service | launchd daemon | systemd unit `maipai-home.service` |
+| Service user | `maipai` | `maipai` |
+
+The default port is 3000 (or the number in `MAIPAI_PORT`). If it is taken, the installer picks the next free one. This is different from the 8787 used when you run from source. Use the address the installer prints.
+
+The installer installs the **latest published release**, never the main branch. If no release exists it stops with "could not find a published release ... there is nothing to install". Run from source until one does.
+
+It also installs the AI engine software, the Stack. Choose a setup plan with `--plan recommended`, `--plan moderate` or `--plan minimal`. The wizard reads it later.
+
+Running it again upgrades in place and keeps your data and backups.
+
+## 🗑️ Uninstall
+
+```bash
+sudo bash /Users/example/Developer/home/scripts/uninstall.sh
+```
+
+It stops and removes the service, then asks whether to keep or wipe your data. The default on every prompt is keep, and a wipe needs you to type `DELETE MY DATA` exactly. Take a backup first. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+
+## ➡️ Next
+
+[First-run setup](/docs/admin/install-and-set-up/first-run-setup).

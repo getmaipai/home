@@ -1,0 +1,107 @@
+{
+  "home": {
+    "file": "home-desktop-light.png",
+    "alt": "The Home screen with cards for people, updates, repairs and engines",
+    "caption": "Your Home screen: who is here and what needs attention."
+  },
+  "chat-empty": {
+    "file": "docs-chat-empty.png",
+    "alt": "An empty chat that says How can I help you today",
+    "caption": "Your first chat is empty. Type below."
+  },
+  "people": {
+    "file": "docs-family.png",
+    "alt": "The Family page with a card each for Sage, Marlow and Nova",
+    "caption": "One card for each person in the house."
+  },
+  "memory": {
+    "file": "docs-profile-memories.png",
+    "alt": "The Memories tab on Sage's profile with one memory and a Clear all button",
+    "caption": "Your memories live on your profile, with Select memories and Clear all."
+  },
+  "notifications": {
+    "file": "docs-settings-notifications.png",
+    "alt": "The Notifications settings with alert switches, quiet hours and a Telegram card",
+    "caption": "Notification settings: alerts, quiet hours and Telegram."
+  },
+  "repairs": {
+    "file": "docs-repairs-fix.png",
+    "alt": "The Repairs list with a warning that says Restart the search helper in the Fix column",
+    "caption": "Repairs lists what needs fixing, and the Fix column says how."
+  },
+  "roles-users": {
+    "file": "settings-users-desktop-light.png",
+    "alt": "The Users list showing an owner, a teen and a child, with an Add someone form",
+    "caption": "Pick a role in Add someone. It decides what the person can do."
+  },
+  "updates": {
+    "file": "settings-updates-desktop-light.png",
+    "alt": "The Updates table with one row for MaiPai Home",
+    "caption": "The Updates table: what is installed and what is available."
+  },
+  "fit-check": {
+    "file": "fit-panel-yes-desktop-light.png",
+    "alt": "The AI models page saying Qwen3 8B Instruct runs well on this computer",
+    "caption": "The AI models page says whether a model fits this computer."
+  },
+  "sign-in-picker": {
+    "file": "docs-sign-in-picker.png",
+    "alt": "The sign-in screen with a circle for Sage, Marlow and Nova",
+    "caption": "Pick your own name to sign in."
+  },
+  "sign-in-pin": {
+    "file": "docs-sign-in-pin.png",
+    "alt": "The PIN screen for Sage with four boxes and a Use a password instead link",
+    "caption": "Type your four digits, or tap Use a password instead."
+  },
+  "sign-in-wrong-pin": {
+    "file": "docs-sign-in-wrong-pin.png",
+    "alt": "The PIN screen after a wrong PIN, showing the hint",
+    "caption": "After a wrong PIN you see a hint, not a lock."
+  },
+  "child-topics": {
+    "file": "docs-family-child-topics.png",
+    "alt": "The Topics tab on Nova's profile with a menu for each sensitive subject",
+    "caption": "Topics decides how MaiPai answers a child about sensitive subjects."
+  },
+  "settings-ease": {
+    "file": "docs-settings-ease.png",
+    "alt": "The Appearance settings with the Ease of use card and Comfort style set to Standard",
+    "caption": "Comfort style sits at the top of Ease of use."
+  },
+  "settings-search": {
+    "file": "docs-settings-search.png",
+    "alt": "The Search settings with web search switches and the Blocked sites table",
+    "caption": "Search settings, with Blocked sites for kids, teens and adults."
+  },
+  "settings-network": {
+    "file": "docs-settings-network.png",
+    "alt": "The Network and access settings with the Reach Home from anywhere steps",
+    "caption": "Reach Home from anywhere walks you through Tailscale."
+  },
+  "settings-engines": {
+    "file": "docs-settings-engines.png",
+    "alt": "The Engines and AI settings listing a model choice for each role",
+    "caption": "Engines and AI: one model choice for each job."
+  },
+  "backups": {
+    "file": "docs-backups.png",
+    "alt": "The Backups list with dates and sizes and a Back up now button",
+    "caption": "Backups lists each copy with its date and size."
+  },
+  "main-menu-desktop": {
+    "file": "docs-main-menu-desktop.png",
+    "alt": "The Home page on a computer with the icon rail on the left",
+    "caption": "On a computer, the menu is a column of icons on the left."
+  },
+  "main-menu-phone": {
+    "file": "docs-main-menu-phone.png",
+    "alt": "The Home page on a phone with the icon rail on the left",
+    "caption": "On a phone, the same menu stays at the side."
+  },
+  "setup-wizard": {
+    "file": "docs-setup-wizard.png",
+    "alt": "The first setup step, Your computers, with a Set up my Home button",
+    "caption": "Setup starts with Your computers."
+  }
+}

@@ -221,6 +221,9 @@ const chatFindBubbleHoverWidthReview = process.argv.includes("--chat-find-bubble
 const chatFindComposerShiftReview = process.argv.includes("--chat-find-composer-shift-review");
 const chatHeaderTitleReview = process.argv.includes("--chat-header-title-review");
 const phoneHeaderFoldReview = process.argv.includes("--phone-header-fold-review");
+const docsReview = process.argv.includes("--docs-review");
+// The plain `bun run screenshots` run: its chat re-visit sends a real message, so it needs the Stack like the named chat reviews.
+const plainRun = process.argv.slice(2).every((arg) => arg === "--webkit");
 const settingsReview = process.argv.includes("--settings-review");
 const pictureReview = process.argv.includes("--picture-review");
 let pictureSearchServer: ReturnType<typeof Bun.serve> | undefined;
@@ -405,7 +408,7 @@ const ROUTES: RouteSpec[] = [
   // before the settings areas (the shell's own phone start is a column list).
   { slug: "settings", path: "/settings/home/general" },
   { slug: "status", path: "/status" },
-  { slug: "turn-trace", path: "/trace/screenshot-trace-turn" },
+  { slug: "turn-trace", path: "/trace/turn-screentrace1" },
   { slug: "settings-models", path: "/settings/home/ai" },
   { slug: "settings-backups", path: "/backups" },
   { slug: "settings-voices", path: "/settings/account/voice" },
@@ -613,7 +616,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg)) {
+  if (plainRun || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg)) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -712,9 +715,9 @@ async function seedHousehold(): Promise<string> {
 function seedChatHistoryRows(personId: string): void {
   const db = new Database(join(DATA_DIR, "hub.db"));
   const now = new Date().toISOString();
-  for (const [index, row] of [{ id: "a11y-history-1", title: "Weekend plans" }, { id: "a11y-history-2", title: null }].entries()) {
+  for (const [index, row] of [{ id: "conv-a11yhistory1", title: "Weekend plans" }, { id: "conv-a11yhistory2", title: null }].entries()) {
     if (db.query("SELECT id FROM conversations WHERE id = ?").get(row.id)) continue;
-    const hlc = `${now}:${index}:screenshot`;
+    const hlc = `${Date.now()}:${index}:screenshot`;
     db.query("INSERT INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES (?, ?, 'chat', 'chat', ?, ?, ?, ?)").run(row.id, personId, hlc, now, now, row.title);
   }
   db.close();
@@ -723,14 +726,14 @@ function seedChatHistoryRows(personId: string): void {
 function seedTraceReviewTurn(personId: string): void {
   const db = new Database(join(DATA_DIR, "hub.db"));
   const now = new Date().toISOString();
-  const conversationId = "screenshot-trace-conversation";
-  db.query("INSERT OR IGNORE INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES (?, ?, 'chat', 'chat', ?, ?, ?, ?)").run(conversationId, personId, `${now}:0:screenshot-trace`, now, now, "Trace review");
+  const conversationId = "conv-screentrace1";
+  db.query("INSERT OR IGNORE INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES (?, ?, 'chat', 'chat', ?, ?, ?, ?)").run(conversationId, personId, `${Date.now()}:0:screentrace`, now, now, "Trace review");
   const nodes = ["safety", "commands", "context", "model", "policy", "tool", "answer", "output_gate"].map((node, index) => ({
     node, impl: `${node}-node`, version: "v1", startMs: index * 12, endMs: index * 12 + 8,
     outcome: node === "commands" ? { skipped: true, reason: "not needed" } : { ok: true },
   }));
   const stats = { generations: [{ reason: "answer", request_sent_ms: 36, first_delta_ms: 51, predicted_ms: 15, error: null }], nodes };
-  db.query("INSERT OR IGNORE INTO conversation_turns (id, person_id, conversation_id, surface, user_text, reply_text, source, safety_action, minor_speaker, created_at, hlc, status, stats) VALUES ('screenshot-trace-turn', ?, ?, 'chat', 'fixture utterance', 'fixture answer', 'model', 'allow', 0, ?, ?, 'done', ?)").run(personId, conversationId, now, `${now}:1:screenshot-trace-turn`, JSON.stringify(stats));
+  db.query("INSERT OR IGNORE INTO conversation_turns (id, person_id, conversation_id, surface, user_text, reply_text, source, safety_action, minor_speaker, created_at, hlc, status, stats) VALUES ('turn-screentrace1', ?, ?, 'chat', 'fixture utterance', 'fixture answer', 'model', 'allow', 0, ?, ?, 'done', ?)").run(personId, conversationId, now, `${Date.now()}:1:screentrace`, JSON.stringify(stats));
   db.close();
 }
 
@@ -1269,7 +1272,8 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.reload();
   await page.getByText("And some herbs for cooking", { exact: true }).waitFor();
   await showThreads();
-  const item = page.locator('[data-slot="aui_thread-list-item"]').filter({ has: page.getByRole("button", { name: "Help me plan a small garden", exact: true }) });
+  const item = page.locator('[data-slot="aui_thread-list-item"]').filter({ hasText: "Help me plan a small garden" });
+  await item.hover();
   await item.getByRole("button", { name: "More options" }).click();
   await page.getByRole("menuitem", { name: "Rename", exact: true }).click();
   await page.getByRole("textbox", { name: "Rename thread" }).fill("Garden plans");
@@ -1280,7 +1284,8 @@ async function exerciseChat(page: import("playwright").Page, viewport: ViewportS
   await page.getByRole("button", { name: "Garden plans", exact: true }).waitFor();
   await settleAnimations(page);
   await page.screenshot({ path: join(SCREENS_DIR, `chat-history-${viewport.slug}-${theme}.png`) });
-  const other = page.locator('[data-slot="aui_thread-list-item"]').filter({ has: page.getByRole("button", { name: "Help me choose a book", exact: true }) }).last();
+  const other = page.locator('[data-slot="aui_thread-list-item"]').filter({ hasText: "Help me choose a book" }).last();
+  await other.hover();
   await other.getByRole("button", { name: "More options" }).click();
   await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
   await page.getByRole("button", { name: "Delete chat", exact: true }).click();
@@ -1361,25 +1366,6 @@ async function capturePictureReview(browser: Browser, sessionValue: string, view
  * URL. A small dedicated capture, the same shape `captureHero()` uses,
  * rather than folding a modal-opening step into the matrix's own
  * per-route loop. */
-async function capturePaletteOpen(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
-  const context = await newContext(browser, viewport, theme, sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/`);
-    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
-    const isMac = process.platform === "darwin";
-    await page.keyboard.press(isMac ? "Meta+K" : "Control+K");
-    await page.getByPlaceholder("Search, or ask MaiPai...").waitFor();
-    await page.keyboard.type("weather");
-    await page.getByText("Ask MaiPai: weather", { exact: true }).waitFor();
-    await settleAnimations(page);
-    await page.screenshot({ path: join(SCREENS_DIR, `search-palette-${viewport.slug}-${theme}.png`) });
-  } finally {
-    await context.close();
-  }
-}
-
 /** COMP-01d's dedicated review: the seeded backend has no package call in
  * the ordinary garden script, so this isolated browser route supplies one
  * bounded document response without changing the persisted demo household.
@@ -2323,60 +2309,6 @@ async function captureFitVerdictCard(browser: Browser, sessionValue: string, vie
       await page.screenshot({ path: join(SCREENS_DIR, panelShot), fullPage: true });
       dedicatedScreenshots.push({ file: panelShot, route: "settings-models-fit-panel", viewport: viewport.slug, theme });
     }
-  } finally {
-    await context.close();
-  }
-}
-
-/** Lane 11 item 2's own acceptance: "the screenshot script gains the
- * section (desktop and phone), opened and judged." "People and things"
- * moved from Memory's own second tab to People's (owner ruling,
- * "Navigation, corrected," 2026-09-20: Memories moved to a person's
- * profile, and "People and things" - household-wide data, not a
- * specific person's own - never belonged there, so it stayed on
- * People). Radix's Tabs.Content doesn't mount an inactive panel at all,
- * so the tab has to be clicked open first, the same "a small dedicated
- * capture" shape `capturePaletteOpen()` above uses rather than folding
- * a click into the shared per-route loop (which would also mean the
- * ordinary `people-*.png` capture picks up whichever tab was left open
- * instead of the default Household view). */
-async function capturePeopleAndThings(browser: Browser, sessionValue: string, viewport: ViewportSpec, theme: "light" | "dark"): Promise<void> {
-  const context = await newContext(browser, viewport, theme, sessionValue);
-  try {
-    const page = await context.newPage();
-    await page.goto(`${BASE_URL}/people`);
-    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
-    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 5000 }).catch(() => {});
-    await page.getByRole("tab", { name: "People and things" }).click();
-    await page.getByText("owner of Juniper").waitFor();
-    await settleAnimations(page);
-
-    // A code review caught TabsTrigger's own 48px hit-area extension
-    // (kit/ui/tabs.tsx's `before:-inset-y-3.5`, a real element with no
-    // `pointer-events: none`) as capable of reaching past the gap
-    // between TabsList and TabsContent into the content's own top edge
-    // - happy-dom's own getBoundingClientRect() always reads zeroed
-    // (this file's own established reason every real-layout check lives
-    // here, not in a unit test), so this is the only place it can be
-    // proven. `elementFromPoint` a few pixels inside TabsContent's own
-    // top edge and confirm it isn't the trigger's invisible pseudo-
-    // element intercepting the tap.
-    const boundaryHit = await page.evaluate(() => {
-      const content = document.querySelector('[role="tabpanel"]:not([hidden])');
-      const trigger = document.querySelector('[role="tab"][aria-selected="true"]');
-      if (!content || !trigger) return { ok: false, reason: "tabpanel or active tab not found" };
-      const rect = content.getBoundingClientRect();
-      const x = rect.left + 10;
-      const y = rect.top + 3;
-      const hit = document.elementFromPoint(x, y);
-      const hitsTrigger = hit === trigger || trigger.contains(hit);
-      return { ok: !hitsTrigger, x, y, hitTag: hit?.tagName, hitsTrigger };
-    });
-    if (!boundaryHit.ok) {
-      throw new Error(`A tap just inside TabsContent's own top edge (${JSON.stringify(boundaryHit)}) hits the active tab's own invisible hit-area instead of the content below it`);
-    }
-
-    await page.screenshot({ path: join(SCREENS_DIR, `people-things-${viewport.slug}-${theme}.png`) });
   } finally {
     await context.close();
   }
@@ -5024,8 +4956,7 @@ async function captureHero(browser: Browser, sessionValue: string): Promise<void
     // Real content, not a spinner: wait for the seeded roster to actually
     // render before capturing (getmaipai/.github/CLAUDE.md's screenshot
     // rule - a shot of a loading state is not a shot of the feature).
-    await page.getByRole("heading", { name: "Household" }).waitFor();
-    await page.getByText("Nova", { exact: true }).waitFor();
+    await page.getByText("Nova", { exact: true }).first().waitFor();
     // Derived from HERO_PATH itself, not a hardcoded "docs/assets" -
     // under --webkit that path is "docs/assets/webkit/" (issue #76), and
     // a code review (2026-09-12) caught that a hardcoded parent here
@@ -5192,12 +5123,12 @@ async function captureTurnTraceReview(browser: Browser, sessionValue: string): P
         const failures: string[] = [];
         page.on("pageerror", (error) => failures.push(error.message));
         page.on("response", (response) => { if (response.status() >= 400) failures.push(`${response.status()} ${response.url()}`); });
-        await page.goto(`${BASE_URL}/trace/screenshot-trace-turn`);
+        await page.goto(`${BASE_URL}/trace/turn-screentrace1`);
         await page.getByRole("heading", { name: "Turn trace" }).waitFor();
         await page.locator('[data-slot="trace-waterfall"]').waitFor();
         await page.getByRole("img", { name: "skipped, starts at 12ms, runs 8ms" }).waitFor();
         const body = await page.locator("body").innerText();
-        if (/fixture utterance|fixture answer|screenshot-trace-turn|screenshot-trace-conversation/.test(body)) {
+        if (/fixture utterance|fixture answer|turn-screentrace1|conv-screentrace1/.test(body)) {
           throw new Error(`turn trace review exposed non-timing fixture data at ${slug}/${theme}`);
         }
         if (failures.length) throw new Error(`turn trace browser errors at ${slug}/${theme}: ${failures.join(" | ")}`);
@@ -9670,6 +9601,208 @@ function writeScreenshotManifest(results: RunResult[], captureScript: string): v
   writeFileSync(manifestPath, JSON.stringify(existing, null, 2) + "\n");
 }
 
+/** `--docs-review`: the pictures the user and admin guides in
+ * docs/site-fumadocs use, from the seeded demo household (persona-roster
+ * names only). Each file is `docs-<id>.png` in SCREENS_DIR so
+ * docs/site-fumadocs/screenshots.json can point at it. One failing shot
+ * is logged and the rest still run; the script fails at the end with the
+ * list, so a stale label surfaces in one run, not one shot at a time. */
+async function captureDocsShots(browser: Browser, sessionValue: string): Promise<void> {
+  const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
+  const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
+  const cookie = { Cookie: `session=${sessionValue}` };
+  const failures: string[] = [];
+
+  // Direct-database seeds the API has no honest route for (the Repairs
+  // list is raised by subsystems, not created by a person).
+  {
+    const db = new Database(join(DATA_DIR, "hub.db"));
+    const now = new Date().toISOString();
+    db.query("INSERT OR IGNORE INTO issues (id, source, key, severity, title, detail, fix, learn_more, created_at, hlc) VALUES ('issue-docsrepair1', 'sidecar', 'search', 'warning', 'The search helper stopped', 'Web search is paused until the search helper runs again. Your other tools still work.', ?, NULL, ?, ?)")
+      .run(JSON.stringify({ label: "Restart the search helper", action: "docs.noop" }), now, `${Date.now()}:0:docsrepair`);
+    db.close();
+  }
+  // A memory about Sage, so the profile's Memories tab has a row.
+  const sagePerson = (() => { const db = new Database(join(DATA_DIR, "hub.db")); try { return (db.query("SELECT id FROM people WHERE display_name = 'Sage'").get() as { id: string } | null)?.id; } finally { db.close(); } })();
+  const memoryResponse = await fetch(`${BASE_URL}/api/memory`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...cookie },
+    body: JSON.stringify({ text: "Sage likes tea with honey in the evening.", category: "preference", tier: "durable", scope: "person", person: sagePerson, importance: 0.5 }),
+  });
+  console.log(`docs memory seed: ${memoryResponse.status} ${(await memoryResponse.text()).slice(0, 200)}`);
+
+  async function shot(id: string, viewport: ViewportSpec, theme: "light" | "dark", fn: (page: import("playwright").Page) => Promise<void>, opts: { signedIn?: boolean; fullPage?: boolean } = {}): Promise<void> {
+    const context = opts.signedIn === false
+      ? await browser.newContext({ viewport: { width: viewport.width, height: viewport.height }, colorScheme: theme, userAgent: viewport.userAgent, isMobile: viewport.slug === "phone", hasTouch: viewport.slug === "phone" })
+      : await newContext(browser, viewport, theme, sessionValue);
+    const page = await context.newPage();
+    try {
+      await fn(page);
+      await settleAnimations(page);
+      const file = `docs-${id}.png`;
+      await page.screenshot({ path: join(SCREENS_DIR, file), fullPage: opts.fullPage ?? false });
+      dedicatedScreenshots.push({ file, route: `docs-${id}`, viewport: viewport.slug, theme });
+      console.log(`Wrote docs-${id}.png`);
+    } catch (error) {
+      mkdirSync(join(ROOT, "data-scratch", "docs-fail"), { recursive: true });
+      await page.screenshot({ path: join(ROOT, "data-scratch", "docs-fail", `${id}.png`) }).catch(() => {});
+      failures.push(`${id}: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
+      console.error(`docs shot ${id} failed:`, error instanceof Error ? error.message.split("\n")[0] : error);
+    } finally {
+      await context.close();
+    }
+  }
+  const ready = async (page: import("playwright").Page, path: string, text: string | RegExp) => {
+    await page.goto(`${BASE_URL}${path}`);
+    await page.getByText(text).first().waitFor({ timeout: 15000 });
+    await page.locator('[role="status"]').first().waitFor({ state: "detached", timeout: 3000 }).catch(() => {});
+  };
+
+  // The exercised chat (a real reply, rating, rename, delete), the same
+  // visit the plain run makes; it also writes chat-desktop-light.png.
+  {
+    const context = await newContext(browser, desktop, "light", sessionValue);
+    try {
+      await visitRoute(context, ROUTES.find((r) => r.slug === "chat")!, desktop, "light", true, true);
+    } catch (error) {
+      failures.push(`chat exercise: ${error instanceof Error ? error.message.split("\n")[0] : String(error)}`);
+      console.error("docs chat exercise failed:", error instanceof Error ? error.message.slice(0, 900) : error);
+    } finally {
+      await context.close();
+    }
+  }
+
+  // Sign-in: the picker, the PIN prompt and a wrong PIN with its hint.
+  await shot("sign-in-picker", desktop, "light", async (page) => {
+    await page.goto(`${BASE_URL}/sign-in`);
+    await page.getByRole("button", { name: "Sage" }).waitFor({ timeout: 15000 });
+  }, { signedIn: false });
+  await shot("sign-in-pin", desktop, "light", async (page) => {
+    await page.goto(`${BASE_URL}/sign-in`);
+    await page.getByRole("button", { name: "Sage" }).click();
+    await page.getByText("Enter your PIN").waitFor({ timeout: 15000 });
+  }, { signedIn: false });
+  await shot("sign-in-wrong-pin", desktop, "light", async (page) => {
+    await page.goto(`${BASE_URL}/sign-in`);
+    await page.getByRole("button", { name: "Sage" }).click();
+    await page.getByText("Enter your PIN").waitFor({ timeout: 15000 });
+    await page.keyboard.type("0000");
+    await page.getByText(/Use a password instead/).first().waitFor({ timeout: 15000 });
+    await page.getByText(/password longer than 4/).waitFor({ timeout: 15000 });
+  }, { signedIn: false });
+
+  // Chat: an empty first chat, and the delete menu on a saved chat.
+  await fetch(`${BASE_URL}/api/conversations/clear`, { method: "POST", headers: { "Content-Type": "application/json", ...cookie }, body: "{}" });
+  await shot("chat-empty", desktop, "light", async (page) => {
+    await ready(page, "/chat", /How can I help/);
+  });
+  {
+    const db = new Database(join(DATA_DIR, "hub.db"));
+    const now = new Date().toISOString();
+    const person = db.query("SELECT id FROM people WHERE display_name = 'Sage'").get() as { id: string } | null;
+    if (person) db.query("INSERT OR IGNORE INTO conversations (id, person_id, surface, mode, hlc, created_at, updated_at, title) VALUES ('conv-docsweekend1', ?, 'chat', 'chat', ?, ?, ?, 'Weekend plans')").run(person.id, `${Date.now()}:0:docsweekend`, now, now);
+    db.close();
+  }
+  await shot("chat-delete-menu", desktop, "light", async (page) => {
+    await ready(page, "/chat?conversation=conv-docsweekend1", /Weekend plans/);
+    const row = page.locator('[data-slot="aui_thread-list-item"]').filter({ hasText: "Weekend plans" });
+    await row.hover();
+    await row.locator('[data-slot="aui_thread-list-item-more"]').click();
+    await page.getByRole("menuitem", { name: /Delete/ }).waitFor({ timeout: 10000 });
+  });
+
+  // Family: the page, a child's profile with Limits and Topics, add someone.
+  await shot("family", desktop, "light", async (page) => {
+    await ready(page, "/people", "Nova");
+  });
+  await shot("family-child-limits", desktop, "light", async (page) => {
+    await ready(page, "/people", "Nova");
+    await page.getByText("Nova", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Limits" }).click();
+    await settleAnimations(page);
+  });
+  await shot("family-child-topics", desktop, "light", async (page) => {
+    await ready(page, "/people", "Nova");
+    await page.getByText("Nova", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Topics" }).click();
+    await settleAnimations(page);
+  });
+  await shot("profile-memories", desktop, "light", async (page) => {
+    await ready(page, "/people", "Sage");
+    await page.getByText("Sage", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Memories" }).click();
+    await page.getByText(/tea with honey/).waitFor({ timeout: 10000 });
+  });
+  await shot("forget-confirm", desktop, "light", async (page) => {
+    await ready(page, "/people", "Sage");
+    await page.getByText("Sage", { exact: true }).first().click();
+    await page.getByRole("tab", { name: "Memories" }).click();
+    await page.getByRole("button", { name: "Clear all" }).click();
+    await page.getByRole("alertdialog").or(page.getByRole("dialog")).first().waitFor({ timeout: 10000 });
+  });
+  await shot("add-someone", desktop, "light", async (page) => {
+    await ready(page, "/users", "Add");
+    await page.getByRole("button", { name: /Add someone|Add person|Add/ }).first().click();
+    await page.getByRole("combobox").first().waitFor({ timeout: 10000 });
+  });
+
+  // Settings pages.
+  await shot("settings-ease", desktop, "light", async (page) => {
+    await ready(page, "/settings/account/appearance", /Comfort style/);
+  });
+  await shot("settings-search", desktop, "light", async (page) => {
+    await ready(page, "/settings/home/search", /Search/);
+  });
+  await shot("settings-blocked-sites", desktop, "light", async (page) => {
+    await ready(page, "/settings/home/search", /Blocked sites/i);
+    await page.locator('[id="settings-household.blocked_sites"]').scrollIntoViewIfNeeded().catch(() => {});
+  });
+  await shot("settings-network", desktop, "light", async (page) => {
+    await ready(page, "/settings/home/network", /Reach Home from anywhere/);
+  });
+  await shot("settings-notifications", desktop, "light", async (page) => {
+    await ready(page, "/settings/account/notifications", /Telegram/);
+  });
+  await shot("settings-engines", desktop, "light", async (page) => {
+    await ready(page, "/settings/home/ai", /Engines and AI/);
+  });
+  await shot("engines-another-computer", desktop, "light", async (page) => {
+    await ready(page, "/settings/home/ai", /Engine computer link/);
+    await page.getByRole("button", { name: "Pair engine computer" }).click();
+    await page.getByRole("dialog").first().waitFor({ timeout: 10000 });
+    await settleAnimations(page);
+    await page.locator("#pair-where").click({ timeout: 8000 });
+    await page.getByRole("option", { name: "Another computer" }).click({ timeout: 8000 });
+    await page.getByRole("dialog").getByRole("button", { name: "Next", exact: true }).click({ timeout: 8000 });
+    await page.getByText("Engine computer name or address").waitFor({ timeout: 10000 });
+  });
+
+  // Backups with a real row, and Repairs with a Fix button.
+  await shot("backups", desktop, "light", async (page) => {
+    await page.goto(`${BASE_URL}/backups`);
+    await page.getByRole("button", { name: /Back up now/ }).first().click();
+    await page.getByText(/\.tar|MB|KB|bytes/i).first().waitFor({ timeout: 30000 });
+  });
+  await shot("repairs-fix", desktop, "light", async (page) => {
+    await ready(page, "/repairs", "The search helper stopped");
+    await page.getByText("Restart the search helper").first().waitFor({ timeout: 10000 });
+  });
+
+  // Main menu and setup wizard.
+  await shot("main-menu-desktop", desktop, "light", async (page) => {
+    await ready(page, "/", "Here is your household today.");
+  });
+  await shot("main-menu-phone", phone, "light", async (page) => {
+    await ready(page, "/", "Here is your household today.");
+  });
+  await shot("setup-wizard", desktop, "light", async (page) => {
+    await page.goto(`${BASE_URL}/setup`);
+    await page.getByRole("heading", { level: 1 }).first().waitFor({ timeout: 15000 });
+  });
+
+  if (failures.length > 0) throw new Error(`docs shots failed:\n- ${failures.join("\n- ")}`);
+}
+
 async function main() {
   console.log("Building the frontend so the backend has something to serve...");
   const buildOwner: RunOwner = { pid: process.pid, startedAt: processStartTime(process.pid) ?? null, token: crypto.randomUUID() };
@@ -9853,7 +9986,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
+  const screenshotStack = plainRun || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
@@ -10547,18 +10680,18 @@ async function main() {
       await captureChatHeaderTitleReview(browser, sessionValue);
     }
 
+    if (!a11yOnly && docsReview) {
+      await captureDocsShots(browser, sessionValue);
+    }
+
     if (!a11yOnly && phoneHeaderFoldReview) {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
+    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
-      await capturePaletteOpen(browser, sessionValue, phone, "dark");
-      await capturePaletteOpen(browser, sessionValue, desktop, "light");
-      await capturePeopleAndThings(browser, sessionValue, phone, "dark");
-      await capturePeopleAndThings(browser, sessionValue, desktop, "light");
       // Isolated, unlike the captures above: it hardcodes one chunk's own
       // hashed-filename prefix and races a fixed delay against a fixed
       // timeout, both of which are more likely to need adjusting after an
@@ -10586,7 +10719,7 @@ async function main() {
       ? SETUP_REVIEW_COMBOS
       : filesReview
       ? FILES_REVIEW_COMBOS
-      : notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
+      : docsReview || notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
         ? []
         : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
           ? A11Y_ONLY_COMBOS
@@ -10656,7 +10789,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
+    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

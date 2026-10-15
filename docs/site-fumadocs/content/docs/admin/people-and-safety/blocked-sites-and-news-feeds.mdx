@@ -1,0 +1,61 @@
+---
+title: Blocked-site lists and news feeds
+description: Choose which site lists apply to children and teens, add your own rules, and pick the news a child sees.
+---
+
+This page is for owners and admins.
+
+<Shot id="settings-search" />
+
+## 🚫 Blocked-site lists
+
+Web search checks every result against lists of sites that are blocked for the age group. Home downloads the lists from The Block List Project and refreshes them about monthly. It asks for the list index about daily. Neither request carries a name or device ID.
+
+| List | Child | Teen | Adult |
+|---|---|---|---|
+| **Adult sites** | On, locked | On, locked | Off |
+| **Gambling sites** | On | On | Off |
+| **Scam sites** | On | On | Off |
+| **Phishing sites** | On | On | Off |
+| **Malware sites** | On | On | Off |
+| **Drug sites** | On | Off | Off |
+
+"Locked" means nobody can turn it off.
+
+## ✍️ Change a list for one person
+
+1. Open **Settings**, then **Home settings**, then **Search**.
+2. Find **Blocked sites by person** and pick the **Person**.
+3. The left column shows the global defaults. Tick or untick a box in the person's column.
+4. To undo a change, use the reset link beside the row.
+
+Rows you cannot change are the age group's setting, or a block that always stays on.
+
+## 🌐 Your own site rules
+
+Under the advanced Search settings you can add sites by hand, separated by commas, such as `example.com`:
+
+- **Always block these sites** and **Allow these sites** apply to everyone.
+- The same pair exists for child, teen and adult.
+
+An allow entry shows a site even when a list has it. Use it sparingly for children.
+
+## 📰 News feeds
+
+The News shelf on Home is on by default. Pick which feed lists each age group sees:
+
+| Setting | Default |
+|---|---|
+| **News lists with child controls** | Kids' news feeds |
+| **News lists with teen controls** | Household news feeds |
+| **News lists with adult controls** | Household news feeds |
+
+To add your own, put the feed addresses in **Extra news feeds for** child, teen or adult. Each must start with `https://`.
+
+Home polls feeds every 1800 seconds by default (900 is the minimum) and keeps 90 days of items. It reads only the feed file, never the articles. Each feed adds a row on the [privacy page](/docs/admin/look-after-it/privacy-audit).
+
+## 🔧 When a list does not download
+
+Home shows a notice under Settings, Repairs. Check the computer has internet, then reopen Repairs. Search keeps working, using the lists it already has.
+
+Planned, not in the app yet: importing your own blocklist files.

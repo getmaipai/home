@@ -1,0 +1,47 @@
+---
+title: Keeping the docs current
+description: "Plan. How the guides and screenshots update when code changes."
+---
+
+<Callout type="warn" title="Plan for approval">Nothing here is built yet. It is the design for your approval.</Callout>
+
+## The idea in one line
+
+A page either **comes from code** (rebuilt by a script), or **names the code it describes** (the check tells you when that code changed and the page did not).
+
+## 1. Pages generated from code
+
+These cannot drift because nobody types them:
+
+- The settings reference, the roles table, the privacy "what leaves" list, install facts, the API reference, the design-note index.
+- A script writes them into the pages. The docs check fails if someone edits a generated block by hand.
+- Several already exist: the settings reference, the privacy table and the OpenAPI file. Install facts and the roles table are new.
+
+## 2. Screenshots that rebuild themselves, with captions
+
+- Every picture is declared once in a screenshot list: an id, the screen, the phone or desktop size, light or dark, any state to set up, and the **caption**.
+- The existing `bun run screenshots` takes them from the seeded demo household. Nobody takes a picture by hand.
+- A page uses a picture by id. Its caption comes from the list, so it is the same on every page and in the app's help.
+- The check fails when a page names a picture that is not in the list, and flags a picture whose screen code changed since it was taken.
+- Each new picture is opened and judged once, as the org rule requires.
+
+## 3. Pages that say which code they describe
+
+- Every page has a short header: which files or settings it covers, and the commit it was last checked against.
+- On every code change, the docs check lists pages whose code changed. Fix the page, or mark it "still correct" with a one-line reason. It never silently passes.
+- Docs-only changes keep the fast check.
+
+## 4. Release and publishing
+
+- The site is rebuilt from the tagged release, so each version has matching docs, bundled in the app for the Help assistant.
+- Publishing the public site is a local script, because private repos get no push-triggered workflows.
+- Search, the AI index and the in-app copy all come from the same build.
+
+## 5. A drift report for you
+
+- One command prints "pages that may be out of date, with the code that changed", newest first. A Codex lane can run it each week and file the fixes as small items.
+
+## What this does not solve
+
+- A change in meaning that touches no listed file (a new rule). Page headers help, but a person still has to say "this affects the docs".
+- Screenshots of a feature that has no demo data yet. The seeded household must gain that data first.

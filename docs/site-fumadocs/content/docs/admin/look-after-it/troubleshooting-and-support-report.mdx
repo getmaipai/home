@@ -1,0 +1,51 @@
+---
+title: Troubleshooting and support report
+description: Find a problem in Repairs, fix it, and share a redacted report when you ask for help.
+---
+
+<Shot id="repairs" />
+
+## 🛠️ Repairs
+
+Open **Settings**, **Home settings**, **Maintenance**, then **Repairs**. Home lists problems it found, such as web search failing, a backup copy failing or an engine reporting trouble. Each item may have a fix button, named for what it does, and has a **Dismiss** button.
+
+- The fix button runs the repair Home offers. Not every item has one.
+- **Dismiss** asks you to confirm, then hides the item.
+
+Only an owner or admin can fix or dismiss. If a button fails, Home says "Could not fix that repair." or "Could not dismiss that repair." Reload the page and try again. If the list does not load, it says "Could not load repairs." Check Home is running and that you are signed in as an owner or admin.
+
+Tick **Telegram me about new Repairs items** to hear about them when you are out.
+
+## 🩺 Other places to look
+
+| Page | Use it for |
+|---|---|
+| **Status** (Maintenance) | Whether Home, the engines and the internet check are working. |
+| **Performance** (Maintenance) | How busy the computer is. |
+| **Engines** | Engine health, and **Check the connection** to a separate engine computer. |
+| **Storage** | Free disk space. Home warns when free space drops below 2 GB. |
+| `data/local-app/app.log` | The log when you run from source. |
+
+## 🧰 Common fixes
+
+| Symptom | Do this |
+|---|---|
+| Chat does not answer | Open **Engines**. If it says "No Stack configured", set the engine location. See [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai). |
+| Web search says it is not set up | Add a SearXNG address. See [Set up web search](/docs/admin/connect-and-extend/web-search). |
+| Phone cannot reach Home | See [Reach Home when you are away](/docs/admin/connect-and-extend/remote-access). |
+| Someone cannot sign in | See [Cannot sign in](/docs/user/fix-a-problem/cannot-sign-in). |
+
+## 📄 Support report
+
+Home can build a redacted report for you to attach when you ask for help. Open `/api/storage/diagnostics` while signed in as an owner or admin. It returns:
+
+- Home's instance id, never the household's name.
+- People: id, role, whether enabled, where they came from and when created. No names.
+- Issue source, key, severity and times. No titles or details.
+- Package ids, status and smoke test results.
+- Household settings, without secrets.
+- A storage summary.
+
+It never contains conversations, memories, files or names. Read it before you send it.
+
+Planned, not in the app yet: a **Create a report** button.

@@ -1,0 +1,13 @@
+{
+  "title": "Admin guide",
+  "description": "For the person who runs the house",
+  "root": true,
+  "pages": [
+    "index",
+    "how-it-works",
+    "install-and-set-up",
+    "people-and-safety",
+    "connect-and-extend",
+    "look-after-it"
+  ]
+}

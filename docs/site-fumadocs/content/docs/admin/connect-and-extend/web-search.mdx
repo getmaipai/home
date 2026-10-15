@@ -1,0 +1,53 @@
+---
+title: Set up web search
+description: Choose where answers come from, connect SearXNG, and keep children and teens safe.
+---
+
+Home answers most questions from the model and its offline reference library. When a question needs fresh facts, Home can search the web. Web search is off until you set it up.
+
+<Shot id="settings-search" />
+
+## 📚 Library or internet
+
+Under **Settings**, **Home settings**, **Search**, pick **Search sources**:
+
+| Choice | What Home does |
+|---|---|
+| **Library first** (default) | Checks the offline library, goes online only if it has no answer. |
+| **Internet first** | Goes online even when the library has a match. |
+| **Library only** | Turns off the live Wikipedia-style lookup. Web search stays on unless it is also set to Library only. |
+
+**Encyclopedia lookups** and **Web searches** (advanced) can each follow the household choice or override it. Children and teens keep their protections in every mode.
+
+## 🔍 Connect SearXNG
+
+SearXNG is a search service you run yourself. Home asks it for results, so no search company sees who asked.
+
+1. Run SearXNG on a computer in your home. Turn on its JSON output.
+2. Open **Settings**, **Home settings**, **Search**.
+3. Type its address in **Your own SearXNG (optional)**, for example `http://192.0.2.20:8080`.
+4. Ask Home something recent in **Chat**. A sources list appears under the reply.
+
+Until an address is set, Home says "Web search isn't set up yet". Library and Wikipedia lookups still work.
+
+Home checks SearXNG every hour while it is healthy and every 15 minutes while it is not. A failing check appears under **Repairs**, with the step to take. Check the computer is on, the address is right and JSON output is enabled.
+
+## 🦆 Other sources
+
+| Source | Who gets it | How to enable |
+|---|---|---|
+| **DuckDuckGo** | Adults only | Start the ddgs helper on the same computer, set `MAIPAI_DDGS_URL` to its loopback address, then pick it in **Web search sources**. |
+| **Brave Search** | Adults only | Paste a key in **Brave Search key (optional)**. The words an adult searches go to Brave. The key is stored encrypted. |
+
+Without the helper, Home says "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source." A child's or teen's search never goes to either.
+
+## 🛡️ Safe search
+
+| Setting | Behavior |
+|---|---|
+| **Safe search level** | **Default** follows age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. |
+| **Web search with child controls** | On: strictest SafeSearch, adult sites blocked, links hidden. Off: offline library only. |
+| **Web search with teen controls** | On: moderate or stricter. |
+| **Page text check** | Cleans fetched page text before the assistant reads it. On for children and teens. |
+
+For site lists, see [Blocked-site lists](/docs/admin/people-and-safety/blocked-sites-and-news-feeds). For exactly what leaves the house, see [Privacy audit](/docs/admin/look-after-it/privacy-audit). To use search from a phone away from home, see [Remote access](/docs/admin/connect-and-extend/remote-access).

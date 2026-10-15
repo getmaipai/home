@@ -1,0 +1,11 @@
+{
+  "title": "🛟 Fix a problem",
+  "pages": [
+    "chat-does-not-answer",
+    "page-will-not-load",
+    "voice-does-not-work",
+    "cannot-sign-in",
+    "a-setting-will-not-save",
+    "still-stuck"
+  ]
+}
