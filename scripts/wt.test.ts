@@ -109,7 +109,7 @@ describe("wt.sh worktree lifecycle", () => {
     cleanRecord.pid = 999999999;
     writeFileSync(cleanFile, JSON.stringify(cleanRecord));
 
-    expect(run(["reap"]).status).toBe(0);
+    expect(run(["reap"], { MAIPAI_WT_REAP_AGE: "0" }).status).toBe(0);
     expect(spawnSync("git", ["-C", fixture, "show-ref", "--verify", `refs/heads/wip/${dirtyName}`]).status).toBe(0);
     expect(readFileSync(join(dirtyPath, "lost-work.txt"), "utf8")).toBe("keep this\n");
     expect(readFileSync(join(data, "reaped.md"), "utf8")).toContain(dirtyName);

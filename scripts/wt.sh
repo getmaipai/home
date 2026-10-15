@@ -206,13 +206,18 @@ cmd_done() {
 
 cmd_reap() {
   mkdir -p "$WT_SESSION_DIR" "$WT_PORT_DIR"
-  local f name pid tmuxname path branch alive dirty
+  local f name pid tmuxname path branch alive dirty created age
   shopt -s nullglob
   for f in "$WT_SESSION_DIR"/*.json; do
     name="$(basename "$f" .json)"; pid="$(read_json "$f" pid)"; tmuxname="$(read_json "$f" tmux)"; path="$(read_json "$f" path)"; branch="$(read_json "$f" branch)"
     alive=0; [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null && alive=1
     if [[ -n "$tmuxname" ]] && command -v tmux >/dev/null 2>&1 && tmux_cmd has-session -t "$tmuxname" >/dev/null 2>&1; then alive=1; fi
     (( alive )) && continue
+    # A session's pid is the caller's shell, which can exit while the session lives on,
+    # so only sessions older than the grace period (default 4 h) are ever reaped.
+    created="$(read_json "$f" created)"
+    age=$(( $(date +%s) - $(date -u -j -f '%Y-%m-%dT%H:%M:%S' "${created%.*}" +%s 2>/dev/null || date -u -d "$created" +%s 2>/dev/null || echo 0) ))
+    (( age >= ${MAIPAI_WT_REAP_AGE:-14400} )) || continue
     if [[ ! -e "$path/.git" ]]; then rm -f "$f"; continue; fi
     dirty="$(git -C "$path" status --porcelain)"
     if [[ -z "$dirty" ]] && git -C "$WT_MAIN" merge-base --is-ancestor "$branch" origin/main 2>/dev/null; then
