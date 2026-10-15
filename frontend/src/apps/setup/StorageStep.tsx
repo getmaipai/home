@@ -1,9 +1,12 @@
+import { getIcon } from "@maipai/ui/src/icons";
 import { useEffect, useState } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FolderPicker, type FolderPickerCopy } from "@maipai/ui/src/primitives/FolderPicker";
 import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
+
+const CheckIcon = getIcon("check");
 
 export interface StorageChoice { models?: string; records?: string }
 type FolderClass = "models" | "records";
@@ -178,7 +181,7 @@ export function StorageStep({ split, value, onChange }: {
                   </Alert>
                 </div>
               )) : null}
-              {picking !== which && state === "valid" && own.length === 0 ? <p role="status" className="pt-3 text-base text-muted-foreground">Home can use this folder.</p> : null}
+              {picking !== which && state === "valid" && own.length === 0 ? <p role="status" className="flex items-center gap-2 pt-3 text-base font-medium text-[color:var(--hue-teal)]"><CheckIcon aria-hidden className="size-5" />Home can use this folder.</p> : null}
             </CardContent>
           </Card>
         );
