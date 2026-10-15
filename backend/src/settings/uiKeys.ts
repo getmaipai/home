@@ -32,6 +32,18 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     honoured_by: ["home"],
   }),
   SettingsKey.parse({
+    key: "tours.autostart.enabled",
+    scope: "person",
+    selector: "boolean",
+    default: true,
+    label: "Start tours automatically",
+    help: "A guide opens on a page's first visit when enabled. Help can open Show me around at any time.",
+    copy: { does: "First visits can open a guide, and Help keeps Show me around available." },
+    level: "basic",
+    lives_in: "profile.appearance",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "ui.appearance",
     scope: "person",
     selector: "select",
