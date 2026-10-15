@@ -1,12 +1,11 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 import { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { scenarioList } from "./scenarios";
 import { installFetchHandlers } from "./handlers";
 
-const commons = resolve(fileURLToPath(new URL("../../../../node_modules/@maipai/spec", import.meta.url)));
+const commons = resolve("../../commons-tags/spec-spec-v0.1.136/spec");
 const stackJobSchema = JSON.parse(readFileSync(resolve(commons, "schemas/stack-job.schema.json"), "utf8")) as object;
 const healthSchema = JSON.parse(readFileSync(resolve(commons, "schemas/health-item.schema.json"), "utf8")) as object;
 const openapi = JSON.parse(readFileSync(resolve("../docs/api/openapi.json"), "utf8")) as Record<string, unknown>;
