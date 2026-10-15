@@ -181,6 +181,53 @@ describe("DevicesSection", () => {
     }
   });
 
+  test("a paired robot shows plain capability labels and keeps unknown ids visible", async () => {
+    const capabilities = [
+      "lease",
+      "estop",
+      "head_pan_tilt",
+      "light_ring",
+      "speaker",
+      "camera",
+      "battery_readout",
+      "speech_pod",
+      "future_capability",
+    ];
+    const restore = stubFetch(
+      [
+        device({
+          id: "stackchan-1",
+          kind: "robot",
+          name: "Riff",
+          capabilities,
+          state: { activity: "idle", muted: false, tracking: true, reachable: true, unreachableSince: null },
+        }),
+      ],
+      [],
+    );
+    try {
+      const { findByTestId } = renderSection();
+      const card = await findByTestId("robot-card");
+      for (const label of [
+        "Motion control",
+        "Emergency stop",
+        "Head turns and nods",
+        "Light ring",
+        "Speaker",
+        "Camera",
+        "Battery level",
+        "Speaks through Home",
+        "future_capability",
+      ]) {
+        expect(card.textContent).toContain(label);
+      }
+      expect(card.textContent).toContain("Paired");
+      expect(card.textContent).toContain("Ready");
+    } finally {
+      restore();
+    }
+  });
+
   test("new robot activities render their plain status labels", async () => {
     const restore = stubFetch(
       [

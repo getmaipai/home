@@ -5,6 +5,7 @@ import { CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardT
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import type { DeviceInfo, RobotDeviceState } from "@/lib/api";
+import { robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
   starting: "Starting up",
@@ -105,9 +106,19 @@ export function RobotBody({
         <CardDescription>{device.area ?? "Robot"}</CardDescription>
         <CardAction>
           <Badge variant={unreachable ? "destructive" : "secondary"}>{status}</Badge>
+          <Badge variant="secondary">Paired</Badge>
         </CardAction>
       </CardHeader>
       <CardContent>
+        {device.capabilities.length > 0 ? (
+          <div className="mb-4 flex flex-wrap gap-2" aria-label="Robot capabilities">
+            {device.capabilities.map((capability) => (
+              <Badge key={capability} variant="outline">
+                {robotCapabilityLabel(capability)}
+              </Badge>
+            ))}
+          </div>
+        ) : null}
         {state === null ? (
           <p className="text-base text-muted-foreground">
             {device.name} has not reported in yet. It shows up here once it is switched on and connected.
