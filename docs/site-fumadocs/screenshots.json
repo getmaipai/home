@@ -1,7 +1,7 @@
 {
   "home": {
     "file": "home-desktop-light.png",
-    "alt": "The Home screen with cards for people, updates, repairs and engines",
+    "alt": "The Home screen with counts for people, updates and repairs, and recent activity",
     "caption": "Your Home screen: counts for people, updates and repairs, and recent activity."
   },
   "chat-empty": {
