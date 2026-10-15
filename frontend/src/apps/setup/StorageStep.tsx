@@ -49,6 +49,8 @@ export function StorageStep({ split, value, onChange }: {
   const [picking, setPicking] = useState<FolderClass | null>(null);
   const [listing, setListing] = useState<SetupFolderListing | undefined>(undefined);
   const [loading, setLoading] = useState(false);
+  const [windowOpen, setWindowOpen] = useState<FolderClass | null>(null);
+  const [nativeRefusal, setNativeRefusal] = useState<{ which: FolderClass; text: string } | null>(null);
   const [pickerError, setPickerError] = useState<string | null>(null);
   const [lastPath, setLastPath] = useState<string | undefined>(undefined);
   const [rows, setRows] = useState<SetupPlacementRow[] | null>(null);
@@ -60,7 +62,6 @@ export function StorageStep({ split, value, onChange }: {
   const kinds: FolderClass[] = split ? ["records"] : ["records", "models"];
   const layout: StorageChoice = { ...(!split && value.models ? { models: value.models } : {}), ...(value.records ? { records: value.records } : {}) };
   const layoutKey = JSON.stringify(layout);
-  const chosen = Object.keys(layout).length > 0;
 
   useEffect(() => {
     let active = true;
@@ -91,9 +92,19 @@ export function StorageStep({ split, value, onChange }: {
     } finally { setLoading(false); }
   }
 
-  function startPicking(which: FolderClass) {
+  // This computer's own folder window first; the in-page picker when there is none.
+  async function startPicking(which: FolderClass) {
     setPicking(which);
+    setWindowOpen(which);
     setListing(undefined);
+    setPickerError(null);
+    setNativeRefusal(null);
+    try {
+      const native = await api.setupNativeFolder(which);
+      if (native.status === "chosen") { onChange({ ...value, [which]: native.path }, true); setPicking(null); return; }
+      if (native.status === "cancelled") { setPicking(null); return; }
+      if (native.status === "refused") { setPicking(null); setNativeRefusal({ which, text: native.error }); return; }
+    } catch { /* fall through to the in-page picker */ } finally { setWindowOpen(null); }
     void open(value[which]);
   }
 
@@ -124,15 +135,19 @@ export function StorageStep({ split, value, onChange }: {
       {kinds.map((which) => {
         const copy = COPY[which];
         const path = layout[which];
+        const own = problems.filter((row) => row.class === which);
+        const state = own.some((row) => row.kind === "refusal") ? "invalid" : checking || rows === null || checkError ? undefined : "valid";
         return (
-          <Card key={which}>
+          <Card key={which} state={state}>
             <CardHeader>
               <h2 className="text-2xl font-semibold md:text-3xl">{copy.title}</h2>
               <p className="text-base text-muted-foreground md:text-lg">{copy.about}</p>
             </CardHeader>
             <CardContent>
               <p className="break-all text-base md:text-lg">{path ?? defaults?.[which] ?? "Default folder"}</p>
-              {picking === which ? (
+              {windowOpen === which ? (
+                <p role="status" className="pt-3 text-base text-muted-foreground md:text-lg">Choose a folder in the window that just opened.</p>
+              ) : picking === which ? (
                 <FolderPicker
                   listing={listing ? { path: listing.path, parent: listing.parent, freeBytes: listing.freeBytes, rows: listing.folders.map((folder) => ({ name: folder.name, path: folder.path, writable: true })) } : undefined}
                   copy={PICKER_COPY(copy.pickerTitle)}
@@ -147,26 +162,35 @@ export function StorageStep({ split, value, onChange }: {
                 />
               ) : (
                 <div className="flex flex-wrap gap-2 pt-3">
-                  <Button type="button" variant="secondary" size="lg" disabled={picking !== null} onClick={() => startPicking(which)}>{path ? "Choose a different folder" : "Choose a folder"}</Button>
+                  <Button type="button" variant="secondary" size="lg" disabled={picking !== null} onClick={() => void startPicking(which)}>{path ? "Choose a different folder" : "Choose a folder"}</Button>
                   {path ? <Button type="button" variant="ghost" size="lg" disabled={picking !== null} onClick={() => onChange({ ...value, [which]: undefined }, true)}>Keep the default</Button> : null}
                 </div>
               )}
+              {nativeRefusal?.which === which ? <div className="pt-3"><Alert variant="destructive"><AlertDescription>{nativeRefusal.text}</AlertDescription></Alert></div> : null}
               {picking === which && pickerError ? <p role="alert">{pickerError}</p> : null}
               {picking === which && listing && !listing.writable ? <p className="text-base text-muted-foreground md:text-lg">Home can't save files in this folder. Go up and pick a folder you own, or make a new one here.</p> : null}
-              {picking === which ? <Button type="button" variant="ghost" size="lg" onClick={() => setPicking(null)}>Cancel</Button> : null}
+              {picking === which && windowOpen !== which ? <Button type="button" variant="ghost" size="lg" onClick={() => setPicking(null)}>Cancel</Button> : null}
+              {picking !== which ? own.map((row) => (
+                <div key={row.id} className="pt-3">
+                  <Alert variant={row.kind === "refusal" ? "destructive" : "warning"}>
+                    <AlertTitle>{row.kind === "refusal" ? "Home can't use this folder" : "Worth knowing"}</AlertTitle>
+                    <AlertDescription>{placementLine(row)}</AlertDescription>
+                  </Alert>
+                </div>
+              )) : null}
+              {picking !== which && state === "valid" && own.length === 0 ? <p role="status" className="pt-3 text-base text-muted-foreground">Home can use this folder.</p> : null}
             </CardContent>
           </Card>
         );
       })}
       {checking ? <p role="status" className="text-base text-muted-foreground md:text-lg">Checking that Home can use your choice.</p> : null}
       {checkError ? <Alert variant="destructive"><AlertTitle>Home couldn't check your choice</AlertTitle><AlertDescription>{checkError}</AlertDescription></Alert> : null}
-      {problems.map((row) => (
+      {problems.filter((row) => !kinds.includes(row.class as FolderClass)).map((row) => (
         <Alert key={`${row.class}-${row.id}`} variant={row.kind === "refusal" ? "destructive" : "warning"}>
           <AlertTitle>{row.kind === "refusal" ? "Home can't use this folder" : "Worth knowing"}</AlertTitle>
           <AlertDescription>{placementLine(row)}</AlertDescription>
         </Alert>
       ))}
-      {chosen && !checking && !checkError && rows && rows.length === 0 && picking === null ? <p role="status" className="text-base text-muted-foreground md:text-lg">Home can use your choice. Press Continue when you are ready.</p> : null}
     </div>
   );
 }

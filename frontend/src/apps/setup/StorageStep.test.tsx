@@ -7,13 +7,14 @@ afterEach(cleanup);
 
 const listing = (path: string, writable = true) => ({ path, parent: path === "/" ? null : "/", freeBytes: 500e9, writable, folders: [{ name: "Disks", path: `${path === "/" ? "" : path}/Disks`, writable: true }, { name: "Locked", path: `${path}/Locked`, writable: false }] });
 
-function setup(rows: unknown[] = []) {
+function setup(rows: unknown[] = [], native: unknown = { status: "unavailable" }) {
   const original = globalThis.fetch;
   const calls: string[] = [];
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(`${init?.method ?? "GET"} ${url}${init?.body ? ` ${String(init.body)}` : ""}`);
     if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/Users/me/maipai/data", models: "/Users/me/maipai/data/models" }), { status: 200 });
+    if (url.includes("/api/setup/folders/native")) return new Response(JSON.stringify(native), { status: 200 });
     if (url.includes("/api/setup/storage/check")) return new Response(JSON.stringify({ rows }), { status: 200 });
     if (url.includes("/api/setup/folders") && init?.method === "POST") return new Response(JSON.stringify({ name: "Models", path: "/Disks/Models", writable: true }), { status: 200 });
     if (url.includes("/api/setup/folders")) {
@@ -54,6 +55,11 @@ describe("StorageStep", () => {
       const view = render(<Host report={report} />);
       await waitFor(() => expect(view.container.textContent).toContain("needs about 200 GB"));
       expect(report.mock.calls.at(-1)?.[1]).toBe(true);
+      const cards = Array.from(view.container.querySelectorAll('[data-slot="card"]')) as HTMLElement[];
+      const models = cards.find((card) => card.textContent?.includes("needs about 200 GB"))!;
+      expect(models.dataset.state).toBe("invalid");
+      expect(models.textContent).toContain("AI models");
+      expect(cards.find((card) => card.textContent?.includes("Home's data"))!.dataset.state).toBe("valid");
     } finally { h.restore(); }
   });
 
@@ -78,11 +84,35 @@ describe("StorageStep", () => {
       await act(async () => { fireEvent.click(view.getByRole("button", { name: /Disks/ })); });
       await waitFor(() => expect(view.container.textContent).toContain("/Disks"));
       await act(async () => { fireEvent.click(view.getByRole("button", { name: "Use this folder" })); });
-      await waitFor(() => expect(view.container.textContent).toContain("Home can use your choice."));
+      await waitFor(() => expect(view.container.textContent).toContain("Home can use this folder."));
       expect(h.calls.some((call) => call.startsWith("POST /api/setup/storage/check") && call.includes("\"models\":\"/Users/me/Disks\""))).toBe(true);
       expect(report.mock.calls.at(-1)).toEqual([{ models: "/Users/me/Disks" }, false]);
       await act(async () => { fireEvent.click(view.getByRole("button", { name: "Keep the default" })); });
       await waitFor(() => expect(report.mock.calls.at(-1)).toEqual([{ models: undefined }, false]));
+    } finally { h.restore(); }
+  });
+
+  test("the computer's own folder window is used first and its choice is checked", async () => {
+    const h = setup([], { status: "chosen", path: "/Volumes/Big/models" });
+    try {
+      const report = mock((_value: StorageChoice, _blocked: boolean) => {});
+      const view = render(<Host report={report} />);
+      await act(async () => { fireEvent.click(view.getAllByRole("button", { name: "Choose a folder" })[1]!); });
+      await waitFor(() => expect(view.getByText("/Volumes/Big/models")).toBeTruthy());
+      expect(view.queryByRole("button", { name: "Use this folder" })).toBeNull();
+      expect(h.calls.some((call) => call.startsWith("POST /api/setup/folders/native") && call.includes('"folder":"models"'))).toBe(true);
+      await waitFor(() => expect(report.mock.calls.at(-1)).toEqual([{ models: "/Volumes/Big/models" }, false]));
+    } finally { h.restore(); }
+  });
+
+  test("a folder Home cannot write to, picked in the window, is explained inside its card", async () => {
+    const h = setup([], { status: "refused", error: "Home can't save files in that folder. Choose a folder you own, or make a new one." });
+    try {
+      const view = render(<Host report={() => {}} />);
+      await act(async () => { fireEvent.click(view.getAllByRole("button", { name: "Choose a folder" })[1]!); });
+      await waitFor(() => expect(view.container.textContent).toContain("Home can't save files in that folder"));
+      const card = Array.from(view.container.querySelectorAll('[data-slot="card"]')).find((c) => c.textContent?.includes("Home can't save files in that folder"))!;
+      expect(card.textContent).toContain("AI models");
     } finally { h.restore(); }
   });
 

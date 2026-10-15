@@ -13,6 +13,7 @@ import { getSetupState } from "@/lib/setupState";
 import { createFolder, listFolder, validateProposedPath } from "@/lib/folderBrowse";
 import { checkPlacement } from "@/lib/placement";
 import { classDir } from "@/lib/paths";
+import { chooseNativeFolder } from "@/lib/nativeFolderDialog";
 import { statfsSync, existsSync } from "node:fs";
 import { dirname } from "node:path";
 
@@ -94,6 +95,31 @@ setupFolderRoutes.openapi(createRouteDef, (c) => {
   const { parent, name } = c.req.valid("json");
   const result = createFolder(parent, name);
   return result.ok ? c.json(result.value, 200) : (c.json({ error: result.error }, result.status) as never);
+});
+
+const nativeRoute = createRoute({
+  method: "post", path: "/folders/native", tags: ["Setup"], summary: "Open this computer's own folder window and return the folder chosen",
+  request: { body: { content: { "application/json": { schema: z.object({ folder: z.enum(["records", "models"]) }).strict() } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.discriminatedUnion("status", [
+      z.object({ status: z.literal("chosen"), path: z.string() }),
+      z.object({ status: z.literal("cancelled") }),
+      z.object({ status: z.literal("unavailable") }),
+      z.object({ status: z.literal("refused"), error: z.string() }),
+    ]) } }, description: "The folder, or why there is none. unavailable means use the in-page picker." },
+    ...errs,
+  },
+});
+setupFolderRoutes.openapi(nativeRoute, async (c) => {
+  const refusal = accessRefusal(c);
+  if (refusal) return refusal as never;
+  const title = c.req.valid("json").folder === "models" ? "Choose the AI models folder" : "Choose Home's data folder";
+  const picked = await chooseNativeFolder(title);
+  if (picked.status !== "chosen") return c.json(picked, 200);
+  const listing = listFolder(picked.path);
+  if (!listing.ok) return c.json({ status: "refused" as const, error: listing.error }, 200);
+  if (!listing.value.writable) return c.json({ status: "refused" as const, error: "Home can't save files in that folder. Choose a folder you own, or make a new one." }, 200);
+  return c.json({ status: "chosen" as const, path: listing.value.path }, 200);
 });
 
 const PlacementRowSchema = z.object({ class: z.string(), kind: z.enum(["refusal", "warning", "unknown"]), id: z.string(), text: z.string(), fix: z.string() });

@@ -110,6 +110,7 @@ describe("setup folder picker", () => {
     expect((await list(new TestClient("192.0.2.42"), root)).status).toBe(403);
     expect((await new TestClient("192.0.2.42").post("/api/setup/folders", { parent: root, name: "x" })).status).toBe(403);
     expect((await new TestClient("192.0.2.42").post("/api/setup/storage/check", { records: root })).status).toBe(403);
+    expect((await new TestClient("192.0.2.42").post("/api/setup/folders/native", { folder: "records" })).status).toBe(403);
   });
 
   test("after an owner exists, a signed-out caller is refused and the owner is allowed", async () => {
@@ -129,6 +130,7 @@ describe("setup folder picker", () => {
     expect(await errorOf(response)).toContain("Settings");
     expect((await owner.post("/api/setup/folders", { parent: root, name: "late" })).status).toBe(409);
     expect((await owner.post("/api/setup/storage/check", { records: root })).status).toBe(409);
+    expect((await owner.post("/api/setup/folders/native", { folder: "models" })).status).toBe(409);
   });
 });
 
