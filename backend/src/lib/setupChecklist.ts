@@ -1,4 +1,8 @@
 import { listActivePeople, isOwnerOrAdmin } from "@/lib/access";
+import { listBiometricPrints } from "@/lib/biometricPrints";
+import { getSmbTarget } from "@/lib/backupTargets";
+import { hasRedeemedDeviceToken } from "@/lib/deviceTokens";
+import { hasNonDefaultInstalledPackage } from "@/lib/plugins";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
 import { effectiveMode } from "@/lib/retrieval/sourceMode";
 import { getLinkCredentialStatus } from "@/lib/stack/linkKeys";
@@ -8,11 +12,16 @@ import type { PersonRow } from "@/types";
 import type { SetupChecklistItem } from "@/wire";
 
 export const SETUP_CHECKLIST_ITEMS = [
+  { id: "face-sign-in", title: "Set up face sign-in", reason: "A face print lets Home recognise you.", open: { label: "Open", href: "face" } },
+  { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", open: { label: "Open", href: "/settings/home/people" } },
+  { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", open: { label: "Open", href: "/settings/home/storage" } },
+  { id: "phone-or-tablet", title: "Add a phone or tablet", reason: "Sign in on another device to use Home there.", open: { label: "Open", href: "/devices" } },
+  { id: "web-search", title: "Fix web search", reason: "Home cannot complete its web search check yet.", open: { label: "Open", href: "/settings/home/search" } },
+  { id: "apps", title: "Add apps", reason: "Add an app to give Home another useful skill.", open: { label: "Open", href: "/store" } },
+  { id: "away-access", title: "Set up access away from home", reason: "Tailscale lets your family reach Home when they are away.", open: { label: "Open", href: "/setup/away" } },
   { id: "backup-key", title: "Save your backup key", reason: "This key helps restore your Home if this computer is lost.", open: { label: "Open", href: "/settings/home/storage" } },
   { id: "voice", title: "Choose a speaking voice", reason: "Home can read replies aloud in this voice.", open: { label: "Open", href: "/settings/home/voice" } },
   { id: "photos", title: "Turn on photo understanding", reason: "Home can help with photos when you ask.", open: { label: "Open", href: "/settings/home/ai" } },
-  { id: "people", title: "Add people to your Home", reason: "Each person gets their own account and settings.", open: { label: "Open", href: "/settings/home/people" } },
-  { id: "web-search", title: "Set up web search", reason: "Web search helps Home look up current information.", open: { label: "Open", href: "/settings/home/search" } },
   { id: "remote-engine", title: "Pair your remote AI computer", reason: "A paired computer can run Home's AI on another machine.", open: { label: "Open", href: "/settings/home/ai" } },
 ] as const;
 
@@ -45,6 +54,9 @@ export async function getSetupChecklist(actor: PersonRow): Promise<SetupChecklis
   if (!isOwnerOrAdmin(actor)) return [];
   const activePeople = listActivePeople();
   const owner = activePeople.find((person) => person.role === "owner");
+  const facePrints = owner ? listBiometricPrints(owner, owner.id) : null;
+  const target = getSmbTarget();
+  const hasDevice = hasRedeemedDeviceToken();
   const webIsOffline = effectiveMode("web", "adult") === "offline";
   const searchStatus = webIsOffline ? null : await checkSearchInstance({ updateRepairs: false });
   const searchWorks = webIsOffline || Boolean(searchStatus?.checks.length && searchStatus.checks.every((check) => check.state === "pass"));
@@ -54,16 +66,22 @@ export async function getSetupChecklist(actor: PersonRow): Promise<SetupChecklis
   const photosOn = getHouseholdSettingValue("vision.on_request.enabled") === true && getHouseholdSettingSource("vision.on_request.enabled") !== undefined;
   const engineIsRemote = getHouseholdSettingValue("engines.stack.where") === "another_computer";
   const enginePaired = !engineIsRemote || getLinkCredentialStatus().paired;
+  const appsAdded = hasNonDefaultInstalledPackage();
   const dismissed = dismissedIds(actor);
 
   const doneById: Record<(typeof SETUP_CHECKLIST_ITEMS)[number]["id"], boolean> = {
+    "face-sign-in": Boolean(facePrints?.ok && facePrints.value.some((print) => print.modality === "face" && print.deleted_at === null)),
+    family: activePeople.length > 1,
+    "backup-target": target !== null,
+    "phone-or-tablet": hasDevice,
+    apps: appsAdded,
+    "away-access": getHouseholdSettingValue("network.tailnet_access") === true,
     "backup-key": backupSaved,
     voice: voiceChosen,
     photos: photosOn,
-    people: activePeople.length > 1,
     "web-search": searchWorks,
     "remote-engine": enginePaired,
   };
 
-  return checklistFromFacts(doneById, dismissed);
+  return checklistFromFacts(doneById, new Set([...dismissed, ...(!engineIsRemote ? ["remote-engine"] : [])]));
 }
