@@ -13,6 +13,7 @@ import { owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { TestClient } from "./client";
+import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { reconcileCapabilities, packagesLosingCapability, removalConfirmation } from "@/lib/capabilityReconcile";
 
 // Builds a REAL packed tarball too (tests/support/tufFixtures.ts's own
@@ -214,6 +215,14 @@ describe("install", () => {
     const second = await owner.request("/api/settings", { method: "PUT", body: { ...off, confirmRemoval: true } });
     expect(second.status).toBe(200);
     expect(getActiveInstall("test-store-route-image")).toBeNull();
+  });
+
+  test("CAP-GATE-01: a tool whose package needs a capability that is off is not offered to the model", async () => {
+    const { targetPath } = await buildInstallableFixture({ id: "test-store-tool-image", requires: ["image"] });
+    expect((await install({ id: "test-store-tool-image", targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);
+    expect(toolSpecFor("test-store-tool-image")).not.toBeNull();
+    setHouseholdSettingValue("engines.image.choice", "off");
+    expect(toolSpecFor("test-store-tool-image")).toBeNull();
   });
 
   test("refuses when the target path is not in the index at all", async () => {

@@ -8,6 +8,7 @@ import { foldedBlock } from "@/lib/systemFold";
 import { startCompleteStreamPieces, envelopeToolCall, StackStreamError } from "@/lib/llm";
 import { roleHealth } from "@/lib/roleHealth";
 import type { LlmMessage, ToolSpec, ToolCall } from "@/lib/llm";
+import { missingRequired } from "@/lib/capabilities";
 import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun } from "@/lib/text";
@@ -152,6 +153,8 @@ export function toolSpecFor(id: string): ToolSpec | null {
   if (virtual) return virtual.spec();
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) return null;
+  // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
+  if (missingRequired(loaded.value).length > 0) return null;
   return { id, description: loaded.value.description, args: loaded.value.args };
 }
 
