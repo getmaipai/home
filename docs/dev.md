@@ -37031,3 +37031,32 @@ later offers again is asked again. A frame whose offer names a motor outside `mo
 shows the offer only while the robot is reachable. `POST /api/devices/{id}/motor-reboot {answer}`: the device's owner or an
 admin, and an adult by age band; "yes" issues `motor_reboot {motors}` from the stored offer (the request carries no motor
 names), "no" sends nothing; either answer hides the offer. Nothing reboots a motor without a yes.
+
+## HOST-TUNE-01: macOS host tuning for the always-on Mac (2026-10-16)
+
+`scripts/studio/host-tune.sh` is the one definition of what an always-on Home Mac needs; the setup wizard and a person at the Mac both
+call it. Subcommands `detect`, `apply <id>`, `revert <id>`; `--json` for machines; `--data-dir` and `--models-dir` name Home's folders
+for the two AUTO items. It is dry-run unless `--yes` is given, bash 3.2 clean (macOS's own), and exits 0 ok, 2 bad use, 3 needs an
+administrator, 4 the change failed, 5 not macOS; with `--json` a failure prints `{error, code}` where `error` says what went wrong and
+the exact next step. Items (`id`, `title`, `why`, `mode`, `state` ok|needs|unknown|applied, `current`, `proposed`):
+
+- **auto** (Home's folders only, no sudo): `no-spotlight` (`.metadata_never_index` in the data and models folders) and
+  `no-timemachine-models` (`tmutil addexclusion` on the models folder only; Home's data stays in the backup path).
+- **consent** (whole Mac, root; without root the script exits 3 and prints `sudo bash <script> apply <id> --yes`): `power` (`pmset -a sleep 0
+  disksleep 0 displaysleep 10 autorestart 1 womp 1 powernap 0`; the old values are saved under `/Library/Application Support/MaiPai/host-tune/power.prev`
+  and `revert` restores them, or macOS defaults), `wired-limit` (`iogpu.wired_limit_mb` = memory minus max(12 GB, 15 percent); 111412 MB on
+  128 GB; persisted by the `com.maipai.wired-limit` LaunchDaemon; not offered under 32 GB; labelled as needed only for big models later),
+  `no-auto-major-upgrade` (`AutomaticallyInstallMacOSUpdates` off, `CriticalUpdateInstall` and `ConfigDataInstall` on), `remote-login`
+  (`systemsetup -setremotelogin on`; a refusal names System Settings, Sharing as the manual route).
+- **advice** (never scripted, `apply` refuses): Apple services off for the hub account, radios, fixed address and the Tailscale approval,
+  no extra toolchains, automatic login on with FileVault off (Jesse's decision 2026-10-16: unattended recovery after a power cut
+  outweighs disk encryption), screen saver.
+
+`detect` needs no root. The backend wrapper is `lib/hostTune.ts` with the routes in `routes/setupHostTune.ts`, mounted in `routes/setup.ts`
+before the `/{step}` catch-all with the folder picker's access rule (loopback before an owner exists, the owner after, closed once setup
+is done): `GET /api/setup/host-tune` returns `{supported, items}` (`supported` is false off macOS), `POST /api/setup/host-tune/apply` and
+`/revert` take `{id}` and return `{item}`. The id is a Zod enum of the allowlist and reaches the script as one argv element, never a
+shell string. A change that needs root answers 409 with the exact `sudo` line; the wizard shows it. Tests: `scripts/studio/hostTune.test.ts`
+(fake `pmset`, `sysctl`, `tmutil`, `defaults`, `launchctl`, `systemsetup`, `uname`, `id`, `nc` on PATH) and `backend/tests/setupHostTune.test.ts`
+(a stub script behind `MAIPAI_HOST_TUNE_SCRIPT`). Not run on the Studio: real `pmset`, the `iogpu` sysctl on Apple silicon, `tmutil addexclusion`
+on a volume, the LaunchDaemon bootstrap, `systemsetup` under Full Disk Access.

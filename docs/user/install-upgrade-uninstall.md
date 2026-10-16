@@ -43,7 +43,29 @@ If it stops, read the last lines. They say what went wrong and what to do. Fix t
 
 MaiPai Home starts by itself when the Mac starts. No one needs to log in.
 
-The AI engine starts when the Mac's user logs in. To make that automatic, turn on automatic login: open System Settings, then Users and Groups, then Automatic login. If FileVault is on, macOS does not allow automatic login. After a restart, log in once at the Mac and the engine starts.
+The AI engine starts when the Mac's user logs in. To make that automatic, turn on automatic login: open System Settings, then Users and Groups, then Automatic login. macOS only allows automatic login when FileVault is off. For a Mac that must come back by itself after a power cut, turn FileVault off. The trade: anyone who can touch the Mac can read its disk, so keep it somewhere safe. If you keep FileVault on, log in once at the Mac after a restart and the engine starts.
+
+## Tune the Mac
+
+A Mac that runs Home all day works best with a few settings changed. Setup shows them as a list. You can also run the tool yourself at the Mac. It changes nothing unless you add `--yes`.
+
+```bash
+bash /usr/local/maipai-home/scripts/studio/host-tune.sh detect
+```
+
+Two kinds of change are in the list.
+
+- Changes inside Home's own folders. Home makes them for you. They keep Spotlight out of Home's files and keep the big AI models out of Time Machine. Home's data stays in your backups.
+- Changes to the whole Mac. These need an administrator, so Home asks first. If Home cannot do one, it shows the exact line to paste in Terminal at the Mac. They stop the Mac from sleeping, turn it back on after a power cut, stop big macOS upgrades by themselves (security updates stay on), and turn on SSH. One more lets the graphics chip use more memory. You only need that one for very big AI models later.
+
+Every change can be undone. Run the same line with `revert` and the name of the item.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/studio/host-tune.sh apply power --yes
+sudo bash /usr/local/maipai-home/scripts/studio/host-tune.sh revert power --yes
+```
+
+Some things only you can do, so the list shows them as advice: leave iCloud, Siri and Apple Intelligence off for this account, turn the screen saver off, give the Mac a fixed address in your router, approve it in Tailscale, and install nothing extra except the Command Line Tools.
 
 ## Upgrade
 

@@ -52,7 +52,7 @@ const errs = {
 } as const;
 
 /** Returns a refusal response, or null when the caller may use the picker. */
-function accessRefusal(c: Context): Response | null {
+export function accessRefusal(c: Context): Response | null {
   if (getSetupState().completed_at) {
     return c.json({ error: "Setup is finished, so this screen is closed. Change where Home keeps its files in Settings, under Storage." }, 409);
   }
