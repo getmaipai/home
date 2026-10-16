@@ -28,8 +28,8 @@ declare global {
 }
 
 const PHASES: WizardStep[] = [
-  { id: "computers", title: "Getting started" },
-  { id: "meet", title: "Your Home" },
+  { id: "computers", title: "Your Home" },
+  { id: "meet", title: "Your AI" },
 ];
 const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "checks", "plan", "owner", "face", "hello", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
@@ -120,6 +120,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [certificate, setCertificate] = useState<"loading" | "ready" | "error">("loading");
   const [backupKey, setBackupKey] = useState<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string } | null>(null);
   const [backupKeyError, setBackupKeyError] = useState(false);
+  const [backupSavedError, setBackupSavedError] = useState(false);
   const [checkRows, setCheckRows] = useState<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }> | null>(null);
   const [checkError, setCheckError] = useState(false);
   const [checksFetching, setChecksFetching] = useState(false);
@@ -151,7 +152,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     // removes screen 9 until it exists, so its server record is not a UI step.
     const ownerDone = stepIsDone(result, "owner");
     const disclosureSeen = sessionStorage.getItem("maipai:setup-before-start-read") === "true";
-    const next = !ownerDone && !disclosureSeen && firstPending !== "welcome" ? "before_start" : firstPending === "profile" ? "hello" : firstPending;
+    const next = !ownerDone && !disclosureSeen && firstPending !== "welcome" ? "before_start" : firstPending === "profile" ? "hello" : firstPending === "backup_key" ? "backup" : firstPending;
     if (next && (SCREEN_IDS as readonly string[]).includes(next)) setScreen(next as ScreenId);
     setEngine(result.engine.where);
     return result;
@@ -232,6 +233,19 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     popup.print();
   }
 
+  async function confirmBackupKeySaved() {
+    setBusy(true);
+    try {
+      await api.setupStep("backup_key", { status: "done", phase: "meet" });
+      setBackupSavedError(false);
+      setOpenThings((count) => count === null ? null : Math.max(0, count - 1));
+    } catch {
+      setBackupSavedError(true);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const phase = screen === "owner" || screen === "face" || screen === "hello" || screen === "backup" || screen === "done" ? "meet" : "computers";
   const completedCount = phase === "meet" ? 1 : 0;
   const thingsLeftLine = openThings === null ? null : setupChecklistCountLine(openThings);
@@ -269,7 +283,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     if (screen === "before_start") {
       sessionStorage.setItem("maipai:setup-before-start-read", "true");
       const firstPending = updated.steps.find((step) => step.id !== "away" && (step.status === "pending" || step.status === "running" || step.status === "failed"))?.id;
-      const target = firstPending === "profile" ? "hello" : firstPending;
+      const target = firstPending === "profile" ? "hello" : firstPending === "backup_key" ? "backup" : firstPending;
       if (target && (SCREEN_IDS as readonly string[]).includes(target)) setScreen(target as ScreenId);
       return;
     }
@@ -377,7 +391,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "owner": body = <Card><CardContent><p>{OWNER_COPY}</p><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} checkSecret hideSubmit /></CardContent></Card>; break;
     case "face": body = <Card><CardContent><p>Face data stays on this computer. You can turn on face greetings now or later in your profile.</p></CardContent></Card>; break;
     case "hello": body = <Card><CardContent><p>You can talk with Home as soon as setup is finished.</p></CardContent></Card>; break;
-    case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void printEmergencyKit()}>Print</Button>{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</CardContent></Card>; break;
+    case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void printEmergencyKit()}>Print</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey || busy} onClick={() => void confirmBackupKeySaved()}>I saved my backup key</Button>{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}{backupSavedError ? <p role="alert">Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</CardContent></Card>; break;
     case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>Start a chat, add people, or choose apps whenever you're ready.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
@@ -393,6 +407,6 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
 
 function phaseFor(id: string): SetupState["phase"] {
   if (id === "done") return "done";
-  if (["owner", "face", "profile", "hello"].includes(id)) return "meet";
+  if (["owner", "face", "profile", "hello", "backup_key"].includes(id)) return "meet";
   return "computers";
 }

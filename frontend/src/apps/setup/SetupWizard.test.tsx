@@ -8,7 +8,7 @@ import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 afterEach(cleanup);
 beforeEach(() => { sessionStorage.clear(); });
 
-const IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "done"] as const;
+const IDS = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "backup_key", "done"] as const;
 function freshState(): SetupState {
   sessionStorage.setItem("maipai:setup-before-start-read", "true");
   const now = new Date().toISOString();
@@ -119,12 +119,14 @@ describe("SetupWizard", () => {
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
+      expect(rendered.container.textContent).toContain("Your Home");
       await advanceTo(rendered, "Set up my Home", "Before you start");
       await advanceTo(rendered, "I understand", "How should Home run?");
       await advanceTo(rendered, "Continue", "Choose where to store data");
       await advanceTo(rendered, "Continue", "Checking your computers");
       await advanceTo(rendered, "Continue", "Your setup plan");
       await advanceTo(rendered, "Continue", "Create your owner account");
+      expect(rendered.container.textContent).toContain("Your AI");
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
       await advanceTo(rendered, "Create owner account", "Let Home greet you");
@@ -157,6 +159,21 @@ describe("SetupWizard", () => {
       fireEvent.click(rendered.getByRole("button", { name: "AI can be wrong or say the wrong thing" }));
       expect(rendered.container.textContent).toContain("Answers can be inaccurate, offensive, or harmful.");
       expect(rendered.container.textContent).toContain("you are responsible for how you use them.");
+    } finally { h.restore(); }
+  });
+
+  test("uses the Your Home and Your AI phases and records the backup key acknowledgement", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile", "hello"] as const) {
+      state.steps.find((step) => step.id === id)!.status = "done";
+    }
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
+      expect(rendered.container.textContent).toContain("Your AI");
+      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "I saved my backup key" })); });
+      expect(h.posts).toContain("backup_key");
     } finally { h.restore(); }
   });
 

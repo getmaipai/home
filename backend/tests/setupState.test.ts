@@ -14,7 +14,7 @@ beforeEach(() => {
 });
 
 const result = (status = "done") => ({ status });
-const allStepIds = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "done"] as const;
+const allStepIds = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "backup_key", "done"] as const;
 
 describe("setup state routes", () => {
   test("unknown step is refused with a plain two-part error", async () => {

@@ -7,7 +7,7 @@ import { randomSuffix } from "@/lib/id";
 
 export const SETUP_STEP_IDS = [
   "welcome", "engine_location", "storage", "checks", "plan", "away",
-  "owner", "face", "profile", "hello", "done",
+  "owner", "face", "profile", "hello", "backup_key", "done",
 ] as const;
 export type SetupStepId = (typeof SETUP_STEP_IDS)[number];
 export const PRE_OWNER_STEPS = new Set<SetupStepId>([

@@ -2,7 +2,7 @@ import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import type { Scenario, CheckRow } from "./types";
 
 const now = "2026-10-14T12:00:00.000Z";
-const ids = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "done"] as const;
+const ids = ["welcome", "engine_location", "storage", "checks", "plan", "away", "owner", "face", "profile", "hello", "backup_key", "done"] as const;
 function freshState(): SetupState {
   return { id: "preview-setup", source: "wizard", steps: ids.map((id) => ({ id, status: "pending", at: now })), phase: "computers", engine: { where: "this_computer", hardware: {} }, away: "later", plan: { option: "recommended", tier: "minimal", roles: [] }, checks: [], started_at: now, completed_at: null, hlc: "1791979200000:0:abcdef" };
 }
