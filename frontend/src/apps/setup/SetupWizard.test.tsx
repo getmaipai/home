@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -46,7 +47,7 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS) {
 }
 
 function view(onDone = () => {}) {
-  return render(<MemoryRouter initialEntries={["/setup"]}><Routes><Route path="/setup" element={<SetupWizard onDone={onDone} />} /><Route path="/sign-in" element={<p>Sign in</p>} /></Routes></MemoryRouter>);
+  return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/setup"]}><Routes><Route path="/setup" element={<SetupWizard onDone={onDone} />} /><Route path="/sign-in" element={<p>Sign in</p>} /></Routes></MemoryRouter></QueryClientProvider>);
 }
 
 async function advanceTo(viewResult: ReturnType<typeof view>, buttonText: string, expected: string) {
@@ -284,6 +285,26 @@ describe("SetupWizard", () => {
       const again = view();
       await waitFor(() => expect(again.container.textContent).toContain("1 thing left to finish setting up"));
     } finally { h.restore(); }
+  });
+
+  test("the Done screen offers to pair the AI computer on a two-computer setup and not on one computer", async () => {
+    const two = freshState();
+    two.engine.where = "another_computer";
+    for (const step of two.steps) if (step.id !== "done") step.status = "done";
+    const h = harness(two);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Pair the computer that runs the AI"));
+      rendered.unmount();
+    } finally { h.restore(); }
+    const one = freshState();
+    for (const step of one.steps) if (step.id !== "done") step.status = "done";
+    const again = harness(one);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Start a chat"));
+      expect(rendered.container.textContent).not.toContain("Pair the computer that runs the AI");
+    } finally { again.restore(); }
   });
 
   test("after completion the setup route redirects to sign-in", async () => {
