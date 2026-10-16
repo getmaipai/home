@@ -13,13 +13,15 @@ describe("grant authority", () => {
   beforeEach(() => resetDb());
 
   test("an admin cannot grant backups.restore, while the owner can", () => {
-    addPerson("admin-one", "admin");
-    addPerson("owner-one", "owner");
+    addPerson("person-admin001", "admin");
+    addPerson("person-owner001", "owner");
 
-    const refused = createGrant({ id: "admin-one", role: "admin" }, { person: "admin-one", action: "backups.restore", effect: "allow" });
-    expect(refused).toMatchObject({ ok: false, status: 400, error: "You can't give someone a permission you don't have. Ask the owner to grant it." });
+    const refused = createGrant({ id: "person-admin001", role: "admin" }, { person: "person-admin001", action: "backups.restore", effect: "allow" });
+    expect(refused).toMatchObject({ ok: false, status: 400, error: "Admins cannot grant themselves backup restore access. Ask the owner to grant it." });
 
-    const allowed = createGrant({ id: "owner-one", role: "owner" }, { person: "admin-one", action: "backups.restore", effect: "allow" });
+    const allowed = createGrant({ id: "person-owner001", role: "owner" }, { person: "person-admin001", action: "backups.restore", effect: "allow" });
     expect(allowed.ok).toBe(true);
+    const adminDelegation = createGrant({ id: "person-admin001", role: "admin" }, { person: "person-owner001", action: "backups.restore", effect: "allow" });
+    expect(adminDelegation).toMatchObject({ ok: false, error: "You can't give someone a permission you don't have. Ask the owner to grant it." });
   });
 });

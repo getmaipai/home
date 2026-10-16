@@ -113,6 +113,7 @@ export function grantActionClassificationIsComplete(): boolean {
 
 function actorHoldsAction(actor: { id: string; role: Role }, action: string, catalogActionId: string): boolean {
   if (actor.role === "owner") return true;
+  if (OWNER_ONLY_GRANT_ACTIONS.has(catalogActionId)) return false;
   if (actor.role === "admin" && ADMIN_HELD_GRANT_ACTIONS.has(catalogActionId) && !OWNER_ONLY_GRANT_ACTIONS.has(catalogActionId)) return true;
   return effectivePermissions(actor.id).some((permission) => permission.action === action && permission.effect === "allow");
 }
@@ -122,6 +123,9 @@ export function createGrant(actor: { id: string; role: Role }, input: GrantCreat
   if (!person) return { ok: false, status: 400, error: "person does not name an existing profile" };
   const matchedAction = matchGrantAction(input.action);
   if (!matchedAction) return { ok: false, status: 400, error: `unknown grant action: ${input.action}` };
+  if (actor.role === "admin" && actor.id === input.person && input.action === "backups.restore") {
+    return { ok: false, status: 400, error: "Admins cannot grant themselves backup restore access. Ask the owner to grant it." };
+  }
   if (!actorHoldsAction(actor, input.action, matchedAction.id)) return { ok: false, status: 400, error: GRANT_AUTHORITY_ERROR };
 
   const now = new Date().toISOString();
