@@ -7,6 +7,7 @@ import { withTimeout } from "@maipai/core/src/withTimeout";
 import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
+import { defaultStackBaseUrl } from "../ports";
 import { StackVoiceSchema } from "./types";
 import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
 import type {
@@ -29,7 +30,7 @@ import type {
   StackVoice,
 } from "./types";
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8770";
+
 const DEFAULT_TIMEOUT_MS = 30_000;
 
 const KIND_BY_STATUS: Record<number, StackErrorKind> = {
@@ -166,7 +167,7 @@ function isLoopback(url: string): boolean {
 }
 
 export function createStackClient(options: StackClientOptions = {}): StackClient {
-  const baseUrl = options.baseUrl ?? DEFAULT_BASE_URL;
+  const baseUrl = options.baseUrl ?? defaultStackBaseUrl();
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const doFetch = options.fetch ?? globalThis.fetch;
 

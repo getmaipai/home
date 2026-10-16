@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { homedir, freemem, totalmem } from "node:os";
 import { createConnection } from "node:net";
 import { hubLockPath } from "./instanceLock";
+import { homePort } from "./ports";
 
 export type PreflightSeverity = "critical" | "error" | "warning";
 export type InstallPreflightRow = {
@@ -86,7 +87,7 @@ export async function checkInstallPreflight(opts: InstallPreflightOptions = {}):
   const mem = (opts.memoryBytes ?? (() => ({ free: freemem(), total: totalmem() })))();
   const version = (opts.systemVersion ?? (() => `${platform} ${process.arch}`))();
   const lock = (opts.lockInfo ?? (() => defaultLockInfo(opts.lockPath ?? hubLockPath())))();
-  const port = opts.port ?? Number(process.env.PORT ?? 3000);
+  const port = opts.port ?? homePort();
   const [busy, reachable] = await Promise.all([
     (opts.portBusy ?? tcpBusy)(port),
     (opts.reachReleaseHost ?? plainHostReach)(releaseHost),

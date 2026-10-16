@@ -2,6 +2,7 @@ import { getConnInfo } from "hono/bun";
 import type { Context, MiddlewareHandler } from "hono";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { homePort } from "@/lib/ports";
 
 type SetupServer = {
   port?: number;
@@ -15,7 +16,7 @@ export function setupIsComplete(): boolean {
 function localSetupUrl(c: Context): string {
   const env = c.env as { server?: SetupServer; port?: number } | undefined;
   const server = env?.server ?? env;
-  const port = typeof server?.port === "number" ? server.port : 3000;
+  const port = typeof server?.port === "number" ? server.port : homePort();
   return `http://localhost:${port}`;
 }
 

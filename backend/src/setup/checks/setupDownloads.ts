@@ -1,5 +1,5 @@
 import { getStackClient } from "@/lib/stackEngine";
-import { getSetupState } from "@/lib/setupState";
+import { getSetupState, resolveMemoryGb } from "@/lib/setupState";
 import type { StackInstallPlan } from "@/lib/stack/client";
 
 type DownloadPin = { id: string; role: string; repo?: string; license?: string; licence?: string; revision: string; engine?: string; component?: string; download?: { url: string; sha256: string; approx_bytes?: number; archive?: boolean; hub_file?: string } };
@@ -45,7 +45,8 @@ async function plannedPulls(client: SetupDownloadClient, vramGb?: number): Promi
 }
 
 export async function startSetupDownloads(client: SetupDownloadClient = getStackClient(), options: { vramGb?: number } = {}): Promise<number> {
-  const pulls = await plannedPulls(client, options.vramGb);
+  // No number given: use the memory answer saved when the plan was chosen.
+  const pulls = await plannedPulls(client, resolveMemoryGb(options.vramGb));
   let cursor = 0;
   const worker = async () => {
     while (cursor < pulls.length) {

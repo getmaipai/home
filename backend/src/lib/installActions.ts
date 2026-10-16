@@ -4,10 +4,11 @@
 import { getStackClient } from "@/lib/stackEngine";
 import { wordPlan, type PlanWording } from "@/lib/installPlanWording";
 import { resetInstallStatusCache } from "@/lib/installStatus";
-import { replaceSetupStep } from "@/lib/setupState";
+import { replaceSetupStep, resolveMemoryGb, setMemoryAnswerGb } from "@/lib/setupState";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
 
-export async function previewPlan(vramGb?: number): Promise<{ plan: unknown; wording: PlanWording }> {
+export async function previewPlan(requestedGb?: number): Promise<{ plan: unknown; wording: PlanWording }> {
+  const vramGb = resolveMemoryGb(requestedGb);
   try {
     const plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined);
     return { plan, wording: wordPlan(plan) };
@@ -20,7 +21,11 @@ export type BeginInstall = { ok: true; models: number } | { ok: false; error: st
 
 /** Starts the downloads in the background. `recordInSetup` also marks the
  * wizard's plan step done; Home settings leaves the setup record alone. */
-export async function beginInstall(vramGb: number | undefined, recordInSetup: boolean): Promise<BeginInstall> {
+export async function beginInstall(requestedGb: number | undefined, recordInSetup: boolean): Promise<BeginInstall> {
+  // A typed memory answer is remembered, so a retry or a re-check later sizes
+  // the plan from the same number instead of dropping it.
+  if (requestedGb) setMemoryAnswerGb(requestedGb);
+  const vramGb = resolveMemoryGb(requestedGb);
   let plan;
   try { plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined); }
   catch { return { ok: false, error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }; }

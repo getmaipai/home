@@ -1,8 +1,9 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
+import { DEFAULT_STACK_PORT, stackPort } from "./ports";
 
-export const HOME_STACK_PORT = 8770;
+export const HOME_STACK_PORT = DEFAULT_STACK_PORT;
 
 export type StackServiceCommand = "start" | "stop";
 export type StackServiceRunner = (binary: string, command: StackServiceCommand, env: NodeJS.ProcessEnv) => void;
@@ -32,7 +33,7 @@ function serviceEnv(): NodeJS.ProcessEnv {
   return {
     ...process.env,
     STACK_DATA_DIR: process.env.MAIPAI_STACK_DATA_DIR ?? join(root, "stack", "data"),
-    PORT: process.env.MAIPAI_STACK_PORT ?? String(HOME_STACK_PORT),
+    PORT: String(stackPort()),
     STACK_BUN_BIN: process.env.MAIPAI_STACK_BUN_BIN ?? join(root, ".bun", "bin", "bun"),
   };
 }

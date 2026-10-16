@@ -23,3 +23,13 @@ test("a full disk is said in plain words", () => {
   const w = wordPlan({ ...base, remaining_bytes: 20e9, free_disk_bytes: 5e9, fits_disk: false, models: [{ id: "a", role: "chat", url: "u", sha256: "s", licence: "l", revision: "r", starter: true, installed: false }] });
   expect(w.diskLine).toContain("not enough free disk space");
 });
+
+test("a Mac that is too small is told its own memory total", () => {
+  const small = wordPlan({ ...base, level: null, tier: null, memory_gb: 8, memory_source: "unified" });
+  expect(small.detail).toContain("This Mac has 8 GB of memory in total.");
+});
+
+test("the memory question tells a Mac owner to pick the total memory", () => {
+  const ask = wordPlan({ ...base, level: null, tier: null, memory_source: "unknown", memory_gb: 0 });
+  expect(ask.detail).toContain("On a Mac, pick the Mac's total memory");
+});

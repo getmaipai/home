@@ -1,4 +1,5 @@
 import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
+import { DEFAULT_HOME_PORT } from "@/lib/ports";
 
 export const LAN_EXPOSURE_SETTING = "network.lan_exposure";
 export const HUB_PORT_SETTING = "network.hub_port";
@@ -10,7 +11,7 @@ export function configuredHubPort(): number {
   if (getHouseholdSettingSource(HUB_PORT_SETTING) !== undefined) {
     return Number(getHouseholdSettingValue(HUB_PORT_SETTING));
   }
-  return Number(process.env.PORT ?? getHouseholdSettingValue(HUB_PORT_SETTING) ?? 3000);
+  return Number(process.env.PORT ?? getHouseholdSettingValue(HUB_PORT_SETTING) ?? DEFAULT_HOME_PORT);
 }
 
 export function configuredLanExposure(): "loopback" | "lan" {

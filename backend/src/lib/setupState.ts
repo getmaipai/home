@@ -23,9 +23,39 @@ const timestamp = () => new Date().toISOString();
 export type StorageChoice = { models?: string; records?: string };
 const STORAGE_CHOICE_KEY = "storage_choice";
 
-function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined } {
-  const { [STORAGE_CHOICE_KEY]: storageChoice, ...rest } = JSON.parse(value) as Record<string, unknown>;
-  return { record: SetupState.parse(rest), storageChoice: storageChoice as StorageChoice | undefined };
+/** The memory the owner typed on the plan screen when Home could not read
+ * it (a graphics card it cannot size). Kept beside the record for the same
+ * reason as the storage choice, so a retry, a re-check and Home settings
+ * size the plan from the same answer. An Apple silicon Mac never needs it:
+ * the Stack reads its unified memory itself. */
+const MEMORY_ANSWER_KEY = "memory_answer_gb";
+
+function splitRow(value: string): { record: SetupStateRecord; storageChoice: StorageChoice | undefined; memoryAnswerGb: number | undefined } {
+  const { [STORAGE_CHOICE_KEY]: storageChoice, [MEMORY_ANSWER_KEY]: memoryAnswerGb, ...rest } = JSON.parse(value) as Record<string, unknown>;
+  return {
+    record: SetupState.parse(rest),
+    storageChoice: storageChoice as StorageChoice | undefined,
+    memoryAnswerGb: typeof memoryAnswerGb === "number" && memoryAnswerGb > 0 ? memoryAnswerGb : undefined,
+  };
+}
+
+export function getMemoryAnswerGb(): number | undefined {
+  const row = db.select().from(setupState).limit(1).get();
+  return row ? splitRow(row.value).memoryAnswerGb : undefined;
+}
+
+/** Saves the typed memory answer beside the record; `undefined` clears it. */
+export function setMemoryAnswerGb(memoryGb: number | undefined): void {
+  ensureSetupState();
+  const row = db.select().from(setupState).limit(1).get();
+  if (!row) return;
+  const { [MEMORY_ANSWER_KEY]: _old, ...rest } = JSON.parse(row.value) as Record<string, unknown>;
+  db.update(setupState).set({ value: JSON.stringify(memoryGb ? { ...rest, [MEMORY_ANSWER_KEY]: memoryGb } : rest) }).where(eq(setupState.slot, 1)).run();
+}
+
+/** The memory to size a plan from: the number asked for now, else the saved answer. */
+export function resolveMemoryGb(requested?: number): number | undefined {
+  return requested ?? getMemoryAnswerGb();
 }
 
 export function getStorageChoice(): StorageChoice | undefined {
@@ -85,6 +115,7 @@ export function replaceSetupStep(
 ): SetupStateRecord {
   const current = getSetupState();
   const storageChoice = result.storageChoice ?? getStorageChoice();
+  const memoryAnswerGb = getMemoryAnswerGb();
   const at = timestamp();
   const steps = current.steps.map((step) => {
     if (step.id !== stepId) return step;
@@ -102,6 +133,6 @@ export function replaceSetupStep(
     completed_at: result.completed_at ?? (done ? at : current.completed_at),
     hlc: nextHlc(),
   });
-  db.update(setupState).set({ value: JSON.stringify(storageChoice ? { ...next, [STORAGE_CHOICE_KEY]: storageChoice } : next) }).where(eq(setupState.slot, 1)).run();
+  db.update(setupState).set({ value: JSON.stringify({ ...next, ...(storageChoice ? { [STORAGE_CHOICE_KEY]: storageChoice } : {}), ...(memoryAnswerGb ? { [MEMORY_ANSWER_KEY]: memoryAnswerGb } : {}) }) }).where(eq(setupState.slot, 1)).run();
   return next;
 }

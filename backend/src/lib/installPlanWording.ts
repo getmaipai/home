@@ -31,9 +31,10 @@ export function wordPlan(plan: StackInstallPlan | null): PlanWording {
   }
   if (!plan.level) {
     if (plan.memory_source === "unknown") {
-      return { level: "unknown", headline: "How much graphics memory does this computer have?", detail: "Home couldn't read it. Pick the total (VRAM) from the list, and Home will choose the right AI for it.", gets: [], needsMemoryAnswer: true, sizeLine: null, diskLine: null };
+      return { level: "unknown", headline: "How much graphics memory does this computer have?", detail: "Home couldn't read it. Pick the total (VRAM) from the list, and Home will choose the right AI for it. On a Mac, pick the Mac's total memory, because a Mac shares one pool of memory between the apps and the AI.", gets: [], needsMemoryAnswer: true, sizeLine: null, diskLine: null };
     }
-    return { level: "below_minimum", headline: "This computer is too small to run the AI", detail: "Home needs about 16 GB of memory for the AI. You can use a bigger computer on your network for the AI instead. Go back and choose two computers.", gets: [], needsMemoryAnswer: false, sizeLine: null, diskLine: null };
+    const macLine = plan.memory_source === "unified" ? ` This Mac has ${Math.round(plan.memory_gb)} GB of memory in total.` : "";
+    return { level: "below_minimum", headline: "This computer is too small to run the AI", detail: `Home needs about 16 GB of memory for the AI.${macLine} You can use a bigger computer on your network for the AI instead. Go back and choose two computers.`, gets: [], needsMemoryAnswer: false, sizeLine: null, diskLine: null };
   }
   const name = plan.level === "recommended" ? "Recommended" : plan.level === "moderate" ? "Moderate" : "Minimal";
   const headline = `${name} setup for this computer`;

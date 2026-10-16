@@ -19,6 +19,7 @@
 import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { StackClient } from "./client";
+import { defaultStackBaseUrl } from "../ports";
 
 const INITIAL_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
@@ -207,7 +208,7 @@ export function startStackEventBridge(client: StackClient, options: StackEventBr
   const doFetch = options.fetch ?? globalThis.fetch;
   const schedule = options.setTimeout ?? setTimeout;
   const unschedule = options.clearTimeout ?? clearTimeout;
-  const base = (options.baseUrl ?? "http://127.0.0.1:8770").replace(/\/$/, "");
+  const base = (options.baseUrl ?? defaultStackBaseUrl()).replace(/\/$/, "");
   const seen = new Set<number>();
   let lastSeq = -1;
   let stopped = false;

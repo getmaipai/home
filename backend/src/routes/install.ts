@@ -8,6 +8,8 @@ import { isOwnerOrAdmin } from "@/lib/access";
 import { getInstallStatus, resetInstallStatusCache } from "@/lib/installStatus";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
 import { beginInstall, previewPlan } from "@/lib/installActions";
+import { getStackClient } from "@/lib/stackEngine";
+import { setMemoryAnswerGb } from "@/lib/setupState";
 
 export const InstallStatusSchema = z.object({
   state: z.enum(["none", "downloading", "starter_ready", "stalled", "out_of_space", "failed", "ready"]),
@@ -37,6 +39,9 @@ installRoutes.openapi(statusRoute, async (c) => c.json(await getInstallStatus(),
 const retryRoute = createRoute({
   method: "post", path: "/retry", tags: ["Install"], summary: "Start the missing downloads again",
   middleware: [requireAuth] as const,
+  // The memory answer is optional: a retry without one reuses the number saved
+  // when the plan was chosen (a Mac reads its unified memory and needs none).
+  request: { body: { required: false, content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional() }).strict() } } } },
   responses: {
     202: { content: { "application/json": { schema: z.object({ started: z.literal(true) }) } }, description: "The downloads were started again." },
     ...errorResponses({ 403: "Only an owner or admin may do this" }),
@@ -44,8 +49,11 @@ const retryRoute = createRoute({
 });
 installRoutes.openapi(retryRoute, (c) => {
   if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "Only an owner or admin can restart the install." }, 403);
+  const body = c.req.valid("json" as never) as { vram_gb?: number } | undefined;
+  if (body?.vram_gb) setMemoryAnswerGb(body.vram_gb);
   resetInstallStatusCache();
-  void startSetupDownloads().catch(() => {});
+  // startSetupDownloads falls back to the saved memory answer when none is given.
+  void startSetupDownloads(getStackClient(), body?.vram_gb ? { vramGb: body.vram_gb } : {}).catch(() => {});
   return c.json({ started: true as const }, 202);
 });
 

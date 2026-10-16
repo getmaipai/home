@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import { resetInstallStatusCache } from "@/lib/installStatus";
-import { getSetupState } from "@/lib/setupState";
+import { getMemoryAnswerGb, getSetupState } from "@/lib/setupState";
 import type { StackClient, StackInstallPlan } from "@/lib/stack/client";
 import { owner } from "./support/testAuth";
 import { TestClient } from "./client";
@@ -80,5 +80,28 @@ describe("setup install routes", () => {
     const { client } = await owner();
     const body = await (await client.get("/api/install")).json() as { state: string };
     expect(body.state).toBe("none");
+  });
+  test("POST /api/install/retry keeps the memory answer: sent now, then reused by a retry with no body", async () => {
+    const asked: Array<number | undefined> = [];
+    __setStackClientForTests({
+      installPlan: async (query?: { vramGb?: number }) => { asked.push(query?.vramGb); return plan({ models: [{ ...model, installed: false }] }); },
+      modelCatalog: async () => ({ models: [] }), pullModel: async () => ({}), jobs: async () => [], models: async () => [],
+    } as unknown as StackClient);
+    const { client } = await owner();
+    expect((await client.post("/api/install/retry", { vram_gb: 24 })).status).toBe(202);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(getMemoryAnswerGb()).toBe(24);
+    expect((await client.post("/api/install/retry", {})).status).toBe(202);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(asked).toEqual([24, 24]);
+  });
+
+  test("the memory answer typed on the plan screen is saved, and a setup step write keeps it", async () => {
+    __setStackClientForTests(stack(async () => plan()));
+    const { client } = await owner();
+    expect((await client.post("/api/install/start", { vram_gb: 32 })).status).toBe(202);
+    expect(getMemoryAnswerGb()).toBe(32);
+    await client.post("/api/setup/welcome", { status: "done" });
+    expect(getMemoryAnswerGb()).toBe(32);
   });
 });
