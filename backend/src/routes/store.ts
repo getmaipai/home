@@ -18,7 +18,7 @@
 // forecloses that.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
-import { requireRole } from "@/middleware/auth";
+import { requireAuth, requireRole } from "@/middleware/auth";
 import { install, rollback, uninstall, setChannel, type StoreResult } from "@/lib/store";
 import { getActiveInstall } from "@/lib/packageResolve";
 
@@ -147,12 +147,29 @@ const uninstallRoute = createRoute({
   tags: ["Store"],
   summary: "Remove a package's store install",
   description: "Falls back to the bundled copy if one exists. Removes only the store's own version files, never a Tier 1 package's separate persistent state.",
-  middleware: [requireRole("owner", "admin")] as const,
+  middleware: [requireAuth] as const,
   request: { params: IdParamSchema },
   responses: {
     200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), confirmation: z.string() } ) } }, description: "Confirmation text for the uninstall step." },
+    ...errorResponses({ 404: "No active store install to remove", 403: "Only a household owner or admin can uninstall packages. Ask one of them to do it." }),
+  },
+});
+
+const uninstallPreviewRoute = createRoute({
+  method: "get",
+  path: "/installs/{id}/uninstall-preview",
+  tags: ["Store"],
+  summary: "Preview what stays when a store package is uninstalled",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: IdParamSchema },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ confirmation: z.string() }) } }, description: "Text to show before the person confirms uninstall." },
     ...errorResponses({ 404: "No active store install to remove", 403: "Not owner/admin" }),
   },
+});
+storeRoutes.openapi(uninstallPreviewRoute, (c) => {
+  if (!getActiveInstall(c.req.valid("param").id)) return c.json({ error: "No active store install to remove." }, 404);
+  return c.json({ confirmation: UNINSTALL_CONFIRMATION }, 200);
 });
 storeRoutes.openapi(uninstallRoute, async (c) => {
   const role = c.get("person").role;

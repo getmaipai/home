@@ -1286,7 +1286,8 @@ export const api = {
   // package, never for every row: 33 real packages installed today,
   // and Remove's own real/disabled state is the only reason to ask.
   storeInstall: (id: string) => request<StoreInstall | null>(`/api/store/installs/${encodeURIComponent(id)}`),
-  uninstallPackage: (id: string) => request<{ ok: true }>(`/api/store/installs/${encodeURIComponent(id)}/uninstall`, { method: "POST" }),
+  uninstallPreview: (id: string) => request<{ confirmation: string }>(`/api/store/installs/${encodeURIComponent(id)}/uninstall-preview`),
+  uninstallPackage: (id: string) => request<{ ok: true; confirmation: string }>(`/api/store/installs/${encodeURIComponent(id)}/uninstall`, { method: "POST" }),
   hardware: () => request<HardwareInfo>("/api/host/hardware"),
   models: (role: string) => request<ModelFit[]>(`/api/host/models?role=${encodeURIComponent(role)}`),
   computerMemory: () => request<ComputerMemoryResponse>("/api/computer-memory"),

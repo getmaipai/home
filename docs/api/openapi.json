@@ -35143,6 +35143,65 @@
         }
       }
     },
+    "/api/store/installs/{id}/uninstall-preview": {
+      "get": {
+        "tags": [
+          "Store"
+        ],
+        "summary": "Preview what stays when a store package is uninstalled",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "weather"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Text to show before the person confirms uninstall.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "confirmation": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "confirmation"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not owner/admin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No active store install to remove",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/store/installs/{id}/uninstall": {
       "post": {
         "tags": [
@@ -35188,7 +35247,7 @@
             }
           },
           "403": {
-            "description": "Not owner/admin",
+            "description": "Only a household owner or admin can uninstall packages. Ask one of them to do it.",
             "content": {
               "application/json": {
                 "schema": {

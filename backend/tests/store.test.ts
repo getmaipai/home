@@ -9,12 +9,20 @@ import { resolvePackageDir, getActiveInstall } from "@/lib/packageResolve";
 import { install, rollback, uninstall, setChannel } from "@/lib/store";
 import type { RootMetadata, TargetsMetadata, TimestampMetadata, TargetEntry } from "@/lib/storeIndex";
 import { makeKeyPair, sign, type KeyPair } from "./support/tufFixtures";
-import { owner, teen } from "./support/testAuth";
+import { owner, teen, child } from "./support/testAuth";
 import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { TestClient } from "./client";
 import { toolSpecFor } from "@/lib/turnMachine/nodes/model";
 import { reconcileCapabilities, packagesLosingCapability, removalConfirmation } from "@/lib/capabilityReconcile";
+import { tier1PackageDataDir } from "@/lib/paths";
+import { settingsValues, people, conversationTurns } from "@/db/schema";
+import { db } from "@/db";
+import { eq } from "drizzle-orm";
+import { createAttachment } from "@/lib/attachments";
+import { resolveOrCreateConversation } from "@/lib/conversationHistory";
+import { newConversationTurnId } from "@/lib/id";
+import { nextHlc } from "@/lib/hlc";
 
 // Builds a REAL packed tarball too (tests/support/tufFixtures.ts's own
 // buildFixtureIndex() only builds signed metadata, no actual package
@@ -455,6 +463,47 @@ describe("uninstall", () => {
 
     expect(existsSync(join(stateDir, "some-state.db"))).toBe(true);
   });
+
+  test("keeps package settings and state through uninstall and reinstall", async () => {
+    const id = "test-store-retained-data";
+    const first = await buildInstallableFixture({ id, version: "1.0.0" });
+    expect((await install({ id, targetPath: first.targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);
+
+    const stateDir = tier1PackageDataDir(id);
+    mkdirSync(stateDir, { recursive: true });
+    writeFileSync(join(stateDir, "settings.json"), JSON.stringify({ theme: "warm" }));
+    writeFileSync(join(stateDir, "state.json"), JSON.stringify({ count: 7 }));
+    db.insert(settingsValues).values({ scope: "household", key: `package.${id}.theme`, value: JSON.stringify("warm"), hlc: nextHlc(), source: "test", updatedAt: new Date().toISOString() }).run();
+
+    expect((await uninstall(id)).ok).toBe(true);
+    const second = await buildInstallableFixture({ id, version: "1.0.0" });
+    expect((await install({ id, targetPath: second.targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);
+
+    expect(db.select().from(settingsValues).where(eq(settingsValues.key, `package.${id}.theme`)).get()?.value).toBe(JSON.stringify("warm"));
+    expect(JSON.parse(readFileSync(join(stateDir, "settings.json"), "utf-8"))).toEqual({ theme: "warm" });
+    expect(JSON.parse(readFileSync(join(stateDir, "state.json"), "utf-8"))).toEqual({ count: 7 });
+  });
+
+  test("keeps a package-created media record visible in Library and owner-scoped Files after uninstall", async () => {
+    const id = "test-store-media-retained";
+    const { targetPath } = await buildInstallableFixture({ id });
+    expect((await install({ id, targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);
+    const { client, row } = await owner();
+    const conversation = resolveOrCreateConversation(row, "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    const turnId = newConversationTurnId();
+    db.insert(conversationTurns).values({ id: turnId, personId: row.id, surface: "chat", conversationId: conversation.value.id, userText: "make a picture", replyText: "done", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    const record = createAttachment(row, { conversationId: conversation.value.id, turnId, mediaType: "image/png", bytes: new TextEncoder().encode("package-picture"), provenance: `package:${id}` });
+    if (!record.ok) throw new Error(record.error);
+
+    expect((await uninstall(id)).ok).toBe(true);
+    for (const path of ["/api/files", `/api/files?owner=${row.id}`]) {
+      const response = await client.get(path);
+      expect(response.status).toBe(200);
+      const rows = await response.json() as { file: { id: string }; owner_person_id: string }[];
+      expect(rows.some((file) => file.file.id === record.value.id && file.owner_person_id === row.id)).toBe(true);
+    }
+  });
 });
 
 describe("setChannel", () => {
@@ -494,6 +543,17 @@ describe("SEC-2-class guard: every store operation rejects a malformed/traversal
 });
 
 describe("the /api/store routes", () => {
+  test("child and teen profiles cannot uninstall and get the next step", async () => {
+    const { client } = await owner();
+    const teenClient = await teen(client);
+    const childProfile = await child(client);
+    for (const profile of [teenClient, childProfile.client]) {
+      const response = await profile.post("/api/store/installs/weather/uninstall", {});
+      expect(response.status).toBe(403);
+      expect(((await response.json()) as { error: string }).error).toBe("Only a household owner or admin can uninstall packages. Ask one of them to do it.");
+    }
+  });
+
   test("every route requires owner/admin, not just any signed-in person", async () => {
     const { client } = await owner();
     const teenClient = await teen(client);
@@ -568,8 +628,15 @@ describe("the /api/store routes", () => {
     expect(rollbackRes.status).toBe(200);
     expect((await rollbackRes.json()) as { version: string }).toEqual({ version: "1.0.0" });
 
+    const preview = await client.get("/api/store/installs/test-store-route-lifecycle/uninstall-preview");
+    expect(preview.status).toBe(200);
+    const previewBody = await preview.json() as { confirmation: string };
+    expect(previewBody.confirmation).toContain("The following will be uninstalled and users will lose access");
+    expect(previewBody.confirmation).toContain("Your pictures stay in Library.");
+
     const uninstallRes = await client.post("/api/store/installs/test-store-route-lifecycle/uninstall", {});
     expect(uninstallRes.status).toBe(200);
+    expect((await uninstallRes.json() as { confirmation: string }).confirmation).toBe(previewBody.confirmation);
     expect(getActiveInstall("test-store-route-lifecycle")).toBeNull();
   });
 });
