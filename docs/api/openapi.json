@@ -23982,6 +23982,10 @@
                     "type": "boolean",
                     "description": "Whether the robot's tracking behavior is active, so the card can expose that live device state."
                   },
+                  "clock_synced": {
+                    "type": "boolean",
+                    "description": "Whether the robot's clock was last corrected against the hub's. Omission means the producer does not yet report this field."
+                  },
                   "on_battery": {
                     "anyOf": [
                       {
