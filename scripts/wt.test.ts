@@ -1,12 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 const scratch = mkdtempSync(join(tmpdir(), "maipai-wt-test-"));
 const repoRoot = join(import.meta.dir, "..");
-const script = join(repoRoot, "scripts/wt.sh");
+// The logic is the shared getmaipai/.github script; this repo's scripts/wt.sh is a thin wrapper, so the
+// lifecycle is exercised against the shared file in the sibling .github checkout.
+const common = resolve(repoRoot, spawnSync("git", ["-C", repoRoot, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).stdout.trim());
+const script = process.env.MAIPAI_WT_SHARED || join(common, "..", "..", ".github", "standards", "bin", "wt.sh");
+process.env.WT_T2_GLOBS ??= "backend/src/auth/* docs/design/RULES.md scripts/check.sh";
 const fixture = join(scratch, "home");
 const bare = join(scratch, "origin.git");
 const data = join(scratch, "session-data");
