@@ -3,9 +3,16 @@ import { Link } from "react-router-dom";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { api, ApiError, type InstallStatusView } from "@/lib/api";
 
-const STAGES = [{ name: "Download", weight: 1 }] as const;
+// The engine install comes first (fetch, build, start), then the models.
+const STAGES = [
+  { name: "Fetch", weight: 1 },
+  { name: "Build", weight: 3 },
+  { name: "Start", weight: 1 },
+  { name: "Download", weight: 12 },
+] as const;
+const ENGINE_STAGE_INDEX: Record<string, number> = { preflight: 0, fetching: 0, building: 1, starting: 2 };
 
-/** One line of install progress: the AI models downloading in the
+/** One line of install progress: the AI engine installing, then the AI models downloading in the
  * background. It hides itself when nothing is installing or everything
  * has landed. Polls fast while moving, slowly otherwise. */
 export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.installStatus, retry = api.installRetry }: {
@@ -27,7 +34,7 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
         const next = await read();
         if (disposed) return;
         setStatus(next);
-        if (next.state === "downloading" || next.state === "starter_ready") delay = 2_000;
+        if (next.state === "downloading" || next.state === "starter_ready" || next.state === "installing_engine") delay = 2_000;
       } catch { /* The strip is a courtesy; a missed poll is retried. */ }
       if (!disposed) timer = setTimeout(() => void poll(), delay);
     };
@@ -37,8 +44,9 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
 
   if (!status || status.state === "none" || status.state === "ready") return null;
   const problem = status.problem;
-  const title = status.state === "starter_ready" ? "Home can chat now. Better AI is still downloading" : "Downloading your AI";
-  const downloadState = status.state === "stalled" ? "stalled" : status.state === "failed" || status.state === "out_of_space" ? "failed" : "running";
+  const engineStep = status.state === "installing_engine" || status.state === "engine_failed";
+  const title = status.state === "installing_engine" ? (status.stageLabel ?? "Setting up your AI") : status.state === "engine_failed" ? "Setting up your AI stopped" : status.state === "starter_ready" ? "Home can chat now. Better AI is still downloading" : "Downloading your AI";
+  const downloadState = status.state === "stalled" ? "stalled" : status.state === "failed" || status.state === "out_of_space" || status.state === "engine_failed" ? "failed" : "running";
   return (
     <>
       <JobProgress
@@ -46,10 +54,9 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
         variant="compact"
         title={title}
         stages={STAGES}
-        stageIndex={0}
-        stageProgress={status.percent / 100}
-        completedBytes={status.completedBytes}
-        totalBytes={status.totalBytes}
+        stageIndex={engineStep ? ENGINE_STAGE_INDEX[status.stage ?? "preflight"] ?? 0 : 3}
+        stageProgress={engineStep ? 0 : status.percent / 100}
+        {...(engineStep ? {} : { completedBytes: status.completedBytes, totalBytes: status.totalBytes })}
         {...(status.bytesPerSecond ? { bytesPerSecond: status.bytesPerSecond } : {})}
         {...(status.etaSeconds ? { etaSeconds: status.etaSeconds } : {})}
         downloadState={downloadState}
@@ -58,7 +65,7 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
           setRetryError(null);
           retry().catch((reason: unknown) => {
             const words = reason instanceof ApiError ? [reason.message, reason.next].filter(Boolean).join(" ") : "";
-            setRetryError(words || "Home couldn't restart the download. Check that the AI engine is running, then press Try again.");
+            setRetryError(words || "Home couldn't restart the install. Check that this computer is online, then press Try again.");
           });
         }}
       />

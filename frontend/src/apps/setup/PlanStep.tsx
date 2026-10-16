@@ -3,7 +3,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
-import { api, ApiError, type PlanWording } from "@/lib/api";
+import { api, ApiError, type InstallStatusView, type PlanWording } from "@/lib/api";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
 export const VRAM_CHOICES = [8, 12, 16, 24, 32, 48, 64, 96, 128] as const;
@@ -18,18 +18,23 @@ export interface PlanStepProps {
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
   readPlan?: (vramGb?: number) => Promise<{ wording: PlanWording }>;
   start?: (vramGb?: number) => Promise<unknown>;
+  /** What the AI engine install is doing; the plan waits on it when this computer is installing the engine. */
+  readInstall?: () => Promise<InstallStatusView>;
+  /** Try the AI engine install again after it failed. */
+  retryEngine?: () => Promise<unknown>;
   actionLabel?: string;
 }
 
 /** Page B: say what this computer can run, ask for graphics memory only when
  * it cannot be read, then start the downloads and go on at once. */
-export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start = api.setupInstall, actionLabel = "Install and continue" }: PlanStepProps) {
+export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start = api.setupInstall, readInstall = api.setupInstallStatus, retryEngine = api.setupEngineInstall, actionLabel = "Install and continue" }: PlanStepProps) {
   const [vram, setVram] = useState<number | undefined>();
   const [wording, setWording] = useState<PlanWording | null>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
+  const [engine, setEngine] = useState<InstallStatusView | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -37,6 +42,24 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
     readPlan(vram).then((result) => { if (active) setWording(result.wording); }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
+
+  // While the plan cannot be read, ask whether it is because the engine is
+  // still being installed here. If so, say so and look again on its own.
+  useEffect(() => {
+    if (!failed) { setEngine(null); return; }
+    let active = true;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const look = async () => {
+      try {
+        const status = await readInstall();
+        if (!active) return;
+        setEngine(status);
+        if (status.state === "installing_engine") timer = setTimeout(() => { if (active) setAttempt((n) => n + 1); }, 4_000);
+      } catch { /* The plain "couldn't reach" message below still applies. */ }
+    };
+    void look();
+    return () => { active = false; if (timer) clearTimeout(timer); };
+  }, [failed, attempt, readInstall]);
 
   // "Check again" belongs wherever the answer can change without the person
   // choosing anything: the engine was not answering, or the disk was short
@@ -60,6 +83,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
     } finally { setBusy(false); }
   }
 
+  if (failed && engine?.state === "installing_engine") return <><Card><CardContent><p>Home is setting up the AI engine on this computer. Now: {engine.stageLabel ?? "starting"}. This page continues by itself when it is ready.</p></CardContent></Card></>;
+  if (failed && engine?.state === "engine_failed") return <><Card><CardContent><p role="alert">{engine.problem ?? "Setting up the AI engine stopped."}</p><Button type="button" variant="secondary" onClick={() => { void retryEngine().catch(() => {}).then(() => setAttempt((n) => n + 1)); }}>Try again</Button></CardContent></Card></>;
   if (failed) return <><Card><CardContent><p role="alert">Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again.</p><Button type="button" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>Check again</Button></CardContent></Card></>;
   if (!wording) return <><Card><CardContent><p>Looking at this computer…</p></CardContent></Card></>;
 

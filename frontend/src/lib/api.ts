@@ -694,9 +694,11 @@ export interface PlanWording {
   headline: string; detail: string; gets: string[]; needsMemoryAnswer: boolean; sizeLine: string | null; diskLine: string | null;
 }
 export interface InstallStatusView {
-  state: "none" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
+  state: "none" | "installing_engine" | "engine_failed" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
   chatReady: boolean; complete: boolean; percent: number; completedBytes: number; totalBytes: number;
   bytesPerSecond: number | null; etaSeconds: number | null; problem: string | null;
+  /** While the AI engine itself installs: the step and its plain label. */
+  stage?: string | null; stageLabel?: string | null;
   items: Array<{ id: string; model: string; role: string | null; label: string; state: string; completedBytes: number; totalBytes: number; reason: string | null }>;
 }
 
@@ -718,6 +720,8 @@ export const api = {
   repairsChecks: () => request<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>>("/api/repairs/checks", { method: "POST" }),
   setupPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/setup/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
   setupInstall: (vramGb?: number) => request<{ started: true; models: number }>("/api/setup/install", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
+  /** Wizard (before an owner): start or restart the AI engine install on this computer. */
+  setupEngineInstall: () => request<{ started: true }>("/api/setup/engine-install", { method: "POST" }),
   setupInstallStatus: () => request<InstallStatusView>("/api/setup/install"),
   installPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/install/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
   installStart: (vramGb?: number) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
@@ -731,7 +735,7 @@ export const api = {
   setupCreateFolder: (parent: string, name: string) => request<{ name: string; path: string; writable: boolean }>("/api/setup/folders", { method: "POST", body: JSON.stringify({ parent, name }) }),
   setupNativeFolder: (folder: "records" | "models") => request<{ status: "chosen"; path: string } | { status: "cancelled" } | { status: "unavailable" } | { status: "refused"; error: string }>("/api/setup/folders/native", { method: "POST", body: JSON.stringify({ folder }) }),
   setupStorageCheck: (layout: { models?: string; records?: string; split?: boolean }) => request<{ rows: SetupPlacementRow[] }>("/api/setup/storage/check", { method: "POST", body: JSON.stringify(layout) }),
-  setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"]; models?: string; records?: string }) =>
+  setupStep: (step: string, body: { status: "done" | "skipped" | "deferred" | "failed"; phase?: SetupState["phase"]; models?: string; records?: string; engine?: SetupState["engine"] }) =>
     request<SetupState>(`/api/setup/${encodeURIComponent(step)}`, {
       method: "POST",
       body: JSON.stringify(body),

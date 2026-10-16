@@ -17,6 +17,18 @@ describe("InstallStrip", () => {
     await view.findByTestId("install-strip");
     view.getByText("Downloading your AI");
   });
+  test("shows the AI engine install step by step, with no byte counts", async () => {
+    const view = show(status({ state: "installing_engine", stage: "building", stageLabel: "Building the AI engine", percent: 0, completedBytes: 0, totalBytes: 0 }));
+    await view.findByText("Building the AI engine");
+    expect(view.container.textContent).not.toContain(" of ");
+  });
+  test("a failed engine install shows its plain-words problem and Try again", async () => {
+    const calls: string[] = [];
+    const view = render(<MemoryRouter><InstallStrip read={async () => status({ state: "engine_failed", problem: "No network. Check the connection, then press Try again." })} retry={async () => { calls.push("retry"); }} /></MemoryRouter>);
+    await view.findAllByText(/No network/);
+    fireEvent.click(await view.findByRole("button", { name: /try again|retry/i }));
+    await waitFor(() => expect(calls).toEqual(["retry"]));
+  });
   test("says chat works when the starter has landed", async () => {
     const view = show(status({ state: "starter_ready", chatReady: true }));
     await view.findByText("Home can chat now. Better AI is still downloading");

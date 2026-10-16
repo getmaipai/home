@@ -252,7 +252,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const completedCount = phase === "meet" ? 1 : 0;
   const thingsLeftLine = openThings === null ? null : setupChecklistCountLine(openThings);
 
-  async function record(id: string, status: "done" | "skipped" | "deferred" = "done", extra: { models?: string; records?: string } = {}) {
+  async function record(id: string, status: "done" | "skipped" | "deferred" = "done", extra: { models?: string; records?: string; engine?: { where: "this_computer" | "another_computer"; hardware: Record<string, unknown> } } = {}) {
     setBusy(true);
     setError(null);
     try {
@@ -280,7 +280,10 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     const deferred = (["checks", "plan", "hello"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
     const folders = screen === "storage" ? { ...(engine === "this_computer" && storageChoice.models ? { models: storageChoice.models } : {}), ...(storageChoice.records ? { records: storageChoice.records } : {}) } : {};
-    const updated = await record(stepId, deferred ? "deferred" : "done", folders);
+    // Saying where the AI runs is what decides whether Home installs the
+    // AI engine on this computer, so the choice itself is sent.
+    const engineChoice = screen === "engine_location" ? { engine: { where: engine, hardware: state?.engine?.hardware ?? {} } } : {};
+    const updated = await record(stepId, deferred ? "deferred" : "done", { ...folders, ...engineChoice });
     if (!updated) return;
     if (screen === "before_start") {
       sessionStorage.setItem("maipai:setup-before-start-read", "true");
@@ -397,7 +400,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
-  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("plan")) body = <><InstallStrip detailsHref={null} read={api.setupInstallStatus} retry={state && stepIsDone(state, "owner") ? api.installRetry : () => api.setupInstall()} />{body}</>;
+  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("engine_location")) body = <><InstallStrip detailsHref={null} read={api.setupInstallStatus} retry={state && stepIsDone(state, "owner") ? api.installRetry : () => api.setupEngineInstall().then(() => api.setupInstall().catch(() => undefined))} />{body}</>;
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const currentPhaseIndex = phase === "meet" ? 1 : 0;
   const screenIndex = SCREEN_IDS.indexOf(screen);

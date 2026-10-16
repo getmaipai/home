@@ -25,6 +25,7 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
   const original = globalThis.fetch;
   let state: SetupState | { done: true } = structuredClone(initial);
   const posts: string[] = [];
+  const bodies: Record<string, { engine?: { where: string } }> = {};
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
@@ -53,14 +54,15 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
     if (match && init?.method === "POST" && !("done" in state)) {
       const id = decodeURIComponent(match[1]!);
       posts.push(id);
-      const body = JSON.parse(String(init.body)) as { status: SetupState["steps"][number]["status"] };
+      const body = JSON.parse(String(init.body)) as { status: SetupState["steps"][number]["status"]; engine?: { where: string } };
+      bodies[id] = body;
       state.steps = state.steps.map((step) => step.id === id ? { ...step, status: body.status, at: new Date().toISOString() } : step);
       if (id === "done" && body.status === "done") state = { done: true };
       return new Response(JSON.stringify(state), { status: 200 });
     }
     throw new Error(`Unstubbed request ${url}`);
   }) as unknown as typeof fetch;
-  return { posts, restore: () => { globalThis.fetch = original; } };
+  return { posts, bodies, restore: () => { globalThis.fetch = original; } };
 }
 
 function view(onDone = () => {}) {
@@ -128,6 +130,18 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.container.textContent).toContain("How should Home run?"));
       await advanceTo(rendered, "Continue", "Choose where to store data");
       expect(h.posts).toEqual(["welcome", "engine_location"]);
+    } finally { h.restore(); }
+  });
+
+  test("Continue on the engine question sends the answer, which is what makes Home install the AI engine (INSTALL-SPLIT-01)", async () => {
+    const state = freshState();
+    state.steps.find((step) => step.id === "welcome")!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("How should Home run?"));
+      await advanceTo(rendered, "Continue", "Choose where to store data");
+      expect(h.bodies.engine_location?.engine?.where).toBe("this_computer");
     } finally { h.restore(); }
   });
 

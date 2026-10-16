@@ -11,6 +11,22 @@ const wording = (over: Partial<PlanWording> = {}): PlanWording => ({
 });
 
 describe("PlanStep", () => {
+  const engineStatus = (over: Record<string, unknown>) => ({ state: "none", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0, bytesPerSecond: null, etaSeconds: null, problem: null, items: [], ...over }) as never;
+
+  test("while the AI engine installs here, says so instead of 'couldn't reach the AI engine'", async () => {
+    const view = render(<PlanStep readPlan={async () => { throw new Error("offline"); }} readInstall={async () => engineStatus({ state: "installing_engine", stageLabel: "Building the AI engine" })} start={async () => ({})} onInstalled={() => {}} />);
+    await view.findByText(/setting up the AI engine on this computer. Now: Building the AI engine/i);
+    expect(view.queryByText(/couldn't reach/)).toBeNull();
+  });
+
+  test("a failed engine install shows its problem and Try again restarts it", async () => {
+    const retry = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => { throw new Error("offline"); }} readInstall={async () => engineStatus({ state: "engine_failed", problem: "Out of room. Free space, then press Try again." })} retryEngine={retry} start={async () => ({})} onInstalled={() => {}} />);
+    await view.findByText("Out of room. Free space, then press Try again.");
+    fireEvent.click(view.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(retry).toHaveBeenCalledTimes(1));
+  });
+
   test("shows the plan and installs on the button", async () => {
     const start = mock(async () => ({}));
     const done = mock(() => {});
