@@ -124,6 +124,9 @@ describe("INITIATIVE-01 gates", () => {
 });
 
 describe("INITIATIVE-01 answers", () => {
+  // The centre notification reads the real clock; pin it so the result does not depend on the hour the suite runs.
+  beforeEach(() => setSystemTime(NOON));
+  afterEach(() => setSystemTime());
   test("approved:true with text that is not consent does not accept", async () => {
     const { adult, adultRobot } = await household();
     allowHere(adultRobot);
