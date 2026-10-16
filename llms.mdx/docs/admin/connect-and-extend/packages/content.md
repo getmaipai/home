@@ -1,0 +1,42 @@
+# Add and remove packages (/docs/admin/connect-and-extend/packages)
+
+A **package** adds one ability to Home, such as weather, a timer or a news shelf. Home itself ships as a set of packages, so nearly every feature is one.
+
+## 📦 What comes with Home [#-what-comes-with-home]
+
+Home includes 36 packages. They cover:
+
+- **Daily help**: timer, reminders, lists, weather, currency, unit conversion, math, translation
+- **Info**: news, sports, web search, media lookup, almanac (date, time, moon, holidays, on this day)
+- **Learning and play**: tutor, trivia, jokes, bedtime storybook, music
+- **Home control**: lights on and off, lock doors
+- **Memory**: remember and recall
+- **News feeds**: household feeds and kids' feeds
+
+A shelf of apps on the Home screen is planned, not available yet.
+
+## 🧒 Who can use a package [#-who-can-use-a-package]
+
+Each package declares the lowest role that may use it. A child sees only what a child may use. Kids' news feeds, for example, are for children.
+
+The child's **Limits** tab saves daily minutes for each kind of package. Enforcing them in the package host is planned, not available yet. See [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls).
+
+## 🔒 What a package may do [#-what-a-package-may-do]
+
+Every package lists the outside services it contacts, when and why. Those rows feed the [privacy audit](/docs/admin/look-after-it/privacy-audit). A package that contacts nothing adds no row.
+
+## 🛒 Install, update and remove [#-install-update-and-remove]
+
+Planned, not in the app yet: browsing the MaiPai catalog and installing packages from a screen. Home has no store page today.
+
+The Home server already has the groundwork:
+
+- A signed catalog index check, so a tampered catalog is rejected.
+- Install, roll back, uninstall and switch between **stable** and **beta** per package.
+- Only an owner or admin may do any of them.
+
+These are available to developers through the Home API, not through a button. See [Developers](/docs/developers).
+
+## 🙋 If a package misbehaves [#-if-a-package-misbehaves]
+
+Open **Repairs** and check for an item. Then see [Troubleshooting](/docs/admin/look-after-it/troubleshooting-and-support-report).

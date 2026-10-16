@@ -1,0 +1,57 @@
+# Safety settings for children and teens (/docs/admin/people-and-safety/safety-settings)
+
+This page is for owners and admins. Home gives children and teens stricter answers than adults. You can tune some of that. You cannot remove it.
+
+## 🔒 What cannot be turned off [#-what-cannot-be-turned-off]
+
+These stay the same for every child and teen, whatever you set:
+
+- Age and surface checks come before everything else in a reply.
+- Feelings and safety get care first, with a pointer to a trusted grown-up.
+- Bullying, secrets and sharing where a child lives are never helped.
+- On religion and politics, Home takes no side.
+- If a child is in danger, Home points to a grown-up and the emergency number.
+- The **Adult sites** blocklist is always on for children and teens.
+- A child's hard-moment notice to adults. See [Add people](/docs/admin/people-and-safety/add-people-and-parental-controls).
+- Reasoning text is never sent to a child or teen.
+- Children's safe search is always strict. A teen's is never lower than moderate.
+
+## 🎚️ What you can change for a child [#️-what-you-can-change-for-a-child]
+
+Open **Family**, the child's card, then **Topics**. Each subject has a level:
+
+| Subject | Choices |
+|---|---|
+| Bodies and relationships | **Follow child controls (recommended)**, **Gently point to you**, **Answer simply with correct body words** |
+| Illness, death and health | **Follow child controls (recommended)**, **Answer gently and honestly**, **Gently point to you** |
+| Drugs, alcohol, betting and dares | **Follow child controls (recommended)**, **Explain simply and kindly**, **Gently point to you** |
+| Violence, weapons and scary news | **Follow child controls (recommended)**, **Answer gently, no gore**, **Gently point to you** |
+| Santa Claus and other family stories | **Keep the stories (recommended)** or **Don't keep them**; edit **Names of family stories** |
+
+Only an owner or admin can change these.
+
+## 🧑 What you can change for every teen [#-what-you-can-change-for-every-teen]
+
+These are household settings under **Settings**, then **Home settings**. The topic levels are under **Privacy**, the web search switch under **Search**, and the reply check under **Engines and AI**, **Chat**:
+
+| Setting | Default | Effect |
+|---|---|---|
+| **Bodies and relationships with teen controls** | Answer factually | Factual and respectful, never sexual or romantic. Can be set to **Point to a trusted adult or doctor**. |
+| **Drugs, alcohol and betting with teen controls** | Explain the real risks | Real risks and how to get help, never tips. Can be set to **Point to a trusted adult or doctor**. |
+| **Web search with teen controls** | On | Off means offline library only. |
+| **How a teen's replies are checked** | Sentence | Sentence checks every sentence before a teen sees it. Arrival shows text as it is written and checks it as it comes, so part of a sentence can show before its check ends. |
+
+Children, and anything spoken, always check every sentence first. An admin cannot see what a teen asks.
+
+## 🔎 Web search for minors [#-web-search-for-minors]
+
+| Setting | Default |
+|---|---|
+| **Web search with child controls** | On: strictest SafeSearch, adult sites blocked, links hidden |
+| **Page text check** | On for children and teens. They cannot turn it off. |
+
+See [Web search](/docs/admin/connect-and-extend/web-search) and [Blocked-site lists](/docs/admin/people-and-safety/blocked-sites-and-news-feeds).
+
+## ⚠️ If a setting looks greyed out [#️-if-a-setting-looks-greyed-out]
+
+A lock means the setting belongs to the age group or the person. Ask the owner, or read the help text under the setting. A teen's own settings are not yours to change.

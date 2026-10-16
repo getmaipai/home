@@ -1,0 +1,29 @@
+# What MaiPai Home is (/docs/user/start-here/what-maipai-home-is)
+
+MaiPai Home is an AI helper for your family. It runs on a computer in your house, so your chats, memories and family details stay there.
+
+<Shot id="home" />
+
+## 🏠 What you can do [#-what-you-can-do]
+
+- Ask questions and get answers in a chat.
+- Talk to it out loud instead of typing.
+- Ask it to look something up and see where the answer came from.
+- Let it remember things that help you, and see or erase them any time.
+
+## 👨‍👩‍👧 Who uses it [#-who-uses-it]
+
+Everyone in the house gets their own profile. A grown-up runs the house and decides what children can see. Teens and adults keep their own chats private.
+
+## 🔒 What stays private [#-what-stays-private]
+
+Your chats and memories are not sent to MaiPai or anyone else. A few features, like a web search, send only the small piece they need. The Privacy page lists each one. See [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house).
+
+## 🧭 Where to go next [#-where-to-go-next]
+
+1. Read [Your first minutes](/docs/user/start-here/your-first-minutes) to sign in and send a message.
+2. Read [Find your way around](/docs/user/start-here/find-your-way-around) to learn the main menu.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Ask the person who runs the house, or see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer).

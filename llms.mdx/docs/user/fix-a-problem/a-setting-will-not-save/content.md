@@ -1,0 +1,21 @@
+# If a setting will not save (/docs/user/fix-a-problem/a-setting-will-not-save)
+
+## 🔒 A lock means an admin controls this one [#-a-lock-means-an-admin-controls-this-one]
+
+A greyed-out or locked setting was set by an admin. You cannot change it. The row says who to ask.
+
+## ✍️ Steps [#️-steps]
+
+1. Look for a lock or a grey row next to the setting.
+2. If you see one, ask an admin to change it or unlock it for you.
+3. If there is no lock, reload the page and try again.
+4. Check that you are on the right page. Your own settings are under **Settings**.
+5. If it still snaps back, check for a message near the setting and follow it.
+
+## 🎚️ Comfort settings [#️-comfort-settings]
+
+For text size and motion, a row set to **Preset** follows your style. Pick a different **Comfort style** or change the single row. See [Make it easier to read](/docs/user/everyday-use/make-it-easier-to-read).
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Settings reference](/docs/admin/install-and-set-up/settings-reference). Others, see [Still stuck](/docs/user/fix-a-problem/still-stuck).

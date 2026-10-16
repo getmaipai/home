@@ -1,0 +1,23 @@
+# Read a turn trace (/docs/admin/look-after-it/turn-trace)
+
+This page is for owners and admins.
+
+## ✍️ Steps [#️-steps]
+
+1. In Chat, find the reply you want to look at and tap the **More** (three dots) button under it.
+2. Tap **Turn trace**.
+3. Read the **Turn trace** page. The **Trace** card lists each step as a bar, with the total time in milliseconds.
+
+Steps include the pipeline stages, **Model generation** and **Tool call**. Each can be completed, failed, skipped or running.
+
+## 🔒 What it never shows [#-what-it-never-shows]
+
+A trace holds names and timings only. It has no message text, no tool details and no names of people. A turn from a temporary or Incognito chat has no trace.
+
+**Turn trace** shows only for owners and admins, and not in an Incognito chat. You can also open `/trace/` followed by a turn's id on your Home address.
+
+If it cannot load, it says "Could not load this trace." Tap **Try again**. A not-found answer means the turn is unknown or was private.
+
+## 🙋 Still need help? [#-still-need-help]
+
+For overall timing, use [Performance](/docs/admin/look-after-it/performance).

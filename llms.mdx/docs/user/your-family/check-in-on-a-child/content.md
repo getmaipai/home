@@ -1,0 +1,27 @@
+# Check in on a child (/docs/user/your-family/check-in-on-a-child)
+
+This page is for owners and admins.
+
+<Shot id="child-topics" />
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Family**, then the child's card. Their **Profile** opens.
+2. On **Overview** you see shared files and the child's details.
+3. Tap **Memories** to see what MaiPai remembers about them.
+4. Tap **Limits** to set daily time limits and storage. The time limits are saved but not applied yet.
+5. Tap **Topics** to choose how MaiPai answers them about sensitive subjects.
+
+Only owners and admins see **Limits** and **Topics**.
+
+## 💛 When a child has a hard moment [#-when-a-child-has-a-hard-moment]
+
+If a conversation seems to weigh on a child, every adult gets a notice: "A check-in may help." It names the child but never says what was said. It cannot be turned off. Talk to the child, kindly and in person.
+
+## 🔐 Teens are different [#-teens-are-different]
+
+A teen's profile, memories and settings are private. A parent gets no check-in view of a teen.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls). For anything else, see [Still stuck](/docs/user/fix-a-problem/still-stuck).

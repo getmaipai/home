@@ -1,0 +1,128 @@
+# Install and start Home (/docs/admin/install-and-set-up/install-and-start)
+
+<Callout type="info" title="Pre-alpha">
+Home has no packaged installer yet. It runs from source, and an installer script exists for a service install. Nothing is deployed to a real household yet.
+</Callout>
+
+## 🧰 What you need [#-what-you-need]
+
+- macOS or Linux on x64 or arm64
+- [Bun](https://bun.sh), the JavaScript runtime
+- Git
+- Internet for the first install
+
+## ▶️ Run from source [#️-run-from-source]
+
+1. Get the code.
+
+```bash
+git clone https://github.com/getmaipai/home.git
+```
+
+2. Go into the folder. Use the full path where you cloned it.
+
+```bash
+cd /Users/example/Developer/home
+```
+
+3. Install the packages.
+
+```bash
+bun install
+```
+
+4. Start Home.
+
+```bash
+bun start
+```
+
+Home builds, runs in the background and prints its addresses. Open the address Home prints. By default it is `http://localhost:3000`. The first person to sign in becomes the **owner**. Running `bun start` again prints the addresses without starting a second copy.
+
+## ⏹️ Stop and restart [#️-stop-and-restart]
+
+Run these in the same folder.
+
+```bash
+bun stop
+```
+
+```bash
+bun restart
+```
+
+The log is `data/local-app/app.log`.
+
+## 🛎️ Install as a service [#️-install-as-a-service]
+
+The installer runs Home in the background so it survives a reboot with nobody signed in. For the short, step by step version for the household, see the [install, upgrade, uninstall and fix page](/docs/user/start-here/install-upgrade-uninstall).
+
+1. Run the installer as root. It installs Home only and prints the address of the setup wizard. SSH works.
+
+```bash
+sudo bash /Users/example/Developer/home/scripts/install.sh
+```
+
+2. Open the address. In the wizard, choose where the AI runs. **This computer** makes Home install the MaiPai Stack right then, with a progress bar. **Another computer** installs no Stack here.
+
+3. To see what it would do first, add `--dry-run`. `--stack-only` runs only the AI engine step, which is what the wizard starts; run it by hand if the wizard cannot.
+
+| Item | macOS | Linux |
+|---|---|---|
+| Install folder | `/usr/local/maipai-home` | `/opt/maipai-home` |
+| Home service | launchd daemon `com.maipai.home` | systemd unit `maipai-home.service` |
+| Stack service | per-user LaunchAgent `com.maipai.stack`, started at login | systemd user unit, kept alive by lingering |
+| Log trimming | daily launchd daemon `com.maipai.logrotate` | journald |
+| Home logs | `data/logs/launchd.out.log`, `launchd.err.log` | `journalctl -u maipai-home` |
+| Stack logs | `stack/data/logs/stack.log`, `stack.error.log` | `journalctl --user -u maipai-stack` |
+
+### What it checks first [#what-it-checks-first]
+
+- Required tools (`curl`, `tar`, `rsync`, `unzip`, `shasum`). On a Mac a miss points at `xcode-select --install`. Homebrew is never used, and Python is not needed.
+- Free disk space: 3 GB for Home. The Stack step checks 6 GB more, and the wizard plan checks the models.
+- For the Stack step only: a logged-in desktop session on macOS. Home itself needs none.
+- The Bun runtime and the install checks, after the build and before any service starts.
+
+### The Stack step [#the-stack-step]
+
+`install.sh --stack-only` fetches, builds and starts the Stack, writes `engines.stack.url`, and records its progress in `data/stack-install.json` (state, stage, a plain problem). Home reads that file for the wizard bar. On macOS Home is a root daemon and runs the step itself. On Linux Home is an unprivileged user, so the installer adds a one-shot unit, `maipai-stack-install.service`, and a sudoers rule that allows exactly `systemctl start --no-block maipai-stack-install.service` for the Home user. The `scripts/` folder is root-owned so that user cannot change what the unit runs. The step is safe to run again.
+
+### Ports [#ports]
+
+Home uses `MAIPAI_PORT` (default 3000). The Stack uses `MAIPAI_STACK_PORT` (default 8770). If a port is taken, the installer takes the next free one. Both values are written into Home's service as `PORT` and `MAIPAI_STACK_PORT`, so the running app and the installer agree. An upgrade keeps the port the last install used. The installer, the service files, the health checks and the backend all read the names above (`backend/src/lib/ports.ts` on the app side).
+
+### Release, plan and version [#release-plan-and-version]
+
+The installer installs the **latest published release**, never the main branch. If no release exists it stops with "could not find a published release ... there is nothing to install". Run from source until one does. `--version v0.1.0` installs a named release. Choose a setup plan with `--plan recommended`, `--plan moderate` or `--plan minimal`; the wizard reads it later.
+
+### Upgrade, resume and roll back [#upgrade-resume-and-roll-back]
+
+Running it again upgrades in place. Order: stop Home and the Stack, save `data/` to `upgrade-backups/<time>-from-<tag>/data.tar.gz` (the last two are kept), replace the program files, rebuild, start, wait for Home (`/`) and the Stack (`/healthz`), then write `.installed-tag`. The Stack's `stack/data/` (models and settings) and the Bun runtime are never replaced.
+
+An upgrade of an install that already has a Stack rebuilds the Stack too. A run that stopped part way is finished by running the same command again. It sees no `.installed-tag`, treats the folder as unfinished and continues. If a run fails after the old Home was stopped but before any file changed, Home is started again on the old version.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/install.sh --rollback
+```
+
+Rollback installs the tag in `.previous-tag`, moves the newer `data/` to `data.rolled-back-<time>` and restores the copy taken before that upgrade. The Stack's own data is not rolled back.
+
+### After a restart [#after-a-restart]
+
+Home starts at boot. The Stack is a per-user LaunchAgent, so it starts when that user logs in. Turn on automatic login for a Mac that restarts unattended. FileVault blocks automatic login; the installer prints a warning when FileVault is on.
+
+### Gatekeeper [#gatekeeper]
+
+The installer clears the quarantine flag on the install folder and checks the signature of Bun and the Stack binary. An unsigned binary gets an ad-hoc signature, which Apple silicon requires. If macOS still blocks one, choose Allow Anyway in System Settings, Privacy and Security.
+
+## 🗑️ Uninstall [#️-uninstall]
+
+```bash
+sudo bash /Users/example/Developer/home/scripts/uninstall.sh
+```
+
+It stops and removes the Home service, the Stack service and the log trimming job, then asks whether to keep or wipe your data. The default on every prompt is keep, and a wipe needs you to type `DELETE MY DATA` exactly. A wipe covers `data/`, `backups/`, `received-backups/`, the Stack's data, `upgrade-backups/` and any `data.rolled-back-*` folder. Take a backup first. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+
+## ➡️ Next [#️-next]
+
+[First-run setup](/docs/admin/install-and-set-up/first-run-setup).

@@ -1,0 +1,41 @@
+# Updates and rollback (/docs/admin/look-after-it/updates-and-rollback)
+
+<Shot id="updates" />
+
+## 🔍 What Home checks [#-what-home-checks]
+
+Home asks GitHub once a day for the latest MaiPai Home release. If a robot is paired, it also checks the bot release. It sends no name or device ID.
+
+Open **Settings**, **Home settings**, **Maintenance**, then **Updates**. The table has **Name**, **Installed**, **Available**, **Last checked** and **Status**. A row says **Up to date** or shows the newer version.
+
+Only an owner or admin can manage updates.
+
+## 🛠️ Update Home [#️-update-home]
+
+Planned, not in the app yet: installing a Home update from this page. Home shows that one is available. You update it by hand.
+
+1. Take a backup first. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+2. Stop Home. If you run it from source, run `bun stop` in the Home folder. If you used the installer, stop the `maipai-home` service.
+3. Install the new release from the GitHub release page, or pull the new tag if you run from source.
+4. Run `bun install --force` if you run from source.
+5. Start Home again.
+6. Open **Updates** and check **Installed** shows the new version.
+
+Planned, not in the app yet: a fixed update window and a kept previous release for one-click rollback of Home itself. To go back today, reinstall the earlier release and, if the data changed, restore the backup from step 1.
+
+## ⚙️ Engines [#️-engines]
+
+Rows for the AI engines (the Stack) have two buttons:
+
+- **Apply** installs the update.
+- **Go back** returns to the previous version after you confirm.
+
+Choosing how reference library updates run, and capping their download speed, is planned, not available yet. The two settings exist but have no effect today.
+
+## 📣 Get told [#-get-told]
+
+Tick **Telegram me when a MaiPai Home update is available** and the engine update switches in your Notifications settings. See [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram).
+
+## 🔧 If the check shows nothing [#-if-the-check-shows-nothing]
+
+Home may have no internet, or GitHub may have limited the request. Wait a day and look again. Open **Repairs** for anything Home flags.

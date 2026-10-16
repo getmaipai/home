@@ -1,0 +1,24 @@
+# Ask it to look something up (/docs/user/everyday-use/ask-it-to-look-something-up)
+
+MaiPai decides on its own when to look something up. You can also ask it to.
+
+## ✍️ Steps [#️-steps]
+
+1. Open a chat.
+2. Type what you want to know, such as "Look up when the next train leaves."
+3. Send the message.
+4. Read the answer. Small numbers like [1] mark facts that came from a page.
+5. Tap a number to see which page it came from.
+6. Open **Sources** under the answer to see the whole list.
+
+## 🔒 What gets sent [#-what-gets-sent]
+
+A search sends only your search words, with no name or address. The Privacy page explains it. See [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house).
+
+## 👶 For children and teens [#-for-children-and-teens]
+
+Their searches follow the house settings, and what MaiPai reads is checked first.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If searching does nothing, an admin may have it off: see [Web search](/docs/admin/connect-and-extend/web-search). Or see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer).

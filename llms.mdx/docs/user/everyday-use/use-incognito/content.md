@@ -1,0 +1,25 @@
+# Use Incognito (/docs/user/everyday-use/use-incognito)
+
+## ✍️ Steps [#️-steps]
+
+1. Tap your picture at the bottom of the left rail. The profile menu opens.
+2. Tap **Incognito**. It shows **On**, and your picture gets a purple ring.
+3. A box called "What Incognito does" appears the first time. Tap **Got it**.
+4. Chat as usual.
+5. To finish, open the profile menu and tap **Incognito** again. It shows **Off**.
+
+## 🕶️ What it does [#️-what-it-does]
+
+Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history. When you turn it off, those chats are forgotten.
+
+What is kept: nothing is saved to your history or memories. MaiPai holds the chat in the hub's working memory only, so it can follow the conversation while you talk. That copy is dropped when you turn Incognito off, after the chat has sat idle for two hours, or when the hub restarts. It does not keep a turn trace either.
+
+Incognito belongs to the tab you are in. A new tab starts with it off. While it is on, the **Projects** page sends you back to chat.
+
+## 👨‍👩‍👧 Who can use it [#-who-can-use-it]
+
+Incognito chats are for owners, admins and adults. Teens, children and guests do not get Incognito chats. The **Incognito** item may still show in their profile menu, but the hub refuses to start a private chat for them, so nothing is turned on for them.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If Incognito does not start a chat, check your role in [What each role can do](/docs/user/your-family/what-each-role-can-do). Ask the person who runs the house to change it.

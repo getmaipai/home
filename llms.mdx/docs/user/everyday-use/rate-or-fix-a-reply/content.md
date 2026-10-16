@@ -1,0 +1,29 @@
+# Rate or fix a reply (/docs/user/everyday-use/rate-or-fix-a-reply)
+
+Every reply has a row of small buttons under it.
+
+## 🔘 What the buttons do [#-what-the-buttons-do]
+
+- **Copy**: copies the reply.
+- **Read aloud**: reads it to you.
+- **Helpful**: tells MaiPai the answer was good.
+- **Not helpful**: opens a short form.
+- **Refresh**: asks for a new answer.
+- **More**: more choices. Adults and teens can pick **Remember this** to keep a fact.
+
+## ✍️ Steps to say what went wrong [#️-steps-to-say-what-went-wrong]
+
+1. Tap **Not helpful** under the reply.
+2. Under **What went wrong?**, pick one or more: Wrong, Too long, Didn't listen, Off topic, or Unsafe.
+3. Add a short note if you like. It is optional.
+4. Tap **Send feedback**.
+
+Children rate with the thumbs only. To take back a rating, tap the lit thumb again.
+
+## 🔁 Try again [#-try-again]
+
+Tap **Refresh** to get a new answer to the same question.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a reply never arrives, see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer). If an answer worried you, tell a grown-up in the house.

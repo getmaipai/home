@@ -1,0 +1,2649 @@
+# Create a command (/docs/admin/connect-and-extend/commands)
+
+A command fires only on the exact phrase. It never guesses.
+
+## ✍️ Steps [#️-steps]
+
+1. Open **Settings**, **Voice**, then the **Commands** card. Tap **Create a command**. Adults and above can do this.
+2. Type a **Trigger phrase**, such as "movie night".
+3. Under **Who can trigger this command**, pick the lowest role.
+4. Under **What this command does**, pick one:
+   - **Say something back**: type what MaiPai says, and optionally a spoken version.
+   - **Control a smart-home device**: type the Home Assistant domain, the service and the entity id.
+5. Tap **Create command**.
+
+## 📋 Manage the list [#-manage-the-list]
+
+Owners and admins open **Home settings**, then **Commands** to see **Household commands**. Each row shows its phrase, its action and the role needed. Tap **Delete** to remove one. You can delete your own commands. Owners and admins can delete any.
+
+If it fails, Home says "Could not create that command." or "Could not delete that command."
+
+## 🙋 Still need help? [#-still-need-help]
+
+For smart-home setup, see [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram) or ask whoever set up Home Assistant.
+
+
+# Notifications and Telegram (/docs/admin/connect-and-extend/notifications-and-telegram)
+
+Home can tell people about things that matter: a backup failing, an update waiting, a new repair. Telegram and browser alerts stay off until a person turns them on.
+
+## 🔔 Where alerts go [#-where-alerts-go]
+
+| Channel | Who sets it up | Default |
+|---|---|---|
+| **Show alerts on this device** | Each person, under Settings, Notifications, Alerts | Off |
+| Telegram | Owner or admin sets the bot, each person links a chat | Off |
+| A robot | **Send time-sensitive notifications to a robot** | Off |
+
+## 🤖 Set up Telegram [#-set-up-telegram]
+
+Telegram uses one bot for the whole household. Messages go through Telegram's servers, so they leave your house. The [privacy page](/docs/admin/look-after-it/privacy-audit) lists the row.
+
+1. In Telegram, message @BotFather and create a bot. Copy its token.
+2. In Home, open **Settings**, **Home settings**, **Integrations**, then the **Telegram** card. Paste the token in **Telegram bot token**. It is stored encrypted.
+3. Each person messages the bot once. The bot replies with a chat id.
+4. Each person opens **Settings**, **Notifications**, **Telegram** and pastes it in **Your Telegram chat id**.
+5. Each person ticks the **Telegram me when** switches they want.
+
+All switches default to off. Examples, one per event:
+
+- **Telegram me about new Repairs items**
+- **Telegram me when backups start failing**
+- **Telegram me when a MaiPai Home update is available**
+- **Telegram me when a Stack engine reports an open warning or critical problem**
+- **Telegram me when a model download fails**
+
+Owners and admins will want the first three.
+
+## 🌙 Quiet hours [#-quiet-hours]
+
+Alerts wait during quiet hours, default 21:00 to 07:00. Set the household times with **Quiet hours start** and **Quiet hours end** on the **Telegram** card under Integrations. A person can set their own with **Personal quiet hours start** and **end**. A parent sets a child's. Safety alarms ignore quiet hours.
+
+## 🔧 If nothing arrives [#-if-nothing-arrives]
+
+1. Check the token has no spaces and the person messaged the bot first.
+2. Check the chat id belongs to that person.
+3. Check the event switch is on for that person.
+
+No test-message button exists yet. Trigger a real alert to check, such as a model download.
+
+
+# Add and remove packages (/docs/admin/connect-and-extend/packages)
+
+A **package** adds one ability to Home, such as weather, a timer or a news shelf. Home itself ships as a set of packages, so nearly every feature is one.
+
+## 📦 What comes with Home [#-what-comes-with-home]
+
+Home includes 36 packages. They cover:
+
+- **Daily help**: timer, reminders, lists, weather, currency, unit conversion, math, translation
+- **Info**: news, sports, web search, media lookup, almanac (date, time, moon, holidays, on this day)
+- **Learning and play**: tutor, trivia, jokes, bedtime storybook, music
+- **Home control**: lights on and off, lock doors
+- **Memory**: remember and recall
+- **News feeds**: household feeds and kids' feeds
+
+A shelf of apps on the Home screen is planned, not available yet.
+
+## 🧒 Who can use a package [#-who-can-use-a-package]
+
+Each package declares the lowest role that may use it. A child sees only what a child may use. Kids' news feeds, for example, are for children.
+
+The child's **Limits** tab saves daily minutes for each kind of package. Enforcing them in the package host is planned, not available yet. See [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls).
+
+## 🔒 What a package may do [#-what-a-package-may-do]
+
+Every package lists the outside services it contacts, when and why. Those rows feed the [privacy audit](/docs/admin/look-after-it/privacy-audit). A package that contacts nothing adds no row.
+
+## 🛒 Install, update and remove [#-install-update-and-remove]
+
+Planned, not in the app yet: browsing the MaiPai catalog and installing packages from a screen. Home has no store page today.
+
+The Home server already has the groundwork:
+
+- A signed catalog index check, so a tampered catalog is rejected.
+- Install, roll back, uninstall and switch between **stable** and **beta** per package.
+- Only an owner or admin may do any of them.
+
+These are available to developers through the Home API, not through a button. See [Developers](/docs/developers).
+
+## 🙋 If a package misbehaves [#-if-a-package-misbehaves]
+
+Open **Repairs** and check for an item. Then see [Troubleshooting](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+
+# Reach Home when you are away (/docs/admin/connect-and-extend/remote-access)
+
+{/* generated-source: backend/src/lib/tailscale.ts, backend/src/routes/tailscale.ts, frontend/src/apps/setup/AwayFromHome.tsx, backend/src/settings/networkKeys.ts */}
+
+By default Home works only on your home Wi-Fi. To use it from anywhere, Home uses **Tailscale**, a free app that links your family's devices privately. Conversations go straight between the device and your Home computer. Tailscale sees device names and addresses, not what you say.
+
+Home never turns this on by itself. Only an owner or admin can.
+
+## ✅ Before you start [#-before-you-start]
+
+1. Install Tailscale on the Home computer from tailscale.com/download.
+2. Sign in to Tailscale with the account your family's devices will use.
+3. Open Tailscale's DNS settings and turn on HTTPS certificates.
+
+Pick a plain computer name first. Turning this on publishes the computer's Tailscale name in public certificate logs, so do not use a family name. Headscale is not supported by this flow.
+
+## ✍️ Turn it on [#️-turn-it-on]
+
+1. Open **Settings**, then **Home settings**, then **Network and access**.
+2. Under **Reach Home from anywhere**, wait until the three lines say Ready.
+3. Press **Turn on**.
+4. Home shows a secure address and a QR code.
+
+If a line is not ready, the **Turn on** button stays grey. If Tailscale is not signed in or HTTPS certificates are off, Home says "Sign in to Tailscale and enable HTTPS certificates first." Fix that in Tailscale, return to Home and try again.
+
+## 📱 Add a phone or tablet [#-add-a-phone-or-tablet]
+
+1. Install Tailscale on the device.
+2. Sign in with the same account.
+3. Scan the QR code, or open the address.
+
+The address works only on devices signed in to your Tailscale account.
+
+## 🔧 Related settings [#-related-settings]
+
+| Setting | Default | Meaning |
+|---|---|---|
+| **Away access through Tailscale** | Off | Set when you turn this on. |
+| **Who can reach Home** | LAN | Loopback keeps Home on this computer. LAN lets devices on your home network connect. Needs a restart. |
+| **Home network port** | 3000 | The port Home listens on. Changing it changes the address devices use. |
+| **Reach the engine computer when away from home** | Off | For a separate engine computer. See [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai). |
+
+## 🔐 Privacy [#-privacy]
+
+Tailscale and the certificate authority are the two outside services involved. Both appear on the [privacy page](/docs/admin/look-after-it/privacy-audit), and only after you opt in.
+
+Planned, not in the app yet: turning remote access on from the setup wizard. The wizard shows "Set up later", and you finish here.
+
+
+# Set up web search (/docs/admin/connect-and-extend/web-search)
+
+Home answers most questions from the model and its offline reference library. When a question needs fresh facts, Home can search the web. Web search is off until you set it up.
+
+<Shot id="settings-search" />
+
+## 📚 Library or internet [#-library-or-internet]
+
+Under **Settings**, **Home settings**, **Search**, pick **Search sources**:
+
+| Choice | What Home does |
+|---|---|
+| **Library first** (default) | Checks the offline library, goes online only if it has no answer. |
+| **Internet first** | Goes online even when the library has a match. |
+| **Library only** | Turns off the live Wikipedia-style lookup. Web search stays on unless it is also set to Library only. |
+
+**Encyclopedia lookups** and **Web searches** (advanced) can each follow the household choice or override it. Children and teens keep their protections in every mode.
+
+## 🔍 Connect SearXNG [#-connect-searxng]
+
+SearXNG is a search service you run yourself. Home asks it for results, so no search company sees who asked.
+
+1. Run SearXNG on a computer in your home. Turn on its JSON output.
+2. Open **Settings**, **Home settings**, **Search**.
+3. Type its address in **Your own SearXNG (optional)**, for example `http://192.0.2.20:8080`.
+4. Ask Home something recent in **Chat**. A sources list appears under the reply.
+
+Until an address is set, Home says "Web search isn't set up yet". Library and Wikipedia lookups still work.
+
+Home checks SearXNG every hour while it is healthy and every 15 minutes while it is not. A failing check appears under **Repairs**, with the step to take. Check the computer is on, the address is right and JSON output is enabled.
+
+## 🦆 Other sources [#-other-sources]
+
+| Source | Who gets it | How to enable |
+|---|---|---|
+| **DuckDuckGo** | Adults only | Start the ddgs helper on the same computer, set `MAIPAI_DDGS_URL` to its loopback address, then pick it in **Web search sources**. |
+| **Brave Search** | Adults only | Paste a key in **Brave Search key (optional)**. The words an adult searches go to Brave. The key is stored encrypted. |
+
+Without the helper, Home says "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source." A child's or teen's search never goes to either.
+
+## 🛡️ Safe search [#️-safe-search]
+
+| Setting | Behavior |
+|---|---|
+| **Safe search level** | **Default** follows age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. |
+| **Web search with child controls** | On: strictest SafeSearch, adult sites blocked, links hidden. Off: offline library only. |
+| **Web search with teen controls** | On: moderate or stricter. |
+| **Page text check** | Cleans fetched page text before the assistant reads it. On for children and teens. |
+
+For site lists, see [Blocked-site lists](/docs/admin/people-and-safety/blocked-sites-and-news-feeds). For exactly what leaves the house, see [Privacy audit](/docs/admin/look-after-it/privacy-audit). To use search from a phone away from home, see [Remote access](/docs/admin/connect-and-extend/remote-access).
+
+
+# How MaiPai Home works (/docs/admin/how-it-works/how-home-works)
+
+MaiPai Home is one program that runs on a computer in your house. People reach it from a browser on a phone, tablet or laptop on your home Wi-Fi. Nothing goes through a MaiPai server, because there is none.
+
+## 🗺️ The parts [#️-the-parts]
+
+```
+ Phone, tablet, laptop (browser)
+            |
+            |  your home network
+            v
+ +-------------------------------+        +---------------------------+
+ | MaiPai Home (the hub)         |        | MaiPai Stack (the engine) |
+ | people, memory, chat, settings| -----> | runs the AI models        |
+ | packages, backups, updates    |        | same computer, or another |
+ | stores: the data folder       |        | stores: models, engines   |
+ +-------------------------------+        +---------------------------+
+            |
+            |  only what you allow
+            v
+   The internet (see Privacy audit)
+```
+
+| Part | What it does | Where it runs |
+|---|---|---|
+| **Home (the hub)** | Holds people, memories, conversations, settings, backups and the screens everyone uses. | The computer you installed it on. |
+| **Stack (the engine)** | Runs the AI models for chat, listening, speaking and pictures. | The same computer, or a second one. See [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai). |
+| **Packages** | Small features such as weather, timers and news. Home ships a default set. | Inside Home. |
+| **Robot** | An optional companion body that pairs with Home. | Its own hardware. |
+
+## 🔁 What happens when someone asks a question [#-what-happens-when-someone-asks-a-question]
+
+1. The person types or speaks in the browser.
+2. Home checks who they are and what their role allows.
+3. Home builds the request and sends it to the engine.
+4. The engine answers. Home checks the reply against the person's age band before showing it.
+5. Home stores the conversation in its own folder.
+
+If the engine is unreachable, chat pauses and Repairs shows why. Nothing is sent elsewhere as a fallback.
+
+## 🏠 What this means for you [#-what-this-means-for-you]
+
+- Your household's data stays in one folder you can back up. See [Where your data lives](/docs/admin/how-it-works/where-your-data-lives).
+- Safety is built into Home, not into a package. Child protections cannot be removed. See [Safety settings](/docs/admin/people-and-safety/safety-settings).
+- Home does not phone home. Every outbound connection is listed on the Privacy page. See [Privacy audit](/docs/admin/look-after-it/privacy-audit).
+
+## 🧭 Where things are in the app [#-where-things-are-in-the-app]
+
+The main menu has **Home**, **Chat**, **Family**, **Privacy** and **Settings**. Admin work lives under **Settings**, in the **Home settings** area. Backups, Updates, Repairs, Status, Storage and Engines are pages you reach from Settings.
+
+<Callout type="info">The sidebar in some screenshots still says People. That page is now called Family.</Callout>
+
+
+# People, roles and permissions (/docs/admin/how-it-works/people-roles-and-permissions)
+
+{/* generated-source: frontend/src/apps/people/roles.ts, backend/src/lib/access.ts, backend/src/lib/personLifecycle.ts, shared/personCredentialRoles.ts */}
+
+Every person in Home has one role. The role decides what they can open, change and see.
+
+<Shot id="roles-users" />
+
+## 🪜 The six roles [#-the-six-roles]
+
+From most to least control: **owner**, **admin**, **adult**, **teen**, **child**, **guest**.
+
+| Role | Sign-in | Runs the house | Reads others' private data |
+|---|---|---|---|
+| Owner | PIN or password | Everything, including restore | Own, plus a child's |
+| Admin | PIN or password | Settings, people, backups, updates | Own, plus a child's |
+| Adult | PIN or password | No | Own only |
+| Teen | None required | No | Own only |
+| Child | None required | No | Own only; a parent sees it |
+| Guest | None required | No | None |
+
+## 🔑 What only the owner can do [#-what-only-the-owner-can-do]
+
+- Create another owner or an admin. An admin can add adults, teens, children and guests.
+- Change a person's role. Nobody can change their own role.
+- Restore a backup. An admin can see the backup list and run one.
+
+Home refuses to remove or demote the household's only owner. Make someone else an owner first.
+
+## 🛡️ What admins cannot see [#️-what-admins-cannot-see]
+
+An owner or admin can open a **child's** profile, memories and settings. A **teen's** profile does not open at all for them, from Family or by typing its address. They cannot see another adult's memories or settings. A teen's chats and settings stay private from admins. This is built in and has no switch.
+
+Household-wide switches still apply to every teen, such as **Web search with teen controls** under Settings, Search. Those change what Home does for teens as a group. They never show an admin what a teen asked.
+
+## 🔒 Settings that follow the role [#-settings-that-follow-the-role]
+
+- **Household settings** are writable only by an owner or admin.
+- **Session lock** (ask for the PIN again after idle time) is set by an owner or admin, from the people list in Settings, Users.
+- A child's **Sensitive subjects** levels are set only by an owner or admin. The child cannot change them.
+- Each person's own look, voice and notification settings belong to that person.
+
+## 🧪 Check it yourself [#-check-it-yourself]
+
+1. Open **Family** as the admin.
+2. Open a child's card. You see **Overview**, **Memories**, **Limits** and **Topics**.
+3. Look at a teen's card in **Family**. It is not a link, and a typed address shows a "You cannot open this profile" message, so there is no **Limits**, **Topics** or **Memories** tab and no teen chats or memories are shown.
+
+For what each role sees day to day, see [What each role can do](/docs/user/your-family/what-each-role-can-do).
+
+
+# Where your data lives (/docs/admin/how-it-works/where-your-data-lives)
+
+{/* generated-source: backend/src/lib/dataClasses.ts, backend/src/lib/paths.ts, backend/src/lib/backup.ts, scripts/uninstall.sh */}
+
+Home keeps everything in one **data folder**. The default is a folder named `data` at the top of the Home folder. Two backup folders sit beside it, not inside it.
+
+## 📁 What is in each folder [#-what-is-in-each-folder]
+
+| Folder | What it holds | Replaceable? |
+|---|---|---|
+| `records` (the data folder itself) | People, memories, conversations, settings in one database file | No. Back this up. |
+| `keys` | Encryption keys for secrets and face prints | No. Keep on a disk that is always connected. |
+| `people` | Each person's files | No |
+| `voice/cloned` | Cloned voices | No |
+| `projects` | Project files | No |
+| `packages` | Package data | Mostly |
+| `models`, `engines`, `sidecars` | Downloaded AI models, engines and helper programs | Yes, downloaded again |
+| `reference` | The offline reference library | Yes, downloaded again |
+| `lists` | Blocked-site lists | Yes |
+| `voice/stt`, `voice/wakewords`, `vision/models` | Speech, wake-word and face recognition models | Yes |
+| `logs`, `cache`, `favicons`, `answer-images`, `local-app`, `labels` | Logs, caches and runtime files | Yes |
+| `backups` (beside the data folder) | Your encrypted backup files | See below |
+| `received-backups` (beside the data folder) | Backups pushed by paired devices | Not yet used by the app UI |
+
+Put `records` and `backups` on different disks. A backup on the same disk is no safer than the data it copies.
+
+## 💾 What a backup covers [#-what-a-backup-covers]
+
+Today a backup is an encrypted copy of the household database: people, memories, conversations and settings. It does not include models, engines, the reference library or people's uploaded files. Those are downloaded or copied again after a restore. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+
+## 🧹 Move or remove [#-move-or-remove]
+
+- The Storage page shows what each person uses and the caps.
+- To change where a folder lives, there is no screen yet. Planned, not in the app yet: the data-location picker. The setup wizard says so too.
+- To uninstall, run the uninstall script. It asks before it deletes anything, and every prompt defaults to keep. See [Install and start](/docs/admin/install-and-set-up/install-and-start).
+
+## ⚠️ Before you delete a folder you do not recognise [#️-before-you-delete-a-folder-you-do-not-recognise]
+
+A folder that looks stray may be live household data. Open it first and check what it holds. Never delete `records` or `keys` without a backup and the backup key.
+
+
+# Admin guide 🛠️ (/docs/admin)
+
+**For the technical dad.** How things work, how to set them up, how to look after and support them. No code internals; for those, see [For developers](/docs/developers).
+
+<div className="hero"><img src="/home/img/repairs.png" alt="The Repairs page" /></div>
+
+MaiPai Home is pre-alpha. It runs from source today, and a few features in these pages are marked "Planned, not in the app yet". Everything else here was checked against the app.
+
+## 🧩 How it works [#-how-it-works]
+
+- [How MaiPai Home works](/docs/admin/how-it-works/how-home-works): the parts, and what runs where.
+- [People, roles and permissions](/docs/admin/how-it-works/people-roles-and-permissions): who can do what.
+- [Where your data lives](/docs/admin/how-it-works/where-your-data-lives): every folder and what is in it.
+
+## 🧰 Install and set up [#-install-and-set-up]
+
+- [Choose hardware](/docs/admin/install-and-set-up/choose-hardware)
+- [Install and start](/docs/admin/install-and-set-up/install-and-start)
+- [First-run setup](/docs/admin/install-and-set-up/first-run-setup)
+- [Settings reference](/docs/admin/install-and-set-up/settings-reference)
+- [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai)
+
+## 👨‍👩‍👧 People and safety [#-people-and-safety]
+
+- [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls)
+- [Safety settings](/docs/admin/people-and-safety/safety-settings)
+- [Blocked sites and news feeds](/docs/admin/people-and-safety/blocked-sites-and-news-feeds)
+
+## 🔌 Connect and extend [#-connect-and-extend]
+
+- [Web search](/docs/admin/connect-and-extend/web-search)
+- [Remote access](/docs/admin/connect-and-extend/remote-access)
+- [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram)
+- [Packages](/docs/admin/connect-and-extend/packages)
+
+## 🩺 Look after it [#-look-after-it]
+
+- [Backups and restore](/docs/admin/look-after-it/backups-and-restore)
+- [Updates and rollback](/docs/admin/look-after-it/updates-and-rollback)
+- [Privacy audit](/docs/admin/look-after-it/privacy-audit)
+- [Troubleshooting and the support report](/docs/admin/look-after-it/troubleshooting-and-support-report)
+
+
+# Choose hardware (/docs/admin/install-and-set-up/choose-hardware)
+
+<Callout type="info" title="Pre-alpha">
+Home does not publish minimum specs yet. This page gives what the code supports and the tool that tells you whether a model fits your computer. It lists no speed numbers.
+</Callout>
+
+## 🖥️ What the installer supports [#️-what-the-installer-supports]
+
+| Item | Supported |
+|---|---|
+| Operating system | macOS and Linux. Windows has a separate installer script. |
+| Chip | x64 and arm64 |
+| Engine computer (a second machine for the AI) | Ubuntu Linux only |
+
+Home itself is light. The AI models are the heavy part. They need memory (RAM, or video memory on a graphics card) and disk space. The AI models page says the models it lists are about 7 to 10 GB each.
+
+## ✅ Check a model against your computer [#-check-a-model-against-your-computer]
+
+The **fit check** answers "will this model run here" before you download anything.
+
+<Shot id="fit-check" />
+
+1. Open **Settings**, **Home settings**, **Engines and AI**, then **AI models**.
+2. Each model shows a verdict:
+
+| Verdict | Meaning |
+|---|---|
+| **Runs well on this computer** | The model fits in memory with room to spare. |
+| **Runs, but slowly** | It fits, but expect long waits. |
+| **Won't fit** | It needs more memory than the computer has. |
+| **Can't tell yet** | Home cannot read the computer's memory or the model's size. |
+
+3. To check a model that is not listed, paste a Hugging Face link in **Check a model**.
+
+The fit check needs the Stack (the engine software) to be running. A memory meter shows what is free.
+
+## 🧭 Pick a shape [#-pick-a-shape]
+
+| Setup | Good when |
+|---|---|
+| One computer runs Home and the AI | You have a Mac or PC with enough memory for a model you like. |
+| Home on a small computer, AI on a stronger one | The stronger machine is Ubuntu. See [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai). |
+
+## 💽 Disk and backups [#-disk-and-backups]
+
+Keep the data folder on a disk with room for models and engines, and put backups on a different disk. Home raises a Repairs item when free space on its own disk drops below 2 GB (a setting you can change). Per-person storage has no cap by default. See [Where your data lives](/docs/admin/how-it-works/where-your-data-lives).
+
+## 📋 Not declared yet [#-not-declared-yet]
+
+- Minimum RAM, disk and graphics card.
+- A list of tested computers.
+- Speed numbers for any model.
+
+Until those exist, treat the fit check as the answer, and start with a smaller model.
+
+
+# First-run setup (/docs/admin/install-and-set-up/first-run-setup)
+
+The first time you open Home it starts a setup wizard. It has three phases: **Your computers**, **Away from home** and **Meet your Home**.
+
+<Callout type="info" title="Pre-alpha">
+Some wizard screens say plainly that a step is not built yet. Those are listed below so you know what to expect.
+</Callout>
+
+<Shot id="setup-wizard" />
+
+## 🪜 The screens [#-the-screens]
+
+| Screen | What it does | State |
+|---|---|---|
+| Welcome | Press **Set up my Home**. | Built |
+| **Where should Home's AI run?** | Pick **This computer** or **Another computer**. | Built |
+| Storage | Choose where the AI models are stored. | Not built. The wizard says a disk picker is not available. |
+| Setup checks | Test the computer. | Not built. It says so. |
+| Plan | Recommend models for your hardware. | Not built. The plan from the installer is recorded for later. |
+| **Reach Home from anywhere** | Set up Tailscale. | Not built here. Press **Set up later**, then finish in Settings. |
+| **Create your owner account** | Your name and a PIN or password. | Built |
+| **Let Home recognise you** | Face enrollment. | Optional. **Do this later** works. |
+| First greeting | Home says hello. | Not built |
+| **Your Home is ready** | Save your backup key, then **Open my Home**. | Built |
+
+## 👑 Create the owner [#-create-the-owner]
+
+1. Type your name.
+2. Type a PIN or password. The owner and admin roles need one. The screen has an **Owner or admin?** note explaining the difference.
+3. Continue.
+
+The owner can add everyone else, including admins. See [People, roles and permissions](/docs/admin/how-it-works/people-roles-and-permissions).
+
+If Home was already set up, it says "Home is already set up. Sign in instead." If it cannot read its progress, it says "Home can't read its setup progress. Refresh this page. If it keeps happening, restart MaiPai Home on this computer or run the installer again."
+
+## 🔑 Save the backup key [#-save-the-backup-key]
+
+On the last screen, press **Download** or **Print** under **Save your backup key**. Keep it somewhere other than this computer. If this computer breaks, the key brings your backups back on a new one. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+
+Then press **Open my Home**.
+
+## 📝 After setup [#-after-setup]
+
+The wizard says how many things are left. They are in the setup checklist on the Home screen, such as adding family, enabling away access and saving the backup key. Come back to them at your own pace.
+
+1. Add your family: [Add people](/docs/admin/people-and-safety/add-people-and-parental-controls).
+2. Connect search: [Set up web search](/docs/admin/connect-and-extend/web-search).
+3. Check what leaves the house: [Privacy audit](/docs/admin/look-after-it/privacy-audit).
+
+For what the wizard looks like to a first-time user, see [Your first minutes](/docs/user/start-here/your-first-minutes).
+
+
+# Install and start Home (/docs/admin/install-and-set-up/install-and-start)
+
+<Callout type="info" title="Pre-alpha">
+Home has no packaged installer yet. It runs from source, and an installer script exists for a service install. Nothing is deployed to a real household yet.
+</Callout>
+
+## 🧰 What you need [#-what-you-need]
+
+- macOS or Linux on x64 or arm64
+- [Bun](https://bun.sh), the JavaScript runtime
+- Git
+- Internet for the first install
+
+## ▶️ Run from source [#️-run-from-source]
+
+1. Get the code.
+
+```bash
+git clone https://github.com/getmaipai/home.git
+```
+
+2. Go into the folder. Use the full path where you cloned it.
+
+```bash
+cd /Users/example/Developer/home
+```
+
+3. Install the packages.
+
+```bash
+bun install
+```
+
+4. Start Home.
+
+```bash
+bun start
+```
+
+Home builds, runs in the background and prints its addresses. Open the address Home prints. By default it is `http://localhost:3000`. The first person to sign in becomes the **owner**. Running `bun start` again prints the addresses without starting a second copy.
+
+## ⏹️ Stop and restart [#️-stop-and-restart]
+
+Run these in the same folder.
+
+```bash
+bun stop
+```
+
+```bash
+bun restart
+```
+
+The log is `data/local-app/app.log`.
+
+## 🛎️ Install as a service [#️-install-as-a-service]
+
+The installer runs Home in the background so it survives a reboot with nobody signed in. For the short, step by step version for the household, see the [install, upgrade, uninstall and fix page](/docs/user/start-here/install-upgrade-uninstall).
+
+1. Run the installer as root. It installs Home only and prints the address of the setup wizard. SSH works.
+
+```bash
+sudo bash /Users/example/Developer/home/scripts/install.sh
+```
+
+2. Open the address. In the wizard, choose where the AI runs. **This computer** makes Home install the MaiPai Stack right then, with a progress bar. **Another computer** installs no Stack here.
+
+3. To see what it would do first, add `--dry-run`. `--stack-only` runs only the AI engine step, which is what the wizard starts; run it by hand if the wizard cannot.
+
+| Item | macOS | Linux |
+|---|---|---|
+| Install folder | `/usr/local/maipai-home` | `/opt/maipai-home` |
+| Home service | launchd daemon `com.maipai.home` | systemd unit `maipai-home.service` |
+| Stack service | per-user LaunchAgent `com.maipai.stack`, started at login | systemd user unit, kept alive by lingering |
+| Log trimming | daily launchd daemon `com.maipai.logrotate` | journald |
+| Home logs | `data/logs/launchd.out.log`, `launchd.err.log` | `journalctl -u maipai-home` |
+| Stack logs | `stack/data/logs/stack.log`, `stack.error.log` | `journalctl --user -u maipai-stack` |
+
+### What it checks first [#what-it-checks-first]
+
+- Required tools (`curl`, `tar`, `rsync`, `unzip`, `shasum`). On a Mac a miss points at `xcode-select --install`. Homebrew is never used, and Python is not needed.
+- Free disk space: 3 GB for Home. The Stack step checks 6 GB more, and the wizard plan checks the models.
+- For the Stack step only: a logged-in desktop session on macOS. Home itself needs none.
+- The Bun runtime and the install checks, after the build and before any service starts.
+
+### The Stack step [#the-stack-step]
+
+`install.sh --stack-only` fetches, builds and starts the Stack, writes `engines.stack.url`, and records its progress in `data/stack-install.json` (state, stage, a plain problem). Home reads that file for the wizard bar. On macOS Home is a root daemon and runs the step itself. On Linux Home is an unprivileged user, so the installer adds a one-shot unit, `maipai-stack-install.service`, and a sudoers rule that allows exactly `systemctl start --no-block maipai-stack-install.service` for the Home user. The `scripts/` folder is root-owned so that user cannot change what the unit runs. The step is safe to run again.
+
+### Ports [#ports]
+
+Home uses `MAIPAI_PORT` (default 3000). The Stack uses `MAIPAI_STACK_PORT` (default 8770). If a port is taken, the installer takes the next free one. Both values are written into Home's service as `PORT` and `MAIPAI_STACK_PORT`, so the running app and the installer agree. An upgrade keeps the port the last install used. The installer, the service files, the health checks and the backend all read the names above (`backend/src/lib/ports.ts` on the app side).
+
+### Release, plan and version [#release-plan-and-version]
+
+The installer installs the **latest published release**, never the main branch. If no release exists it stops with "could not find a published release ... there is nothing to install". Run from source until one does. `--version v0.1.0` installs a named release. Choose a setup plan with `--plan recommended`, `--plan moderate` or `--plan minimal`; the wizard reads it later.
+
+### Upgrade, resume and roll back [#upgrade-resume-and-roll-back]
+
+Running it again upgrades in place. Order: stop Home and the Stack, save `data/` to `upgrade-backups/<time>-from-<tag>/data.tar.gz` (the last two are kept), replace the program files, rebuild, start, wait for Home (`/`) and the Stack (`/healthz`), then write `.installed-tag`. The Stack's `stack/data/` (models and settings) and the Bun runtime are never replaced.
+
+An upgrade of an install that already has a Stack rebuilds the Stack too. A run that stopped part way is finished by running the same command again. It sees no `.installed-tag`, treats the folder as unfinished and continues. If a run fails after the old Home was stopped but before any file changed, Home is started again on the old version.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/install.sh --rollback
+```
+
+Rollback installs the tag in `.previous-tag`, moves the newer `data/` to `data.rolled-back-<time>` and restores the copy taken before that upgrade. The Stack's own data is not rolled back.
+
+### After a restart [#after-a-restart]
+
+Home starts at boot. The Stack is a per-user LaunchAgent, so it starts when that user logs in. Turn on automatic login for a Mac that restarts unattended. FileVault blocks automatic login; the installer prints a warning when FileVault is on.
+
+### Gatekeeper [#gatekeeper]
+
+The installer clears the quarantine flag on the install folder and checks the signature of Bun and the Stack binary. An unsigned binary gets an ad-hoc signature, which Apple silicon requires. If macOS still blocks one, choose Allow Anyway in System Settings, Privacy and Security.
+
+## 🗑️ Uninstall [#️-uninstall]
+
+```bash
+sudo bash /Users/example/Developer/home/scripts/uninstall.sh
+```
+
+It stops and removes the Home service, the Stack service and the log trimming job, then asks whether to keep or wipe your data. The default on every prompt is keep, and a wipe needs you to type `DELETE MY DATA` exactly. A wipe covers `data/`, `backups/`, `received-backups/`, the Stack's data, `upgrade-backups/` and any `data.rolled-back-*` folder. Take a backup first. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+
+## ➡️ Next [#️-next]
+
+[First-run setup](/docs/admin/install-and-set-up/first-run-setup).
+
+
+# Settings reference (/docs/admin/install-and-set-up/settings-reference)
+
+{/* generated-source: backend/src/settings/*Keys.ts, commons/spec/settings/areas.json, commons/spec/settings/keys.json */}
+
+<Callout type="info" title="How to read this page">
+**Home** settings are set once for the household. **Person** settings belong to one person, and the guardian rules decide who may change them for a child or teen. Level is **basic**, **advanced** or **expert**; the app hides higher levels until asked. A blank "What it does" means the screen explains it in place. Settings marked "Not active yet" are saved but nothing reads them today. Robot and vision settings (keys starting `robot.`, `person.robot.`, `person.vision.` and `vision.`) are used by MaiPai Bot, not by Home itself.
+
+One more setting, **Wake word listening** (`voice.wakeword.enabled`, device scope, default off), appears only when the wake-word files are installed, so it is not in the tables. Only owners, admins and adults see it. The one detector today is openWakeWord "Hey Jarvis", and it runs in the browser. No setup screen downloads the wake-word files; the setting stays hidden until all four are on disk in the `voice/wakewords` data folder (see [Where your data lives](/docs/admin/how-it-works/where-your-data-lives)).
+</Callout>
+
+Each table gives the label as shown, the key (useful in a support report), the default, the level and what it does. For the same screens in plain language, see the [user guide](/docs/user).
+
+
+## Home settings [#home-settings]
+
+
+### Home settings > Engines and AI > Chat card [#home-settings--engines-and-ai--chat-card]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Chat context size override** | `chat.context_size_override` | 0 | advanced | 0 lets the hub pick the largest context that fits this computer's memory. A higher number can run out of memory; a lower one leaves headroom but remembers less of the conversation. |
+| **Flash attention override** | `chat.flash_attention_override` | auto | advanced | "Auto" lets the hub decide based on the model and the quantized-KV-cache setting. Flash attention speeds up longer conversations; a very old GPU may not support it. |
+| **KV cache precision override** | `chat.kv_cache_override` | auto | advanced | "Auto" quantizes the conversation cache to fit more context in the same memory, with a small quality tradeoff. "Full" uses full precision: more accurate, uses roughly twice the memory for the same context size. |
+| **Selected chat model** | `chat.model_id` | empty | expert | The catalog model id currently downloaded and running for chat. Changed through the AI models page, not here. |
+| **How a teen's replies are checked** | `chat.teen_gate_grain` | sentence | advanced | "Sentence" checks every sentence before a teen sees it (the default). "Arrival" shows a teen's reply as it is written and checks it as it comes, so part of a sentence can show before its check finishes and the reply stops there if the check fails. Children and anything spoken always check every sentence first. |
+| **Chat model choice** | `engines.chat.choice` | auto | basic | Choose the model for the Chat role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Router model choice** | `engines.router.choice` | auto | basic | Choose the model for the Router role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Embed model choice** | `engines.embed.choice` | auto | basic | Choose the model for the Embed role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Rerank model choice** | `engines.rerank.choice` | auto | basic | Choose the model for the Rerank role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Vision model choice** | `engines.vision.choice` | auto | basic | Choose the model for the Vision role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Image model choice** | `engines.image.choice` | auto | basic | Choose the model for the Image role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Video model choice** | `engines.video.choice` | auto | basic | Choose the model for the Video role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Music model choice** | `engines.music.choice` | auto | basic | Choose the model for the Music role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Coding model choice** | `engines.coding.choice` | auto | basic | Choose the model for the Coding role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Judge model choice** | `engines.judge.choice` | auto | basic | Choose the model for the Judge role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Tts model choice** | `engines.tts.choice` | auto | basic | Choose the model for the Tts role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Stt model choice** | `engines.stt.choice` | auto | basic | Choose the model for the Stt role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Wakeword model choice** | `engines.wakeword.choice` | auto | basic | Choose the model for the Wakeword role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Turn Signal model choice** | `engines.turn_signal.choice` | auto | basic | Choose the model for the Turn Signal role. Auto follows the selected setup plan. Only an admin can change this. |
+| **Reach the engine computer when away from home** | `engines.stack.remote.allow_tailnet` | off | advanced | Off, Home reaches the engine computer only from inside your home network. On, Home may also reach it through your private tailnet when you are away. Turn it on only if you have joined both computers to your tailnet yourself. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Engine computer name** | `engines.stack.remote.host` | empty | basic | The name of the computer that runs the engine, the way your network knows it. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Engine computer local port** | `engines.stack.remote.local_port` | 8771 | advanced | The port on this computer where the engine computer's connection appears. Change it only if another program already uses it. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **Engine computer secure connection port** | `engines.stack.remote.ssh_port` | 22 | advanced | The port Home uses to open its secure connection to the engine computer. Leave it at 22 unless that computer was set up differently. Only an admin can change this. Shown only while the engine runs on another computer. |
+| **MaiPai Stack address** | `engines.stack.url` | empty | expert | Empty uses Home's own built-in engines. With the engine on this computer, set this to the address of the MaiPai Stack installed here to route chat, embeddings and voice through it. With the engine on another computer, Home fills this in for you from the connection settings, so leave it empty. Only an admin can change this. |
+| **Help the chat remember to search the web** | `chat.search_assist` | shadow | advanced | "Off" is the kill switch: nothing is scored. "Shadow" (the default) only counts, as a number, how often a web search looked needed, and changes no reply. "Rescue" is not active yet; for now it behaves like shadow. Children and teens are never scored. |
+| **Use the MaiPai Stack for chat** | `engines.stack.use_chat` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Use the MaiPai Stack for search (embeddings)** | `engines.stack.use_embeddings` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Use the MaiPai Stack for listening (speech to text)** | `engines.stack.use_stt` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Use the MaiPai Stack for speaking (text to speech)** | `engines.stack.use_tts` | off | expert | Deprecated, ignored. A configured Stack serves every role. |
+| **Where the engine runs** | `engines.stack.where` | this_computer | basic | "This computer" runs the engine on the machine Home is installed on. "Another computer" runs it on a different computer in your home that you reach over your network. Only an admin can change this. |
+| **Hugging Face token (for voice cloning)** | `voice.hf_token` | empty | advanced | Needed to clone a voice from a recording. Accept the terms at huggingface.co/kyutai/pocket-tts, then create a read token at huggingface.co/settings/tokens and paste it here. |
+
+### Home settings > Search > Blocked sites [#home-settings--search--blocked-sites]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Blocked sites with child controls** | `search.blocklists.child` | ["blp-gambling", "blp-scam", "blp-phishi | advanced | Which lists of blocked sites are checked when MaiPai searches the web for people using child controls. Adult sites are always blocked for child and teen controls and are not listed here. Home downloads each list once and keeps it up to date. Web search for child controls starts once every list checked here has been downloaded. Only an admin can change this. |
+| **Blocked sites with teen controls** | `search.blocklists.teen` | ["blp-gambling", "blp-scam", "blp-phishi | advanced | Which lists of blocked sites are checked when MaiPai searches the web for people using teen controls. Adult sites are always blocked for child and teen controls and are not listed here. Web search for teen controls starts once every list checked here has been downloaded. Only an admin can change this. It does not show anyone what a teen searched for or which sites were blocked. |
+| **Blocked sites with adult controls** | `search.blocklists.adult` | [] | advanced | Lists of blocked sites to check when MaiPai searches the web for adults. None are checked unless you pick them. Scam, phishing and malware lists are a good start for a household that wants that protection. Only an admin can change this. |
+| **Kinds of sites to block** | `search.blocklists` | [] | advanced | Kinds of sites that web search, page reads and answer pictures leave out. Kids, Teens and Adults each start from their own user defaults. The global defaults add kinds for everyone, and a user override adds or removes kinds for one person. The adult-site list is always on for a child or teen and no override can turn it off. Only an admin can change this, and it never shows what anyone searched for. |
+| **Always block these sites** | `search.hosts.deny` | empty | advanced | Sites that web search never shows for anyone, separated by commas, like example.com. A site you list here also blocks its subpages. This works for every age, and it always wins over the allowed list. Only an admin can change this. |
+| **Allow these sites** | `search.hosts.allow` | empty | advanced | Sites that web search may show even when a blocked-sites list has them, separated by commas, like example.com. It cannot allow an adult site for child or teen controls, and it cannot allow a site you list under Always block these sites. Only an admin can change this. |
+| **Always block these sites for child** | `search.hosts.child.deny` | empty | advanced | Sites that web search never shows to a child, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
+| **Allow these sites for child** | `search.hosts.child.allow` | empty | advanced | Sites that web search may show to a child even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
+| **Always block these sites for teen** | `search.hosts.teen.deny` | empty | advanced | Sites that web search never shows to a teen, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
+| **Allow these sites for teen** | `search.hosts.teen.allow` | empty | advanced | Sites that web search may show to a teen even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
+| **Always block these sites for adult** | `search.hosts.adult.deny` | empty | advanced | Sites that web search never shows to an adult, separated by commas, like example.com, on top of the household list. A site you list here also blocks its subpages. It always wins over the allowed lists. Only an admin can change this. |
+| **Allow these sites for adult** | `search.hosts.adult.allow` | empty | advanced | Sites that web search may show to an adult even when a blocked-sites list has them, separated by commas, like example.com, on top of the household list. It cannot allow an adult site for child or teen controls, and it cannot allow a site that is in an always-block list. Only an admin can change this. |
+
+### Home settings > Integrations > Home Assistant [#home-settings--integrations--home-assistant]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Home Assistant access token** | `home.access_token` | empty | advanced | A long-lived access token from your Home Assistant profile page, used to control your smart-home devices. |
+| **Home Assistant URL** | `home.base_url` | empty | advanced | The address of your Home Assistant instance, e.g. http://homeassistant.local:8123. |
+| **Safety alarm sensors** | `safety.alarm.sensors` | [] | basic | Home Assistant sensors whose alarm events the robot announces. No sensors are selected by default. |
+
+### Home settings > Network and access > Network [#home-settings--network-and-access--network]
+
+<Shot id="settings-network" />
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Home network port** | `network.hub_port` | 3000 | expert | The port Home listens on. Changing it needs a restart and changes the address devices use. Only an admin can change this. |
+| **Who can reach Home** | `network.lan_exposure` | lan | advanced | Loopback keeps Home on this computer. LAN lets devices on your home network connect. Changing this needs a restart. Only an admin can change this. |
+| **Away access through Tailscale** | `network.tailnet_access` | off | basic | Lets your devices reach Home through your private Tailscale network. Tailscale sees device names and addresses, not your conversations. Home never turns this on for you. Only an admin can change this. |
+
+### Home settings > Search > News shelf [#home-settings--search--news-shelf]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **News poll interval (seconds)** | `news.poll_interval_s` | 1800 | advanced | How often Home checks enabled news feeds. At least 900 seconds. |
+| **News retention (days)** | `news.retention_days` | 90 | advanced | How long Home keeps news items and stories. |
+| **News shelf** | `news.shelf.enabled` | on | advanced | Turn the household news shelf on or off. |
+| **News lists with child controls** | `news.lists.child` | ["feeds-children"] | basic | Which lists of news feeds appear on the news shelf for people using child controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
+| **News lists with teen controls** | `news.lists.teen` | ["feeds-household"] | basic | Which lists of news feeds appear on the news shelf for people using teen controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
+| **News lists with adult controls** | `news.lists.adult` | ["feeds-household"] | basic | Which lists of news feeds appear on the news shelf for people using adult controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this. |
+| **Extra news feeds for child** | `news.feeds.child` | empty | advanced | News feed addresses to add for people using child controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
+| **Extra news feeds for teen** | `news.feeds.teen` | empty | advanced | News feed addresses to add for people using teen controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
+| **Extra news feeds for adult** | `news.feeds.adult` | empty | advanced | News feed addresses to add for people using adult controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this. |
+
+### Home settings > Integrations > Telegram [#home-settings--integrations--telegram]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Quiet hours start** | `household.quiet_hours.from` | 21:00 | basic | Quiet hours begin at 9:00 pm by default. Safety alarms always override quiet hours. |
+| **Quiet hours end** | `household.quiet_hours.to` | 07:00 | basic | Quiet hours end at 7:00 am by default. |
+| **Telegram bot token** | `notifications.telegram.bot_token` | empty | advanced | A bot token from @BotFather, used to send notifications to Telegram. One bot for the whole household; each person links their own chat below. |
+
+### Home settings > Integrations > Reference library [#home-settings--integrations--reference-library]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Reference library location** | `reference.library_dir` | empty | basic | Where the household's offline knowledge archives live: a local folder, an external drive, or a NAS mount. Empty uses Home's own data folder. Moving this later moves the files and updates the library records. |
+| **Reference update speed limit (MB/s)** | `reference.update.max_mbps` | 20 | advanced | Not active yet. Planned; this setting has no effect today. |
+
+### Home settings > Search > Web search [#home-settings--search--web-search]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Look up words online** | `search.dictionary_fallback` | off | advanced | Look up a word online when the library does not have it. The word you ask about is sent to Wiktionary (Wikimedia). Adults only. Off by default. |
+| **Search fetch cache limit (GB)** | `search.fetch_cache_gb` | 2 | advanced | Maximum disk space used for cached search pages. The default is 2 GB on p16 and 10 GB on p64 and p128. |
+| **Your own SearXNG (optional)** | `search.searxng_url` | empty | advanced | Your own SearXNG (optional). Leave empty to use the search service MaiPai runs for you. |
+| **Search sources** | `search.source_mode` | mix | basic | Where MaiPai looks for answers: Internet first, Library only, or Library first (the recommended choice). Library only turns off just the live Wikipedia-style lookup; web search stays on unless web search is itself set to Library only. Children and teens keep their current protections in every mode, and this choice never widens what they can reach. |
+| **Encyclopedia lookups** | `search.source_mode.wikimedia` | inherit | advanced | Gives the live Wikipedia-style lookup its own choice. Same as the household choice follows the search sources setting. Library only turns this lookup off. Children and teens never use this lookup in any mode. |
+| **Web searches** | `search.source_mode.web` | inherit | advanced | Gives web search its own choice. Same as the household choice follows the search sources setting. Library only here turns off web search, link reading, Wayback and the hosted search provider together. Children and teens keep their current protections in every mode. |
+| **Web search with child controls** | `search.web.child_mode` | on | basic | When this is on, MaiPai can look things up on the web for people using child controls. Results go through SafeSearch at its strictest, adult sites are blocked, and links are hidden. When it is off, answers come only from the offline library. Only an admin can change this, and a child's searches show in that child's own chats. |
+| **Web search with teen controls** | `search.web.teen_mode` | on | basic | When this is on, MaiPai can look things up on the web for people using teen controls. Results go through SafeSearch at moderate or stricter, and adult sites are blocked. When it is off, answers come only from the offline library. Only an admin can change this. It does not show anyone what a teen searched for. |
+| **Web search sources** | `search.web_sources` | ["searxng"] | advanced | Which services answer web searches. SearXNG, the household's own search service, is on by default. DuckDuckGo is not available yet. With more than one picked, their results are blended into one list. Children and teens only use SearXNG. To turn web search off, set Web searches to Library only. Pictures and videos always use SearXNG. |
+| **Use archived pages when a source is missing** | `search.wayback_fallback` | on | advanced | Check the Wayback Machine when a cited page returns not found. |
+| **Brave Search key (optional)** | `search.brave_api_key` | empty | advanced | Optional. Search works without any key. If you add a Brave Search API key, an adult's web searches go to Brave Search instead of your SearXNG, so the words searched leave your house. A child's or teen's searches never do. The key is stored encrypted and can't be read back. Clear it to go back to keyless search. |
+
+### Home settings > General > Internet check [#home-settings--general--internet-check]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Internet check name** | `status.internet_probe.dns_name` | example.com | advanced | The name MaiPai looks up once a minute to check whether internet name lookups work. |
+| **Check whether the internet is reachable** | `status.internet_probe.enabled` | on | basic | Once a minute, MaiPai looks up a neutral name and opens an empty connection to the chosen address. Turn this off to stop those checks. |
+| **Internet check address** | `status.internet_probe.tcp_address` | 1.1.1.1 | advanced | The public IP address MaiPai connects to once a minute without sending data. |
+| **Internet check port** | `status.internet_probe.tcp_port` | 443 | advanced | The port MaiPai opens and immediately closes without sending data. |
+
+### Home settings > Storage and backups > Limits [#home-settings--storage-and-backups--limits]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Backup storage limit (GB)** | `backup.max_total_gb` | 0 | advanced | Once total backup storage passes this, the oldest backups are deleted first - checked after the normal seven-daily/four-weekly/three-monthly schedule. 0 means no extra limit. |
+| **Backup key saved** | `backups.emergency_kit_saved_at` | empty | basic | The date and time the owner saved or printed the emergency backup key. The key itself is never stored here. |
+| **Warn when free disk space drops below (GB)** | `storage.critical_free_gb` | 2 | advanced | A Repairs item is raised once free space on the hub's own disk drops below this. |
+| **Household storage cap (bytes)** | `storage.household.cap_bytes` | 0 | basic | The total bytes the whole household's files may use. 0 means no cap is set yet - the setup wizard sets this from the disk. |
+| **Default per-person storage cap (bytes)** | `storage.person.default_cap_bytes` | 21474836480 | basic | How many bytes each person may use for their own files, unless that person has their own override below. |
+
+### Home settings > General > Household [#home-settings--general--household]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Conversation history retention** | `household.conversation_retention_days` | 90 | advanced | How long chat history is kept before it's deleted. A safety-flagged conversation involving a teen or child is always kept for at least 90 days regardless of this setting. |
+| **Family name** | `household.family_name` | empty | basic | Not active yet. The name is saved but Home does not show it yet. |
+| **Home location** | `household.home` | empty | basic | The household place used as the fallback for location-based answers. |
+| **Language and region** | `household.locale` | en-US | basic | Sets the household's date, time, and unit formatting. |
+| **Household location** | `household.home_place` | empty | basic | The place MaiPai uses as the household fallback. |
+
+### Home settings > Privacy > Sensitive subjects [#home-settings--privacy--sensitive-subjects]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Bodies and relationships with teen controls** | `topics.teen.bodies` | informative | basic | How MaiPai answers teens' questions about puberty, sex, consent, relationships and identity. The standard answer is factual and respectful, and never sexual or romantic. It applies to everyone on teen controls and is set by an admin. An admin cannot see what a teen asks. |
+| **Drugs, alcohol and betting with teen controls** | `topics.teen.risk` | informative | basic | How MaiPai answers teens' questions about drugs, alcohol, vaping, gambling and dangerous challenges. The standard answer explains the real risks and how to get help fast, and never gives tips for getting high, buying or betting. It applies to everyone on teen controls and is set by an admin. An admin cannot see what a teen asks. |
+
+### Robot settings [#robot-settings]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Robot greeting style** | `robot.greetings.mode` | gesture | basic | Use a gesture by default; spoken greeting remains subject to person and age-band rules. |
+| **Offer acceptance phrases** | `robot.initiative.accept_phrases` | default | basic | Uses the closed default set: “go ahead” or “yes please” to accept, and “not now” or “no thanks” to decline. No gesture accepts an offer. |
+| **Robot initiative** | `robot.initiative.enabled` | on | basic | When on, the robot may make approved offers. On by default for gestures only; spoken offers remain controlled by tiers_spoken. |
+| **Maximum offers per hour** | `robot.initiative.max_offers_per_hour` | 3 | basic | At most three offers per hour by default; tier 3 is limited to one. |
+| **Spoken offer tiers** | `robot.initiative.tiers_spoken` | tier_1 | basic | Tier 1 may speak; tiers 2 and 3 ask first by default. |
+| **Allow robot live view** | `robot.live_view.enabled` | off | basic | Off until an admin enables it. Only admins and adults explicitly named in robot.live_view.who may view. |
+| **Adults allowed to view the robot camera** | `robot.live_view.who` | [] | basic | Admins can view. This list may name adults only; children and teens are never admitted. |
+| **Allow robot access over the tailnet** | `robot.offlan.tailnet` | off | advanced | Off by default. Turn on only after the owner manually joins the device to the household tailnet; Home holds no tailnet key. |
+| **Child safety alarm line** | `safety.alarm.child_line` | Smoke alarm. Please go to your grown-up. | basic | Spoken after a mapped safety alarm for a child. |
+| **Safety alarm repeat interval** | `safety.alarm.repeat_seconds` | 20 | basic | Repeat between 10 and 60 seconds; 20 seconds by default. |
+| **Safety alarm voice** | `safety.alarm.voice` | default | basic | The fixed alarm voice; the deterministic alarm path does not use a model. |
+| **Safety alarm volume** | `safety.alarm.volume` | 70 | basic | Alarm volume has a hard floor of 70; Home enforces the floor. |
+| **Allow vision when requested** | `vision.on_request.enabled` | on | basic | Allows a requested camera turn. Frames are never kept for a child. |
+
+## Per-person settings [#per-person-settings]
+
+
+### Personal Settings > Commands (maps) [#personal-settings--commands-maps]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Maps places** | `maps.places` | [] | basic | Places saved for this surface. |
+| **Maps default place** | `maps.default_place` | current | basic | The place used by default on this surface. |
+
+### Person profile > Limits (daily minutes per package category) [#person-profile--limits-daily-minutes-per-package-category]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Daily Family minutes** | `allowance.family.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Fun minutes** | `allowance.fun.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Health minutes** | `allowance.health.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Home minutes** | `allowance.home.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Info minutes** | `allowance.info.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Learning minutes** | `allowance.learning.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Media minutes** | `allowance.media.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Robot body minutes** | `allowance.robot_body.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+| **Daily Utilities minutes** | `allowance.utilities.daily_minutes` | 0 | basic | Saved but not applied yet. Nothing limits time with it today. |
+
+### Chat settings [#chat-settings]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Send photos in chat** | `chat.photo_uploads` | on | basic | Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Show pictures in answers** | `reference.images` | on | basic | Adults and teens are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Show advanced reply stats** | `ui.show_turn_stats` | off | advanced | Show engine timing and token details below your chat replies. |
+
+### Personal Settings > Notifications > Alerts [#personal-settings--notifications--alerts]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Show alerts on this device** | `notifications.browser.enabled` | off | basic | You'll see a pop-up when MaiPai needs attention, while MaiPai is open. It won't reach you when MaiPai is closed. |
+| **Don't notify me about shares from** | `notifications.file_shared.muted_senders` | [] | basic | Pick anyone in the household whose shared files you don't want a notification about. You'll still be notified about everyone else's. |
+| **Send time-sensitive notifications to a robot** | `notifications.time_sensitive.robot` | off | basic | Deliver time-sensitive notifications through a robot channel when one is configured. Private notification content is never spoken. |
+| **Personal quiet hours start** | `person.quiet_hours.from` | empty | basic | Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own. |
+| **Personal quiet hours end** | `person.quiet_hours.to` | empty | basic | Leave unset to inherit household quiet hours. A parent sets this for a child; teens can set their own. |
+
+### Personal Settings > Voice (persona) [#personal-settings--voice-persona]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Personality** | `persona.active_id` | default | basic | How MaiPai talks to you: formality, complexity, and how much it follows up on what you say. |
+
+### Personal Settings > Profile [#personal-settings--profile]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Enrollment sounds** | `ui.enrollment_sounds` | on | basic | Play soft sounds during face enrollment as the camera finds your face, then a chime when a photo is taken. |
+
+### Personal Settings > Search [#personal-settings--search]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Safe search level** | `search.safe_search` | default | basic | How strictly web search filters results for you. "Default" follows your age: strict for a child, moderate for a teen, off for an adult. A child's is always strict. A teen can make theirs stricter but never lower than moderate. An adult can change their own. |
+| **Page text check** | `search.page_text_cleaning` | off | advanced | When this is on, text MaiPai fetches from a web page is checked and cleaned before the assistant reads it. It is on by default for Kids and Teens and off for Adults. An admin can change it for everyone or for one person. A child or teen cannot turn it off. |
+
+### Personal Settings > Developer tools > Session lock [#personal-settings--developer-tools--session-lock]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Require PIN to unlock after inactivity** | `security.session_lock_required` | off | expert | When on, this account locks behind its PIN or password after sitting idle. Content stays put; unlocking just re-enters the PIN. Set by an owner or admin, for any account. |
+| **Session lock timeout (minutes)** | `security.session_lock_timeout_minutes` | 5 | expert | How many minutes of inactivity before this account locks, when session lock is required. |
+
+### Personal Settings > Data and privacy > Storage [#personal-settings--data-and-privacy--storage]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **This person's storage quota (GB)** | `storage.person_quota_gb` | 0 | advanced | How much disk space this person's own uploads (cloned voices today) may use. 0 means no limit. |
+| **This person's storage cap override (bytes)** | `storage.person.cap_bytes` | 0 | advanced | Overrides the household's default per-person cap for this one person. 0 means no override: this person follows the household default. Set by an owner or admin. |
+
+### Personal Settings > Notifications > Telegram [#personal-settings--notifications--telegram]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Telegram me when someone is asking for approval** | `notifications.approvals.requested.telegram` | off | basic |  |
+| **Telegram me when backups start failing** | `notifications.backups.target_failing.telegram` | off | basic |  |
+| **Telegram me when a Stack engine reports an open warning or critical problem** | `notifications.engines.problem.telegram` | off | basic |  |
+| **Telegram me when a Stack engine updates** | `notifications.engines.update_applied.telegram` | off | basic |  |
+| **Telegram me when a Stack engine has an update available** | `notifications.engines.update_available.telegram` | off | basic |  |
+| **Telegram me when a Stack engine fails to update** | `notifications.engines.update_failed.telegram` | off | basic |  |
+| **Telegram me when someone shares a file with the household** | `notifications.file.shared_with_household.telegram` | off | basic |  |
+| **Telegram me when someone shares a file with me** | `notifications.file.shared_with_you.telegram` | off | basic |  |
+| **Telegram me when I have trouble remembering something from our conversation** | `notifications.memory.judge_failed.telegram` | off | basic |  |
+| **Telegram me when I remember something from our conversation** | `notifications.memory.updated.telegram` | off | basic |  |
+| **Telegram me when a model download fails** | `notifications.model.download_failed.telegram` | off | basic |  |
+| **Telegram me when a model finishes downloading** | `notifications.model.download_ready.telegram` | off | basic |  |
+| **Telegram me when a child or teen's profile band updates on a birthday** | `notifications.person.band_changed.telegram` | off | basic |  |
+| **Telegram me about new Repairs items** | `notifications.repairs.new.telegram` | off | basic |  |
+| **Your Telegram chat id** | `notifications.telegram.chat_id` | empty | basic | Message the household bot once, then paste the chat id it replies with, to receive your notifications on Telegram. |
+| **Telegram me when a MaiPai Home update is available** | `notifications.updates.available.telegram` | off | basic |  |
+
+### Person profile > Topics (Sensitive subjects) [#person-profile--topics-sensitive-subjects]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Bodies and relationships** | `topics.bodies` | default | basic | How MaiPai answers a child's questions about bodies, babies, crushes and relationships. The standard answer gently points them to you. Only a parent or admin can change a child's. It applies only while the person is on child controls and never reaches the care, safety and fairness rules, which stay the same for every child. |
+| **Illness, death and health** | `topics.health` | default | basic | How MaiPai answers a child's questions about illness, death, grief and medicine. The standard answer is honest, short and gentle. Only a parent or admin can change a child's. It applies only while the person is on child controls and never reaches the care, safety and fairness rules, which stay the same for every child. |
+| **Drugs, alcohol, betting and dares** | `topics.risk` | default | basic | How MaiPai answers a child's questions about medicine, drugs, alcohol, vaping, betting and dangerous dares. The standard answer explains simply that these are unsafe or for adults. Only a parent or admin can change a child's. It applies only while the person is on child controls and never reaches the care, safety and fairness rules, which stay the same for every child. |
+| **Violence, weapons and scary news** | `topics.violence` | default | basic | How MaiPai answers a child's questions about violence, weapons, war, scary news and scary stories. The standard answer says what happened without gore and that helpers keep people safe. Only a parent or admin can change a child's. It applies only while the person is on child controls and never reaches the care, safety and fairness rules, which stay the same for every child. |
+| **Santa Claus and other family stories** | `topics.family_stories` | keep | basic | Whether MaiPai keeps stories like Santa Claus, the Tooth Fairy and the Easter Bunny for a child: it never says whether they are real, plays along, and points the child to the family. Turn it off if you would rather MaiPai answered plainly. Only a parent or admin can change a child's. It applies only while the person is on child controls. |
+| **Names of family stories** | `topics.family_story_names` | Santa Claus, the Tooth Fairy, the Easter Bunny | basic | The stories MaiPai keeps for this child, separated by commas. Add your family's own, such as Elf on the Shelf or the Three Kings. Only a parent or admin can change a child's. |
+
+### Personal Settings > Voice [#personal-settings--voice]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Speaking voice** | `tts.voice_id` | alba | basic | The voice MaiPai uses when it reads its replies aloud to you. |
+
+### Personal Settings > Appearance > Appearance [#personal-settings--appearance--appearance]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Start tours automatically** | `tours.autostart.enabled` | on | basic | A guide opens on a page's first visit when enabled. Help can open Show me around at any time. |
+| **Appearance** | `ui.appearance` | system | basic | Light, dark, or match this device's own setting. |
+| **Look** | `ui.look` | neutral | basic | Neutral is the standard black-and-white theme, the same as shadcn's own dashboard; the rest are shadcn's other color sets; Navy is MaiPai's own. |
+| **Pinned apps (advanced)** | `ui.pinned_apps` | [] | expert | A JSON list of nav entry ids, in the order they should appear. Normally set by pinning an app, not by editing this directly. |
+| **Setup checklist items hidden** | `setup.checklist_dismissed` | [] | expert | A JSON list of setup checklist item ids this person chose not to see again. |
+
+### Personal Settings > Appearance > Ease of use [#personal-settings--appearance--ease-of-use]
+
+<Shot id="settings-ease" />
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Comfort style** | `ease.preset` | standard | basic | A bundle of comfort settings: text size, spacing, button size, contrast, calm and helpers. Pick one, then change any single setting below. It is about comfort, not age, and it never changes what is safe or allowed. |
+| **Text size** | `ease.text_size` | preset | basic | Percent of the normal text size. "Preset" follows your ease of use choice. |
+| **Spacing** | `ease.spacing` | preset | basic | How much room there is between things. "Preset" follows your ease of use choice. |
+| **Button size** | `ease.targets` | preset | basic | The smallest size of a button or tap area. Large is about 2 cm. "Preset" follows your ease of use choice. |
+| **Contrast** | `ease.contrast` | preset | basic | More makes text stand out at 7 to 1. "Preset" follows your ease of use choice. |
+| **Motion and color** | `ease.motion` | preset | basic | Calm mutes colors and stops animation. "Preset" follows your ease of use choice. |
+| **Simple mode** | `ease.simple_mode` | preset | basic | Shows only the main apps and settings and hides the rest. It hides, it does not forbid. "Preset" follows your ease of use choice. |
+| **Reading level** | `ease.reading_level` | standard | basic | How plainly MaiPai words its answers and app text: standard, plain or very simple. It changes words and sentence shape only, never what MaiPai will talk about. |
+| **Short explainers** | `ease.explainers` | preset | basic | Shows a short note at the top of a screen about what it is for, until you dismiss it. "Preset" follows your ease of use choice. |
+| **Word help** | `ease.word_help` | preset | basic | Press a word to see what it means in plain words. "Preset" follows your ease of use choice. |
+| **Read aloud** | `ease.read_aloud` | preset | basic | Adds a button to read replies and news aloud in MaiPai's own voice. "Preset" follows your ease of use choice. |
+
+### Robot settings [#robot-settings-1]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Robot may listen for a follow-up** | `person.robot.follow_up` | on | basic | Adults and teens are on by default. Children are off unless a parent enables this. |
+| **Robot may greet by name** | `person.robot.greet_by_name` | on | basic | Adults are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Robot may address this person** | `person.robot.may_address` | on | basic | Adults are on by default. Children are off until a parent enables this; teens control their own setting. |
+| **Allow playful robot clips** | `person.robot.playful_clips` | on | basic | Adults are on by default; children are off until a parent enables this. Teens control their own setting. |
+| **Robot conversation topics** | `person.robot.topics` | nudges | basic | Controls optional nudges and chit-chat. Adults get nudges on and chit-chat off by default; children get both off. Teens control their own setting. |
+| **Allow robot gesture sensing** | `person.vision.gestures` | on | basic | On by default; a parent can change a child setting and teens control their own setting. |
+| **Robot vision watch level** | `person.vision.watch` | presence | basic | Identity is used only for enrolled people. Children stay at presence until a parent chooses; teens control their own setting. The stricter person and robot levels apply. |
+
+### Personal Settings > Commands (weather) [#personal-settings--commands-weather]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Weather places** | `weather.places` | [] | basic | Places saved for this surface. |
+| **Weather default place** | `weather.default_place` | current | basic | The place used by default on this surface. |
+
+## This device [#this-device]
+
+
+### Robot hello (this device) [#robot-hello-this-device]
+
+| Setting | Key | Default | Level | What it does |
+|---|---|---|---|---|
+| **Full open-mic interruption** | `robot.barge_in.open_mic` | off | advanced | Robot-only device setting delivered by Home as settings_changed. Off until arrival-day echo-cancellation measurements pass. |
+| **Robot camera watch level** | `robot.camera.watch_level` | identify | basic | Robot-only device setting delivered by Home as settings_changed. The stricter of this and each person’s watch level applies. |
+| **Robot follow-up window** | `robot.follow_up.seconds` | 8 | basic | Robot-only device setting delivered by Home as settings_changed. 0 disables the window; child access still requires the person switch. |
+| **Robot gesture sensing** | `robot.gestures.enabled` | off | basic | Robot-only device setting delivered by Home as settings_changed. Packages may explicitly arm gestures while this is off. |
+| **Robot idle movement** | `robot.idle.level` | calm | basic | Robot-only device setting delivered by Home as settings_changed. |
+| **Allow offers in this room** | `robot.initiative.allowed_here` | off | basic | Robot-only device setting delivered by Home as settings_changed. Off until an admin allows offers in this room. |
+| **Sleep when dark and quiet** | `robot.sleep.auto` | on | basic | On by default. This robot goes to sleep after 10 minutes of darkness and no speech, and during household quiet hours. A face, speech or a knock wakes it, and the wake word still works. Turn off to keep it awake. Only an admin changes this, for each robot on its own. |
+
+
+# Use another computer for the AI (/docs/admin/install-and-set-up/use-another-computer-for-the-ai)
+
+Home can use the AI engines (the Stack) on the same computer, or on a second computer in your home. A second computer is useful when it has a stronger graphics card or more memory than the one running Home.
+
+<Shot id="settings-engines" />
+
+## ✅ Before you start [#-before-you-start]
+
+- The second computer runs Ubuntu Linux. Other systems are not supported for this.
+- Both computers are on the same home network.
+- You can use `sudo` on the engine computer.
+
+## 🔧 Set up the engine computer [#-set-up-the-engine-computer]
+
+1. On the engine computer, run the installer with the engine option.
+
+```bash
+sudo bash /home/example/home/scripts/install.sh --engine-computer
+```
+
+The installer creates a `maipai-stack` service user, installs the Stack under `/opt/maipai-stack`, keeps its data in `/data/stack`, and enables SSH, asking first if `openssh-server` is missing. It then installs the `maipai-engine` tool.
+
+2. Wait for "Ready to pair."
+
+## 🔗 Pair it with Home [#-pair-it-with-home]
+
+1. In Home, open **Settings**, **Home settings**, **Engines and AI**.
+2. Press **Pair engine computer**.
+3. Pick **Another computer**, then **Next**.
+4. Type the engine computer's name or home network address, for example `192.0.2.20`, and its SSH port (usually 22).
+5. Press **Get a one-time code**. Home shows a command like `sudo maipai-engine pair https://home.example ABCD-EFGH-JKLM`. Copy it.
+6. Run that command on the engine computer. The code works once and Home shows when it expires. The command prints a **check code**.
+7. Back in Home, press **Check the engine computer**, type the check code, then press **Pin this computer**.
+
+Home reads the computer's security key and compares the check code, so you know you are talking to your machine and not another one.
+
+Home runs a hop-by-hop connection test and shows **PASS** or **FAIL** for each hop with the fix.
+
+## 🩺 Check it later [#-check-it-later]
+
+- **Engines** shows **Engine health** and a **Check the connection** button.
+- On the engine computer, `sudo maipai-engine status` and `sudo maipai-engine doctor` report what is running.
+- **Needs restart** or **Update available** on a row means exactly that.
+
+## ✂️ Unpair [#️-unpair]
+
+1. On the engine computer, run `sudo maipai-engine unpair`.
+2. In Home, press **Revoke link key**.
+
+## 🌍 Away from home [#-away-from-home]
+
+Reaching the engine computer through Tailscale is off by default. Turn on the `engines.stack.remote.allow_tailnet` setting only after you have joined both computers to your Tailscale network yourself. See [Remote access](/docs/admin/connect-and-extend/remote-access).
+
+## 🔧 If chat stops answering [#-if-chat-stops-answering]
+
+**Engines** says "No Stack configured" when no engine is set. Open **Where the engine runs**, pick one, and run **Check the connection**. The page for the Home computer is at [Troubleshooting](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+
+# Backups and restore (/docs/admin/look-after-it/backups-and-restore)
+
+{/* generated-source: backend/src/lib/backup.ts, backend/src/lib/restoreStaging.ts, backend/src/lib/emergencyKit.ts, backend/src/lib/backupTargets.ts, backend/src/routes/backups.ts, frontend/src/shell/pages/BackupsPage.tsx */}
+
+A backup is one encrypted copy of Home's household database: people, memories, conversations and settings. Models, engines, the reference library and uploaded files are not in it. Those are downloaded or copied again after a restore.
+
+<Shot id="backups" />
+
+## ⏰ What happens on its own [#-what-happens-on-its-own]
+
+- Home takes a backup **every day**.
+- It keeps **7 daily**, **4 weekly** and **3 monthly** copies, and deletes older ones.
+- **Backup storage limit (GB)** under Storage and backups is 0 by default, which means no limit. Set a number and Home deletes the oldest first to stay under it.
+- Backups go in the `backups` folder beside the data folder. Files are named `backup-<time>-<suffix>.db.enc`.
+
+A backup on the same disk as Home does not survive that disk failing. Copy the `backups` folder to another disk or computer regularly.
+
+## 🔑 Save your backup key [#-save-your-backup-key]
+
+Backups are encrypted. The **backup key** is what lets a new computer read them. The setup wizard offers **Save your backup key** at the end, with **Download** and **Print**. The file is `maipai-home-emergency-backup-key.txt`. Saving the key later from **Settings**, **Backups** gives the same file name.
+
+Keep it somewhere other than the Home computer, such as a password manager or a printed page in a drawer. Without it, a restore on a new computer cannot read the backups.
+
+If Home fails to make the key, it says "Home couldn't make your backup key. Press Download again." If it fails again, open Repairs.
+
+## 💾 Back up now [#-back-up-now]
+
+1. Open **Settings**, then **Home settings**, then **Storage and backups**, then **Backups**.
+2. Press **Back up now**.
+3. The new copy appears in the table with its date and size.
+
+Owners and admins can do this. A new household shows "No backups yet." until the first run.
+
+## ♻️ Restore [#️-restore]
+
+Only the owner can restore.
+
+1. Open **Backups**.
+2. Press **Restore** on the row you want and confirm.
+3. A **Ready to restore** banner appears. Restart Home.
+4. At the next start Home swaps in the restored database.
+
+Before it swaps, Home takes a fresh backup and checks the archive. If the file cannot be read, Home says "that backup could not be read. Try another one." Press **Cancel restore** on the banner to change your mind before restarting.
+
+The database you replaced is kept as `hub.db.pre-restore`. Keep it until you are sure the restore is right.
+
+## 🗄️ A second copy [#️-a-second-copy]
+
+Home can also copy backups to a mounted folder, such as a NAS share. Planned, not in the app yet: a screen for it. Today the folder is set through the Home API by an owner or admin. If that copy starts failing, Home raises a **Repairs** item and can message you on Telegram. See [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram).
+
+## 🧪 Practice [#-practice]
+
+A restore you have never tried is a guess. Once, on a spare computer, install Home, restore a backup with your saved key and sign in.
+
+
+# Devices and signed-in sessions (/docs/admin/look-after-it/devices-and-sessions)
+
+This page shows your own devices and sessions. It is not a household list.
+
+## ✍️ Steps [#️-steps]
+
+1. Open **Settings**, **Data and privacy**, then **Signed-in devices**.
+2. Under **Devices** you see paired robots, pods, TVs, phones, desktops and browsers, with the room and when each was last seen. A device that never connected says "never connected".
+3. Tap **Remove** beside one, then **Yes, remove it**. It must be paired again to reconnect. **Keep it** cancels.
+4. Under **Signed-in sessions**, tap **Sign out** beside another browser, then **Yes, sign it out**.
+
+Your current session shows **This device** and has no sign-out button. Use **Log out** in the profile menu for that.
+
+If nothing is paired, you see "No devices paired to your profile yet."
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a list will not load, reload the page. If it keeps failing, see [Troubleshooting and support report](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+
+# Performance (/docs/admin/look-after-it/performance)
+
+This page is for owners and admins. Other roles are refused.
+
+## ✍️ Steps [#️-steps]
+
+1. Open **Settings**, **Home settings**, **Maintenance**, then **Performance**.
+2. Read the cards:
+
+| Card | What it shows |
+|---|---|
+| **Reply time per day** | How long replies took each day. |
+| **Queues** | Waiting work: **Memory judge**, **Embedding retry**, **Ingestion**. |
+| **Turns per engine** | Which engine answered. |
+| **Route taken** | Which path each turn followed. |
+| **Layers** | Time spent in each step of a turn. |
+| **Label harvest** | How many turns were counted in the window. |
+| **Engines** | Engine health. |
+| **Storage & hardware** | Disk and computer details. |
+
+The numbers come from what Home already records. Nothing new is collected, and nothing leaves the house.
+
+**Layers** says "No traced turns yet" until a turn has left a timing trace.
+
+If the page fails, it says "Could not load performance." Reload it. See [Troubleshooting](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a queue keeps growing, open **Status** in **Maintenance** and check the engines.
+
+
+# Privacy audit (/docs/admin/look-after-it/privacy-audit)
+
+{/* generated-source: backend/src/lib/privacy.ts, backend/src/routes/privacy.ts, backend/packages manifests (data_sources) */}
+
+Home runs in your house. Nothing leaves unless a row on this page says so. Open it at **Settings**, **Home settings**, **Privacy**, **What connects to the internet**, or **Settings**, **Data and privacy** for your own view.
+
+The page is built from the code and each package's declared sources, so it cannot drift from what Home does. A row shows only while that feature is in use.
+
+## 🌍 What can leave the house [#-what-can-leave-the-house]
+
+| Row | When | What goes |
+|---|---|---|
+| Model downloads (wake word, face, speech, robot) | Once per model, the first time a feature needs it. For the wake word, that is the first time someone switches it on in chat. | A download request |
+| Update check (GitHub) | At most once a day | Your internet address |
+| Blocked-site index and lists | Index about daily, lists about monthly | Your internet address. Shown only while a list is on. |
+| Internet check | Once a minute | A DNS lookup of example.com and an empty connection to 1.1.1.1:443. Turn it off under **Internet check**. |
+| News feeds | About every 30 minutes at most, while the shelf is on | A plain request for the feed file |
+| Reference books (Kiwix) | When an adult installs or updates one | A download request |
+| Answer pictures (Wikipedia, Wikidata) | When a picture is picked for an answer | A request for the picture |
+| Voice list | When an adult opens the list of voices | A request for the list |
+| DuckDuckGo | Adult web search, only if picked | The search words |
+| Brave | Adult web search, only with a key | The search words |
+| Telegram | When a notification you chose fires | The notification text |
+| Tailscale and Let's Encrypt | Only after an owner turns on away access, and at renewal | Device names, the computer's name |
+
+A child's or teen's search words never go to DuckDuckGo or Brave.
+
+## 🏠 What stays on your network [#-what-stays-on-your-network]
+
+| Row | Destination |
+|---|---|
+| Home Assistant | Your own Home Assistant on your LAN |
+| Robot connection addresses | A paired robot asking Home for addresses |
+| API token | Only if an adult creates a token and gives it to another app |
+| Engine computer | Your engine computer, when someone chats or asks for a picture. Through Tailscale when you are away. |
+
+## ✅ How to check it yourself [#-how-to-check-it-yourself]
+
+1. Open the page and read each row's destination.
+2. Confirm every destination is one you expect.
+3. To turn something off: the internet check under **Internet check**, the news shelf under **News shelf**, Telegram by clearing the token, DuckDuckGo by unpicking it, Brave by clearing its key, away access under **Network and access**.
+4. Look again. The row is gone when the feature is off.
+
+Package data sources appear here too, with the destination, when, what and who. For how privacy works in plain words, see [What never leaves](/docs/user/privacy-and-safety/what-never-leaves).
+
+There is no row for MaiPai itself. Home has no MaiPai-run service in your data path.
+
+
+# Troubleshooting and support report (/docs/admin/look-after-it/troubleshooting-and-support-report)
+
+<Shot id="repairs" />
+
+## 🛠️ Repairs [#️-repairs]
+
+Open **Settings**, **Home settings**, **Maintenance**, then **Repairs**. Home lists problems it found, such as web search failing, a backup copy failing or an engine reporting trouble. Each item may have a fix button, named for what it does, and has a **Dismiss** button.
+
+- The fix button runs the repair Home offers. Not every item has one.
+- **Dismiss** asks you to confirm, then hides the item.
+
+Only an owner or admin can fix or dismiss. If a button fails, Home says "Could not fix that repair." or "Could not dismiss that repair." Reload the page and try again. If the list does not load, it says "Could not load repairs." Check Home is running and that you are signed in as an owner or admin.
+
+Tick **Telegram me about new Repairs items** to hear about them when you are out.
+
+## 🩺 Other places to look [#-other-places-to-look]
+
+| Page | Use it for |
+|---|---|
+| **Status** (Maintenance) | Whether Home, the engines and the internet check are working. |
+| **Performance** (Maintenance) | How busy the computer is. |
+| **Engines** | Engine health, and **Check the connection** to a separate engine computer. |
+| **Storage** | Free disk space. Home warns when free space drops below 2 GB. |
+| `data/local-app/app.log` | The log when you run from source. |
+
+## 🧰 Common fixes [#-common-fixes]
+
+| Symptom | Do this |
+|---|---|
+| Chat does not answer | Open **Engines**. If it says "No Stack configured", set the engine location. See [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai). |
+| Web search says it is not set up | Add a SearXNG address. See [Set up web search](/docs/admin/connect-and-extend/web-search). |
+| Phone cannot reach Home | See [Reach Home when you are away](/docs/admin/connect-and-extend/remote-access). |
+| Someone cannot sign in | See [Cannot sign in](/docs/user/fix-a-problem/cannot-sign-in). |
+
+## 📄 Support report [#-support-report]
+
+Home can build a redacted report for you to attach when you ask for help. Open `/api/storage/diagnostics` while signed in as an owner or admin. It returns:
+
+- Home's instance id, never the household's name.
+- People: id, role, whether enabled, where they came from and when created. No names.
+- Issue source, key, severity and times. No titles or details.
+- Package ids, status and smoke test results.
+- Household settings, without secrets.
+- A storage summary.
+
+It never contains conversations, memories, files or names. Read it before you send it.
+
+Planned, not in the app yet: a **Create a report** button.
+
+
+# Read a turn trace (/docs/admin/look-after-it/turn-trace)
+
+This page is for owners and admins.
+
+## ✍️ Steps [#️-steps]
+
+1. In Chat, find the reply you want to look at and tap the **More** (three dots) button under it.
+2. Tap **Turn trace**.
+3. Read the **Turn trace** page. The **Trace** card lists each step as a bar, with the total time in milliseconds.
+
+Steps include the pipeline stages, **Model generation** and **Tool call**. Each can be completed, failed, skipped or running.
+
+## 🔒 What it never shows [#-what-it-never-shows]
+
+A trace holds names and timings only. It has no message text, no tool details and no names of people. A turn from a temporary or Incognito chat has no trace.
+
+**Turn trace** shows only for owners and admins, and not in an Incognito chat. You can also open `/trace/` followed by a turn's id on your Home address.
+
+If it cannot load, it says "Could not load this trace." Tap **Try again**. A not-found answer means the turn is unknown or was private.
+
+## 🙋 Still need help? [#-still-need-help]
+
+For overall timing, use [Performance](/docs/admin/look-after-it/performance).
+
+
+# Updates and rollback (/docs/admin/look-after-it/updates-and-rollback)
+
+<Shot id="updates" />
+
+## 🔍 What Home checks [#-what-home-checks]
+
+Home asks GitHub once a day for the latest MaiPai Home release. If a robot is paired, it also checks the bot release. It sends no name or device ID.
+
+Open **Settings**, **Home settings**, **Maintenance**, then **Updates**. The table has **Name**, **Installed**, **Available**, **Last checked** and **Status**. A row says **Up to date** or shows the newer version.
+
+Only an owner or admin can manage updates.
+
+## 🛠️ Update Home [#️-update-home]
+
+Planned, not in the app yet: installing a Home update from this page. Home shows that one is available. You update it by hand.
+
+1. Take a backup first. See [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+2. Stop Home. If you run it from source, run `bun stop` in the Home folder. If you used the installer, stop the `maipai-home` service.
+3. Install the new release from the GitHub release page, or pull the new tag if you run from source.
+4. Run `bun install --force` if you run from source.
+5. Start Home again.
+6. Open **Updates** and check **Installed** shows the new version.
+
+Planned, not in the app yet: a fixed update window and a kept previous release for one-click rollback of Home itself. To go back today, reinstall the earlier release and, if the data changed, restore the backup from step 1.
+
+## ⚙️ Engines [#️-engines]
+
+Rows for the AI engines (the Stack) have two buttons:
+
+- **Apply** installs the update.
+- **Go back** returns to the previous version after you confirm.
+
+Choosing how reference library updates run, and capping their download speed, is planned, not available yet. The two settings exist but have no effect today.
+
+## 📣 Get told [#-get-told]
+
+Tick **Telegram me when a MaiPai Home update is available** and the engine update switches in your Notifications settings. See [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram).
+
+## 🔧 If the check shows nothing [#-if-the-check-shows-nothing]
+
+Home may have no internet, or GitHub may have limited the request. Wait a day and look again. Open **Repairs** for anything Home flags.
+
+
+# Add people and parental controls (/docs/admin/people-and-safety/add-people-and-parental-controls)
+
+This page is for owners and admins.
+
+## 👤 Add a person [#-add-a-person]
+
+<Shot id="roles-users" />
+
+1. Open **Settings**, then **Home settings**, then **Users**.
+2. Under **Add someone**, type the person's name.
+3. Pick a **Role**. The list shows only the roles you may create. An admin sees adult, teen, child and guest. An owner also sees admin and owner.
+4. For an owner, admin or adult, type a **PIN or password**. They use it to sign in. Teens, children and guests need none.
+5. Press **Add to household**.
+
+If you skip the PIN for a role that needs one, Home says "This role requires a PIN or password. Enter one above, then try again." If something else fails, Home says "Could not add that person." Check the name is filled in, then try again.
+
+The person's age group follows the role. A child gets child controls, a teen gets teen controls. See [People, roles and permissions](/docs/admin/how-it-works/people-roles-and-permissions).
+
+## ✏️ Change a role or remove someone [#️-change-a-role-or-remove-someone]
+
+- Only the owner can change a role. Open **Users** and pick the new role next to the name.
+- To lock a person's session after idle time, tick **Require PIN lock** next to the name and set the timeout in minutes. The default is 5.
+- To remove someone, press **Remove**, then **Yes, remove**. Home shows how many files only that person could see. Those files are deleted with them. Files other people can see stay with the household. For a child, you can download their files first. A person's own files are private, so ask an adult to save theirs.
+- Home will not remove or demote the only owner.
+
+## 🧒 A child's controls [#-a-childs-controls]
+
+Open **Family**, then the child's card. Two tabs are only for owners and admins:
+
+| Tab | What you set |
+|---|---|
+| **Limits** | Daily minutes for each kind of app (Family, Fun, Health, Home, Info, Learning, Media, Robot body, Utilities). 0 means no limit. The minutes are saved but not applied yet. Also the child's storage. |
+| **Topics** | **Sensitive subjects**. See [Safety settings](/docs/admin/people-and-safety/safety-settings). |
+
+Changes save as you make them. The child cannot open either tab.
+
+## 🧑 A teen's controls [#-a-teens-controls]
+
+There is no per-teen screen. Teen settings are household-wide and sit under Settings, Privacy and Search. A teen's own profile, chats and settings are private from admins.
+
+## 🤝 When a child has a hard moment [#-when-a-child-has-a-hard-moment]
+
+Every adult gets a notice that "A check-in may help." It names the child and not what was said. This cannot be turned off.
+
+## 🙋 Support [#-support]
+
+- Someone cannot sign in: see [Cannot sign in](/docs/user/fix-a-problem/cannot-sign-in).
+- To see what each role sees, see [What each role can do](/docs/user/your-family/what-each-role-can-do).
+
+
+# Blocked-site lists and news feeds (/docs/admin/people-and-safety/blocked-sites-and-news-feeds)
+
+This page is for owners and admins.
+
+<Shot id="settings-search" />
+
+## 🚫 Blocked-site lists [#-blocked-site-lists]
+
+Web search checks every result against lists of sites that are blocked for the age group. Home downloads the lists from The Block List Project and refreshes them about monthly. It asks for the list index about daily. Neither request carries a name or device ID.
+
+| List | Child | Teen | Adult |
+|---|---|---|---|
+| **Adult sites** | On, locked | On, locked | Off |
+| **Gambling sites** | On | On | Off |
+| **Scam sites** | On | On | Off |
+| **Phishing sites** | On | On | Off |
+| **Malware sites** | On | On | Off |
+| **Drug sites** | On | Off | Off |
+
+"Locked" means nobody can turn it off.
+
+## ✍️ Change a list for one person [#️-change-a-list-for-one-person]
+
+1. Open **Settings**, then **Home settings**, then **Search**.
+2. Find **Blocked sites by person** and pick the **Person**.
+3. The left column shows the global defaults. Tick or untick a box in the person's column.
+4. To undo a change, use the reset link beside the row.
+
+Rows you cannot change are the age group's setting, or a block that always stays on.
+
+## 🌐 Your own site rules [#-your-own-site-rules]
+
+Under the advanced Search settings you can add sites by hand, separated by commas, such as `example.com`:
+
+- **Always block these sites** and **Allow these sites** apply to everyone.
+- The same pair exists for child, teen and adult.
+
+An allow entry shows a site even when a list has it. Use it sparingly for children.
+
+## 📰 News feeds [#-news-feeds]
+
+The News shelf on Home is on by default. Pick which feed lists each age group sees:
+
+| Setting | Default |
+|---|---|
+| **News lists with child controls** | Kids' news |
+| **News lists with teen controls** | Household news |
+| **News lists with adult controls** | Household news |
+
+To add your own, put the feed addresses in **Extra news feeds for** child, teen or adult. Each must start with `https://`.
+
+Home polls feeds every 1800 seconds by default (900 is the minimum) and keeps 90 days of items. It reads only the feed file, never the articles. Each feed adds a row on the [privacy page](/docs/admin/look-after-it/privacy-audit).
+
+## 🔧 When a list does not download [#-when-a-list-does-not-download]
+
+Home shows a notice under Settings, Repairs. Check the computer has internet, then reopen Repairs. Search keeps working, using the lists it already has.
+
+Planned, not in the app yet: importing your own blocklist files.
+
+
+# Safety settings for children and teens (/docs/admin/people-and-safety/safety-settings)
+
+This page is for owners and admins. Home gives children and teens stricter answers than adults. You can tune some of that. You cannot remove it.
+
+## 🔒 What cannot be turned off [#-what-cannot-be-turned-off]
+
+These stay the same for every child and teen, whatever you set:
+
+- Age and surface checks come before everything else in a reply.
+- Feelings and safety get care first, with a pointer to a trusted grown-up.
+- Bullying, secrets and sharing where a child lives are never helped.
+- On religion and politics, Home takes no side.
+- If a child is in danger, Home points to a grown-up and the emergency number.
+- The **Adult sites** blocklist is always on for children and teens.
+- A child's hard-moment notice to adults. See [Add people](/docs/admin/people-and-safety/add-people-and-parental-controls).
+- Reasoning text is never sent to a child or teen.
+- Children's safe search is always strict. A teen's is never lower than moderate.
+
+## 🎚️ What you can change for a child [#️-what-you-can-change-for-a-child]
+
+Open **Family**, the child's card, then **Topics**. Each subject has a level:
+
+| Subject | Choices |
+|---|---|
+| Bodies and relationships | **Follow child controls (recommended)**, **Gently point to you**, **Answer simply with correct body words** |
+| Illness, death and health | **Follow child controls (recommended)**, **Answer gently and honestly**, **Gently point to you** |
+| Drugs, alcohol, betting and dares | **Follow child controls (recommended)**, **Explain simply and kindly**, **Gently point to you** |
+| Violence, weapons and scary news | **Follow child controls (recommended)**, **Answer gently, no gore**, **Gently point to you** |
+| Santa Claus and other family stories | **Keep the stories (recommended)** or **Don't keep them**; edit **Names of family stories** |
+
+Only an owner or admin can change these.
+
+## 🧑 What you can change for every teen [#-what-you-can-change-for-every-teen]
+
+These are household settings under **Settings**, then **Home settings**. The topic levels are under **Privacy**, the web search switch under **Search**, and the reply check under **Engines and AI**, **Chat**:
+
+| Setting | Default | Effect |
+|---|---|---|
+| **Bodies and relationships with teen controls** | Answer factually | Factual and respectful, never sexual or romantic. Can be set to **Point to a trusted adult or doctor**. |
+| **Drugs, alcohol and betting with teen controls** | Explain the real risks | Real risks and how to get help, never tips. Can be set to **Point to a trusted adult or doctor**. |
+| **Web search with teen controls** | On | Off means offline library only. |
+| **How a teen's replies are checked** | Sentence | Sentence checks every sentence before a teen sees it. Arrival shows text as it is written and checks it as it comes, so part of a sentence can show before its check ends. |
+
+Children, and anything spoken, always check every sentence first. An admin cannot see what a teen asks.
+
+## 🔎 Web search for minors [#-web-search-for-minors]
+
+| Setting | Default |
+|---|---|
+| **Web search with child controls** | On: strictest SafeSearch, adult sites blocked, links hidden |
+| **Page text check** | On for children and teens. They cannot turn it off. |
+
+See [Web search](/docs/admin/connect-and-extend/web-search) and [Blocked-site lists](/docs/admin/people-and-safety/blocked-sites-and-news-feeds).
+
+## ⚠️ If a setting looks greyed out [#️-if-a-setting-looks-greyed-out]
+
+A lock means the setting belongs to the age group or the person. Ask the owner, or read the help text under the setting. A teen's own settings are not yours to change.
+
+
+# Build a package (/docs/developers/build/build-a-package)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Manifest, kinds, permissions, publish to the catalog.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- None. Text only.
+
+## Kept current by [#kept-current-by]
+
+Kept in step with the manifest schema from commons.
+
+
+# Write docs and screenshots (/docs/developers/build/docs-and-screenshots)
+
+## Declare what a page covers [#declare-what-a-page-covers]
+
+Every page under `content/docs` and every key in `screenshots.json` has an entry in `docs/site-fumadocs/docs-covers.json`:
+
+```json
+"user/everyday-use/use-incognito": { "areas": ["incognito"] }
+```
+
+- `areas` names code groups defined once at the top of the file, each a list of globs.
+- `covers` adds extra globs for one page (for example `docs/design/RULES.md`).
+- `ignore` lists globs that never count as a change: tests, locales, docs.
+- `baseline` is the commit the docs were last verified at, used until a `v*` tag exists.
+
+## Check what changed [#check-what-changed]
+
+```bash
+bun scripts/docsDrift.ts
+```
+
+It lists the pages to re-check and the pictures to retake since the last release tag. `--since <ref>` picks another start, `--json` gives machine output, `--check` fails if a page or picture has no entry.
+
+## Screenshots [#screenshots]
+
+Pictures come only from the screenshot script. The drift output prints the `DOCS_SHOTS_ONLY=...` line that retakes just the affected docs pictures. A picture whose file does not start with `docs-` comes from the general screenshot run. Open every retaken picture before using it.
+
+## Kept current by [#kept-current-by]
+
+[Keeping the docs current](/docs/keeping-docs-current) explains the release step. The test `scripts/docsDrift.test.ts` fails if the map falls out of step with the pages.
+
+
+# UI rules in practice (/docs/developers/build/ui-rules)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Kit Elements as shipped, tokens, never wrappers.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- Right and wrong examples. Caption: "A kit Element used as shipped."
+
+## Kept current by [#kept-current-by]
+
+Lint output of the UI rules.
+
+
+# For developers 🧱 (/docs/developers)
+
+<Callout type="warn" title="Table of contents draft">Kept small on purpose. Written after the User and Admin guides are signed off.</Callout>
+
+**Contributors only.** Architecture, how to build, and generated reference.
+
+
+# API reference (/docs/developers/reference/api-reference)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Every route, generated.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- None. Text only.
+
+## Kept current by [#kept-current-by]
+
+Generated from code: the page is rebuilt by the docs script and the gate fails on a hand edit. Source: the generated OpenAPI file.
+
+
+# Design record (/docs/developers/reference/design-record)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Index of design notes with status current, superseded, historical.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- None. Text only.
+
+## Kept current by [#kept-current-by]
+
+Generated index (DOCS-INDEX-01).
+
+
+# Design rules (/docs/developers/reference/design-rules)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+The hard rules, with links to the authority file.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- None. Text only.
+
+## Kept current by [#kept-current-by]
+
+Linked, never copied.
+
+
+# Architecture map (/docs/developers/start/architecture-map)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Hub, Stack, commons, catalog, bot: who owns what and how they talk.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- Diagram (generated). Caption: "The products and how they connect."
+
+## Kept current by [#kept-current-by]
+
+Reviewed whenever the platform note changes.
+
+
+# Repo layout and pins (/docs/developers/start/repo-layout)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Backend, frontend, commons pins, lockfile rules.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- None. Text only.
+
+## Kept current by [#kept-current-by]
+
+Generated folder map and pin list.
+
+
+# Run it locally (/docs/developers/start/run-it-locally)
+
+<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+
+## What this page will cover [#what-this-page-will-cover]
+
+Clone, install, start, seeded demo household, run the gate.
+
+## Screenshots it will have (each with a caption) [#screenshots-it-will-have-each-with-a-caption]
+
+- None. Text only.
+
+## Kept current by [#kept-current-by]
+
+Commands pulled from the package scripts.
+
+
+# MaiPai Home documentation (/docs)
+
+<Callout type="warn" title="Table of contents draft">Pick a guide on the left. Each page here is a plan. When you approve, I write them.</Callout>
+
+<div className="pic-cards">
+  <a className="pic-card" href="/home/docs/user/"><img src="/home/img/chat.png" alt="" /><div><strong>User guide</strong><span>For everyone in the house. 23 short pages.</span></div></a>
+  <a className="pic-card" href="/home/docs/admin/"><img src="/home/img/repairs.png" alt="" /><div><strong>Admin guide</strong><span>For the person who runs it. 18 pages.</span></div></a>
+  <a className="pic-card" href="/home/docs/developers/"><img src="/home/img/people.png" alt="" /><div><strong>For developers</strong><span>Architecture and reference. 9 pages.</span></div></a>
+  <a className="pic-card" href="/home/docs/keeping-docs-current/"><img src="/home/img/home.png" alt="" /><div><strong>Keeping the docs current</strong><span>How pages and screenshots update when code changes.</span></div></a>
+</div>
+
+
+# Keeping the docs current (/docs/keeping-docs-current)
+
+## The idea in one line [#the-idea-in-one-line]
+
+Docs are updated when you cut a release, never on a push, and only the pages and pictures whose code changed.
+
+## How it works [#how-it-works]
+
+- One file, `docs/site-fumadocs/docs-covers.json`, says which code each guide page and each screenshot describes.
+- At release time `bun scripts/docsDrift.ts` compares the code changed since the last `v*` tag with that file. It prints the pages to re-check and the pictures to retake.
+- The release step then updates only that list. Pictures from the docs run are retaken with `DOCS_SHOTS_ONLY`, so nothing else is regenerated.
+- Edits to tests, locale files and the docs themselves never mark a page as changed.
+- Before the first release tag exists, the window starts at the commit the docs were last verified against.
+
+## What a contributor does [#what-a-contributor-does]
+
+- A new page or picture gets its entry in `docs-covers.json` in the same commit. A test fails if one is missing or points at nothing.
+- `bun scripts/docsDrift.ts --check` runs the same completeness check by hand.
+
+## What this does not solve [#what-this-does-not-solve]
+
+- A change in meaning that touches no listed file (a new rule). Someone still has to say "this affects the docs".
+- Screenshots of a feature that has no demo data yet. The seeded household must gain that data first.
+- Pages generated from code, and a hand-edit guard for them, are not part of this step.
+
+
+# Ask it to look something up (/docs/user/everyday-use/ask-it-to-look-something-up)
+
+MaiPai decides on its own when to look something up. You can also ask it to.
+
+## ✍️ Steps [#️-steps]
+
+1. Open a chat.
+2. Type what you want to know, such as "Look up when the next train leaves."
+3. Send the message.
+4. Read the answer. Small numbers like [1] mark facts that came from a page.
+5. Tap a number to see which page it came from.
+6. Open **Sources** under the answer to see the whole list.
+
+## 🔒 What gets sent [#-what-gets-sent]
+
+A search sends only your search words, with no name or address. The Privacy page explains it. See [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house).
+
+## 👶 For children and teens [#-for-children-and-teens]
+
+Their searches follow the house settings, and what MaiPai reads is checked first.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If searching does nothing, an admin may have it off: see [Web search](/docs/admin/connect-and-extend/web-search). Or see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer).
+
+
+# Find and share your files (/docs/user/everyday-use/find-and-share-your-files)
+
+## ✍️ Steps [#️-steps]
+
+1. In a chat, find a document MaiPai made. Tap the **More** button beside it.
+2. Tap **Show in Library**. The **Library** opens.
+3. Use **Search your Library**, **Whose** and **Kind** to find a file.
+4. Tap **View details** on a row, or pick it under **Select a file**.
+
+## 🤝 Share a file [#-share-a-file]
+
+Under **Shared with**, pick a person or **The whole household**. Tap **Share**. To stop, tap **Unshare** beside the name.
+
+You can only share files that are yours. A file shared with you shows under **Shared with me** in **Whose**.
+
+## ⬇️ Keep a copy [#️-keep-a-copy]
+
+In the file details, use the download button to save a copy.
+
+If the Library is empty, it says "Nothing here yet. Stories, pictures and documents you make in chat are kept here."
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a file you made is missing, ask the person who runs the house.
+
+
+# Keep chats in a project (/docs/user/everyday-use/keep-chats-in-a-project)
+
+## ✍️ Steps [#️-steps]
+
+1. In **Chat**, find **Projects** in the chat list. Tap **See all projects**.
+2. Tap **Create**.
+3. In **Project settings**, type a **Project name**. Add a **Description** and **Instructions** if you like.
+4. Tap **Save**.
+5. Tap the project's name to open it and chat inside it.
+
+## 🔍 Find and change one [#-find-and-change-one]
+
+Type in **Search projects** to narrow the list. Tap the pencil to change a project. If it is yours, you can also pin it, or tap **Delete project**. Deleting a project keeps its chats.
+
+**Instructions** shape the answers in that project.
+
+## 👨‍👩‍👧 Good to know [#-good-to-know]
+
+Children cannot create projects. The page is hidden while Incognito is on.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If the **Create** button is missing, you may be signed in as a child. Ask the person who runs the house.
+
+
+# Make it easier to read (/docs/user/everyday-use/make-it-easier-to-read)
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Settings**, then **Appearance**.
+2. Find the **Ease of use** card.
+3. Under **Comfort style**, pick one:
+   - **Standard**: MaiPai as it comes.
+   - **Comfortable**: bigger words and more room.
+   - **Large**: bigger words and buttons, stronger contrast.
+   - **Simple**: bigger buttons, calm colors and helpers.
+4. Watch the page change right away.
+
+## 🎚️ Change one thing [#️-change-one-thing]
+
+Each row on the card changes one setting, like text size or motion. A row set to **Preset** follows your style. Change one row and the rest keep following.
+
+After you change a row you see a line like "Large + 2 changes". Tap **Back to Large** to undo them.
+
+## 🔒 A greyed-out row [#-a-greyed-out-row]
+
+If an admin set a row for you, it is greyed out and says so. Ask them if you want it changed.
+
+<Callout type="info">These choices change comfort only. They never change what is safe or allowed.</Callout>
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a change will not save, see [If a setting will not save](/docs/user/fix-a-problem/a-setting-will-not-save).
+
+
+# Rate or fix a reply (/docs/user/everyday-use/rate-or-fix-a-reply)
+
+Every reply has a row of small buttons under it.
+
+## 🔘 What the buttons do [#-what-the-buttons-do]
+
+- **Copy**: copies the reply.
+- **Read aloud**: reads it to you.
+- **Helpful**: tells MaiPai the answer was good.
+- **Not helpful**: opens a short form.
+- **Refresh**: asks for a new answer.
+- **More**: more choices. Adults and teens can pick **Remember this** to keep a fact.
+
+## ✍️ Steps to say what went wrong [#️-steps-to-say-what-went-wrong]
+
+1. Tap **Not helpful** under the reply.
+2. Under **What went wrong?**, pick one or more: Wrong, Too long, Didn't listen, Off topic, or Unsafe.
+3. Add a short note if you like. It is optional.
+4. Tap **Send feedback**.
+
+Children rate with the thumbs only. To take back a rating, tap the lit thumb again.
+
+## 🔁 Try again [#-try-again]
+
+Tap **Refresh** to get a new answer to the same question.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a reply never arrives, see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer). If an answer worried you, tell a grown-up in the house.
+
+
+# See what it remembered (/docs/user/everyday-use/see-what-it-remembered)
+
+MaiPai remembers things that help it answer you, such as a favorite food. You can see them and remove them.
+
+## ✍️ Steps to see them [#️-steps-to-see-them]
+
+1. Tap **Family** in the main menu.
+2. Tap your own card.
+3. Tap the **Memories** tab.
+
+<Shot id="memory" />
+
+If it says "Nothing remembered yet.", there is nothing stored.
+
+## 🗑️ Forget one [#️-forget-one]
+
+Tap the archive-box button beside a memory. It is removed from what MaiPai uses.
+
+## 🗑️ Forget several [#️-forget-several]
+
+1. Tap **Select memories**.
+2. Tick the ones to remove.
+3. Tap **Forget selected**, then confirm. Or tap **Clear all** to remove every one.
+
+Forgetting cannot be undone. Choose **Keep them** if you change your mind.
+
+## 👥 Who may hear a memory [#-who-may-hear-a-memory]
+
+Adults can choose who a memory may be shared with: everyone, teens and adults, or adults only.
+
+## 🙋 Still need help? [#-still-need-help]
+
+To erase more than memories, see [Forget something](/docs/user/privacy-and-safety/forget-something). If this page will not load, see [If a page will not load](/docs/user/fix-a-problem/page-will-not-load).
+
+
+# See your notifications (/docs/user/everyday-use/see-your-notifications)
+
+## ✍️ Steps [#️-steps]
+
+1. Tap the bell, or open your profile menu and tap **Notifications**. A small list of new notices opens.
+2. Tap **Dismiss** beside a notice to clear it, or **Dismiss all** to clear the list.
+3. Tap **View history** to see older ones.
+4. On the history page, tap **Select**, choose some, then tap **Dismiss selected**. Or tap **Clear all**.
+
+<Shot id="notifications" />
+
+<Shot id="notifications-history" />
+
+History goes back 30 days. A notice you cleared shows a **Dismissed** badge. One you opened shows **Read**. If nothing came in, you see "Nothing in the last 30 days."
+
+## 👨‍👩‍👧 If you are a parent [#-if-you-are-a-parent]
+
+You also get a note when a child had a conversation that seemed to weigh on them. It carries the child's name only, never what was said. It cannot be turned off.
+
+## 📨 Notices elsewhere [#-notices-elsewhere]
+
+An admin can also send notices to Telegram. See [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram).
+
+## 🙋 Still need help? [#-still-need-help]
+
+If the bell stays empty and you expected a notice, ask the person who runs the house.
+
+
+# Send a message (/docs/user/everyday-use/send-a-message)
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Chat** in the main menu.
+2. Tap **New chat** to start fresh, or tap an older chat in the list to keep going.
+3. Click the box that says **Send a message...**
+4. Type your question.
+5. Press Enter, or tap **Send message**.
+6. Read the answer as it appears.
+7. If you scrolled up, tap **Scroll to bottom** to jump to the newest text.
+
+## 📎 Adding a file [#-adding-a-file]
+
+Tap the **+** button (**Add Attachment**) next to the box to add a file or picture to your message.
+
+## 🔎 Find an old chat [#-find-an-old-chat]
+
+Tap **Search chats** and type a word from the chat you want.
+
+## 🏷️ Rename or delete a chat [#️-rename-or-delete-a-chat]
+
+Open the chat, then tap the menu at the top, called **Conversation actions**. Pick **Rename** or **Delete**. For more on deleting, see [Forget something](/docs/user/privacy-and-safety/forget-something).
+
+## 🙋 Still need help? [#-still-need-help]
+
+If no answer comes, see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer).
+
+
+# Talk instead of type (/docs/user/everyday-use/talk-instead-of-type)
+
+## ✍️ Steps to talk [#️-steps-to-talk]
+
+1. Open a chat.
+2. Tap the microphone button (**Voice input**) in the message box.
+3. If your browser asks to use the microphone, choose to allow it. MaiPai cannot hear you until you do.
+4. Say your question.
+5. Tap **Stop dictation** when you finish. Your words appear in the box.
+6. Check them, then send the message.
+
+## 🔊 Hear an answer [#-hear-an-answer]
+
+Under a reply, tap **Read aloud**. Tap **Stop reading** to quiet it. In the menu at the top, called **Conversation actions**, **Read replies aloud** reads every reply. You see it only when your house has a voice set up.
+
+## 🎙️ Wake word [#️-wake-word]
+
+On a computer where the wake word files are installed, owners, admins and adults can turn on wake word listening so they do not have to tap. Teens, children and guests do not get it. It is off until you turn it on.
+
+1. In a chat, tap the microphone button in the message box that says **Turn on wake word listening**. You do not see it if the files are not installed.
+2. Allow the microphone if your browser asks.
+3. Say "Hey Jarvis". That is the only wake word today, and you cannot change it. The voice conversation opens.
+4. To stop, tap **Turn off wake word listening** in the red bar that says "Listening for Hey Jarvis".
+
+The setting belongs to this device, not to you. Listening is paused while a voice conversation is open and stops when you close the page.
+
+<Callout type="info">The microphone works only while the page is open and you have allowed it.</Callout>
+
+## 🙋 Still need help? [#-still-need-help]
+
+If it cannot hear you, see [If voice does not work](/docs/user/fix-a-problem/voice-does-not-work). An admin can set up voices: see [Settings reference](/docs/admin/install-and-set-up/settings-reference).
+
+
+# Use Incognito (/docs/user/everyday-use/use-incognito)
+
+## ✍️ Steps [#️-steps]
+
+1. Tap your picture at the bottom of the left rail. The profile menu opens.
+2. Tap **Incognito**. It shows **On**, and your picture gets a purple ring.
+3. A box called "What Incognito does" appears the first time. Tap **Got it**.
+4. Chat as usual.
+5. To finish, open the profile menu and tap **Incognito** again. It shows **Off**.
+
+## 🕶️ What it does [#️-what-it-does]
+
+Incognito turns off memory and personalization across MaiPai. What you do while it is on stays out of your history. When you turn it off, those chats are forgotten.
+
+What is kept: nothing is saved to your history or memories. MaiPai holds the chat in the hub's working memory only, so it can follow the conversation while you talk. That copy is dropped when you turn Incognito off, after the chat has sat idle for two hours, or when the hub restarts. It does not keep a turn trace either.
+
+Incognito belongs to the tab you are in. A new tab starts with it off. While it is on, the **Projects** page sends you back to chat.
+
+## 👨‍👩‍👧 Who can use it [#-who-can-use-it]
+
+Incognito chats are for owners, admins and adults. Teens, children and guests do not get Incognito chats. The **Incognito** item may still show in their profile menu, but the hub refuses to start a private chat for them, so nothing is turned on for them.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If Incognito does not start a chat, check your role in [What each role can do](/docs/user/your-family/what-each-role-can-do). Ask the person who runs the house to change it.
+
+
+# If a setting will not save (/docs/user/fix-a-problem/a-setting-will-not-save)
+
+## 🔒 A lock means an admin controls this one [#-a-lock-means-an-admin-controls-this-one]
+
+A greyed-out or locked setting was set by an admin. You cannot change it. The row says who to ask.
+
+## ✍️ Steps [#️-steps]
+
+1. Look for a lock or a grey row next to the setting.
+2. If you see one, ask an admin to change it or unlock it for you.
+3. If there is no lock, reload the page and try again.
+4. Check that you are on the right page. Your own settings are under **Settings**.
+5. If it still snaps back, check for a message near the setting and follow it.
+
+## 🎚️ Comfort settings [#️-comfort-settings]
+
+For text size and motion, a row set to **Preset** follows your style. Pick a different **Comfort style** or change the single row. See [Make it easier to read](/docs/user/everyday-use/make-it-easier-to-read).
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Settings reference](/docs/admin/install-and-set-up/settings-reference). Others, see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# If you cannot sign in (/docs/user/fix-a-problem/cannot-sign-in)
+
+<Shot id="sign-in-wrong-pin" />
+
+## ✍️ Steps [#️-steps]
+
+1. Make sure you picked your own name from the list.
+2. Type your 4 digits again under **Enter your PIN**.
+3. If your sign-in is a longer password, tap **Use a password instead**. Type it in **Password** and tap **Sign in**.
+4. To go back to digits, tap **Use a PIN instead**. To pick a different name, tap **Back**.
+5. If it still fails, ask an admin to reset your PIN.
+
+After a wrong PIN you see a tip about using a longer password. That tip is a hint, not a lock.
+
+## 🆕 A brand new install [#-a-brand-new-install]
+
+If nobody has been added yet, MaiPai opens its setup instead. Ask the person who installed it.
+
+## 🔐 Teens, children and guests [#-teens-children-and-guests]
+
+You may not need a PIN at all. Adults, admins and owners always do.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [First-run setup](/docs/admin/install-and-set-up/first-run-setup). Others, see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# If chat does not answer (/docs/user/fix-a-problem/chat-does-not-answer)
+
+## ✍️ Steps [#️-steps]
+
+1. Wait a minute. The first answer after a restart can be slow, and you may see **Starting your AI…**.
+2. If an error shows, tap **Retry**.
+3. Reload the page and send the message again.
+4. Open **Home** and look at the **Repairs** card. A number means something needs fixing.
+5. Open **Repairs**. Each row says what is wrong and how to fix it.
+
+<Shot id="repairs" />
+
+6. If a repair needs an admin, tell the person who runs the house.
+
+Admins also see **Error details** on a failed answer. Send those to whoever helps with the house.
+
+## 🔁 Try a fresh start [#-try-a-fresh-start]
+
+Tap **New chat** and ask something short. If that works, the old chat may be the problem.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Troubleshooting and support report](/docs/admin/look-after-it/troubleshooting-and-support-report). Others, see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# If a page will not load (/docs/user/fix-a-problem/page-will-not-load)
+
+## ✍️ Steps [#️-steps]
+
+1. Check that your phone or computer is on your home Wi-Fi.
+2. Reload the page.
+3. Close the tab and open MaiPai Home again with the address the person who runs the house gave you.
+4. Try a different browser.
+5. If you see "Could not reach the hub.", the computer that runs MaiPai may be off or restarting. Wait a few minutes and try again.
+6. Ask the person who runs the house to check that the computer is on.
+
+<Callout type="info">Away from home, MaiPai only opens if an admin set up remote access.</Callout>
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Remote access](/docs/admin/connect-and-extend/remote-access) and [Troubleshooting and support report](/docs/admin/look-after-it/troubleshooting-and-support-report). Others, see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# Still stuck (/docs/user/fix-a-problem/still-stuck)
+
+## ✍️ Steps [#️-steps]
+
+1. Write down what you were doing and what you saw. Include the words on any message.
+2. Tell the person who runs the house. They are the owner or an admin.
+3. Tell them the time it happened and whether it happens every time.
+
+## 🧰 For the person who runs the house [#-for-the-person-who-runs-the-house]
+
+Admins can build a support report to share when asking for help. See [Troubleshooting and support report](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+Other useful pages:
+
+- [Updates and rollback](/docs/admin/look-after-it/updates-and-rollback)
+- [Backups and restore](/docs/admin/look-after-it/backups-and-restore)
+- [Where your data lives](/docs/admin/how-it-works/where-your-data-lives)
+
+## 🙋 Still need help? [#-still-need-help]
+
+Open the [Admin guide](/docs/admin/) and read the troubleshooting page. If you run the house, it covers the next steps.
+
+
+# If voice does not work (/docs/user/fix-a-problem/voice-does-not-work)
+
+## 🎤 It cannot hear you [#-it-cannot-hear-you]
+
+1. Tap the microphone button (**Voice input**).
+2. When your browser asks to use the microphone, choose to allow it.
+3. If you said no before, open your browser's site settings for MaiPai Home and allow the microphone there.
+4. Say your question, then tap **Stop dictation**.
+
+## 🔊 It will not speak [#-it-will-not-speak]
+
+1. Look for **Read aloud** under a reply. If you do not see it, your house has no voice set up yet.
+2. Turn up your device volume.
+3. Tap **Read aloud** again.
+
+## 👂 The wake word [#-the-wake-word]
+
+1. Wake word listening is for owners, admins and adults only, and it is off until someone turns it on.
+2. Look for the microphone button that says **Turn on wake word listening** in the message box. If it is missing, wake word is not set up on this house's Home, and no screen in Home sets it up. Ask the person who runs the house.
+3. The only wake word is "Hey Jarvis". Allow the microphone in your browser, and keep the MaiPai page open.
+4. A red bar that says "Listening for Hey Jarvis" shows while it is on. Tap **Turn off wake word listening** to stop it.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins can set voices: see [Settings reference](/docs/admin/install-and-set-up/settings-reference). Others, see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# MaiPai Home 🏠 (/docs/user)
+
+**Welcome. Pick a topic and follow the steps.**
+
+<div className="hero"><img src="/home/img/home.png" alt="The MaiPai Home screen" /></div>
+
+<div className="pic-cards">
+  <a className="pic-card" href="/home/docs/user/start-here/what-maipai-home-is"><img src="/home/img/home.png" alt="" /><div><strong>🚀 Start here</strong><span>What MaiPai Home is, your first message, and the main menu.</span></div></a>
+  <a className="pic-card" href="/home/docs/user/everyday-use/send-a-message"><img src="/home/img/chat.png" alt="" /><div><strong>💬 Everyday use</strong><span>Chat, talk, look things up, memories and notices.</span></div></a>
+  <a className="pic-card" href="/home/docs/user/your-family/who-is-in-the-house"><img src="/home/img/people.png" alt="" /><div><strong>👨‍👩‍👧 Your family</strong><span>Who is in the house, roles, and looking after children.</span></div></a>
+  <a className="pic-card" href="/home/docs/user/privacy-and-safety/what-stays-in-the-house"><img src="/home/img/privacy.png" alt="" /><div><strong>🔒 Privacy and safety</strong><span>What stays in the house and how to forget something.</span></div></a>
+  <a className="pic-card" href="/home/docs/user/fix-a-problem/chat-does-not-answer"><img src="/home/img/repairs.png" alt="" /><div><strong>🛟 Fix a problem</strong><span>Steps for chat, pages, voice, sign-in and settings.</span></div></a>
+</div>
+
+
+# Forget something (/docs/user/privacy-and-safety/forget-something)
+
+Forgetting cannot be undone.
+
+<Shot id="memory" />
+
+## 💬 Delete a chat [#-delete-a-chat]
+
+1. Open the chat.
+2. Tap the menu at the top, **Conversation actions**.
+3. Tap **Delete**.
+
+## 🧠 Forget a memory [#-forget-a-memory]
+
+1. Tap **Family**, then your own card.
+2. Tap **Memories**.
+3. Tap the archive-box button beside a memory. Or tap **Select memories**, tick some, and tap **Forget selected**.
+4. To remove all of them, tap **Clear all**, then **Yes, forget all**. Choose **Keep them** to stop.
+
+## 👶 Erase everything about a child [#-erase-everything-about-a-child]
+
+Owners and admins only:
+
+1. Open the child's profile and tap **Memories**.
+2. Tap **Forget everything about** and the child's name.
+3. Confirm with **Yes, forget everything**.
+
+Before you erase, tap **Export** and the child's name first if you want a copy.
+
+## 🔐 Teens and adults [#-teens-and-adults]
+
+Only that person can forget their own memories. An admin cannot.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Ask the person who runs the house. Admins, see [Backups and restore](/docs/admin/look-after-it/backups-and-restore).
+
+
+# What never leaves (/docs/user/privacy-and-safety/what-never-leaves)
+
+{/* generated-source: docs/user/privacy.md */}
+
+These stay on your computer:
+
+- Your conversations.
+- Everything MaiPai remembers.
+- Every profile in your household.
+- Anything your family says. It is never used to train anything.
+
+## 🚫 What MaiPai does not collect [#-what-maipai-does-not-collect]
+
+- No usage stats.
+- No crash reports.
+
+## 🌐 Your browser [#-your-browser]
+
+Your browser saves MaiPai's own screens so the app can open without internet. It never stores what you typed or what MaiPai remembers.
+
+## 🕶️ Temporary chats [#️-temporary-chats]
+
+An owner, admin or adult can mark a chat as temporary. Its turns are not added to history or memory. If you open it again, the old turns do not return. This covers MaiPai on this computer only.
+
+## 💛 A child's hard moment [#-a-childs-hard-moment]
+
+The adults get a note with the child's name only, never what was said. It cannot be turned off.
+
+## ✍️ Check it [#️-check-it]
+
+1. Tap **Privacy**.
+2. Read **What leaves your house**. It names every exception.
+
+## 🙋 Still need help? [#-still-need-help]
+
+See [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house), or ask the person who runs the house.
+
+
+# What stays in the house (/docs/user/privacy-and-safety/what-stays-in-the-house)
+
+Your conversations, memories and family profiles stay on the computer in your house. MaiPai does not run a server that your family's information passes through. Nothing reports back about how you use it.
+
+## ✍️ See for yourself [#️-see-for-yourself]
+
+1. Tap **Privacy** in the main menu.
+2. Read the answers to "Can someone outside see what we say to MaiPai?" and "Can someone reach into your house?"
+3. Open **What leaves your house** to see every connection.
+
+For each connection you see **When** it happens, **What it sends**, **Who gets it** and **How long they keep it**. Anything not listed does not happen.
+
+## 📨 What can leave [#-what-can-leave]
+
+A feature can send the small piece it needs, such as your search words or the place for a weather check. A web search sends the words you searched, never your name or address. A child's or teen's search never goes to DuckDuckGo or Brave, and it follows the household **Search sources** choice.
+
+## 🕶️ Temporary chats [#️-temporary-chats]
+
+An owner, admin or adult can mark a chat as temporary. It is not saved to history or memory.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Not sure why a connection is listed? Ask the person who runs the house. Admins, see [Privacy audit](/docs/admin/look-after-it/privacy-audit).
+
+
+# Find your way around (/docs/user/start-here/find-your-way-around)
+
+The main menu runs down the left side on a computer. On a phone it stays as the same thin column of icons. It always has the same items.
+
+<Shot id="main-menu-desktop" />
+
+<Shot id="main-menu-phone" />
+
+## 🧭 The main menu [#-the-main-menu]
+
+- **Home**: counts for people, updates and repairs, and recent activity.
+- **Chat**: talk to MaiPai. Your past chats are listed here too.
+- **Library**: the files you and the family have added.
+- **Family**: one card for each person. Tap a card to open that person's profile, where memories live.
+
+Your own picture or initial sits at the bottom of the menu. Tap it to open your profile menu. It holds **Notifications**, **Incognito**, **Settings** and **Help**, and the way to sign out. Adults also see household settings under **Settings**. To see what stays in the house, read [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house).
+
+The search box at the top finds chats, people and pages.
+
+## 🔔 The bell [#-the-bell]
+
+The bell shows new notices. See [See your notifications](/docs/user/everyday-use/see-your-notifications).
+
+## ✍️ Steps to try it [#️-steps-to-try-it]
+
+1. Tap **Chat** and start a new chat.
+2. Tap **Family** and tap your own card.
+3. Tap **Memories** to see what MaiPai remembers about you.
+4. Tap **Settings** to see what you can change.
+
+<Callout type="info">Some settings show a lock. A lock means an admin controls that one.</Callout>
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a page will not open, see [If a page will not load](/docs/user/fix-a-problem/page-will-not-load).
+
+
+# Install, upgrade, uninstall and fix the install (/docs/user/start-here/install-upgrade-uninstall)
+
+## Before you start [#before-you-start]
+
+Use the Mac itself. You need three things:
+
+- A Mac with Apple silicon or Intel, and an internet connection.
+- 3 GB of free disk space for Home. The installer checks this first.
+- An account that can use `sudo` (an administrator).
+
+The AI engine is a separate step that Home does for you later, inside the setup wizard, and only if this computer runs the AI. It needs 6 GB more to build, plus room for the AI models.
+
+| Plan | Free space needed for the models |
+|---|---|
+| Recommended | 26 GB |
+| Moderate | 19 GB |
+| Minimal | 14 GB |
+
+You do not need Homebrew. You do not need to install anything else first.
+
+## Install [#install]
+
+Open Terminal on the Mac and paste this one line. A plain SSH connection works too.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash
+```
+
+This installs Home only, so it takes about a minute. When Home answers, the installer prints the address to open, such as `http://localhost:3000`. Open it in a browser to start the setup wizard.
+
+If it stops, read the last lines. They say what went wrong and what to do. Fix that, then run the same line again. It picks up where it stopped and does not hurt anything already installed.
+
+## The AI engine installs from the wizard [#the-ai-engine-installs-from-the-wizard]
+
+The wizard asks where the AI runs.
+
+- **This computer.** Home starts the AI engine install right away. A progress bar at the bottom of the wizard shows each step: fetch, build and start, then the model downloads. You can keep answering questions while it works.
+- **Another computer.** Nothing is installed on this one. You pair the other computer later.
+
+The engine needs the Mac's logged-in desktop to use the graphics chip. If nobody is logged in at the Mac, the bar stops and says so. Log in at the Mac and press Try again.
+
+If the bar stops for any reason, it says what went wrong. Fix that and press Try again. It picks up where it stopped. You can also run the engine step by hand.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/install.sh --stack-only
+```
+
+## What happens after a restart [#what-happens-after-a-restart]
+
+MaiPai Home starts by itself when the Mac starts. No one needs to log in.
+
+The AI engine starts when the Mac's user logs in. To make that automatic, turn on automatic login: open System Settings, then Users and Groups, then Automatic login. macOS only allows automatic login when FileVault is off. For a Mac that must come back by itself after a power cut, turn FileVault off. The trade: anyone who can touch the Mac can read its disk, so keep it somewhere safe. If you keep FileVault on, log in once at the Mac after a restart and the engine starts.
+
+## Tune the Mac [#tune-the-mac]
+
+A Mac that runs Home all day works best with a few settings changed. Setup shows them as a list. You can also run the tool yourself at the Mac. It changes nothing unless you add `--yes`.
+
+```bash
+bash /usr/local/maipai-home/scripts/studio/host-tune.sh detect
+```
+
+Two kinds of change are in the list.
+
+- Changes inside Home's own folders. Home makes them for you. They keep Spotlight out of Home's files and keep the big AI models out of Time Machine. Home's data stays in your backups.
+- Changes to the whole Mac. These need an administrator, so Home asks first. If Home cannot do one, it shows the exact line to paste in Terminal at the Mac. They stop the Mac from sleeping, turn it back on after a power cut, stop big macOS upgrades by themselves (security updates stay on), and turn on SSH. One more lets the graphics chip use more memory. You only need that one for very big AI models later.
+
+Every change can be undone. Run the same line with `revert` and the name of the item.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/studio/host-tune.sh apply power --yes
+sudo bash /usr/local/maipai-home/scripts/studio/host-tune.sh revert power --yes
+```
+
+Some things only you can do, so the list shows them as advice: leave iCloud, Siri and Apple Intelligence off for this account, turn the screen saver off, give the Mac a fixed address in your router, approve it in Tailscale, and install nothing extra except the Command Line Tools.
+
+## Upgrade [#upgrade]
+
+Run the same install line again. If the AI engine is already installed, it is rebuilt too, so the Mac must have someone logged in. It does these steps in order:
+
+1. Stops MaiPai Home and the engine.
+2. Saves a copy of your data in `/usr/local/maipai-home/upgrade-backups`. It keeps the last two copies.
+3. Replaces the program files. Your data, backups and engine models stay where they are.
+4. Starts everything again and waits until it answers.
+
+Home keeps the same address it had before.
+
+To install one exact version, add `--version` and the release name.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/install.sh --version v0.1.0
+```
+
+## Go back one version [#go-back-one-version]
+
+If an upgrade does not work for you, go back.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/install.sh --rollback
+```
+
+This installs the version you had before. It also puts back the data copy from just before the upgrade. Your newer data is not thrown away. It is moved to a folder named `data.rolled-back-` and the date, next to the install.
+
+## Uninstall [#uninstall]
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/uninstall.sh
+```
+
+This stops and removes the services. Your data is kept unless you type `DELETE MY DATA` exactly when it asks. Any other answer keeps everything. Make a backup first if you are not sure.
+
+## Where the logs are [#where-the-logs-are]
+
+| What | Where |
+|---|---|
+| MaiPai Home | `/usr/local/maipai-home/data/logs/` |
+| The AI engine | `/usr/local/maipai-home/stack/data/logs/` |
+
+A daily job keeps each log file under about 20 MB. It keeps the last three older copies.
+
+## Change a port [#change-a-port]
+
+Home uses port 3000 and the engine uses port 8770. If something else already uses one, the installer picks the next free number. To choose your own, set it before the install line.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo MAIPAI_PORT=3100 MAIPAI_STACK_PORT=8780 bash
+```
+
+## Fix a problem [#fix-a-problem]
+
+| What you see | What to do |
+|---|---|
+| The wizard bar says nobody is logged in at the Mac | Log in at the Mac, then press Try again in the wizard. |
+| The wizard bar says the AI engine install stopped | Read the plain words on the bar, fix what they name, then press Try again. |
+| "these tools are missing" | In Terminal run `xcode-select --install`, wait until it ends, then run the install line again. |
+| "not enough free disk space" | Free up space, then run the install line again, or press Try again in the wizard. |
+| "could not download" | Check the Mac's internet connection, then run the install line again. |
+| macOS says it cannot verify a program | Open System Settings, then Privacy and Security, and choose Allow Anyway. Then run the install line again. |
+| Home did not come up | Read the last lines of `/usr/local/maipai-home/data/logs/launchd.err.log`. Fix what they name, then run the install line again. |
+| The engine does not answer after a restart | Log in at the Mac. The engine starts at login. |
+
+If a run stops after it changed files, the last message tells you your data is safe. It also gives the rollback line.
+
+
+# What MaiPai Home is (/docs/user/start-here/what-maipai-home-is)
+
+MaiPai Home is an AI helper for your family. It runs on a computer in your house, so your chats, memories and family details stay there.
+
+<Shot id="home" />
+
+## 🏠 What you can do [#-what-you-can-do]
+
+- Ask questions and get answers in a chat.
+- Talk to it out loud instead of typing.
+- Ask it to look something up and see where the answer came from.
+- Let it remember things that help you, and see or erase them any time.
+
+## 👨‍👩‍👧 Who uses it [#-who-uses-it]
+
+Everyone in the house gets their own profile. A grown-up runs the house and decides what children can see. Teens and adults keep their own chats private.
+
+## 🔒 What stays private [#-what-stays-private]
+
+Your chats and memories are not sent to MaiPai or anyone else. A few features, like a web search, send only the small piece they need. The Privacy page lists each one. See [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house).
+
+## 🧭 Where to go next [#-where-to-go-next]
+
+1. Read [Your first minutes](/docs/user/start-here/your-first-minutes) to sign in and send a message.
+2. Read [Find your way around](/docs/user/start-here/find-your-way-around) to learn the main menu.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Ask the person who runs the house, or see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer).
+
+
+# Your first minutes (/docs/user/start-here/your-first-minutes)
+
+<Shot id="sign-in-picker" />
+
+<Shot id="sign-in-pin" />
+
+## ✍️ Steps [#️-steps]
+
+1. Open MaiPai Home in your web browser. Ask the person who runs the house for the address if you do not have it.
+2. Pick your name from the list of people.
+3. Under **Enter your PIN**, type your 4 digits. If you use a longer password, tap **Use a password instead**, type it in **Password**, then tap **Sign in**.
+4. Tap **Chat** in the main menu.
+5. Tap **New chat** if the page is not already empty.
+6. Click the box that says **Send a message...** and type a question.
+7. Press Enter, or tap the arrow button. The answer appears below your question.
+
+<Shot id="chat-empty" />
+
+<Callout type="info">Teens, children and guests may not need a PIN. Adults always do.</Callout>
+
+## 🤔 If the first answer takes a while [#-if-the-first-answer-takes-a-while]
+
+The first reply can be slow while MaiPai gets ready. You may see **Starting your AI…**. Wait a minute and it will answer.
+
+## 🙋 Still need help? [#-still-need-help]
+
+If your PIN is refused, see [If you cannot sign in](/docs/user/fix-a-problem/cannot-sign-in). If the first chat stays silent, see [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer).
+
+
+# Check in on a child (/docs/user/your-family/check-in-on-a-child)
+
+This page is for owners and admins.
+
+<Shot id="child-topics" />
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Family**, then the child's card. Their **Profile** opens.
+2. On **Overview** you see shared files and the child's details.
+3. Tap **Memories** to see what MaiPai remembers about them.
+4. Tap **Limits** to set daily time limits and storage. The time limits are saved but not applied yet.
+5. Tap **Topics** to choose how MaiPai answers them about sensitive subjects.
+
+Only owners and admins see **Limits** and **Topics**.
+
+## 💛 When a child has a hard moment [#-when-a-child-has-a-hard-moment]
+
+If a conversation seems to weigh on a child, every adult gets a notice: "A check-in may help." It names the child but never says what was said. It cannot be turned off. Talk to the child, kindly and in person.
+
+## 🔐 Teens are different [#-teens-are-different]
+
+A teen's profile, memories and settings are private. A parent gets no check-in view of a teen.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls). For anything else, see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# Sensitive subjects (/docs/user/your-family/sensitive-subjects)
+
+This page is for owners and admins.
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Family**, then the child's card.
+2. Tap the **Topics** tab.
+3. Find the **Sensitive subjects** group.
+4. Choose a level for each subject.
+5. Your choice saves as you make it.
+
+Only owners and admins can change these. The child cannot.
+
+## 🛡️ What never changes [#️-what-never-changes]
+
+Some things stay the same for every child:
+
+- Feelings and safety come first. MaiPai points the child to a trusted grown-up.
+- MaiPai never helps with bullying, secrets, or sharing where they live.
+- It takes no side on religion or politics.
+- If a child is in danger, it points to a grown-up and the emergency number.
+
+## 🔐 Teens [#-teens]
+
+There is no per-teen control. Household settings in **Settings**, **Privacy** apply to every teen. A teen's own settings are private.
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Safety settings](/docs/admin/people-and-safety/safety-settings). Otherwise see [Still stuck](/docs/user/fix-a-problem/still-stuck).
+
+
+# Sites and news a child sees (/docs/user/your-family/sites-and-news-a-child-sees)
+
+This page is for owners and admins.
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Settings** and open the household settings for search.
+2. Find **Blocked sites by person**.
+3. Find the kind of site you want to change.
+4. Tick or untick the box under **Kids**, **Teens** or **Adults**.
+5. Your choice saves as you tick it.
+
+Adult sites stay blocked for children and teens. Their boxes are greyed out and cannot be changed.
+
+## 📰 News [#-news]
+
+The news shelf has its own card where you choose which news sources show up. It sits beside the blocked sites card.
+
+<Callout type="info">These lists are for the household. They do not read any chat.</Callout>
+
+## 🙋 Still need help? [#-still-need-help]
+
+Admins, see [Blocked sites and news feeds](/docs/admin/people-and-safety/blocked-sites-and-news-feeds). If a setting will not save, see [If a setting will not save](/docs/user/fix-a-problem/a-setting-will-not-save).
+
+
+# What each role can do (/docs/user/your-family/what-each-role-can-do)
+
+{/* generated-source: backend/src/lib/access.ts and frontend/src/apps/people/roles.ts */}
+
+Every person has one role. It sets what they can do.
+
+| Role | Sign-in | Can add people | Can see a child's profile | Temporary chats |
+|---|---|---|---|---|
+| **Owner** | PIN or password | Anyone, including admins | Yes | Yes |
+| **Admin** | PIN or password | Adults, teens, children, guests | Yes | Yes |
+| **Adult** | PIN or password | No | No | Yes |
+| **Teen** | None needed | No | No | No |
+| **Child** | None needed | No | No | No |
+| **Guest** | None needed | No | No | No |
+
+## 🔐 Private by design [#-private-by-design]
+
+- Everyone can open their own profile and memories.
+- An owner or admin can open a **child's** profile and memories. They cannot open a teen's or another adult's.
+- A teen's chats and settings stay private from admins.
+
+## 👶 Children [#-children]
+
+Children's answers follow stricter settings. Only an owner or admin can change them. See [Sensitive subjects](/docs/user/your-family/sensitive-subjects).
+
+## 🙋 Still need help? [#-still-need-help]
+
+To change someone's role, ask an admin. Admins, see [People, roles and permissions](/docs/admin/how-it-works/people-roles-and-permissions).
+
+
+# Who is in the house (/docs/user/your-family/who-is-in-the-house)
+
+## ✍️ Steps [#️-steps]
+
+1. Tap **Family** in the main menu.
+2. Stay on the **People** tab. Each person has one card with their name and role.
+3. Tap a card to open that person's profile.
+
+<Shot id="people" />
+
+## 🏷️ The roles [#️-the-roles]
+
+A role is a label that sets what a person may do: **Owner**, **Admin**, **Adult**, **Teen**, **Child** or **Guest**. See [What each role can do](/docs/user/your-family/what-each-role-can-do).
+
+## 🐾 Other tabs [#-other-tabs]
+
+Family may also show **Pets**. Owners and admins also see **Bots**.
+
+## 🔐 What you can open [#-what-you-can-open]
+
+You can always open your own profile. Owners and admins can also open a child's profile. Nobody can see a teen's or another adult's settings or memories, not even an admin. A teen's card in **Family** does not open for an admin, and typing the teen's address shows a message that the profile cannot be opened.
+
+## ➕ Adding someone [#-adding-someone]
+
+Only an admin can add a person. Admins, see [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls).
+
+## 🙋 Still need help? [#-still-need-help]
+
+Ask the person who runs the house, or see [Still stuck](/docs/user/fix-a-problem/still-stuck).

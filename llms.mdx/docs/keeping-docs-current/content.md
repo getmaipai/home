@@ -1,0 +1,24 @@
+# Keeping the docs current (/docs/keeping-docs-current)
+
+## The idea in one line [#the-idea-in-one-line]
+
+Docs are updated when you cut a release, never on a push, and only the pages and pictures whose code changed.
+
+## How it works [#how-it-works]
+
+- One file, `docs/site-fumadocs/docs-covers.json`, says which code each guide page and each screenshot describes.
+- At release time `bun scripts/docsDrift.ts` compares the code changed since the last `v*` tag with that file. It prints the pages to re-check and the pictures to retake.
+- The release step then updates only that list. Pictures from the docs run are retaken with `DOCS_SHOTS_ONLY`, so nothing else is regenerated.
+- Edits to tests, locale files and the docs themselves never mark a page as changed.
+- Before the first release tag exists, the window starts at the commit the docs were last verified against.
+
+## What a contributor does [#what-a-contributor-does]
+
+- A new page or picture gets its entry in `docs-covers.json` in the same commit. A test fails if one is missing or points at nothing.
+- `bun scripts/docsDrift.ts --check` runs the same completeness check by hand.
+
+## What this does not solve [#what-this-does-not-solve]
+
+- A change in meaning that touches no listed file (a new rule). Someone still has to say "this affects the docs".
+- Screenshots of a feature that has no demo data yet. The seeded household must gain that data first.
+- Pages generated from code, and a hand-edit guard for them, are not part of this step.

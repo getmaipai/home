@@ -1,0 +1,21 @@
+# Still stuck (/docs/user/fix-a-problem/still-stuck)
+
+## ✍️ Steps [#️-steps]
+
+1. Write down what you were doing and what you saw. Include the words on any message.
+2. Tell the person who runs the house. They are the owner or an admin.
+3. Tell them the time it happened and whether it happens every time.
+
+## 🧰 For the person who runs the house [#-for-the-person-who-runs-the-house]
+
+Admins can build a support report to share when asking for help. See [Troubleshooting and support report](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+Other useful pages:
+
+- [Updates and rollback](/docs/admin/look-after-it/updates-and-rollback)
+- [Backups and restore](/docs/admin/look-after-it/backups-and-restore)
+- [Where your data lives](/docs/admin/how-it-works/where-your-data-lives)
+
+## 🙋 Still need help? [#-still-need-help]
+
+Open the [Admin guide](/docs/admin/) and read the troubleshooting page. If you run the house, it covers the next steps.

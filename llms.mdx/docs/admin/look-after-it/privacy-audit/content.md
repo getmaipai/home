@@ -1,0 +1,46 @@
+# Privacy audit (/docs/admin/look-after-it/privacy-audit)
+
+{/* generated-source: backend/src/lib/privacy.ts, backend/src/routes/privacy.ts, backend/packages manifests (data_sources) */}
+
+Home runs in your house. Nothing leaves unless a row on this page says so. Open it at **Settings**, **Home settings**, **Privacy**, **What connects to the internet**, or **Settings**, **Data and privacy** for your own view.
+
+The page is built from the code and each package's declared sources, so it cannot drift from what Home does. A row shows only while that feature is in use.
+
+## 🌍 What can leave the house [#-what-can-leave-the-house]
+
+| Row | When | What goes |
+|---|---|---|
+| Model downloads (wake word, face, speech, robot) | Once per model, the first time a feature needs it. For the wake word, that is the first time someone switches it on in chat. | A download request |
+| Update check (GitHub) | At most once a day | Your internet address |
+| Blocked-site index and lists | Index about daily, lists about monthly | Your internet address. Shown only while a list is on. |
+| Internet check | Once a minute | A DNS lookup of example.com and an empty connection to 1.1.1.1:443. Turn it off under **Internet check**. |
+| News feeds | About every 30 minutes at most, while the shelf is on | A plain request for the feed file |
+| Reference books (Kiwix) | When an adult installs or updates one | A download request |
+| Answer pictures (Wikipedia, Wikidata) | When a picture is picked for an answer | A request for the picture |
+| Voice list | When an adult opens the list of voices | A request for the list |
+| DuckDuckGo | Adult web search, only if picked | The search words |
+| Brave | Adult web search, only with a key | The search words |
+| Telegram | When a notification you chose fires | The notification text |
+| Tailscale and Let's Encrypt | Only after an owner turns on away access, and at renewal | Device names, the computer's name |
+
+A child's or teen's search words never go to DuckDuckGo or Brave.
+
+## 🏠 What stays on your network [#-what-stays-on-your-network]
+
+| Row | Destination |
+|---|---|
+| Home Assistant | Your own Home Assistant on your LAN |
+| Robot connection addresses | A paired robot asking Home for addresses |
+| API token | Only if an adult creates a token and gives it to another app |
+| Engine computer | Your engine computer, when someone chats or asks for a picture. Through Tailscale when you are away. |
+
+## ✅ How to check it yourself [#-how-to-check-it-yourself]
+
+1. Open the page and read each row's destination.
+2. Confirm every destination is one you expect.
+3. To turn something off: the internet check under **Internet check**, the news shelf under **News shelf**, Telegram by clearing the token, DuckDuckGo by unpicking it, Brave by clearing its key, away access under **Network and access**.
+4. Look again. The row is gone when the feature is off.
+
+Package data sources appear here too, with the destination, when, what and who. For how privacy works in plain words, see [What never leaves](/docs/user/privacy-and-safety/what-never-leaves).
+
+There is no row for MaiPai itself. Home has no MaiPai-run service in your data path.

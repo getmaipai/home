@@ -1,0 +1,83 @@
+# Docs
+
+- [MaiPai Home documentation](/docs): Table of contents draft for approval.
+- User guide: For everyone in the house
+  - [MaiPai Home 🏠](/docs/user): Short, plain pages for everyone in the house.
+  - 🚀 Start here
+    - [What MaiPai Home is](/docs/user/start-here/what-maipai-home-is): A private AI helper that lives on a computer in your house.
+    - [Install, upgrade, uninstall and fix the install](/docs/user/start-here/install-upgrade-uninstall): Put MaiPai Home on a Mac, update it, go back a version, remove it, and fix the common install problems.
+    - [Your first minutes](/docs/user/start-here/your-first-minutes): Sign in for the first time and send your first message.
+    - [Find your way around](/docs/user/start-here/find-your-way-around): What each item in the main menu does.
+  - 💬 Everyday use
+    - [Send a message](/docs/user/everyday-use/send-a-message): Type a question, read the answer, and get back to the newest text.
+    - [Talk instead of type](/docs/user/everyday-use/talk-instead-of-type): Speak your question and have answers read out loud.
+    - [Ask it to look something up](/docs/user/everyday-use/ask-it-to-look-something-up): Get an answer from the web and see where each part came from.
+    - [Rate or fix a reply](/docs/user/everyday-use/rate-or-fix-a-reply): Tell MaiPai when an answer was good or wrong, or ask for another try.
+    - [See what it remembered](/docs/user/everyday-use/see-what-it-remembered): Look at your memories and make MaiPai forget the ones you do not want.
+    - [Make it easier to read](/docs/user/everyday-use/make-it-easier-to-read): Pick a comfort style with bigger text, clearer colors or calmer motion.
+    - [See your notifications](/docs/user/everyday-use/see-your-notifications): Read notices from MaiPai and look back over the last 30 days.
+    - [Use Incognito](/docs/user/everyday-use/use-incognito): Chat without saving anything, then let it all go.
+    - [Keep chats in a project](/docs/user/everyday-use/keep-chats-in-a-project): Group related chats together and give them their own instructions.
+    - [Find and share your files](/docs/user/everyday-use/find-and-share-your-files): See the stories, pictures and documents you made in chat, and share them.
+  - 👨‍👩‍👧 Your family
+    - [Who is in the house](/docs/user/your-family/who-is-in-the-house): See everyone in your household and the role each person has.
+    - [What each role can do](/docs/user/your-family/what-each-role-can-do): A short table of the six roles and what each one may do.
+    - [Check in on a child](/docs/user/your-family/check-in-on-a-child): What an owner or admin can see about a child, and what stays private.
+    - [Sensitive subjects](/docs/user/your-family/sensitive-subjects): Choose how MaiPai talks to a child about hard topics.
+    - [Sites and news a child sees](/docs/user/your-family/sites-and-news-a-child-sees): Turn site types and news sources on or off for kids, teens and adults.
+  - 🔒 Privacy & safety
+    - [What stays in the house](/docs/user/privacy-and-safety/what-stays-in-the-house): Your chats, memories and profiles stay on your own computer.
+    - [What never leaves](/docs/user/privacy-and-safety/what-never-leaves): The things MaiPai keeps in your house, always.
+    - [Forget something](/docs/user/privacy-and-safety/forget-something): Delete a chat or a memory, or erase everything about a child.
+  - 🛟 Fix a problem
+    - [If chat does not answer](/docs/user/fix-a-problem/chat-does-not-answer): What to try when you send a message and nothing comes back.
+    - [If a page will not load](/docs/user/fix-a-problem/page-will-not-load): What to try when MaiPai Home will not open or a page stays blank.
+    - [If voice does not work](/docs/user/fix-a-problem/voice-does-not-work): What to try when MaiPai cannot hear you or will not speak.
+    - [If you cannot sign in](/docs/user/fix-a-problem/cannot-sign-in): What to try when your PIN or password is refused.
+    - [If a setting will not save](/docs/user/fix-a-problem/a-setting-will-not-save): Why a setting snaps back or cannot be changed.
+    - [Still stuck](/docs/user/fix-a-problem/still-stuck): Who to ask when nothing here fixed it.
+- Admin guide: For the person who runs the house
+  - [Admin guide 🛠️](/docs/admin): For the person who runs the house. How MaiPai Home works, how to set it up, and how to look after it.
+  - 🧩 How it works
+    - [How MaiPai Home works](/docs/admin/how-it-works/how-home-works): The parts of a MaiPai Home, what each one does, and where it runs.
+    - [People, roles and permissions](/docs/admin/how-it-works/people-roles-and-permissions): The six roles, what each can do, and what an admin can never see.
+    - [Where your data lives](/docs/admin/how-it-works/where-your-data-lives): Every folder Home writes, what is in it, and which folders a backup covers.
+  - 🛠️ Install and set up
+    - [Choose hardware](/docs/admin/install-and-set-up/choose-hardware): What Home runs on, how to check whether a model fits, and what is not declared yet.
+    - [Install and start Home](/docs/admin/install-and-set-up/install-and-start): Run Home from source today, or use the installer for a background service. Stop, restart and uninstall.
+    - [First-run setup](/docs/admin/install-and-set-up/first-run-setup): The setup wizard screen by screen, and what is not built yet.
+    - [Settings reference](/docs/admin/install-and-set-up/settings-reference): Every household and per-person setting, its default and what it changes.
+    - [Use another computer for the AI](/docs/admin/install-and-set-up/use-another-computer-for-the-ai): Run the AI engines on a second Ubuntu computer and pair it with Home.
+  - 👪 People and safety
+    - [Add people and parental controls](/docs/admin/people-and-safety/add-people-and-parental-controls): Add a person, pick a role, and set a child's time limits and storage.
+    - [Safety settings for children and teens](/docs/admin/people-and-safety/safety-settings): What the safeguards do, which ones you can change, and which cannot be turned off.
+    - [Blocked-site lists and news feeds](/docs/admin/people-and-safety/blocked-sites-and-news-feeds): Choose which site lists apply to children and teens, add your own rules, and pick the news a child sees.
+  - 🔌 Connect and extend
+    - [Set up web search](/docs/admin/connect-and-extend/web-search): Choose where answers come from, connect SearXNG, and keep children and teens safe.
+    - [Reach Home when you are away](/docs/admin/connect-and-extend/remote-access): Use Tailscale to open Home from a phone outside the house, with a private https address.
+    - [Notifications and Telegram](/docs/admin/connect-and-extend/notifications-and-telegram): Send alerts to browsers and Telegram, and set quiet hours.
+    - [Add and remove packages](/docs/admin/connect-and-extend/packages): What packages are, which ones come with Home, and what is not in the app yet.
+    - [Create a command](/docs/admin/connect-and-extend/commands): Teach Home a phrase of your own that triggers a reply or a smart-home action.
+  - 🩺 Look after it
+    - [Backups and restore](/docs/admin/look-after-it/backups-and-restore): How Home backs itself up, how to take one now, and how to restore.
+    - [Updates and rollback](/docs/admin/look-after-it/updates-and-rollback): How Home finds updates, how to update by hand, and how engine updates are applied and undone.
+    - [Privacy audit](/docs/admin/look-after-it/privacy-audit): Every outside address Home can contact, when, and what it sends.
+    - [Troubleshooting and support report](/docs/admin/look-after-it/troubleshooting-and-support-report): Find a problem in Repairs, fix it, and share a redacted report when you ask for help.
+    - [Devices and signed-in sessions](/docs/admin/look-after-it/devices-and-sessions): See what is paired to your profile and sign out a browser you no longer use.
+    - [Performance](/docs/admin/look-after-it/performance): See how replies, queues and engines are doing over time.
+    - [Read a turn trace](/docs/admin/look-after-it/turn-trace): See how long each step of one reply took.
+- For developers: Contributors
+  - [For developers 🧱](/docs/developers): Table of contents draft. Architecture and advanced work.
+  - 🧭 Start
+    - [Architecture map](/docs/developers/start/architecture-map): Planned page. Hub, Stack, commons, catalog, bot: who owns what and how they talk.
+    - [Run it locally](/docs/developers/start/run-it-locally): Planned page. Clone, install, start, seeded demo household, run the gate.
+    - [Repo layout and pins](/docs/developers/start/repo-layout): Planned page. Backend, frontend, commons pins, lockfile rules.
+  - 🧱 Build
+    - [Build a package](/docs/developers/build/build-a-package): Planned page. Manifest, kinds, permissions, publish to the catalog.
+    - [UI rules in practice](/docs/developers/build/ui-rules): Planned page. Kit Elements as shipped, tokens, never wrappers.
+    - [Write docs and screenshots](/docs/developers/build/docs-and-screenshots): How a page declares the code it covers, and how the release-time drift check works.
+  - 📚 Reference
+    - [API reference](/docs/developers/reference/api-reference): Planned page. Every route, generated.
+    - [Design rules](/docs/developers/reference/design-rules): Planned page. The hard rules, with links to the authority file.
+    - [Design record](/docs/developers/reference/design-record): Planned page. Index of design notes with status current, superseded, historical.
+- [Keeping the docs current](/docs/keeping-docs-current): How the guides and screenshots update at release time, and only for what changed.

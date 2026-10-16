@@ -1,0 +1,29 @@
+# Performance (/docs/admin/look-after-it/performance)
+
+This page is for owners and admins. Other roles are refused.
+
+## ✍️ Steps [#️-steps]
+
+1. Open **Settings**, **Home settings**, **Maintenance**, then **Performance**.
+2. Read the cards:
+
+| Card | What it shows |
+|---|---|
+| **Reply time per day** | How long replies took each day. |
+| **Queues** | Waiting work: **Memory judge**, **Embedding retry**, **Ingestion**. |
+| **Turns per engine** | Which engine answered. |
+| **Route taken** | Which path each turn followed. |
+| **Layers** | Time spent in each step of a turn. |
+| **Label harvest** | How many turns were counted in the window. |
+| **Engines** | Engine health. |
+| **Storage & hardware** | Disk and computer details. |
+
+The numbers come from what Home already records. Nothing new is collected, and nothing leaves the house.
+
+**Layers** says "No traced turns yet" until a turn has left a timing trace.
+
+If the page fails, it says "Could not load performance." Reload it. See [Troubleshooting](/docs/admin/look-after-it/troubleshooting-and-support-report).
+
+## 🙋 Still need help? [#-still-need-help]
+
+If a queue keeps growing, open **Status** in **Maintenance** and check the engines.
