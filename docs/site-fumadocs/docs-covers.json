@@ -254,6 +254,12 @@
         "chat"
       ]
     },
+    "user/start-here/install-upgrade-uninstall": {
+      "areas": [
+        "setup",
+        "updates"
+      ]
+    },
     "user/start-here/find-your-way-around": {
       "areas": [
         "shell"
