@@ -51,6 +51,10 @@ function pageId(pathname: string): string {
   return pathname.split("/").filter(Boolean)[0] ?? "home";
 }
 
+export function tourTargetPresent(target: string): boolean {
+  return document.querySelector(`[${["data", "tour"].join("-")}="${CSS.escape(target)}"]`) !== null;
+}
+
 function isBusy() {
   if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return true;
   const active = document.activeElement;
@@ -110,7 +114,12 @@ export function useTourRunner(person: Roster) {
         return steps.length ? [{ packageId, tour: { ...tour, steps } }] : [];
       });
       setTourListing({ page: key, tours: available });
-      const activate = (next: AvailableTour) => {
+      const activate = (full: AvailableTour) => {
+        // Drop steps whose target is not on screen now, so "Step N of M"
+        // counts only cards the person will actually see.
+        const steps = full.tour.steps.filter((step) => !step.target || tourTargetPresent(step.target));
+        if (!steps.length) return;
+        const next = { ...full, tour: { ...full.tour, steps } };
         missingCount = 0;
         selected = {
           ...next,
