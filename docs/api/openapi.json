@@ -30942,6 +30942,111 @@
         }
       }
     },
+    "/api/reference/catalog": {
+      "get": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "List reference sets offered by Kiwix",
+        "responses": {
+          "200": {
+            "description": "Resolved reference set catalogue.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "source": {
+                        "type": "string"
+                      },
+                      "flavour": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string"
+                      },
+                      "sizeBytes": {
+                        "type": "number"
+                      },
+                      "snapshotDate": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "installed": {
+                        "type": "boolean"
+                      },
+                      "child": {
+                        "type": "boolean"
+                      },
+                      "wikipedia": {
+                        "type": "boolean"
+                      },
+                      "bands": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "source",
+                      "flavour",
+                      "name",
+                      "language",
+                      "sizeBytes",
+                      "snapshotDate",
+                      "installed",
+                      "child",
+                      "wikipedia",
+                      "bands"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Kiwix catalogue unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reference/sets/{id}/install": {
       "post": {
         "tags": [

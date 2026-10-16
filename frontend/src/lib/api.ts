@@ -165,6 +165,12 @@ export type Role = Person["role"];
 export interface StatusBoardNote { id: string; body: string; posted_at: string; posted_by_name: string }
 export interface StatusMaintenance { id: string; title: string; description: string; components: string[]; starts_at: string; ends_at: string; rrule?: string; until?: string; status: "scheduled" | "in_progress" | "completed" | "cancelled" }
 export interface StatusBoard { note: StatusBoardNote | null; maintenance: StatusMaintenance[] }
+export interface ReferenceSelection { source: string; flavour: "mini" | "maxi" | "nopic" | "default" }
+export interface ReferenceSet { id: string; source: string; flavour: string; name: string; snapshotDate: string | null; sizeBytes: number; sha256: string; installed: boolean; child: boolean; wikipedia: boolean }
+export interface ReferencePlan { preset: string; sets: ReferenceSet[]; totalBytes: number; freeBytes: number; freeAfterInstallBytes: number; requiredFreeBytes: number; refusal: string | null; swapHeadroomBytes: number; estimatedSeconds: number | null; warnings: string[]; settings: Record<string, string | number | boolean> }
+export interface ReferenceJob { id: string; setId: string; state: "queued" | "waiting_window" | "downloading" | "paused" | "done" | "failed" | "cancelled"; completedBytes: number; totalBytes: number; message: string | null }
+export interface ReferenceLibraryState { installed: Array<{ id: string; name: string; book: string; language: string; flavour: string; snapshotDate: string | null }>; jobs: ReferenceJob[]; matchesPresets: string[] }
+export interface ReferenceCatalogSet extends ReferenceSet { language: string; bands: string[]; available: boolean; message: string | null }
 
 // PROJECT-PROGRESS-01: routes/projects.ts's own GET response, a real
 // Project (@maipai/spec) plus the one derived sibling field that route
@@ -692,6 +698,13 @@ export const api = {
   referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),
   referenceSearch: (q: string, book?: string) => request<ReferenceSearchHit[]>(`/api/reference/search?q=${encodeURIComponent(q)}${book ? `&book=${encodeURIComponent(book)}` : ""}`),
   referenceArticle: (book: string, path: string) => request<ReferenceArticleView>(`/api/reference/article/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`),
+  referenceState: () => request<ReferenceLibraryState>("/api/reference/state"),
+  referenceCatalog: () => request<ReferenceCatalogSet[]>("/api/reference/catalog"),
+  referencePlan: (preset: "minimum" | "moderate" | "full" | "custom", selection?: ReferenceSelection[]) => request<ReferencePlan>("/api/reference/plan", { method: "POST", body: JSON.stringify({ preset, selection }) }),
+  referenceApply: (preset: "minimum" | "moderate" | "full" | "custom", selection?: ReferenceSelection[]) => request<{ jobs: ReferenceJob[]; idempotent: boolean }>("/api/reference/apply", { method: "POST", body: JSON.stringify({ preset, selection }) }),
+  referenceInstall: (id: string) => request<ReferenceJob>(`/api/reference/sets/${encodeURIComponent(id)}/install`, { method: "POST" }),
+  referenceRemove: (id: string) => request<{ removed: boolean; freedBytes: number }>(`/api/reference/sets/${encodeURIComponent(id)}/remove`, { method: "POST" }),
+  referenceJob: (id: string, action: "pause" | "resume" | "cancel") => request<ReferenceJob>(`/api/reference/jobs/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
   setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null }>("/api/setup/checks/run", { method: "POST" }),
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),

@@ -112,8 +112,15 @@ describe("the settings route", () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
-    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Maintenance", "Privacy", "Developer tools", "Network and access"]);
+    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Maintenance", "Privacy", "Developer tools", "Network and access", "Reference library"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
+  });
+
+  test("a child cannot reach Reference library settings by direct URL", async () => {
+    const view = open(makePerson("child"), "/settings/home/reference-library");
+    await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
+    expect(view.queryByText("All sets")).toBeNull();
+    expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
 
   test("an owner manages the household command list in Home settings", async () => {

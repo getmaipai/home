@@ -130,7 +130,7 @@ referenceRoutes.openapi(MEDIA_ROUTE, async (c) => {
     return c.body(await res.arrayBuffer(), 200);
   } catch { return unavailable(c); }
 });
-import { applyReference, controlReferenceJob, getReferenceState, planReference, type PresetId, type Selection, installOneReference, removeOneReference } from "@/lib/referencePresetEngine";
+import { applyReference, controlReferenceJob, getReferenceState, planReference, type PresetId, type Selection, installOneReference, removeOneReference, listReferenceCatalog } from "@/lib/referencePresetEngine";
 import { requireRole } from "@/middleware/auth";
 
 
@@ -145,6 +145,8 @@ const applyPresetRoute = createRoute({ method: "post", path: "/apply", tags: ["R
 referenceRoutes.openapi(applyPresetRoute, async (c) => { const body = c.req.valid("json"); try { return c.json(await applyReference(body.preset as PresetId | "custom", body.selection as Selection | undefined), 200); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The reference selection could not be applied." }, 400); } });
 const stateRoute = createRoute({ method: "get", path: "/state", tags: ["Reference library"], summary: "Get installed sets and download progress", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: z.object({ installed: z.array(z.object({ id: z.string(), name: z.string(), book: z.string(), language: z.string(), flavour: z.string(), snapshotDate: z.string().nullable() })), jobs: z.array(JobSchema), matchesPresets: z.array(z.string()) }) } }, description: "Current reference library state." }, ...errorResponses({ 401: "Not signed in", 403: "Owner or admin only" }) } });
 referenceRoutes.openapi(stateRoute, (c) => c.json(getReferenceState(), 200));
+const catalogRoute = createRoute({ method: "get", path: "/catalog", tags: ["Reference library"], summary: "List reference sets offered by Kiwix", middleware: [requireRole("owner", "admin")] as const, responses: { 200: { content: { "application/json": { schema: z.array(z.object({ id: z.string(), source: z.string(), flavour: z.string(), name: z.string(), language: z.string(), sizeBytes: z.number(), snapshotDate: z.string().nullable(), installed: z.boolean(), child: z.boolean(), wikipedia: z.boolean(), bands: z.array(z.string()), available: z.boolean(), message: z.string().nullable() })) } }, description: "Resolved reference set catalogue." }, ...errorResponses({ 401: "Not signed in", 403: "Owner or admin only" }) } });
+referenceRoutes.openapi(catalogRoute, async (c) => c.json(await listReferenceCatalog(), 200));
 const setId = z.string().regex(/^[a-z-]+:(mini|maxi|nopic|default)$/).openapi({ param: { name: "id", in: "path" } });
 const installSetRoute = createRoute({ method: "post", path: "/sets/{id}/install", tags: ["Reference library"], summary: "Install one reference set", middleware: [requireRole("owner", "admin")] as const, request: { params: z.object({ id: setId }) }, responses: { 202: { content: { "application/json": { schema: JobSchema } }, description: "Download queued." }, ...errorResponses({ 400: "Install refused or invalid", 401: "Not signed in", 403: "Owner or admin only" }) } });
 referenceRoutes.openapi(installSetRoute, async (c) => { const [source, flavour] = c.req.valid("param").id.split(":"); try { return c.json(await installOneReference(source!, flavour!), 202); } catch (error) { return c.json({ error: error instanceof Error ? error.message : "The set could not be installed." }, 400); } });

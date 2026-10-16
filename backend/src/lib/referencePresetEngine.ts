@@ -1,4 +1,4 @@
-import { readFileSync, mkdirSync, writeFileSync, renameSync, existsSync } from "node:fs";
+import { readFileSync, mkdirSync, writeFileSync, renameSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import presetsVocab from "@maipai/spec/vocab/reference-presets.json";
 import { Referencelibrarypresets } from "@maipai/spec/gen/ts/reference-presets.js";
@@ -100,6 +100,31 @@ export async function planReference(preset: PresetId | "custom", custom?: Select
   if (currentSetting("search.source_mode", "mix") === "offline" && !rows.some((row) => row.source === "wikipedia-en" || row.source === "wikipedia-simple")) warnings.push("Live Wikipedia search is off and no Wikipedia set is selected, so Wikipedia results will not be available.");
   const settings = preset === "custom" ? {} : { ...presetLibrary.presets.find((p) => p.id === preset)!.settings };
   return { preset, sets: rows.map(({ label: _label, ...row }) => row), totalBytes, freeBytes: disk.freeBytes, freeAfterInstallBytes, requiredFreeBytes, refusal, swapHeadroomBytes, estimatedSeconds, warnings, settings };
+}
+
+/** Catalogue view for the admin settings page. Resolves live metadata from
+ * Kiwix and reports only sets whose installed files Home itself owns. */
+export async function listReferenceCatalog() {
+  const installed = listInstalledReferenceFlavours();
+  const choices: Selection = [
+    { source: "vikidia", flavour: "default" }, { source: "wikipedia-simple", flavour: "default" },
+    { source: "wikipedia-en", flavour: "mini" }, { source: "wikipedia-en", flavour: "maxi" },
+    { source: "wiktionary-simple", flavour: "default" }, { source: "wiktionary-en", flavour: "default" },
+    { source: "wikivoyage", flavour: "default" }, { source: "wikibooks", flavour: "default" },
+    { source: "world-factbook", flavour: "default" }, { source: "medlineplus", flavour: "default" },
+    { source: "stackexchange", flavour: "default" },
+  ];
+  return Promise.all(choices.map(async (choice) => {
+    const spec = setSpec(choice.source, choice.flavour);
+    const own = installed.find((row) => row.book === spec.book && row.language === spec.language && row.flavour === spec.catalogFlavour);
+    const bands = choice.source === "medlineplus" ? ["adult"] : ["child", "teen", "adult"];
+    try {
+      const resolved = await resolveReferenceFlavour(spec.book, spec.language, spec.catalogFlavour, catalogUrlOverride);
+      return { id: `${choice.source}:${choice.flavour}`, source: choice.source, flavour: choice.flavour, name: resolved.name, language: resolved.language, sizeBytes: own ? statSync(join(referenceLibraryDir(), `${own.name}_${own.flavour}.zim`)).size : resolved.sizeBytes, snapshotDate: own?.snapshotDate ?? resolved.snapshotDate, installed: Boolean(own), child: spec.child, wikipedia: spec.wikipedia, bands, available: true, message: null };
+    } catch {
+      return { id: `${choice.source}:${choice.flavour}`, source: choice.source, flavour: choice.flavour, name: `${spec.book} (${choice.flavour})`, language: spec.language, sizeBytes: own ? statSync(join(referenceLibraryDir(), `${own.name}_${own.flavour}.zim`)).size : 0, snapshotDate: own?.snapshotDate ?? null, installed: Boolean(own), child: spec.child, wikipedia: spec.wikipedia, bands, available: false, message: "This set is not available in the current Kiwix catalogue." };
+    }
+  }));
 }
 
 let runner = false;

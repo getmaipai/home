@@ -20,6 +20,7 @@ import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection
 import { AddRobotSection } from "@/apps/settings/AddRobotSection";
 import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
+import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettings";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { useTabItem } from "@/shell/tabIdentity";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
@@ -78,6 +79,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.users_admin": HomeUsersAdminSettings,
   "home.devices_admin": HomeDevicesAdminSettings,
   "home.routing_stats": HomeRoutingStatsSettings,
+  "home.reference_library": ReferenceLibrarySettings,
   "account.device_appearance": DeviceAppearanceSettings,
   "chat.skills": ChatSkillsSettings,
   "chat.shortcuts": ChatShortcutsSettings,

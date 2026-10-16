@@ -364,6 +364,7 @@ const engineDownReview = process.argv.includes("--engine-down-review");
 // APP-SET-02: the settings areas (Account, Chat settings, Home settings) as an admin, an adult, a teen and a child see them.
 const appSettingsReview = process.argv.includes("--app-settings-review");
 const adminHomeReview = process.argv.includes("--admin-home-review");
+const referenceSettingsReview = process.argv.includes("--reference-settings-review");
 // MINOR-SEARCH-01e-10: the Blocked sites card (a tick-box grid) in Home settings, Search, as an admin.
 const blockedSitesReview = process.argv.includes("--blocked-sites-review");
 const rule9PagesReview = process.argv.includes("--rule9-pages-review");
@@ -408,6 +409,7 @@ const ROUTES: RouteSpec[] = [
   // APP-SET-02: Home settings General, the page `/settings` opened for an admin
   // before the settings areas (the shell's own phone start is a column list).
   { slug: "settings", path: "/settings/home/general" },
+  { slug: "reference-settings", path: "/settings/home/reference-library" },
   { slug: "status", path: "/status" },
   { slug: "turn-trace", path: "/trace/turn-screentrace1" },
   { slug: "settings-models", path: "/settings/home/ai" },
@@ -906,6 +908,14 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
           { type: "table", headers: ["Use", "Notes"], rows: [["Pulp", "Paper and board"], ["Timber", "Matches, pallets"]] },
         ],
       } }));
+    }
+    if (route.slug === "reference-settings") {
+      await page.route("**/api/reference/state", (request) => request.fulfill({ status: 200, json: { installed: [], jobs: [], matchesPresets: ["minimum"] } }));
+      await page.route("**/api/reference/catalog", (request) => request.fulfill({ status: 200, json: [
+        { id: "vikidia:default", source: "vikidia", flavour: "default", name: "Vikidia", language: "English", sizeBytes: 1_800_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: true, child: true, wikipedia: false, bands: ["child", "teen", "adult"] },
+        { id: "wikipedia-simple:default", source: "wikipedia-simple", flavour: "default", name: "Simple English Wikipedia", language: "English", sizeBytes: 4_000_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: false, child: true, wikipedia: true, bands: ["child", "teen", "adult"] },
+        { id: "wikipedia-en:mini", source: "wikipedia-en", flavour: "mini", name: "English Wikipedia Mini", language: "English", sizeBytes: 12_000_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: false, child: false, wikipedia: true, bands: ["child", "teen", "adult"] },
+      ] }));
     }
     if (route.slug === "files") {
       await page.route("**/api/files", (request) => request.fulfill({ status: 200, json: screenshotLibraryFiles() }));
@@ -10602,6 +10612,34 @@ async function main() {
     if (adminHomeReview) {
       await captureAdminHomeReview(browser, sessionValue);
       console.log("completed named review: --admin-home-review");
+      return;
+    }
+
+    if (referenceSettingsReview) {
+      const viewports = [VIEWPORTS.find((v) => v.width === 1440)!, VIEWPORTS.find((v) => v.width === 390)!];
+      for (const viewport of viewports) for (const theme of THEMES) {
+        const context = await newContext(browser, viewport, theme, sessionValue);
+        try {
+          const page = await context.newPage();
+          page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
+          await page.route("**/api/reference/state", (request) => request.fulfill({ status: 200, json: { installed: [{ id: "vikidia_en:nopic", name: "vikidia_en_all", book: "vikidia_en", language: "eng", flavour: "nopic", snapshotDate: "2026-10-01" }], jobs: [], matchesPresets: ["minimum"] } }));
+          await page.route("**/api/reference/catalog", (request) => request.fulfill({ status: 200, json: [
+            { id: "vikidia:default", source: "vikidia", flavour: "default", name: "Vikidia", language: "English", sizeBytes: 1_800_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: true, child: true, wikipedia: false, bands: ["child", "teen", "adult"] },
+            { id: "wikipedia-simple:default", source: "wikipedia-simple", flavour: "default", name: "Simple English Wikipedia", language: "English", sizeBytes: 4_000_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: false, child: true, wikipedia: true, bands: ["child", "teen", "adult"] },
+            { id: "wikipedia-en:mini", source: "wikipedia-en", flavour: "mini", name: "English Wikipedia Mini", language: "English", sizeBytes: 12_000_000_000, sha256: "demo", snapshotDate: "2026-10-01", installed: false, child: false, wikipedia: true, bands: ["child", "teen", "adult"] },
+          ] }));
+          await page.goto(`${BASE_URL}/settings/home/reference-library`);
+          await page.getByRole("heading", { level: 1, name: "Reference library" }).waitFor();
+          await page.getByText("Simple English Wikipedia").waitFor();
+          await settleAnimations(page);
+          const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
+          if (overflow) throw new Error(`Reference library overflows at ${viewport.width}px in ${theme}`);
+          const file = join(ROOT, "docs", "assets", "screens", `reference-library-${viewport.width}-${theme}.png`);
+          await page.screenshot({ path: file, fullPage: true });
+          console.log(`Wrote ${file}`);
+        } finally { await context.close(); }
+      }
+      console.log("completed named review: --reference-settings-review");
       return;
     }
 
