@@ -28,22 +28,10 @@ Your chats, people and memories stay in your house. Home goes online only to do 
 
 ## Status
 
-Early release (0.1.0). Not deployed to a real household yet.
-
-## Install
-
-On the Mac that will run Home, open Terminal and run:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash
-```
-
-Home is up in about a minute. Open the address it prints and the setup
-wizard installs the AI engine if this computer runs the AI. Steps,
-upgrade, rollback and uninstall:
-[Install, upgrade, uninstall and fix](docs/user/install-upgrade-uninstall.md).
-For running from source, see the Admin guide's
-[install and start](docs/site-fumadocs/content/docs/admin/install-and-set-up/install-and-start.mdx).
+Pre-alpha. MaiPai Home has no packaged installer yet and runs from source
+today. It is not deployed to a real household yet. The Admin guide covers
+[install and start](docs/site-fumadocs/content/docs/admin/install-and-set-up/install-and-start.mdx),
+including start, stop and restart.
 
 ## Contributing
 
