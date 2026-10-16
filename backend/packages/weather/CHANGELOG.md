@@ -4,6 +4,12 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Changed
+
+- The hourly warm uses only the household home place, and its privacy row
+  describes the background refresh.
+- The manifest placeholder is replaced by Home before the hourly warm runs.
+
 ### Added
 
 - The package builds a single weather card (`weather_card`: current
@@ -15,14 +21,6 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
   sheet, 24-hour chart and daily table; those three come back only when
   the card cannot be built (no current reading or no valid day row), so
   the two are never shown together.
-
-### Changed
-
-- The hourly warm uses only the household home place, and its privacy row
-  describes the background refresh.
-- The manifest placeholder is replaced by Home before the hourly warm runs.
-
-### Added
 
 - Answers now come with a card for the current conditions, a chart of
   the next 24 hours and a table of the next 7 days (GENUI-04). The same
