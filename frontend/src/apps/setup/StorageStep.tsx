@@ -13,7 +13,7 @@ type FolderClass = "models" | "records";
 
 const PICKER_ERROR = "Home couldn't open that folder. Go up a level or pick another folder, then try again.";
 const COPY: Record<FolderClass, { title: string; about: string; pickerTitle: string }> = {
-  models: { title: "AI models", about: "Where the AI models are stored. Plan for about 200 GB.", pickerTitle: "Choose the AI models folder" },
+  models: { title: "AI models", about: "Home saves your pick, but for now downloads the AI models to its default folder. Plan for about 200 GB there.", pickerTitle: "Choose the AI models folder" },
   records: { title: "Home's data", about: "Your family's chats, people and memories. Small, usually well under 5 GB.", pickerTitle: "Choose Home's data folder" },
 };
 const PICKER_COPY = (title: string): FolderPickerCopy => ({
