@@ -55,6 +55,12 @@ export function tourTargetPresent(target: string): boolean {
   return document.querySelector(`[${["data", "tour"].join("-")}="${CSS.escape(target)}"]`) !== null;
 }
 
+/** Steps whose target is on screen now (a step with no target always stays),
+ * so "Step N of M" counts only the cards the person will actually see. */
+export function stepsWithPresentTargets<T extends { target?: string | undefined }>(steps: T[], present: (target: string) => boolean = tourTargetPresent): T[] {
+  return steps.filter((step) => !step.target || present(step.target));
+}
+
 function isBusy() {
   if (document.querySelector('[role="dialog"], [aria-modal="true"]')) return true;
   const active = document.activeElement;
@@ -117,7 +123,7 @@ export function useTourRunner(person: Roster) {
       const activate = (full: AvailableTour) => {
         // Drop steps whose target is not on screen now, so "Step N of M"
         // counts only cards the person will actually see.
-        const steps = full.tour.steps.filter((step) => !step.target || tourTargetPresent(step.target));
+        const steps = stepsWithPresentTargets(full.tour.steps);
         if (!steps.length) return;
         const next = { ...full, tour: { ...full.tour, steps } };
         missingCount = 0;

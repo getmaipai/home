@@ -484,6 +484,8 @@ export class ApiError extends Error {
     message: string,
     public status: number,
     public code?: string,
+    /** The routes' own "what to do next" sentence, when they send one. */
+    public next?: string,
   ) {
     super(message);
   }
@@ -549,7 +551,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined);
     }
     return body as T;
   } catch (err) {
