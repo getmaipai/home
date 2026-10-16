@@ -250,6 +250,8 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       // flag, so it is treated as a list here, and it may name adults only (the selector offers adults only).
       const adultsOnly = keyDef.key === LIVE_VIEW_WHO_KEY;
       const multiple = adultsOnly || (range as { multiple?: boolean } | undefined)?.multiple === true;
+      // A single id is accepted for the list key and treated as a one-person list.
+      if (adultsOnly && typeof value === "string") value = [value];
       const ids = multiple ? value : [value];
       if (multiple ? !Array.isArray(value) : typeof value !== "string") {
         return { ok: false, status: 400, error: multiple ? "expected an array of person ids" : "expected a person id" };
