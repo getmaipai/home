@@ -212,7 +212,8 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const photoSettingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const photoSettings = Array.isArray(photoSettingsQuery.data) ? photoSettingsQuery.data : [];
   const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
-  const weatherDefaultIsCurrent = (photoSettings.find((setting) => setting.key === "weather.default_place")?.value ?? "current") === "current";
+  // Only an explicit, loaded value turns this on: nothing is sent while the setting is still loading.
+  const weatherDefaultIsCurrent = photoSettings.find((setting) => setting.key === "weather.default_place")?.value === "current";
   const weatherDefaultIsCurrentRef = useRef(weatherDefaultIsCurrent);
   weatherDefaultIsCurrentRef.current = weatherDefaultIsCurrent;
   const photoUploadsEnabled = photoUploadsEnabledForBand(person.age_band, photoSetting);

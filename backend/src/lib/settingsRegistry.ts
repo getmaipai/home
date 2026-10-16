@@ -34,11 +34,12 @@ export const PLACE_SETTINGS_KEYS = [
  * declaration fails at boot instead of at the first read. */
 function bundledPackageKeys(): SettingsKey[] {
   if (!existsSync(PACKAGES_DIR)) return [];
+  const seen = new Set<string>();
   return readdirSync(PACKAGES_DIR).sort().flatMap((id) => {
     const path = join(PACKAGES_DIR, id, "manifest.json");
     if (!existsSync(path)) return [];
     const config = (JSON.parse(readFileSync(path, "utf-8")) as { config?: unknown[] }).config;
-    return Array.isArray(config) ? config.map((entry) => SettingsKey.parse(entry)) : [];
+    return (Array.isArray(config) ? config.map((entry) => SettingsKey.parse(entry)) : []).filter((entry) => !seen.has(entry.key) && !!seen.add(entry.key));
   });
 }
 

@@ -102,7 +102,7 @@ describe("weather place plumbing", () => {
     const home = await created.json() as { id: string };
     expect((await owner.put("/api/settings", { scope: "household", key: "household.home", value: home.id })).status).toBe(200);
     const resolved = await resolveWeatherPlace({ person: adult });
-    expect(resolved).toEqual({ place: "New York", hostInputs: { latitude: 40.71, longitude: -74.01 }, uncached: false });
+    expect(resolved).toEqual({ place: "Home", hostInputs: { latitude: 40.71, longitude: -74.01 }, uncached: false });
   });
 
   test("a model or caller cannot supply coordinates", async () => {
@@ -111,6 +111,28 @@ describe("weather place plumbing", () => {
     expect(result).toMatchObject({ ok: true });
     expect(urls[0]).toContain("geocoding-api");
     expect(forecastUrl()).not.toContain("1.11");
+  });
+
+  test("the weather settings are registered from the manifest and default to Current location", async () => {
+    const { owner, adult } = await household();
+    const values = await (await owner.get(`/api/settings?scope=person:${adult.id}`)).json() as { key: string; value: unknown }[];
+    expect(values.find((setting) => setting.key === "weather.default_place")?.value).toBe("current");
+    expect(values.find((setting) => setting.key === "weather.places")?.value).toEqual([]);
+  });
+
+  test("a saved place is labelled by its own name, never an address-like stored area", async () => {
+    const { owner, adult } = await household();
+    const created = await owner.post("/api/entities", { kind: "place", place_kind: "map", name: "Cabin", scope: "person", geo: { lat: 44.1234, lon: -121.5678, precision: "exact", area: "12 Example Street, Town", from: "typed" } });
+    const cabin = await created.json() as { id: string };
+    expect((await owner.put("/api/settings", { scope: `person:${adult.id}`, key: "weather.default_place", value: cabin.id })).status).toBe(200);
+    const resolved = await resolveWeatherPlace({ person: adult });
+    expect(resolved).toMatchObject({ place: "Cabin", hostInputs: { latitude: 44.12, longitude: -121.57 }, uncached: false });
+  });
+
+  test("an address-like area sent with Current location is not echoed as the label", async () => {
+    const { adult } = await household();
+    const resolved = await resolveWeatherPlace({ person: adult, current: { lat: 44.1, lon: -121.5, area: "12 Example Street" } });
+    expect(resolved?.place).toBe("your current location");
   });
 
   test("parseCurrentLocation drops anything off shape", () => {

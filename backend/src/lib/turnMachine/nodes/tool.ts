@@ -57,6 +57,8 @@ function withDeadline<T>(promise: Promise<T>, signal: AbortSignal): Promise<T | 
  * (LIVE-0923-01, READ-PAGE-01 below). Exported so a retry round compares a new
  * call against what the failed one really ran with. */
 export function modelFacingArgs(tool: string, args: Record<string, unknown>): Record<string, unknown> {
+  // PLACE-WEATHER-01: coordinates are host-only inputs; a model-proposed pair never enters the call, event or record.
+  if (tool === "weather") return Object.fromEntries(Object.entries(args).filter(([k]) => k !== "latitude" && k !== "longitude"));
   if (tool !== "websearch") return args;
   const stripKeys = new Set(["category", ...(process.env.MAIPAI_BENCH_KEEP_READ_PAGE === "1" ? [] : ["read_page"])]);
   return Object.fromEntries(Object.entries(args).filter(([k]) => !stripKeys.has(k)));

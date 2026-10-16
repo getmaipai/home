@@ -177,7 +177,10 @@ export async function resolveWeatherPlace(input: {
 }): Promise<{ place: string; hostInputs: { latitude?: number; longitude?: number }; uncached: boolean } | null> {
   const named = typeof input.named === "string" && input.named.trim() ? input.named.trim() : null;
   const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false });
-  const label = resolved.from === "current" ? (resolved.area && resolved.area !== "Approximate area" ? resolved.area : "your current location") : (resolved.area ?? resolved.label);
+  // The spoken name wins. A saved or household place is labelled by its own name (never its
+  // stored area, which may be address-like); Current location by a broad area, if any.
+  const currentArea = resolved.area ? childSafeAreaLabel(resolved.area) : null;
+  const label = resolved.from === "current" ? (currentArea && currentArea !== "Approximate area" ? currentArea : "your current location") : resolved.label;
   const place = named ?? label;
   if (!place) return null;
   if (resolved.lat === null || resolved.lon === null) return { place, hostInputs: {}, uncached: false };

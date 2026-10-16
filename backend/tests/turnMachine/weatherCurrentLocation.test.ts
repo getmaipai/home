@@ -20,7 +20,7 @@ import { withStub, replies } from "./toolHarness";
 
 const FORECAST = { current: { temperature_2m: 51.2, weather_code: 3 }, hourly: { time: ["2026-09-05T05:00"], temperature_2m: [51] }, daily: { time: ["2026-09-05"], temperature_2m_max: [58.1], temperature_2m_min: [44.9], precipitation_probability_max: [20] } };
 const REAL = { lat: 47.60621, lon: -122.33207 };
-const FRAGMENTS = ["47.606", "122.332", "47.61", "122.33"];
+const FRAGMENTS = ["47.606", "122.332", "47.61", "122.33", "11.1111", "22.2222"];
 
 let people: BenchPeople;
 const realFetch = globalThis.fetch;
@@ -59,7 +59,7 @@ describe("weather turn with Current location", () => {
     try {
       await withStub(
         {
-          calls: (request) => (request.tool_choice === "none" || request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-w", name: "weather", args: "{}" }]),
+          calls: (request) => (request.tool_choice === "none" || request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-w", name: "weather", args: JSON.stringify({ latitude: 11.1111, longitude: 22.2222 }) }]),
           reply: replies,
         },
         async (seen) => {

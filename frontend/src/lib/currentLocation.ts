@@ -21,7 +21,7 @@ export async function currentLocationIfGranted(ageBand: "adult" | "teen" | "chil
   try {
     const status = await permissions.query({ name: "geolocation" });
     if (status.state !== "granted") return undefined;
-    const position = await new Promise<GeolocationPosition>((resolve, reject) => geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 3000, maximumAge: 10 * 60 * 1000 }));
+    const position = await new Promise<GeolocationPosition>((resolve, reject) => geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: false, timeout: 1500, maximumAge: 10 * 60 * 1000 }));
     const decimals = ageBand === "child" ? 1 : 2;
     const round = (value: number) => Number(value.toFixed(decimals));
     return { lat: round(position.coords.latitude), lon: round(position.coords.longitude) };
