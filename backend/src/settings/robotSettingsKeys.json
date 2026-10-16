@@ -387,6 +387,9 @@
     "key": "robot.live_view.who",
     "scope": "household",
     "selector": "person",
+    "range": {
+      "multiple": true
+    },
     "default": [],
     "label": "Adults allowed to view the robot camera",
     "help": "Admins can view. This list may name adults only; children and teens are never admitted.",
