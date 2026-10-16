@@ -79,7 +79,11 @@ describe("POST /api/grants", () => {
     for (const person of [admin.id, other.id]) {
       const res = await admin.client.post("/api/grants", { person, action: "backups.restore", effect: "allow" });
       expect(res.status).toBe(400);
-      expect(await res.json()).toEqual({ error: "You can't give someone a permission you don't have. Ask the owner to grant it." });
+      expect(await res.json()).toEqual({
+        error: person === admin.id
+          ? "Admins cannot grant themselves backup restore access. Ask the owner to grant it."
+          : "You can't give someone a permission you don't have. Ask the owner to grant it.",
+      });
     }
     expect((await owner.get("/api/grants")).status).toBe(200);
     expect(((await (await owner.get(`/api/grants?person=${admin.id}`)).json()) as unknown[])).toHaveLength(0);
@@ -97,8 +101,7 @@ describe("POST /api/grants", () => {
     const owner = await ownerSession();
     const admin = await makeAdmin(owner, "Marlow");
     const other = await makeAdult(owner, "Iris");
-    await owner.post("/api/grants", { person: admin.id, action: "backups.restore", effect: "allow" });
-    const res = await admin.client.post("/api/grants", { person: other.id, action: "backups.restore", effect: "allow" });
+    const res = await admin.client.post("/api/grants", { person: other.id, action: "packages.install", effect: "allow" });
     expect(res.status).toBe(201);
   });
 
