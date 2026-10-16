@@ -28309,6 +28309,38 @@ new hand-built frontend surface (org rule, 2026-09-21). `BACKLOG.md`
 line 147's own wording is corrected from "disk impact in the wizard" to
 match.
 
+## KS-REF-PRESETS-01: plan, apply and per-set reference controls (2026-10-15)
+
+The Home sidecar exposes admin-only `POST /api/reference/plan`,
+`POST /api/reference/apply`, `GET /api/reference/state`, per-set install
+and remove, plus pause, resume and cancel for jobs. Plans resolve every
+selected member through Kiwix's OPDS and `.meta4` records, return the
+publisher's size, sha-256 and snapshot date, include free-after-install
+and swap headroom, and refuse when the 20 percent free-space reserve
+would be crossed. A single location resolver in `kiwixSidecar.ts` keeps
+the current `reference.library_dir` lookup swappable for
+DATA-LOCATION-01f.
+
+Apply stores the selected sets and preset settings (including
+`search.source_mode`), queues child-eligible sets before Wikipedia, and
+keeps downloads outside chat's request path. Durable queue state lives
+with the reference library; the existing `.part` Range download resumes
+after process restart or pause, verifies the Kiwix sha-256, and applies
+`reference.update.max_mbps`. `reference.download.when = window` gates
+starts on the household quiet-hours interval. Remove accepts only a ZIM
+with a matching adjacent record created by this installer, deletes both,
+and rebuilds the sidecar library when Kiwix is registered.
+
+The acceptance fixture covers all three preset plans, disk refusal,
+child-first/Wikipedia-last ordering, idempotent apply, restart recovery,
+window gating, installed-file removal and child-role denial. Backend
+type checking and focused reference tests passed. The architect record
+and design note named by the brief were unavailable in this worktree
+because `data-scratch/` is gitignored; preset membership and settings
+were read from pinned spec-v0.1.142. Live Kiwix book/flavour mappings
+remain an external catalogue dependency, exercised here with a
+local-shaped fixture.
+
 **Privacy: two rows, one a pre-existing gap.** `platform:reference-library`
 is this item's own new row (verbatim from the design's Privacy
 paragraph: a download or update check sends the file name and the

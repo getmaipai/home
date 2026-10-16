@@ -29,6 +29,7 @@ export interface DownloadOptions {
   expectedBytes?: number;
   onProgress?: (p: DownloadProgress) => void;
   signal?: AbortSignal;
+  maxBytesPerSecond?: number;
 }
 
 // A stalled connection (socket open, server frozen mid-response) never
@@ -94,6 +95,7 @@ async function downloadOnce(
   const out = createWriteStream(partPath, { flags: startAt > 0 ? "a" : "w" });
   const reader = res.body.getReader();
   let completedBytes = startAt;
+  const startedAt = Date.now();
 
   try {
     while (true) {
@@ -106,9 +108,20 @@ async function downloadOnce(
       await new Promise<void>((resolve, reject) =>
         out.write(step.value, (err) => (err ? reject(err) : resolve())),
       );
+      if (opts.maxBytesPerSecond && opts.maxBytesPerSecond > 0) {
+        const elapsed = Date.now() - startedAt;
+        const expectedElapsed = ((completedBytes - startAt) / opts.maxBytesPerSecond) * 1000;
+        if (expectedElapsed > elapsed) await new Promise((resolve) => setTimeout(resolve, expectedElapsed - elapsed));
+      }
       opts.onProgress?.({ completedBytes, totalBytes, status: "downloading" });
     }
+  } catch (error) {
+    if (!(opts.signal?.aborted)) unlinkSync(partPath);
+    throw error;
   } finally {
+    if (opts.signal?.aborted) {
+      try { await reader.cancel(); } catch { /* the fetch may already have cancelled it */ }
+    }
     await new Promise<void>((resolve) => out.end(resolve));
   }
 

@@ -16,7 +16,7 @@ import { downloadUrl } from "@/lib/modelDownload";
 import { extractArchive } from "@maipai/core/src/archive";
 import { detectHardware } from "@/lib/hardware";
 import { selectKiwixBinary, KIWIX_READY_MARKER, type KiwixBinaryPin } from "@/lib/kiwixCatalog";
-import { kiwixToolsDir, defaultReferenceLibraryDir } from "@/lib/paths";
+import { kiwixToolsDir, defaultReferenceLibraryDir, classDir } from "@/lib/paths";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { registerSidecar, startSidecar, getSidecar, markSidecarStartPhase, clearSidecarStart } from "@/lib/sidecars";
 
@@ -41,7 +41,14 @@ function installDir(pin: KiwixBinaryPin): string {
  * change takes effect on the next start. */
 export function referenceLibraryDir(): string {
   const value = getHouseholdSettingValue("reference.library_dir");
-  return typeof value === "string" && value.length > 0 ? value : defaultReferenceLibraryDir;
+  return typeof value === "string" && value.length > 0 ? value : classDir("reference") || defaultReferenceLibraryDir;
+}
+
+/** KS-REF-PRESETS-01 seam: all plan, job, install and remove code asks
+ * for the reference destination here. DATA-LOCATION-01f can replace
+ * this resolver without changing the engine or API. */
+export function resolveReferenceLibraryLocation(override?: string): string {
+  return override?.trim() || referenceLibraryDir();
 }
 
 /** Downloads, verifies and extracts the pinned kiwix-tools build for

@@ -30409,6 +30409,800 @@
         }
       }
     },
+    "/api/reference/plan": {
+      "post": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Plan reference set downloads",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "preset": {
+                    "type": "string",
+                    "enum": [
+                      "minimum",
+                      "moderate",
+                      "full",
+                      "custom"
+                    ]
+                  },
+                  "selection": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "flavour": {
+                          "type": "string",
+                          "enum": [
+                            "mini",
+                            "maxi",
+                            "nopic",
+                            "default"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "flavour"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 20
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 1024
+                  }
+                },
+                "required": [
+                  "preset"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Resolved catalog sizes and disk impact.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "preset": {
+                      "type": "string"
+                    },
+                    "sets": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "source": {
+                            "type": "string"
+                          },
+                          "flavour": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "snapshotDate": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "sizeBytes": {
+                            "type": "number"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "installed": {
+                            "type": "boolean"
+                          },
+                          "child": {
+                            "type": "boolean"
+                          },
+                          "wikipedia": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "source",
+                          "flavour",
+                          "name",
+                          "snapshotDate",
+                          "sizeBytes",
+                          "sha256",
+                          "installed",
+                          "child",
+                          "wikipedia"
+                        ]
+                      }
+                    },
+                    "totalBytes": {
+                      "type": "number"
+                    },
+                    "freeBytes": {
+                      "type": "number"
+                    },
+                    "freeAfterInstallBytes": {
+                      "type": "number"
+                    },
+                    "requiredFreeBytes": {
+                      "type": "number"
+                    },
+                    "refusal": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "swapHeadroomBytes": {
+                      "type": "number"
+                    },
+                    "estimatedSeconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "warnings": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "settings": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "number"
+                          },
+                          {
+                            "type": "boolean"
+                          }
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "preset",
+                    "sets",
+                    "totalBytes",
+                    "freeBytes",
+                    "freeAfterInstallBytes",
+                    "requiredFreeBytes",
+                    "refusal",
+                    "swapHeadroomBytes",
+                    "estimatedSeconds",
+                    "warnings",
+                    "settings"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid selection or catalog failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/apply": {
+      "post": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Apply a reference preset or custom selection",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "preset": {
+                    "type": "string",
+                    "enum": [
+                      "minimum",
+                      "moderate",
+                      "full",
+                      "custom"
+                    ]
+                  },
+                  "selection": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "source": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 80
+                        },
+                        "flavour": {
+                          "type": "string",
+                          "enum": [
+                            "mini",
+                            "maxi",
+                            "nopic",
+                            "default"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "source",
+                        "flavour"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 20
+                  }
+                },
+                "required": [
+                  "preset"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings saved and background downloads queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "setId": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "waiting_window",
+                              "downloading",
+                              "paused",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "completedBytes": {
+                            "type": "number"
+                          },
+                          "totalBytes": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "setId",
+                          "state",
+                          "completedBytes",
+                          "totalBytes",
+                          "message"
+                        ]
+                      }
+                    },
+                    "idempotent": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "jobs",
+                    "idempotent"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Selection refused or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/state": {
+      "get": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Get installed sets and download progress",
+        "responses": {
+          "200": {
+            "description": "Current reference library state.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "installed": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "book": {
+                            "type": "string"
+                          },
+                          "language": {
+                            "type": "string"
+                          },
+                          "flavour": {
+                            "type": "string"
+                          },
+                          "snapshotDate": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "book",
+                          "language",
+                          "flavour",
+                          "snapshotDate"
+                        ]
+                      }
+                    },
+                    "jobs": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "setId": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "waiting_window",
+                              "downloading",
+                              "paused",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "completedBytes": {
+                            "type": "number"
+                          },
+                          "totalBytes": {
+                            "type": "number"
+                          },
+                          "message": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "setId",
+                          "state",
+                          "completedBytes",
+                          "totalBytes",
+                          "message"
+                        ]
+                      }
+                    },
+                    "matchesPresets": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "installed",
+                    "jobs",
+                    "matchesPresets"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/sets/{id}/install": {
+      "post": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Install one reference set",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z-]+:(mini|maxi|nopic|default)$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Download queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "setId": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "waiting_window",
+                        "downloading",
+                        "paused",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "completedBytes": {
+                      "type": "number"
+                    },
+                    "totalBytes": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "setId",
+                    "state",
+                    "completedBytes",
+                    "totalBytes",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Install refused or invalid",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/sets/{id}/remove": {
+      "post": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Remove one installed reference set",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z-]+:(mini|maxi|nopic|default)$"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Installed set removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "boolean"
+                    },
+                    "freedBytes": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "removed",
+                    "freedBytes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid set",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/jobs/{id}/{action}": {
+      "post": {
+        "tags": [
+          "Reference library"
+        ],
+        "summary": "Pause, resume, or cancel a reference download",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "pause",
+                "resume",
+                "cancel"
+              ]
+            },
+            "required": true,
+            "name": "action",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Download job updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "setId": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "waiting_window",
+                        "downloading",
+                        "paused",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "completedBytes": {
+                      "type": "number"
+                    },
+                    "totalBytes": {
+                      "type": "number"
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "setId",
+                    "state",
+                    "completedBytes",
+                    "totalBytes",
+                    "message"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Job not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/reference/{book}/{path}": {
       "get": {
         "tags": [

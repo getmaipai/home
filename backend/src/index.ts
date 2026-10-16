@@ -11,6 +11,7 @@ import { cleanupStaleSnapshots } from "@/lib/backup";
 import { sampleEngineStats } from "@/lib/engineStats";
 import { startAllSidecars, registerGracefulExit } from "@/lib/sidecars";
 import { startKiwixSidecar } from "@/lib/kiwixSidecar";
+import { resumeReferenceJobsOnBoot } from "@/lib/referencePresetEngine";
 import { initCrashBootHold } from "@/lib/dirtyBoot";
 import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/lib/llmSupervisor";
 import { turnWarmupPrompt } from "@/lib/turnMachine/warmup";
@@ -244,6 +245,7 @@ await initCrashBootHold();
 // harmless either way.
 void startKiwixSidecar();
 void startAllSidecars();
+resumeReferenceJobsOnBoot();
 // Warm Home-owned chat when the Stack does not serve it.
 for (const role of engineWarmupsForStackRoles()) {
   const warmup = getChatClient;

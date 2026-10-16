@@ -17,7 +17,7 @@
 // services: we are the user), and trusts whatever that catalog and its
 // `.meta4` currently say.
 import { DOMParser } from "linkedom";
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, unlinkSync, writeFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { downloadUrl, type DownloadProgress } from "@/lib/modelDownload";
 import { raiseIssue, resolveIssue, registerFixHandler } from "@/lib/issues";
@@ -173,6 +173,35 @@ export interface InstallResult {
   replacedPrevious: boolean;
 }
 
+/** Removes only a ZIM slot with a valid adjacent record written by this
+ * installer. Unknown ZIM files are left untouched. */
+export async function removeInstalledReferenceFlavour(id: string): Promise<{ removed: boolean; freedBytes: number }> {
+  const libraryDir = referenceLibraryDir();
+  if (!existsSync(libraryDir)) return { removed: false, freedBytes: 0 };
+  for (const installed of listInstalledReferenceFlavours()) {
+    if (installed.id !== id && `${installed.name}:${installed.flavour}` !== id) continue;
+    const path = join(libraryDir, slotFileName(installed.name, installed.flavour));
+    if (!existsSync(path) || !existsSync(metadataPath(path))) return { removed: false, freedBytes: 0 };
+    const record = JSON.parse(readFileSync(metadataPath(path), "utf-8")) as Partial<InstalledReferenceFlavour>;
+    if (record.id !== installed.id || record.name !== installed.name || record.flavour !== installed.flavour) return { removed: false, freedBytes: 0 };
+    const freedBytes = statSync(path).size;
+    unlinkSync(path);
+    unlinkSync(metadataPath(path));
+    const running = getSidecar(KIWIX_SIDECAR_ID)?.status === "running";
+    if (running) {
+      const bins = await ensureKiwixInstalled();
+      await regenerateLibrary(bins.manageBin, libraryDir);
+      await stopSidecar(KIWIX_SIDECAR_ID);
+      await startSidecar(KIWIX_SIDECAR_ID);
+    } else if (getSidecar(KIWIX_SIDECAR_ID)) {
+      const bins = await ensureKiwixInstalled();
+      await regenerateLibrary(bins.manageBin, libraryDir);
+    }
+    return { removed: true, freedBytes };
+  }
+  return { removed: false, freedBytes: 0 };
+}
+
 // A review caught a real race: two concurrent installs of the same
 // book/language/flavour (two admin sessions, or a Repairs "try again"
 // fix fired while a first attempt is still running) would both delete
@@ -202,7 +231,7 @@ export async function installReferenceFlavour(
   book: string,
   language: string,
   flavour: string,
-  opts: { catalogUrl?: string; onProgress?: (p: DownloadProgress) => void } = {},
+  opts: { catalogUrl?: string; onProgress?: (p: DownloadProgress) => void; signal?: AbortSignal; location?: string; maxBytesPerSecond?: number } = {},
 ): Promise<InstallResult> {
   const key = slotKey(book, language, flavour);
   if (inFlightInstalls.has(key)) {
@@ -211,7 +240,7 @@ export async function installReferenceFlavour(
   inFlightInstalls.add(key);
   try {
     const resolved = await resolveReferenceFlavour(book, language, flavour, opts.catalogUrl);
-    const libraryDir = referenceLibraryDir();
+    const libraryDir = opts.location ?? referenceLibraryDir();
     mkdirSync(libraryDir, { recursive: true });
     const stablePath = join(libraryDir, slotFileName(resolved.name, resolved.flavour));
     const replacedPrevious = existsSync(stablePath);
@@ -228,6 +257,8 @@ export async function installReferenceFlavour(
         expectedSha256: resolved.sha256,
         expectedBytes: resolved.sizeBytes,
         onProgress: opts.onProgress,
+        signal: opts.signal,
+        maxBytesPerSecond: opts.maxBytesPerSecond,
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -318,7 +349,7 @@ export async function installAndPublishReferenceFlavour(
   book: string,
   language: string,
   flavour: string,
-  opts: { catalogUrl?: string; onProgress?: (p: DownloadProgress) => void } = {},
+  opts: { catalogUrl?: string; onProgress?: (p: DownloadProgress) => void; signal?: AbortSignal; location?: string; maxBytesPerSecond?: number } = {},
 ): Promise<InstallResult> {
   const key = slotKey(book, language, flavour);
   const fixAction = `retry_reference_install:${key}`;
