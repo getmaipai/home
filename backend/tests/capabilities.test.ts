@@ -18,6 +18,16 @@ describe("capabilities follow the allocation", () => {
     expect(missingRequired({ optional: ["image"] })).toEqual([]);
   });
 
+  test.each(["vision", "stt", "tts"] as const)("%s off makes the role unavailable and auto restores it", (role) => {
+    const capability = role === "vision" ? "vision" : role;
+    expect(setHouseholdSettingValue(`engines.${role}.choice`, "off").ok).toBe(true);
+    expect(unavailableCapabilities().has(capability)).toBe(true);
+    expect(setHouseholdSettingValue(`engines.${role}.choice`, "auto").ok).toBe(true);
+    expect(unavailableCapabilities().has(capability)).toBe(false);
+    expect(setHouseholdSettingValue(`engines.${role}.choice`, "sample-model").ok).toBe(true);
+    expect(unavailableCapabilities().has(capability)).toBe(false);
+  });
+
   test("a role that failed to install counts as off", () => {
     expect(unavailableCapabilities(["video"]).has("video")).toBe(true);
   });

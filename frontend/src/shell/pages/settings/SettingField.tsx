@@ -168,6 +168,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
     );
   } else if (def.selector === "select") {
     const options = (def.range as { options?: string[] } | undefined)?.options ?? [];
+    const optionDescriptions = (def as { copy?: { options?: Record<string, string> } }).copy?.options;
     const optionLabels = (def as { copy?: { option_labels?: Record<string, string> } }).copy?.option_labels;
     // MINOR-TOPICS-01e: a key's spec copy names its options in plain words; titleCaseOption is the fallback.
     const getLabel = (option: string) => optionLabels?.[option] ?? (def.key === "household.locale" ? localeDisplayName(option) : titleCaseOption(option));
@@ -179,7 +180,7 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         <SelectContent>
           {options.map((option) => (
             <SelectItem key={option} value={option}>
-              {getLabel(option)}
+              {optionDescriptions?.[option] ?? getLabel(option)}
             </SelectItem>
           ))}
         </SelectContent>

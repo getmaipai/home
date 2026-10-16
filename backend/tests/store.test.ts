@@ -225,6 +225,27 @@ describe("install", () => {
     expect(getActiveInstall("test-store-route-image")).toBeNull();
   });
 
+  test.each([
+    { role: "tts", requires: ["tts"] as string[], id: "test-store-route-voice" },
+    { role: "vision", requires: ["vision"] as string[], id: "test-store-route-photos" },
+  ])("turning off $role asks before removing a dependent package, and saves plainly without one", async ({ role, requires, id }) => {
+    const { targetPath } = await buildInstallableFixture({ id, requires });
+    expect((await install({ id, targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);
+    const { client } = await owner();
+    const key = role === "tts" ? "engines.tts.choice" : "engines.vision.choice";
+    const off = { scope: "household", key, value: "off" };
+    const first = await client.request("/api/settings", { method: "PUT", body: off });
+    expect(first.status).toBe(400);
+    expect(((await first.json()) as { error: string }).error).toContain("users will lose access");
+    expect(getActiveInstall(id)).not.toBeNull();
+    const second = await client.request("/api/settings", { method: "PUT", body: { ...off, confirmRemoval: true } });
+    expect(second.status).toBe(200);
+    expect(getActiveInstall(id)).toBeNull();
+
+    const plain = await client.request("/api/settings", { method: "PUT", body: { ...off, key: key === "engines.tts.choice" ? "engines.stt.choice" : "engines.image.choice" } });
+    expect(plain.status).toBe(200);
+  });
+
   test("CAP-GATE-01: a tool whose package needs a capability that is off is not offered to the model", async () => {
     const { targetPath } = await buildInstallableFixture({ id: "test-store-tool-image", requires: ["image"] });
     expect((await install({ id: "test-store-tool-image", targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);

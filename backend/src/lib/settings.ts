@@ -207,8 +207,8 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       // sentinel that delegates selection to the Stack; specific ids are
       // checked by the Stack when applying its setup plan.
       if (typeof range?.options_from === "string" && range.options_from.startsWith("models.")) {
-        if (typeof value !== "string" || (value !== "auto" && value.length === 0)) {
-          return { ok: false, status: 400, error: "expected auto or a model id" };
+        if (typeof value !== "string" || (value !== "auto" && value !== "off" && value.length === 0)) {
+          return { ok: false, status: 400, error: "expected auto, off, or a model id" };
         }
         break;
       }

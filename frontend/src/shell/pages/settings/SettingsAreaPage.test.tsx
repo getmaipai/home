@@ -123,6 +123,13 @@ describe("the settings route", () => {
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
   });
 
+  test.each(["child", "teen"] as const)("a %s cannot reach Engines and AI by direct URL", async (role) => {
+    const view = open(makePerson(role), "/settings/home/ai");
+    await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
+    expect(view.queryByText("Where the engine runs")).toBeNull();
+    expect(fixture!.requests.filter((r) => /api\/(engines|settings\?scope=household)/.test(r))).toEqual([]);
+  });
+
   test("an admin opens the spec-declared Reference library view", async () => {
     const view = open(makePerson("admin"), "/settings/home/reference-library");
     await waitFor(() => expect(where(view)).toBe("/settings/home/reference-library"));

@@ -59,6 +59,18 @@ test("a select shows the plain-word option labels from the key's copy", () => {
   expect(view.queryByText("Gentle")).toBeNull();
 });
 
+test("dynamic model selects retain and explain the fixed off option", () => {
+  const def = SettingsKey.parse({
+    key: "engines.vision.choice", scope: "household", selector: "select",
+    range: { options: ["off"], options_from: "models.vision" }, default: "auto",
+    label: "Vision model choice", level: "basic", lives_in: "household.ai", honoured_by: ["home"],
+    copy: { does: "Directs vision work.", options: { off: "Off: Home will not use photo understanding." } },
+  });
+  const view = render(<SettingField setting={{ def, resolved: { key: def.key, value: "auto", source: "default", label: def.label, level: "basic", secret: false } } as MergedSetting} onChange={async () => true} onReset={() => {}} />);
+  fireEvent.click(view.getByRole("combobox", { name: "Vision model choice" }));
+  expect(view.getByText("Off: Home will not use photo understanding.")).toBeTruthy();
+});
+
 test("turning companions off requires confirmation and cancel changes nothing", async () => {
   const onChange = mock(async () => true);
   const setting = {
