@@ -1,3 +1,5 @@
+import { useQuery } from "@tanstack/react-query";
+import { api } from "@/lib/api";
 import { getIcon } from "@maipai/ui/src/icons";
 import { greetingFor, timeOfDay } from "@/apps/home/greeting";
 
@@ -23,11 +25,24 @@ const MoonIcon = getIcon("moon");
  * than freezing a computed value in `useState` from a mount-only
  * effect - the second bug the review found, since a frozen value never
  * updates across an hour boundary while the page stays open. */
+/** `household.family_name` (DOCS-GAP-04): "Willow" shows as "Willow Family"
+ * above the greeting; blank (the default) shows nothing. */
+export function familyLine(name: unknown): string | null {
+  const trimmed = typeof name === "string" ? name.trim() : "";
+  return trimmed ? `${trimmed} Family` : null;
+}
+
 export function Greeting({ displayName }: { displayName: string }) {
+  const family = useQuery({
+    queryKey: ["household-family-name"],
+    queryFn: () => api.settingsValues("household", "household.family_name"),
+  });
+  const line = familyLine(family.data?.find((v) => v.key === "household.family_name")?.value);
   const isDaytime = timeOfDay(new Date().getHours()) !== "evening";
 
   return (
     <div className="flex flex-col items-start">
+      {line ? <p className="text-sm font-medium text-muted-foreground">{line}</p> : null}
       <h2 className="text-xl flex items-center gap-2 capitalize">
         {greetingFor(new Date(), displayName)} <span className="flex items-center">{isDaytime ? <SunIcon size={25} color="orange" /> : <MoonIcon size={25} />}</span>
       </h2>
