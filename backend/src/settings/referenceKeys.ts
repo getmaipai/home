@@ -8,6 +8,37 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const REFERENCE_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
+    key: "reference.update.mode",
+    scope: "household",
+    selector: "select",
+    range: { options: ["auto", "ask", "off"] },
+    default: "ask",
+    label: "Reference library update mode",
+    help: "Choose whether updates happen automatically, wait for you, or stay off.",
+    level: "advanced",
+    lives_in: "household.reference",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "reference.download.when",
+    scope: "household",
+    selector: "select",
+    range: { options: ["anytime", "window"] },
+    default: "window",
+    label: "Reference download time",
+    copy: {
+      does: "Downloads reference books anytime or during the nightly window.",
+      options: {
+        anytime: "Downloads a book as soon as you ask for it, at any hour.",
+        window: "Waits for the nightly window so downloads do not slow the home in the day.",
+      },
+    },
+    help: "Choose when reference books may download. The nightly window is set in Home updates.",
+    level: "advanced",
+    lives_in: "household.reference",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
     key: "reference.library_dir",
     scope: "household",
     selector: "text",
