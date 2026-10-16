@@ -5022,6 +5022,9 @@
                   },
                   "value": {
                     "nullable": true
+                  },
+                  "confirmRemoval": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
