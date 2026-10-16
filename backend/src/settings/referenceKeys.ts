@@ -8,18 +8,6 @@ import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
 export const REFERENCE_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
-    key: "reference.update.mode",
-    scope: "household",
-    selector: "select",
-    range: { options: ["auto", "ask", "off"] },
-    default: "ask",
-    label: "Reference library update mode",
-    help: "Choose whether updates happen automatically, wait for you, or stay off.",
-    level: "advanced",
-    lives_in: "household.reference",
-    honoured_by: ["home"],
-  }),
-  SettingsKey.parse({
     key: "reference.download.when",
     scope: "household",
     selector: "select",
