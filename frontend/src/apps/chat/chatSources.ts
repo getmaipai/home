@@ -28,7 +28,7 @@ function licenceLine(source: SpecSource): string | null {
  * host and the licence line ride in `providerMetadata` for the Sources footer. */
 export function sourceMessageParts(sources: readonly SpecSource[] | undefined): SourceMessagePart[] {
   return (sources ?? []).map((source) => {
-    const local = source.kind === "reference" && source.local_path ? source.local_path : null;
+    const local = source.kind === "reference" && source.local_path ? readerPath(source.local_path) : null;
     const line = local ? licenceLine(source) : null;
     return {
       type: "source",
@@ -39,6 +39,12 @@ export function sourceMessageParts(sources: readonly SpecSource[] | undefined): 
       ...(local ? { providerMetadata: { [META_KEY]: { domain: sourceDomain(source.url), ...(line ? { licence: line } : {}) } } } : {}),
     };
   });
+}
+
+function readerPath(localPath: string): string {
+  const match = localPath.match(/^\/api\/reference\/([^/]+)\/(.+)$/);
+  if (!match) return localPath;
+  return `/reference/${encodeURIComponent(match[1]!)}/${match[2]!.split("/").map(encodeURIComponent).join("/")}`;
 }
 
 const EMPTY_SOURCES: ChatSource[] = [];

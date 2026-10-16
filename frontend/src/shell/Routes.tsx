@@ -31,6 +31,7 @@ import { DevicesPage } from "@/shell/pages/DevicesPage";
 import { PrivacyPage } from "@/shell/pages/PrivacyPage";
 import { UsersPage } from "@/shell/pages/UsersPage";
 import { FilesPage } from "@/shell/pages/FilesPage";
+import { ReferencePage } from "@/shell/pages/ReferencePage";
 import { PersonProfilePage } from "@/shell/pages/PersonProfilePage";
 import { SignInPage } from "@/shell/pages/SignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
@@ -101,6 +102,7 @@ function PageHeaderLayout() {
     "/privacy": "Privacy",
     "/users": "Users",
     "/files": "Library",
+    "/reference": "Reference",
     "/dev/ui": "Chat showcase",
   };
   const title = titleByPath[pathname.replace(/\/$/, "") || "/"];
@@ -247,6 +249,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="privacy" element={<PrivacyPage />} />
             <Route path="users" element={<UsersPage person={person} />} />
             <Route path="files" element={<FilesPage person={person} />} />
+            <Route path="reference/*" element={<ReferencePage />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
             <Route path="*" element={<NotFoundPage />} />

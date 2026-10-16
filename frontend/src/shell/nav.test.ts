@@ -9,8 +9,8 @@ describe("NAV_ENTRIES", () => {
       ["Family", "/people"],
     ]);
   });
-  test("lists Privacy and Settings after them", () => {
-    expect(NAV_ENTRIES.slice(3).map((entry) => entry.to)).toEqual(["/privacy", "/settings"]);
+  test("lists Reference, Privacy and Settings after them", () => {
+    expect(NAV_ENTRIES.slice(3).map((entry) => entry.to)).toEqual(["/reference", "/privacy", "/settings"]);
   });
   test("every entry has a unique absolute path, a label and an icon", () => {
     const paths = NAV_ENTRIES.map((entry) => entry.to);

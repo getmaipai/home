@@ -105,6 +105,27 @@ export interface SiteBlocksView {
   setBy: Record<string, string>;
 }
 
+export interface ReferenceBookView {
+  id: string; source_label: string; language: string | null; size_bytes: number | null;
+  snapshot_date: string | null; licence: string; article_count: number;
+}
+export interface ReferenceSuggestion { title: string; book: string; path: string }
+export interface ReferenceSearchHit { title: string; snippet: string; book: string; path: string }
+export type ReferenceInline = string | { type: "text" | "emphasis" | "strong"; text: string } | { type: "link"; text: string; href?: string; book?: string; path?: string };
+export type ReferenceBlock =
+  | { type: "heading"; level: number; id: string; text: string }
+  | { type: "paragraph"; inlines: ReferenceInline[] }
+  | { type: "list"; ordered: boolean; items: ReferenceInline[][] }
+  | { type: "rows"; rows: Array<{ label: string; value: string }> }
+  | { type: "table"; headers: string[]; rows: string[][] }
+  | { type: "figure"; src: string; alt: string; caption?: string }
+  | { type: "note"; text: string };
+export interface ReferenceArticleView {
+  title: string; book: string; path: string; source_label: string; licence: string;
+  snapshot_date: string | null; blocks: ReferenceBlock[];
+  toc: Array<{ id: string; title: string; level: number }>;
+}
+
 export type PersonRosterEntry = Omit<Person, "birthdate"> & {
   sessionLockRequired: boolean;
   sessionLockTimeoutMinutes: number;
@@ -667,6 +688,10 @@ export interface InstallStatusView {
 }
 
 export const api = {
+  referenceBooks: () => request<ReferenceBookView[]>("/api/reference/books"),
+  referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),
+  referenceSearch: (q: string, book?: string) => request<ReferenceSearchHit[]>(`/api/reference/search?q=${encodeURIComponent(q)}${book ? `&book=${encodeURIComponent(book)}` : ""}`),
+  referenceArticle: (book: string, path: string) => request<ReferenceArticleView>(`/api/reference/article/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`),
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
   setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null }>("/api/setup/checks/run", { method: "POST" }),
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),

@@ -20,16 +20,20 @@ describe("chatSources", () => {
     licence: "cc-by-sa-4.0",
     snapshot_date: "2026-09-01",
   };
-  test("a library source opens its Home proxy path, never the public url", () => {
+  test("a library source opens its reader route, never the public url", () => {
     const [part] = sourceMessageParts([reference] as never);
-    expect(part).toMatchObject({ type: "source", sourceType: "url", url: "/api/reference/wikipedia_en_all/A/Moon" });
+    expect(part).toMatchObject({ type: "source", sourceType: "url", url: "/reference/wikipedia_en_all/A/Moon" });
     const [source] = sourcesFromMessage(msg([part]));
-    expect(source?.url).toBe("/api/reference/wikipedia_en_all/A/Moon");
+    expect(source?.url).toBe("/reference/wikipedia_en_all/A/Moon");
     expect(JSON.stringify(source)).not.toContain("https://en.wikipedia.org/wiki/Moon");
+  });
+  test("a citation target keeps escaped article path segments on the reader", () => {
+    const [part] = sourceMessageParts([{ ...reference, local_path: "/api/reference/wiki_en/A/Red%20Fox" }] as never);
+    expect(part?.url).toBe("/reference/wiki_en/A/Red%2520Fox");
   });
   test("a library source shows the public host and the licence line from the backend label map", () => {
     const [source] = sourcesFromMessage(msg(sourceMessageParts([reference] as never)));
-    expect(source).toEqual({ domain: "en.wikipedia.org", title: "Moon", url: "/api/reference/wikipedia_en_all/A/Moon", detail: "CC BY-SA 4.0, snapshot 2026-09-01" });
+    expect(source).toEqual({ domain: "en.wikipedia.org", title: "Moon", url: "/reference/wikipedia_en_all/A/Moon", detail: "CC BY-SA 4.0, snapshot 2026-09-01" });
   });
   test("every licence value gets a label and a library source without a snapshot shows the label alone", () => {
     for (const [licence, label] of [["cc0", "CC0"], ["public-domain", "Public domain"], ["publisher", "Publisher's licence"]]) {

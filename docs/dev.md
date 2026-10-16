@@ -28309,6 +28309,19 @@ new hand-built frontend surface (org rule, 2026-09-21). `BACKLOG.md`
 line 147's own wording is corrected from "disk impact in the wizard" to
 match.
 
+## REFERENCE-READER-01b: the Reference page (2026-10-15)
+
+The shell's Reference page reads the age-band-filtered library through the
+closed `/api/reference` books, suggestion, search and article routes. It
+renders article blocks as text and kit UI primitives, keeps internal links
+on `/reference/{book}/{path}`, and opens source citations at that reader
+route. Browser history supplies back and forward. The desktop contents list
+and phone Sheet use the article's API-provided headings. Article footers show
+the licence and snapshot date. Search text stays in the request and page
+state; it is not added to Home logs. See
+`docs/plans/reference-reader-and-library-settings-2026-10-15.md` for the
+accepted design and `docs/user/reference.md` for reader instructions.
+
 ## KS-REF-PRESETS-01: plan, apply and per-set reference controls (2026-10-15)
 
 The Home sidecar exposes admin-only `POST /api/reference/plan`,
