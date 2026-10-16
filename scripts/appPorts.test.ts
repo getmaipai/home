@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 // PORTS-01: 8787 is the main checkout's hub; a worktree leases an 88xx port;
@@ -14,7 +14,10 @@ const tree = join(scratch, "wt", "home-ports-x");
 const data = join(scratch, "data");
 const git = (cwd: string, ...args: string[]) =>
   spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
-const env = { ...process.env, MAIPAI_WT_DATA: data, MAIPAI_HUB_LOCK_PATH: "", MAIPAI_MAIN_CHECKOUT: "", PORT: "" };
+// scripts/wt.sh is a thin wrapper around the shared .github script; the fixture has no sibling checkout.
+const common = resolve(scripts, "..", spawnSync("git", ["-C", scripts, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).stdout.trim());
+const sharedWt = process.env.MAIPAI_WT_SHARED || join(common, "..", "..", ".github", "standards", "bin", "wt.sh");
+const env = { ...process.env, MAIPAI_WT_SHARED: sharedWt, MAIPAI_WT_DATA: data, MAIPAI_HUB_LOCK_PATH: "", MAIPAI_MAIN_CHECKOUT: "", PORT: "" };
 delete (env as Record<string, string | undefined>).PORT;
 delete (env as Record<string, string | undefined>).MAIPAI_HUB_LOCK_PATH;
 delete (env as Record<string, string | undefined>).MAIPAI_MAIN_CHECKOUT;
