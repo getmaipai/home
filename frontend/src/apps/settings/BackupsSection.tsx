@@ -9,7 +9,7 @@ interface BackupsSectionProps {
   person: Roster;
 }
 
-const EMERGENCY_KIT_SAVED_KEY = "backups.emergency_kit_saved_at";
+export const EMERGENCY_KIT_SAVED_KEY = "backups.emergency_kit_saved_at";
 const EMERGENCY_KIT_ERROR = "Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.";
 
 function EmergencyBackupKeyRow() {

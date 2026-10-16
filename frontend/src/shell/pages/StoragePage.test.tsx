@@ -73,8 +73,16 @@ function makeOverview(overrides: Partial<StorageUsageOverview> = {}): StorageUsa
 
 function mockFetch(overview: StorageUsageOverview | { status: number }, registry: SettingsKey[] = []) {
   const originalFetch = globalThis.fetch;
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
+  globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/backups/restore/pending")) return Promise.resolve(Response.json({ pending: null }));
+    if (url === "/api/backups/emergency-kit") return Promise.resolve(Response.json({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "secret-backup-key", generatedAt: "2026-10-13T10:00:00.000Z" }));
+    if (url === "/api/backups") return Promise.resolve(Response.json([]));
+    if (url === "/api/status/apps") return Promise.resolve(Response.json([]));
+    if (url === "/api/settings" && init?.method === "PUT") {
+      const body = JSON.parse(String(init.body)) as { key: string; value: unknown };
+      return Promise.resolve(Response.json(body));
+    }
     if (url.includes("/api/storage/usage")) {
       if ("status" in overview) return Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: overview.status }));
       return Promise.resolve(Response.json(overview));
@@ -88,7 +96,10 @@ function mockFetch(overview: StorageUsageOverview | { status: number }, registry
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       if (scope === "household") {
         return Promise.resolve(
-          Response.json(registry.map((k) => ({ key: k.key, value: 20 * 1024 ** 3, source: "default", label: k.label, level: k.level, secret: false }))),
+          Response.json([
+            ...registry.map((k) => ({ key: k.key, value: 20 * 1024 ** 3, source: "default", label: k.label, level: k.level, secret: false })),
+            { key: "backups.emergency_kit_saved_at", value: null, source: "default", label: "Backup key saved", level: "basic", secret: false },
+          ]),
         );
       }
       return Promise.resolve(Response.json([]));
@@ -126,6 +137,18 @@ describe("StoragePage", () => {
       // the household.storage group, not a hand-built form.
       await waitFor(() => expect(document.body.textContent).toContain("Household storage cap (bytes)"));
       expectHomeTablesWithoutDemoOrActions(1);
+    } finally {
+      restore();
+    }
+  });
+
+  test("Storage and backups offers the emergency key download and print row", async () => {
+    const restore = mockFetch(makeOverview());
+    try {
+      const view = renderWithQueryClient(<MemoryRouter><StoragePage person={makePerson()} /></MemoryRouter>);
+      expect(await view.findByText(/If this computer breaks/)).toBeTruthy();
+      expect(await view.findByRole("button", { name: "Download" })).toBeTruthy();
+      expect(await view.findByRole("button", { name: "Print" })).toBeTruthy();
     } finally {
       restore();
     }
@@ -186,6 +209,10 @@ describe("StoragePage", () => {
       if (url.includes("/api/storage/package-cache/clear")) return Promise.resolve(new Response("{}", { status: 500 }));
       if (url.includes("/api/storage/package-cache")) return Promise.resolve(Response.json([{ source: "weather:current", packageId: "weather", label: "Weather", entryCount: 1, sizeBytes: 100 }]));
       if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json([]));
+      if (url.includes("/api/backups/restore/pending")) return Promise.resolve(Response.json({ pending: null }));
+      if (url === "/api/backups/emergency-kit") return Promise.resolve(Response.json({ hubName: "Home", hubInstanceId: "hub-1", backupKeyHex: "secret-backup-key", generatedAt: "2026-10-13T10:00:00.000Z" }));
+      if (url === "/api/backups") return Promise.resolve(Response.json([]));
+      if (url === "/api/status/apps") return Promise.resolve(Response.json([]));
       if (url.includes("/api/settings?scope=")) return Promise.resolve(Response.json([]));
       return Promise.resolve(Response.json({}));
     }) as unknown as typeof fetch;

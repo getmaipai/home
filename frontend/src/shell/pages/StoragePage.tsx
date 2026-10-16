@@ -13,6 +13,7 @@ import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { DataTable, type DataTableColumn } from "@maipai/ui/src/elements/data-table";
 import { DataTableRowActions } from "@/shell/components/DataTableRowActions";
 import { formatBytes } from "@/apps/settings/formatBytes";
+import { BackupsSection } from "@/apps/settings/BackupsSection";
 import { api, ApiError, isOwnerOrAdminRole, type Roster, type StorageUsageOverview, type PersonStorageRow } from "@/lib/api";
 import type { PackageCacheSourceRow } from "@maipai/home-backend/src/wire";
 import { useTabItem } from "@/shell/tabIdentity";
@@ -134,12 +135,12 @@ export function StoragePage({ person }: { person: Roster }) {
       errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load storage."}
       loadingLabel="Loading storage"
     >
-      {(data: StorageUsageOverview) => <StorageContent data={data} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} />}
+      {(data: StorageUsageOverview) => <StorageContent data={data} person={person} isAdmin={isAdmin} cacheRows={cacheQuery.data ?? []} cacheLoading={cacheQuery.isLoading} clearAllOpen={clearAllOpen} setClearAllOpen={setClearAllOpen} clear={clear} />}
     </AsyncState>
   );
 }
 
-function StorageContent({ data, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear }: { data: StorageUsageOverview; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void> }) {
+function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearAllOpen, setClearAllOpen, clear }: { data: StorageUsageOverview; person: Roster; isAdmin: boolean; cacheRows: PackageCacheSourceRow[]; cacheLoading: boolean; clearAllOpen: boolean; setClearAllOpen: (open: boolean) => void; clear: (source?: string, label?: string) => Promise<void> }) {
   const rows = [...data.people.map(toRow), ...(data.household && data.household.inherited.files > 0 ? [inheritedRow(data.household.inherited)] : [])];
   const model = useDataTableModel(rows, tableColumns<PersonUsageRow>(["person", "role", "used", "cap", "top kind"], {
     person: 180,
@@ -179,6 +180,7 @@ function StorageContent({ data, isAdmin, cacheRows, cacheLoading, clearAllOpen, 
       <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage usage by person" getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
+        <BackupsSection person={person} />
         <Card>
           <CardHeader>
             <CardTitle>Saved online data</CardTitle>
