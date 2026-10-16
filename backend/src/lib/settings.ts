@@ -119,6 +119,19 @@ export function assertCanSetTtsVoice(actor: PersonRow, targetId: string): Settin
   return { ok: false, status: 403, error: "That person chooses their own voice. Only they can change it." };
 }
 
+/** Voice print enrollment is a guardian choice for a child and a self choice
+ * for teens and adults, as declared by the shared settings registry. */
+function assertCanSetVoicePrintEnrollment(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  const targetRole = getPersonRole(targetId);
+  if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
+  if (actor.id === targetId) {
+    if (targetRole === "child") return { ok: false, status: 403, error: "A parent must agree before a child's voice pattern is saved." };
+    return { ok: true, value: true };
+  }
+  if (isOwnerOrAdmin(actor) && targetRole === "child") return { ok: true, value: true };
+  return { ok: false, status: 403, error: "Only a person can choose voice print enrollment for themselves, or a parent for a child." };
+}
+
 function assertCanSetPhotoUploads(actor: PersonRow, targetId: string): SettingsOpResult<true> {
   const targetRole = getPersonRole(targetId);
   if (!targetRole) return { ok: false, status: 403, error: "cannot access another person's settings" };
@@ -636,6 +649,8 @@ export function setValue(
         ? assertCanAccessWakewordDeviceSetting(actor)
         : key === "tts.voice_id" && parsed.kind === "person"
           ? assertCanSetTtsVoice(actor, parsed.id!)
+        : key === "person.voice_print.enrollment" && parsed.kind === "person"
+          ? assertCanSetVoicePrintEnrollment(actor, parsed.id!)
         : key === "chat.photo_uploads" && parsed.kind === "person"
           ? assertCanSetPhotoUploads(actor, parsed.id!)
         : key === "reference.images" && parsed.kind === "person"

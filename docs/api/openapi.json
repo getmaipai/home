@@ -4719,6 +4719,30 @@
                             "type": "string",
                             "minLength": 1
                           },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "what_is_stored": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "consent_adult_self": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "consent_teen_self": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "consent_child_parent": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "consent_guest": {
+                            "type": "string",
+                            "minLength": 1
+                          },
                           "options": {
                             "type": "object",
                             "additionalProperties": {
