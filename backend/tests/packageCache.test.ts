@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, symlinkSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, unlinkSync, symlinkSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { cacheDir } from "@/lib/paths";
 import {
@@ -42,6 +42,8 @@ describe("sweepPackageCache", () => {
   const keyFor = (url: string) => createHash("sha256").update(`GET\n${url}\n\n`).digest("hex");
 
   test("removes entries strictly past staleUntil and preserves the exact boundary", async () => {
+    // The sweep is global and the test data dir is shared by every file in a shard, so start clean.
+    rmSync(cacheDir, { recursive: true, force: true });
     const url = "https://example.com/sweep-expired";
     await cachedFetch(PKG, { ttl_s: 60, stale_ok_s: 30 }, url, undefined, async () => ({ v: 1 }));
     const path = join(cacheDir, PKG, `${keyFor(url)}.json`);
