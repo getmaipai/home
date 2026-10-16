@@ -25,6 +25,7 @@
 // (kept behaviorally identical, spec/fixtures/recipes/) and this file's
 // own `host.schedule` real implementation (packageHost.ts) now carry a
 // recipe's own `schedule` step's `inputs` field through for real.
+import { sweepLiveViews } from "@/lib/liveView";
 import { dispatchRobotOffers, sweepRobotOffers } from "@/lib/robotOffers";
 import { eq, and, lte, isNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -245,7 +246,7 @@ type CoreJobHandler = (row: JobRow) => void | Promise<void>;
 const CORE_JOBS: Record<string, CoreJobHandler> = {
   "notifications.deliver_held": async () => { await deliverHeldNotifications(); },
   // INITIATIVE-01: send the queued robot offers whose gates pass, after closing the expired ones into the centre (so a backoff sees them).
-  "robot.offers.tick": async () => { await sweepRobotOffers(); dispatchRobotOffers(); },
+  "robot.offers.tick": async () => { await sweepRobotOffers(); dispatchRobotOffers(); sweepLiveViews(); },
   "memory.maintenance": () => {
     runMaintenance();
   },

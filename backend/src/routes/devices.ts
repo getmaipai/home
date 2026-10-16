@@ -7,6 +7,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { upgradeWebSocket } from "hono/bun";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
+import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession } from "@/middleware/auth";
 import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
 import { getDeviceState, resolveRequestDevice, upsertDeviceState } from "@/lib/deviceStates";
@@ -239,6 +240,85 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const { kind } = c.req.valid("json");
   const command = issueDeviceCommand(device.id, kind, {});
   return c.json({ id: command.id }, 202);
+});
+
+// LIVE-VIEW-01: the hub's own live view of a robot. Start and stop are for an admitted adult only
+// (lib/liveView.ts decides); the robot posts JPEG frames, the hub re-serves them to the one viewer.
+const startLiveViewRoute = createRoute({
+  method: "post",
+  path: "/{id}/live-view",
+  tags: ["Devices"],
+  summary: "Open a live view of a paired robot's camera (admins and named adults only)",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "device-a1b2c3") },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ view_id: z.string(), stream: z.string() }) } }, description: "The view is starting; open `stream` to watch." },
+    ...errorResponses({ 400: "Not a robot", 401: "Not signed in", 403: "Live view is off or this person may not watch", 404: "No such device (or it is not yours to control)" }),
+  },
+});
+devicesRoutes.openapi(startLiveViewRoute, (c) => {
+  const started = startLiveView(c.get("person"), c.req.valid("param").id);
+  if (!started.ok) return c.json({ error: started.error }, started.status);
+  return c.json({ view_id: started.viewId, stream: `/api/devices/live-view/${started.viewId}` }, 200);
+});
+
+const watchLiveViewRoute = createRoute({
+  method: "get",
+  path: "/live-view/{viewId}",
+  tags: ["Devices"],
+  summary: "Watch a live view (multipart JPEG stream); closing the page stops the view",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ viewId: z.string() }) },
+  responses: {
+    200: { description: "A multipart/x-mixed-replace stream of JPEG frames." },
+    ...errorResponses({ 401: "Not signed in", 403: "Live view is off or this person may not watch", 404: "No such view" }),
+  },
+});
+devicesRoutes.openapi(watchLiveViewRoute, (c) => {
+  const actor = c.get("person");
+  const view = getLiveView(c.req.valid("param").viewId);
+  if (!view || view.personId !== actor.id) return c.json({ error: "That live view is not open. Start it again from the robot's card." }, 404);
+  const admitted = liveViewAdmits(actor);
+  if (!admitted.ok) { stopLiveView(view.viewId); return c.json({ error: admitted.error }, admitted.status); }
+  return new Response(liveViewStream(view), { status: 200, headers: { "Content-Type": LIVE_VIEW_CONTENT_TYPE, "Cache-Control": "no-store" } });
+});
+
+const stopLiveViewRoute = createRoute({
+  method: "delete",
+  path: "/live-view/{viewId}",
+  tags: ["Devices"],
+  summary: "Close a live view",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ viewId: z.string() }) },
+  responses: {
+    204: { description: "Closed." },
+    ...errorResponses({ 401: "Not signed in", 404: "No such view" }),
+  },
+});
+devicesRoutes.openapi(stopLiveViewRoute, (c) => {
+  const view = getLiveView(c.req.valid("param").viewId);
+  if (!view || view.personId !== c.get("person").id) return c.json({ error: "That live view is not open." }, 404);
+  stopLiveView(view.viewId);
+  return c.body(null, 204);
+});
+
+const streamFrameRoute = createRoute({
+  method: "post",
+  path: "/me/stream/{viewId}",
+  tags: ["Devices"],
+  summary: "The robot posts one JPEG frame of an open live view",
+  middleware: [requireDeviceSession("robot")] as const,
+  request: { params: z.object({ viewId: z.string() }) },
+  responses: {
+    204: { description: "Frame accepted." },
+    ...errorResponses({ 400: "Not a JPEG, or too large", 401: "Not signed in", 403: "Not a robot device session", 404: "No open view for this robot" }),
+  },
+});
+devicesRoutes.openapi(streamFrameRoute, async (c) => {
+  const outcome = pushLiveFrame(c.get("deviceId"), c.req.valid("param").viewId, new Uint8Array(await c.req.arrayBuffer()));
+  if (outcome === "unknown_view") return c.json({ error: "No live view is open for this robot. Stop streaming." }, 404);
+  if (outcome === "bad_frame") return c.json({ error: "A live view frame must be a JPEG under 512 KB." }, 400);
+  return c.body(null, 204);
 });
 
 const deleteRoute = createRoute({

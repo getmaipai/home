@@ -204,6 +204,8 @@ const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["GET", /^\/api\/devices\/me\/assets\/[^/]+\/?$/],
   ["GET", /^\/api\/devices\/me\/hub-endpoints\/?$/],
   ["GET", /^\/api\/biometric-prints\/sync\/?$/],
+  // LIVE-VIEW-01: the robot posts JPEG frames of an open live view.
+  ["POST", /^\/api\/devices\/me\/stream\/[^/]+\/?$/],
 ];
 
 export function robotSessionMayReach(method: string, path: string): boolean {

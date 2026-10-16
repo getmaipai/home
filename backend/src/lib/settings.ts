@@ -246,7 +246,10 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       // of this branch - every existing "person" selector use (the
       // spec's own recipe fixtures) is still a single id, so a plain
       // string stays the default when `multiple` isn't set.
-      const multiple = (range as { multiple?: boolean } | undefined)?.multiple === true;
+      // LIVE-VIEW-01: the spec's declaration of `robot.live_view.who` has an array default but no `multiple`
+      // flag, so it is treated as a list here, and it may name adults only (the selector offers adults only).
+      const adultsOnly = keyDef.key === LIVE_VIEW_WHO_KEY;
+      const multiple = adultsOnly || (range as { multiple?: boolean } | undefined)?.multiple === true;
       const ids = multiple ? value : [value];
       if (multiple ? !Array.isArray(value) : typeof value !== "string") {
         return { ok: false, status: 400, error: multiple ? "expected an array of person ids" : "expected a person id" };
@@ -259,6 +262,10 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
           .where(and(eq(people.id, id), isNull(people.deletedAt)))
           .get();
         if (!exists) return { ok: false, status: 400, error: `unknown person: ${id}` };
+        if (adultsOnly) {
+          const named = db.select().from(people).where(eq(people.id, id)).get()!;
+          if (speakerAgeBand(named, new Date()) !== "adult") return { ok: false, status: 400, error: "Live view can only name adults. Pick an adult, or leave a child or teen off the list." };
+        }
       }
       break;
     }
@@ -609,6 +616,7 @@ function assertCanSetPageTextCleaning(actor: PersonRow, targetId: string): Setti
 
 /** INITIATIVE-01: the robot may speak first to a child only on a parent's or admin's switch, so a child
  * can never write this key for themselves; everyone else follows the ordinary person-scope rule. */
+export const LIVE_VIEW_WHO_KEY = "robot.live_view.who";
 export const ROBOT_MAY_ADDRESS_KEY = "person.robot.may_address";
 function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
   if (actor.id === targetId && actor.role === "child") {

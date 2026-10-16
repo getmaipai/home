@@ -36980,3 +36980,16 @@ confirmed speaker who is alone (`sensitiveAllowed`); the non-personal line passe
 created; the tick sweeps before it dispatches so a backoff sees the expiries; "not now" extends the expiry past the snooze so it
 re-offers and never notifies "missed". Known limit: a channel decline or snooze frame carries no speaker evidence (the spec frame
 has no field), so any voice at the robot can close an offer; it cannot accept one.
+
+## LIVE-VIEW-01: the hub half of the robot live view (2026-10-16)
+
+`backend/src/lib/liveView.ts` decides who may watch: `robot.live_view.enabled` on, an adult by age band (a teen or child never,
+even when a row names them), and an owner, an admin, or an adult in `robot.live_view.who`. The settings write for that list
+refuses a non-adult. (The pinned spec declares the key with an array default but no `range.multiple`; `settings.ts` treats it as
+a list by key name until commons adds the flag.) `POST /api/devices/{id}/live-view` issues `live_view_start {view_id, fps: 5,
+size: 640x360}`; the robot posts JPEGs to `POST /api/devices/me/stream/{view_id}` (added to the robot session allowlist); the
+starter watches `GET /api/devices/live-view/{view_id}` as multipart JPEG; closing that response, `DELETE`, the 10 minute cap, or
+no viewer within 30 seconds issues `live_view_stop`. Frames are held in memory only and never written to a table. The privacy
+page gains the `platform:robot-live-view` row. Not built: the robot card button in the frontend, and the bot half (cyan Eyes
+look, streaming). A viewer closing is noticed when the response is cancelled, which is immediate on a normal socket close and
+otherwise bounded by the 30 second attach grace and the 10 minute cap.

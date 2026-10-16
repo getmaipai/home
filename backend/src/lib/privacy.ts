@@ -356,6 +356,19 @@ function inboundConnections(): PrivacyConnection[] {
       direction: "inbound",
     },
     {
+      id: "platform:robot-live-view",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "only while an admin, or an adult an admin named, has a robot's live view open",
+      what:
+        "the robot's camera pictures (about five a second) go from the robot to Home and on to that one adult's open page. Nothing is recorded or saved, and no outside service is used. It stays off until an admin turns on 'Allow robot live view', a child or teen can never watch, the robot's eyes show a cyan look the whole time, and it closes by itself when the page closes or after 10 minutes.",
+      who: "the paired robot, and the one adult watching",
+      optIn: true,
+      retention: "none: each picture is held in memory only while it is shown",
+      direction: "inbound",
+    },
+    {
       id: "platform:inbound-api",
       source: "MaiPai Home",
       sourceKind: "platform",
