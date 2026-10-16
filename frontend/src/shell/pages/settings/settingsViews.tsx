@@ -2,6 +2,7 @@ import type { ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
+import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
 import { AwaySessionsSection } from "@/apps/settings/AwaySessionsSection";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
@@ -40,6 +41,7 @@ function AccountProfile({ person, onPersonChange }: SettingsViewProps) {
       </Card>
       <AwaySessionsSection />
       {canViewFaceEnrollment(person, person) ? <Card><FaceEnrollmentBody profile={person} viewer={person} /></Card> : null}
+      {canViewFaceEnrollment(person, person) ? <Card><VoiceEnrollmentBody profile={person} viewer={person} /></Card> : null}
     </>
   );
 }
