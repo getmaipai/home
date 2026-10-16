@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T22:24:14.766Z",
+  "generatedAt": "2026-10-16T23:25:44.079Z",
   "kitTag": "ui-v0.5.233",
   "items": [
     {
@@ -1372,8 +1372,8 @@
       "file": "weather-card.tsx",
       "name": "weather-card",
       "group": "answer/weather",
-      "verdict": "later",
-      "verdictReason": "Home's weather package does not emit the weather_card block yet (WEATHER-CARD-01 Home half); adopt when it does.",
+      "verdict": "wire-now",
+      "verdictReason": "Selected for current Home UI adoption: the weather package returns this block (WEATHER-CARD-01) and the kit's answer-block dispatcher draws it.",
       "implemented": false
     },
     {
