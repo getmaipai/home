@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
@@ -9,7 +10,8 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@maipai/ui/src/dashboard/components/ui/accordion";
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
-import { api, ApiError } from "@/lib/api";
+import { api, ApiError, type SignedInPerson } from "@/lib/api";
+import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } from "@/lib/modelDownloadProgress";
 import { setupChecklistCountLine } from "@/shell/useSetupChecklist";
@@ -109,6 +111,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const dark = useIsDark();
   const navigate = useNavigate();
   const downloads = useModelDownloadJobs();
+  const sizingPerson = useQuery<SignedInPerson>({ queryKey: ["setup-sizing-person"], queryFn: () => api.me(), retry: false });
   const [state, setState] = useState<SetupState | null>(null);
   const [screen, setScreen] = useState<ScreenId>(initialScreen ?? "welcome");
   const [loading, setLoading] = useState(true);
@@ -387,7 +390,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       </div>;
       break;
     }
-    case "plan": body = <><PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} />{searchCandidate ? <Card><CardContent><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void chooseSearchCandidate()}>Use it</Button></CardContent></Card> : null}{searchError ? <p role="alert">{searchError}</p> : null}</>; break;
+    case "plan": body = <><PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} />{sizingPerson.data?.role === "owner" || sizingPerson.data?.role === "admin" ? <SizingPanel person={sizingPerson.data} onRemoval={() => {}} /> : null}{searchCandidate ? <Card><CardContent><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void chooseSearchCandidate()}>Use it</Button></CardContent></Card> : null}{searchError ? <p role="alert">{searchError}</p> : null}</>; break;
     case "owner": body = <Card><CardContent><p>{OWNER_COPY}</p><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} checkSecret hideSubmit /></CardContent></Card>; break;
     case "face": body = <Card><CardContent><p>Face data stays on this computer. You can turn on face greetings now or later in your profile.</p></CardContent></Card>; break;
     case "hello": body = <Card><CardContent><p>You can talk with Home as soon as setup is finished.</p></CardContent></Card>; break;

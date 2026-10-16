@@ -23,6 +23,9 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS) {
   const posts: string[] = [];
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.includes("/api/auth/me")) return new Response(JSON.stringify({ id: "owner-1", displayName: "Owner", role: "owner", hasSecret: true, hasPasskeys: false, age_band: "adult", sessionLockRequired: false, sessionLockTimeoutMinutes: 0 }), { status: 200 });
+    if (url.includes("/api/engines")) return new Response(JSON.stringify({ configured: true, roles: [{ id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "ready", since: "", reason: null }, reason: null, model: { id: "small-chat", sizeBytes: 100, measuredFootprintBytes: 1_073_741_824, measuredContextLength: 4096, estimated: false }, check: { state: "passed", at: null, reason: null, stale: false } }], engines: [], budget: null }), { status: 200 });
+    if (url.includes("/api/settings?scope=household")) return new Response(JSON.stringify([]), { status: 200 });
     if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
     if (url.includes("/api/setup/checks/run")) return new Response(JSON.stringify({ rows: checkRows, state }), { status: 200 });
     if (url.includes("/api/setup-checklist")) return new Response(JSON.stringify(Array.from({ length: 5 }, (_, i) => ({ id: `item-${i}`, title: "Item", reason: "", done: i >= checklistOpen, open: { label: "Open", href: "/" } }))), { status: 200 });
@@ -56,6 +59,18 @@ async function advanceTo(viewResult: ReturnType<typeof view>, buttonText: string
 }
 
 describe("SetupWizard", () => {
+  test("shows memory sizing on the setup plan screen", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Your setup plan"));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Memory and model choices"));
+      expect(rendered.container.textContent).toContain("Keeps 1.0 GB memory.");
+    } finally { h.restore(); }
+  });
+
   test("Checks screen uses persisted rows, continues on amber and holds on red", async () => {
     const state = freshState();
     for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
