@@ -395,7 +395,10 @@
     "lives_in": "robot.settings",
     "honoured_by": [
       "home"
-    ]
+    ],
+    "range": {
+      "multiple": true
+    }
   },
   {
     "key": "robot.offlan.tailnet",
