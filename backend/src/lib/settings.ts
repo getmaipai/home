@@ -624,8 +624,9 @@ export const ROBOT_FOLLOW_UP_KEY = "person.robot.follow_up";
 export const VISION_WATCH_KEY = "person.vision.watch";
 const PARENT_GATED_ROBOT_KEYS: ReadonlySet<string> = new Set([ROBOT_MAY_ADDRESS_KEY, ROBOT_FOLLOW_UP_KEY, VISION_WATCH_KEY]);
 function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
-  if (actor.id === targetId && actor.role === "child") {
-    return { ok: false, status: 403, error: "A parent turns this on for you. Ask the person who manages Home." };
+  // The band, not the role alone: a birthdate under 13 makes an adult-role person a child here too (speakerAgeBand is role-floored).
+  if (actor.id === targetId && speakerAgeBand(actor, new Date()) === "child") {
+    return { ok: false, status: 403, error: "A parent sets this for you. Ask the person who manages Home." };
   }
   return assertCanAccessScope(actor, { kind: "person", id: targetId }, "write");
 }

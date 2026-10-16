@@ -97,6 +97,18 @@ describe("GET /api/devices/me/people", () => {
     expect((await rosterOf(robot)).people[0]!.follow_up).toBe(true);
   });
 
+  test("an adult-role person whose birthdate makes them a child cannot switch these on for themself", async () => {
+    const { ownerRow, add } = await setup();
+    const minor = await add("Pippa", "adult");
+    db.update(people).set({ birthdate: `${new Date().getUTCFullYear() - 9}-01-01` }).where(eq(people.id, minor.id)).run();
+    const row = db.select().from(people).where(eq(people.id, minor.id)).get()!;
+    addPrint(minor.id);
+    for (const [key, value] of [["person.robot.follow_up", true], ["person.vision.watch", "identify"], ["person.robot.may_address", true]] as const) {
+      expect(setValue(row, `person:${minor.id}`, key, value)).toMatchObject({ ok: false, status: 403 });
+    }
+    expect((await rosterOf(await deviceSession(ownerRow.id, "robot"))).people).toEqual([{ person_id: minor.id, age_band: "child", follow_up: false }]);
+  });
+
   test("legacy teen and guest prints, and a revoked print, drop their person from the roster", async () => {
     const { ownerRow, add } = await setup();
     const teen = await add("River", "teen");
