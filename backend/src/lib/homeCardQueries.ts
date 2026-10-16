@@ -19,7 +19,7 @@ import { weatherCardQuestion } from "@/homeCardQuestions";
 
 /** True only for the exact question a Home card is allowed to ask
  * ephemerally right now (today: the weather card's two shapes, with or
- * without a configured `household.home_place`). Anything else - even
+ * without a configured `household.home`). Anything else - even
  * something that merely looks like it, or a stale place from before a
  * household changed the setting - is refused: routes/turn.ts logs the
  * turn normally instead of honoring `ephemeral` for it. A future second

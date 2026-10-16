@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-15T18:09:51.323Z",
-  "kitTag": "ui-v0.5.231",
+  "generatedAt": "2026-10-16T22:24:14.766Z",
+  "kitTag": "ui-v0.5.233",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1366,6 +1366,22 @@
       "group": "voice",
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
+      "implemented": false
+    },
+    {
+      "file": "weather-card.tsx",
+      "name": "weather-card",
+      "group": "answer/weather",
+      "verdict": "later",
+      "verdictReason": "Home's weather package does not emit the weather_card block yet (WEATHER-CARD-01 Home half); adopt when it does.",
+      "implemented": false
+    },
+    {
+      "file": "weather-condition.ts",
+      "name": "weather-condition",
+      "group": "answer/weather",
+      "verdict": "support",
+      "verdictReason": "The WMO code table the weather card reads; used only through that Element.",
       "implemented": false
     },
     {

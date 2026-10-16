@@ -2358,9 +2358,11 @@ describe("POST /api/turn/stream", () => {
       }
     });
 
-    test("the weather card's own with-place question, once household.home_place is set, also writes no row", async () => {
+    test("the weather card's own with-place question, once household.home is set, also writes no row", async () => {
       const { client } = await owner();
-      setHouseholdSettingValue("household.home_place", "Portland, OR");
+      const created = await client.post("/api/entities", { kind: "place", place_kind: "map", name: "Portland, OR", scope: "household", geo: null });
+      const place = await created.json() as { id: string };
+      expect((await client.put("/api/settings", { scope: "household", key: "household.home", value: place.id })).status).toBe(200);
       const before = db.select().from(conversationTurns).all().length;
       const res = await client.post("/api/turn/stream", { text: "What's the weather like in Portland, OR today?", ephemeral: true });
       expect(res.status).toBe(200);
@@ -2377,7 +2379,9 @@ describe("POST /api/turn/stream", () => {
     // widens the match) without depending on either.
     test("an ordinary sentence is still refused once a place is set - a place never widens the match", async () => {
       const { client } = await owner();
-      setHouseholdSettingValue("household.home_place", "Portland, OR");
+      const created = await client.post("/api/entities", { kind: "place", place_kind: "map", name: "Portland, OR", scope: "household", geo: null });
+      const place = await created.json() as { id: string };
+      expect((await client.put("/api/settings", { scope: "household", key: "household.home", value: place.id })).status).toBe(200);
       const before = db.select().from(conversationTurns).all().length;
       const res = await client.post("/api/turn/stream", { text: "remember that today is trash day", ephemeral: true });
       expect(res.status).toBe(200);

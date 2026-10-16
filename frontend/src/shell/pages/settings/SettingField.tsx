@@ -9,6 +9,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { ItemDescription } from "@maipai/ui/src/dashboard/components/ui/item";
 import { OptionMultiSelect } from "@maipai/ui/src/settings/OptionMultiSelect";
 import { PersonMultiSelect } from "@/shell/pages/settings/PersonMultiSelect";
+import { LocationSetting } from "@/shell/pages/settings/placeAdapter";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 
@@ -230,6 +231,8 @@ export function SettingField({ setting, onChange, onReset, disabled, selfPersonI
         ariaLabel={def.label}
       />
     );
+  } else if (def.selector === "location") {
+    control = <LocationSetting def={def} value={resolved.value} onChange={onChange} disabled={disabled} />;
   } else {
     control = <span className="text-sm text-muted-foreground">Not supported in this hub version yet.</span>;
   }

@@ -189,7 +189,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
         loadingLabel="Loading settings"
       >
         {({ registry, values }: { registry: SettingsKey[]; values: ResolvedSetting[] }) => {
-          const renderableRegistry = registry.filter((key) => key.selector !== "location") as KitSettingsKey[];
+          const renderableRegistry = registry.filter((key) => key.selector !== "location" || key.key === "household.home") as KitSettingsKey[];
           const allGroups: SettingsGroup[] = groupSettings(renderableRegistry, values, scope, "home");
           let groups = (only ? allGroups.filter((g) => only.includes(g.id)) : allGroups).map((group) => {
             const companionsVisible = values.find((value) => value.key === "companions.allowed")?.value !== false;

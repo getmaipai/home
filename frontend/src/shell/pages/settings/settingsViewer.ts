@@ -26,11 +26,11 @@ export function baseViewer(person: Pick<Roster, "id" | "role" | "age_band">): Se
  * search and every card, so none of them can show a minor more. */
 export function visibleRegistry(registry: readonly SettingsKey[], band: Band, includeExpertKeys: readonly string[] = []): KitSettingsKey[] {
   const allowed = minorVisibleSettingKeys(band);
-  // The installed settings kit does not render the location selector yet.
-  // Keep the existing household.home_place editor visible until the kit
-  // ships that control; the canonical key is used by backend resolvers now.
+  // The household home is the one location key drawn here (Settings >
+  // General). A person's place lists belong in each app's own settings area
+  // (PLACE-ELEMENT-01b), never in a generic card.
   const expertKeys = new Set(includeExpertKeys);
-  return registry.filter((key) => key.selector !== "location" && (key.level !== "expert" || expertKeys.has(key.key)) && (!allowed || allowed.has(key.key))) as KitSettingsKey[];
+  return registry.filter((key) => (key.selector !== "location" || key.key === "household.home") && (key.level !== "expert" || expertKeys.has(key.key)) && (!allowed || allowed.has(key.key))) as KitSettingsKey[];
 }
 
 /** The runtime scope string the settings API expects for a card's scope. */

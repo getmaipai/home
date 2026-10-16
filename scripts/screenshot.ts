@@ -684,7 +684,7 @@ async function seedHousehold(): Promise<string> {
     if (!statsSetting.ok) throw new Error(`seed ui.show_turn_stats failed: ${statsSetting.status}`);
   }
 
-  // household.home_place, found live 2026-09-13: without it, Home's own
+  // household.home, found live 2026-09-13: without it, Home's own
   // WeatherCard sends a place-free fixed question, and the weather
   // package's deterministic floor (weather/recipe.json, matched before
   // this ever reaches the chat model) geocodes an EMPTY place - no
@@ -697,16 +697,20 @@ async function seedHousehold(): Promise<string> {
   // page now agree instead of naming two different cities. This literal
   // "Seattle, WA" is `seedWeatherCache()`'s own `WEATHER_HOUSEHOLD_PLACE`
   // above - change this and change that.
+  const headers = { "Content-Type": "application/json", Cookie: `session=${sessionValue}` };
+  const homeEntity = await fetch(`${BASE_URL}/api/entities`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ kind: "place", place_kind: "map", name: "Seattle, WA", scope: "household", geo: null }),
+  });
+  if (!homeEntity.ok) throw new Error(`seed household home place failed: ${homeEntity.status}`);
+  const homeId = ((await homeEntity.json()) as { id: string }).id;
   const place = await fetch(`${BASE_URL}/api/settings`, {
     method: "PUT",
-    headers: { "Content-Type": "application/json", Cookie: `session=${sessionValue}` },
-    body: JSON.stringify({ scope: "household", key: "household.home_place", value: "Seattle, WA" }),
+    headers,
+    body: JSON.stringify({ scope: "household", key: "household.home", value: homeId }),
   });
-  // spec-v0.1.112 replaced `household.home_place` with `household.home` (a
-  // `location` selector, PLACE-HUB-01's migration to make), so this seed no
-  // longer lands. The screenshots that need a home place are that item's to
-  // re-seed; every other review runs without one.
-  if (!place.ok) console.warn(`seed household.home_place skipped: ${place.status} (replaced by household.home; PLACE-HUB-01)`);
+  if (!place.ok) throw new Error(`seed household.home failed: ${place.status}`);
 
   await seedPeopleAndThings(sessionValue);
 

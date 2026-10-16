@@ -128,12 +128,12 @@ describe("runSearchProviders - conversations", () => {
 describe("runSearchProviders - settings", () => {
   test("matches a settings key by its label", async () => {
     const restore = stubFetch({
-      "/api/settings/registry": [{ key: "household.home_place", label: "Household location", help: "Where your household is, for weather and time.", scope: "household", level: "basic" }],
+      "/api/settings/registry": [{ key: "household.home", label: "Household location", help: "Where your household is, for weather and time.", scope: "household", level: "basic" }],
     });
     try {
       const groups = await runSearchProviders("location");
       const settings = findGroup(groups, "Settings");
-      expect(settings?.items).toEqual([{ id: "setting:household.home_place", label: "Household location", sublabel: "Where your household is, for weather and time.", icon: "settings", to: "/settings" }]);
+      expect(settings?.items).toEqual([{ id: "setting:household.home", label: "Household location", sublabel: "Where your household is, for weather and time.", icon: "settings", to: "/settings" }]);
     } finally {
       restore();
     }

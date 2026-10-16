@@ -63,9 +63,7 @@ export const CORE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.system",
     honoured_by: ["home"],
   }),
-  // A household-scoped map Entity reference shared by Home and Bot. The
-  // transitional `household.home_place` alias stays available from
-  // settingsRegistry.ts until Home ships the location selector.
+  // A household-scoped map Entity reference shared by Home and Bot.
   SettingsKey.parse({
     key: "household.home",
     scope: "household",

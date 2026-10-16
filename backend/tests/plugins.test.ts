@@ -654,15 +654,6 @@ describe("registerAllPackageNotificationTypes", () => {
   });
 });
 
-describe("transitional household.home_place setting alias", () => {
-  test("keeps the existing text setting backed by the canonical household.home Entity reference", () => {
-    setHouseholdSettingValue("household.home_place", "Portland, OR");
-    const homeId = getHouseholdSettingValue("household.home");
-    expect(typeof homeId).toBe("string");
-    expect(getHouseholdSettingValue("household.home_place")).toBe("Portland, OR");
-  });
-});
-
 describe("warmPackage weather privacy", () => {
   async function householdHome(name: string): Promise<TestClient> {
     const client = await owner();

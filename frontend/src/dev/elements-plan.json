@@ -3546,6 +3546,40 @@
       "replacesHandBuilt": [],
       "realTurnToday": null,
       "verdictReason": "No current Home feature needs this Element\u2019s specific data and interaction; the audit records the current scope decision."
+    },
+    {
+      "file": "weather-card.tsx",
+      "name": "weather-card",
+      "group": "answer/weather",
+      "verdict": "later",
+      "verdictReason": "Home's weather package does not emit the weather_card block yet (WEATHER-CARD-01 Home half); adopt when it does.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
+    },
+    {
+      "file": "weather-condition.ts",
+      "name": "weather-condition",
+      "group": "answer/weather",
+      "verdict": "support",
+      "verdictReason": "The WMO code table the weather card reads; used only through that Element.",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null
     }
   ]
 }

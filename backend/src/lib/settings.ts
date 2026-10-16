@@ -24,9 +24,7 @@ import { describeSetting } from "@maipai/spec/interpreters/ts/describeSetting.js
 import type { PersonRow } from "@/types";
 import { newEntityId } from "@/lib/id";
 import { assertCanWriteSelfService, isLayeredScalar, isSelfService, resolveLayeredScalar } from "@/lib/layeredScalar";
-import { createEntity, updateEntity } from "@/lib/entities";
 
-const LEGACY_HOME_PLACE_KEY = "household.home_place";
 const HOUSEHOLD_HOME_KEY = "household.home";
 const COMPANIONS_ALLOWED_KEY = "companions.allowed";
 const COMPANIONS_PERMISSION_ERROR = "Only a household owner or admin chooses who can use AI companions. Ask one of them.";
@@ -407,9 +405,7 @@ export function listValues(actor: PersonRow, scope: string, onlyKey?: string): S
         const own = layered.layer === "person";
         return { ...resolveForResponse(k, layered.value, own ? "user" : "default", descriptionContext), layer: layered.layer, locked: layered.locked };
       }
-      const rawValue = k.key === LEGACY_HOME_PLACE_KEY
-        ? getHouseholdSettingValue(LEGACY_HOME_PLACE_KEY)
-        : row ? decodeStoredRow(k, row.value) : k.default;
+      const rawValue = row ? decodeStoredRow(k, row.value) : k.default;
       const source = row ? (row.source as ResolvedSetting["source"]) : "default";
       return resolveForResponse(k, rawValue, source, descriptionContext);
     });
@@ -694,13 +690,6 @@ export function setValue(
     return { ok: false, status: 403, error: "A parent chooses your voice. Ask the person who manages Home to pick a preset voice for you." };
   }
 
-  if (key === LEGACY_HOME_PLACE_KEY) {
-    const trimmed = typeof value === "string" ? value.trim() : "";
-    if (trimmed !== (value as string)) value = trimmed;
-    const changed = setHouseholdHomeByName(actor, trimmed);
-    if (!changed.ok) return changed;
-    return writeValue(scope, keyDef, trimmed, responseContext(actor, actor, parsed.kind));
-  }
   if (keyDef.selector === "location" && key !== HOUSEHOLD_HOME_KEY) {
     const range = keyDef.range as { multiple?: boolean; allow_current?: boolean } | undefined;
     const entries = range?.multiple ? value as unknown[] : [value];
@@ -725,42 +714,10 @@ export function setValue(
  * not a hostile request, but the check is nearly free either way. Never
  * exposed through a route. */
 export function setHouseholdSettingValue(key: string, value: unknown): SettingsOpResult<ResolvedSetting> {
-  if (key === LEGACY_HOME_PLACE_KEY) {
-    const trimmed = typeof value === "string" ? value.trim() : "";
-    const changed = setHouseholdHomeByName(null, trimmed);
-    if (!changed.ok) return changed;
-    const keyDef = getRegistryKey(LEGACY_HOME_PLACE_KEY)!;
-    return writeValue("household", keyDef, trimmed);
-  }
   const keyDef = getRegistryKey(key);
   if (!keyDef) return { ok: false, status: 400, error: `unknown settings key: ${key}` };
   if (keyDef.scope !== "household") return { ok: false, status: 400, error: `${key} is a ${keyDef.scope}-scope key, not household` };
   return writeValue("household", keyDef, value);
-}
-
-/** Keep the legacy text editor operational while the location selector is
- * absent: its text is reflected by a household place Entity and the
- * canonical household.home reference. */
-function setHouseholdHomeByName(actor: PersonRow | null, name: string): SettingsOpResult<true> {
-  const writer = actor ?? ({ id: "system", role: "owner" } as PersonRow);
-  const homeId = getHouseholdSettingValue(HOUSEHOLD_HOME_KEY);
-  if (!name) {
-    const changed = actor
-      ? setValue(actor, "household", HOUSEHOLD_HOME_KEY, null)
-      : writeValue("household", getRegistryKey(HOUSEHOLD_HOME_KEY)!, null);
-    return changed.ok ? { ok: true, value: true } : changed;
-  }
-  if (typeof homeId === "string") {
-    const updated = updateEntity(writer, homeId, { name });
-    if (!updated.ok) return { ok: false, status: updated.status === 403 ? 403 : 400, error: updated.error ?? "could not update household home" };
-    return { ok: true, value: true };
-  }
-  const created = createEntity(writer, { kind: "place", name, place_kind: "map", scope: "household", geo: null });
-  if (!created.ok || !created.value) return { ok: false, status: created.status === 403 ? 403 : 400, error: created.error ?? "could not create household home" };
-  const changed = actor
-    ? setValue(actor, "household", HOUSEHOLD_HOME_KEY, created.value.id)
-    : writeValue("household", getRegistryKey(HOUSEHOLD_HOME_KEY)!, created.value.id);
-  return changed.ok ? { ok: true, value: true } : changed;
 }
 
 /** A household setting's resolved value with no actor gate: for core
@@ -770,11 +727,6 @@ function setHouseholdHomeByName(actor: PersonRow | null, name: string): Settings
  * runMaintenance() directly. Never exposed through a route: a person-
  * facing read always goes through listValues()'s real authorization. */
 export function getHouseholdSettingValue(key: string): unknown {
-  if (key === LEGACY_HOME_PLACE_KEY) {
-    const homeId = getHouseholdSettingValue(HOUSEHOLD_HOME_KEY);
-    if (typeof homeId !== "string") return "";
-    return db.select({ name: entities.name }).from(entities).where(and(eq(entities.id, homeId), isNull(entities.deletedAt))).get()?.name ?? "";
-  }
   const keyDef = getRegistryKey(key);
   if (!keyDef) return undefined;
   return resolveStoredValue("household", keyDef);
@@ -965,13 +917,6 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
       : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
-  if (key === LEGACY_HOME_PLACE_KEY) {
-    const changed = setHouseholdHomeByName(actor, "");
-    if (!changed.ok) return changed;
-    db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
-    settingsCache.delete(settingsCacheKey(scope, key));
-    return { ok: true, value: resolveForResponse(keyDef, "", "default", responseContext(actor, actor, parsed.kind)) };
-  }
 
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));

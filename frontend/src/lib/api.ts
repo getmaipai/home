@@ -1115,7 +1115,11 @@ export const api = {
     place_kind?: "map" | "area" | null;
     scope?: "household" | "person";
     account_person_id?: string | null;
+    geo?: Entity["geo"];
   }) => request<Entity>("/api/entities", { method: "POST", body: JSON.stringify(input) }),
+  // PLACE-ELEMENT-01a: geocoding candidates for the location field's search.
+  searchPlaces: (q: string) =>
+    request<Array<{ name: string; area: string | null; lat: number; lon: number }>>(`/api/places/search?q=${encodeURIComponent(q)}`),
   // kind is deliberately not editable (backend/src/lib/entities.ts's own
   // updateEntity() comment: "set once at creation and never move
   // afterward... a household that got a kind wrong deletes the entity

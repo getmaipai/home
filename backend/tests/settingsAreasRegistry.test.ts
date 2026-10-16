@@ -39,9 +39,7 @@ describe("settings registry and the spec's areas", () => {
       }
     }
     for (const key of getRegistry()) {
-      // The current kit has no location selector renderer. These keys are
-      // backend resolver data until the kit ships that editor; the legacy
-      // household.home_place text alias remains the visible Home control.
+      // Location keys are drawn by the kit's LocationField, not counted as cards here.
       if (key.level === "expert" || key.selector === "location" || !key.honoured_by.includes("home")) continue;
       const id = `${key.scope}:${key.lives_in}`;
       if (notPlaced.has(id)) continue;
