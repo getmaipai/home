@@ -30994,6 +30994,13 @@
                         "items": {
                           "type": "string"
                         }
+                      },
+                      "available": {
+                        "type": "boolean"
+                      },
+                      "message": {
+                        "type": "string",
+                        "nullable": true
                       }
                     },
                     "required": [
@@ -31007,7 +31014,9 @@
                       "installed",
                       "child",
                       "wikipedia",
-                      "bands"
+                      "bands",
+                      "available",
+                      "message"
                     ]
                   }
                 }
@@ -31026,16 +31035,6 @@
           },
           "403": {
             "description": "Owner or admin only",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Kiwix catalogue unavailable",
             "content": {
               "application/json": {
                 "schema": {
