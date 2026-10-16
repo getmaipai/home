@@ -1256,6 +1256,10 @@ export const deviceStates = sqliteTable("device_states", {
   // spec-v0.1.147: motor and thermal health, null until the robot reports them.
   motorsLatched: text("motors_latched", { mode: "json" }).$type<string[]>(),
   motorsStuck: integer("motors_stuck", { mode: "boolean" }),
+  // spec-v0.1.151: the robot's motor reboot offer, and the motors in it an adult has already answered (yes or no).
+  // The answered list is pruned to the current offer on every frame, so a later, new offer is asked again.
+  motorsRebootOffer: text("motors_reboot_offer", { mode: "json" }).$type<string[]>(),
+  motorsRebootAnswered: text("motors_reboot_answered", { mode: "json" }).$type<string[]>(),
   thermal: text("thermal", { mode: "json" }).$type<NonNullable<RobotStateFrame["thermal"]>>(),
   reportedAt: text("reported_at").notNull(),
 });

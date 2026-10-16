@@ -513,5 +513,23 @@
     "honoured_by": [
       "home"
     ]
+  },
+  {
+    "key": "robot.sleep.auto",
+    "scope": "device",
+    "selector": "boolean",
+    "default": true,
+    "label": "Sleep when dark and quiet",
+    "help": "On by default. This robot goes to sleep after 10 minutes of darkness and no speech, and during household quiet hours. A face, speech or a knock wakes it, and the wake word still works. Turn off to keep it awake. Only an admin changes this, for each robot on its own.",
+    "level": "basic",
+    "secret": false,
+    "lives_in": "robot.hello",
+    "honoured_by": [
+      "home",
+      "bot"
+    ],
+    "copy": {
+      "does": "Lets this robot nap after ten minutes with the lights off and nobody talking."
+    }
   }
 ]

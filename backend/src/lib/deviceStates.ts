@@ -25,9 +25,25 @@ export function resolveRequestDevice(c: Context<AppEnv>): Device | null {
   return getDeviceById(row.deviceId);
 }
 
+/** The offered motors the robot did not also report as latched; a reboot is only ever offered for a latched motor. */
+export function rebootOfferOutsideLatched(frame: RobotStateFrame): string[] {
+  const latched = new Set(frame.motors_latched ?? []);
+  return (frame.motors_reboot_offer ?? []).filter((motor) => !latched.has(motor));
+}
+
+export class MotorRebootOfferError extends Error {}
+
 export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): void {
   const parsed = RobotState.parse(frame);
+  const outside = rebootOfferOutsideLatched(parsed);
+  if (outside.length > 0) {
+    throw new MotorRebootOfferError(`The robot offered to reboot ${outside.join(", ")}, which it did not report as latched. Update the robot's MaiPai software, then try again.`);
+  }
   const now = new Date().toISOString();
+  const previous = db.select({ answered: deviceStates.motorsRebootAnswered }).from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get();
+  const offer = parsed.motors_reboot_offer ?? null;
+  // An answer lasts only while the robot keeps offering the same motor; once it stops, a new offer is asked afresh.
+  const answered = offer ? (previous?.answered ?? []).filter((motor) => offer.includes(motor)) : [];
   const values = {
     deviceId,
     activity: parsed.activity,
@@ -41,6 +57,8 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
     putDownCount: parsed.put_down_count ?? null,
     motorsLatched: parsed.motors_latched ?? null,
     motorsStuck: parsed.motors_stuck ?? null,
+    motorsRebootOffer: offer,
+    motorsRebootAnswered: answered,
     thermal: parsed.thermal ?? null,
     reportedAt: now,
   };
@@ -58,6 +76,8 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
       putDownCount: values.putDownCount,
       motorsLatched: values.motorsLatched,
       motorsStuck: values.motorsStuck,
+      motorsRebootOffer: values.motorsRebootOffer,
+      motorsRebootAnswered: values.motorsRebootAnswered,
       thermal: values.thermal,
       reportedAt: values.reportedAt,
     },
@@ -87,9 +107,31 @@ export function updateMutedFromDeviceCommand(deviceId: string, muted: boolean): 
     putDownCount: null,
     motorsLatched: null,
     motorsStuck: null,
+    motorsRebootOffer: null,
+    motorsRebootAnswered: null,
     thermal: null,
     reportedAt,
   }).run();
+}
+
+/** The offered motors still waiting for an answer: offered, still latched, and not yet answered. */
+export function pendingMotorRebootOffer(row: Pick<DeviceStateRow, "motorsRebootOffer" | "motorsRebootAnswered" | "motorsLatched">): string[] {
+  const latched = new Set(row.motorsLatched ?? []);
+  const answered = new Set(row.motorsRebootAnswered ?? []);
+  return (row.motorsRebootOffer ?? []).filter((motor) => latched.has(motor) && !answered.has(motor));
+}
+
+/** Record that an adult answered the current offer for these motors, so the card stops asking. */
+export function markMotorRebootAnswered(deviceId: string, motors: string[]): void {
+  const row = db.select().from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get();
+  if (!row) return;
+  const answered = [...new Set([...(row.motorsRebootAnswered ?? []), ...motors])];
+  db.update(deviceStates).set({ motorsRebootAnswered: answered }).where(eq(deviceStates.deviceId, deviceId)).run();
+}
+
+export function getPendingMotorRebootOffer(deviceId: string): string[] {
+  const row = db.select().from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get();
+  return row ? pendingMotorRebootOffer(row) : [];
 }
 
 export interface DeviceState extends RobotStateFrame {
@@ -117,6 +159,7 @@ export function getDeviceState(deviceId: string): DeviceState | null {
     put_down_count: row.putDownCount ?? undefined,
     motors_latched: row.motorsLatched ?? undefined,
     motors_stuck: row.motorsStuck ?? undefined,
+    motors_reboot_offer: pendingMotorRebootOffer(row).length > 0 ? pendingMotorRebootOffer(row) : undefined,
     thermal: row.thermal ?? undefined,
     reachable,
     unreachableSince: reachable ? null : row.reportedAt,

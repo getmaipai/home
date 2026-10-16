@@ -271,6 +271,8 @@ export interface RobotDeviceState {
   put_down_count?: number;
   motors_latched?: RobotState["motors_latched"];
   motors_stuck?: RobotState["motors_stuck"];
+  /** spec-v0.1.151: latched motors the robot offers to restart; the hub drops a motor once an adult has answered. */
+  motors_reboot_offer?: RobotState["motors_reboot_offer"];
   thermal?: RobotState["thermal"];
   reachable: boolean;
   unreachableSince: string | null;
@@ -779,6 +781,9 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind: muted ? "mute" : "unmute" }),
     }),
+  // MOTOR-REBOOT-CARD: an adult's answer to the robot's offer to restart a latched motor. Only "yes" sends a command.
+  answerMotorReboot: (id: string, answer: "yes" | "no") =>
+    request<unknown>(`/api/devices/${encodeURIComponent(id)}/motor-reboot`, { method: "POST", body: JSON.stringify({ answer }) }),
   // LIVE-VIEW-01: open and close the hub's live view of one robot's camera. `stream` is the
   // hub's own multipart JPEG route; the browser shows it in an image and closing it stops the view.
   startRobotLiveView: (id: string) =>

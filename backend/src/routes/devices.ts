@@ -10,7 +10,8 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession } from "@/middleware/auth";
 import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
-import { getDeviceState, resolveRequestDevice, upsertDeviceState } from "@/lib/deviceStates";
+import { getDeviceState, getPendingMotorRebootOffer, markMotorRebootAnswered, MotorRebootOfferError, resolveRequestDevice, upsertDeviceState } from "@/lib/deviceStates";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import { discoverRobots } from "@/lib/robotDiscovery";
 import { rotateRobotPassword, RobotPasswordRotationError } from "@/lib/robotSsh";
@@ -61,6 +62,7 @@ const DeviceSchema = z.object({
     put_down_count: RobotState.shape.put_down_count,
     motors_latched: RobotState.shape.motors_latched,
     motors_stuck: RobotState.shape.motors_stuck,
+    motors_reboot_offer: RobotState.shape.motors_reboot_offer,
     thermal: RobotState.shape.thermal,
     reachable: z.boolean(),
     unreachableSince: z.string().nullable(),
@@ -122,7 +124,12 @@ const updateMyStateRoute = createRoute({
 devicesRoutes.openapi(updateMyStateRoute, (c) => {
   const device = resolveRequestDevice(c);
   if (!device) return c.json({ error: "Not signed in" }, 401);
-  upsertDeviceState(device.id, c.req.valid("json"));
+  try {
+    upsertDeviceState(device.id, c.req.valid("json"));
+  } catch (err) {
+    if (err instanceof MotorRebootOfferError) return c.json({ error: err.message }, 400);
+    throw err;
+  }
   return c.body(null, 204);
 });
 
@@ -261,6 +268,46 @@ devicesRoutes.openapi(sendCommandRoute, (c) => {
   const { kind } = c.req.valid("json");
   const command = issueDeviceCommand(device.id, kind, {});
   return c.json({ id: command.id }, 202);
+});
+
+// MOTOR-REBOOT-CARD: the robot offers to reboot a latched motor (state frame `motors_reboot_offer`); an adult answers
+// on the Devices card. Only a yes sends `motor_reboot`, and it names the motors the hub stored, never the browser's.
+const motorRebootRoute = createRoute({
+  method: "post",
+  path: "/{id}/motor-reboot",
+  tags: ["Devices"],
+  summary: "Answer a robot's offer to reboot a latched motor (adults only)",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id", "device-a1b2c3"),
+    body: { content: { "application/json": { schema: z.object({ answer: z.enum(["yes", "no"]) }) } } },
+  },
+  responses: {
+    202: { content: { "application/json": { schema: z.object({ id: z.string(), motors: z.array(z.string()) }) } }, description: "Yes: the reboot command is persisted for delivery to the robot." },
+    204: { description: "No: nothing is sent and the offer is dismissed." },
+    ...errorResponses({ 400: "Not a robot", 401: "Not signed in", 403: "Not an adult", 404: "No such device (or it is not yours to control)", 409: "No motor reboot is being offered" }),
+  },
+});
+devicesRoutes.openapi(motorRebootRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const device = getDeviceById(id);
+  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) {
+    return c.json({ error: "No such device" }, 404);
+  }
+  if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
+  if (speakerAgeBand(actor, new Date()) !== "adult") {
+    return c.json({ error: "Only an adult can restart a robot's motor. Ask an adult to answer this." }, 403);
+  }
+  const motors = getPendingMotorRebootOffer(device.id);
+  if (motors.length === 0) return c.json({ error: "No motor is waiting for a restart. The robot will ask again if it needs to." }, 409);
+  if (c.req.valid("json").answer === "no") {
+    markMotorRebootAnswered(device.id, motors);
+    return c.body(null, 204);
+  }
+  const command = issueDeviceCommand(device.id, "motor_reboot", { motors });
+  markMotorRebootAnswered(device.id, motors);
+  return c.json({ id: command.id, motors }, 202);
 });
 
 // LIVE-VIEW-01: the hub's own live view of a robot. Start and stop are for an admitted adult only

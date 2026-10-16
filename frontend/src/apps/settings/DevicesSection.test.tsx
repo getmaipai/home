@@ -371,6 +371,7 @@ describe("DevicesSection", () => {
       onSetMuted={onSetMuted}
       onStartLiveView={async () => ({ view_id: "view-1", stream: "/api/devices/live-view/view-1" })}
       onStopLiveView={async () => {}}
+      onAnswerMotorReboot={async () => {}}
     /></Card>);
     fireEvent.click(view.getByRole("button", { name: "Mute microphone" }));
     await view.findByRole("alert");
@@ -380,6 +381,52 @@ describe("DevicesSection", () => {
     expect(onSetMuted).toHaveBeenNthCalledWith(2, true);
     expect(view.queryByRole("alert")).toBeNull();
   });
+  function rebootCard(answer: (a: "yes" | "no") => Promise<void>, offer: string[] | null = ["stewart_3"], reachable = true) {
+    return render(<Card><RobotBody
+      device={device({
+        id: "robot-reboot",
+        kind: "robot",
+        name: "Riff",
+        state: { activity: "idle", muted: false, tracking: false, reachable, unreachableSince: null, motors_latched: ["body_yaw", "stewart_3"], ...(offer ? { motors_reboot_offer: offer } : {}) },
+      })}
+      onRemove={() => {}}
+      confirmingRemove={false}
+      onConfirmRemove={() => {}}
+      onCancelRemove={() => {}}
+      busy={false}
+      onSetMuted={async () => {}}
+      onStartLiveView={async () => ({ view_id: "view-1", stream: "/api/devices/live-view/view-1" })}
+      onStopLiveView={async () => {}}
+      onAnswerMotorReboot={answer}
+    /></Card>);
+  }
+
+  test("a motor reboot offer names the latched motors and sends nothing until yes", async () => {
+    const answers: string[] = [];
+    const view = rebootCard(async (a) => { answers.push(a); });
+    expect(view.getByTestId("motor-reboot-offer").textContent).toContain("stewart_3");
+    expect(view.getByTestId("motor-reboot-offer").textContent).toContain("Restart Riff");
+    expect(answers).toEqual([]);
+    fireEvent.click(view.getByRole("button", { name: "Yes, restart it" }));
+    await waitFor(() => expect(answers).toEqual(["yes"]));
+  });
+
+  test("answering no sends no and the plain refusal from the hub is shown", async () => {
+    const answers: string[] = [];
+    const view = rebootCard(async (a) => { answers.push(a); throw new ApiError("Only an adult can restart a robot's motor. Ask an adult to answer this.", 403); });
+    fireEvent.click(view.getByRole("button", { name: "No, leave it" }));
+    await view.findByText(/Only an adult can restart/);
+    expect(answers).toEqual(["no"]);
+  });
+
+  test("no offer, or a robot that is not responding, shows no reboot question", () => {
+    expect(rebootCard(async () => {}, null).queryByRole("button", { name: "Yes, restart it" })).toBeNull();
+    cleanup();
+    expect(rebootCard(async () => {}, [], true).queryByRole("button", { name: "Yes, restart it" })).toBeNull();
+    cleanup();
+    expect(rebootCard(async () => {}, ["stewart_3"], false).queryByRole("button", { name: "Yes, restart it" })).toBeNull();
+  });
+
   function liveCard(start: () => Promise<{ view_id: string; stream: string }>, stop: (id: string) => Promise<void>) {
     return render(<Card><RobotBody
       device={device({
@@ -396,6 +443,7 @@ describe("DevicesSection", () => {
       onSetMuted={async () => {}}
       onStartLiveView={start}
       onStopLiveView={stop}
+      onAnswerMotorReboot={async () => {}}
     /></Card>);
   }
 

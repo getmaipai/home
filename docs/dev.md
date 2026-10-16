@@ -37020,3 +37020,12 @@ Open, each blocked on commons (this lane does not bump the pin): the motor-reboo
 signal from the robot (`RobotState` has no motor fields and the offer frames are hub to robot) and a `motor_reboot` command; the
 Home robot-card prompt follows. HEARTBEAT-01 is not started (needs SCHED-02, MODEL-BG-SPEC-01 and the `background` surface), so
 nothing calls `createRobotOffer` yet.
+
+## MOTOR-REBOOT-CARD: the motor reboot offer (2026-10-16)
+
+The robot raises `motors_reboot_offer` (a subset of `motors_latched`) on its state frame. `device_states` keeps the offer and
+`motors_reboot_answered`; the answered list is cut to the current offer on every frame, so a robot that stops offering and
+later offers again is asked again. A frame whose offer names a motor outside `motors_latched` is refused (400). The card
+shows the offer only while the robot is reachable. `POST /api/devices/{id}/motor-reboot {answer}`: the device's owner or an
+admin, and an adult by age band; "yes" issues `motor_reboot {motors}` from the stored offer (the request carries no motor
+names), "no" sends nothing; either answer hides the offer. Nothing reboots a motor without a yes.

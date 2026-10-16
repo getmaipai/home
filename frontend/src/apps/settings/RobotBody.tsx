@@ -73,6 +73,7 @@ export function RobotBody({
   onSetMuted,
   onStartLiveView,
   onStopLiveView,
+  onAnswerMotorReboot,
 }: {
   device: DeviceInfo;
   onRemove: () => void;
@@ -83,6 +84,7 @@ export function RobotBody({
   onSetMuted: (muted: boolean) => Promise<void>;
   onStartLiveView: () => Promise<{ view_id: string; stream: string }>;
   onStopLiveView: (viewId: string) => Promise<void>;
+  onAnswerMotorReboot: (answer: "yes" | "no") => Promise<void>;
 }) {
   const state = device.state ?? null;
   const lastPutDownCount = useRef<number | undefined>(state?.put_down_count);
@@ -151,7 +153,22 @@ export function RobotBody({
   const openViewRef = useRef<string | null>(null);
   openViewRef.current = liveViewId;
   useEffect(() => () => { if (openViewRef.current) void stopRef.current(openViewRef.current).catch(() => undefined); }, []);
+  // MOTOR-REBOOT-CARD: the robot offers to restart a latched motor; nothing is sent until someone answers yes.
+  const [rebootBusy, setRebootBusy] = useState(false);
+  const [rebootError, setRebootError] = useState<string | null>(null);
+  async function answerReboot(answer: "yes" | "no"): Promise<void> {
+    setRebootError(null);
+    setRebootBusy(true);
+    try {
+      await onAnswerMotorReboot(answer);
+    } catch (err) {
+      setRebootError(err instanceof ApiError ? err.message : `Could not send that to ${device.name}. Check that it is switched on, then try again.`);
+    } finally {
+      setRebootBusy(false);
+    }
+  }
   const unreachable = state !== null && !state.reachable;
+  const rebootOffer = state !== null && !unreachable ? state.motors_reboot_offer ?? [] : [];
   const showMuted = state !== null && !unreachable && state.muted && (state.activity === "idle" || state.activity === "listening");
   const status = state === null ? "Waiting for first report" : unreachable ? "Not responding" : showMuted ? "Muted" : ACTIVITY_LABELS[state.activity];
   const motion = state?.motion ?? null;
@@ -202,6 +219,25 @@ export function RobotBody({
             <Row label="Body software">{state.daemon_version ?? "Unknown"}</Row>
           </dl>
         )}
+        {rebootOffer.length > 0 ? (
+          <div className="mt-4 flex flex-col gap-2" data-testid="motor-reboot-offer">
+            <p className="text-base font-medium">
+              Restart {device.name}'s {rebootOffer.join(", ")} {rebootOffer.length === 1 ? "motor" : "motors"}?
+            </p>
+            <p className="text-sm text-muted-foreground">
+              {rebootOffer.length === 1 ? "That motor" : "Those motors"} stopped working and the robot could not recover on its own. Restarting moves {rebootOffer.length === 1 ? "it" : "them"}, so keep hands clear of the head first.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={rebootBusy} onClick={() => void answerReboot("yes")}>
+                Yes, restart it
+              </Button>
+              <Button variant="ghost" disabled={rebootBusy} onClick={() => void answerReboot("no")}>
+                No, leave it
+              </Button>
+            </div>
+            {rebootError ? <p role="alert" className="text-base text-destructive">{rebootError}</p> : null}
+          </div>
+        ) : null}
         {liveView && liveView.stream ? (
           <div className="mt-4" data-testid="robot-live-view">
             <Image.Root size="full">

@@ -23642,6 +23642,14 @@
                             "type": "boolean",
                             "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
                           },
+                          "motors_reboot_offer": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Names of the latched motors for which the robot asks the hub to offer a reboot to an adult (a latched servo error that cycling the motor mode did not clear). Always a subset of motors_latched. An empty list means no offer is pending; omission means the producer does not yet report this field. The hub shows one card offer and, on an adult's yes, sends a motor_reboot command naming these motors; the robot never reboots a motor on its own while a person may be touching the head."
+                          },
                           "thermal": {
                             "type": "object",
                             "properties": {
@@ -23861,6 +23869,14 @@
                           "motors_stuck": {
                             "type": "boolean",
                             "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
+                          },
+                          "motors_reboot_offer": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Names of the latched motors for which the robot asks the hub to offer a reboot to an adult (a latched servo error that cycling the motor mode did not clear). Always a subset of motors_latched. An empty list means no offer is pending; omission means the producer does not yet report this field. The hub shows one card offer and, on an adult's yes, sends a motor_reboot command naming these motors; the robot never reboots a motor on its own while a person may be touching the head."
                           },
                           "thermal": {
                             "type": "object",
@@ -24095,6 +24111,14 @@
                   "motors_stuck": {
                     "type": "boolean",
                     "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
+                  },
+                  "motors_reboot_offer": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "description": "Names of the latched motors for which the robot asks the hub to offer a reboot to an adult (a latched servo error that cycling the motor mode did not clear). Always a subset of motors_latched. An empty list means no offer is pending; omission means the producer does not yet report this field. The hub shows one card offer and, on an adult's yes, sends a motor_reboot command naming these motors; the robot never reboots a motor on its own while a person may be touching the head."
                   },
                   "thermal": {
                     "type": "object",
@@ -24608,6 +24632,126 @@
           },
           "404": {
             "description": "No such device (or it is not yours to control)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/motor-reboot": {
+      "post": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Answer a robot's offer to reboot a latched motor (adults only)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "device-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "answer": {
+                    "type": "string",
+                    "enum": [
+                      "yes",
+                      "no"
+                    ]
+                  }
+                },
+                "required": [
+                  "answer"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Yes: the reboot command is persisted for delivery to the robot.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "motors": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "motors"
+                  ]
+                }
+              }
+            }
+          },
+          "204": {
+            "description": "No: nothing is sent and the offer is dismissed."
+          },
+          "400": {
+            "description": "Not a robot",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not an adult",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such device (or it is not yours to control)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No motor reboot is being offered",
             "content": {
               "application/json": {
                 "schema": {
