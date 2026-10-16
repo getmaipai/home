@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import fixture from "./fixtures/tour-runner-manifest.json";
 import type { InstalledPackage, TourProgressRecord } from "@/lib/api";
-import { replayTour, toursForPage } from "@/shell/useTourRunner";
+import { replayTour, stepsWithPresentTargets, toursForPage, tourTargetPresent } from "@/shell/useTourRunner";
 
 function shouldStart(tour: { id: string; version: number }, packageId: string, records: TourProgressRecord[]) {
   return !records.some((record) => record.package_id === packageId && record.tour_id === tour.id && record.version === tour.version);
@@ -35,5 +35,30 @@ describe("manifest tour first-open selection", () => {
     expect(started).toEqual(["tour-fixture:fixture.first-open"]);
     expect(replayTour(available, "tour-fixture", "missing", () => started.push("wrong"))).toBe(false);
     expect(started).toEqual(["tour-fixture:fixture.first-open"]);
+  });
+});
+
+describe("tour targets on screen", () => {
+  test("tourTargetPresent finds only elements carrying the target attribute", () => {
+    const attr = ["data", "tour"].join("-");
+    document.body.innerHTML = `<nav ${attr}="rail"></nav>`;
+    expect(tourTargetPresent("rail")).toBe(true);
+    expect(tourTargetPresent("profile")).toBe(false);
+    document.body.innerHTML = "";
+  });
+
+  test("steps whose target is missing are dropped, so Step N of M counts shown cards", () => {
+    const attr = ["data", "tour"].join("-");
+    document.body.innerHTML = `<nav ${attr}="rail"></nav><button ${attr}="chat"></button>`;
+    const steps = [{ id: "a", target: "profile" }, { id: "b", target: "rail" }, { id: "c" }, { id: "d", target: "chat" }];
+    expect(stepsWithPresentTargets(steps).map((step) => step.id)).toEqual(["b", "c", "d"]);
+    expect(stepsWithPresentTargets([{ id: "x", target: "gone" }])).toEqual([]);
+    document.body.innerHTML = "";
+  });
+
+  test("a phone with the rail hidden loses the rail step only", () => {
+    const present = (target: string) => target !== "rail";
+    const steps = [{ id: "profile", target: "profile" }, { id: "rail", target: "rail" }, { id: "chat", target: "chat" }];
+    expect(stepsWithPresentTargets(steps, present).map((step) => step.id)).toEqual(["profile", "chat"]);
   });
 });

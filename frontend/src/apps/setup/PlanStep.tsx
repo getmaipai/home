@@ -38,6 +38,10 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
+  // "Check again" belongs wherever the answer can change without the person
+  // choosing anything: the engine was not answering, or the disk was short
+  // and they have since freed space. Memory questions re-read on their own.
+  const canRecheck = !!wording && !wording.needsMemoryAnswer && (wording.level === "unknown" || !!wording.diskLine);
   const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !wording.diskLine;
   // Continue stays blocked while the plan is still being read and while the
   // Install button is the way forward; it opens only when Home cannot
@@ -51,7 +55,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
     setBusy(true); setError(null);
     try { await start(vram); onInstalled(); }
     catch (reason) {
-      setError(reason instanceof ApiError || reason instanceof Error ? reason.message : "Home couldn't start the download. Press Install again.");
+      const next = reason instanceof ApiError ? reason.next : undefined;
+      setError(reason instanceof Error ? [reason.message, next].filter(Boolean).join(" ") : "Home couldn't start the download. Press Install again.");
     } finally { setBusy(false); }
   }
 
@@ -61,7 +66,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   return (
     <>
     <Card>
-      <CardContent>
+      <CardContent><div className="flex flex-col gap-3">
         <h3 className="text-lg font-semibold">{wording.headline}</h3>
         <p className="text-muted-foreground">{wording.detail}</p>
         {wording.needsMemoryAnswer ? (
@@ -71,11 +76,13 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
             ))}
           </RadioGroup>
         ) : null}
-        {wording.gets.length ? <ul className="list-disc pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
+        {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
         {wording.sizeLine ? <p>{wording.sizeLine}</p> : null}
         {wording.diskLine ? <p role="alert">{wording.diskLine}</p> : null}
         {error ? <p role="alert">{error}</p> : null}
+        {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
         {canInstall ? <Button type="button" size="lg" disabled={busy} onClick={() => void install()}>{actionLabel}</Button> : null}
+        </div>
       </CardContent>
     </Card>
     </>
