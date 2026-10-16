@@ -37060,3 +37060,22 @@ shell string. A change that needs root answers 409 with the exact `sudo` line; t
 (fake `pmset`, `sysctl`, `tmutil`, `defaults`, `launchctl`, `systemsetup`, `uname`, `id`, `nc` on PATH) and `backend/tests/setupHostTune.test.ts`
 (a stub script behind `MAIPAI_HOST_TUNE_SCRIPT`). Not run on the Studio: real `pmset`, the `iogpu` sysctl on Apple silicon, `tmutil addexclusion`
 on a volume, the LaunchDaemon bootstrap, `systemsetup` under Full Disk Access.
+
+## Home first, the Stack from the wizard (INSTALL-SPLIT-01, 2026-10-16)
+
+## Supersedes
+
+HOME-STACK-01's order of work: `install.sh` no longer builds the Stack up front. HOME-STACK-01's Stack placement, console-user rules and `engines.stack.url` write are unchanged; they now run in `install.sh --stack-only`.
+
+### The split
+
+- `install.sh` (fresh install): Home only. Checks 3 GB, builds Home, starts the service, waits for `/`, prints the address. It needs no console session, so SSH works. It records `.stack-port-base` (the Stack port the wizard will use) and, on Linux, `.install-user` (who ran it, because sudo hides that from the Stack step).
+- `install.sh` (upgrade): unchanged when `stack/.user` exists: the Stack is rebuilt with Home and the console session is checked. With no Stack, Home only.
+- `install.sh --stack-only`: the Stack part (preflight, fetch, build, service, healthz, `engines.stack.url`). It writes `data/stack-install.json` (`state`, `stage`, `problem`, `pid`) atomically, and a failure writes a plain-words problem with the next step. It is idempotent: a re-run finishes what is missing.
+- Privilege: macOS, Home is a root LaunchDaemon (with `AbandonProcessGroup`, so a Home restart does not kill the step) and `stackInstall.ts` spawns the script directly. Linux, Home is the `maipai` user in a read-only sandbox, so the step is its own root one-shot unit, started with `sudo -n systemctl start --no-block maipai-stack-install.service`. The sudoers rule is that exact command, with no wildcard, and `scripts/` is root-owned.
+- Backend: `stackInstall.ts` (`startEngineInstall`, `engineInstallStatus`) refuses outside an installed copy (no `scripts/install.sh` at the install root), joins a run in progress, reads a dead pid as failed, and on ready invalidates the settings cache and starts the model downloads once. Only `state`, `stage`, `stageLabel` and `problem` reach the API: never the pid or the account.
+- Wizard: Continue on `engine_location` sends `engine`. `this_computer` starts the install; `another_computer` starts nothing. The install status gains `installing_engine` and `engine_failed`. `InstallStrip` shows Fetch, Build, Start, Download from the storage screen on; `PlanStep` says the engine is installing instead of "couldn't reach the AI engine". Retry: `POST /api/setup/engine-install` before an owner, `POST /api/install/retry` after.
+
+### Not verified off the Mac Studio
+
+The `launchctl asuser` flow with a real console, a real Stack build, the Linux unit and sudoers on a real host, and `AbandonProcessGroup` on a live LaunchDaemon.

@@ -5,15 +5,15 @@ description: Put MaiPai Home on a Mac, update it, go back a version, remove it, 
 
 ## Before you start
 
-Use the Mac itself, not another computer. Sit at its screen, or use Screen Sharing, and log in. The AI engine needs that logged-in desktop to use the graphics chip. A plain SSH connection is not enough.
-
-You need three things:
+Use the Mac itself. You need three things:
 
 - A Mac with Apple silicon or Intel, and an internet connection.
-- Free disk space. The installer checks this first and tells you if it is too little.
+- 3 GB of free disk space for Home. The installer checks this first.
 - An account that can use `sudo` (an administrator).
 
-| Plan | Free space needed |
+The AI engine is a separate step that Home does for you later, inside the setup wizard, and only if this computer runs the AI. It needs 6 GB more to build, plus room for the AI models.
+
+| Plan | Free space needed for the models |
 |---|---|
 | Recommended | 26 GB |
 | Moderate | 19 GB |
@@ -23,21 +23,30 @@ You do not need Homebrew. You do not need to install anything else first.
 
 ## Install
 
-Open Terminal on the Mac and paste this one line.
+Open Terminal on the Mac and paste this one line. A plain SSH connection works too.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash
 ```
 
-To pick a plan, add it after `bash`.
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash -s -- --plan moderate
-```
-
-The installer takes a few minutes. When it ends, it waits until MaiPai Home answers. Then it prints the address to open, such as `http://localhost:3000`. Open that address in a browser to finish setup.
+This installs Home only, so it takes about a minute. When Home answers, the installer prints the address to open, such as `http://localhost:3000`. Open it in a browser to start the setup wizard.
 
 If it stops, read the last lines. They say what went wrong and what to do. Fix that, then run the same line again. It picks up where it stopped and does not hurt anything already installed.
+
+## The AI engine installs from the wizard
+
+The wizard asks where the AI runs.
+
+- **This computer.** Home starts the AI engine install right away. A progress bar at the bottom of the wizard shows each step: fetch, build and start, then the model downloads. You can keep answering questions while it works.
+- **Another computer.** Nothing is installed on this one. You pair the other computer later.
+
+The engine needs the Mac's logged-in desktop to use the graphics chip. If nobody is logged in at the Mac, the bar stops and says so. Log in at the Mac and press Try again.
+
+If the bar stops for any reason, it says what went wrong. Fix that and press Try again. It picks up where it stopped. You can also run the engine step by hand.
+
+```bash
+sudo bash /usr/local/maipai-home/scripts/install.sh --stack-only
+```
 
 ## What happens after a restart
 
@@ -69,7 +78,7 @@ Some things only you can do, so the list shows them as advice: leave iCloud, Sir
 
 ## Upgrade
 
-Run the same install line again. It does these steps in order:
+Run the same install line again. If the AI engine is already installed, it is rebuilt too, so the Mac must have someone logged in. It does these steps in order:
 
 1. Stops MaiPai Home and the engine.
 2. Saves a copy of your data in `/usr/local/maipai-home/upgrade-backups`. It keeps the last two copies.
@@ -123,9 +132,10 @@ curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install
 
 | What you see | What to do |
 |---|---|
-| "nobody is logged in at this Mac's own screen" | Log in at the Mac, open Terminal, and run the install line there. |
+| The wizard bar says nobody is logged in at the Mac | Log in at the Mac, then press Try again in the wizard. |
+| The wizard bar says the AI engine install stopped | Read the plain words on the bar, fix what they name, then press Try again. |
 | "these tools are missing" | In Terminal run `xcode-select --install`, wait until it ends, then run the install line again. |
-| "not enough free disk space" | Free up space, or add `--plan minimal`. |
+| "not enough free disk space" | Free up space, then run the install line again, or press Try again in the wizard. |
 | "could not download" | Check the Mac's internet connection, then run the install line again. |
 | macOS says it cannot verify a program | Open System Settings, then Privacy and Security, and choose Allow Anyway. Then run the install line again. |
 | Home did not come up | Read the last lines of `/usr/local/maipai-home/data/logs/launchd.err.log`. Fix what they name, then run the install line again. |

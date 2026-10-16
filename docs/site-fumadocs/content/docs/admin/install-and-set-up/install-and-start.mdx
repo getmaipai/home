@@ -60,14 +60,15 @@ The log is `data/local-app/app.log`.
 
 The installer runs Home in the background so it survives a reboot with nobody signed in. For the short, step by step version for the household, see the [install, upgrade, uninstall and fix page](/docs/user/install-upgrade-uninstall).
 
-1. On a Mac, sit at the Mac's own screen (or use Screen Sharing) and log in. The Stack needs that desktop session. Over SSH alone the installer stops before it changes anything, and prints the one line to run at the Mac.
-2. Run the installer as root.
+1. Run the installer as root. It installs Home only and prints the address of the setup wizard. SSH works.
 
 ```bash
 sudo bash /Users/example/Developer/home/scripts/install.sh
 ```
 
-3. To see what it would do first, add `--dry-run`.
+2. Open the address. In the wizard, choose where the AI runs. **This computer** makes Home install the MaiPai Stack right then, with a progress bar. **Another computer** installs no Stack here.
+
+3. To see what it would do first, add `--dry-run`. `--stack-only` runs only the AI engine step, which is what the wizard starts; run it by hand if the wizard cannot.
 
 | Item | macOS | Linux |
 |---|---|---|
@@ -81,9 +82,13 @@ sudo bash /Users/example/Developer/home/scripts/install.sh
 ### What it checks first
 
 - Required tools (`curl`, `tar`, `rsync`, `unzip`, `shasum`). On a Mac a miss points at `xcode-select --install`. Homebrew is never used, and Python is not needed.
-- A logged-in desktop session on macOS.
-- Free disk space for the plan: 26 GB recommended, 19 GB moderate, 14 GB minimal. An upgrade needs 3 GB.
+- Free disk space: 3 GB for Home. The Stack step checks 6 GB more, and the wizard plan checks the models.
+- For the Stack step only: a logged-in desktop session on macOS. Home itself needs none.
 - The Bun runtime and the install checks, after the build and before any service starts.
+
+### The Stack step
+
+`install.sh --stack-only` fetches, builds and starts the Stack, writes `engines.stack.url`, and records its progress in `data/stack-install.json` (state, stage, a plain problem). Home reads that file for the wizard bar. On macOS Home is a root daemon and runs the step itself. On Linux Home is an unprivileged user, so the installer adds a one-shot unit, `maipai-stack-install.service`, and a sudoers rule that allows exactly `systemctl start --no-block maipai-stack-install.service` for the Home user. The `scripts/` folder is root-owned so that user cannot change what the unit runs. The step is safe to run again.
 
 ### Ports
 
@@ -97,7 +102,7 @@ The installer installs the **latest published release**, never the main branch. 
 
 Running it again upgrades in place. Order: stop Home and the Stack, save `data/` to `upgrade-backups/<time>-from-<tag>/data.tar.gz` (the last two are kept), replace the program files, rebuild, start, wait for Home (`/`) and the Stack (`/healthz`), then write `.installed-tag`. The Stack's `stack/data/` (models and settings) and the Bun runtime are never replaced.
 
-A run that stopped part way is finished by running the same command again. It sees no `.installed-tag`, treats the folder as unfinished and continues. If a run fails after the old Home was stopped but before any file changed, Home is started again on the old version.
+An upgrade of an install that already has a Stack rebuilds the Stack too. A run that stopped part way is finished by running the same command again. It sees no `.installed-tag`, treats the folder as unfinished and continues. If a run fails after the old Home was stopped but before any file changed, Home is started again on the old version.
 
 ```bash
 sudo bash /usr/local/maipai-home/scripts/install.sh --rollback
