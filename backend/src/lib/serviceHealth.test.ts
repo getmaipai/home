@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterAll, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { statusEvents } from "@/db/schema";
@@ -9,6 +9,7 @@ import { __setStatusAppsForTests, __resetStatusAppsForTests, type StatusApp } fr
 import { resetDb } from "../../tests/reset-db";
 
 beforeEach(() => { resetDb(); __resetServiceHealthForTests(); __resetStatusAppsForTests(); __resetReminderTimersForTests(); __setReminderTimingForTests(10); });
+afterAll(() => { __resetStatusAppsForTests(); __resetServiceHealthForTests(); __resetReminderTimersForTests(); });
 
 describe("outside service request health", () => {
   test("one transient timeout stays operational if the next real request succeeds", async () => {
