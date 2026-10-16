@@ -244,8 +244,8 @@ type CoreJobHandler = (row: JobRow) => void | Promise<void>;
 
 const CORE_JOBS: Record<string, CoreJobHandler> = {
   "notifications.deliver_held": async () => { await deliverHeldNotifications(); },
-  // INITIATIVE-01: send the queued robot offers whose gates pass, then close the expired ones into the centre.
-  "robot.offers.tick": async () => { dispatchRobotOffers(); await sweepRobotOffers(); },
+  // INITIATIVE-01: send the queued robot offers whose gates pass, after closing the expired ones into the centre (so a backoff sees them).
+  "robot.offers.tick": async () => { await sweepRobotOffers(); dispatchRobotOffers(); },
   "memory.maintenance": () => {
     runMaintenance();
   },

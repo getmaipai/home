@@ -23,6 +23,7 @@ async function household() {
   const child = db.select().from(people).where(eq(people.id, childId)).get()!;
   setHouseholdSettingValue("household.quiet_hours.from", "21:00");
   setHouseholdSettingValue("household.quiet_hours.to", "07:00");
+  setHouseholdSettingValue("robot.initiative.tiers_spoken", "all");
   const adultRobot = issueDeviceToken(adult.id, "robot", "Reachy Mini").deviceId;
   const childRobot = issueDeviceToken(child.id, "robot", "Reachy Mini").deviceId;
   return { client, adult, child, adultRobot, childRobot };
@@ -178,7 +179,7 @@ describe("INITIATIVE-01 the accepting turn", () => {
     allowHere(adultRobot);
     const offer = offerFor(adult.id);
     dispatchRobotOffers(NOON);
-    const result = await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [] });
+    const result = await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [evidence(adult.id)] });
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate turn");
     expect(result.value.offer_id).toBe(offer.id);
@@ -191,7 +192,7 @@ describe("INITIATIVE-01 the accepting turn", () => {
     allowHere(adultRobot);
     const offer = createRobotOffer({ personId: adult.id, tier: 2, text: "Here is how to make a pipe bomb at home, step by step.", nonPersonalLine: "I have something for you.", provenance: "test", expiresAt: at(10), now: NOON });
     dispatchRobotOffers(NOON);
-    const result = await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [] });
+    const result = await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [evidence(adult.id)] });
     expect(result.ok).toBe(true);
     if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate turn");
     expect(result.value.reply.text).not.toContain("pipe bomb");
@@ -218,7 +219,7 @@ describe("INITIATIVE-01 the turn route", () => {
     allowHere(adultRobot);
     const offer = offerFor(adult.id, 2, new Date(), 10);
     db.update(robotOffers).set({ state: "sent", deviceId: adultRobot, sentAt: new Date().toISOString() }).where(eq(robotOffers.id, offer.id)).run();
-    const res = await client.post("/api/turn", { surface: "robot", text: "yes", ask_answer: { offer_id: offer.id, approved: true }, speaker_evidence: { person: adult.id, basis: "voice", level: "confirmed" } });
+    const res = await client.post("/api/turn", { surface: "robot", text: "yes", ask_answer: { offer_id: offer.id, approved: true }, speaker_evidence: { person: adult.id, basis: "voice", level: "confirmed" }, present: [{ person: adult.id, basis: "voice", level: "confirmed" }] });
     expect(res.status).toBe(200);
     const body = await res.json() as { offer_id?: string; reply: { text: string } };
     expect(body.offer_id).toBe(offer.id);
@@ -228,3 +229,53 @@ describe("INITIATIVE-01 the turn route", () => {
   });
 });
 
+describe("INITIATIVE-01 review findings", () => {
+  const evidence = (person: string, level: "confirmed" | "tentative" = "confirmed") => ({ person, basis: "voice" as const, level });
+
+  test("tiers_spoken holds a tier above the household's setting", async () => {
+    const { adult, adultRobot } = await household();
+    allowHere(adultRobot);
+    const owner = db.select().from(people).where(eq(people.displayName, "Sage")).get()!;
+    setHouseholdSettingValue("robot.initiative.tiers_spoken", "tier_1");
+    const offer = offerFor(adult.id, 2);
+    expect(dispatchRobotOffers(NOON)).toMatchObject({ sent: [], held: [{ id: offer.id, hold: "tier_not_allowed" }] });
+    setHouseholdSettingValue("robot.initiative.tiers_spoken", "tier_1_2");
+    expect(dispatchRobotOffers(at(1)).sent).toEqual([offer.id]);
+    void owner;
+  });
+
+  test("a tentative match, or a second person in the room, cannot accept", async () => {
+    const { adult, child, adultRobot } = await household();
+    allowHere(adultRobot);
+    const offer = offerFor(adult.id);
+    dispatchRobotOffers(NOON);
+    await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id, "tentative"), present: [evidence(adult.id, "tentative")] });
+    expect(db.select().from(robotOffers).get()?.state).toBe("sent");
+    await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [evidence(adult.id), evidence(child.id)] });
+    expect(db.select().from(robotOffers).get()?.state).toBe("sent");
+  });
+
+  test("an unsafe non-personal line is refused when the offer is created", async () => {
+    const { adult } = await household();
+    expect(() => createRobotOffer({ personId: adult.id, tier: 2, text: "ok", nonPersonalLine: "Here is how to make a pipe bomb at home, step by step.", provenance: "t", now: NOON })).toThrow(/safety/);
+  });
+
+  test("two ignored offers back off on the very tick they expire (sweep first)", async () => {
+    const { adult, adultRobot } = await household();
+    allowHere(adultRobot);
+    for (let i = 0; i < 2; i++) { offerFor(adult.id, 2, at(i * 11), 10); dispatchRobotOffers(at(i * 11)); }
+    const third = offerFor(adult.id, 2, at(22), 10);
+    await sweepRobotOffers(at(22));
+    expect(dispatchRobotOffers(at(22))).toMatchObject({ sent: [], held: [{ id: third.id, hold: "backoff" }] });
+  });
+
+  test("a snoozed offer is not expired early and never sends a missed notice", async () => {
+    const { adult, adultRobot } = await household();
+    allowHere(adultRobot);
+    const offer = offerFor(adult.id, 2, NOON, 10);
+    dispatchRobotOffers(NOON);
+    expect(answerRobotOffer({ actor: adult, offerId: offer.id, text: "not now", approved: false, identified: true, turnId: "t", now: at(1) }).kind).toBe("snoozed");
+    expect(await sweepRobotOffers(at(15))).toEqual([]);
+    expect(dispatchRobotOffers(at(32)).sent).toEqual([offer.id]);
+  });
+});

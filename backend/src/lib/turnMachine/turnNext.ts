@@ -41,7 +41,7 @@ import { contextToMessages } from "./messages";
 import { topicBlockForTurn } from "@/lib/topicPrompt";
 import type { ContextSegmentKey } from "@/wire";
 import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
-import { emptyTimings, outcomeOf } from "@/lib/turnContext";
+import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
 import { roleHealth } from "@/lib/roleHealth";
@@ -454,7 +454,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     if (surface !== "robot") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
     const answered = answerRobotOffer({
       actor, offerId: offerAnswer.offer_id, text, approved: offerAnswer.approved, turnId,
-      identified: opts.speakerEvidence?.person === actor.id && opts.speakerEvidence.level !== "unknown",
+      identified: sensitiveAllowed(surface, opts.speakerEvidence, opts.present, actor.id), // confirmed and alone, the same bar as sensitive records
     });
     if (answered.kind === "stale") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
     if (answered.kind === "accepted") offerTurn = { id: answered.offer.id, reply: answered.offer.text };

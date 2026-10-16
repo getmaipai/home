@@ -14,6 +14,7 @@ import { nextHlc } from "@/lib/hlc";
 import { issueDeviceCommand, listRobotsPairedUnderPerson } from "@/lib/deviceCommands";
 import { quietHours, trigger } from "@/lib/notifications";
 import { AFFIRMATIVE_RE, NEGATIVE_RE } from "@/lib/consentVocab";
+import { evaluateSafety } from "@/lib/safety";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { ROBOT_MAY_ADDRESS_KEY, getDeviceSettingValue, getHouseholdSettingValue, getPersonSettingSource, getSettingValueForPerson } from "@/lib/settings";
 
@@ -27,7 +28,7 @@ export type OfferState = "queued" | "sent" | "snoozed" | "accepted" | "declined"
 export type OfferRow = typeof robotOffers.$inferSelect;
 
 export type OfferHold =
-  | "disabled" | "may_address" | "quiet_hours" | "no_robot" | "not_allowed_here" | "rate_limit" | "backoff" | "outstanding" | "snoozed";
+  | "disabled" | "tier_not_allowed" | "may_address" | "quiet_hours" | "no_robot" | "not_allowed_here" | "rate_limit" | "backoff" | "outstanding" | "snoozed";
 
 export interface CreateOfferInput {
   personId: string;
@@ -48,6 +49,8 @@ export function createRobotOffer(input: CreateOfferInput): OfferRow {
   const expiresAt = (input.expiresAt ?? new Date(now.getTime() + DEFAULT_OFFER_TTL_MS)).toISOString();
   RobotOffer.parse({ id, person_id: input.personId, tier: input.tier, text: input.text, expires_at: expiresAt, provenance: input.provenance, hlc });
   if (!input.nonPersonalLine.trim() || input.nonPersonalLine.length > 200) throw new Error("a robot offer needs a non-personal line of 1 to 200 characters");
+  // The robot says this line aloud before any consent, to whoever is in the room: it passes the output floor at the child band.
+  if (evaluateSafety(input.nonPersonalLine, "child").flagged) throw new Error("the non-personal line of a robot offer failed the safety check; write a plainer line");
   db.insert(robotOffers).values({
     id, personId: input.personId, tier: input.tier, text: input.text, nonPersonalLine: input.nonPersonalLine, provenance: input.provenance,
     hlc, expiresAt, state: "queued", createdAt: now.toISOString(),
@@ -69,6 +72,13 @@ export function personMayBeAddressed(person: PersonRow, now: Date): boolean {
   return true;
 }
 
+/** `robot.initiative.tiers_spoken`: tier_1 (default) speaks only tier 1 first; tier_1_2 adds tier 2; all adds tier 3. */
+function tierSpoken(tier: number): boolean {
+  const setting = String(getHouseholdSettingValue("robot.initiative.tiers_spoken") ?? "tier_1");
+  const top = setting === "all" ? 3 : setting === "tier_1_2" ? 2 : 1;
+  return tier <= top;
+}
+
 function sentSince(deviceId: string, sinceMs: number): OfferRow[] {
   return db.select().from(robotOffers)
     .where(and(eq(robotOffers.deviceId, deviceId), isNotNull(robotOffers.sentAt)))
@@ -80,6 +90,7 @@ function sentSince(deviceId: string, sinceMs: number): OfferRow[] {
 export function offerHold(offer: OfferRow, deviceId: string, now: Date): OfferHold | null {
   if (offer.snoozedUntil && Date.parse(offer.snoozedUntil) > now.getTime()) return "snoozed";
   if (getHouseholdSettingValue("robot.initiative.enabled") === false) return "disabled";
+  if (!tierSpoken(offer.tier)) return "tier_not_allowed";
   const person = personRow(offer.personId);
   if (!person || !personMayBeAddressed(person, now)) return "may_address";
   if (quietHours(person, now).active) return "quiet_hours";
@@ -188,8 +199,10 @@ function closeOffer(offer: OfferRow, state: "accepted" | "declined", turnId: str
 
 function snoozeOffer(offer: OfferRow, now: Date): OfferRow {
   const snoozedUntil = new Date(now.getTime() + OFFER_SNOOZE_MS).toISOString();
-  db.update(robotOffers).set({ state: "snoozed", snoozedUntil }).where(eq(robotOffers.id, offer.id)).run();
-  return { ...offer, state: "snoozed", snoozedUntil };
+  // The snooze outlasts the offer's own ttl, so "not now" is a later re-offer and never a "missed" notice.
+  const expiresAt = new Date(Math.max(Date.parse(offer.expiresAt), Date.parse(snoozedUntil) + DEFAULT_OFFER_TTL_MS)).toISOString();
+  db.update(robotOffers).set({ state: "snoozed", snoozedUntil, expiresAt }).where(eq(robotOffers.id, offer.id)).run();
+  return { ...offer, state: "snoozed", snoozedUntil, expiresAt };
 }
 
 /** A channel `offer_snooze` frame (voice only): snoozes an offer the robot was sent, for 30 minutes. */
