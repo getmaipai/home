@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, setSystemTime, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { deviceCommands, notificationDeliveries, people, robotOffers } from "@/db/schema";
@@ -174,6 +174,10 @@ describe("INITIATIVE-01 answers", () => {
 });
 
 describe("INITIATIVE-01 the accepting turn", () => {
+  // The turn reads the real clock; pin it to NOON so the offer made at NOON is still waiting
+  // (it expired and answered ask_stale whenever the suite ran after 12:10 local on that day).
+  beforeEach(() => setSystemTime(NOON));
+  afterEach(() => setSystemTime());
   const evidence = (person: string) => ({ person, basis: "voice" as const, level: "confirmed" as const });
 
   test("an accepted offer's turn carries the offer id and speaks the prepared content through the gate", async () => {
