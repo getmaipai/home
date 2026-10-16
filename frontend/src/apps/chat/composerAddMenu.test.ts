@@ -13,6 +13,10 @@ describe("attachmentAddErrorMessage", () => {
     expect(attachmentAddErrorMessage({ reason: "not-accepted", message: "File type image/png is not accepted. Accepted types: .pdf", contentType: "image/png" }, true, false)).toBe("Pictures need a ready vision model.");
   });
 
+  test("a photo upload during AI installation says installation is in progress", () => {
+    expect(attachmentAddErrorMessage({ reason: "adapter-error", message: "The AI is still downloading. It will work as soon as the download finishes.", code: "ai_installing", contentType: "image/png" }, true)).toBe("The AI is still installing. Photos will work when the install finishes.");
+  });
+
   test("an unsupported file type gets a plain line, not the accept list", () => {
     const line = attachmentAddErrorMessage({ reason: "not-accepted", message: "File type application/zip is not accepted. Accepted types: image/*,.pdf", contentType: "application/zip" }, true);
     expect(line).toBe("That kind of file can't be added here.");

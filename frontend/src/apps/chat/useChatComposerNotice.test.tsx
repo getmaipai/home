@@ -20,6 +20,15 @@ function view(apps: unknown[], person: { role: string; age_band: string }) {
 const chat = (reason: string) => [{ id: "chat", name: "Chat", state: "degraded", reason }];
 
 describe("useChatComposerNotice for a degraded Chat app", () => {
+  test("the composer says the AI is installing and will work when it finishes", async () => {
+    globalThis.fetch = mock((url: string | URL | Request) => Promise.resolve(String(url).includes("/api/status/apps")
+      ? Response.json([])
+      : Response.json({ engines: { chat: { kind: "starting", pid: null, alive: false, availability: "unavailable", reason: "ai_installing", notice: { adult: "The AI is still downloading.", teen: "The AI is still downloading.", child: "I'm still installing.", repairs_link: null } } } }))) as unknown as typeof fetch;
+    const client = createQueryClient();
+    const v = renderHook(() => useChatComposerNotice({ role: "adult", age_band: "adult" } as never), { wrapper: ({ children }) => <QueryClientProvider client={client}>{children}</QueryClientProvider> });
+    await waitFor(() => expect(v.result.current).toEqual({ text: "The AI is still installing. Chat will work when the install finishes.", repairsLink: null }));
+  });
+
   test("owner sees the reason and the Repairs link", async () => {
     const v = view(chat("Chat is working, but Memory isn't running."), { role: "owner", age_band: "adult" });
     await waitFor(() => expect(v.result.current).toEqual({ text: "Chat is working, but Memory isn't running.", repairsLink: "Open Repairs" }));

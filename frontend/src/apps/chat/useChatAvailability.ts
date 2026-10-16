@@ -60,7 +60,14 @@ export function useChatComposerNotice(person: Pick<Roster, "role" | "age_band">)
         : { text: "Some chat features may be limited right now.", repairsLink: null };
     }
   }
-  if (!notice || chatAvailability(health) === "ready") return null;
+  if (chatAvailability(health) === "ready") return null;
+  if (health?.kind === "starting" && (health.reason as string | undefined) === "ai_installing") {
+    const text = person.age_band === "child"
+      ? "The AI is still installing. Ask a grown-up; chat will work when it finishes."
+      : "The AI is still installing. Chat will work when the install finishes.";
+    return { text, repairsLink: null };
+  }
+  if (!notice) return null;
   const text = person.age_band === "child" ? notice.child : person.age_band === "teen" ? notice.teen : person.age_band === "adult" ? notice.adult : null;
   return text === null ? null : { text, repairsLink: isOwnerOrAdminRole(person.role) ? notice.repairs_link : null };
 }

@@ -73,12 +73,13 @@ export interface LiveVoiceSessionProps {
   speechFailed?: number;
   /** Injectable retry waits keep the reconnect tests quick. */
   retryDelays?: [number, number];
+  installationNotice?: boolean;
 }
 
 export const WAKE_SESSION_IDLE_CLOSE_MS = 8000;
 export const BARGE_IN_ARM_DELAY_MS = 400;
 
-export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
+export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, idleCloseMs = null, turnSchedulerRef, liveVoiceActiveRef, pendingSpeechRef, activeTurnRef, cancelRun, voiceBargeIn = false, isSpeaking, speakingEndedAt, speechFailed = 0, retryDelays = [0, 1500], installationNotice = false, createSocket = createSttSocket, startCapture = startMicCapture }: LiveVoiceSessionProps) {
   const [mode, setMode] = useState<VoiceMode>("connecting");
   const [amplitude, setAmplitude] = useState(0);
   const [muted, setMuted] = useState(false);
@@ -259,7 +260,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
             micHandle?.stop();
             levelMeter?.stop();
             clearInterval(levelTimer);
-            onProblem?.("listening_engine");
+            if (!installationNotice) onProblem?.("listening_engine");
             onOpenChange(false);
             break;
         }

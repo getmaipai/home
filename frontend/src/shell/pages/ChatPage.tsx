@@ -1292,6 +1292,7 @@ export function ChatPage({ person }: { person: Roster }) {
     composer: runtime.thread.composer,
     open: voiceOpen,
     onOpenChange: closeAwareSetVoiceOpen,
+    installationNotice: chatAvailability === "unavailable" && composerNotice?.text.startsWith("The AI is still installing.") === true,
     onProblem: (kind: VoiceFailureKind) => toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" }),
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,

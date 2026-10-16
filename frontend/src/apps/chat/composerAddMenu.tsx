@@ -131,7 +131,8 @@ export const PhotoUploadsContext = createContext<PhotoUploadsState>({ settingAll
  * a 12 MB one or a child's pasted photo would silently do nothing. The
  * adapter's own messages are already plain (CHAT_IMAGE_REFUSAL and the
  * photo-uploads line); the runtime's own "not accepted" text is not. */
-export function attachmentAddErrorMessage(error: { reason: string; message: string; contentType?: string }, photosAllowed: boolean, modelCanReadPictures = true): string {
+export function attachmentAddErrorMessage(error: { reason: string; message: string; contentType?: string; code?: string }, photosAllowed: boolean, modelCanReadPictures = true): string {
+  if (error.code === "ai_installing" || error.message.includes("still downloading")) return "The AI is still installing. Photos will work when the install finishes.";
   if (error.reason === "not-accepted") {
     if (!photosAllowed && error.contentType?.toLowerCase().startsWith("image/")) return "Photo uploads are turned off for this profile.";
     if (!modelCanReadPictures && error.contentType?.toLowerCase().startsWith("image/")) return "Pictures need a ready vision model.";

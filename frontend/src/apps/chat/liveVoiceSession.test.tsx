@@ -36,7 +36,7 @@ function fakeStartCapture(): (options: MicCaptureOptions) => Promise<MicCaptureH
 
 const SettingsIcon = getIcon("settings");
 
-function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number] }) {
+function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakingEndedAt, speechFailed = 0, fixture, sentTexts, idleCloseMs, voiceBargeIn = true, activeTurn = { turnId: "turn-test", heardVisibleEnd: () => 23 }, cancelRun = () => {}, stopScheduler = () => {}, socketConnections, captureCalls, dropConnections = [], doubleDropConnections = [], dropWhileSpeaking = false, retryDelays, installationNotice = false }: { open: boolean; onOpenChange: (open: boolean) => void; onProblem?: (kind: string) => void; isSpeaking: boolean; speakingEndedAt: number; speechFailed?: number; fixture: readonly SttFixtureStep[] | ((connection: number) => readonly SttFixtureStep[]); sentTexts: string[]; idleCloseMs?: number | null; voiceBargeIn?: boolean; activeTurn?: { turnId: string; heardVisibleEnd: () => number } | null; cancelRun?: () => void; stopScheduler?: () => void; socketConnections?: number[]; captureCalls?: number[]; dropConnections?: number[]; doubleDropConnections?: number[]; dropWhileSpeaking?: boolean; retryDelays?: [number, number]; installationNotice?: boolean }) {
   const adapter: ChatModelAdapter = {
     async *run({ messages }) {
       const last = messages[messages.length - 1];
@@ -69,6 +69,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
     speakingEndedAt,
     speechFailed,
     retryDelays,
+    installationNotice,
     idleCloseMs,
     createSocket: (handlers) => {
       const connection = connectionCount.current++;
@@ -182,6 +183,14 @@ describe("live voice session", () => {
     await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
     expect(onProblem).toHaveBeenCalledWith("listening_engine");
     expect(socketConnections).toEqual([0]);
+  });
+
+  test("a speech engine error during AI installation avoids the generic voice error", async () => {
+    const onOpenChange = mock();
+    const onProblem = mock();
+    render(<Harness open onOpenChange={onOpenChange} onProblem={onProblem} isSpeaking={false} speakingEndedAt={0} fixture={[{ delayMs: 0, message: { t: "error", v: "private engine detail" } }]} sentTexts={[]} installationNotice />);
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(onProblem).not.toHaveBeenCalled();
   });
 
   test("a failed sentence tells the person once, even when several sentences fail", async () => {
