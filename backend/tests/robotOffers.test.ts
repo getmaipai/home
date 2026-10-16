@@ -14,6 +14,8 @@ beforeEach(() => resetDb());
 // Local noon on a fixed day: outside the default 21:00 to 07:00 quiet hours.
 const NOON = new Date(2026, 9, 16, 12, 0, 0);
 const at = (minutes: number) => new Date(NOON.getTime() + minutes * 60_000);
+// The accepting turn checks expiry against the real clock, so its offers outlive any real now.
+const TEN_YEARS_MIN = 10 * 365 * 24 * 60;
 
 async function household() {
   const client = new TestClient();
@@ -177,7 +179,7 @@ describe("INITIATIVE-01 the accepting turn", () => {
   test("an accepted offer's turn carries the offer id and speaks the prepared content through the gate", async () => {
     const { adult, adultRobot } = await household();
     allowHere(adultRobot);
-    const offer = offerFor(adult.id);
+    const offer = offerFor(adult.id, 2, NOON, TEN_YEARS_MIN);
     dispatchRobotOffers(NOON);
     const result = await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [evidence(adult.id)] });
     expect(result.ok).toBe(true);
@@ -190,7 +192,7 @@ describe("INITIATIVE-01 the accepting turn", () => {
   test("the prepared content is checked by the output gate, so unsafe text never reaches the speaker", async () => {
     const { adult, adultRobot } = await household();
     allowHere(adultRobot);
-    const offer = createRobotOffer({ personId: adult.id, tier: 2, text: "Here is how to make a pipe bomb at home, step by step.", nonPersonalLine: "I have something for you.", provenance: "test", expiresAt: at(10), now: NOON });
+    const offer = createRobotOffer({ personId: adult.id, tier: 2, text: "Here is how to make a pipe bomb at home, step by step.", nonPersonalLine: "I have something for you.", provenance: "test", expiresAt: at(TEN_YEARS_MIN), now: NOON });
     dispatchRobotOffers(NOON);
     const result = await runTurnNext(adult, "robot", "yes", { ask_answer: { offer_id: offer.id, approved: true }, speakerEvidence: evidence(adult.id), present: [evidence(adult.id)] });
     expect(result.ok).toBe(true);
