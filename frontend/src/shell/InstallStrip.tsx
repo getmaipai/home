@@ -8,7 +8,7 @@ const STAGES = [{ name: "Download", weight: 1 }] as const;
 /** One line of install progress: the AI models downloading in the
  * background. It hides itself when nothing is installing or everything
  * has landed. Polls fast while moving, slowly otherwise. */
-export function InstallStrip({ detailsHref = "/settings/ai", read = api.installStatus }: { detailsHref?: string; read?: () => Promise<InstallStatusView> }) {
+export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.installStatus }: { detailsHref?: string; read?: () => Promise<InstallStatusView> }) {
   const [status, setStatus] = useState<InstallStatusView | null>(null);
 
   useEffect(() => {

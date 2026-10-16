@@ -380,7 +380,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "done": body = <Card><CardContent><p>Start a chat, add people, or choose apps whenever you're ready.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
-  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("plan")) body = <><InstallStrip detailsHref="/settings/ai" read={api.setupInstallStatus} />{body}</>;
+  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("plan")) body = <><InstallStrip detailsHref="/settings/home/ai" read={api.setupInstallStatus} />{body}</>;
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const currentPhaseIndex = phase === "meet" ? 1 : 0;
   const screenIndex = SCREEN_IDS.indexOf(screen);
