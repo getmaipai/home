@@ -7,7 +7,7 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, statusEvents } from "@/db/schema";
 import { TestClient } from "../client";
 import { resetDb } from "../reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -19,6 +19,20 @@ import { setHouseholdSettingValue } from "@/lib/settings";
 import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PersonRow } from "@/types";
 import { changedTables, tableCounts } from "./modeHarness";
+
+// A search outcome also feeds the service-health sampler (recordServiceOutcome
+// fires recordStatusSample without awaiting it), which writes status_events and
+// status_heartbeat a few ticks after the search returns. That is system
+// telemetry (component and state, never a query), not search history, and its
+// timing is load dependent: an immediate row-count diff passed alone and failed
+// when a loaded run let the sample land first. The test waits for the sample,
+// then excludes those two telemetry tables and checks their rows hold no query.
+const TELEMETRY_TABLES = new Set(["status_events", "status_heartbeat"]);
+
+async function settleStatusSample(): Promise<void> {
+  for (let i = 0; i < 200 && db.select().from(statusEvents).all().length === 0; i++) await Bun.sleep(10);
+  await Bun.sleep(50);
+}
 
 const SECRET = "BSA-test-key-do-not-log";
 const QUERY = "where do otters sleep";
@@ -111,8 +125,10 @@ describe("THIN-INC row 4: a temporary search keeps no query history or cache", (
     // Not remembered for later: the same words in a durable chat are a fresh lookup too.
     await search(owner, durableId, "turn-d-1");
     expect(searxngQueries).toEqual([QUERY, QUERY, QUERY]);
-    // And no table holds a query.
-    expect(changedTables(before, tableCounts())).toEqual([]);
+    // And no table holds a query. The background health sample lands first.
+    await settleStatusSample();
+    expect(changedTables(before, tableCounts()).filter((name) => !TELEMETRY_TABLES.has(name))).toEqual([]);
+    expect(JSON.stringify(db.select().from(statusEvents).all())).not.toContain(QUERY);
   });
 });
 
