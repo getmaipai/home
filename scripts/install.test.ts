@@ -1068,7 +1068,7 @@ main ${args.join(" ")}`]);
   });
 
   test("a bad MAIPAI_PORT or MAIPAI_STACK_PORT stops with the fix", () => {
-    for (const [name, message] of [["MAIPAI_PORT", "MAIPAI_PORT is 'abc'"], ["MAIPAI_STACK_PORT", "MAIPAI_STACK_PORT is 'abc'"]]) {
+    for (const [name, message] of [["MAIPAI_PORT", "MAIPAI_PORT is 'abc'"], ["MAIPAI_STACK_PORT", "MAIPAI_STACK_PORT is 'abc'"]] as const) {
       const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; main --dry-run`], { env: { ...process.env, [name]: "abc" } });
       expect(result.exitCode).toBe(1);
       expect(result.stderr.toString()).toContain(message);
@@ -1257,7 +1257,7 @@ describe("upgrade data copy and rollback", () => {
       const names = readdirSync(join(root, "upgrade-backups"));
       expect(names).toHaveLength(1);
       expect(names[0]).toMatch(/^\d{8}-\d{6}-from-v0\.0\.9$/);
-      const listing = Bun.spawnSync(["tar", "-tzf", join(root, "upgrade-backups", names[0], "data.tar.gz")]).stdout.toString();
+      const listing = Bun.spawnSync(["tar", "-tzf", join(root, "upgrade-backups", names[0] as string, "data.tar.gz")]).stdout.toString();
       expect(listing).toContain("data/home.db");
       expect(listing).not.toContain("big.log");
     } finally { rmSync(root, { recursive: true, force: true }); }
