@@ -4,8 +4,11 @@
 // disagree about what has landed.
 import type { StackJob } from "@maipai/spec/stack/ts/stack-job.js";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { engineInstallStatus } from "@/lib/stackInstall";
 
-export type InstallState = "none" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
+// installing_engine and engine_failed come before any model download: the
+// setup wizard is building the MaiPai Stack on this computer (INSTALL-SPLIT-01).
+export type InstallState = "none" | "installing_engine" | "engine_failed" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
 
 export interface InstallItem {
   id: string;
@@ -33,11 +36,14 @@ export interface InstallStatus {
   items: InstallItem[];
   /** Plain-words reason when the state is stalled, out_of_space or failed. */
   problem: string | null;
+  /** While the AI engine itself installs: the step (fetching, building, starting) and its plain label. */
+  stage: string | null;
+  stageLabel: string | null;
 }
 
 export const EMPTY_INSTALL: InstallStatus = {
   state: "none", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0,
-  bytesPerSecond: null, etaSeconds: null, items: [], problem: null,
+  bytesPerSecond: null, etaSeconds: null, items: [], problem: null, stage: null, stageLabel: null,
 };
 
 const OUT_OF_SPACE = /enospc|no space|not enough (disk )?space|disk (is )?full|out of (disk )?space/i;
@@ -98,7 +104,7 @@ export function summarizeInstall(allJobs: StackJob[]): InstallStatus {
     completedBytes, totalBytes,
     bytesPerSecond: speed > 0 ? Math.round(speed) : null,
     etaSeconds: speed > 0 && left > 0 ? Math.ceil(left / speed) : null,
-    items, problem,
+    items, problem, stage: null, stageLabel: null,
   };
 }
 
@@ -114,6 +120,13 @@ export async function getInstallStatus(): Promise<InstallStatus> {
   let value = EMPTY_INSTALL;
   if (isStackConfigured()) {
     try { value = summarizeInstall(await getStackClient().jobs()); } catch { value = EMPTY_INSTALL; }
+  }
+  // Model downloads are the later, bigger part. Until one exists, the
+  // engine's own install (if the wizard started it) is what is happening.
+  if (value.items.length === 0) {
+    const engine = engineInstallStatus();
+    if (engine.state === "running") value = { ...EMPTY_INSTALL, state: "installing_engine", stage: engine.stage, stageLabel: engine.stageLabel };
+    else if (engine.state === "failed") value = { ...EMPTY_INSTALL, state: "engine_failed", problem: engine.problem };
   }
   cache = { at: Date.now(), value };
   return value;

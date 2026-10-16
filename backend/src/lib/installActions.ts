@@ -1,10 +1,11 @@
 // The two things a person does with the install plan, shared by the setup
 // wizard (before an owner exists) and Home settings (after): look at the
 // plan in plain words, and start it.
-import { getStackClient } from "@/lib/stackEngine";
+import { getStackClient, isRemoteStackSelected, isStackConfigured } from "@/lib/stackEngine";
+import { engineInstallStatus, startEngineInstall } from "@/lib/stackInstall";
 import { wordPlan, type PlanWording } from "@/lib/installPlanWording";
 import { resetInstallStatusCache } from "@/lib/installStatus";
-import { replaceSetupStep, resolveMemoryGb, setMemoryAnswerGb } from "@/lib/setupState";
+import { getSetupState, replaceSetupStep, resolveMemoryGb, setMemoryAnswerGb } from "@/lib/setupState";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
 
 export async function previewPlan(requestedGb?: number): Promise<{ plan: unknown; wording: PlanWording }> {
@@ -17,6 +18,25 @@ export async function previewPlan(requestedGb?: number): Promise<{ plan: unknown
   }
 }
 
+/** This computer is meant to run the AI but has no MaiPai Stack yet: the
+ * household said "this computer" (or never said otherwise) and nothing is
+ * configured. The setup wizard installs the Stack in that case. */
+export function engineNeedsInstall(): boolean {
+  if (isRemoteStackSelected() || getSetupState().engine.where === "another_computer") return false;
+  return !isStackConfigured();
+}
+
+/** Starts (or joins) the AI engine install. Always answers in the "not
+ * ready yet" shape: the caller's job is to wait and try again. */
+export function ensureEngineInstalling(): { ok: false; error: string; next: string; cannotStart?: true } {
+  const status = engineInstallStatus();
+  if (status.state !== "running") {
+    const started = startEngineInstall();
+    if (!started.ok) return { ...started, cannotStart: true };
+  }
+  return { ok: false, error: "The AI engine is still installing on this computer.", next: "Wait for the progress bar to finish, then press Check again." };
+}
+
 export type BeginInstall = { ok: true; models: number } | { ok: false; error: string; next: string };
 
 /** Starts the downloads in the background. `recordInSetup` also marks the
@@ -26,6 +46,7 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
   // the plan from the same number instead of dropping it.
   if (requestedGb) setMemoryAnswerGb(requestedGb);
   const vramGb = resolveMemoryGb(requestedGb);
+  if (engineNeedsInstall()) return ensureEngineInstalling();
   let plan;
   try { plan = await getStackClient().installPlan(vramGb ? { vramGb } : undefined); }
   catch { return { ok: false, error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }; }

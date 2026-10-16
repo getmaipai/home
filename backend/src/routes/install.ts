@@ -7,12 +7,12 @@ import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { getInstallStatus, resetInstallStatusCache } from "@/lib/installStatus";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
-import { beginInstall, previewPlan } from "@/lib/installActions";
+import { beginInstall, engineNeedsInstall, ensureEngineInstalling, previewPlan } from "@/lib/installActions";
 import { getStackClient } from "@/lib/stackEngine";
 import { setMemoryAnswerGb } from "@/lib/setupState";
 
 export const InstallStatusSchema = z.object({
-  state: z.enum(["none", "downloading", "starter_ready", "stalled", "out_of_space", "failed", "ready"]),
+  state: z.enum(["none", "installing_engine", "engine_failed", "downloading", "starter_ready", "stalled", "out_of_space", "failed", "ready"]),
   chatReady: z.boolean(),
   complete: z.boolean(),
   percent: z.number().int().min(0).max(100),
@@ -21,6 +21,8 @@ export const InstallStatusSchema = z.object({
   bytesPerSecond: z.number().nullable(),
   etaSeconds: z.number().nullable(),
   problem: z.string().nullable(),
+  stage: z.string().nullable(),
+  stageLabel: z.string().nullable(),
   items: z.array(z.object({
     id: z.string(), model: z.string(), role: z.string().nullable(), label: z.string(),
     state: z.string(), completedBytes: z.number(), totalBytes: z.number(), reason: z.string().nullable(),
@@ -44,7 +46,7 @@ const retryRoute = createRoute({
   request: { body: { required: false, content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional() }).strict() } } } },
   responses: {
     202: { content: { "application/json": { schema: z.object({ started: z.literal(true) }) } }, description: "The downloads were started again." },
-    ...errorResponses({ 403: "Only an owner or admin may do this" }),
+    ...errorResponses({ 403: "Only an owner or admin may do this", 409: "The AI engine install could not be started" }),
   },
 });
 installRoutes.openapi(retryRoute, (c) => {
@@ -52,6 +54,13 @@ installRoutes.openapi(retryRoute, (c) => {
   const body = c.req.valid("json" as never) as { vram_gb?: number } | undefined;
   if (body?.vram_gb) setMemoryAnswerGb(body.vram_gb);
   resetInstallStatusCache();
+  // No Stack yet: Try again means install the engine first. The model
+  // downloads start by themselves once it answers.
+  if (engineNeedsInstall()) {
+    const result = ensureEngineInstalling();
+    if (result.cannotStart) return c.json({ error: result.error, next: result.next }, 409);
+    return c.json({ started: true as const }, 202);
+  }
   // startSetupDownloads falls back to the saved memory answer when none is given.
   void startSetupDownloads(getStackClient(), body?.vram_gb ? { vramGb: body.vram_gb } : {}).catch(() => {});
   return c.json({ started: true as const }, 202);

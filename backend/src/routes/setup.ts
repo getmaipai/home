@@ -27,7 +27,8 @@ import { db } from "@/db";
 import { people } from "@/db/schema";
 import { runSetupChecks, healthItems } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
-import { beginInstall, previewPlan } from "@/lib/installActions";
+import { beginInstall, engineNeedsInstall, previewPlan } from "@/lib/installActions";
+import { startEngineInstall } from "@/lib/stackInstall";
 import { getStackClient } from "@/lib/stackEngine";
 import { getInstallStatus } from "@/lib/installStatus";
 import { InstallStatusSchema } from "@/routes/install";
@@ -111,6 +112,21 @@ setupRoutes.openapi(installStartRoute, async (c) => {
   const result = await beginInstall(vramGb, true);
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   return c.json({ started: true as const, models: result.models }, 202);
+});
+
+const engineInstallRoute = createRoute({
+  method: "post", path: "/engine-install", tags: ["Setup"], summary: "Start (or restart) installing the AI engine on this computer",
+  responses: {
+    202: { content: { "application/json": { schema: z.object({ started: z.literal(true) }) } }, description: "The engine install is running. Nothing happens when this computer already has an engine or the AI runs on another computer." },
+    409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "Home could not start the install." },
+  },
+});
+setupRoutes.openapi(engineInstallRoute, (c) => {
+  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "Change the AI under Home settings." }, 409);
+  if (!engineNeedsInstall()) return c.json({ started: true as const }, 202);
+  const started = startEngineInstall();
+  if (!started.ok) return c.json({ error: started.error, next: started.next }, 409);
+  return c.json({ started: true as const }, 202);
 });
 
 const useSearchCandidateRoute = createRoute({
@@ -396,5 +412,11 @@ setupRoutes.openapi(setupStepRoute, async (c) => {
     storageChoice = layout;
   }
   const updated = replaceSetupStep(step, { ...stepResult, ...(storageChoice ? { storageChoice } : {}) });
+  // "This computer runs the AI" is the moment the MaiPai Stack gets built
+  // (INSTALL-SPLIT-01). "Another computer" installs nothing here. Before an
+  // owner exists only: later changes go through Home settings.
+  if (step === "engine_location" && stepResult.status === "done" && !anyone && updated.engine.where === "this_computer" && engineNeedsInstall()) {
+    startEngineInstall();
+  }
   return c.json(updated, 200);
 });

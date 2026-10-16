@@ -8,7 +8,7 @@ export const HOME_STACK_PORT = DEFAULT_STACK_PORT;
 export type StackServiceCommand = "start" | "stop";
 export type StackServiceRunner = (binary: string, command: StackServiceCommand, env: NodeJS.ProcessEnv) => void;
 
-function installRoot(): string {
+export function installRoot(): string {
   if (process.env.MAIPAI_INSTALL_ROOT) return process.env.MAIPAI_INSTALL_ROOT;
   return process.platform === "darwin" ? "/usr/local/maipai-home" : "/opt/maipai-home";
 }

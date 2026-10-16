@@ -21895,6 +21895,8 @@
                       "type": "string",
                       "enum": [
                         "none",
+                        "installing_engine",
+                        "engine_failed",
                         "downloading",
                         "starter_ready",
                         "stalled",
@@ -21929,6 +21931,14 @@
                       "nullable": true
                     },
                     "problem": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stageLabel": {
                       "type": "string",
                       "nullable": true
                     },
@@ -21987,6 +21997,8 @@
                     "bytesPerSecond",
                     "etaSeconds",
                     "problem",
+                    "stage",
+                    "stageLabel",
                     "items"
                   ]
                 }
@@ -22146,6 +22158,58 @@
                   },
                   "required": [
                     "wording"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/engine-install": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Start (or restart) installing the AI engine on this computer",
+        "responses": {
+          "202": {
+            "description": "The engine install is running. Nothing happens when this computer already has an engine or the AI runs on another computer.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "started": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "started"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Home could not start the install.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "next": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }
@@ -23529,6 +23593,8 @@
                       "type": "string",
                       "enum": [
                         "none",
+                        "installing_engine",
+                        "engine_failed",
                         "downloading",
                         "starter_ready",
                         "stalled",
@@ -23563,6 +23629,14 @@
                       "nullable": true
                     },
                     "problem": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stageLabel": {
                       "type": "string",
                       "nullable": true
                     },
@@ -23621,6 +23695,8 @@
                     "bytesPerSecond",
                     "etaSeconds",
                     "problem",
+                    "stage",
+                    "stageLabel",
                     "items"
                   ]
                 }
@@ -23678,6 +23754,16 @@
           },
           "403": {
             "description": "Only an owner or admin may do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The AI engine install could not be started",
             "content": {
               "application/json": {
                 "schema": {
