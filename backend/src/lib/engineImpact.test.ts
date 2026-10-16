@@ -42,7 +42,7 @@ describe("engineImpact", () => {
     proposal.hardware.graphicsMemoryBytes = null;
     const result = engineImpact(proposal);
     expect(result.fits).toBeNull();
-    expect(result.memoryQuestion).toContain("How much video memory");
+    expect(result.memoryQuestion).toContain("memory limit has not been measured");
   });
 
   test("asks for total video memory when unified memory is missing a reading", () => {
@@ -51,7 +51,7 @@ describe("engineImpact", () => {
     proposal.hardware.systemMemoryBytes = null;
     const result = engineImpact(proposal);
     expect(result.fits).toBeNull();
-    expect(result.memoryQuestion).toContain("How much video memory");
+    expect(result.memoryQuestion).toContain("memory limit has not been measured");
   });
 
   test("reports freed memory and the trade when a role is turned off", () => {
@@ -60,5 +60,16 @@ describe("engineImpact", () => {
     const result = engineImpact(proposal);
     expect(result.freedBytes).toBe(3 * 1024 ** 3);
     expect(result.trade).toContain("chat can use a bigger model");
+  });
+
+  test("keeps measured roles visible without inventing a cost for an unmeasured role", () => {
+    const proposal = base();
+    proposal.roles[0]!.choices[0]!.memoryBytes = null;
+    const result = engineImpact(proposal);
+    expect(result.fits).toBeNull();
+    expect(result.roles[0]?.memoryBytes).toBeNull();
+    expect(result.roles[0]?.impact).toContain("has not been measured");
+    expect(result.roles[1]?.memoryBytes).toBe(3 * 1024 ** 3);
+    expect(result.trade).toBeNull();
   });
 });
