@@ -214,6 +214,9 @@ commons_archive_sha256() {
   case "$1" in
     core-v0.1.0) printf '%s\n' "d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4" ;;
     spec-v0.1.136) printf '%s\n' "5dece57ae0495d27f8c3e565b7de14217e0f5d1495b0a09feee7e10b625e4342" ;;
+    core-v0.1.5) printf '%s\n' "d2fb1699c872ae0200fec895cc2b29f44d4134520e5c2dc903fd5a8c1719be17" ;;
+    spec-v0.1.151) printf '%s\n' "1b00dce8dd76676e626f055b4f0aa4a9e33935c3a30c1e8a79401656d05f005f" ;;
+    ui-v0.5.231) printf '%s\n' "d52dc6e8ac64f2b5b50c8b9d53267d3459c68baa32ab9240b37cd4b1c0c62dd1" ;;
     *) return 1 ;;
   esac
 }
@@ -222,21 +225,22 @@ commons_archive_sha256() {
 # file:../../commons-tags/<dir>/<package> with <dir> = <package>-<tag>. This is the one place the pins
 # come from, so they cannot drift from the Stack at STACK_TAG.
 stack_commons_deps() {
-  local manifest="$1" line pkg dir leaf tag found=0
+  local manifest="$1" label="${2:-}" line pkg dir leaf tag found=0
+  [ -n "$label" ] || label="The Stack's backend/package.json"
   while IFS= read -r line; do
     pkg=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\1#p')
     dir=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\2#p')
     leaf=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\3#p')
     [ -n "$pkg" ] || continue
     if [ "$leaf" != "$pkg" ] || [ "${dir#"${pkg}-"}" = "$dir" ]; then
-      log "The Stack's backend/package.json names @maipai/${pkg} as ${dir}/${leaf}, which is not <package>-<tag>/<package>. The Stack was bumped to a layout this script does not know; update stack_commons_deps in scripts/install.sh and scripts/engine-computer/maipai-engine."
+      log "${label} names @maipai/${pkg} as ${dir}/${leaf}, which is not <package>-<tag>/<package>. The Stack was bumped to a layout this script does not know; update stack_commons_deps in scripts/install.sh and scripts/engine-computer/maipai-engine."
       return 1
     fi
     tag="${dir#"${pkg}-"}"
     printf '%s %s %s\n' "$pkg" "$dir" "$tag"
     found=1
   done < "$manifest"
-  [ "$found" = 1 ] || { log "The Stack's backend/package.json names no Commons package under ../../commons-tags/. Check that STACK_TAG points at the Stack commit this installer was written for."; return 1; }
+  [ "$found" = 1 ] || { log "${label} names no Commons package under ../../commons-tags/. Check that this installer matches the source it fetched."; return 1; }
 }
 
 # One Commons package into <workspace>/commons-tags/<dir>/<package>, the place the Stack's
@@ -244,7 +248,7 @@ stack_commons_deps() {
 fetch_one_stack_commons() {
   local work="$1" pkg="$2" dir="$3" tag="$4" expected actual tmp dest="$1/commons-tags/$3"
   if ! expected=$(commons_archive_sha256 "$tag"); then
-    log "The Stack needs Commons ${tag}, and this script has no pinned SHA-256 for it. Add the SHA-256 of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run this again."
+    log "Commons ${tag} is pinned by a package.json, and this script has no pinned SHA-256 for it. Add the SHA-256 of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run this again."
     return 1
   fi
   tmp=$(mktemp -d)

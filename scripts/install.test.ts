@@ -206,6 +206,57 @@ describe("fetch_stack_commons", () => {
     }
   });
 
+  // Home's own pins: a bump in backend/ or frontend/ package.json without a digest here breaks every fresh install.
+  const HOME_ROOT = join(import.meta.dir, "..");
+  test("every Commons pin in Home's backend and frontend package.json has a pinned digest", () => {
+    let seen = 0;
+    for (const m of ["backend", "frontend"]) {
+      const text = readFileSync(join(HOME_ROOT, m, "package.json"), "utf8");
+      const out = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; stack_commons_deps "$MANIFEST"`], { env: { ...process.env, MANIFEST: join(HOME_ROOT, m, "package.json") } });
+      expect(out.exitCode, out.stdout.toString()).toBe(0);
+      for (const line of out.stdout.toString().trim().split("\n")) {
+        const [pkg, dir, ctag] = line.split(" ");
+        seen++;
+        expect(text).toContain(`"file:../../commons-tags/${dir}/${pkg}"`);
+        for (const script of [INSTALL_SH, ENGINE_HELPER]) {
+          expect(Bun.spawnSync(["bash", "-c", `source "${script}"; commons_archive_sha256 "${ctag}"`]).exitCode, `${m}/package.json pins ${ctag} but ${script} has no digest for it: add the SHA-256 of its GitHub archive to commons_archive_sha256`).toBe(0);
+        }
+      }
+    }
+    expect(seen).toBeGreaterThanOrEqual(4);
+  });
+
+  test("fetch_home_commons stages every tag both Home manifests name beside the install root, once each", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-home-commons-"));
+    try {
+      const prefix = join(root, "prefix");
+      const install = join(prefix, "maipai-home");
+      mkdirSync(join(install, "backend"), { recursive: true });
+      mkdirSync(join(install, "frontend"), { recursive: true });
+      writeFileSync(join(install, "backend", "package.json"), JSON.stringify({ dependencies: { "@maipai/core": "file:../../commons-tags/core-core-v0.1.0/core", "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.136/spec" } }, null, 2));
+      writeFileSync(join(install, "frontend", "package.json"), JSON.stringify({ dependencies: { "@maipai/spec": "file:../../commons-tags/spec-spec-v0.1.136/spec", react: "^19" } }, null, 2));
+      const { digests } = commonsFixture(root);
+      const run = (digestOverride?: string) => Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; n=0; curl() { n=$((n+1)); echo "$2" >> "$ROOT/urls"; case "$2" in *core-v0.1.0*) cp "$ROOT/core-v0.1.0.tar.gz" "$4";; *spec-v0.1.136*) cp "$ROOT/spec-v0.1.136.tar.gz" "$4";; *) return 22;; esac; }; commons_archive_sha256() { case "$1" in core-v0.1.0) echo "$CORE_SHA";; spec-v0.1.136) echo "$SPEC_SHA";; *) return 1;; esac; }; fetch_home_commons "$INSTALL"`], {
+        env: { ...process.env, ROOT: root, INSTALL: install, CORE_SHA: digestOverride ?? digests["core-v0.1.0"]!, SPEC_SHA: digests["spec-v0.1.136"]!, TMPDIR: root },
+      });
+      const bad = run("0".repeat(64));
+      expect(bad.exitCode).not.toBe(0);
+      expect(bad.stdout.toString()).toContain("SHA-256 mismatch");
+      expect(existsSync(join(prefix, "commons-tags", "core-core-v0.1.0", "core", "package.json"))).toBe(false);
+      const ok = run();
+      expect(ok.exitCode, ok.stdout.toString() + ok.stderr.toString()).toBe(0);
+      for (const rel of ["core-core-v0.1.0/core", "spec-spec-v0.1.136/spec"]) {
+        const resolved = join(install, "backend", "../../commons-tags", rel);
+        expect(readFileSync(join(resolved, "package.json"), "utf8")).toContain("@maipai/");
+      }
+      // spec is named by both manifests but downloaded once; core once; the failed run above fetched core only.
+      const urls = readFileSync(join(root, "urls"), "utf8").trim().split("\n");
+      expect(urls.filter((u) => u.includes("spec-v0.1.136")).length).toBe(1);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
   test("dry-run prints the Commons tags and their verified archive digests without fetching", () => {
     const result = bashCall('fetch_stack_commons /tmp/maipai-stack yes');
     expect(result.exitCode).toBe(0);

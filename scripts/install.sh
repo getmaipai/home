@@ -458,8 +458,32 @@ fetch_release_source() {
   rm -rf "$tmp"
 }
 
+# Home's own backend/ and frontend/ package.json name their Commons packages as
+# file:../../commons-tags/<package>-<tag>/<package>, which resolves to <parent of the install
+# root>/commons-tags (/usr/local/commons-tags on macOS, /opt/commons-tags on Linux). A release
+# tarball does not carry them, so stage each one (digest-checked) before bun install runs. The
+# pins are read from the manifests, so they cannot drift; a test fails when one has no digest.
+fetch_home_commons() {
+  local dir="$1" work deps pkg cdir tag m
+  work=$(dirname "$dir")
+  local one all=""
+  for m in backend frontend; do
+    [ -f "${dir}/${m}/package.json" ] || continue
+    grep -q 'file:\.\./\.\./commons-tags/' "${dir}/${m}/package.json" || continue
+    one=$(stack_commons_deps "${dir}/${m}/package.json" "Home's ${m}/package.json") || { printf '%s\n' "$one"; return 1; }
+    all="${all}${one}"$'\n'
+  done
+  deps=$(printf '%s' "$all" | sort -u)
+  while read -r pkg cdir tag; do
+    [ -n "$pkg" ] || continue
+    if [ -f "${work}/commons-tags/${cdir}/${pkg}/package.json" ]; then continue; fi
+    fetch_one_stack_commons "$work" "$pkg" "$cdir" "$tag" || return 1
+  done <<< "$deps"
+}
+
 build_app() {
   local dir="$1" bun_bin="$2"
+  fetch_home_commons "$dir" || die "could not fetch the Commons packages Home needs. Read the message above, fix what it names, then run the installer again."
   log "Installing dependencies and building the frontend (this can take a minute)..."
   (cd "$dir/backend" && "$bun_bin" install --production)
   (cd "$dir/frontend" && "$bun_bin" install && "$bun_bin" run build)
@@ -666,6 +690,9 @@ commons_archive_sha256() {
   case "$1" in
     core-v0.1.0) printf '%s\n' "d3c60aec818e73c00079e5a819d86477ecb590a0172f214a0aee80890d8427f4" ;;
     spec-v0.1.136) printf '%s\n' "5dece57ae0495d27f8c3e565b7de14217e0f5d1495b0a09feee7e10b625e4342" ;;
+    core-v0.1.5) printf '%s\n' "d2fb1699c872ae0200fec895cc2b29f44d4134520e5c2dc903fd5a8c1719be17" ;;
+    spec-v0.1.151) printf '%s\n' "1b00dce8dd76676e626f055b4f0aa4a9e33935c3a30c1e8a79401656d05f005f" ;;
+    ui-v0.5.231) printf '%s\n' "d52dc6e8ac64f2b5b50c8b9d53267d3459c68baa32ab9240b37cd4b1c0c62dd1" ;;
     *) return 1 ;;
   esac
 }
@@ -674,21 +701,22 @@ commons_archive_sha256() {
 # file:../../commons-tags/<dir>/<package> with <dir> = <package>-<tag>. This is the one place the pins
 # come from, so they cannot drift from the Stack at STACK_TAG.
 stack_commons_deps() {
-  local manifest="$1" line pkg dir leaf tag found=0
+  local manifest="$1" label="${2:-}" line pkg dir leaf tag found=0
+  [ -n "$label" ] || label="The Stack's backend/package.json"
   while IFS= read -r line; do
     pkg=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\1#p')
     dir=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\2#p')
     leaf=$(printf '%s\n' "$line" | sed -n 's#.*"@maipai/\([a-z][a-z0-9-]*\)"[[:space:]]*:[[:space:]]*"file:\.\./\.\./commons-tags/\([^/"]*\)/\([^/"]*\)".*#\3#p')
     [ -n "$pkg" ] || continue
     if [ "$leaf" != "$pkg" ] || [ "${dir#"${pkg}-"}" = "$dir" ]; then
-      log "The Stack's backend/package.json names @maipai/${pkg} as ${dir}/${leaf}, which is not <package>-<tag>/<package>. The Stack was bumped to a layout this script does not know; update stack_commons_deps in scripts/install.sh and scripts/engine-computer/maipai-engine."
+      log "${label} names @maipai/${pkg} as ${dir}/${leaf}, which is not <package>-<tag>/<package>. The Stack was bumped to a layout this script does not know; update stack_commons_deps in scripts/install.sh and scripts/engine-computer/maipai-engine."
       return 1
     fi
     tag="${dir#"${pkg}-"}"
     printf '%s %s %s\n' "$pkg" "$dir" "$tag"
     found=1
   done < "$manifest"
-  [ "$found" = 1 ] || { log "The Stack's backend/package.json names no Commons package under ../../commons-tags/. Check that STACK_TAG points at the Stack commit this installer was written for."; return 1; }
+  [ "$found" = 1 ] || { log "${label} names no Commons package under ../../commons-tags/. Check that this installer matches the source it fetched."; return 1; }
 }
 
 sha256_file() {
@@ -705,7 +733,7 @@ sha256_file() {
 fetch_one_stack_commons() {
   local work="$1" pkg="$2" dir="$3" tag="$4" expected actual tmp dest="$1/commons-tags/$3"
   if ! expected=$(commons_archive_sha256 "$tag"); then
-    log "The Stack needs Commons ${tag}, and this script has no pinned SHA-256 for it. Add the SHA-256 of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run this again."
+    log "Commons ${tag} is pinned by a package.json, and this script has no pinned SHA-256 for it. Add the SHA-256 of https://github.com/getmaipai/commons/archive/refs/tags/${tag}.tar.gz to commons_archive_sha256 in scripts/install.sh and scripts/engine-computer/maipai-engine, then run this again."
     return 1
   fi
   tmp=$(mktemp -d)
