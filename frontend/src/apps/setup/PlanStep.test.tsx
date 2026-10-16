@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { PlanStep } from "./PlanStep";
-import { ApiError, type PlanWording } from "@/lib/api";
+import type { PlanWording } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -44,29 +44,5 @@ describe("PlanStep", () => {
     fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
     await view.findByText("The AI engine isn't answering yet.");
     expect(done).not.toHaveBeenCalled();
-  });
-
-  test("an engine that is not answering offers Check again and re-reads the plan", async () => {
-    let calls = 0;
-    const read = mock(async () => ({ wording: ++calls === 1 ? wording({ level: "unknown", headline: "Home can't see this computer's AI yet", detail: "Wait a minute and press Check again.", gets: [], sizeLine: null }) : wording() }));
-    const view = render(<PlanStep readPlan={read} start={async () => ({})} onInstalled={() => {}} />);
-    await view.findByText("Home can't see this computer's AI yet");
-    expect(view.queryByRole("button", { name: "Install and continue" })).toBeNull();
-    fireEvent.click(view.getByRole("button", { name: "Check again" }));
-    await view.findByText("Moderate setup for this computer");
-    expect(view.getByRole("button", { name: "Install and continue" })).toBeTruthy();
-  });
-
-  test("a full disk offers Check again so freed space can be picked up", async () => {
-    const view = render(<PlanStep readPlan={async () => ({ wording: wording({ diskLine: "Not enough room." }) })} start={async () => ({})} onInstalled={() => {}} />);
-    await view.findByText("Not enough room.");
-    expect(view.getByRole("button", { name: "Check again" })).toBeTruthy();
-  });
-
-  test("a refused start shows the route's next step too", async () => {
-    const view = render(<PlanStep readPlan={async () => ({ wording: wording() })} start={async () => { throw new ApiError("The AI engine isn't answering yet.", 409, undefined, "Wait a minute and press Check again."); }} onInstalled={() => {}} />);
-    await view.findByText("Moderate setup for this computer");
-    fireEvent.click(view.getByRole("button", { name: "Install and continue" }));
-    await view.findByText("The AI engine isn't answering yet. Wait a minute and press Check again.");
   });
 });

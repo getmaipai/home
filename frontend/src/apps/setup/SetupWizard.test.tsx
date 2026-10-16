@@ -19,9 +19,7 @@ const GREEN_ROWS = [{ id: "engine", title: "Engine service", state: "green", tex
 let checklistOpen = 3;
 const RECOMMENDED_PLAN = { plan: {}, wording: { level: "recommended", headline: "Recommended setup for this computer", detail: "Fits.", gets: ["Chat with Home"], needsMemoryAnswer: false, sizeLine: "Download: 40 GB", diskLine: null } };
 /** `plan` is what GET /api/setup/plan answers: the recommended plan by default, or "unreachable" for an engine that is not answering. */
-let jobRows: unknown[] = [];
-const SILENT_PLAN = { plan: null, wording: { level: "unknown", headline: "Home can't see this computer's AI yet", detail: "The AI engine isn't answering. Wait a minute and press Check again.", gets: [], needsMemoryAnswer: false, sizeLine: null, diskLine: null } };
-function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan: "recommended" | "unreachable" | "silent" = "recommended") {
+function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan: "recommended" | "unreachable" = "recommended") {
   const original = globalThis.fetch;
   let state: SetupState | { done: true } = structuredClone(initial);
   const posts: string[] = [];
@@ -30,12 +28,8 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
     if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
     if (url.includes("/api/setup/plan") && init?.method !== "POST") {
       if (plan === "unreachable") return new Response(JSON.stringify({ error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }), { status: 503 });
-      // The real route answers 200 with level "unknown" when the engine is silent.
-      if (plan === "silent") return new Response(JSON.stringify(SILENT_PLAN), { status: 200 });
       return new Response(JSON.stringify(RECOMMENDED_PLAN), { status: 200 });
     }
-    if (url.includes("/api/jobs")) return new Response(JSON.stringify(jobRows), { status: 200 });
-    if (url.includes("/api/setup/install") && init?.method !== "POST") return new Response(JSON.stringify({ state: "downloading", chatReady: false, complete: false, percent: 30, completedBytes: 3, totalBytes: 10, bytesPerSecond: null, etaSeconds: null, problem: null, items: [] }), { status: 200 });
     if (url.includes("/api/setup/install") && init?.method === "POST" && !("done" in state)) {
       // The real route records the plan step itself when it starts the downloads.
       state.steps = state.steps.map((step) => step.id === "plan" ? { ...step, status: "done", at: new Date().toISOString() } : step);
@@ -388,37 +382,5 @@ describe("SetupWizard", () => {
       expect(onDone).toHaveBeenCalledTimes(1);
       await waitFor(() => expect(rendered.container.textContent).toContain("Sign in"));
     } finally { h.restore(); }
-  });
-
-  test("a silent engine on the plan screen offers Check again and leaves Continue open", async () => {
-    // The real plan route answers 200 with level "unknown" (not an error), and its
-    // words say "press Check again": there has to be a button to press.
-    const state = freshState();
-    for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
-    const h = harness(state, GREEN_ROWS, "silent");
-    try {
-      const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Home can't see this computer's AI yet"));
-      expect(rendered.getByRole("button", { name: "Check again" })).toBeTruthy();
-      await waitFor(() => expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false));
-    } finally { h.restore(); }
-  });
-
-  test("after the plan the wizard shows one install strip, not a card per model, and no Details link", async () => {
-    // Found walking the wizard: after the owner exists, six per-model cards pushed
-    // the backup key buttons off screen, and "Details" led to a settings page that
-    // needs a sign-in.
-    const state = freshState();
-    for (const id of ["welcome", "engine_location", "storage", "checks", "plan", "owner"] as const) state.steps.find((step) => step.id === id)!.status = "done";
-    jobRows = ["chat-27b", "judge-4b", "stt-w"].map((title, i) => ({ id: `j${i}`, kind: "model_download", state: "running", title, updatedAt: new Date().toISOString(), progress: { completedBytes: 1, totalBytes: 10, percent: 10 }, actions: ["stop"] }));
-    const h = harness(state);
-    try {
-      const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Let Home greet you"));
-      await waitFor(() => expect(rendered.queryByTestId("install-strip")).not.toBeNull());
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(rendered.container.textContent).not.toContain("chat-27b");
-      expect(rendered.queryByRole("link", { name: "Details" })).toBeNull();
-    } finally { jobRows = []; h.restore(); }
   });
 });

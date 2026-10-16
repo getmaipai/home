@@ -11,7 +11,7 @@ export function InstallPlanSection() {
   return (
     <section aria-labelledby="install-plan-heading" className="flex flex-col gap-3">
       <h2 id="install-plan-heading" className="text-lg font-semibold">Install the AI for this computer</h2>
-      <InstallStrip detailsHref={null} />
+      <InstallStrip />
       {started ? <p role="status">Downloading started. You can keep using Home while it finishes.</p> : null}
       <PlanStep readPlan={api.installPlan} start={api.installStart} actionLabel="Download what's missing" onInstalled={() => setStarted(true)} />
     </section>

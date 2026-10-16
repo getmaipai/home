@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Wizard, type WizardStep } from "@maipai/ui/src/primitives/Wizard";
+import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { CheckGrid } from "./CheckGrid";
@@ -10,6 +11,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@m
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { api, ApiError } from "@/lib/api";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
+import { isVisibleModelDownload, modelDownloadProgress, useModelDownloadJobs } from "@/lib/modelDownloadProgress";
 import { setupChecklistCountLine } from "@/shell/useSetupChecklist";
 import { SetupPreviewBar } from "./preview/SetupPreviewBar";
 import { useIsDark } from "@/shell/ThemeToggle";
@@ -106,6 +108,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const ownerFormRef = useRef<HTMLFormElement>(null);
   const dark = useIsDark();
   const navigate = useNavigate();
+  const downloads = useModelDownloadJobs();
   const [state, setState] = useState<SetupState | null>(null);
   const [screen, setScreen] = useState<ScreenId>(initialScreen ?? "welcome");
   const [loading, setLoading] = useState(true);
@@ -394,17 +397,17 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "face": body = <Card><CardContent><p>Face data stays on this computer. You can turn on face greetings now or later in your profile.</p></CardContent></Card>; break;
     case "hello": body = <Card><CardContent><p>You can talk with Home as soon as setup is finished.</p></CardContent></Card>; break;
     case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void printEmergencyKit()}>Print</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey || busy} onClick={() => void confirmBackupKeySaved()}>I saved my backup key</Button>{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}{backupSavedError ? <p role="alert">Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</CardContent></Card>; break;
-    case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
+    case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>Start a chat, add people, or choose apps whenever you're ready.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
-  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("plan")) body = <><InstallStrip detailsHref={null} read={api.setupInstallStatus} retry={state && stepIsDone(state, "owner") ? api.installRetry : () => api.setupInstall()} />{body}</>;
+  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("plan")) body = <><InstallStrip detailsHref="/settings/home/ai" read={api.setupInstallStatus} />{body}</>;
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const currentPhaseIndex = phase === "meet" ? 1 : 0;
   const screenIndex = SCREEN_IDS.indexOf(screen);
   const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
   const previewBanner = window.__setupPreview ? <SetupPreviewBar currentScreen={screenIndex + 1} onJump={(index) => setScreen(SCREEN_IDS[Math.max(0, Math.min(SCREEN_IDS.length - 1, index))]!)} /> : undefined;
   const art = SCREEN_ART[screen];
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "plan" ? planBlocksContinue && !planInstalled.current && !stepIsDone(state, "plan") : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={false} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "plan" ? planBlocksContinue && !planInstalled.current && !stepIsDone(state, "plan") : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={false} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{downloads.filter((job) => isVisibleModelDownload(job)).map((job) => <JobProgress key={job.id} {...modelDownloadProgress(job)} variant="compact" cancelable={job.actions?.includes("stop")} onCancel={job.actions?.includes("stop") ? () => { void api.stopJob(job.id); } : undefined} />)}{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {

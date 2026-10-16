@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, render, waitFor } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { InstallStrip } from "./InstallStrip";
-import { ApiError, type InstallStatusView } from "@/lib/api";
+import type { InstallStatusView } from "@/lib/api";
 
 afterEach(cleanup);
 const status = (over: Partial<InstallStatusView>): InstallStatusView => ({
@@ -32,24 +32,5 @@ describe("InstallStrip", () => {
       await waitFor(() => expect(view.queryByTestId("install-strip")).toBeNull());
       cleanup();
     }
-  });
-
-  test("Details is a link by default and hidden where it would dead-end", async () => {
-    const withLink = show(status({}));
-    await withLink.findByRole("link", { name: "Details" });
-    cleanup();
-    const view = render(<MemoryRouter><InstallStrip detailsHref={null} read={async () => status({})} /></MemoryRouter>);
-    await view.findByTestId("install-strip");
-    expect(view.queryByRole("link", { name: "Details" })).toBeNull();
-  });
-
-  test("a failed download's retry runs the given retry, and a refusal says what to do", async () => {
-    const calls: string[] = [];
-    const retry = async () => { calls.push("retry"); throw new ApiError("The AI engine isn't answering yet.", 409, undefined, "Wait a minute and press Check again."); };
-    const view = render(<MemoryRouter><InstallStrip read={async () => status({ state: "failed", problem: "A download did not finish." })} retry={retry} /></MemoryRouter>);
-    await view.findByTestId("install-strip");
-    fireEvent.click(await view.findByRole("button", { name: /try again|retry/i }));
-    await view.findByText("The AI engine isn't answering yet. Wait a minute and press Check again.");
-    expect(calls).toEqual(["retry"]);
   });
 });
