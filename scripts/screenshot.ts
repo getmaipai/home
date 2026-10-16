@@ -177,6 +177,7 @@ const TRAIL_THUMBNAIL_PNG_BASE64 =
 
 const a11yOnly = process.argv.includes("--a11y-only");
 const filesReview = process.argv.includes("--files-review");
+const referenceReview = process.argv.includes("--reference-review");
 // Focused review retains the same seeded data, readiness, and a11y checks.
 const chatFocusReview = process.argv.includes("--chat-focus-review");
 const chatModeReview = process.argv.includes("--chat-mode-review");
@@ -421,6 +422,8 @@ const ROUTES: RouteSpec[] = [
   { slug: "settings-users", path: "/users" },
   { slug: "settings-devices", path: "/devices" },
   { slug: "files", path: "/files" },
+  { slug: "reference", path: "/reference" },
+  { slug: "reference-article", path: "/reference/wikipedia/A/Aspen" },
   { slug: "settings-repairs", path: "/repairs" },
   { slug: "settings-updates", path: "/updates" },
 ];
@@ -886,6 +889,24 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
   const page = await context.newPage();
   page.setDefaultTimeout(PAGE_VISIT_TIMEOUT_MS);
   try {
+    if (route.slug === "reference" || route.slug === "reference-article") {
+      const book = { id: "wikipedia", source_label: "Wikipedia (English, top articles)", language: "English", size_bytes: 1_800_000_000, snapshot_date: "2026-08-01", licence: "CC BY-SA 4.0", article_count: 52_000 };
+      await page.route("**/api/reference/books", (request) => request.fulfill({ status: 200, json: [book, { ...book, id: "wikibooks", source_label: "Wikibooks (English)", size_bytes: 640_000_000, article_count: 3_100 }] }));
+      await page.route("**/api/reference/article/**", (request) => request.fulfill({ status: 200, json: {
+        title: "Aspen", book: "wikipedia", path: "A/Aspen", source_label: book.source_label, licence: book.licence, snapshot_date: book.snapshot_date,
+        toc: [{ id: "overview", title: "Overview", level: 2 }, { id: "range", title: "Range and habitat", level: 2 }, { id: "uses", title: "Uses", level: 2 }],
+        blocks: [
+          { type: "paragraph", inlines: ["Aspens are ", { type: "strong", text: "deciduous trees" }, " of the genus ", { type: "link", text: "Populus", book: "wikipedia", path: "A/Populus" }, ", known for leaves that tremble in the wind."] },
+          { type: "rows", rows: [{ label: "Kingdom", value: "Plantae" }, { label: "Family", value: "Salicaceae" }] },
+          { type: "heading", level: 2, id: "overview", text: "Overview" },
+          { type: "paragraph", inlines: ["Stands of aspen often grow from one shared root system, so a whole grove can be a single organism."] },
+          { type: "heading", level: 2, id: "range", text: "Range and habitat" },
+          { type: "list", ordered: false, items: [["North America"], ["Europe"], ["Northern Asia"]] },
+          { type: "heading", level: 2, id: "uses", text: "Uses" },
+          { type: "table", headers: ["Use", "Notes"], rows: [["Pulp", "Paper and board"], ["Timber", "Matches, pallets"]] },
+        ],
+      } }));
+    }
     if (route.slug === "files") {
       await page.route("**/api/files", (request) => request.fulfill({ status: 200, json: screenshotLibraryFiles() }));
     }
@@ -10723,7 +10744,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
+    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -10752,7 +10773,7 @@ async function main() {
     // browser contexts that would only ever iterate zero routes below.
     const combos = setupReviewCaptures
       ? SETUP_REVIEW_COMBOS
-      : filesReview
+      : filesReview || referenceReview
       ? FILES_REVIEW_COMBOS
       : docsReview || notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
         ? []
@@ -10773,7 +10794,7 @@ async function main() {
       const context = await newContext(launchedBrowser, viewport, combo.theme, sessionValue);
       const comboResult: RunResult[] = [];
       try {
-        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : setupReviewCaptures ? [...ROUTES.filter((entry) => entry.slug === "settings-repairs"), { slug: "setup-review", path: "/setup/review" }] : filesReview ? ROUTES.filter((entry) => entry.slug === "files") : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
+        for (const route of ((chatReview || chatStatsReview || chatResearchReview || chatContinueReview) ? ROUTES.filter((entry) => entry.slug === "chat") : setupReviewCaptures ? [...ROUTES.filter((entry) => entry.slug === "settings-repairs"), { slug: "setup-review", path: "/setup/review" }] : filesReview ? ROUTES.filter((entry) => entry.slug === "files") : referenceReview ? ROUTES.filter((entry) => entry.slug.startsWith("reference")) : settingsReview ? ROUTES.filter((entry) => entry.slug === "settings" || entry.slug === "settings-models") : notificationsReview ? [] : ROUTES)) {
           console.log(`${route.slug} @ ${viewport.slug}/${combo.theme}...`);
           // A hard ceiling around the whole visit, not just Playwright's
           // own actions inside it: `AxeBuilder#analyze()` runs its
@@ -10824,7 +10845,7 @@ async function main() {
     // size of 1 avoids), replacing their results and screenshots with
     // the exercised conversation - the manifest records the real
     // capture script for each, so a stale one is visible, not silent.
-    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
+    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !notificationsReview && !lookReview && !pictureReview && !chatShortcutsReview && !chatMobileSheetReview) {
       console.log("re-visiting chat with a real conversation (phone/dark, desktop/light)...");
       for (const combo of A11Y_ONLY_COMBOS) {
         const viewport = VIEWPORTS.find((v) => v.slug === combo.viewport);

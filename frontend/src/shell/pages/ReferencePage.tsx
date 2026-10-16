@@ -17,7 +17,7 @@ const sizeLabel = (bytes: number | null) => bytes === null ? "Size unavailable" 
 function InlineText({ values }: { values: ReferenceInline[] }) {
   return <>{values.map((value, i) => {
     if (typeof value === "string") return <span key={i}>{value}</span>;
-    if (value.type === "link") return value.book && value.path ? <Link key={i} to={routeFor(value.book, value.path)}>{value.text}</Link> : <span key={i}>{value.text}</span>;
+    if (value.type === "link") return value.book && value.path ? <Link key={i} className="underline underline-offset-2" to={routeFor(value.book, value.path)}>{value.text}</Link> : <span key={i}>{value.text}</span>;
     if (value.type === "strong") return <strong key={i}>{value.text}</strong>;
     if (value.type === "emphasis") return <em key={i}>{value.text}</em>;
     return <span key={i}>{value.text}</span>;
@@ -79,7 +79,7 @@ export function ReferencePage() {
   }
 
   return <Page title={title}>
-    <main className="flex min-w-0 flex-1 flex-col gap-5 p-4">
+    <div className="flex min-w-0 flex-1 flex-col gap-5 p-4">
       {book && path ? <div className="flex flex-wrap items-center gap-2">
         <Button variant="outline" onClick={() => navigate(-1)}>Back</Button>
         <Button variant="outline" onClick={() => navigate(1)}>Forward</Button>
@@ -96,8 +96,8 @@ export function ReferencePage() {
         {unavailable ? <p role="status">This article is not available.</p> : null}
         {articleQuery.isError && !unavailable ? <p role="alert">Could not load this article.</p> : null}
         {articleQuery.data ? <div className="grid min-w-0 gap-6 md:grid-cols-4">
-          {toc.length ? <nav aria-label="Table of contents" className="hidden md:block"><h2 className="mb-2 font-semibold">Contents</h2><List label="Article contents" items={formattedToc} getKey={(item) => item.id} renderItem={(item) => <a href={`#${encodeURIComponent(item.id)}`} className="min-w-0 break-words">{item.label}</a>} /></nav> : null}
-          <article id="reference-article" className="min-w-0 max-w-prose space-y-4">
+          {toc.length ? <nav aria-label="Table of contents" className="hidden md:block"><h2 className="mb-2 font-semibold">Contents</h2><List label="Article contents" items={formattedToc} getKey={(item) => item.id} onSelect={(item) => document.getElementById(item.id)?.scrollIntoView()} renderItem={(item) => <span className="min-w-0 break-words">{item.label}</span>} /></nav> : null}
+          <article id="reference-article" data-touch-target-exempt className="min-w-0 max-w-prose space-y-4">
             <h2 className="text-2xl font-semibold">{articleQuery.data.title}</h2>
             <p className="text-sm text-muted-foreground">{articleQuery.data.source_label}</p>
             <ArticleContent article={articleQuery.data} />
@@ -108,6 +108,6 @@ export function ReferencePage() {
       {!book && resultQuery ? <section aria-label="Search results"><h2 className="text-xl font-semibold">Results for {resultQuery}</h2>{resultsQuery.isPending ? <p role="status">Searching…</p> : null}<List label="Reference search results" items={resultsQuery.data ?? []} getKey={(hit) => `${hit.book}:${hit.path}`} getLabel={(hit) => hit.title} onSelect={(hit) => navigate(routeFor(hit.book, hit.path))} renderItem={(hit) => <div className="min-w-0"><p className="font-medium">{hit.title}</p><p className="break-words text-muted-foreground">{hit.snippet}</p></div>} emptyState={{ icon: "book-open", text: "No articles found." }} /></section> : null}
       {!book && !resultQuery ? <section><h2 className="text-xl font-semibold">Your library</h2>{booksQuery.isPending ? <p role="status">Loading library…</p> : null}<div className="grid min-w-0 gap-3 sm:grid-cols-2">{books.map((item) => <Card key={item.id} className="min-w-0 p-4"><h3 className="break-words font-semibold">{item.source_label}</h3><p>{item.language ?? "Language unavailable"} · {sizeLabel(item.size_bytes)}</p><p className="text-muted-foreground">Snapshot {item.snapshot_date ?? "date unavailable"} · {item.article_count.toLocaleString()} articles</p><p className="text-muted-foreground">{item.licence}</p><Button asChild variant="link"><Link to={`/reference/${encodeURIComponent(item.id)}`}>Browse this book</Link></Button></Card>)}</div>{booksQuery.isError ? <p role="alert">Could not load your library.</p> : null}</section> : null}
       {book && !path && !resultQuery ? <section><h2 className="text-xl font-semibold">{books.find((item) => item.id === book)?.source_label ?? "Browse this book"}</h2><p>Search for an article in this book.</p>{query.trim() && !suggestions.length ? <p>No matching article titles.</p> : null}</section> : null}
-    </main>
+    </div>
   </Page>;
 }
