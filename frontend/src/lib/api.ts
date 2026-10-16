@@ -903,10 +903,10 @@ export const api = {
   settingsValues: (scope: string, key?: string) =>
     request<ResolvedSetting[]>(`/api/settings?scope=${encodeURIComponent(scope)}${key ? `&key=${encodeURIComponent(key)}` : ""}`),
   emergencyKit: () => request<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string }>("/api/backups/emergency-kit"),
-  setSetting: (scope: string, key: string, value: unknown) =>
+  setSetting: (scope: string, key: string, value: unknown, confirmRemoval?: boolean) =>
     request<ResolvedSetting>("/api/settings", {
       method: "PUT",
-      body: JSON.stringify({ scope, key, value }),
+      body: JSON.stringify({ scope, key, value, ...(confirmRemoval ? { confirmRemoval } : {}) }),
     }),
   // The community voice catalog (2026-09-04): every real file in
   // `kyutai/tts-voices`, not just the 26 bundled presets.

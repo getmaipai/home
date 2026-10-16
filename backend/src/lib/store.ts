@@ -17,6 +17,7 @@ import { packageInstalls, storeIndexState } from "@/db/schema";
 import { dataDir, installedPackageVersionDir, installStagingDir, isValidPackageId } from "@/lib/paths";
 import { getActiveInstall } from "@/lib/packageResolve";
 import { runSmoke } from "@/lib/smoke";
+import { installRefusal } from "@/lib/capabilities";
 import { killLiveProcessForInstallChange } from "@/lib/denoHost";
 import {
   fetchRawIndex,
@@ -223,13 +224,16 @@ async function installLocked(opts: InstallOptions): Promise<InstallResult> {
   await tar.extract({ file: tarballPath, cwd: staging });
   rmSync(tarballPath);
 
-  let manifest: { id: string; version: string };
+  let manifest: { id: string; version: string; requires?: string[]; optional?: string[] };
   try {
     manifest = JSON.parse(readFileSync(join(staging, "manifest.json"), "utf-8"));
   } catch (err) {
     rmSync(staging, { recursive: true, force: true });
     return { ok: false, error: `unpacked package has no readable manifest.json: ${(err as Error).message}` };
   }
+  // CAP-GATE-01: a package whose required capability the allocation has off is refused, with the reason.
+  const refusal = installRefusal(opts.id, manifest);
+  if (refusal) { rmSync(staging, { recursive: true, force: true }); return { ok: false, error: refusal }; }
   if (manifest.id !== opts.id) {
     rmSync(staging, { recursive: true, force: true });
     return { ok: false, error: `manifest identity mismatch: asked to install ${opts.id}, unpacked manifest declares ${manifest.id}` };

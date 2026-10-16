@@ -98,7 +98,14 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
     setPendingKey(key);
     setWriteError(null);
     try {
-      const updated = await api.setSetting(scopeValue, key, value);
+      let updated: ResolvedSetting;
+      try { updated = await api.setSetting(scopeValue, key, value); }
+      catch (first) {
+        // CAP-GATE-01: turning a role off names the packages it removes; the
+        // person confirms before anything is uninstalled.
+        if (first instanceof ApiError && first.message.includes("users will lose access") && window.confirm(first.message)) updated = await api.setSetting(scopeValue, key, value, true);
+        else throw first;
+      }
       replaceValue(updated);
       return true;
     } catch (e) {

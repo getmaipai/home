@@ -11,6 +11,9 @@ import type { RootMetadata, TargetsMetadata, TimestampMetadata, TargetEntry } fr
 import { makeKeyPair, sign, type KeyPair } from "./support/tufFixtures";
 import { owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { TestClient } from "./client";
+import { reconcileCapabilities, packagesLosingCapability, removalConfirmation } from "@/lib/capabilityReconcile";
 
 // Builds a REAL packed tarball too (tests/support/tufFixtures.ts's own
 // buildFixtureIndex() only builds signed metadata, no actual package
@@ -46,7 +49,7 @@ afterEach(() => {
  * package) or the same id ("weather" - an update to a bundled default,
  * this step's own acceptance scenario) are both real, tested cases. */
 async function buildInstallableFixture(
-  opts: { id: string; version?: string; permissions?: string[]; sourcePackageId?: string; pathPrefix?: string; dir?: string } = {
+  opts: { id: string; version?: string; permissions?: string[]; requires?: string[]; sourcePackageId?: string; pathPrefix?: string; dir?: string } = {
     id: "weather",
   },
 ): Promise<{
@@ -60,6 +63,7 @@ async function buildInstallableFixture(
   const manifest = JSON.parse(readFileSync(join(stagingSrc, "manifest.json"), "utf-8"));
   manifest.id = opts.id;
   manifest.version = version;
+  if (opts.requires) manifest.requires = opts.requires;
   writeFileSync(join(stagingSrc, "manifest.json"), JSON.stringify(manifest));
 
   const targetPath = `${opts.pathPrefix ?? "plugins/utilities"}/${opts.id}/${version}`;
@@ -167,6 +171,49 @@ describe("install", () => {
     });
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("unknown signer");
+  });
+
+  test("CAP-GATE-01: refuses a package whose required capability the allocation has off, and installs it once on", async () => {
+    const { targetPath } = await buildInstallableFixture({ id: "test-store-needs-image", requires: ["image"] });
+    const args = { id: "test-store-needs-image", targetPath, source: { kind: "dir" as const, dir: indexDir }, trust: trust() };
+    setHouseholdSettingValue("engines.image.choice", "off");
+    const refused = await install(args);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(refused.error).toContain("Pictures is off");
+    expect(getActiveInstall("test-store-needs-image")).toBeNull();
+    setHouseholdSettingValue("engines.image.choice", "auto");
+    expect((await install(args)).ok).toBe(true);
+  });
+
+  test("CAP-GATE-01: turning a role off names and removes the store packages that require it, and leaves the rest", async () => {
+    for (const [id, requires] of [["test-store-reconcile-image", ["image"]], ["test-store-reconcile-plain", undefined]] as const) {
+      const { targetPath } = await buildInstallableFixture({ id, requires: requires ? [...requires] : undefined });
+      const done = await install({ id, targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+      expect(done.ok).toBe(true);
+    }
+    expect(packagesLosingCapability()).toEqual([]);
+    setHouseholdSettingValue("engines.image.choice", "off");
+    const losers = packagesLosingCapability();
+    expect(losers.map((l) => l.id)).toEqual(["test-store-reconcile-image"]);
+    expect(removalConfirmation(losers)).toContain("The following will be uninstalled and users will lose access");
+    expect(await reconcileCapabilities()).toEqual(["test-store-reconcile-image"]);
+    expect(getActiveInstall("test-store-reconcile-image")).toBeNull();
+    expect(getActiveInstall("test-store-reconcile-plain")).not.toBeNull();
+  });
+
+  test("CAP-GATE-01: the settings save names the packages first and removes them only once confirmed", async () => {
+    const { targetPath } = await buildInstallableFixture({ id: "test-store-route-image", requires: ["image"] });
+    expect((await install({ id: "test-store-route-image", targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() })).ok).toBe(true);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const off = { scope: "household", key: "engines.image.choice", value: "off" };
+    const first = await owner.request("/api/settings", { method: "PUT", body: off });
+    expect(first.status).toBe(400);
+    expect(((await first.json()) as { error: string }).error).toContain("uninstalled and users will lose access");
+    expect(getActiveInstall("test-store-route-image")).not.toBeNull();
+    const second = await owner.request("/api/settings", { method: "PUT", body: { ...off, confirmRemoval: true } });
+    expect(second.status).toBe(200);
+    expect(getActiveInstall("test-store-route-image")).toBeNull();
   });
 
   test("refuses when the target path is not in the index at all", async () => {

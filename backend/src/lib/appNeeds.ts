@@ -1,5 +1,6 @@
 import { listPackageIds, loadManifestOnly } from "@/lib/plugins";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
 import { serviceComponent } from "@/lib/serviceComponent";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { AppNeed, StatusApp } from "@/lib/statusApps";
@@ -47,10 +48,11 @@ export function listStatusApps(): StatusApp[] {
   if (statusAppsForTests) return statusAppsForTests.map((app) => ({ ...app, needs: [...app.needs] }));
   const packageApps: PackageManifest[] = [];
   const installedServices = new Map<string, AppNeed>();
+  const unavailable = unavailableCapabilities();
   for (const id of listPackageIds()) {
     const result = loadManifestOnly(id);
     if (!result.ok) continue;
-    if (result.value.kind === "app") packageApps.push(result.value);
+    if (result.value.kind === "app" && missingRequired(result.value, unavailable).length === 0) packageApps.push(result.value);
     if (result.value.kind === "plugin") {
       for (const need of BUILT_IN_PLUGIN_SERVICES[id] ?? []) installedServices.set(need.id, need);
     }

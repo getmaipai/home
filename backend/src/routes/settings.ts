@@ -15,6 +15,7 @@ import { validateCustomHosts } from "@/lib/blocklists/customHosts";
 import { checkSearchInstance } from "@/lib/searchInstanceCheck";
 import { applyEngineWhere, validateRemoteEngineSetting, ENGINE_WHERE_KEY, refreshConfiguredEngineLink } from "@/lib/remoteStackSettings";
 import { canBindHubPort, configuredHubPort, configuredLanExposure, HUB_PORT_IN_USE_MESSAGE, HUB_PORT_SETTING } from "@/lib/networkSettings";
+import { packagesLosingCapability, reconcileCapabilities, removalConfirmation } from "@/lib/capabilityReconcile";
 import { detectLanIps } from "@/lib/hubEndpoints";
 import { scheduleHubRestart } from "@/lib/hubRestart";
 import { turnOnTailscaleAccess, setTailscaleRenewalActive } from "@/lib/tailscale";
@@ -108,7 +109,7 @@ const putRoute = createRoute({
     body: {
       content: {
         "application/json": {
-          schema: z.object({ scope: z.string(), key: z.string(), value: z.unknown() }),
+          schema: z.object({ scope: z.string(), key: z.string(), value: z.unknown(), confirmRemoval: z.boolean().optional() }),
         },
       },
     },
@@ -134,10 +135,16 @@ settingsRoutes.openapi(putRoute, async (c) => {
     const hostsRefusal = validateCustomHosts(body.key, body.value);
     if (hostsRefusal) return c.json({ error: hostsRefusal }, 400);
   }
+  // CAP-GATE-01: packages that require what is being turned off are named
+  // first; nothing is saved or removed until the person confirms.
+  const roleOff = body.scope === "household" && body.value === "off" ? /^engines\.([a-z]+)\.choice$/.exec(body.key)?.[1] : undefined;
+  const warning = roleOff ? removalConfirmation(packagesLosingCapability([roleOff])) : null;
+  if (warning && body.confirmRemoval !== true) return c.json({ error: warning }, 400);
   const result = setValue(actor, body.scope, body.key, body.value);
   if (!result.ok) {
     return result.status === 400 ? c.json({ error: result.error }, 400) : c.json({ error: result.error }, 403);
   }
+  if (warning) await reconcileCapabilities();
   if (body.scope === "household" && body.key === "search.searxng_url") await checkSearchInstance({ force: true });
   if (body.scope === "household" && body.key === "network.tailnet_access") {
     if (body.value === true) {

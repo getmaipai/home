@@ -11,6 +11,7 @@ import { PACKAGES_DIR } from "@/lib/paths";
 import { isDirectory } from "@/lib/bundledPackages";
 import type { PersonRow } from "@/types";
 import { requireAuth, requireRole } from "@/middleware/auth";
+import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
 import { listInstalledManifests, listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
@@ -94,11 +95,12 @@ export async function writtenChatToolIds(actor: PersonRow): Promise<Set<string>>
 pluginsRoutes.openapi(skillsRoute, async (c) => {
   const actor = c.get("person");
   const statuses = allPackageStatuses();
+  const unavailable = unavailableCapabilities();
   const offered = await writtenChatToolIds(actor);
   const rows = listPackageIds()
     .map((id) => loadManifestOnly(id))
     .flatMap((loaded) => (loaded.ok ? [loaded.value] : []))
-    .filter((manifest) => SKILL_KINDS.has(manifest.kind) && meetsMinRole(actor.role, manifest.min_role))
+    .filter((manifest) => SKILL_KINDS.has(manifest.kind) && meetsMinRole(actor.role, manifest.min_role) && missingRequired(manifest, unavailable).length === 0)
     .map((manifest) => {
       const status = statuses.get(manifest.id)?.status ?? "enabled";
       const offeredHere = manifest.kind === "project" ? offered.has(START_PROJECT_TOOL_ID) && getProjectType(manifest.id) !== undefined : offered.has(manifest.id);
