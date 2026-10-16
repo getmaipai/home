@@ -85,6 +85,8 @@ export function DevicesSection() {
                   device={r}
                   busy={busy}
                   onSetMuted={(muted) => api.setRobotMuted(r.id, muted).then(() => undefined)}
+                  onStartLiveView={() => api.startRobotLiveView(r.id)}
+                  onStopLiveView={(viewId) => api.stopRobotLiveView(viewId).then(() => undefined)}
                   confirmingRemove={confirming?.kind === "device" && confirming.id === r.id}
                   onRemove={() => setConfirming({ kind: "device", id: r.id, label: r.name })}
                   onConfirmRemove={handleRevoke}

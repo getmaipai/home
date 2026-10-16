@@ -4,7 +4,7 @@ import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
 import { didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { DeviceInfo, SessionInfo } from "@/lib/api";
+import { ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 
 afterEach(cleanup);
 
@@ -362,6 +362,8 @@ describe("DevicesSection", () => {
       onCancelRemove={() => {}}
       busy={false}
       onSetMuted={onSetMuted}
+      onStartLiveView={async () => ({ view_id: "view-1", stream: "/api/devices/live-view/view-1" })}
+      onStopLiveView={async () => {}}
     /></Card>);
     fireEvent.click(view.getByRole("button", { name: "Mute microphone" }));
     await view.findByRole("alert");
@@ -370,5 +372,63 @@ describe("DevicesSection", () => {
     expect(onSetMuted).toHaveBeenNthCalledWith(1, true);
     expect(onSetMuted).toHaveBeenNthCalledWith(2, true);
     expect(view.queryByRole("alert")).toBeNull();
+  });
+  function liveCard(start: () => Promise<{ view_id: string; stream: string }>, stop: (id: string) => Promise<void>) {
+    return render(<Card><RobotBody
+      device={device({
+        id: "robot-live",
+        kind: "robot",
+        name: "Riff",
+        state: { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null },
+      })}
+      onRemove={() => {}}
+      confirmingRemove={false}
+      onConfirmRemove={() => {}}
+      onCancelRemove={() => {}}
+      busy={false}
+      onSetMuted={async () => {}}
+      onStartLiveView={start}
+      onStopLiveView={stop}
+    /></Card>);
+  }
+
+  test("the live view button opens the hub stream and stop closes it", async () => {
+    const stopped: string[] = [];
+    const view = liveCard(
+      async () => ({ view_id: "view-9", stream: "/api/devices/live-view/view-9" }),
+      async (id) => { stopped.push(id); },
+    );
+    fireEvent.click(view.getByRole("button", { name: "Live view" }));
+    // happy-dom cannot load a stream, so the kit preview shows its broken-image state here; the real
+    // <img src> is checked in the browser screenshot. What matters here is the view's own lifecycle.
+    await view.findByTestId("robot-live-view");
+    fireEvent.click(view.getByRole("button", { name: "Stop live view" }));
+    expect(stopped).toEqual(["view-9"]);
+    expect(view.queryByTestId("robot-live-view")).toBeNull();
+    view.unmount();
+    expect(stopped).toEqual(["view-9"]);
+  });
+
+  test("closing the card while a live view is open stops it", async () => {
+    const stopped: string[] = [];
+    const view = liveCard(
+      async () => ({ view_id: "view-10", stream: "/api/devices/live-view/view-10" }),
+      async (id) => { stopped.push(id); },
+    );
+    fireEvent.click(view.getByRole("button", { name: "Live view" }));
+    await view.findByTestId("robot-live-view");
+    view.unmount();
+    expect(stopped).toEqual(["view-10"]);
+  });
+
+  test("a refused live view shows the hub's own reason and no image", async () => {
+    const view = liveCard(
+      async () => { throw new ApiError("Live view is off. An admin can turn it on in the robot settings.", 403); },
+      async () => {},
+    );
+    fireEvent.click(view.getByRole("button", { name: "Live view" }));
+    expect((await view.findByRole("alert")).textContent).toContain("Live view is off");
+    expect(view.queryByTestId("robot-live-view")).toBeNull();
+    expect(view.getByRole("button", { name: "Live view" })).toBeTruthy();
   });
 });

@@ -36990,6 +36990,14 @@ a list by key name until commons adds the flag.) `POST /api/devices/{id}/live-vi
 size: 640x360}`; the robot posts JPEGs to `POST /api/devices/me/stream/{view_id}` (added to the robot session allowlist); the
 starter watches `GET /api/devices/live-view/{view_id}` as multipart JPEG; closing that response, `DELETE`, the 10 minute cap, or
 no viewer within 30 seconds issues `live_view_stop`. Frames are held in memory only and never written to a table. The privacy
-page gains the `platform:robot-live-view` row. Not built: the robot card button in the frontend, and the bot half (cyan Eyes
+page gains the `platform:robot-live-view` row. Not built: the bot half (cyan Eyes
 look, streaming). A viewer closing is noticed when the response is cancelled, which is immediate on a normal socket close and
 otherwise bounded by the 30 second attach grace and the 10 minute cap.
+
+The robot card button (`frontend/src/apps/settings/RobotBody.tsx`): a "Live view" button beside Mute on a reachable robot card
+calls `POST /api/devices/{id}/live-view` and shows `stream` in the kit's `Image.Root` and `Image.Preview` (no className, rule 9);
+"Stop live view", leaving the page, and a 10 minute timer each close it (`DELETE`; the hub also stops when the response is
+cancelled). The button is offered to everyone on a reachable robot card and the hub's own refusal (off, not an adult, not on
+the list) is shown as written, so the frontend carries no second copy of the rule. The footer row wraps, because at 390 px three
+buttons ran off the card. Verified with `bun run screenshots --live-view-review` (desktop and phone, both themes, a stubbed
+one-frame stream; the demo household has no paired robot). Not exercised: a real robot's stream (the bot half).

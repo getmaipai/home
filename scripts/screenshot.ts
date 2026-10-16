@@ -188,6 +188,7 @@ const chatReview = process.argv.includes("--chat-review") || chatFocusReview || 
 const chatStatsReview = process.argv.includes("--chat-stats-review");
 const liveVoiceSessionReview = process.argv.includes("--live-voice-session-review");
 const canvasPaneReview = process.argv.includes("--canvas-pane-review");
+const liveViewReview = process.argv.includes("--live-view-review");
 const chatToolsRowReview = process.argv.includes("--chat-tools-row-review");
 const librarySourcesReview = process.argv.includes("--library-sources-review");
 const specSheetsReview = process.argv.includes("--spec-sheets-review");
@@ -7512,6 +7513,75 @@ async function captureNextChatArtifactReview(browser: Browser, sessionValue: str
   }
 }
 
+/** LIVE-VIEW-01: the robot card's live view button on the Devices page, before and while a view is open,
+ * at desktop and phone in both themes. The seeded household has no paired robot, so the browser request
+ * layer supplies one card and a one-frame stream; the hub's own routes are covered by backend/tests/liveView.test.ts. */
+async function captureLiveViewReview(browser: Browser, sessionValue: string): Promise<void> {
+  const outDir = join(ROOT, "data-scratch", "screenshots", "live-view");
+  mkdirSync(outDir, { recursive: true });
+  const drawSource = `
+    import sharp from "sharp";
+    const scene = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#b9a58f"/><rect y="240" width="640" height="120" fill="#7a5c45"/><rect x="40" y="90" width="160" height="150" fill="#d8cdbd"/><circle cx="470" cy="190" r="70" fill="#f4f4f2"/><rect x="420" y="165" width="100" height="40" rx="18" fill="#1d1d22"/></svg>';
+    console.log((await sharp(Buffer.from(scene)).jpeg().toBuffer()).toString("base64"));
+  `;
+  const drawn = Bun.spawnSync({ cmd: ["bun", "-e", drawSource], cwd: join(ROOT, "backend"), stdout: "pipe", stderr: "pipe" });
+  if (drawn.exitCode !== 0) throw new Error(`captureLiveViewReview: drawing the demo frame failed: ${drawn.stderr.toString()}`);
+  const frame = Buffer.from(drawn.stdout.toString().trim().split("\n").at(-1)!, "base64");
+  const boundary = "maipaiframe";
+  const multipart = Buffer.concat([
+    Buffer.from(`--${boundary}\r\nContent-Type: image/jpeg\r\nContent-Length: ${frame.byteLength}\r\n\r\n`),
+    frame,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ]);
+  for (const slug of ["desktop", "phone"] as const) {
+    const viewport = VIEWPORTS.find((item) => item.slug === slug)!;
+    for (const theme of THEMES) {
+      const context = await newContext(browser, viewport, theme, sessionValue);
+      try {
+        const page = await context.newPage();
+        await page.route("**/api/devices**", async (route) => {
+          const request = route.request();
+          const url = new URL(request.url());
+          if (request.method() === "GET" && url.pathname === "/api/devices") {
+            await route.fulfill({ json: [{
+              id: "device-riff-live", kind: "robot", name: "Riff", area: "Living room",
+              lastSeenAt: "2026-10-16T12:00:00.000Z", createdAt: "2026-10-01T12:00:00.000Z", capabilities: ["mute"],
+              state: { activity: "idle", muted: false, tracking: true, reachable: true, unreachableSince: null, battery_level: 0.82, app_version: "0.1.0", daemon_version: "1.4.2" },
+            }] });
+            return;
+          }
+          if (request.method() === "POST" && url.pathname === "/api/devices/device-riff-live/live-view") {
+            await route.fulfill({ json: { view_id: "view-demo", stream: "/api/devices/live-view/view-demo" } });
+            return;
+          }
+          if (url.pathname === "/api/devices/live-view/view-demo") {
+            if (request.method() === "DELETE") { await route.fulfill({ status: 204 }); return; }
+            await route.fulfill({ status: 200, headers: { "content-type": `multipart/x-mixed-replace; boundary=${boundary}` }, body: multipart });
+            return;
+          }
+          await route.continue();
+        });
+        await page.goto(`${BASE_URL}/devices`);
+        await page.getByTestId("robot-card").waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const before = join(outDir, `live-view-closed-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: before, fullPage: true });
+        console.log(`Wrote ${before}`);
+        await page.getByRole("button", { name: "Live view", exact: true }).click();
+        await page.getByTestId("robot-live-view").waitFor({ timeout: 15000 });
+        await page.getByRole("img", { name: "Live view from Riff's camera" }).waitFor({ timeout: 15000 });
+        await page.getByRole("button", { name: "Stop live view" }).waitFor({ timeout: 15000 });
+        await settleAnimations(page);
+        const after = join(outDir, `live-view-open-${viewport.width}-${theme}.png`);
+        await page.screenshot({ path: after, fullPage: true });
+        console.log(`Wrote ${after}`);
+      } finally {
+        await context.close();
+      }
+    }
+  }
+}
+
 /** ELT-T1-18: a real artifact canvas in the shipped pane variant, with
  * the history column both visible and collapsed at 1440px in light and
  * dark themes. */
@@ -10537,6 +10607,12 @@ async function main() {
       return;
     }
 
+    if (!a11yOnly && liveViewReview) {
+      await captureLiveViewReview(browser, sessionValue);
+      console.log("completed named review: --live-view-review");
+      return;
+    }
+
     if (!a11yOnly && canvasPaneReview) {
       await captureCanvasPaneReview(browser, sessionValue);
       console.log("completed named review: --canvas-pane-review");
@@ -10782,7 +10858,7 @@ async function main() {
       await capturePhoneHeaderFoldReview(browser, sessionValue);
     }
 
-    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !chatToolsRowReview) {
+    if (!a11yOnly && !docsReview && !setupReviewCaptures && !filesReview && !referenceReview && !laneBTouchTargetsReview && !settingsReview && !chatReview && !chatStatsReview && !chatResearchReview && !chatTemporaryReview && !chatContinueReview && !fitVerdictReview && !chatAcceptanceReview && !shellRailReview && !chatThreadActionsReview && !chatListReview && !chatSearchReview && !chatMobileSheetReview && !chatShortcutsReview && !chatFindHeaderAlignmentReview && !chatFindBubbleHoverWidthReview && !chatHeaderTitleReview && !phoneHeaderFoldReview && !nextChatArtifactReview && !nextChatComposerReview && !nextSidebarReview && !notificationsReview && !lookReview && !pictureReview && !showcaseScrollReview && !liveVoiceSessionReview && !canvasPaneReview && !liveViewReview && !chatToolsRowReview) {
       await captureHero(browser, sessionValue);
       const phone = VIEWPORTS.find((v) => v.slug === "phone")!;
       const desktop = VIEWPORTS.find((v) => v.slug === "desktop")!;
@@ -10813,7 +10889,7 @@ async function main() {
       ? SETUP_REVIEW_COMBOS
       : filesReview || referenceReview
       ? FILES_REVIEW_COMBOS
-      : docsReview || notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || chatToolsRowReview
+      : docsReview || notificationsReview || lookReview || pictureReview || fitVerdictReview || laneBTouchTargetsReview || chatShortcutsReview || chatMobileSheetReview || liveVoiceSessionReview || canvasPaneReview || liveViewReview || chatToolsRowReview
         ? []
         : a11yOnly || settingsReview || chatReview || chatStatsReview || chatResearchReview || chatContinueReview || fitVerdictReview
           ? A11Y_ONLY_COMBOS

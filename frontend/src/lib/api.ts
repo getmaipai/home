@@ -776,6 +776,12 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ kind: muted ? "mute" : "unmute" }),
     }),
+  // LIVE-VIEW-01: open and close the hub's live view of one robot's camera. `stream` is the
+  // hub's own multipart JPEG route; the browser shows it in an image and closing it stops the view.
+  startRobotLiveView: (id: string) =>
+    request<{ view_id: string; stream: string }>(`/api/devices/${encodeURIComponent(id)}/live-view`, { method: "POST" }),
+  stopRobotLiveView: (viewId: string) =>
+    request<unknown>(`/api/devices/live-view/${encodeURIComponent(viewId)}`, { method: "DELETE" }),
   approveRobotCode: (code: string, totpToken?: string) =>
     request<{ success: true }>("/api/auth/quick-connect/approve", {
       method: "POST",

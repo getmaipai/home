@@ -3,8 +3,9 @@ import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { CardAction, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
+import { Image } from "@maipai/ui/src/elements/image";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
-import type { DeviceInfo, RobotDeviceState } from "@/lib/api";
+import { ApiError, type DeviceInfo, type RobotDeviceState } from "@/lib/api";
 import { robotCapabilityLabel } from "@/apps/settings/capabilityLabels";
 
 const ACTIVITY_LABELS: Record<RobotDeviceState["activity"], string> = {
@@ -55,6 +56,8 @@ export function RobotBody({
   onCancelRemove,
   busy,
   onSetMuted,
+  onStartLiveView,
+  onStopLiveView,
 }: {
   device: DeviceInfo;
   onRemove: () => void;
@@ -63,6 +66,8 @@ export function RobotBody({
   onCancelRemove: () => void;
   busy: boolean;
   onSetMuted: (muted: boolean) => Promise<void>;
+  onStartLiveView: () => Promise<{ view_id: string; stream: string }>;
+  onStopLiveView: (viewId: string) => Promise<void>;
 }) {
   const state = device.state ?? null;
   const lastPutDownCount = useRef<number | undefined>(state?.put_down_count);
@@ -94,6 +99,43 @@ export function RobotBody({
       setMuteError(true);
     }
   }
+  // LIVE-VIEW-01: the hub refuses (live view off, not an adult, not on the list) with a plain
+  // message, shown as it came. The hub stops a view at 10 minutes; so does this card.
+  const [liveView, setLiveView] = useState<{ viewId: string; stream: string } | null>(null);
+  const [liveStarting, setLiveStarting] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const liveViewId = liveView?.viewId ?? null;
+  const stopRef = useRef(onStopLiveView);
+  stopRef.current = onStopLiveView;
+  async function startLive(): Promise<void> {
+    setLiveError(null);
+    setLiveStarting(true);
+    try {
+      const started = await onStartLiveView();
+      setLiveView({ viewId: started.view_id, stream: started.stream });
+    } catch (err) {
+      setLiveView(null);
+      setLiveError(err instanceof ApiError ? err.message : `Could not open the live view of ${device.name}. Check that it is switched on, then try again.`);
+    } finally {
+      setLiveStarting(false);
+    }
+  }
+  function stopLive(): void {
+    const id = liveViewId;
+    setLiveView(null);
+    if (id) void stopRef.current(id).catch(() => undefined);
+  }
+  useEffect(() => {
+    if (!liveViewId) return;
+    const timer = setTimeout(() => {
+      setLiveView(null);
+      void stopRef.current(liveViewId).catch(() => undefined);
+    }, 10 * 60_000);
+    return () => clearTimeout(timer);
+  }, [liveViewId]);
+  const openViewRef = useRef<string | null>(null);
+  openViewRef.current = liveViewId;
+  useEffect(() => () => { if (openViewRef.current) void stopRef.current(openViewRef.current).catch(() => undefined); }, []);
   const unreachable = state !== null && !state.reachable;
   const showMuted = state !== null && !unreachable && state.muted && (state.activity === "idle" || state.activity === "listening");
   const status = state === null ? "Waiting for first report" : unreachable ? "Not responding" : showMuted ? "Muted" : ACTIVITY_LABELS[state.activity];
@@ -144,6 +186,15 @@ export function RobotBody({
             <Row label="Body software">{state.daemon_version ?? "Unknown"}</Row>
           </dl>
         )}
+        {liveView && liveView.stream ? (
+          <div className="mt-4" data-testid="robot-live-view">
+            <Image.Root size="full">
+              <Image.Preview src={liveView.stream} alt={`Live view from ${device.name}'s camera`} />
+            </Image.Root>
+            <p className="mt-2 text-sm text-muted-foreground">Live view stops by itself after 10 minutes. Nothing is recorded.</p>
+          </div>
+        ) : null}
+        {liveError ? <p role="alert" className="mt-4 text-base text-destructive">{liveError}</p> : null}
         {muteError && state !== null ? (
           <ErrorState
             layout="inline"
@@ -154,7 +205,7 @@ export function RobotBody({
         ) : null}
       </CardContent>
       <CardFooter>
-        <div className="flex w-full items-center justify-end gap-2">
+        <div className="flex w-full flex-wrap items-center justify-end gap-2">
           {confirmingRemove ? (
             <>
               <p className="mr-auto text-base font-medium">Remove {device.name}? It will need to be paired again.</p>
@@ -172,6 +223,15 @@ export function RobotBody({
                   {askedMuted !== null && !muteError ? (
                     <p className="mr-auto text-sm text-muted-foreground">Asked {device.name} to {askedMuted ? "mute" : "unmute"}, waiting for it.</p>
                   ) : null}
+                  {liveView ? (
+                    <Button variant="outline" onClick={stopLive}>
+                      Stop live view
+                    </Button>
+                  ) : (
+                    <Button variant="outline" disabled={busy || unreachable || liveStarting} onClick={() => void startLive()}>
+                      {liveStarting ? "Opening…" : "Live view"}
+                    </Button>
+                  )}
                   <Button
                     variant="outline"
                     disabled={busy || unreachable || askedMuted !== null}
