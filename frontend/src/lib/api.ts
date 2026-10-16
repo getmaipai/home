@@ -479,6 +479,9 @@ export interface VisionModelInfo {
   file: string;
 }
 
+export interface HostTuneItem { id: string; title: string; why: string; mode: "auto" | "consent" | "advice"; state: "ok" | "needs" | "unknown" | "applied"; current: string; proposed: string }
+export interface HostTuneView { supported: boolean; items: HostTuneItem[] }
+
 export class ApiError extends Error {
   constructor(
     message: string,
@@ -722,6 +725,9 @@ export const api = {
   setupInstall: (vramGb?: number) => request<{ started: true; models: number }>("/api/setup/install", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
   /** Wizard (before an owner): start or restart the AI engine install on this computer. */
   setupEngineInstall: () => request<{ started: true }>("/api/setup/engine-install", { method: "POST" }),
+  setupHostTune: () => request<HostTuneView>("/api/setup/host-tune"),
+  setupHostTuneApply: (id: string) => request<{ item: HostTuneItem }>("/api/setup/host-tune/apply", { method: "POST", body: JSON.stringify({ id }) }),
+  setupHostTuneRevert: (id: string) => request<{ item: HostTuneItem }>("/api/setup/host-tune/revert", { method: "POST", body: JSON.stringify({ id }) }),
   setupInstallStatus: () => request<InstallStatusView>("/api/setup/install"),
   installPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/install/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
   installStart: (vramGb?: number) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),

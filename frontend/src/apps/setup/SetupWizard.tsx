@@ -15,6 +15,7 @@ import { SetupPreviewBar } from "./preview/SetupPreviewBar";
 import { useIsDark } from "@/shell/ThemeToggle";
 import { InstallStrip } from "@/shell/InstallStrip";
 import { PlanStep } from "./PlanStep";
+import { HostTuneStep, useHostTuneSupported } from "./HostTuneStep";
 import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
@@ -29,13 +30,14 @@ const PHASES: WizardStep[] = [
   { id: "computers", title: "Your Home" },
   { id: "meet", title: "Your AI" },
 ];
-const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "checks", "plan", "owner", "face", "hello", "backup", "done"] as const;
+const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "owner", "face", "hello", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
   before_start: "Before you start",
   engine_location: "How should Home run?",
   storage: "Choose where to store data",
+  host_tune: "Tune this computer",
   checks: "Checking your computers",
   plan: "Your setup plan",
   owner: "Create your owner account",
@@ -49,6 +51,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   before_start: "Home is built to protect your family and your data. Like any AI or online tool, it works best when you know a few things.",
   engine_location: "Choose one computer, or add a bigger one for the AI.",
   storage: "Keep the defaults or pick your own.",
+  host_tune: "Optional changes that help the AI run faster here.",
   checks: "Home is checking that everything is ready.",
   plan: "Review the steps Home will complete.",
   owner: "Create the account that manages this Home.",
@@ -135,6 +138,13 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [storageChoice, setStorageChoice] = useState<StorageChoice>({});
   const [storageBlocked, setStorageBlocked] = useState(false);
+  // The optional "This computer" step shows only on a Mac that runs the AI itself.
+  const hostTuneShown = useHostTuneSupported(engine === "this_computer");
+  const neighbour = (from: ScreenId, step: 1 | -1): ScreenId | undefined => {
+    let index = SCREEN_IDS.indexOf(from) + step;
+    if (SCREEN_IDS[index] === "host_tune" && !hostTuneShown) index += step;
+    return SCREEN_IDS[index];
+  };
 
   const refresh = async () => {
     const result = await api.setupState();
@@ -277,6 +287,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       return;
     }
     const stepId = screen === "before_start" ? "welcome" : screen;
+    if (screen === "host_tune") { arrivedByBack.current = false; setScreen(neighbour(screen, 1) ?? "checks"); return; }
     const deferred = (["checks", "plan", "hello"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
     const folders = screen === "storage" ? { ...(engine === "this_computer" && storageChoice.models ? { models: storageChoice.models } : {}), ...(storageChoice.records ? { records: storageChoice.records } : {}) } : {};
@@ -294,8 +305,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
     if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
     arrivedByBack.current = false;
-    const index = SCREEN_IDS.indexOf(screen);
-    const following = SCREEN_IDS[index + 1];
+    const following = neighbour(screen, 1);
     // Once the owner exists, Back and Continue step over the create form.
     if (following === "owner" && !("done" in updated) && stepIsDone(updated, "owner")) setScreen("face");
     else if (following) setScreen(following);
@@ -306,7 +316,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     if (!updated) return;
     if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
     arrivedByBack.current = false;
-    setScreen(SCREEN_IDS[SCREEN_IDS.indexOf(screen) + 1] ?? "done");
+    setScreen(neighbour(screen, 1) ?? "done");
   }
 
   async function submitOwner(name = ownerName, secret = ownerSecret) {
@@ -364,7 +374,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     const index = SCREEN_IDS.indexOf(screen);
     if (index <= 0) return;
     arrivedByBack.current = true;
-    const previous = SCREEN_IDS[index - 1]!;
+    const previous = neighbour(screen, -1)!;
     setScreen(previous === "owner" && state && stepIsDone(state, "owner") ? "plan" : previous);
   };
 
@@ -379,6 +389,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "before_start": body = <Accordion typography="body">{BEFORE_START_DETAILS.map((item) => <AccordionItem key={item.id} value={item.id}><AccordionTrigger>{item.title}</AccordionTrigger><AccordionContent><p>{item.detail}</p></AccordionContent></AccordionItem>)}</Accordion>; break;
     case "engine_location": body = renderSetupReviewScreen({ screen: "engine_location", engine, onEngineChange: setEngine, showTitle: false }); break;
     case "storage": body = <StorageStep split={engine === "another_computer"} value={storageChoice} onChange={(value, blocked) => { setStorageChoice(value); setStorageBlocked(blocked); }} />; break;
+    case "host_tune": body = <HostTuneStep onSkip={() => void next()} />; break;
     case "checks": {
       const blocking = checkRows?.some((row) => row.state === "red") ?? false;
       const warnings = checkRows?.some((row) => row.state === "amber") ?? false;

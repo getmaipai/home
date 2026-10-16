@@ -75,6 +75,31 @@ async function advanceTo(viewResult: ReturnType<typeof view>, buttonText: string
 }
 
 describe("SetupWizard", () => {
+  test("the This computer step shows after storage only when the Mac offers tuning, records nothing and never blocks", async () => {
+    for (const supported of [true, false]) {
+      const state = freshState();
+      for (const id of ["welcome", "engine_location"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+      const h = harness(state);
+      const inner = globalThis.fetch;
+      globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => String(input).endsWith("/api/setup/host-tune")
+        ? new Response(JSON.stringify({ supported, items: [{ id: "a", title: "Keep the Mac awake", why: "Sleep stops downloads.", mode: "auto", state: "needs", current: "off", proposed: "on" }] }), { status: 200 })
+        : inner(input, init)) as unknown as typeof fetch;
+      try {
+        const rendered = view();
+        await waitFor(() => expect(rendered.container.textContent).toContain("Choose where to store data"));
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
+        await advanceTo(rendered, "Continue", supported ? "Tune this computer" : "Checking your computers");
+        if (supported) {
+          await waitFor(() => expect(rendered.container.textContent).toContain("Keep the Mac awake"));
+          await advanceTo(rendered, "Continue", "Checking your computers");
+          expect(h.posts).toEqual(["storage"]);
+          await advanceTo(rendered, "Back", "Tune this computer");
+        } else expect(h.posts).toEqual(["storage"]);
+      } finally { globalThis.fetch = inner; h.restore(); }
+      cleanup();
+    }
+  });
+
   test("Checks screen uses persisted rows, continues on amber and holds on red", async () => {
     const state = freshState();
     for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
