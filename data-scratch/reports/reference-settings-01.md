@@ -1,18 +1,14 @@
-# REFERENCE-SETTINGS-01 report
+# REFERENCE-SETTINGS-01b report
 
-Built the admin-only Reference library section in Home settings using the existing `SettingsShell` and shipped kit parts. It lists catalogue sets with language, resolved size, snapshot date and installed state; shows current preset matching; plans presets and single installs before confirmation; confirms removal with bytes freed and affected age bands; and polls job state while active to show progress and pause, resume and cancel. Custom is an in-memory selection list and is not saved as a preset. Mutations use the existing per-set install/remove and job routes.
+Fixed the review findings on the Reference library settings page. The settings area now comes directly from the pinned spec v0.1.145, while the `home.reference_library` view registration remains in Home. Updated settings tests to the spec's Reference library section order and verified the admin view remains reachable while child access is blocked.
 
-Added `GET /api/reference/catalog`, admin-only, because `/api/reference/state` does not expose the full set catalogue or size and age-band metadata. It resolves publisher metadata through the engine's existing Kiwix resolver and returns a per-set availability message if Kiwix no longer offers a flavour. No settings keys, package pins, setup wizard files or voice enrollment files were changed.
+Removed the in-memory Custom selection checkboxes, selection state and Custom list card. The per-set Install and Remove actions remain the custom path. Kept Minimum, Moderate and Full shortcuts, with the current shortcut marked. Removed the component's duplicate Reference library heading and retained its one-line description. Preset confirmation now uses the label from `reference-presets.json` (for example, “Install the Minimum library?”) and says that existing sets stay installed. Applying a preset continues to install only missing sets and never removes sets.
 
-The screenshot script captured seeded demo household images at 1440 and 390 in light and dark. I opened all four: desktop copy is readable with visible contrast in both themes; the phone has no horizontal overflow and its copy wraps without truncation. The phone's first view shows the preset list and the beginning of the set list; actions remain reachable by scrolling.
+Regenerated and opened all four review captures at 1440 and 390 px in light and dark themes. No horizontal overflow, clipped or truncated copy, or contrast issue was visible. The Quick choices and All sets labels sit close to their kit cards; this is recorded for review and no kit spacing override was added.
 
-Checks run:
+Checks:
 
-- `cd frontend && bun run lint:ui-rules`
-- `cd frontend && bunx tsc --noEmit`
-- `cd frontend && bun test src/apps/settings/ReferenceLibrarySettings.test.tsx src/shell/pages/settings/SettingsAreaPage.test.tsx`
-- `cd frontend && bun run lint` (passed; two existing hook dependency warnings in ChatPage and useShellAppearance)
-- `bun run scripts/screenshot.ts --reference-settings-review`
-- `cd backend && bunx tsc --noEmit`
-
-`bash scripts/wt.sh check` passed its generated-file checks, UI rules and typechecks, but its full backend test process stalled while Deno test workers waited on IPC with the test parent. I stopped that stuck process tree to release the shared check lock. The focused frontend tests and frontend/backend typechecks passed. Live Kiwix catalogue behavior was not verified; the screenshot uses a stable routed catalogue fixture against the seeded demo backend.
+- `cd frontend && bunx tsc --noEmit && bunx eslint . && bun run lint:ui-rules` — passed (ESLint reports the two existing hook dependency warnings in ChatPage and useShellAppearance).
+- `cd frontend && bun test src/apps/settings/ReferenceLibrarySettings.test.tsx src/shell/pages/settings/settingsMatrix.test.ts src/shell/pages/settings/SettingsAreaPage.test.tsx` — 56 passed.
+- `bun run scripts/screenshot.ts --reference-settings-review` — passed; all four captures reviewed.
+- `bash scripts/wt.sh check` — preflight passed and the full gate acquired the machine lock after 150 seconds. The backend API-doc drift check failed: `docs/api/openapi.json` is out of date with route registrations and the generator requested `bun run gen:api-docs` in backend. I excluded that unrelated generated diff. The frontend gate leg passed UI rules, typecheck, ESLint (two existing hook dependency warnings), build and a11y. The scripts test shard passed 191/191; backend tests did not report any spec test failure names before the gate stopped. The gate also logged its frontend worker terminated with signal 15 during shutdown. No spec test failures were reported, so there was no origin/main spec-test comparison to make.

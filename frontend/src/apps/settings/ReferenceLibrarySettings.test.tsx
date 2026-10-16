@@ -45,6 +45,13 @@ describe("Reference library settings", () => {
     expect(view.queryByRole("button", { name: "Install set" })).toBeNull();
     view.restore();
   });
+  test("preset confirmation uses its label and preserves already installed sets", async () => {
+    const view = mount({ installed: [], jobs: [], matchesPresets: [] });
+    fireEvent.click((await view.findAllByRole("button", { name: "Select" }))[0]!);
+    await waitFor(() => expect(view.getByText("Install the Minimum library?")).toBeTruthy());
+    expect(view.getByText(/Sets you already have stay installed\./)).toBeTruthy();
+    view.restore();
+  });
   test("shows progress and supports pause, resume, and cancel", async () => {
     const view = mount();
     await waitFor(() => expect(view.getByRole("button", { name: "Pause" })).toBeTruthy());

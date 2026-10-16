@@ -112,7 +112,7 @@ describe("the settings route", () => {
     const view = open(makePerson("owner"), "/settings/home");
     await waitFor(() => expect(where(view)).toBe("/settings/home/general"));
     await waitFor(() => expect(rows(view)).toContain("Maintenance"));
-    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Maintenance", "Privacy", "Developer tools", "Network and access", "Reference library"]);
+    expect(rows(view)).toEqual(["General", "People", "Engines and AI", "Devices", "Search", "Integrations", "Commands", "Voices", "Storage and backups", "Reference library", "Maintenance", "Privacy", "Developer tools", "Network and access"]);
     expect(view.getByRole("heading", { level: 1, name: /^General$/ })).toBeTruthy();
   });
 
@@ -121,6 +121,12 @@ describe("the settings route", () => {
     await waitFor(() => expect(where(view)).toBe("/settings/account/profile"));
     expect(view.queryByText("All sets")).toBeNull();
     expect(fixture!.requests.some((r) => r.includes("/api/reference/"))).toBe(false);
+  });
+
+  test("an admin opens the spec-declared Reference library view", async () => {
+    const view = open(makePerson("admin"), "/settings/home/reference-library");
+    await waitFor(() => expect(where(view)).toBe("/settings/home/reference-library"));
+    expect(view.getByRole("heading", { level: 1, name: "Reference library" })).toBeTruthy();
   });
 
   test("an owner manages the household command list in Home settings", async () => {

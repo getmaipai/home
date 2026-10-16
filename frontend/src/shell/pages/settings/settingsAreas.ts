@@ -4,13 +4,7 @@
 import areasFile from "@maipai/spec/settings/areas.json";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 
-// REFERENCE-SETTINGS-01: this page is Home-owned UI, so declare its trail in
-// the Home data adapter while the pinned spec's next settings-area release is pending.
-export const SETTINGS_AREAS: SettingsAreaDef[] = (areasFile.areas as unknown as SettingsAreaDef[]).map((area) => area.id !== "home" ? area : {
-  ...area,
-  groups: [...area.groups, { label: "Reference library", sections: ["reference-library"] }],
-  sections: [...area.sections, { id: "reference-library", label: "Reference library", icon: "book-open", kind: "view", view: "home.reference_library", min_role: "admin" }],
-});
+export const SETTINGS_AREAS = areasFile.areas as unknown as SettingsAreaDef[];
 
 /** The area a route segment names, if it is one of the spec's. */
 export function settingsArea(id: string | undefined): SettingsAreaDef | undefined {
