@@ -57,7 +57,9 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
       // otherwise a scalar person selector is stressed with the real
       // household member created by this iteration.
       if ((key.range as { multiple?: boolean } | undefined)?.multiple === true) {
-        return db.select({ id: people.id }).from(people).all().map((row) => row.id);
+        // LIVE-VIEW-01: robot.live_view.who names adults only, so a child is left out of its stressed list.
+        const everyone = db.select({ id: people.id, role: people.role }).from(people).all();
+        return everyone.filter((row) => key.key !== "robot.live_view.who" || row.role !== "child").map((row) => row.id);
       }
       // LIVE-VIEW-01: a list key that names adults only is stressed with the owner, never a child.
       return db.select({ id: people.id }).from(people).where(eq(people.role, "owner")).limit(1).get()?.id
