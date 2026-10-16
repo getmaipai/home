@@ -23082,6 +23082,24 @@
           "Install"
         ],
         "summary": "Start the missing downloads again",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "vram_gb": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 512
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
             "description": "The downloads were started again.",
