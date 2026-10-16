@@ -23,6 +23,7 @@ import { install, rollback, uninstall, setChannel, type StoreResult } from "@/li
 import { getActiveInstall } from "@/lib/packageResolve";
 
 export const storeRoutes = apiRouter();
+export const UNINSTALL_CONFIRMATION = "The following will be uninstalled and users will lose access. Your pictures stay in Library.";
 
 // The same small local shape routes/commands.ts, routes/memory.ts,
 // routes/conversations.ts, and routes/scheduler.ts already each factor
@@ -149,17 +150,19 @@ const uninstallRoute = createRoute({
   middleware: [requireRole("owner", "admin")] as const,
   request: { params: IdParamSchema },
   responses: {
-    200: { content: { "application/json": { schema: z.object({ ok: z.literal(true) } ) } }, description: "Removed." },
+    200: { content: { "application/json": { schema: z.object({ ok: z.literal(true), confirmation: z.string() } ) } }, description: "Confirmation text for the uninstall step." },
     ...errorResponses({ 404: "No active store install to remove", 403: "Not owner/admin" }),
   },
 });
 storeRoutes.openapi(uninstallRoute, async (c) => {
+  const role = c.get("person").role;
+  if (role !== "owner" && role !== "admin") return c.json({ error: "Only a household owner or admin can uninstall packages. Ask one of them to do it." }, 403);
   const result = await uninstall(c.req.valid("param").id);
   // lib/store.ts's uninstall() only ever fails with 404 ("no active
   // install") - the cast narrows fail()'s general 400|404 (rollback's
   // own wider case) to what this route actually declares.
   if (!result.ok) return c.json(fail(result).body, 404);
-  return c.json({ ok: true as const }, 200);
+  return c.json({ ok: true as const, confirmation: UNINSTALL_CONFIRMATION }, 200);
 });
 
 const ChannelBodySchema = z.object({ channel: z.enum(["stable", "beta"]) });
