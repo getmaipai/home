@@ -23630,6 +23630,66 @@
                             "minimum": 0,
                             "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
                           },
+                          "motors_latched": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Names of the motors the robot's motor gate has latched off after a failed recovery, so the hub can show which parts are down. An empty list means none are latched. Omission means the producer does not yet report this field."
+                          },
+                          "motors_stuck": {
+                            "type": "boolean",
+                            "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
+                          },
+                          "thermal": {
+                            "type": "object",
+                            "properties": {
+                              "level": {
+                                "type": "string",
+                                "enum": [
+                                  "nominal",
+                                  "vision_slowed",
+                                  "gestures_suspended",
+                                  "idle_still"
+                                ],
+                                "description": "The thermal governor's current step: nominal, vision slowed, gestures suspended, then idle and still. A consumer that meets a level it does not know treats it as unknown, not as an error."
+                              },
+                              "temp_c": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                              },
+                              "vision_hz": {
+                                "type": "number",
+                                "minimum": 0,
+                                "description": "The camera processing rate the governor currently allows, in frames per second."
+                              },
+                              "fault": {
+                                "type": "boolean",
+                                "description": "Whether the temperature sensor could not be read, so the level is a best guess."
+                              }
+                            },
+                            "required": [
+                              "level",
+                              "temp_c",
+                              "vision_hz",
+                              "fault"
+                            ],
+                            "additionalProperties": false,
+                            "description": "The robot's thermal governor state, so the hub can say why the robot has slowed down. Omission means the producer does not report thermal state (no monitor wired)."
+                          },
                           "reachable": {
                             "type": "boolean"
                           },
@@ -23789,6 +23849,66 @@
                             "type": "integer",
                             "minimum": 0,
                             "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
+                          },
+                          "motors_latched": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Names of the motors the robot's motor gate has latched off after a failed recovery, so the hub can show which parts are down. An empty list means none are latched. Omission means the producer does not yet report this field."
+                          },
+                          "motors_stuck": {
+                            "type": "boolean",
+                            "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
+                          },
+                          "thermal": {
+                            "type": "object",
+                            "properties": {
+                              "level": {
+                                "type": "string",
+                                "enum": [
+                                  "nominal",
+                                  "vision_slowed",
+                                  "gestures_suspended",
+                                  "idle_still"
+                                ],
+                                "description": "The thermal governor's current step: nominal, vision slowed, gestures suspended, then idle and still. A consumer that meets a level it does not know treats it as unknown, not as an error."
+                              },
+                              "temp_c": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                              },
+                              "vision_hz": {
+                                "type": "number",
+                                "minimum": 0,
+                                "description": "The camera processing rate the governor currently allows, in frames per second."
+                              },
+                              "fault": {
+                                "type": "boolean",
+                                "description": "Whether the temperature sensor could not be read, so the level is a best guess."
+                              }
+                            },
+                            "required": [
+                              "level",
+                              "temp_c",
+                              "vision_hz",
+                              "fault"
+                            ],
+                            "additionalProperties": false,
+                            "description": "The robot's thermal governor state, so the hub can say why the robot has slowed down. Omission means the producer does not report thermal state (no monitor wired)."
                           },
                           "reachable": {
                             "type": "boolean"

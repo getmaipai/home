@@ -269,6 +269,9 @@ export interface RobotDeviceState {
   app_version?: string | null;
   motion?: RobotState["motion"];
   put_down_count?: number;
+  motors_latched?: RobotState["motors_latched"];
+  motors_stuck?: RobotState["motors_stuck"];
+  thermal?: RobotState["thermal"];
   reachable: boolean;
   unreachableSince: string | null;
 }

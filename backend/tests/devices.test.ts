@@ -107,6 +107,23 @@ describe("PUT /api/devices/me/state", () => {
     expect(state?.put_down_count).toBe(3);
   });
 
+  test("stores and returns motor and thermal health (spec-v0.1.147)", async () => {
+    const { personId, client } = await owner();
+    const { deviceId, token } = issueDeviceToken(personId, "robot", "Reachy");
+    storeRobotCredential(deviceId, "test-host", "pollen", "rotated-test-password");
+    const robot = new TestClient();
+    await robot.post("/api/auth/devices/redeem", { token });
+    const response = await robot.put("/api/devices/me/state", {
+      activity: "idle", muted: false, tracking: true,
+      motors_latched: ["antenna_left"], motors_stuck: true, thermal: { level: "vision_slowed", temp_c: 71.5, vision_hz: 2, fault: false },
+    });
+    expect(response.status).toBe(204);
+    const state = (await client.get("/api/devices").then((r) => r.json()) as Array<{ id: string; state: Record<string, unknown> }>).find((d) => d.id === deviceId)?.state;
+    expect(state?.motors_latched).toEqual(["antenna_left"]);
+    expect(state?.motors_stuck).toBe(true);
+    expect(state?.thermal).toMatchObject({ level: "vision_slowed", temp_c: 71.5, vision_hz: 2, fault: false });
+  });
+
   test("accepts null motion and frames that omit both new fields", async () => {
     const { personId } = await owner();
     const { deviceId, token } = issueDeviceToken(personId, "robot", "Reachy");

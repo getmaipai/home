@@ -31,6 +31,21 @@ function batteryText(state: RobotDeviceState): string {
   return "Level unknown";
 }
 
+/** Plain-words body health (spec-v0.1.147): null when the robot reports nothing wrong or nothing at all. */
+export function bodyHealthText(state: RobotDeviceState): string | null {
+  const parts: string[] = [];
+  const latched = state.motors_latched ?? [];
+  if (latched.length > 0) parts.push(`${latched.join(", ")} switched off after a failed recovery`);
+  else if (state.motors_stuck === true) parts.push("Working on a stuck motor");
+  switch (state.thermal?.level) {
+    case "vision_slowed": parts.push("Warm: watching less often"); break;
+    case "gestures_suspended": parts.push("Hot: gestures paused"); break;
+    case "idle_still": parts.push("Very hot: resting until it cools"); break;
+    default: break;
+  }
+  return parts.length > 0 ? parts.join(". ") : null;
+}
+
 export function didPutDownCountIncrease(previous: number | undefined, next: number | undefined): boolean {
   return previous !== undefined && next !== undefined && next > previous;
 }
@@ -182,6 +197,7 @@ export function RobotBody({
             {battery !== null && battery !== undefined ? (
               <Progress value={Math.round(battery * 100)} aria-label="Battery level" />
             ) : null}
+            {bodyHealthText(state) ? <Row label="Body health">{bodyHealthText(state)}</Row> : null}
             <Row label="MaiPai version">{state.app_version ?? "Unknown"}</Row>
             <Row label="Body software">{state.daemon_version ?? "Unknown"}</Row>
           </dl>

@@ -708,6 +708,13 @@
       "when": 1792141501363,
       "tag": "0100_robot_offers",
       "breakpoints": true
+    },
+    {
+      "idx": 101,
+      "version": "6",
+      "when": 1792154447968,
+      "tag": "0101_lively_puma",
+      "breakpoints": true
     }
   ]
 }

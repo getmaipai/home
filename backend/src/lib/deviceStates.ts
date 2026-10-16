@@ -39,6 +39,9 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
     appVersion: parsed.app_version ?? null,
     motion: parsed.motion ?? null,
     putDownCount: parsed.put_down_count ?? null,
+    motorsLatched: parsed.motors_latched ?? null,
+    motorsStuck: parsed.motors_stuck ?? null,
+    thermal: parsed.thermal ?? null,
     reportedAt: now,
   };
   db.insert(deviceStates).values(values).onConflictDoUpdate({
@@ -53,6 +56,9 @@ export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): voi
       appVersion: values.appVersion,
       motion: values.motion,
       putDownCount: values.putDownCount,
+      motorsLatched: values.motorsLatched,
+      motorsStuck: values.motorsStuck,
+      thermal: values.thermal,
       reportedAt: values.reportedAt,
     },
   }).run();
@@ -79,6 +85,9 @@ export function updateMutedFromDeviceCommand(deviceId: string, muted: boolean): 
     appVersion: null,
     motion: null,
     putDownCount: null,
+    motorsLatched: null,
+    motorsStuck: null,
+    thermal: null,
     reportedAt,
   }).run();
 }
@@ -106,6 +115,9 @@ export function getDeviceState(deviceId: string): DeviceState | null {
     app_version: row.appVersion,
     motion: (row.motion as RobotStateFrame["motion"]) ?? null,
     put_down_count: row.putDownCount ?? undefined,
+    motors_latched: row.motorsLatched ?? undefined,
+    motors_stuck: row.motorsStuck ?? undefined,
+    thermal: row.thermal ?? undefined,
     reachable,
     unreachableSince: reachable ? null : row.reportedAt,
   };

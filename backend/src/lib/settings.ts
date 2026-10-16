@@ -246,12 +246,10 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       // of this branch - every existing "person" selector use (the
       // spec's own recipe fixtures) is still a single id, so a plain
       // string stays the default when `multiple` isn't set.
-      // LIVE-VIEW-01: the spec's declaration of `robot.live_view.who` has an array default but no `multiple`
-      // flag, so it is treated as a list here, and it may name adults only (the selector offers adults only).
+      // LIVE-VIEW-01: `robot.live_view.who` declares `range.multiple` in the spec (spec-v0.1.147), so it is a list
+      // like any other; the key alone keeps the adults-only gate (the selector offers adults only).
       const adultsOnly = keyDef.key === LIVE_VIEW_WHO_KEY;
-      const multiple = adultsOnly || (range as { multiple?: boolean } | undefined)?.multiple === true;
-      // A single id is accepted for the list key and treated as a one-person list.
-      if (adultsOnly && typeof value === "string") value = [value];
+      const multiple = (range as { multiple?: boolean } | undefined)?.multiple === true;
       const ids = multiple ? value : [value];
       if (multiple ? !Array.isArray(value) : typeof value !== "string") {
         return { ok: false, status: 400, error: multiple ? "expected an array of person ids" : "expected a person id" };

@@ -1,6 +1,7 @@
 import { sqliteTable, text, integer, real, blob, primaryKey, index, uniqueIndex, check } from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 import type { SessionSignInSource } from "@maipai/spec/gen/ts/session-sign-in-source.js";
+import type { RobotState as RobotStateFrame } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StatusComponent } from "@maipai/spec/gen/ts/status-component.js";
 
 // Mirrors spec/schemas/person.schema.json (spec/gen/ts/person.ts is the
@@ -1252,6 +1253,10 @@ export const deviceStates = sqliteTable("device_states", {
   appVersion: text("app_version"),
   motion: text("motion"),
   putDownCount: integer("put_down_count"),
+  // spec-v0.1.147: motor and thermal health, null until the robot reports them.
+  motorsLatched: text("motors_latched", { mode: "json" }).$type<string[]>(),
+  motorsStuck: integer("motors_stuck", { mode: "boolean" }),
+  thermal: text("thermal", { mode: "json" }).$type<NonNullable<RobotStateFrame["thermal"]>>(),
   reportedAt: text("reported_at").notNull(),
 });
 

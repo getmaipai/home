@@ -2,7 +2,7 @@ import { describe, expect, test, mock, afterEach } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { DevicesSection } from "@/apps/settings/DevicesSection";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
-import { didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
+import { bodyHealthText, didPutDownCountIncrease, RobotBody } from "@/apps/settings/RobotBody";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
 
@@ -78,6 +78,13 @@ describe("DevicesSection", () => {
     expect(didPutDownCountIncrease(1, 1)).toBe(false);
     expect(didPutDownCountIncrease(2, 1)).toBe(false);
     expect(didPutDownCountIncrease(1, 2)).toBe(true);
+  });
+  test("body health says nothing when fine and names a latched motor or heat", () => {
+    const base = { activity: "idle", muted: false, tracking: false, reachable: true, unreachableSince: null } as const;
+    expect(bodyHealthText({ ...base })).toBeNull();
+    expect(bodyHealthText({ ...base, motors_latched: [], thermal: { level: "nominal", temp_c: 40, vision_hz: 15, fault: false } })).toBeNull();
+    expect(bodyHealthText({ ...base, motors_latched: ["antenna_left"] })).toContain("antenna_left");
+    expect(bodyHealthText({ ...base, thermal: { level: "gestures_suspended", temp_c: 76, vision_hz: 2, fault: false } })).toContain("gestures paused");
   });
   test("empty devices and sessions say so, not a blank page", async () => {
     const restore = stubFetch([], []);
