@@ -241,6 +241,12 @@
         "privacy"
       ]
     },
+    "user/start-here/install-upgrade-uninstall": {
+      "areas": [
+        "install",
+        "updates"
+      ]
+    },
     "user/start-here/your-first-minutes": {
       "areas": [
         "setup",
