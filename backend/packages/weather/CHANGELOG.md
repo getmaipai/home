@@ -4,6 +4,18 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ## [Unreleased]
 
+### Added
+
+- The package builds a single weather card (`weather_card`: current
+  conditions with an icon code, the next 24 hours, an 8-day outlook,
+  Open-Meteo attribution) from the forecast call. The call also asks
+  for `is_day`, the hourly chance of rain, each day's condition code
+  and 8 days, on the same two Open-Meteo hosts, so the privacy row is
+  unchanged. The card is returned alone, in place of the conditions
+  sheet, 24-hour chart and daily table, once the manifest lists it in
+  `returns_blocks` (which waits for the spec tag that knows the card);
+  until then the three older blocks are returned. Never both.
+
 ### Changed
 
 - The hourly warm uses only the household home place, and its privacy row

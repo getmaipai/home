@@ -11,6 +11,7 @@
 // applies the age band and the output floor to each string and drops what
 // fails, one block at a time. A producer that cannot build a block returns
 // nothing; the package reply is never affected.
+import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import { nextHlc } from "@/lib/hlc";
 
 /** Rows a host read already holds, handed to the block producers of the same
@@ -109,11 +110,86 @@ function dayLabel(iso: unknown): string | null {
   return `${WEEKDAYS[date.getUTCDay()]} ${MONTHS[date.getUTCMonth()]} ${date.getUTCDate()}`;
 }
 
+
+function finite(value: unknown): number | null {
+  const n = typeof value === "string" && value.trim() !== "" ? Number(value) : value;
+  return typeof n === "number" && Number.isFinite(n) ? n : null;
+}
+
+function wmoCode(value: unknown): number | null {
+  const n = finite(value);
+  return n !== null && Number.isInteger(n) && n >= 0 ? n : null;
+}
+
+const CARD_HOURS_MAX = 24;
+const CARD_DAYS_MAX = 8;
+const WEATHER_ATTRIBUTION = "Weather data by Open-Meteo.com (CC BY 4.0)";
+
+/** The one `weather_card` block: the current reading, up to 24 hours and 1 to 8
+ * days, all from the response the recipe already fetched. Returns null when
+ * the current reading or every day row is missing (the card needs both).
+ * Exported for tests; weatherBlocks() decides whether it is shown. */
+export function weatherCard(producer: string, provenance: string, data: Record<string, unknown> | undefined, attribution: string = WEATHER_ATTRIBUTION): Record<string, unknown> | null {
+  if (!data) return null;
+  const place = text(data.place);
+  const temp = finite(data.temperature);
+  const code = wmoCode(data.block_code);
+  const condition = text(data.conditions);
+  if (!place || temp === null || code === null || !condition) return null;
+  const unit = data.unit === "celsius" ? "C" : "F";
+  const isDay = data.block_is_day === 0 || data.block_is_day === false ? false : true;
+
+  const highs = Array.isArray(data.block_day_highs) ? data.block_day_highs : [];
+  const lows = Array.isArray(data.block_day_lows) ? data.block_day_lows : [];
+  const dates = Array.isArray(data.block_day_dates) ? data.block_day_dates : [];
+  const codes = Array.isArray(data.block_day_codes) ? data.block_day_codes : [];
+  const chances = Array.isArray(data.block_day_rain) ? data.block_day_rain : [];
+  const daily: Record<string, unknown>[] = [];
+  for (let i = 0; i < dates.length && daily.length < CARD_DAYS_MAX; i++) {
+    const date = typeof dates[i] === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dates[i] as string) ? (dates[i] as string) : null;
+    const high = finite(highs[i]);
+    const low = finite(lows[i]);
+    const dayCode = wmoCode(codes[i]);
+    if (!date || high === null || low === null || dayCode === null) continue;
+    const pop = finite(chances[i]);
+    daily.push({ date, high, low, code: dayCode, ...(pop !== null && pop >= 0 && pop <= 100 ? { pop } : {}) });
+  }
+  if (daily.length === 0) return null;
+
+  const times = Array.isArray(data.block_hour_times) ? data.block_hour_times : [];
+  const temps = Array.isArray(data.block_hour_temps) ? data.block_hour_temps : [];
+  const pops = Array.isArray(data.block_hour_pop) ? data.block_hour_pop : [];
+  const hourly: Record<string, unknown>[] = [];
+  for (let i = 0; i < times.length && hourly.length < CARD_HOURS_MAX; i++) {
+    const t = typeof times[i] === "string" && times[i] !== "" ? (times[i] as string) : null;
+    const hourTemp = finite(temps[i]);
+    if (!t || hourTemp === null) continue;
+    const pop = finite(pops[i]);
+    hourly.push({ time: t, temp: hourTemp, ...(pop !== null && pop >= 0 && pop <= 100 ? { pop } : {}) });
+  }
+
+  const today = daily[0]!;
+  const alt = `Weather in ${place} now: ${temp}°${unit} and ${condition}; today's high ${today.high}°${unit}, low ${today.low}°${unit}.`;
+  return blockEnvelope("weather_card", producer, alt, provenance, {
+    place,
+    unit,
+    current: { temp, condition, code, is_day: isDay },
+    ...(hourly.length > 0 ? { hourly } : {}),
+    daily,
+    attribution,
+  });
+}
+
 /** Weather: the current reading, the next 24 hours and the next 7 days, all
  * from the one forecast response the recipe already fetched. A part the
  * response lacks is simply not built; the reply is never affected. */
-function weatherBlocks(producer: string, provenance: string, data: Record<string, unknown> | undefined): Record<string, unknown>[] {
+function weatherBlocks(producer: string, provenance: string, data: Record<string, unknown> | undefined, attribution?: string, cardAllowed = false): Record<string, unknown>[] {
   if (!data) return [];
+  // The card replaces the sheet, chart and table: one answer, never both. It is
+  // returned alone when the manifest lists `weather_card` and the pinned spec knows it; until then (or
+  // when the card cannot be built) the three older blocks are the answer.
+  const card = cardAllowed ? weatherCard(producer, provenance, data, attribution) : null;
+  if (card && AnswerBlock.safeParse(card).success) return [card];
   const blocks: Record<string, unknown>[] = [];
   const place = text(data.place);
   const unit = data.unit === "celsius" ? "°C" : "°F";
@@ -187,7 +263,7 @@ function weatherBlocks(producer: string, provenance: string, data: Record<string
 /** The blocks a Tier 0 recipe package returns for one successful run, or an
  * empty array. Only a kind the manifest lists in `returns_blocks` is built. */
 export function blocksForRecipeRun(
-  manifest: { id: string; returns_blocks?: readonly string[] },
+  manifest: { id: string; returns_blocks?: readonly string[]; data_sources?: readonly { attribution?: string }[] },
   result: RecipeResult,
   capture: BlockCapture,
   turnId?: string,
@@ -206,7 +282,7 @@ export function blocksForRecipeRun(
     case "list-view":
       return allowed.includes("todo_list") ? todoList(manifest.id, provenance, capture.listItems ?? []) : [];
     case "weather":
-      return weatherBlocks(manifest.id, provenance, result.data).filter((block) => allowed.includes(String(block.kind)));
+      return weatherBlocks(manifest.id, provenance, result.data, manifest.data_sources?.[0]?.attribution, allowed.includes("weather_card")).filter((block) => allowed.includes(String(block.kind)));
     default:
       return [];
   }

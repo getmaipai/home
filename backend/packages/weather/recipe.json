@@ -55,7 +55,7 @@
     {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit",
       "method": "GET"
     },
     {
@@ -155,6 +155,30 @@
       "path": "daily.precipitation_probability_max"
     },
     {
+      "op": "pick",
+      "as": "is_day",
+      "from": "wx",
+      "path": "current.is_day"
+    },
+    {
+      "op": "pick",
+      "as": "hour_times",
+      "from": "wx",
+      "path": "hourly.time"
+    },
+    {
+      "op": "pick",
+      "as": "hour_pop",
+      "from": "wx",
+      "path": "hourly.precipitation_probability"
+    },
+    {
+      "op": "pick",
+      "as": "day_codes",
+      "from": "wx",
+      "path": "daily.weather_code"
+    },
+    {
       "op": "lookup",
       "as": "rain_pct",
       "from": "rain_chance",
@@ -188,7 +212,12 @@
         "block_day_dates": "{day_dates}",
         "block_day_highs": "{day_highs}",
         "block_day_lows": "{day_lows}",
-        "block_day_rain": "{day_rain}"
+        "block_day_rain": "{day_rain}",
+        "block_code": "{code}",
+        "block_is_day": "{is_day}",
+        "block_hour_times": "{hour_times}",
+        "block_hour_pop": "{hour_pop}",
+        "block_day_codes": "{day_codes}"
       }
     }
   ]
