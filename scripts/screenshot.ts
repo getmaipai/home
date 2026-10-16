@@ -556,19 +556,23 @@ function seedWeatherCache(dataDir: string): void {
   // carries the same shape): current temperature and weather_code, plus
   // today's high, low and rain chance.
   const forecastUrl =
-    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
+    "https://api.open-meteo.com/v1/forecast?latitude=47.60621&longitude=-122.33207&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit";
   const hourTemps = [57.3, 56.8, 56.1, 55.4, 54.9, 54.6, 54.8, 56.0, 58.2, 60.5, 62.4, 63.8, 64.2, 64.0, 63.1, 61.7, 60.0, 58.6, 57.5, 56.9, 56.2, 55.7, 55.1, 54.8];
-  const dayHighs = [64.2, 66.0, 63.5, 61.8, 65.1, 67.3, 62.9];
-  const dayLows = [52.1, 51.4, 50.2, 49.8, 51.0, 52.6, 50.7];
-  const dayRain = [20, 10, 55, 70, 15, 5, 40];
+  const dayHighs = [64.2, 66.0, 63.5, 61.8, 65.1, 67.3, 62.9, 60.4];
+  const dayLows = [52.1, 51.4, 50.2, 49.8, 51.0, 52.6, 50.7, 49.2];
+  const dayRain = [20, 10, 55, 70, 15, 5, 40, 30];
+  const dayCodes = [2, 3, 61, 63, 1, 0, 80, 3];
+  const hourPop = hourTemps.map((_, i) => (i < 6 ? 10 : 20 + (i % 5) * 10));
   const forecastValue = {
-    current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 57.3, weather_code: 2 },
+    current: { time: new Date().toISOString().slice(0, 16), temperature_2m: 57.3, weather_code: 2, is_day: 1 },
     hourly: {
       time: hourTemps.map((_, i) => new Date(Date.now() + i * 3600_000).toISOString().slice(0, 13) + ":00"),
       temperature_2m: hourTemps,
+      precipitation_probability: hourPop,
     },
     daily: {
       time: dayHighs.map((_, i) => new Date(Date.now() + i * 86400_000).toISOString().slice(0, 10)),
+      weather_code: dayCodes,
       temperature_2m_max: dayHighs,
       temperature_2m_min: dayLows,
       precipitation_probability_max: dayRain,
@@ -6270,9 +6274,8 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
   });
   if (!setModel.ok) throw new Error(`captureNextChatToolsReview: seeding chat.model_id failed: ${setModel.status}`);
 
-  // GENUI-04: the weather package returns three answer blocks (a spec
-  // sheet, an hourly chart and a 7-day data table), so each viewport and
-  // theme runs one real weather turn and waits for all three Elements.
+  // WEATHER-CARD-01: the weather package returns one weather_card block, so
+  // each viewport and theme runs one real weather turn and waits for it.
   for (const viewport of VIEWPORTS.filter((v) => v.slug === "desktop" || v.slug === "phone")) for (const theme of THEMES) {
     const context = await newContext(browser, viewport, theme, sessionValue);
     try {
@@ -6282,25 +6285,17 @@ async function captureNextChatToolsReview(browser: Browser, sessionValue: string
       await page.getByRole("button", { name: "Send message", exact: true }).click();
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ timeout: 15000 });
       await page.getByRole("button", { name: "Stop generating", exact: true }).waitFor({ state: "detached", timeout: 30000 });
-      // The three kit Elements, standalone in the message flow.
-      await page.locator('[data-slot="spec-sheet"]').first().waitFor({ timeout: 15000 });
-      await page.locator('[data-slot="chart"]').first().waitFor({ timeout: 15000 });
-      await page.locator('[data-slot="data-table"]').first().waitFor({ timeout: 15000 });
+      // The one weather card Element, standalone in the message flow, and none of the older blocks beside it.
+      await page.locator('[data-slot="weather-card"]').first().waitFor({ timeout: 15000 });
+      if (await page.locator('[data-slot="spec-sheet"], [data-slot="chart"], [data-slot="data-table"]').count() > 0) throw new Error("weather card drew beside the older blocks");
       // A block the kit could not draw shows only its alt sentence.
       if (await page.locator('[data-slot="answer-block"][data-fallback]').count() > 0) throw new Error("weather block fell back to its alt sentence");
       await settleAnimations(page);
-      // The thread scrolls inside the page: one shot with the spec sheet
-      // at the top of the view, one with the table's end and the reply.
-      await page.locator('[data-slot="spec-sheet"]').first().evaluate((el) => el.scrollIntoView({ block: "start" }));
+      await page.locator('[data-slot="weather-card"]').first().evaluate((el) => el.scrollIntoView({ block: "start" }));
       await settleAnimations(page);
       const path = join(outDir, `next-chat-tools-${viewport.width}-${theme}.png`);
       await page.screenshot({ path });
       console.log(`Wrote ${path}`);
-      await page.locator('[data-slot="data-table"]').first().evaluate((el) => el.scrollIntoView({ block: "start" }));
-      await settleAnimations(page);
-      const tablePath = join(outDir, `next-chat-tools-${viewport.width}-${theme}-table.png`);
-      await page.screenshot({ path: tablePath });
-      console.log(`Wrote ${tablePath}`);
       await page.close();
     } finally {
       await context.close();
