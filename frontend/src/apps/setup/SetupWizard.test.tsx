@@ -172,8 +172,11 @@ describe("SetupWizard", () => {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       expect(rendered.container.textContent).toContain("Your AI");
+      // The button stays disabled until the emergency kit request resolves, a fetch separate from the
+      // screen text; clicking before then is a no-op, which failed this test when the machine was loaded.
+      await waitFor(() => expect(rendered.getByRole("button", { name: "I saved my backup key" }).hasAttribute("disabled")).toBe(false));
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "I saved my backup key" })); });
-      expect(h.posts).toContain("backup_key");
+      await waitFor(() => expect(h.posts).toContain("backup_key"));
     } finally { h.restore(); }
   });
 

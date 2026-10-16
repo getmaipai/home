@@ -1893,16 +1893,22 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     __setSummaryRefreshDelayForTests(1);
     try {
       scheduleSummaryRefresh(conv.value.id);
-      await new Promise((resolve) => setTimeout(resolve, 20));
+      // Poll, never a fixed sleep: the retry is a 1 ms timer plus two real requests to the stub, and a loaded
+      // machine took far longer than the 20 ms this test once waited (0 calls seen, 4 of 18 runs under load).
+      const deadline = Date.now() + 8_000;
+      let row = getConversation(actor, conv.value.id);
+      while (Date.now() < deadline && !(calls >= 2 && row.ok && row.value.summary !== null)) {
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        row = getConversation(actor, conv.value.id);
+      }
       expect(calls).toBe(2);
-      const row = getConversation(actor, conv.value.id);
       if (!row.ok) throw new Error(row.error);
       expect(row.value.summary).not.toBeNull();
     } finally {
       __setSummaryRefreshDelayForTests(null);
       await stub.stop();
     }
-  });
+ }, 15_000);
 
   // A code review (2026-09-13) found that editing the exact turn named by
   // `summary_through_turn` made this function lose its place:
@@ -1989,7 +1995,10 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
     // documents - a code review of the first cut of this test (30ms
     // delay, a 15ms "still null" check) found it could flake under the
     // full suite's real CPU contention for the identical reason.
-    const DELAY_MS = 200;
+    // 1000, not 200: the load-reproduced failure was the second runTurnNext() itself taking longer than the
+    // delay, so the first timer fired before the "newer turn" could cancel it. The idle wait below polls, so
+    // a wider delay costs little on a quiet machine.
+    const DELAY_MS = 1000;
     __setSummaryRefreshDelayForTests(DELAY_MS);
     try {
       const result = await runTurnNext(actor, "chat", "one more, still active");
@@ -2015,15 +2024,19 @@ describe("maybeRefreshConversationSummary() (step 3: runs when due, not before)"
 
       // Once genuinely idle (the second turn's own fresh timer has had
       // time to fire, with nothing newer to cancel it), the refresh runs.
-      await new Promise((r) => setTimeout(r, DELAY_MS * 3));
-      const row = getConversation(actor, conv.value.id);
+      const idleDeadline = Date.now() + DELAY_MS * 8;
+      let row = getConversation(actor, conv.value.id);
+      while (Date.now() < idleDeadline && row.ok && row.value.summary === null) {
+        await new Promise((r) => setTimeout(r, 25));
+        row = getConversation(actor, conv.value.id);
+      }
       if (!row.ok) throw new Error(row.error);
       expect(row.value.summary).not.toBeNull();
     } finally {
       __setSummaryRefreshDelayForTests(null);
       conversationStubs.push(stub);
     }
-  });
+  }, 20_000);
 
   // Defense in depth alongside the `finally` above (a try/finally already
   // runs on a thrown assertion failure too, but a review flagged the risk
