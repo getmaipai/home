@@ -1,6 +1,5 @@
 import type { ComponentType } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FaceEnrollmentBody, canViewFaceEnrollment } from "@/apps/people/FaceEnrollmentBody";
 import { VoiceEnrollmentBody } from "@/apps/people/VoiceEnrollmentBody";
 import { ProfileForm } from "@/apps/people/ProfileForm";
@@ -22,6 +21,10 @@ import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettings";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
+import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
+import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
+import { useState } from "react";
 import { useTabItem } from "@/shell/tabIdentity";
 import type { PersonRosterEntry, Roster } from "@/lib/api";
 
@@ -63,7 +66,8 @@ function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("V
 // computer's name and ports) come the pairing wizard, the engines console (roles, installed engines, health, the
 // connection check, formerly /engines), the AI model list (formerly /models) and the Hugging Face token.
 function HomeEngineAdminSettings({ person }: SettingsViewProps) {
-  return <><EngineLinkCredentialSection /><EnginesConsole person={person} /><InstallPlanSection /><ModelsSection /><HuggingFaceTokenSection /></>;
+  const [removal, setRemoval] = useState<{ message: string; confirm: () => void } | null>(null);
+  return <><EngineLinkCredentialSection /><EnginesConsole person={person} /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><InstallPlanSection /><ModelsSection /><HuggingFaceTokenSection /></>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
