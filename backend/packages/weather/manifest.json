@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
-  "description": "Get the weather for a named place: temperature, conditions, today's high and low, and the chance of rain.",
+  "description": "Get the weather for a named place, or the person's own default place when none is named.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -21,9 +21,7 @@
   },
   "args": {
     "type": "object",
-    "required": [
-      "place"
-    ],
+    "required": [],
     "properties": {
       "place": {
         "type": "string",
@@ -41,7 +39,32 @@
   "consequential": false,
   "offline": "unavailable",
   "returns_blocks": ["spec_sheet", "chart", "data_table"],
-  "config": [],
+  "config": [
+    {
+      "key": "weather.places",
+      "scope": "person",
+      "selector": "location",
+      "range": { "multiple": true, "allow_current": false },
+      "default": [],
+      "label": "Weather places",
+      "help": "Places saved for weather answers.",
+      "level": "basic",
+      "lives_in": "weather",
+      "honoured_by": ["home"]
+    },
+    {
+      "key": "weather.default_place",
+      "scope": "person",
+      "selector": "location",
+      "range": { "multiple": false, "allow_current": true },
+      "default": "current",
+      "label": "Weather default place",
+      "help": "The place weather uses when you do not name one.",
+      "level": "basic",
+      "lives_in": "weather",
+      "honoured_by": ["home"]
+    }
+  ],
   "data_sources": [
     {
       "id": "open-meteo",
@@ -49,7 +72,7 @@
       "hosts": ["geocoding-api.open-meteo.com", "api.open-meteo.com"],
       "destination": "Open-Meteo (open-meteo.com), a free public weather API",
       "when": "each time the family asks for the weather somewhere, and about once an hour in the background for your home place",
-      "what": "the place name (the one spoken in the request, or your home place for the hourly refresh)",
+      "what": "the place name you spoke or your saved place name; with Current location on, your device coordinates rounded to about 1 km (about 10 km for a child), sent for that request only and never stored; your home place name for the hourly refresh",
       "who": "Open-Meteo",
       "opt_in": true,
       "retention": "unknown, see Open-Meteo's own policy"

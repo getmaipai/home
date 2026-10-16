@@ -4,6 +4,7 @@
 // stop at cancellation; the race still records a timeout if a package
 // ignores the signal.
 import { runPlugin } from "@/lib/plugins";
+import { resolveWeatherPlace } from "@/lib/places";
 import { blockEventsFor } from "../blockEvents";
 import { outcomeOf, type FailureKind } from "@/lib/turnContext";
 import { lookupFailureKind } from "./lookupFallback";
@@ -181,7 +182,20 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     const spokenSearch = (state.planBasis?.surfaceClass ?? "spoken") === "spoken";
     const runArgs = tool === "websearch" ? { ...(args as Record<string, unknown>), read_page: true, ...(spokenSearch ? { spoken: true } : {}) } : args;
     const startedAt = Date.now();
-    const raced = await withDeadline(runPlugin(tool, state.actor, runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt }), signal);
+    // PLACE-WEATHER-01: the host resolves the place and injects coordinates; the
+    // model's own args (and so the stored call) carry only the place it named.
+    let hostInputs: Record<string, unknown> | undefined;
+    let uncached = false;
+    let weatherArgs: Record<string, unknown> | undefined;
+    if (tool === "weather") {
+      const weatherPlace = await resolveWeatherPlace({ person: state.actor, named: (args as Record<string, unknown>).place, current: state.currentLocation });
+      if (weatherPlace) {
+        weatherArgs = { ...(args as Record<string, unknown>), place: weatherPlace.place };
+        hostInputs = weatherPlace.hostInputs;
+        uncached = weatherPlace.uncached;
+      }
+    }
+    const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt, ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

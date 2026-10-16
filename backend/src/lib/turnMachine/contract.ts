@@ -226,6 +226,11 @@ export interface TurnState {
    * whatever `surface` says - withholds reasoning the same as a
    * non-chat surface does (`decideReasoning`, `nodes/context.ts`). */
   spoken: boolean;
+  /** PLACE-WEATHER-01: this request's coordinates, sent only when the person's
+   * weather default is Current location and the browser already granted
+   * permission. Read by the tool node for one weather call; never stored,
+   * logged, traced or written to the turn record. */
+  currentLocation?: { lat: number; lon: number; area?: string | null };
   /** THIN-7C (ADMIN-COMPARE-01 b): the bare-mode bypass, an owner or admin
    * adult's own turn. No commands, no persona, no recalled memory, no tools:
    * one plain system prompt, the conversation's history and the message,

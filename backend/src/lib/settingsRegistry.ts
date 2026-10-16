@@ -6,12 +6,13 @@
 // this repo), the same self-contained-copy convention every other
 // spec import here already uses - never a relative path escaping to the
 // sibling checkout, which a deployed build won't have.
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
 import { HOSTED_SEARCH_SETTINGS_KEYS } from "@/settings/hostedSearchKeys";
 import { SPEC_DIR } from "./specDir.js";
+import { PACKAGES_DIR } from "./paths";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
 import { NOTIFICATION_SETTINGS_KEYS } from "@/settings/notificationKeys";
@@ -21,14 +22,25 @@ import { REFERENCE_SETTINGS_KEYS } from "@/settings/referenceKeys";
 const RETIRED_WIKIPEDIA_FALLBACK_KEY = "search.wikipedia_fallback";
 const REGISTRY_PATH = join(SPEC_DIR, "settings", "keys.json");
 
-// Package-owned location settings do not enter the core spec registry.
-// They are supplied here until the weather and maps packages declare them.
+// Maps still has no bundled package, so its two location keys ride here
+// until PLACE-MAPS-01 ships the package that declares them.
 export const PLACE_SETTINGS_KEYS = [
-  ...(["weather", "maps"] as const).flatMap((surface) => [
-    SettingsKey.parse({ key: `${surface}.places`, scope: "person", selector: "location", range: { multiple: true, allow_current: false }, default: [], label: `${surface === "weather" ? "Weather" : "Maps"} places`, help: "Places saved for this surface.", level: "basic", lives_in: surface, honoured_by: ["home"] }),
-    SettingsKey.parse({ key: `${surface}.default_place`, scope: "person", selector: "location", range: { multiple: false, allow_current: true }, default: "current", label: `${surface === "weather" ? "Weather" : "Maps"} default place`, help: "The place used by default on this surface.", level: "basic", lives_in: surface, honoured_by: ["home"] }),
-  ]),
+  SettingsKey.parse({ key: "maps.places", scope: "person", selector: "location", range: { multiple: true, allow_current: false }, default: [], label: "Maps places", help: "Places saved for this surface.", level: "basic", lives_in: "maps", honoured_by: ["home"] }),
+  SettingsKey.parse({ key: "maps.default_place", scope: "person", selector: "location", range: { multiple: false, allow_current: true }, default: "current", label: "Maps default place", help: "The place used by default on this surface.", level: "basic", lives_in: "maps", honoured_by: ["home"] }),
 ];
+
+/** Settings a bundled package declares in its manifest `config[]`. They load
+ * through the same SettingsKey schema as the spec registry, so a malformed
+ * declaration fails at boot instead of at the first read. */
+function bundledPackageKeys(): SettingsKey[] {
+  if (!existsSync(PACKAGES_DIR)) return [];
+  return readdirSync(PACKAGES_DIR).sort().flatMap((id) => {
+    const path = join(PACKAGES_DIR, id, "manifest.json");
+    if (!existsSync(path)) return [];
+    const config = (JSON.parse(readFileSync(path, "utf-8")) as { config?: unknown[] }).config;
+    return Array.isArray(config) ? config.map((entry) => SettingsKey.parse(entry)) : [];
+  });
+}
 
 // Transition alias: the current Home settings field still writes a name.
 // It is kept outside the committed Commons registry and resolves through
@@ -45,7 +57,7 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, LEGACY_HOME_PLACE_KEY].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys(), LEGACY_HOME_PLACE_KEY].filter((entry) => !keys.has(entry.key))];
   return combined.map(withPersonGuardFacts);
 }
 

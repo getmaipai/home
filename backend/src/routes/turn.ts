@@ -1,4 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
+import { parseCurrentLocation } from "@/lib/places";
 import { bodyLimit } from "hono/body-limit";
 import type { MiddlewareHandler } from "hono";
 import { randomBytes } from "node:crypto";
@@ -822,6 +823,7 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     bare?: boolean;
     temporary?: boolean;
     spoken?: boolean;
+    current_location?: unknown;
     stt_ms?: number;
     ask_answer?: unknown;
     document_attachments?: { name: string; media_type: string; data: string }[];
@@ -935,11 +937,13 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     // turn the structural backstop. It always runs on the chat surface, with
     // the model the active chat role's, and thinking on.
     const bare = body.bare === true;
+    const currentLocation = parseCurrentLocation(body.current_location);
     result = await runTurnNextStream(actor, bare ? "chat" : surface, body.text ?? "", {
       conversationId: body.conversation_id,
       temporary: body.temporary,
       bare,
       spoken: body.spoken === true,
+      ...(currentLocation ? { currentLocation } : {}),
       thinking: dropReasoning ? false : body.thinking,
       model: modelSelection.model,
       signal: abortController.signal,

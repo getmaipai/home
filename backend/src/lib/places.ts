@@ -90,6 +90,9 @@ export async function resolvePlace(input: {
   surface: PlaceSurface;
   named?: string | null;
   current?: CurrentCoordinates | null;
+  /** False leaves an unsaved name without coordinates, so the caller's own
+   * lookup (the weather recipe's geocoding step) resolves it as before. */
+  geocodeNamed?: boolean;
 }): Promise<ResolvedPlace> {
   const { person, surface } = input;
   const visible = person ? listEntities(person, "place") : db.select().from(entities).where(and(eq(entities.kind, "place"), eq(entities.scope, "household"), isNull(entities.deletedAt))).all().map((row) => {
@@ -101,6 +104,7 @@ export async function resolvePlace(input: {
   if (named) {
     const matched = visible.find((place) => place.kind === "place" && [place.name, ...place.aliases].some((part) => part.localeCompare(named, undefined, { sensitivity: "accent" }) === 0));
     if (matched) return childSafe(await withGeocode(entityResult(matched, "named"), matched.name), person);
+    if (input.geocodeNamed === false) return { ...emptyPlace(), label: named, from: "named" };
     const found = await geocode(named);
     return childSafe(found ? { label: named, area: found.area, lat: found.lat, lon: found.lon, precision: "exact", from: "named" } : { ...emptyPlace(), label: named, from: "named" }, person);
   }
@@ -159,4 +163,36 @@ async function geocodeMany(name: string): Promise<Array<{ name: string; area: st
   } catch {
     return [];
   }
+}
+
+/** The place and the host-only coordinates for one weather call. The model
+ * supplies only `place`; `hostInputs` are injected at the recipe call by the
+ * runner, so they never enter a tool call, turn record, trace or log line.
+ * Coordinates are rounded to two decimals (about 1 km) for a teen or adult
+ * and one for a child (owner, 2026-10-08). Null when no place resolves. */
+export async function resolveWeatherPlace(input: {
+  person: PersonRow | null;
+  named?: unknown;
+  current?: CurrentCoordinates | null;
+}): Promise<{ place: string; hostInputs: { latitude?: number; longitude?: number }; uncached: boolean } | null> {
+  const named = typeof input.named === "string" && input.named.trim() ? input.named.trim() : null;
+  const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false });
+  const label = resolved.from === "current" ? (resolved.area && resolved.area !== "Approximate area" ? resolved.area : "your current location") : (resolved.area ?? resolved.label);
+  const place = named ?? label;
+  if (!place) return null;
+  if (resolved.lat === null || resolved.lon === null) return { place, hostInputs: {}, uncached: false };
+  const decimals = input.person?.role === "child" ? 1 : 2;
+  const round = (value: number) => Number(value.toFixed(decimals));
+  return { place, hostInputs: { latitude: round(resolved.lat), longitude: round(resolved.lon) }, uncached: resolved.from === "current" };
+}
+
+/** Validates the `current_location` a turn request may carry. Anything off
+ * shape is dropped (the turn then falls back to the household home), never an error. */
+export function parseCurrentLocation(value: unknown): CurrentCoordinates | null {
+  if (!value || typeof value !== "object") return null;
+  const { lat, lon, area } = value as Record<string, unknown>;
+  if (typeof lat !== "number" || typeof lon !== "number" || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  const label = typeof area === "string" && area.trim() && area.length <= 80 ? area.trim() : undefined;
+  return { lat, lon, ...(label ? { area: label } : {}) };
 }

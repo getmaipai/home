@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
+import { currentLocationIfGranted } from "@/lib/currentLocation";
 import { Link, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -211,6 +212,9 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
   const photoSettingsQuery = useQuery({ queryKey: ["settingsValues", `person:${person.id}`], queryFn: () => api.settingsValues(`person:${person.id}`) });
   const photoSettings = Array.isArray(photoSettingsQuery.data) ? photoSettingsQuery.data : [];
   const photoSetting = photoSettings.find((setting) => setting.key === "chat.photo_uploads");
+  const weatherDefaultIsCurrent = (photoSettings.find((setting) => setting.key === "weather.default_place")?.value ?? "current") === "current";
+  const weatherDefaultIsCurrentRef = useRef(weatherDefaultIsCurrent);
+  weatherDefaultIsCurrentRef.current = weatherDefaultIsCurrent;
   const photoUploadsEnabled = photoUploadsEnabledForBand(person.age_band, photoSetting);
   const chatRole = enginesQuery.data?.roles?.find((role) => role.id === "chat");
   // VISION-02d (rule 8): what each chat model can do, from its record
@@ -502,6 +506,7 @@ function useChatRuntime(person: Roster, closeSheet: () => void, temporaryNext: b
           // saved by its setter, and used on every send until changed.
           getThinking: () => (thinkingAllowed && currentModelThinksRef.current ? thinkingRef.current : undefined),
           getAgeBand: () => person.age_band,
+          getCurrentLocation: () => (weatherDefaultIsCurrentRef.current ? currentLocationIfGranted(person.age_band) : Promise.resolve(undefined)),
           consumeSupersedes,
           consumePackageScope: () => {
             const value = packageScopeRef.current?.id;

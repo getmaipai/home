@@ -91,6 +91,10 @@ export interface ChatModelAdapterDeps {
   getModel?(): string | undefined;
   /** Age band for the signed-in person; per-message model choice is adults-only. */
   getAgeBand?(): "adult" | "teen" | "child" | undefined;
+  /** PLACE-WEATHER-01: this request's coordinates when the person's weather
+   * default is Current location and the browser already allowed it. Read once
+   * per send, never on a reconnect, and never stored. */
+  getCurrentLocation?(): Promise<{ lat: number; lon: number } | undefined>;
   // ADMIN-COMPARE-01 (b): a plain read, never consumed/reset - unlike
   // `consumeThinking()`, bare mode is meant to stay on across every send
   // in the conversation until the admin turns it off themselves
@@ -369,6 +373,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           const thinking = deps.getThinking ? deps.getThinking() : deps.consumeThinking?.();
           const perRunModel = (runConfig as { custom?: { model?: unknown } } | undefined)?.custom?.model;
           const runModel = deps.getAgeBand?.() === "adult" && typeof perRunModel === "string" ? perRunModel : undefined;
+          const currentLocation = reconnectAttempts === 0 && !bare ? await deps.getCurrentLocation?.() : undefined;
           const response = await (deps.openStream?.(text ?? "", abortSignal) ?? api.streamTurn(text ?? (imageAttached ? "Please look at the attached picture." : "Please read the attached document."), abortSignal, {
             thinking: reconnectAttempts === 0 && !bare ? thinking : undefined,
             model: !bare ? (runModel ?? selectedModel) : undefined,
@@ -389,6 +394,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             packageScope: reconnectAttempts === 0 ? deps.consumePackageScope?.() : undefined,
             temporary: reconnectAttempts === 0 ? temporary : undefined,
             spoken: reconnectAttempts === 0 ? quote ? quoteSpoken : deps.consumeSpoken?.() : undefined,
+            currentLocation,
             // APPROVE-CARD-01: the same reconnectAttempts===0 gate as
             // packageScope/temporary/spoken above - a single-shot field
             // only ever meaningful on the first attempt of this send,

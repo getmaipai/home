@@ -19,7 +19,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **When it happens:** Home asks Open-Meteo when someone asks about weather. About once an hour, it also refreshes the home place in the background. It skips this refresh if no home place is set.
 
-**What it sends:** A weather request sends the place name you said to Open-Meteo. The hourly refresh sends your saved home place. Open-Meteo's geocoding service may also receive the place name.
+**What it sends:** A weather request sends the place name you said to Open-Meteo. If your weather default is Current location, it sends your device's coordinates instead, rounded to about 1 km (about 10 km for a child). Home uses them for that one request and never stores them. The hourly refresh sends your saved home place. Open-Meteo's geocoding service may also receive a place name.
 
 **Who can use it:** Everyone. The package floor is child.
 

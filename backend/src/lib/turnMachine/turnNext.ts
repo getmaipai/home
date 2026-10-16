@@ -84,6 +84,9 @@ export interface RunTurnNextOpts {
   // dictated chat turn - unwired to any client today (no dictation
   // marker exists yet), plumbed and tested ahead of a real caller.
   spoken?: boolean;
+  // PLACE-WEATHER-01: this request's coordinates for a Current location weather
+  // answer; held in memory for the turn, never persisted or logged.
+  currentLocation?: { lat: number; lon: number; area?: string | null };
   // THINK-DEFAULT-01 (dev.md "U6 rerun ruling" (b) 1): mirrors the old
   // path's own RunTurnOpts.thinking exactly - the person's per-turn
   // toggle (routes/turn.ts's `dropReasoning ? false : body.thinking`,
@@ -579,6 +582,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     end: null,
     temporary,
     spoken: opts.spoken === true,
+    ...(opts.currentLocation ? { currentLocation: opts.currentLocation } : {}),
     ...(bare ? { bare: true } : {}),
     ...(supersedes ? { supersedes } : {}),
     ...(continuation ? { continuation } : {}),

@@ -3,7 +3,18 @@
   "inputs": [
     {
       "name": "place",
-      "selector": "text"
+      "selector": "text",
+      "required": false
+    },
+    {
+      "name": "latitude",
+      "selector": "number",
+      "required": false
+    },
+    {
+      "name": "longitude",
+      "selector": "number",
+      "required": false
     }
   ],
   "steps": [
@@ -11,30 +22,40 @@
       "op": "fetch",
       "as": "geo",
       "url": "https://geocoding-api.open-meteo.com/v1/search?count=1&name={place}",
-      "method": "GET"
-    },
-    {
-      "op": "pick",
-      "as": "lat",
-      "from": "geo",
-      "path": "results.0.latitude"
-    },
-    {
-      "op": "pick",
-      "as": "lon",
-      "from": "geo",
-      "path": "results.0.longitude"
+      "method": "GET",
+      "unless_set": "latitude"
     },
     {
       "op": "pick",
       "as": "place_name",
       "from": "geo",
-      "path": "results.0.name"
+      "path": "results.0.name",
+      "unless_set": "latitude"
+    },
+    {
+      "op": "pick",
+      "as": "latitude",
+      "from": "geo",
+      "path": "results.0.latitude",
+      "unless_set": "latitude"
+    },
+    {
+      "op": "pick",
+      "as": "longitude",
+      "from": "geo",
+      "path": "results.0.longitude",
+      "unless_set": "longitude"
+    },
+    {
+      "op": "pick",
+      "as": "place_name",
+      "from": "place",
+      "unless_set": "place_name"
     },
     {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code&hourly=temperature_2m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=7&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit",
       "method": "GET"
     },
     {

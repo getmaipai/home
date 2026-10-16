@@ -12,9 +12,9 @@
 // function - a first draft hand-duplicated the template string here
 // instead, which a second review pass caught) is the one place that
 // question is built; `isFixedHomeCardQuery()` below just re-derives it
-// from the same household.home_place setting the frontend itself reads
+// from the same household home place the frontend itself reads
 // and compares against the actual submitted text.
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { householdHomePlaceName } from "@/lib/places";
 import { weatherCardQuestion } from "@/homeCardQuestions";
 
 /** True only for the exact question a Home card is allowed to ask
@@ -25,6 +25,6 @@ import { weatherCardQuestion } from "@/homeCardQuestions";
  * turn normally instead of honoring `ephemeral` for it. A future second
  * card gets its own line here, not a broader pattern match. */
 export function isFixedHomeCardQuery(text: string): boolean {
-  const place = getHouseholdSettingValue("household.home_place");
-  return text === weatherCardQuestion(typeof place === "string" && place.length > 0 ? place : undefined);
+  const place = householdHomePlaceName();
+  return text === weatherCardQuestion(place && place.length > 0 ? place : undefined);
 }

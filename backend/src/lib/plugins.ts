@@ -552,8 +552,15 @@ export async function runPlugin(
   actor: PersonRow,
   inputs: Record<string, unknown>,
   turn?: { id: string; conversationId?: string },
-  options: { signal?: AbortSignal; deadlineAt?: number } = {},
+  options: { signal?: AbortSignal; deadlineAt?: number; hostInputs?: Record<string, unknown>; uncached?: boolean } = {},
 ): Promise<PluginOpResult<PluginResult>> {
+  // PLACE-WEATHER-01: latitude and longitude are host-only recipe inputs. A model
+  // or a direct caller can never supply them; the runner merges its own after
+  // validation, so they stay out of the tool call, the turn record and logs.
+  if (id === "weather") {
+    const { latitude: _lat, longitude: _lon, ...rest } = inputs;
+    inputs = rest;
+  }
   const manifestResult = loadManifestOnly(id);
   if (!manifestResult.ok) return manifestResult;
   const manifest = manifestResult.value;
@@ -562,6 +569,9 @@ export async function runPlugin(
   }
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
+  if (id === "weather" && typeof inputs.place !== "string" && options.hostInputs?.latitude === undefined) {
+    return { ok: false, status: 400, error: "Weather needs a place. Name one, or set a default place or a household home place in Settings.", code: "bad_arguments" };
+  }
 
   if (manifest.tier === 1) {
     // KS-05b: while the News shelf is on, the news answer comes from the shelf the poller
@@ -630,9 +640,11 @@ export async function runPlugin(
   const { recipe } = loaded.value;
   // GENUI-05: rows the host reads for a block producer (packageBlocks.ts).
   const capture: BlockCapture = {};
-  const host = createHost(actor, manifest, [], turn, { ...options, capture });
+  // `uncached`: the request carries this request's own coordinates (Current
+  // location), and the package cache would write them to disk inside the URL.
+  const host = createHost(actor, options.uncached ? { ...manifest, cache: undefined } : manifest, [], turn, { ...options, capture });
   try {
-    const value = await runRecipe(recipe, inputs, host);
+    const value = await runRecipe(recipe, options.hostInputs ? { ...inputs, ...options.hostInputs } : inputs, host);
     // The package's blocks come from this run's own data; a failure to build
     // one never changes the reply (the blocks are an addition to it).
     let blocks: Record<string, unknown>[] = [];
