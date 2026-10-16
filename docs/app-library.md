@@ -24,4 +24,7 @@ selection order; stale routes are ignored.
 
 Installed backend plugins are not automatically launchable frontend apps.
 Automatic package discovery needs a route-registration and app-metadata
-contract before it can safely contribute entries to this catalog.
+contract before it can safely contribute entries to this catalog. That
+contract is designed (not built) in
+[plans/app-kind-2026-10-16.md](plans/app-kind-2026-10-16.md): one `apps/*`
+route, `GET /api/apps` merged into the catalog, and pins unchanged.
