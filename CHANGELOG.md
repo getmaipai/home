@@ -3,11 +3,18 @@
 All notable changes to MaiPai Home. Format follows
 [Keep a Changelog](https://keepachangelog.com); versions follow semver.
 Everything stays `0.x` until the product passes its battle-tested
-checklist (`docs/dev.md`); no release has been cut yet.
+checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-10-16
+
+First release.
+
 ### Added
+- Install: `scripts/install.sh` brings up Home and prints its address, then the setup wizard installs the AI engine (the Stack) when you choose that this computer runs the AI. Upgrades keep a snapshot of your data and `--rollback` returns to the last version. `uninstall.sh` keeps your data unless you type `DELETE MY DATA`. Home and Stack ports can be set with `MAIPAI_PORT` and `MAIPAI_STACK_PORT`.
+- Setup wizard: a silent engine on the plan screen offers Check again, install errors say what to do next, and a failed retry shows an alert.
+- Host tuning for an always-on Mac: `scripts/studio/host-tune.sh` checks and applies power, GPU memory, update and indexing settings, one at a time with your say-so.
 - Pictures under an answer: for an adult, Commons structured data ("depicts") now brings in
   more pictures of the subject and puts them first, behind the same checks as every other
   picture. Photos with children in them, and photos filed under another person's own
