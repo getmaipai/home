@@ -35163,7 +35163,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Removed.",
+            "description": "Confirmation text for the uninstall step.",
             "content": {
               "application/json": {
                 "schema": {
@@ -35174,10 +35174,14 @@
                       "enum": [
                         true
                       ]
+                    },
+                    "confirmation": {
+                      "type": "string"
                     }
                   },
                   "required": [
-                    "ok"
+                    "ok",
+                    "confirmation"
                   ]
                 }
               }
