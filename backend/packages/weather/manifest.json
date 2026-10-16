@@ -38,7 +38,7 @@
   "min_role": "child",
   "consequential": false,
   "offline": "unavailable",
-  "returns_blocks": ["spec_sheet", "chart", "data_table"],
+  "returns_blocks": ["weather_card", "spec_sheet", "chart", "data_table"],
   "config": [
     {
       "key": "weather.places",

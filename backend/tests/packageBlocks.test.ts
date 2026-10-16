@@ -251,7 +251,7 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
   }
 
   test("the manifest names the three kinds, and the recipe stays on the hosts the manifest permits", () => {
-    expect(allowed("weather")).toEqual(["spec_sheet", "chart", "data_table"]);
+    expect(allowed("weather")).toEqual(["weather_card", "spec_sheet", "chart", "data_table"]);
     const loaded = loadManifestOnly("weather");
     if (!loaded.ok) throw new Error(loaded.error);
     expect(loaded.value.permissions).toEqual(["net:geocoding-api.open-meteo.com", "net:api.open-meteo.com"]);
@@ -319,6 +319,18 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
     expect(table.props.rows[0]).toEqual({ day: "Fri Oct 9", high: 68.2, low: 52.4, rain: 10 });
     expect(table.props.rows[6]).toEqual({ day: "Thu Oct 15", high: 69.9, low: 53.1, rain: 5 });
     expect(table.props.caption).toBe("Next 7 days");
+  });
+
+  test("a full forecast (is_day, codes) returns the weather_card alone, and the tool round streams it as one valid block", async () => {
+    const full = forecast() as any;
+    full.current.is_day = 1;
+    full.daily.weather_code = [3, 1, 61, 63, 3, 0, 2];
+    const value = await withForecast(() => run("weather", people.owner, { place: "Lantern Bay" }), full);
+    expect((value.blocks as Block[]).map((b) => b.kind)).toEqual(["weather_card"]);
+    expect(AnswerBlock.safeParse((value.blocks as Block[])[0]).success).toBe(true);
+    const { output } = await withForecast(() => toolNode(toolState(people.owner), { proposals: [proposal("weather", { place: "Lantern Bay" }, "call-w2")] }, SIGNAL), full);
+    expect(output.toolEvents.map((e) => e.t)).toEqual(["tool_call", "tool_result", "block"]);
+    for (const event of output.toolEvents) expect(WireEvent.safeParse(event).success).toBe(true);
   });
 
   test("a forecast with no hourly data still answers: no chart, the sheet and the table it can build", async () => {

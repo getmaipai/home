@@ -4,11 +4,12 @@
 // with no chance-of-rain fields). The recipe runs against the spec's host
 // emulator, the same way the package smoke test does, and the card is checked
 // against the contract in this file because the pinned spec carries the card
-// only after the pin bump (until then weather returns its older three blocks).
+// as of spec-v0.1.152; the contract copy here pins the shape the package must produce.
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { z } from "zod";
+import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import { HostEmulator } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { runRecipe } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { loadPackage } from "@/lib/plugins";
@@ -112,10 +113,18 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     expect(props.daily).toHaveLength(8);
   });
 
-  test("until the pinned spec knows the card, the three older blocks are returned and the card is not", async () => {
+  test("the manifest lists the card, and the card is returned alone: valid against the spec, never beside the older three", async () => {
     const { result, manifest } = await runWeather("clear-day");
-    const kinds = (blocksForRecipeRun(manifest, result as any, {}) as { kind: string }[]).map((b) => b.kind);
-    // The pin bump (with the manifest's returns_blocks gaining the card) flips this to ["weather_card"]; the sets are never mixed.
-    expect(kinds).toEqual(["spec_sheet", "chart", "data_table"]);
+    expect(manifest.returns_blocks).toContain("weather_card");
+    const blocks = blocksForRecipeRun(manifest, result as any, {}) as { kind: string }[];
+    expect(blocks.map((b) => b.kind)).toEqual(["weather_card"]);
+    expect(AnswerBlock.safeParse(blocks[0]).success).toBe(true);
+  });
+
+  test("a card the spec rejects falls back to the older three blocks, never an empty answer", async () => {
+    const { result, manifest } = await runWeather("clear-day");
+    const broken = { ...(result as any), data: { ...(result as any).data, block_day_codes: ["x"] } };
+    // No valid day row: no card, so the sheet, chart and table (no codes needed) stand in.
+    expect((blocksForRecipeRun(manifest, broken, {}) as { kind: string }[]).map((b) => b.kind)).toEqual(["spec_sheet", "chart", "data_table"]);
   });
 });

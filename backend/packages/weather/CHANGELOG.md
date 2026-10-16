@@ -12,9 +12,9 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
   for `is_day`, the hourly chance of rain, each day's condition code
   and 8 days, on the same two Open-Meteo hosts, so the privacy row is
   unchanged. The card is returned alone, in place of the conditions
-  sheet, 24-hour chart and daily table, once the manifest lists it in
-  `returns_blocks` (which waits for the spec tag that knows the card);
-  until then the three older blocks are returned. Never both.
+  sheet, 24-hour chart and daily table; those three come back only when
+  the card cannot be built (no current reading or no valid day row), so
+  the two are never shown together.
 
 ### Changed
 
