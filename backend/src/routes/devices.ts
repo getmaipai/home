@@ -21,6 +21,7 @@ import { closeDeviceCommandChannel, deviceCommandWebSocket, issueDeviceCommand }
 import { listHubEndpoints } from "@/lib/hubEndpoints";
 import { getHubInstanceId } from "@/lib/hubIdentity";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { listRobotPeople } from "@/lib/robotPeople";
 
 export const devicesRoutes = apiRouter();
 
@@ -148,6 +149,23 @@ devicesRoutes.openapi(hubEndpointsRoute, async (c) => {
     .filter((endpoint) => endpoint.kind !== "overlay" || includeOverlay)
     .map((endpoint) => ({ ...endpoint, instanceId })), 200);
 });
+
+const RobotPeopleSchema = z.object({
+  as_of: z.string(),
+  people: z.array(z.object({ person_id: z.string(), age_band: z.enum(["adult", "teen", "child"]), follow_up: z.boolean() })),
+});
+const robotPeopleRoute = createRoute({
+  method: "get",
+  path: "/me/people",
+  tags: ["Devices"],
+  summary: "The age band and follow-up switch of each person this robot can recognise",
+  middleware: [requireDeviceSession("robot")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: RobotPeopleSchema } }, description: "A wholesale snapshot: a person missing from it is forgotten by the robot. No names; only people with a live, robot-eligible face print." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not a robot device session" }),
+  },
+});
+devicesRoutes.openapi(robotPeopleRoute, (c) => c.json({ as_of: new Date().toISOString(), people: listRobotPeople() }, 200));
 
 const RobotAssetsSchema = z.object({
   assets: z.array(z.object({

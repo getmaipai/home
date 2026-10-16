@@ -164,7 +164,11 @@ biometricPrintsRoutes.openapi(deleteRoute, (c) => {
 // purpose, so even a household owner's own browser session gets 403, not
 // 200 - and specifically "camera", not just any robot, since a robot
 // with no camera has no legitimate reason to hold face-recognition data.
-const FullPrintSchema = SummarySchema.extend({ embedding: z.array(z.number()) });
+const FullPrintSchema = SummarySchema.extend({
+  embedding: z.array(z.number()),
+  // FACE-WATCH-01: the print owner's own `person.vision.watch`; the robot keeps the stricter of this and its device level.
+  vision_watch: z.enum(["off", "presence", "identify"]),
+});
 
 const syncRoute = createRoute({
   method: "get",

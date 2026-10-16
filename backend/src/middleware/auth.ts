@@ -203,6 +203,8 @@ const ROBOT_SESSION_ROUTES: ReadonlyArray<readonly [string, RegExp]> = [
   ["GET", /^\/api\/devices\/me\/assets\/?$/],
   ["GET", /^\/api\/devices\/me\/assets\/[^/]+\/?$/],
   ["GET", /^\/api\/devices\/me\/hub-endpoints\/?$/],
+  // FOLLOWUP-01: the roster (age band and follow-up switch) the robot's follow-up window decides from.
+  ["GET", /^\/api\/devices\/me\/people\/?$/],
   ["GET", /^\/api\/biometric-prints\/sync\/?$/],
   // LIVE-VIEW-01: the robot posts JPEG frames of an open live view.
   ["POST", /^\/api\/devices\/me\/stream\/[^/]+\/?$/],

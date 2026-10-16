@@ -37001,3 +37001,22 @@ cancelled). The button is offered to everyone on a reachable robot card and the 
 the list) is shown as written, so the frontend carries no second copy of the rule. The footer row wraps, because at 390 px three
 buttons ran off the card. Verified with `bun run screenshots --live-view-review` (desktop and phone, both themes, a stubbed
 one-frame stream; the demo household has no paired robot). Not exercised: a real robot's stream (the bot half).
+
+## ROBOT-HUB-GAPS-01: watch level in sync, and the robot people roster (2026-10-16)
+
+`GET /api/biometric-prints/sync` now carries `vision_watch` (`off`, `presence` or `identify`) on every print, read from that
+person's own `person.vision.watch`; any other stored value reads as `presence`, which is the bot's old behavior, so the field is
+additive. A child cannot write `person.vision.watch` or `person.robot.follow_up` for themselves (the same parent-gated guard as
+`person.robot.may_address`); the registry marks both as guardian-controlled for the child band.
+
+`GET /api/devices/me/people` (robot session only, on the robot allowlist) feeds the bot's `PeopleDirectory`:
+`{as_of, people: [{person_id, age_band, follow_up}]}`, sorted by person id, with no names. It lists exactly the people the print
+sync would send (a live, robot-eligible face print), so a teen without their own confirmation, a guest and a revoked print never
+appear and the robot treats them as unknown (the child default). `follow_up` is the effective switch: adults and teens are true
+unless set false; a child is true only when a parent or admin saved true. The privacy page gains the `platform:robot-people` row.
+Not built: the bot poller that fills `PeopleDirectory` from this route. Not exercised: a real robot.
+
+Open, each blocked on commons (this lane does not bump the pin): the motor-reboot offer (bot MOTOR-RECOVER-01) needs a spec
+signal from the robot (`RobotState` has no motor fields and the offer frames are hub to robot) and a `motor_reboot` command; the
+Home robot-card prompt follows. HEARTBEAT-01 is not started (needs SCHED-02, MODEL-BG-SPEC-01 and the `background` surface), so
+nothing calls `createRobotOffer` yet.

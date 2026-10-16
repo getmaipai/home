@@ -50,7 +50,10 @@ function loadRegistry(): SettingsKey[] {
 }
 
 // INITIATIVE-01: person.robot.may_address is guardian-set for a child too (assertCanSetRobotMayAddress in settings.ts).
-const CHILD_GUARDIAN_KEYS = new Set(["chat.photo_uploads", "reference.images", "person.robot.may_address"]);
+// FOLLOWUP-01 makes person.robot.follow_up the same (off for a child until a parent saves it).
+const CHILD_GUARDIAN_KEYS = new Set(["chat.photo_uploads", "reference.images", "person.robot.may_address", "person.robot.follow_up"]);
+// FACE-WATCH-01: a child's own watch level is the parent's to choose; the default stays `presence` (a select, not a boolean).
+const CHILD_GUARDIAN_CONTROL_ONLY_KEYS = new Set(["person.vision.watch"]);
 // MINOR-TOPICS-01e: a child's sensitive-subject levels are guardian-set (assertCanSetChildTopic in settings.ts).
 const isChildTopicKey = (key: string) => key.startsWith("topics.");
 const ADMIN_ONLY_KEYS = new Set([
@@ -71,7 +74,7 @@ function withPersonGuardFacts(key: SettingsKey): SettingsKey {
     adult: key.key === "search.safe_search" ? "off" : key.default,
   };
   const control = {
-    child: CHILD_GUARDIAN_KEYS.has(key.key) || ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
+    child: CHILD_GUARDIAN_KEYS.has(key.key) || CHILD_GUARDIAN_CONTROL_ONLY_KEYS.has(key.key) || ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
     teen: ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
     adult: ADMIN_ONLY_KEYS.has(key.key) || isChildTopicKey(key.key) ? "guardian" : "self",
   };

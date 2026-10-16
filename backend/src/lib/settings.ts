@@ -618,6 +618,11 @@ function assertCanSetPageTextCleaning(actor: PersonRow, targetId: string): Setti
  * can never write this key for themselves; everyone else follows the ordinary person-scope rule. */
 export const LIVE_VIEW_WHO_KEY = "robot.live_view.who";
 export const ROBOT_MAY_ADDRESS_KEY = "person.robot.may_address";
+/** The robot follow-up window (FOLLOWUP-01) and the person's own watch level (FACE-WATCH-01) follow the same
+ * rule: the registry help says a parent turns them on for a child, so a child never writes them for themselves. */
+export const ROBOT_FOLLOW_UP_KEY = "person.robot.follow_up";
+export const VISION_WATCH_KEY = "person.vision.watch";
+const PARENT_GATED_ROBOT_KEYS: ReadonlySet<string> = new Set([ROBOT_MAY_ADDRESS_KEY, ROBOT_FOLLOW_UP_KEY, VISION_WATCH_KEY]);
 function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
   if (actor.id === targetId && actor.role === "child") {
     return { ok: false, status: 403, error: "A parent turns this on for you. Ask the person who manages Home." };
@@ -675,7 +680,7 @@ export function setValue(
           ? assertCanSetAnswerPictures(actor, parsed.id!)
         : key === "search.page_text_cleaning" && parsed.kind === "person"
           ? assertCanSetPageTextCleaning(actor, parsed.id!)
-        : key === ROBOT_MAY_ADDRESS_KEY && parsed.kind === "person"
+        : PARENT_GATED_ROBOT_KEYS.has(key) && parsed.kind === "person"
           ? assertCanSetRobotMayAddress(actor, parsed.id!)
         : key.startsWith("topics.") && parsed.kind === "person"
           ? assertCanSetChildTopic(actor, parsed.id!)

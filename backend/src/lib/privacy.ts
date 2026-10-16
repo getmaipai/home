@@ -356,6 +356,19 @@ function inboundConnections(): PrivacyConnection[] {
       direction: "inbound",
     },
     {
+      id: "platform:robot-people",
+      source: "MaiPai Home",
+      sourceKind: "platform",
+      destination: "your own network only - nothing leaves the house for this row",
+      when: "when a paired robot asks Home which people it may recognise, and its face-print list is refreshed",
+      what:
+        "Home gives that paired robot, for each person with a saved face print, an anonymous person id, whether they are an adult, teen or child, whether the robot may keep listening for a follow-up after it answers them, and that person's own camera watch level (off, presence or identify). No names, no birthdates and no one without a saved face print. No outside service is used.",
+      who: "the paired robot device session",
+      optIn: false,
+      retention: "the robot keeps the latest list in memory and replaces it on every refresh; Home keeps no separate request record",
+      direction: "inbound",
+    },
+    {
       id: "platform:robot-live-view",
       source: "MaiPai Home",
       sourceKind: "platform",

@@ -206,7 +206,7 @@ describe("the hub's own connections", () => {
   test("direction structurally marks inbound rows - every other row is outbound", () => {
     const rows = privacyConnections();
     const inbound = rows.filter((r) => r.direction === "inbound");
-    expect(inbound.map((r) => r.id)).toEqual(["platform:robot-hub-endpoints", "platform:robot-live-view", "platform:inbound-api"]);
+    expect(inbound.map((r) => r.id)).toEqual(["platform:robot-hub-endpoints", "platform:robot-people", "platform:robot-live-view", "platform:inbound-api"]);
     for (const row of rows) {
       if (!inbound.includes(row)) expect(row.direction).toBe("outbound");
     }

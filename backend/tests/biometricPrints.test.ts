@@ -10,6 +10,7 @@ import { storeRobotCredential } from "@/lib/robotCredentials";
 import type { DeviceKind } from "@/lib/devices";
 import { encryptSecret } from "@/lib/secrets";
 import { newBiometricPrintId } from "@/lib/id";
+import { setValue } from "@/lib/settings";
 
 beforeEach(() => resetDb());
 
@@ -354,6 +355,40 @@ describe("GET /api/biometric-prints/sync", () => {
 
     const body = (await (await robot.get("/api/biometric-prints/sync")).json()) as { prints: Array<{ person_id: string }> };
     expect(body.prints.map((print) => print.person_id)).toEqual([personId]);
+  });
+
+  test("each print carries its own person's vision_watch, defaulting to presence", async () => {
+    const { owner, personId } = await ownerPersonId();
+    const other = await addPerson(owner, "Marlow", "adult", "adultpin1");
+    insertRawPrint(personId, "face");
+    insertRawPrint(other.id, "face");
+    const ownerRow = db.select().from(people).where(eq(people.id, personId)).get()!;
+    expect(setValue(ownerRow, `person:${personId}`, "person.vision.watch", "identify").ok).toBe(true);
+    const robot = await deviceSession(personId, "robot", ["camera"]);
+
+    const body = (await (await robot.get("/api/biometric-prints/sync")).json()) as { prints: Array<{ person_id: string; vision_watch: string }> };
+    const byPerson = Object.fromEntries(body.prints.map((print) => [print.person_id, print.vision_watch]));
+    expect(byPerson).toEqual({ [personId]: "identify", [other.id]: "presence" });
+  });
+
+  test("a person who lowers their watch level to off is sent as off on the next sync", async () => {
+    const { personId } = await ownerPersonId();
+    insertRawPrint(personId, "face");
+    const ownerRow = db.select().from(people).where(eq(people.id, personId)).get()!;
+    expect(setValue(ownerRow, `person:${personId}`, "person.vision.watch", "off").ok).toBe(true);
+    const robot = await deviceSession(personId, "robot", ["camera"]);
+
+    const body = (await (await robot.get("/api/biometric-prints/sync")).json()) as { prints: Array<{ vision_watch: string }> };
+    expect(body.prints.map((print) => print.vision_watch)).toEqual(["off"]);
+  });
+
+  test("a child cannot raise their own watch level; a parent can", async () => {
+    const { owner, personId } = await ownerPersonId();
+    const child = await addPerson(owner, "Bramble", "child");
+    const childRow = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    const ownerRow = db.select().from(people).where(eq(people.id, personId)).get()!;
+    expect(setValue(childRow, `person:${child.id}`, "person.vision.watch", "identify")).toMatchObject({ ok: false, status: 403 });
+    expect(setValue(ownerRow, `person:${child.id}`, "person.vision.watch", "identify").ok).toBe(true);
   });
 
   test("a deleted/tombstoned face print never appears", async () => {

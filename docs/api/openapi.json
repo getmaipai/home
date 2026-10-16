@@ -24307,6 +24307,82 @@
         }
       }
     },
+    "/api/devices/me/people": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "The age band and follow-up switch of each person this robot can recognise",
+        "responses": {
+          "200": {
+            "description": "A wholesale snapshot: a person missing from it is forgotten by the robot. No names; only people with a live, robot-eligible face print.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "as_of": {
+                      "type": "string"
+                    },
+                    "people": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "person_id": {
+                            "type": "string"
+                          },
+                          "age_band": {
+                            "type": "string",
+                            "enum": [
+                              "adult",
+                              "teen",
+                              "child"
+                            ]
+                          },
+                          "follow_up": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "person_id",
+                          "age_band",
+                          "follow_up"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "as_of",
+                    "people"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not a robot device session",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/devices/me/assets": {
       "get": {
         "tags": [
@@ -34135,6 +34211,14 @@
                             "items": {
                               "type": "number"
                             }
+                          },
+                          "vision_watch": {
+                            "type": "string",
+                            "enum": [
+                              "off",
+                              "presence",
+                              "identify"
+                            ]
                           }
                         },
                         "required": [
@@ -34151,7 +34235,8 @@
                           "updated_at",
                           "deleted_at",
                           "hlc",
-                          "embedding"
+                          "embedding",
+                          "vision_watch"
                         ]
                       }
                     }

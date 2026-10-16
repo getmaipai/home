@@ -28,6 +28,7 @@ import { biometricPrints, people } from "@/db/schema";
 import { newBiometricPrintId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { encryptSecret, decryptSecret } from "@/lib/secrets";
+import { VISION_WATCH_KEY, getSettingValueForPerson } from "@/lib/settings";
 import { canManage } from "@/lib/personLifecycle";
 import { SFACE_DIM, SFACE_MODEL_ID, SFACE_SHA256 } from "@/lib/faceModelPins";
 import type { PersonRow } from "@/types";
@@ -316,19 +317,45 @@ export function deleteBiometricPrint(actor: PersonRow, printId: string): OpResul
  * same isNull(deletedAt) filter every other live-print read in this file
  * already uses; because of that, every row this query returns is
  * guaranteed to still have an embedding to decrypt. */
-export function listPrintsForSync(): BiometricPrintT[] {
+export type VisionWatchLevel = "off" | "presence" | "identify";
+
+/** A person's own `person.vision.watch` (FACE-WATCH-01). Anything the registry would not accept reads as the
+ * registry default, `presence`: the robot then names nobody, which is the safe direction. */
+export function visionWatchOf(personId: string): VisionWatchLevel {
+  const value = getSettingValueForPerson(personId, VISION_WATCH_KEY);
+  return value === "off" || value === "identify" ? value : "presence";
+}
+
+/** Every live face print whose person may reach a robot, with the owner's role. One definition for the
+ * print sync and the roster feed, so the two never disagree about who a robot may know. */
+function liveRobotFaceRows(): Array<{ print: PrintRow; personRole: string }> {
   const rows = db
     .select({ print: biometricPrints, personRole: people.role })
     .from(biometricPrints)
     .innerJoin(people, eq(biometricPrints.personId, people.id))
     .where(and(eq(biometricPrints.modality, "face"), isNull(biometricPrints.deletedAt), isNull(people.deletedAt)))
     .all();
+  return rows.filter(({ personRole }) => eligibleForRobotSync(personRole));
+}
 
-  return rows.filter(({ personRole }) => eligibleForRobotSync(personRole)).map(({ print: row }) => ({
-    ...toSummary(row),
-    // Safe: a live (deletedAt IS NULL) row always still has its embedding -
-    // only the tombstone path (above) ever nulls embeddingEncrypted, and
-    // it sets deletedAt in the same write.
-    embedding: JSON.parse(decryptSecret(row.embeddingEncrypted!)) as number[],
-  }));
+/** The people a robot may be told about: those with a live, robot-eligible face print. */
+export function listRobotKnownPersonIds(): string[] {
+  return [...new Set(liveRobotFaceRows().map(({ print }) => print.personId))];
+}
+
+/** Each entry also carries the print owner's own `vision_watch` (an additive field, not part of the spec's
+ * BiometricPrint record): the robot takes the stricter of this and the device's `robot.camera.watch_level`. */
+export function listPrintsForSync(): Array<BiometricPrintT & { vision_watch: VisionWatchLevel }> {
+  const watch = new Map<string, VisionWatchLevel>();
+  return liveRobotFaceRows().map(({ print: row }) => {
+    if (!watch.has(row.personId)) watch.set(row.personId, visionWatchOf(row.personId));
+    return {
+      ...toSummary(row),
+      vision_watch: watch.get(row.personId)!,
+      // Safe: a live (deletedAt IS NULL) row always still has its embedding -
+      // only the tombstone path (above) ever nulls embeddingEncrypted, and
+      // it sets deletedAt in the same write.
+      embedding: JSON.parse(decryptSecret(row.embeddingEncrypted!)) as number[],
+    };
+  });
 }
