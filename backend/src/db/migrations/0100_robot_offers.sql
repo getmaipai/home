@@ -1,0 +1,20 @@
+CREATE TABLE `robot_offers` (
+	`id` text PRIMARY KEY NOT NULL,
+	`person_id` text NOT NULL,
+	`tier` integer NOT NULL,
+	`text` text NOT NULL,
+	`non_personal_line` text NOT NULL,
+	`provenance` text NOT NULL,
+	`hlc` text NOT NULL,
+	`expires_at` text NOT NULL,
+	`state` text NOT NULL,
+	`device_id` text,
+	`created_at` text NOT NULL,
+	`sent_at` text,
+	`closed_at` text,
+	`snoozed_until` text,
+	`turn_id` text,
+	`centre_notified_at` text,
+	FOREIGN KEY (`person_id`) REFERENCES `people`(`id`) ON UPDATE no action ON DELETE cascade,
+	FOREIGN KEY (`device_id`) REFERENCES `devices`(`id`) ON UPDATE no action ON DELETE set null
+);

@@ -109,6 +109,7 @@ recoverInterruptedJobsAtBoot();
 ensureCoreJob("memory.maintenance", "every:1d");
 ensureCoreJob("conversation.retention", "every:1d");
 ensureCoreJob("notifications.deliver_held", "every:1m");
+ensureCoreJob("robot.offers.tick", "every:1m");
 // A memory whose embed() call failed at write time (embed backend down,
 // or a transient error) sits in pending_embeddings until this retries
 // it; every:1m is the finest grain the scheduler's own grammar supports,

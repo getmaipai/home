@@ -35,10 +35,17 @@ export type CommandsOutput =
   // `whoAnswer` (THIN-7E): the reply is ASK-01's answer to a who question; the outcome is
   // only the answer node's input and is never recorded on the turn.
   | { matched: true; text: string; speech?: string; outcome: import("@/lib/turnContext").ToolExecutionOutcome; whoAnswer?: true;
+      /** INITIATIVE-01: the reply answers a robot offer; the outcome is only the answer node's input. */
+      offerAnswer?: true;
       /** GENUI-05: the package's accepted answer blocks, as `block` events (a command match runs no tool round). */
       blockEvents?: import("@maipai/spec/stack/ts/turn-stream-event.js").TurnStreamEvent[] };
 
 export const commandsNode: Node<CommandsInput, CommandsOutput> = async (state, input) => {
+  // INITIATIVE-01: the answer to a robot offer comes first; the prepared text is the reply and no model runs.
+  if (state.offer) {
+    const outcome = outcomeOf({ callId: `offer:${state.offer.id}`, packageId: "engine", status: "succeeded", via: "command", userMessage: state.offer.reply });
+    return { outcome: { ok: true }, output: { matched: true, text: state.offer.reply, outcome, offerAnswer: true } };
+  }
   // THIN-7E (ASK-01): the answer to a question put on an earlier turn, or a judge's open
   // question answered before it is put, comes before every command, as on the old path
   // (after `safety`, before routing). The deterministic parser reads it; no model runs.

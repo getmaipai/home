@@ -49,7 +49,8 @@ function loadRegistry(): SettingsKey[] {
   return combined.map(withPersonGuardFacts);
 }
 
-const CHILD_GUARDIAN_KEYS = new Set(["chat.photo_uploads", "reference.images"]);
+// INITIATIVE-01: person.robot.may_address is guardian-set for a child too (assertCanSetRobotMayAddress in settings.ts).
+const CHILD_GUARDIAN_KEYS = new Set(["chat.photo_uploads", "reference.images", "person.robot.may_address"]);
 // MINOR-TOPICS-01e: a child's sensitive-subject levels are guardian-set (assertCanSetChildTopic in settings.ts).
 const isChildTopicKey = (key: string) => key.startsWith("topics.");
 const ADMIN_ONLY_KEYS = new Set([

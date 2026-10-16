@@ -354,6 +354,8 @@ export interface TurnValue {
   parent_turn_id?: string | null;
   branch_chosen?: boolean;
   latency?: TurnLatency;
+  /** INITIATIVE-01: present when this turn answered a robot offer; the id of that offer. */
+  offer_id?: string;
   /** CHAT-PARITY-04: a continuation is a new sibling answer, not an edit;
    * the original stopped turn remains immutable and this points back to it. */
   continued_from_turn_id?: string | null;

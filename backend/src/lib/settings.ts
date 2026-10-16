@@ -607,6 +607,16 @@ function assertCanSetPageTextCleaning(actor: PersonRow, targetId: string): Setti
   return { ok: false, status: 403, error: "Only a household owner or admin changes this for a child or teen, and only an adult changes their own." };
 }
 
+/** INITIATIVE-01: the robot may speak first to a child only on a parent's or admin's switch, so a child
+ * can never write this key for themselves; everyone else follows the ordinary person-scope rule. */
+export const ROBOT_MAY_ADDRESS_KEY = "person.robot.may_address";
+function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
+  if (actor.id === targetId && actor.role === "child") {
+    return { ok: false, status: 403, error: "A parent turns this on for you. Ask the person who manages Home." };
+  }
+  return assertCanAccessScope(actor, { kind: "person", id: targetId }, "write");
+}
+
 export function setValue(
   actor: PersonRow,
   scope: string,
@@ -657,6 +667,8 @@ export function setValue(
           ? assertCanSetAnswerPictures(actor, parsed.id!)
         : key === "search.page_text_cleaning" && parsed.kind === "person"
           ? assertCanSetPageTextCleaning(actor, parsed.id!)
+        : key === ROBOT_MAY_ADDRESS_KEY && parsed.kind === "person"
+          ? assertCanSetRobotMayAddress(actor, parsed.id!)
         : key.startsWith("topics.") && parsed.kind === "person"
           ? assertCanSetChildTopic(actor, parsed.id!)
         : key === PERSON_STORAGE_CAP_KEY
@@ -796,6 +808,14 @@ export function getSettingValueForPerson(personId: string, key: string): unknown
     return resolveLayeredScalar(keyDef, personId, person ? speakerAgeBand(person, new Date()) : "adult").value;
   }
   return resolveStoredValue(`person:${personId}`, keyDef);
+}
+
+/** A device-scope setting's resolved value, no actor gate: the hub resolving a robot's own room setting
+ * (robot.initiative.allowed_here) for a gate it enforces itself. Never exposed through a route. */
+export function getDeviceSettingValue(deviceId: string, key: string): unknown {
+  const keyDef = getRegistryKey(key);
+  if (!keyDef || keyDef.scope !== "device") return undefined;
+  return resolveStoredValue(`device:${deviceId}`, keyDef);
 }
 
 /** Whether a person setting was explicitly saved. Used for age-band defaults

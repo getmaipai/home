@@ -61,6 +61,17 @@ function isDeliveredChannel(channel: string): channel is NotificationChannel {
 // off the household's own history of what happened, not just muting a
 // ping. Every type - configurable or not - always gets it.
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
+  // INITIATIVE-01: a robot offer nobody answered in time lands here once, so the item is not lost.
+  // The body never carries the prepared text, only the plain line the robot would have said.
+  {
+    id: "robot.offer_missed",
+    level: "passive",
+    audience: "person",
+    template: "{line}",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
   {
     id: "safety.alarm",
     level: "immediate",

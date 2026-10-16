@@ -1212,6 +1212,30 @@ export const deviceCommands = sqliteTable("device_commands", {
   ackedAt: text("acked_at"),
 });
 
+// INITIATIVE-01: the robot-offer queue. The record shape is the spec's
+// RobotOffer (id, person_id, tier, text, expires_at, provenance, hlc); the
+// rest is the hub's own delivery bookkeeping. `state` is one of queued, sent,
+// snoozed, accepted, declined, ignored, expired. `text` is the prepared
+// content, spoken only after a spoken acceptance and through the output gate.
+export const robotOffers = sqliteTable("robot_offers", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id, { onDelete: "cascade" }),
+  tier: integer("tier").notNull(),
+  text: text("text").notNull(),
+  nonPersonalLine: text("non_personal_line").notNull(),
+  provenance: text("provenance").notNull(),
+  hlc: text("hlc").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  state: text("state").notNull(),
+  deviceId: text("device_id").references(() => devices.id, { onDelete: "set null" }),
+  createdAt: text("created_at").notNull(),
+  sentAt: text("sent_at"),
+  closedAt: text("closed_at"),
+  snoozedUntil: text("snoozed_until"),
+  turnId: text("turn_id"),
+  centreNotifiedAt: text("centre_notified_at"),
+});
+
 // ROBOT-CARD-01: the latest robot-reported state is a hub-local
 // projection, deliberately separate from the synced Device record.
 export const deviceStates = sqliteTable("device_states", {

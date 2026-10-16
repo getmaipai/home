@@ -202,7 +202,7 @@ function validTime(value: unknown): number | undefined {
   return hour! * 60 + minute!;
 }
 
-function quietHours(recipient: PersonRow, now: Date): { active: boolean; endAt: Date } {
+export function quietHours(recipient: PersonRow, now: Date): { active: boolean; endAt: Date } {
   const householdFrom = validTime(getHouseholdSettingValue(`household.${QUIET_FROM}`)) ?? 21 * 60;
   const householdTo = validTime(getHouseholdSettingValue(`household.${QUIET_TO}`)) ?? 7 * 60;
   const personFromValue = getSettingValueForPerson(recipient.id, `person.${QUIET_FROM}`);

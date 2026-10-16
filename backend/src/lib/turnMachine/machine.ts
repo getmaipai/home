@@ -304,7 +304,7 @@ export const turnMachine = setup({
     },
     recordCommandOutcome: ({ context }) => {
       const step = context.step as CommandsOutput;
-      if (step.matched && !step.whoAnswer) {
+      if (step.matched && !step.whoAnswer && !step.offerAnswer) {
         context.turnState.outcomes.push(step.outcome);
         // GENUI-05: the matched package's accepted blocks, in the turn's tool events.
         if (step.blockEvents?.length) context.turnState.toolEvents.push(...step.blockEvents);

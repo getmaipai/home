@@ -11,6 +11,7 @@ import { deviceCommands, devices } from "@/db/schema";
 import { updateMutedFromDeviceCommand } from "@/lib/deviceStates";
 import { nextHlc } from "@/lib/hlc";
 import { getRegistryKey } from "@/lib/settingsRegistry";
+import { declineRobotOfferFromChannel, snoozeRobotOffer } from "@/lib/robotOffers";
 
 export const DEVICE_COMMAND_RETENTION_MS = 24 * 60 * 60 * 1000;
 export const DEVICE_HEARTBEAT_MS = 15_000;
@@ -299,16 +300,24 @@ export function deviceCommandWebSocket(deviceId: string, lastEventId?: string): 
         sendControl(connection, { type: result.ok ? "alarm_action_accepted" : "alarm_action_rejected", alarm_id: alarmAction.alarm_id, ...(result.ok ? { state: result.state } : { message: result.error }) });
         return;
       }
-      if (typeof message === "object" && message !== null && (message as Record<string, unknown>).kind === "offer_answer") {
+      const kind = typeof message === "object" && message !== null ? (message as Record<string, unknown>).kind : undefined;
+      if (kind === "offer_answer" || kind === "offer_snooze") {
         const frame = RobotChannelFrame.safeParse(message);
-        if (!frame.success || frame.data.kind !== "offer_answer") {
+        if (!frame.success || (frame.data.kind !== "offer_answer" && frame.data.kind !== "offer_snooze")) {
           sendControl(connection, { type: "error", message: "invalid offer answer: source must be voice" });
           return;
         }
-        // Offer acceptance is intentionally not connected to turn creation
-        // here; this guard ensures a future handler cannot bypass the shared
-        // voice-only wire contract.
-        sendControl(connection, { type: "error", message: "offer answers are not currently actionable" });
+        // INITIATIVE-01: the frame only carries that the robot heard a voice. A snooze and a decline are applied here;
+        // an accept is never applied from a frame, because the words are checked in the turn that speaks the offer
+        // (POST /api/turn with ask_answer {offer_id, approved}). The robot is told to open that turn.
+        const payload = frame.data.payload;
+        if (frame.data.kind === "offer_snooze") {
+          sendControl(connection, { type: snoozeRobotOffer(deviceId, payload.offer_id) ? "offer_snoozed" : "offer_stale", offer_id: payload.offer_id });
+        } else if (!(payload as { approved: boolean }).approved) {
+          sendControl(connection, { type: declineRobotOfferFromChannel(deviceId, payload.offer_id) ? "offer_declined" : "offer_stale", offer_id: payload.offer_id });
+        } else {
+          sendControl(connection, { type: "offer_turn", offer_id: payload.offer_id });
+        }
         return;
       }
       sendControl(connection, { type: "error", message: "unknown device channel message" });

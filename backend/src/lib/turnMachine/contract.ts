@@ -329,6 +329,10 @@ export interface TurnState {
   /** THIN-7E: this turn was the answer (or cancel) of a who question, read by the parser;
    * no model ran. finishTurn() reports it as source "confirm", as the old engine did. */
   whoAnswer?: boolean;
+  /** INITIATIVE-01: the turn answers a robot offer. `reply` is the offer's prepared text (accepted) or a short
+   * acknowledgement (declined, snoozed); the commands node returns it without the model, and output_gate checks it
+   * like any other reply. `id` rides the done value as `offer_id`. */
+  offer?: { id: string; reply: string };
   /** THIN-7E: set by the model node with the question it appended; logResult() calls it
    * with the text that was delivered, and the ask stands only if the question reached the person. */
   askCommit?: (deliveredText: string) => void;

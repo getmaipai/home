@@ -278,7 +278,7 @@ const present = z.array(evidence).nullable();
 // parked since the card was shown) never resumes, same as an unrelated
 // new statement. Validated here, the same way evidence/present already
 // are, since this field genuinely drives a package call when approved.
-const askAnswer = z.object({ turn_id: z.string(), approved: z.boolean() }).strict();
+const askAnswer = z.union([z.object({ turn_id: z.string(), approved: z.boolean() }).strict(), z.object({ offer_id: z.string().min(1).max(128), approved: z.boolean() }).strict()]);
 
 turnRoutes.post("/", requireAuth, bodyLimit({ maxSize: TURN_BODY_LIMIT }), async (c) => {
   const actor = c.get("person");

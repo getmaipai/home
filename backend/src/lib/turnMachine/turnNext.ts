@@ -59,6 +59,7 @@ import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { PARENT_REQUIRED_LINE } from "./nodes/answer";
 import { AnswerImagePlacer, SHOW_IMAGES_TOOL_ID, answerImagesAllowed, settleAnswerBlocks, settleAnswerImages, startAnswerImages } from "@/lib/answerImages/turn";
 import { reAskForShowImages } from "./nodes/model";
+import { answerRobotOffer } from "@/lib/robotOffers";
 import { decidePendingAsk } from "@/lib/gate/pendingAskMigration";
 import type { GateDecision } from "@/lib/gate/types";
 
@@ -72,7 +73,7 @@ export interface RunTurnNextOpts {
   // /api/turn/stream's own additive `ask_answer` field - resumesAsk()'s
   // own doc comment has the full matching rule. Absent for every typed
   // or spoken turn, exactly as today.
-  ask_answer?: { turn_id: string; approved: boolean };
+  ask_answer?: { turn_id: string; approved: boolean } | { offer_id: string; approved: boolean };
   // THIN-0D: the robot body's own speaker_evidence and present list,
   // from POST /api/turn and /api/turn/stream (routes/turn.ts passes them
   // for the robot surface only). Absent means the body said nothing, and
@@ -169,6 +170,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     safety: safety ?? state.safety,
     conversation_id: state.conversationId,
     turn_id: state.turnId,
+    ...(state.offer ? { offer_id: state.offer.id } : {}),
     ...(state.images?.length ? { images: state.images } : {}),
     ...(state.toolEvents.some((event) => event.t === "block")
       ? { blocks: state.toolEvents.flatMap((event) => event.t === "block" ? [event.block] : []) }
@@ -443,7 +445,23 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   const band = turnAgeBand(surface, actor, opts.speakerEvidence, new Date());
   const speaker = { surface, actor, speakerEvidence: opts.speakerEvidence ?? null };
   const pendingAskDecision = pendingAsk?.kind === "confirm" ? decidePendingAsk(pendingAsk, actor, { band, anonymous: speakerIsAnonymous(speaker) }) : null;
-  if (opts.ask_answer && (!pendingAsk || pendingAsk.turnId !== opts.ask_answer.turn_id)) {
+  // INITIATIVE-01: an `ask_answer {offer_id, approved}` answers a robot offer, not a pending ask. Robot surface only;
+  // the words in `text` decide (answerRobotOffer), never the flag alone.
+  const offerAnswer = opts.ask_answer && "offer_id" in opts.ask_answer ? opts.ask_answer : undefined;
+  const askAnswer = opts.ask_answer && "turn_id" in opts.ask_answer ? opts.ask_answer : undefined;
+  let offerTurn: { id: string; reply: string } | undefined;
+  if (offerAnswer) {
+    if (surface !== "robot") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
+    const answered = answerRobotOffer({
+      actor, offerId: offerAnswer.offer_id, text, approved: offerAnswer.approved, turnId,
+      identified: opts.speakerEvidence?.person === actor.id && opts.speakerEvidence.level !== "unknown",
+    });
+    if (answered.kind === "stale") return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "That offer is no longer waiting for an answer." } };
+    if (answered.kind === "accepted") offerTurn = { id: answered.offer.id, reply: answered.offer.text };
+    else if (answered.kind === "declined") offerTurn = { id: answered.offer.id, reply: "Okay, I won't bring it up." };
+    else if (answered.kind === "snoozed") offerTurn = { id: answered.offer.id, reply: "Okay, I'll ask again in a little while." };
+  }
+  if (askAnswer && (!pendingAsk || pendingAsk.turnId !== askAnswer.turn_id)) {
     return { ok: false, result: { ok: false, status: 409, code: "ask_stale", error: "This confirmation is no longer waiting for an answer." } };
   }
   const blockedPendingAnswer = pendingAsk?.kind === "confirm" && (
@@ -453,7 +471,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   );
   if (blockedPendingAnswer) {
     setPendingAsk(conversation.id, null);
-    if (opts.ask_answer || AFFIRMATIVE_RE.test(text)) {
+    if (askAnswer || AFFIRMATIVE_RE.test(text)) {
       if (pendingAskDecision?.kind === "ask_parent") {
         return { ok: false, result: { ok: false, status: 403, code: "parent_required", error: PARENT_REQUIRED_LINE } };
       }
@@ -533,6 +551,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     surface,
     ...(surface === "robot" ? { speakerEvidence: opts.speakerEvidence ?? null, present: opts.present ?? null } : {}),
     utterance: text,
+    ...(offerTurn ? { offer: offerTurn } : {}),
     // VISION-02c: only the five stored fields come from a caller; the
     // shown-to-model mark is the hub's own (model.ts), never a client's.
     ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),
@@ -592,7 +611,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // safety state runs first, then the pending ask is consumed before
   // commands") still holds, now with one safety evaluation, traced
   // once, for every turn including a resumed one.
-  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, opts.ask_answer, pendingAskDecision, band !== "adult") ?? undefined) : undefined;
+  const preConfirmed = pendingAsk ? (resumesAsk(pendingAsk, text, askAnswer, pendingAskDecision, band !== "adult") ?? undefined) : undefined;
   // THIN-7E (ASK-01): a standing `who` question is read as an answer by the commands node
   // (askNames.ts), so it is kept on the state although the stored ask is cleared just below.
   if (pendingAsk?.kind === "who") state.pendingWho = pendingAsk;
@@ -752,7 +771,7 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
     const lastVia = state.outcomes.at(-1)?.via;
     const failedPattern = state.outcomes.some((outcome) => outcome.via === "pattern" && outcome.status === "failed");
     // THIN-7E: the answer to a who question is a "confirm", as the old engine reported it.
-    const source: TurnValue["source"] = state.whoAnswer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
+    const source: TurnValue["source"] = state.whoAnswer || state.offer ? "confirm" : failedPattern ? "model" : lastVia === "command" ? "command" : lastVia === "pattern" || lastVia === "tool_call" || lastVia === "forced" ? "plugin" : "model";
     // GENUI-13c: a block still waiting when the answer ends goes after the reply; stamped before the value is built so
     // the stored `blocks` carry where each one sits.
     // GENUI-05: the picture gallery is one of the turn's blocks, so the picture pipeline settles first (a gallery that
