@@ -12,6 +12,11 @@ export interface FakeBook {
   /** The served id (the ZIM file stem). */
   id: string;
   date?: string;
+  size?: number;
+  language?: string;
+  articleCount?: number;
+  /** Optional title snippets returned by Kiwix's full-text index. */
+  searchSnippet?: string;
   /** Articles by path, e.g. "Juniper_Falls". */
   articles: Record<string, FakeArticle>;
 }
@@ -39,7 +44,7 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
       const url = new URL(req.url);
       requests.push(`${url.pathname}${url.search}`);
       if (url.pathname === "/catalog/v2/entries") {
-        const entries = books.map((b) => `<entry><title>${esc(b.id)}</title><link type="text/html" href="/content/${b.id}"/></entry>`).join("");
+        const entries = books.map((b) => `<entry><title>${esc(b.id)}</title><link type="text/html" href="/content/${b.id}"/><size>${b.size ?? 12345}</size><language>${b.language ?? "eng"}</language><articleCount>${b.articleCount ?? Object.keys(b.articles).length}</articleCount></entry>`).join("");
         return new Response(`<?xml version="1.0"?><feed>${entries}</feed>`, { headers: { "content-type": "application/atom+xml" } });
       }
       if (url.pathname === "/suggest") {
@@ -58,7 +63,7 @@ export function startFakeKiwix(initial: FakeBook[]): FakeKiwix {
         const pattern = (url.searchParams.get("pattern") ?? "").toLowerCase();
         const items = Object.entries(book.articles)
           .filter(([, a]) => a.html.toLowerCase().includes(pattern))
-          .map(([path, a]) => `<item><title>${esc(a.title)}</title><link>/content/${book.id}/${path}</link></item>`)
+          .map(([path, a]) => `<item><title>${esc(a.title)}</title><link>/content/${book.id}/${path}</link><description>${esc(book.searchSnippet ?? a.html.replace(/<[^>]+>/g, " ").slice(0, 240))}</description></item>`)
           .join("");
         return new Response(`<?xml version="1.0"?><rss><channel>${items}</channel></rss>`, { headers: { "content-type": "application/xml" } });
       }

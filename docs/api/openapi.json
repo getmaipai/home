@@ -30025,6 +30025,390 @@
         }
       }
     },
+    "/api/reference/books": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Books available in the offline library",
+        "responses": {
+          "200": {
+            "description": "Readable installed books.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "source_label": {
+                        "type": "string"
+                      },
+                      "language": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "size_bytes": {
+                        "type": "number",
+                        "nullable": true
+                      },
+                      "snapshot_date": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "licence": {
+                        "type": "string"
+                      },
+                      "article_count": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "source_label",
+                      "language",
+                      "size_bytes",
+                      "snapshot_date",
+                      "licence"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/suggest": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Suggest offline article titles",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Title suggestions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "book": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "book",
+                      "path"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/search": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Search installed offline articles",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "book",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Search hits.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "snippet": {
+                        "type": "string"
+                      },
+                      "book": {
+                        "type": "string"
+                      },
+                      "path": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "snippet",
+                      "book",
+                      "path"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/article/{book}/{path}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Read a cleaned offline article",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "required": true,
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Closed article blocks.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string"
+                    },
+                    "book": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    },
+                    "source_label": {
+                      "type": "string"
+                    },
+                    "licence": {
+                      "type": "string"
+                    },
+                    "snapshot_date": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "blocks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        }
+                      }
+                    },
+                    "toc": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "level": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "title",
+                          "level"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "book",
+                    "path",
+                    "source_label",
+                    "licence",
+                    "snapshot_date",
+                    "blocks",
+                    "toc"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Article not available.",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/reference/media/{book}/{path}": {
+      "get": {
+        "tags": [
+          "Sources"
+        ],
+        "summary": "Read an allowed offline article image",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "book",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 1000
+            },
+            "required": true,
+            "name": "path",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Image bytes."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Image not available."
+          }
+        }
+      }
+    },
     "/api/reference/{book}/{path}": {
       "get": {
         "tags": [

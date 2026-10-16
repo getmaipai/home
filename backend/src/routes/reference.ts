@@ -11,8 +11,125 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { readReferencePage } from "@/lib/retrieval/referenceReader";
 import type { ReferenceRow } from "@/lib/retrieval/minorFloor";
 import { licenceLabel } from "@/lib/retrieval/referenceSources";
+import { readableBooks } from "@/lib/retrieval/referenceSources";
+import { kiwixBaseUrl } from "@/lib/kiwixSidecar";
+import { extractArticle, extractFullArticle } from "@/lib/retrieval/extractArticle";
+import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
+import { getPersonSettingValue } from "@/lib/settings";
 
 export const referenceRoutes = apiRouter();
+
+const REFUSAL = "That article is not available. It may not be in this home's offline library, or the library may be switched off. Go back and search again, or ask an adult to check the library in Settings.";
+const param = (name: string, max: number) => z.string().min(1).max(max).openapi({ param: { name, in: "path" } });
+const booksResponse = z.array(z.object({ id: z.string(), source_label: z.string(), language: z.string().nullable(), size_bytes: z.number().nullable(), snapshot_date: z.string().nullable(), licence: z.string(), article_count: z.number().optional() }));
+const suggestResponse = z.array(z.object({ title: z.string(), book: z.string(), path: z.string() }));
+const searchResponse = z.array(z.object({ title: z.string(), snippet: z.string(), book: z.string(), path: z.string() }));
+const articleResponse = z.object({ title: z.string(), book: z.string(), path: z.string(), source_label: z.string(), licence: z.string(), snapshot_date: z.string().nullable(), blocks: z.array(z.record(z.string(), z.unknown())), toc: z.array(z.object({ id: z.string(), title: z.string(), level: z.number() })) });
+const BOOKS_ROUTE = createRoute({ method: "get", path: "/books", tags: ["Sources"], summary: "Books available in the offline library", middleware: [requireAuth] as const, responses: { 200: { content: { "application/json": { schema: booksResponse } }, description: "Readable installed books." }, ...errorResponses({ 401: "Not signed in" }) } });
+const SUGGEST_ROUTE = createRoute({ method: "get", path: "/suggest", tags: ["Sources"], summary: "Suggest offline article titles", middleware: [requireAuth] as const, request: { query: z.object({ book: z.string().min(1).max(200), q: z.string().min(1).max(200) }) }, responses: { 200: { content: { "application/json": { schema: suggestResponse } }, description: "Title suggestions." }, ...errorResponses({ 401: "Not signed in" }) } });
+const SEARCH_ROUTE = createRoute({ method: "get", path: "/search", tags: ["Sources"], summary: "Search installed offline articles", middleware: [requireAuth] as const, request: { query: z.object({ q: z.string().min(1).max(200), book: z.string().max(200).optional() }) }, responses: { 200: { content: { "application/json": { schema: searchResponse } }, description: "Search hits." }, ...errorResponses({ 401: "Not signed in" }) } });
+const ARTICLE_ROUTE = createRoute({ method: "get", path: "/article/{book}/{path}", tags: ["Sources"], summary: "Read a cleaned offline article", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 500) }) }, responses: { 200: { content: { "application/json": { schema: articleResponse } }, description: "Closed article blocks." }, 404: { content: { "text/plain": { schema: z.string() } }, description: "Article not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+const MEDIA_ROUTE = createRoute({ method: "get", path: "/media/{book}/{path}", tags: ["Sources"], summary: "Read an allowed offline article image", middleware: [requireAuth] as const, request: { params: z.object({ book: param("book", 200), path: param("path", 1000) }) }, responses: { 200: { description: "Image bytes." }, 404: { description: "Image not available." }, ...errorResponses({ 401: "Not signed in" }) } });
+
+const unavailable = (c: any) => { c.header("Content-Type", "text/plain; charset=utf-8"); c.header("X-Content-Type-Options", "nosniff"); return c.body(REFUSAL, 404); };
+const reqTimeout = 2500;
+async function libraryRequest(base: string, path: string): Promise<Response> { return fetch(`${base.replace(/\/+$/, "")}${path}`, { signal: AbortSignal.timeout(reqTimeout) }); }
+async function installed(base: string): Promise<string[]> {
+  const res = await libraryRequest(base, "/catalog/v2/entries?count=200"); if (!res.ok) return [];
+  const xml = await res.text(); return [...new Set([...xml.matchAll(/href="\/content\/([^"/?#]+)"/g)].map((m) => decodeURIComponent(m[1]!)))];
+}
+function snapshotDate(value: string): string | null { return /^\d{4}-\d{2}-\d{2}$/.test(value.trim()) ? value.trim() : null; }
+async function dateFor(base: string, book: string): Promise<string | null> { try { const r = await libraryRequest(base, `/raw/${encodeURIComponent(book)}/meta/Date`); return r.ok ? snapshotDate(await r.text()) : null; } catch { return null; } }
+function bookRows(xml: string, band: ReturnType<typeof speakerAgeBand>) {
+  const installedIds = [...new Set([...xml.matchAll(/href="\/content\/([^"/?#]+)"/g)].map((m) => decodeURIComponent(m[1]!)))];
+  return readableBooks(installedIds, band).books;
+}
+
+referenceRoutes.openapi(BOOKS_ROUTE, async (c) => {
+  const base = kiwixBaseUrl(); if (!base) return c.json([], 200);
+  try {
+    const res = await libraryRequest(base, "/catalog/v2/entries?count=200"); if (!res.ok) return c.json([], 200);
+    const xml = await res.text(); const rows = bookRows(xml, speakerAgeBand(c.get("person"), new Date()));
+    const result = await Promise.all(rows.map(async ({ book, source }) => {
+      const block = new RegExp(`<entry[^>]*>([\\s\\S]*?<title>${book.replace(/[.*+?^${}()|[\\]\\\\]/g, "\\\\$&")}</title>[\\s\\S]*?)</entry>`).exec(xml)?.[1] ?? "";
+      const field = (name: string) => new RegExp(`<${name}[^>]*>([^<]*)</${name}>`, "i").exec(block)?.[1] ?? null;
+      const size = Number(field("size")); const count = Number(field("articleCount"));
+      return { id: book, source_label: source.label, language: field("language"), size_bytes: Number.isFinite(size) && size > 0 ? size : null, snapshot_date: await dateFor(base, book), licence: licenceLabel(source.licence), ...(Number.isFinite(count) && count >= 0 ? { article_count: count } : {}) };
+    }));
+    return c.json(result, 200);
+  } catch { return c.json([], 200); }
+});
+
+referenceRoutes.openapi(SUGGEST_ROUTE, async (c) => {
+  const { book, q } = c.req.valid("query"); const band = speakerAgeBand(c.get("person"), new Date()); const base = kiwixBaseUrl();
+  if (!base) return c.json([], 200);
+  try {
+    const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return c.json([], 200);
+    const res = await libraryRequest(base, `/suggest?content=${encodeURIComponent(book)}&term=${encodeURIComponent(q)}&count=10`); if (!res.ok) return c.json([], 200);
+    const data: unknown = await res.json(); if (!Array.isArray(data)) return c.json([], 200);
+    return c.json(data.filter((x: any) => x?.kind === "path" && typeof x.label === "string" && typeof x.path === "string" && x.path && !x.path.split("/").includes("..")).slice(0, 10).map((x: any) => ({ title: x.label, book, path: x.path })), 200);
+  } catch { return c.json([], 200); }
+});
+
+referenceRoutes.openapi(SEARCH_ROUTE, async (c) => {
+  const { q, book } = c.req.valid("query"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl(); if (!base) return c.json([], 200);
+  try {
+    const names = await installed(base); let books = readableBooks(names, band).books; if (book) books = books.filter((x) => x.book === book);
+    const hits: Array<{ title: string; snippet: string; book: string; path: string }> = [];
+    for (const rb of books) {
+      if (hits.length >= 20) break;
+      const res = await libraryRequest(base, `/search?content=${encodeURIComponent(rb.book)}&pattern=${encodeURIComponent(q)}&count=20`); if (!res.ok) continue;
+      const xml = await res.text();
+      for (const m of xml.matchAll(/<item>([\s\S]*?)<\/item>/gi)) {
+        const item = m[1]!; const title = /<title>([\s\S]*?)<\/title>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim(); const href = /<link>([^<]+)<\/link>/i.exec(item)?.[1]?.trim(); const snippet = /<description>([\s\S]*?)<\/description>/i.exec(item)?.[1]?.replace(/<[^>]+>/g, "").trim() ?? "";
+        if (!title || !href) continue;
+        let path = ""; try { path = new URL(href, base).pathname.split("/").slice(3).map(decodeURIComponent).join("/"); } catch { continue; }
+        if (!path || path.split("/").includes("..")) continue;
+        const articleRes = await libraryRequest(base, `/content/${encodeURIComponent(rb.book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!articleRes.ok) continue;
+        const full = extractFullArticle(await articleRes.text(), { book: rb.book, allowedBooks: new Set(names), allowLinks: false, allowImages: false });
+        const plainText = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : []).join(" ");
+        if (band !== "adult" && tripsMinorFloor(`${title}. ${snippet}. ${plainText}`)) continue;
+        hits.push({ title, snippet: (snippet || plainText).slice(0, 240), book: rb.book, path }); if (hits.length >= 20) break;
+      }
+    }
+    return c.json(hits, 200);
+  } catch { return c.json([], 200); }
+});
+
+referenceRoutes.openapi(ARTICLE_ROUTE, async (c) => {
+  const { book, path } = c.req.valid("param"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
+  if (!base || path.split("/").includes("..")) return unavailable(c);
+  try {
+    const names = await installed(base); const rb = readableBooks(names, band).books.find((x) => x.book === book); if (!rb) return unavailable(c);
+    const res = await libraryRequest(base, `/content/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return unavailable(c);
+    const html = await res.text();
+    const full = extractFullArticle(html, { book, allowedBooks: new Set(names), allowLinks: band === "adult", allowImages: getPersonSettingValue(person, "reference.images") === true });
+    if (full.redirectTo) {
+      const target = new URL(full.redirectTo, "http://kiwix.local").pathname.match(/^\/(?:content\/)?([^/]+)\/(.+)$/);
+      if (target && decodeURIComponent(target[1]!) === book && !decodeURIComponent(target[2]!).split("/").includes("..")) {
+        return c.redirect(`/api/reference/article/${encodeURIComponent(book)}/${decodeURIComponent(target[2]!).split("/").map(encodeURIComponent).join("/")}`, 302);
+      }
+    }
+    const fallback = extractArticle(html); const title = full.title || fallback.title || path;
+    const plain = full.blocks.flatMap((b) => b.type === "paragraph" ? b.inlines.map((i) => i.text) : b.type === "heading" ? [b.text] : b.type === "rows" ? b.rows.flatMap((r) => [r.label, r.value]) : []).join(" ");
+    if (band !== "adult" && tripsMinorFloor(`${title}. ${plain}`)) return unavailable(c);
+    c.header("Cache-Control", "private, max-age=600"); c.header("X-Content-Type-Options", "nosniff");
+    return c.json({ title, book, path, source_label: rb.source.label, licence: licenceLabel(rb.source.licence), snapshot_date: await dateFor(base, book), blocks: full.blocks, toc: full.toc });
+  } catch { return unavailable(c); }
+});
+
+referenceRoutes.openapi(MEDIA_ROUTE, async (c) => {
+  const { book, path } = c.req.valid("param"); const person = c.get("person"); const band = speakerAgeBand(person, new Date()); const base = kiwixBaseUrl();
+  if (!base || !path || path.split("/").includes("..") || getPersonSettingValue(person, "reference.images") !== true) return unavailable(c);
+  try {
+    const names = await installed(base); if (!readableBooks(names, band).books.some((x) => x.book === book)) return unavailable(c);
+    const safePath = decodeURIComponent(path); if (/^(?:https?:|data:|javascript:)/i.test(safePath)) return unavailable(c);
+    const res = await libraryRequest(base, `/raw/${encodeURIComponent(book)}/${safePath.split("/").map(encodeURIComponent).join("/")}`); if (!res.ok) return unavailable(c);
+    const type = (res.headers.get("content-type") ?? "").split(";")[0]!.toLowerCase(); if (!["image/png", "image/jpeg", "image/webp", "image/svg+xml"].includes(type)) return unavailable(c);
+    c.header("Content-Type", type); c.header("X-Content-Type-Options", "nosniff"); c.header("Content-Security-Policy", "default-src 'none'; sandbox"); c.header("Cross-Origin-Resource-Policy", "same-origin"); c.header("Cache-Control", "private, max-age=600");
+    return c.body(await res.arrayBuffer(), 200);
+  } catch { return unavailable(c); }
+});
 
 const getRoute = createRoute({
   method: "get",

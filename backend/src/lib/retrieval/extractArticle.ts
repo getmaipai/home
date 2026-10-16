@@ -14,6 +14,98 @@ export const LEAD_MAX_CHARS = 2500;
 const INFOBOX_MAX_ROWS = 12;
 const INFOBOX_VALUE_MAX = 200;
 const DISAMBIGUATION_OPTIONS_MAX = 8;
+const FULL_ARTICLE_DROP = "references, .references, .reflist, .navbox, .mw-editsection, script, style, iframe, form, noscript, svg, .catlinks, .metadata, .sistersitebox, .portal, .mw-jump-link, .mw-references-wrap";
+
+export type ArticleInline = { type: "text" | "emphasis" | "strong"; text: string } | { type: "link"; text: string; target?: { book: string; path: string } };
+export type ArticleBlock =
+  | { type: "heading"; level: 2 | 3 | 4; id: string; text: string }
+  | { type: "paragraph"; inlines: ArticleInline[] }
+  | { type: "list"; ordered: boolean; items: ArticleInline[][] }
+  | { type: "rows"; rows: Array<{ label: string; value: string }> }
+  | { type: "table"; headers: string[]; rows: string[][] }
+  | { type: "figure"; src: string; alt: string; caption: string }
+  | { type: "note"; text: string };
+export interface FullArticle { title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; redirectTo?: string }
+
+function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
+
+/** Extract a closed, renderable block model. This walk deliberately ignores unknown markup. */
+export function extractFullArticle(html: string, opts: { book: string; allowedBooks: ReadonlySet<string>; allowLinks: boolean; allowImages: boolean }): FullArticle {
+  const { document } = parseHTML(html);
+  const detectedBeforeClean = document.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*=\"disambig\"]") !== null || /\bmay (?:also )?refer to\b/i.test(document.body?.textContent ?? "");
+  const redirectTo = document.querySelector(".redirectMsg a, .redirectText a, #redirectedfrom a")?.getAttribute("href") ?? null;
+  document.querySelectorAll(FULL_ARTICLE_DROP).forEach((n: Node) => n.remove());
+  document.querySelectorAll(".redirectMsg, .redirectText, #redirectedfrom").forEach((n: Node) => n.remove());
+  document.querySelectorAll("[style*='display:none'],[style*='display: none'],[hidden]").forEach((n: Node) => n.remove());
+  const title = cleanText((document.querySelector("h1") ?? document.querySelector("title"))?.textContent ?? "");
+  const blocks: ArticleBlock[] = [];
+  const toc: FullArticle["toc"] = [];
+  const content = document.querySelector(".mw-parser-output") ?? document.querySelector("main") ?? document.body ?? document.documentElement;
+  const titleNode = content.querySelector("h1");
+  if (titleNode) titleNode.remove();
+  const inline = (root: Element): ArticleInline[] => {
+    const out: ArticleInline[] = [];
+    const walk = (node: any, style: "text" | "emphasis" | "strong" = "text") => {
+      if (node.nodeType === 3) { const text = cleanText(node.nodeValue ?? ""); if (text) out.push({ type: style, text }); return; }
+      if (node.nodeType !== 1) return;
+      const el = node as Element; const tag = el.tagName.toLowerCase();
+      if (["script", "style", "iframe", "form", "svg", "img", "sup"].includes(tag) || el.hasAttribute("hidden") || el.hasAttribute("style") && /display\s*:\s*none/i.test(el.getAttribute("style") ?? "")) return;
+      if (tag === "a") {
+        const text = cleanText(el.textContent ?? ""); const href = el.getAttribute("href") ?? "";
+        const match = /^\/(?:content\/)?([^/?#]+)\/([^?#]+)$/.exec(href) ?? /^\.\/([^/?#]+)$/.exec(href);
+        let target: { book: string; path: string } | undefined;
+        if (opts.allowLinks && match) {
+          const book = match.length === 3 ? decodeURIComponent(match[1]!) : opts.book;
+          const path = decodeURIComponent(match.length === 3 ? match[2]! : match[1]!);
+          if (opts.allowedBooks.has(book) && !path.split("/").includes("..")) target = { book, path };
+        }
+        if (text) out.push(target ? { type: "link", text, target } : { type: "text", text }); return;
+      }
+      const next = tag === "b" || tag === "strong" ? "strong" : tag === "i" || tag === "em" ? "emphasis" : style;
+      for (const child of Array.from(el.childNodes)) walk(child, next);
+    };
+    for (const child of Array.from(root.childNodes)) walk(child);
+    return out;
+  };
+  const root = content;
+  const disambig = root.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*='disambig']");
+  const detectedDisambiguation = detectedBeforeClean || disambig !== null || /\bmay (?:also )?refer to\b/i.test(root.textContent ?? "") || /\(disambiguation\)\s*$/i.test(title);
+  if (detectedDisambiguation) blocks.push({ type: "note", text: "Several articles share this name." });
+  if (detectedDisambiguation) {
+    const options = (Array.from(root.querySelectorAll("li")) as Element[]).slice(0, 8).map((li) => cleanText(li.textContent ?? "")).filter(Boolean);
+    if (options.length) blocks.push({ type: "list", ordered: false, items: options.map((text) => [{ type: "text", text }]) });
+  }
+  const elements = Array.from(root.querySelectorAll("h2,h3,h4,p,ul,ol,table.infobox,table.infobox_v2,table.infobox_v3,table:not(.infobox):not(.infobox_v2):not(.infobox_v3),figure")) as Element[];
+  const dropped = new Set(["references", "see also", "external links", "notes", "further reading", "citations", "bibliography", "footnotes", "sources"]);
+  let skip = false;
+  for (const el of elements) {
+    if (el.closest(FULL_ARTICLE_DROP)) continue;
+    const tag = el.tagName.toLowerCase();
+    if (/^h[2-4]$/.test(tag)) {
+      const text = plain(el); skip = dropped.has(text.toLowerCase());
+      if (skip || !text) continue;
+      const level = Number(tag.slice(1)) as 2 | 3 | 4; const id = el.getAttribute("id") || text.replace(/\s+/g, "_");
+      blocks.push({ type: "heading", level, id, text }); toc.push({ id, title: text, level }); continue;
+    }
+    if (skip || el.closest("table") && !/^table/.test(tag)) continue;
+    if (tag === "p") { const inlines = inline(el); if (inlines.length) blocks.push({ type: "paragraph", inlines }); }
+    else if (tag === "ul" || tag === "ol") { if (el.parentElement?.closest("ul,ol")) continue; const items = Array.from(el.querySelectorAll(":scope > li")).map((li) => inline(li)).filter((x) => x.length); if (items.length) blocks.push({ type: "list", ordered: tag === "ol", items }); }
+    else if (tag === "table") {
+      const trs = Array.from(el.querySelectorAll("tr")) as Element[];
+      const rows = trs.map((tr) => (Array.from(tr.querySelectorAll(":scope > th,:scope > td")) as Element[]).map(plain)).filter((r) => r.length);
+      if (el.matches(".infobox,.infobox_v2,.infobox_v3")) { const pairs = trs.flatMap((tr) => { const th = tr.querySelector("th"); const td = tr.querySelector("td"); const label = th && plain(th), value = td && plain(td); return label && value ? [{ label, value }] : []; }); if (pairs.length) blocks.push({ type: "rows", rows: pairs }); }
+      else if (rows.length) { const first = rows[0]!; blocks.push({ type: "table", headers: first, rows: rows.slice(1) }); }
+    } else if (tag === "figure" && opts.allowImages) { const img = el.querySelector("img"); const src = img?.getAttribute("src") ?? ""; if (/^(?:\/|\.\/|https?:\/\/)/i.test(src) && !/^data:/i.test(src)) blocks.push({ type: "figure", src, alt: img?.getAttribute("alt") ?? "", caption: plain(el.querySelector("figcaption") ?? el) }); }
+  }
+  // Wiktionary and similar definition lists.
+  for (const dl of Array.from(root.querySelectorAll("dl")) as Element[]) {
+    if (dl.closest(FULL_ARTICLE_DROP)) continue;
+    const children = Array.from(dl.children) as Element[]; const rows: Array<{ label: string; value: string }> = []; let label = "";
+    for (const child of children) { if (child.tagName === "DT") label = plain(child); else if (child.tagName === "DD" && label) { rows.push({ label, value: plain(child) }); label = ""; } }
+    if (rows.length) blocks.push({ type: "rows", rows });
+  }
+  return { title, blocks, toc, ...(redirectTo ? { redirectTo } : {}) };
+}
 
 /** Section headings that are never kept (their text is not read either). */
 const DROPPED_SECTIONS: ReadonlySet<string> = new Set([
