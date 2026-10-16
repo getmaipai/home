@@ -55,6 +55,10 @@ write_note() {
   {
     printf '# Main gate failure: %s\n\n' "$sha"
     printf 'Failing stage: %s\n\n' "$stage"
+    local cause
+    cause="$(grep -m1 -E 'Executable not found in \$PATH|Terminated: 15' "$output" || true)"
+    # The last started "== " stage can be the wrong one when a tool crashes mid-run; quote the crash itself.
+    [[ -z "$cause" ]] || printf 'Probable cause: %s\n\n' "$cause"
     printf '## Last 60 lines of gate output\n\n```text\n'
     tail -n 60 "$output"
     printf '\n```\n\n## Commits since last green\n\n'

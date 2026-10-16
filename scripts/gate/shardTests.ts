@@ -120,10 +120,17 @@ export function chooseShardCount(opts: {
   return safeMaximum;
 }
 
+/** A system tool by absolute path when it exists there: launchd hands the gate a PATH without /usr/sbin,
+ * and Bun.spawnSync throws ENOENT for a bare name it cannot find instead of returning a nonzero exit. */
+function sysTool(name: string, ...dirs: string[]): string {
+  for (const dir of dirs) if (existsSync(`${dir}/${name}`)) return `${dir}/${name}`;
+  return name;
+}
+
 export type ResourceSnapshot = { reclaimableGb: number; totalGb: number; pressureLevel: number };
 
 export function processTreeRssGb(rootPid: number): number {
-  const res = Bun.spawnSync(["ps", "-A", "-o", "pid=,ppid=,rss="]);
+  const res = Bun.spawnSync([sysTool("ps", "/bin", "/usr/bin"), "-A", "-o", "pid=,ppid=,rss="]);
   if (res.exitCode !== 0) return 0;
   const rows = res.stdout.toString().split(/\r?\n/).flatMap((line) => {
     const values = line.trim().split(/\s+/).map(Number);
@@ -172,7 +179,7 @@ export function reserveWorkerSlot(directory: string, capacity: number, ownerPid 
     close($record);
     print "$path\\n";
   `;
-  const result = Bun.spawnSync(["perl", "-e", perl, directory, String(ownerPid), String(capacity)]);
+  const result = Bun.spawnSync([sysTool("perl", "/usr/bin"), "-e", perl, directory, String(ownerPid), String(capacity)]);
   if (result.exitCode === 75) return null;
   if (result.exitCode !== 0) throw new Error(result.stderr.toString() || `worker slots: could not reserve in ${directory}`);
   return result.stdout.toString().trim();
@@ -196,7 +203,7 @@ export function workerSlotCount(directory: string): number {
     }
     print "$count\\n";
   `;
-  const result = Bun.spawnSync(["perl", "-e", perl, directory]);
+  const result = Bun.spawnSync([sysTool("perl", "/usr/bin"), "-e", perl, directory]);
   if (result.exitCode !== 0) throw new Error(result.stderr.toString() || `worker slots: could not count ${directory}`);
   return Number(result.stdout.toString().trim());
 }
@@ -225,9 +232,13 @@ export async function engineResidentGb(stackUrl = process.env.MAIPAI_STACK_URL ?
 
 export function memoryPressureLevel(): number {
   if (process.platform !== "darwin") return 0;
-  const result = Bun.spawnSync(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"]);
-  const level = Number(result.stdout.toString().trim());
-  return result.exitCode === 0 && Number.isFinite(level) ? level : 0;
+  try {
+    const result = Bun.spawnSync([sysTool("sysctl", "/usr/sbin", "/sbin"), "-n", "kern.memorystatus_vm_pressure_level"]);
+    const level = Number(result.stdout.toString().trim());
+    return result.exitCode === 0 && Number.isFinite(level) ? level : 0;
+  } catch {
+    return 0; // a missing diagnostic tool must never fail the gate
+  }
 }
 
 export function resourceSnapshot(): ResourceSnapshot {
@@ -278,7 +289,7 @@ export function junitFileSeconds(xml: string): Timings {
 }
 
 function descendants(pid: number): number[] {
-  const res = Bun.spawnSync(["ps", "-A", "-o", "pid=,ppid="]);
+  const res = Bun.spawnSync([sysTool("ps", "/bin", "/usr/bin"), "-A", "-o", "pid=,ppid="]);
   const kids = new Map<number, number[]>();
   for (const line of res.stdout.toString().split("\n")) {
     const [p, pp] = line.trim().split(/\s+/).map(Number);
@@ -405,7 +416,7 @@ export async function run(opts: RunOptions): Promise<number> {
 
   const launchShard = (shardFiles: string[], index: number, slot: string | undefined) => {
     const tmp = join(scratch, `s${index}`);
-    Bun.spawnSync(["mkdir", "-p", tmp]);
+    Bun.spawnSync([sysTool("mkdir", "/bin"), "-p", tmp]);
     const logPath = join(scratch, `s${index}.log`);
     const junit = join(scratch, `s${index}.xml`);
     const args = ["test", ...(opts.record ? [`--reporter=junit`, `--reporter-outfile=${junit}`] : []), ...(opts.extraArgs ?? []), ...shardFiles.map((f) => (f.startsWith("./") ? f : `./${f}`))];
@@ -678,7 +689,7 @@ function changedTestFiles(dir: string, entries: FlakeEntry[]): string[] {
 export function availableGb(): number {
   try {
     if (process.platform === "darwin") {
-      const out = Bun.spawnSync(["vm_stat"]).stdout.toString();
+      const out = Bun.spawnSync([sysTool("vm_stat", "/usr/bin")]).stdout.toString();
       const page = Number(/page size of (\d+) bytes/.exec(out)?.[1] ?? 16384);
       const pages = (k: string) => Number(new RegExp(`${k}:\\s+(\\d+)`).exec(out)?.[1] ?? 0);
       const reclaimable = ((pages("Pages free") + pages("Pages inactive") + pages("Pages speculative") + pages("Pages purgeable")) * page) / 1024 ** 3;

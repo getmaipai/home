@@ -113,6 +113,24 @@ describe("main-gate", () => {
     expect(note).toContain("second bad landing");
   });
 
+  test("a missing-tool crash is named as the probable cause in the note", () => {
+    const first = commit("first landing");
+    const sha = commit("second landing");
+    expect(first).not.toBe(sha);
+    const result = invoke("echo '== scripts: bun test'; echo 'error: Executable not found in $PATH: \"sysctl\"'; echo '== frontend: ui rules'; exit 1");
+    expect(result.status, result.stderr + result.stdout).toBe(1);
+    const note = readNote(join(repo, "data-scratch", "main-gate", `${sha}.md`), result);
+    expect(note).toContain('Probable cause: error: Executable not found in $PATH: "sysctl"');
+  });
+
+  test("a note without a known crash line has no probable cause", () => {
+    commit("first landing");
+    const sha = commit("second landing");
+    const result = invoke("echo '== backend: bun test'; echo 'failure details'; exit 1");
+    const note = readNote(join(repo, "data-scratch", "main-gate", `${sha}.md`), result);
+    expect(note).not.toContain("Probable cause");
+  });
+
   test("unchanged tip is a no-op", () => {
     const result = invoke("echo should-not-run >&2; exit 1");
     expect(result.status).toBe(0);

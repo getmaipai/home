@@ -313,3 +313,20 @@ describe("run: the gate's pass/fail meaning", () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 });
+
+describe("gate probes under a launchd-style PATH", () => {
+  test("memoryPressureLevel and resourceSnapshot never throw when sysctl is not on PATH", () => {
+    const empty = mkdtempSync(join(tmpdir(), "gate-path-"));
+    try {
+      const code = `import { memoryPressureLevel, resourceSnapshot } from ${JSON.stringify(join(import.meta.dir, "shardTests.ts"))};
+        const level = memoryPressureLevel(); const snap = resourceSnapshot();
+        console.log(JSON.stringify({ level: typeof level, pressure: typeof snap.pressureLevel, total: Number.isFinite(snap.totalGb) }));`;
+      const res = Bun.spawnSync([process.execPath, "-e", code], { env: { PATH: empty, HOME: process.env.HOME ?? "" } });
+      expect(res.stderr.toString()).toBe("");
+      expect(res.exitCode).toBe(0);
+      expect(JSON.parse(res.stdout.toString().trim())).toEqual({ level: "number", pressure: "number", total: true });
+    } finally {
+      rmSync(empty, { recursive: true, force: true });
+    }
+  });
+});
