@@ -55,15 +55,32 @@ describe("motor reboot offer: storage", () => {
     expect((await stateOf(owner, deviceId))?.motors_reboot_offer).toBeUndefined();
   });
 
-  test("an offer naming a motor that is not latched is refused with a plain message", async () => {
+  test("an offer naming a motor that is not latched is cut back; the rest of the frame is kept", async () => {
     const { ownerRow, robotFor, owner } = await household();
     const { robot, deviceId } = await robotFor(ownerRow.id);
-    const res = await robot.request("/api/devices/me/state", { method: "PUT", body: { ...frame, motors_reboot_offer: ["antenna_left"] } });
-    expect(res.status).toBe(400);
-    expect(((await res.json()) as { error: string }).error).toContain("latched");
-    const none = await robot.request("/api/devices/me/state", { method: "PUT", body: { ...frame, motors_latched: [], motors_reboot_offer: ["body_yaw"] } });
-    expect(none.status).toBe(400);
-    expect(await stateOf(owner, deviceId)).toBeNull();
+    const res = await robot.request("/api/devices/me/state", { method: "PUT", body: { ...frame, motors_reboot_offer: ["antenna_left", "stewart_3"] } });
+    expect(res.status).toBe(204);
+    expect((await stateOf(owner, deviceId))?.motors_reboot_offer).toEqual(["stewart_3"]);
+    await robot.request("/api/devices/me/state", { method: "PUT", body: { ...frame, motors_latched: [], motors_reboot_offer: ["body_yaw"] } });
+    const state = await stateOf(owner, deviceId);
+    expect(state?.motors_reboot_offer).toBeUndefined();
+    expect(state).toMatchObject({ reachable: true });
+    // Even a stored bad offer could not be answered: the command names only offered, still-latched motors.
+    expect((await owner.post(`/api/devices/${deviceId}/motor-reboot`, { answer: "yes" })).status).toBe(409);
+  });
+
+  test("only an adult sees the offer on the device list; the robot's own session cannot answer it", async () => {
+    const { owner, ownerRow, teen, robotFor, login } = await household();
+    const { robot, deviceId } = await robotFor(teen.id);
+    await robot.request("/api/devices/me/state", { method: "PUT", body: offerFrame });
+    const teenClient = await login(teen.id);
+    expect((await stateOf(teenClient, deviceId))?.motors_reboot_offer).toBeUndefined();
+    expect((await stateOf(teenClient, deviceId))).not.toBeNull();
+    const own = await robotFor(ownerRow.id);
+    await own.robot.request("/api/devices/me/state", { method: "PUT", body: offerFrame });
+    expect((await own.robot.post(`/api/devices/${own.deviceId}/motor-reboot`, { answer: "yes" })).status).toBe(403);
+    expect(commandKinds(own.deviceId)).not.toContain("motor_reboot");
+    void owner;
   });
 });
 

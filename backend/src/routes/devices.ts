@@ -10,7 +10,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession } from "@/middleware/auth";
 import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
-import { getDeviceState, getPendingMotorRebootOffer, markMotorRebootAnswered, MotorRebootOfferError, resolveRequestDevice, upsertDeviceState } from "@/lib/deviceStates";
+import { getDeviceState, getPendingMotorRebootOffer, markMotorRebootAnswered, resolveRequestDevice, stateForViewer, upsertDeviceState } from "@/lib/deviceStates";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import { discoverRobots } from "@/lib/robotDiscovery";
@@ -83,7 +83,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const devices = listDevicesForPerson(actor.id);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: d.kind === "robot" ? getDeviceState(d.id) : null })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
     200,
   );
 });
@@ -104,7 +104,7 @@ const listRobotsRoute = createRoute({
 devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: getDeviceState(d.id) })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: stateForViewer(getDeviceState(d.id), c.get("person")) })),
     200,
   );
 });
@@ -124,12 +124,7 @@ const updateMyStateRoute = createRoute({
 devicesRoutes.openapi(updateMyStateRoute, (c) => {
   const device = resolveRequestDevice(c);
   if (!device) return c.json({ error: "Not signed in" }, 401);
-  try {
-    upsertDeviceState(device.id, c.req.valid("json"));
-  } catch (err) {
-    if (err instanceof MotorRebootOfferError) return c.json({ error: err.message }, 400);
-    throw err;
-  }
+  upsertDeviceState(device.id, c.req.valid("json"));
   return c.body(null, 204);
 });
 

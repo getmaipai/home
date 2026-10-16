@@ -9,7 +9,8 @@ import { db } from "@/db";
 import { deviceStates, sessions } from "@/db/schema";
 import { getDeviceById, type Device } from "@/lib/devices";
 import { hashSessionToken } from "@/lib/session";
-import type { AppEnv } from "@/types";
+import { speakerAgeBand } from "@/lib/ageBand";
+import type { AppEnv, PersonRow } from "@/types";
 
 export const ROBOT_STATE_STALE_MS = 45_000;
 
@@ -25,23 +26,19 @@ export function resolveRequestDevice(c: Context<AppEnv>): Device | null {
   return getDeviceById(row.deviceId);
 }
 
-/** The offered motors the robot did not also report as latched; a reboot is only ever offered for a latched motor. */
-export function rebootOfferOutsideLatched(frame: RobotStateFrame): string[] {
+/** A reboot is only ever offered for a motor the robot also reports as latched. A frame that offers any other motor
+ * keeps its telemetry (so the robot is not shown as not responding); only the offer is cut back to the latched ones. */
+export function latchedRebootOffer(frame: RobotStateFrame): string[] | null {
   const latched = new Set(frame.motors_latched ?? []);
-  return (frame.motors_reboot_offer ?? []).filter((motor) => !latched.has(motor));
+  const offer = (frame.motors_reboot_offer ?? []).filter((motor) => latched.has(motor));
+  return offer.length > 0 ? offer : null;
 }
-
-export class MotorRebootOfferError extends Error {}
 
 export function upsertDeviceState(deviceId: string, frame: RobotStateFrame): void {
   const parsed = RobotState.parse(frame);
-  const outside = rebootOfferOutsideLatched(parsed);
-  if (outside.length > 0) {
-    throw new MotorRebootOfferError(`The robot offered to reboot ${outside.join(", ")}, which it did not report as latched. Update the robot's MaiPai software, then try again.`);
-  }
   const now = new Date().toISOString();
   const previous = db.select({ answered: deviceStates.motorsRebootAnswered }).from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get();
-  const offer = parsed.motors_reboot_offer ?? null;
+  const offer = latchedRebootOffer(parsed);
   // An answer lasts only while the robot keeps offering the same motor; once it stops, a new offer is asked afresh.
   const answered = offer ? (previous?.answered ?? []).filter((motor) => offer.includes(motor)) : [];
   const values = {
@@ -134,6 +131,13 @@ export function getPendingMotorRebootOffer(deviceId: string): string[] {
   return row ? pendingMotorRebootOffer(row) : [];
 }
 
+/** The reboot question is for adults: anyone else reading the device list never sees an offer to answer. */
+export function stateForViewer(state: DeviceState | null, viewer: PersonRow): DeviceState | null {
+  if (!state || speakerAgeBand(viewer, new Date()) === "adult") return state;
+  const { motors_reboot_offer: _hidden, ...rest } = state;
+  return rest;
+}
+
 export interface DeviceState extends RobotStateFrame {
   on_battery: boolean | null;
   battery_level: number | null;
@@ -147,6 +151,7 @@ export function getDeviceState(deviceId: string): DeviceState | null {
   const row = db.select().from(deviceStates).where(eq(deviceStates.deviceId, deviceId)).get() as DeviceStateRow | undefined;
   if (!row) return null;
   const reachable = Date.now() - new Date(row.reportedAt).getTime() <= ROBOT_STATE_STALE_MS;
+  const pending = pendingMotorRebootOffer(row);
   return {
     activity: row.activity as RobotStateFrame["activity"],
     muted: row.muted,
@@ -159,7 +164,7 @@ export function getDeviceState(deviceId: string): DeviceState | null {
     put_down_count: row.putDownCount ?? undefined,
     motors_latched: row.motorsLatched ?? undefined,
     motors_stuck: row.motorsStuck ?? undefined,
-    motors_reboot_offer: pendingMotorRebootOffer(row).length > 0 ? pendingMotorRebootOffer(row) : undefined,
+    motors_reboot_offer: pending.length > 0 ? pending : undefined,
     thermal: row.thermal ?? undefined,
     reachable,
     unreachableSince: reachable ? null : row.reportedAt,
