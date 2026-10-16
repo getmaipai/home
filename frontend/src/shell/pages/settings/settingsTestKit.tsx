@@ -87,6 +87,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     if (url.endsWith("/api/people") || url.includes("/api/people?")) return Promise.resolve(Response.json(hasChild ? [{ id: "person-kid", role: "child", display_name: "Kid" }] : []));
     if (url.includes("/api/plugins/skills")) return Promise.resolve(Response.json([]));
     if (url.includes("/api/biometric-prints")) return Promise.resolve(Response.json([]));
+    if (url.startsWith("/api/voice-prints?")) return Promise.resolve(Response.json([]));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
   return { requests, scopes, puts, pinnedAppsValue: () => pinnedAppsSerialized, restore: () => { globalThis.fetch = original; } };
