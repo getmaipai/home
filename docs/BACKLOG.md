@@ -7119,7 +7119,7 @@ approvals are still real, unstarted work for a future session.
       module}`) alongside `widgets[]`; the redundant top-level
       `pages: string[]` is gone, and every bundled manifest's own empty
       `"pages": []` was dropped with it. **Superseded by the design note** [docs/plans/app-kind-2026-10-16.md](plans/app-kind-2026-10-16.md)
-      (2026-10-16, draft, architect gate pending; slices APP-KIND-01 to 06 below). Was still open for E: the
+      (2026-10-16, draft, architect gate pending, rule S2 reading owner confirmed 2026-10-16; slices APP-KIND-01 to 06 below). Was still open for E: the
       `GET /api/plugins/:id/pages/:pageId` route itself, `PackageScopeContext`,
       the nav-registry merge, and `PackagePage.tsx` - no package
       populates `contributes.pages` yet (D's own `lists` didn't end up
