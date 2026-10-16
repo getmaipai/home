@@ -105,9 +105,35 @@ detect_arch() {
 # never in a loop, so no rate limiter is needed at this single call site.
 latest_tag() {
   local tag
-  tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases/latest" | grep -m1 '"tag_name"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/')
-  [ -n "$tag" ] || die "could not find a published release for ${REPO} yet - there is nothing to install (this project has not cut v0.1.0 yet)"
+  # Only Home's own release tags (v0.1.0, v1.2.3-rc1) count. The repo also
+  # publishes data releases under other tag names (search-assist-weights-v2
+  # was GitHub's "latest" on 2026-10-16), and installing one of those would
+  # silently put an old snapshot of Home on the computer. The list is newest
+  # first; the first v-tag wins.
+  tag=$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" \
+    | grep -o '"tag_name": *"[^"]*"' | sed -E 's/.*"tag_name": *"([^"]+)".*/\1/' \
+    | grep -m1 -E '^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.-]+)?$' || true)
+  [ -n "$tag" ] || die "could not find a published Home release (a v0.1.0-style tag) for ${REPO} yet - there is nothing to install. Cut a release, then run the installer again."
   echo "$tag"
+}
+
+# The TypeScript preflight (backend/src/lib/installPreflight.ts, the one
+# definition the wizard's checks share). It imports Home's own packages,
+# so it can only run once Bun is installed and the fetched backend has its
+# dependencies: main() calls it right after build_app(), before the Stack
+# build and before any service starts. Earlier versions ran it first, with
+# `bun` from PATH and `../backend` next to this script: under `sudo` (a
+# reset PATH) or `curl ... | bash` (no script directory) neither exists,
+# so every real install died before doing anything.
+run_install_preflight() {
+  local bun_bin="$1" backend_dir="$2" port="$3"
+  local preflight_json blockers
+  [ -x "$bun_bin" ] || die "Could not check this computer before install: the Bun runtime at ${bun_bin} is missing. Run the installer again."
+  [ -d "$backend_dir" ] || die "Could not check this computer before install: ${backend_dir} is missing. Run the installer again."
+  preflight_json=$(cd "$backend_dir" && PORT="$port" "$bun_bin" -e 'import { checkInstallPreflight } from "./src/lib/installPreflight.ts"; console.log(JSON.stringify(await checkInstallPreflight()));') \
+    || die "Could not check this computer before install. Check that Bun runs (${bun_bin} --version), then run the installer again."
+  blockers=$(printf '%s' "$preflight_json" | "$bun_bin" -e 'const rows = JSON.parse(await Bun.stdin.text()); const blocked = rows.filter((row) => row.severity === "critical" || row.severity === "error"); for (const row of blocked) console.error(`${row.title}: ${row.text} Fix: ${row.fix?.label ?? "Check the system and try again."}`); console.log(blocked.length);')
+  [ "$blockers" = "0" ] || die "This computer did not pass the install checks. Follow the fixes above, then run the installer again."
 }
 
 # Finds a free TCP port starting at the requested one, so a box that
@@ -738,13 +764,6 @@ main() {
     exit 0
   fi
 
-  local preflight_json blockers backend_dir
-  backend_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../backend" && pwd)"
-  preflight_json=$(bun --cwd "$backend_dir" -e 'import { checkInstallPreflight } from "./src/lib/installPreflight.ts"; console.log(JSON.stringify(await checkInstallPreflight()));') \
-    || die "Could not check this computer before install. Check that Bun runs, then run the installer again."
-  blockers=$(printf '%s' "$preflight_json" | bun -e 'const rows = JSON.parse(await Bun.stdin.text()); const blocked = rows.filter((row) => row.severity === "critical" || row.severity === "error"); for (const row of blocked) console.error(`${row.title}: ${row.text} Fix: ${row.fix?.label ?? "Check the system and try again."}`); console.log(blocked.length);')
-  [ "$blockers" = "0" ] || die "This computer did not pass the install checks. Follow the fixes above, then run the installer again."
-
   require_root
   local tag
   tag=$(latest_tag)
@@ -753,12 +772,6 @@ main() {
   local bun_home="${install_root}/.bun"
 
   record_setup_plan "${install_root}/data" "$requested_plan" no
-
-  local port
-  port=$(find_free_port "$APP_PORT")
-  if [ "$port" != "$APP_PORT" ]; then
-    log "Port ${APP_PORT} is already in use - using ${port} instead."
-  fi
 
   local upgrading="no"
   [ -d "$install_root" ] && upgrading="yes"
@@ -801,9 +814,20 @@ main() {
     fetch_release_source "$tag" "$install_root"
   fi
 
+  # Chosen only now, after an existing Home has been stopped above: probed
+  # while the old service still held its port, an upgrade moved Home to the
+  # next free port (3001) every time, and the address in the final line and
+  # every bookmark changed with it.
+  local port
+  port=$(find_free_port "$APP_PORT")
+  if [ "$port" != "$APP_PORT" ]; then
+    log "Port ${APP_PORT} is already in use - using ${port} instead."
+  fi
+
   ensure_bun_system_wide "$bun_home"
   local bun_bin="${bun_home}/bin/bun"
   build_app "$install_root" "$bun_bin"
+  run_install_preflight "$bun_bin" "${install_root}/backend" "$port"
 
   # The Stack must be fully installed and configured before Home's own
   # service starts.

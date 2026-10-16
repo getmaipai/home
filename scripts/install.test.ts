@@ -792,3 +792,141 @@ describe("piped execution (curl -fsSL ... | bash, this file's own documented usa
     expect(result.stdout.toString()).toContain("[dry-run] MaiPai Stack install plan for");
   });
 });
+
+describe("latest_tag (Mac Studio install audit, 2026-10-16)", () => {
+  // GitHub's releases/latest for getmaipai/home answered
+  // search-assist-weights-v2 (a data release whose tag points at an old
+  // commit), so a real install would have fetched a stale Home. Only
+  // Home's own v-tags count now.
+  const releases = (tags: string[]) => JSON.stringify(tags.map((tag_name) => ({ tag_name })));
+
+  test("skips a data release and takes the newest v-tag", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { printf '%s' '${releases(["search-assist-weights-v2", "v0.1.1-rc1", "v0.1.0"])}'; }; latest_tag`]);
+    expect(result.exitCode).toBe(0);
+    expect(result.stdout.toString().trim()).toBe("v0.1.1-rc1");
+  });
+
+  test("with no v-tag at all it stops and says to cut a release", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { printf '%s' '${releases(["search-assist-weights-v2"])}'; }; latest_tag`]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("Cut a release");
+  });
+});
+
+describe("run_install_preflight", () => {
+  function fakeBun(root: string, rows: string) {
+    // The first call (import ... checkInstallPreflight) answers with the
+    // given rows; the second (the blocker filter, fed on stdin) runs the
+    // real Bun so the filter itself is exercised.
+    const bun = join(root, "bun");
+    writeFileSync(bun, `#!/bin/bash\ncase "\${2:-}" in import*) printf '%s' '${rows}' ;; *) exec "${Bun.which("bun")}" "$@" ;; esac\n`, { mode: 0o755 });
+    return bun;
+  }
+
+  test("a blocking row stops the install with the row's fix and the next step", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-preflight-"));
+    mkdirSync(join(root, "backend"));
+    try {
+      const bun = fakeBun(root, JSON.stringify([{ severity: "error", title: "Disk space", text: "Only 1 GB is free.", fix: { label: "Free up space" } }, { severity: null, title: "Memory", text: "ok" }]));
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; run_install_preflight "${bun}" "${root}/backend" 3000`]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("Disk space: Only 1 GB is free. Fix: Free up space");
+      expect(result.stderr.toString()).toContain("did not pass the install checks");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("warnings alone let the install go on", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-preflight-"));
+    mkdirSync(join(root, "backend"));
+    try {
+      const bun = fakeBun(root, JSON.stringify([{ severity: "warning", title: "Home port", text: "3000 is busy." }]));
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; run_install_preflight "${bun}" "${root}/backend" 3000 && echo PASSED`]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toContain("PASSED");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a missing backend or Bun is named, not a bare cd error", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; run_install_preflight /nonexistent/bun /nonexistent/backend 3000`]);
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr.toString()).toContain("/nonexistent/bun is missing");
+  });
+});
+
+describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
+  // Every step that touches the network, root, or the system is a stub
+  // that appends its name to a trace, so the order main() runs them in
+  // is asserted the way a real run would experience it. Two regressions
+  // live here: the preflight used to run first, with `bun` from PATH
+  // and ../backend beside the script (neither exists under sudo or
+  // `curl | bash`), and the port was probed before the old Home was
+  // stopped on an upgrade, so every upgrade drifted to 3001.
+  function runMain(root: string, extra = "") {
+    const trace = join(root, "trace");
+    const stubs = `
+      INSTALL_ROOT_DARWIN="${root}/install"
+      t() { echo "$*" >> "${trace}"; }
+      detect_os() { echo darwin; }
+      detect_arch() { echo arm64; }
+      require_root() { t require_root; }
+      latest_tag() { echo v0.1.0; }
+      record_setup_plan() { t record_setup_plan; }
+      launchctl() { t "launchctl $1"; }
+      rsync() { t rsync; }
+      fetch_release_source() { t "fetch_release_source $1"; mkdir -p "$2/backend"; }
+      find_free_port() { t find_free_port; echo 3000; }
+      ensure_bun_system_wide() { t ensure_bun_system_wide; }
+      build_app() { t "build_app $1 $2"; }
+      run_install_preflight() { t "run_install_preflight $1 $2 $3"; }
+      setup_stack() { t setup_stack; }
+      install_launchd_daemon() { t "install_launchd_daemon $3"; }
+      ${extra}
+    `;
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${stubs}
+main`]);
+    const lines = existsSync(trace) ? readFileSync(trace, "utf8").trim().split("\n") : [];
+    return { result, lines };
+  }
+
+  test("fresh install: preflight runs with the installed Bun against the fetched backend, after the build and before the Stack", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    try {
+      const { result, lines } = runMain(root);
+      expect(result.exitCode).toBe(0);
+      expect(lines).toEqual([
+        "require_root",
+        "record_setup_plan",
+        "fetch_release_source v0.1.0",
+        "find_free_port",
+        "ensure_bun_system_wide",
+        `build_app ${root}/install ${root}/install/.bun/bin/bun`,
+        `run_install_preflight ${root}/install/.bun/bin/bun ${root}/install/backend 3000`,
+        "setup_stack",
+        "install_launchd_daemon 3000",
+      ]);
+      expect(result.stdout.toString()).toContain("http://localhost:3000");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("upgrade: the old Home is stopped before the port is probed", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    try {
+      const { result, lines } = runMain(root);
+      expect(result.exitCode).toBe(0);
+      expect(lines.indexOf("launchctl bootout")).toBeGreaterThanOrEqual(0);
+      expect(lines.indexOf("launchctl bootout")).toBeLessThan(lines.indexOf("find_free_port"));
+      expect(lines.indexOf("rsync")).toBeLessThan(lines.indexOf("find_free_port"));
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a failed preflight stops before the Stack and before any service", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    try {
+      const { result, lines } = runMain(root, 'run_install_preflight() { t run_install_preflight; die "This computer did not pass the install checks."; }');
+      expect(result.exitCode).toBe(1);
+      expect(lines).not.toContain("setup_stack");
+      expect(lines.some((line) => line.startsWith("install_launchd_daemon"))).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
