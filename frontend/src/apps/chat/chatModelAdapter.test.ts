@@ -1377,6 +1377,18 @@ describe("createChatModelAdapter errors", () => {
     }
   });
 
+  test("a 503 while the AI is still downloading shows the hub's plain sentence and keeps its code", async () => {
+    const env = stubEnvironment(() => Promise.resolve(new Response(JSON.stringify({ error: "The AI is still downloading. It will work as soon as the download finishes.", code: "ai_installing" }), { status: 503, headers: { "content-type": "application/json" } })) as Promise<never>);
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toBeInstanceOf(ChatTurnError);
+      expect((error as Error).message).toBe("The AI is still downloading. It will work as soon as the download finishes.");
+      expect(error).toMatchObject({ code: "ai_installing" });
+    } finally {
+      env.restore();
+    }
+  });
+
   test("a mid-stream error event surfaces the friendly down-state message", async () => {
     const env = stubEnvironment(
       ndjsonStream([{ type: "delta", text: "Partial reply" }, { type: "error", error: "chat model unavailable: llama-server crashed" }]),
