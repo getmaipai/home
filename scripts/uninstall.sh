@@ -60,6 +60,14 @@ if command -v launchctl >/dev/null 2>&1; then
     echo "   Removed."
     removed_service=true
   fi
+  # The daily log trimmer install.sh adds next to it.
+  LOGROTATE_PLIST="/Library/LaunchDaemons/com.maipai.logrotate.plist"
+  if [ -f "$LOGROTATE_PLIST" ]; then
+    echo "== Found the log rotation daemon: $LOGROTATE_PLIST"
+    sudo launchctl bootout system "$LOGROTATE_PLIST" 2>/dev/null || true
+    sudo rm -f "$LOGROTATE_PLIST"
+    echo "   Removed."
+  fi
 fi
 
 if ! $removed_service; then
@@ -132,8 +140,14 @@ DATA_DIR="${MAIPAI_DATA_DIR:-$ROOT/data}"
 BACKUP_DIR="${MAIPAI_BACKUP_DIR:-$ROOT/backups}"
 RECEIVED_BACKUPS_DIR="$(dirname "$BACKUP_DIR")/received-backups"
 
+# upgrade-backups/ holds the data copies install.sh takes before an
+# upgrade, and data.rolled-back-* the newer data a rollback set aside:
+# both are household data too.
+UPGRADE_DIRS=("$ROOT/upgrade-backups")
+for D in "$ROOT"/data.rolled-back-*; do [ -d "$D" ] && UPGRADE_DIRS+=("$D"); done
+
 FOUND_ANY=false
-for D in "$DATA_DIR" "$BACKUP_DIR" "$RECEIVED_BACKUPS_DIR"; do
+for D in "$DATA_DIR" "$BACKUP_DIR" "$RECEIVED_BACKUPS_DIR" "${UPGRADE_DIRS[@]}"; do
   if [ -d "$D" ]; then
     FOUND_ANY=true
     SIZE=$(du -sh "$D" 2>/dev/null | cut -f1)
@@ -151,7 +165,7 @@ if $FOUND_ANY; then
   echo "   Together, this is every person, memory, conversation, model and backup."
   read -r -p "   Delete all of it? Type exactly \"DELETE MY DATA\" to confirm, anything else keeps everything: " CONFIRM
   if [ "$CONFIRM" = "DELETE MY DATA" ]; then
-    for D in "$DATA_DIR" "$BACKUP_DIR" "$RECEIVED_BACKUPS_DIR"; do
+    for D in "$DATA_DIR" "$BACKUP_DIR" "$RECEIVED_BACKUPS_DIR" "${UPGRADE_DIRS[@]}"; do
       [ -d "$D" ] && rm -rf "$D" && echo "   Deleted $D."
     done
   else
@@ -167,10 +181,10 @@ if [ -n "$STACK_USER" ]; then
   if $STACK_BINARY_USABLE; then
     if [ "$CONFIRM" = "DELETE MY DATA" ]; then
       echo "== Removing the Stack's service and data..."
-      sudo -u "$STACK_USER" env STACK_DATA_DIR="$STACK_DATA_DIR" "$STACK_BINARY" uninstall-service --remove-data
+      run_as_console_user "$STACK_OS" "$STACK_USER" STACK_DATA_DIR="$STACK_DATA_DIR" "$STACK_BINARY" uninstall-service --remove-data
     else
       echo "== Removing the Stack's service (data kept)..."
-      sudo -u "$STACK_USER" env STACK_DATA_DIR="$STACK_DATA_DIR" "$STACK_BINARY" uninstall-service
+      run_as_console_user "$STACK_OS" "$STACK_USER" STACK_DATA_DIR="$STACK_DATA_DIR" "$STACK_BINARY" uninstall-service
     fi
   else
     # No usable binary to call uninstall-service through, so this
@@ -188,5 +202,10 @@ if [ -n "$STACK_USER" ]; then
   echo
 fi
 
+if [ "$CONFIRM" = "DELETE MY DATA" ]; then
+  echo "== Your data is deleted."
+else
+  echo "== Your data was kept: $DATA_DIR and the folders listed above."
+fi
 echo "== Done. The application files under $ROOT are still here -"
 echo "   delete this directory yourself once you've confirmed data/ is handled."

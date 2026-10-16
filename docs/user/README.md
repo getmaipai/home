@@ -24,4 +24,5 @@ day the hub arrives; the rest are for when you need them.
 - [Blocked sites](blocked-sites.md): see which lists of bad sites web search checks, and choose them.
 - [The news shelf](news-shelf.md): how MaiPai keeps recent headlines for the news answer, and how to choose which lists each person sees.
 - [Sensitive subjects](sensitive-subjects.md): choose how MaiPai talks with a child about bodies, health, risk and violence.
+- [Install, upgrade, uninstall and fix the install](install-upgrade-uninstall.md): put MaiPai Home on a Mac, update it, go back a version, remove it, and fix install problems.
 - [Fix a problem](fix-a-problem.md): what to check first when something is not working right.

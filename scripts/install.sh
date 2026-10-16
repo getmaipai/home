@@ -18,9 +18,15 @@
 #        bash scripts/install.sh --plan recommended|moderate|minimal
 #
 # Idempotent: re-running upgrades an existing install in place (stop,
-# replace the source tree, keep data/backups untouched, restart) - the
-# Stack's own binary is rebuilt from STACK_TAG and its service restarted
-# the same way.
+# snapshot data/, replace the source tree, keep data/backups untouched,
+# restart) - the Stack's own binary is rebuilt from STACK_TAG and its
+# service restarted the same way. A run that stopped part way is finished
+# by running the same command again. `--rollback` goes back to the
+# previous release and the data snapshot taken just before the upgrade.
+#
+# Ports: MAIPAI_PORT (Home, default 3000) and MAIPAI_STACK_PORT (Stack,
+# default 8770) move either one; both are written into Home's service so
+# the running app agrees with the installer.
 set -euo pipefail
 
 if [ "${1:-}" = "--check" ]; then
@@ -46,9 +52,12 @@ STACK_TAG="dbc7bacb5e1b2ad0c74d78b203307a80e1fa0e0f"
 INSTALL_ROOT_LINUX="/opt/maipai-home"
 INSTALL_ROOT_DARWIN="/usr/local/maipai-home"
 SERVICE_USER="maipai"
-APP_PORT="${MAIPAI_PORT:-3000}"
-# stack/backend/src/lib/stack/client.ts's own DEFAULT_BASE_URL port.
-STACK_PORT_BASE=8770
+DEFAULT_APP_PORT=3000
+APP_PORT="${MAIPAI_PORT:-$DEFAULT_APP_PORT}"
+# backend/src/lib/ports.ts is the app's side of these two names.
+STACK_PORT_BASE="${MAIPAI_STACK_PORT:-8770}"
+UPGRADE_KEEP=2
+LOG_ROTATE_MAX_MB=20
 ENGINE_STACK_USER=maipai-stack
 ENGINE_STACK_ROOT=/opt/maipai-stack
 ENGINE_STACK_DATA=/data/stack
@@ -159,6 +168,264 @@ find_free_port() {
   echo "$port"
 }
 
+valid_port() {
+  case "$1" in ''|*[!0-9]*) return 1 ;; esac
+  [ "$1" -ge 1 ] && [ "$1" -le 65535 ]
+}
+
+valid_release_tag() {
+  printf '%s' "$1" | grep -Eq '^v[0-9]+(\.[0-9]+)*([-.][0-9A-Za-z.-]+)?$'
+}
+
+# Everything this installer calls that is not part of a bare macOS or
+# Linux. Homebrew is never needed or used. On a Mac these ship with the
+# system, so a miss means the Command Line Tools are damaged or absent.
+check_required_tools() {
+  local os="$1" missing="" tool
+  for tool in curl tar rsync unzip df awk sed grep; do
+    command -v "$tool" >/dev/null 2>&1 || missing="${missing} ${tool}"
+  done
+  if ! command -v sha256sum >/dev/null 2>&1 && ! command -v shasum >/dev/null 2>&1; then
+    missing="${missing} shasum"
+  fi
+  if [ -n "$missing" ]; then
+    if [ "$os" = "darwin" ]; then
+      die "these tools are missing from this Mac:${missing}. Install Apple's Command Line Tools: at the Mac's own screen open Terminal, run xcode-select --install, wait for it to finish, then run this installer again."
+    fi
+    die "these tools are missing from this computer:${missing}. Install them with your package manager (on Ubuntu: sudo apt-get install curl tar rsync unzip coreutils), then run this installer again."
+  fi
+  if [ "$os" = "darwin" ] && ! xcode-select -p >/dev/null 2>&1; then
+    log "Note: Apple's Command Line Tools are not installed. This installer does not need them; if a later step asks for them, run xcode-select --install at the Mac's own screen."
+  fi
+}
+
+# The Stack is a per-user LaunchAgent and needs a logged-in desktop
+# session (GPU access). Over SSH with nobody at the screen there is no
+# such session, and install-service would fail with a message about a
+# missing domain. Stop first, say why, and give the command to run at
+# the Mac itself.
+check_console_session() {
+  local os="$1" user uid
+  [ "$os" = "darwin" ] || return 0
+  user=$(find_console_user darwin)
+  if [ -z "$user" ]; then
+    log "error: nobody is logged in at this Mac's own screen. An SSH session does not count."
+    log "The MaiPai Stack runs as the logged-in person and needs that desktop session to use the GPU."
+    log "Nothing was installed. Fix: sit at the Mac (or use Screen Sharing), log in, open Terminal, and run:"
+    log "  curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash"
+    return 1
+  fi
+  uid=$(id -u "$user" 2>/dev/null || true)
+  if [ -z "$uid" ] || ! launchctl print "gui/${uid}" >/dev/null 2>&1; then
+    log "error: ${user} is the console user but has no desktop session that this installer can reach."
+    log "Nothing was installed. Fix: log in as ${user} at the Mac's own screen (the lock screen counts as logged out), open Terminal, and run:"
+    log "  curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash"
+    return 1
+  fi
+}
+
+# Runs a command as the console user. On macOS it joins that user's
+# login session first (launchctl asuser), which is what lets the Stack
+# register its LaunchAgent in gui/<uid>. Arguments after the user are
+# env-style: NAME=value pairs, then the program.
+run_as_console_user() {
+  local os="$1" user="$2" uid home
+  shift 2
+  if [ "$os" = "darwin" ]; then
+    uid=$(id -u "$user") || return 1
+    home=$(dscl . -read "/Users/${user}" NFSHomeDirectory 2>/dev/null | awk '{print $2}')
+    [ -n "$home" ] || home="/Users/${user}"
+    # launchctl asuser needs root; the installer already is, the
+    # uninstaller is not.
+    local elevate=""
+    [ "$(id -u)" -eq 0 ] || elevate=sudo
+    $elevate launchctl asuser "$uid" sudo -u "$user" env "HOME=${home}" "$@"
+  else
+    sudo -u "$user" env "$@"
+  fi
+}
+
+# Free disk needed, in GB, for each setup plan: the engine and its models
+# (about 10, 15 and 20 GB for minimal, moderate and recommended) plus room
+# for Bun, the build and Home's own data. An upgrade only needs room for
+# the new source and the data snapshot.
+plan_required_gb() {
+  case "${1:-recommended}" in
+    minimal) echo 14 ;;
+    moderate) echo 19 ;;
+    *) echo 26 ;;
+  esac
+}
+
+nearest_existing_dir() {
+  local p="$1"
+  while [ ! -d "$p" ] && [ "$p" != "/" ] && [ "$p" != "." ]; do p=$(dirname "$p"); done
+  echo "$p"
+}
+
+free_gb_at() {
+  df -Pk "$(nearest_existing_dir "$1")" 2>/dev/null | awk 'NR==2 {printf "%d", $4/1048576}'
+}
+
+check_disk_space() {
+  local root="$1" plan="$2" kind="$3" need free
+  if [ "$kind" = "upgrade" ]; then need=3; else need=$(plan_required_gb "$plan"); fi
+  free=$(free_gb_at "$root")
+  [ -n "$free" ] || { log "Could not read the free disk space for ${root}; continuing."; return 0; }
+  if [ "$free" -lt "$need" ]; then
+    die "not enough free disk space: ${free} GB free where ${root} lives, ${need} GB needed for the ${plan:-recommended} plan. Free up space (empty the Trash, remove large files) or run the installer again with a smaller plan: --plan minimal needs $(plan_required_gb minimal) GB."
+  fi
+  log "Disk space: ${free} GB free, ${need} GB needed."
+}
+
+# macOS only. A downloaded binary carries the quarantine flag and an
+# unsigned one is killed on Apple Silicon. curl and tar do not set the
+# flag, but a browser-downloaded copy of this folder would, so clear it,
+# then make sure each executable has a valid signature (ad-hoc is enough).
+clear_quarantine_and_sign() {
+  local os="$1" dir="$2" bin
+  shift 2
+  [ "$os" = "darwin" ] || return 0
+  if command -v xattr >/dev/null 2>&1; then
+    xattr -dr com.apple.quarantine "$dir" 2>/dev/null || true
+  fi
+  command -v codesign >/dev/null 2>&1 || return 0
+  for bin in "$@"; do
+    [ -x "$bin" ] || continue
+    if ! codesign --verify "$bin" >/dev/null 2>&1; then
+      codesign --force --sign - "$bin" >/dev/null 2>&1 \
+        || log "Could not sign ${bin}. If macOS blocks it, open System Settings, Privacy and Security, and choose Allow Anyway."
+    fi
+  done
+}
+
+# Polls one URL until it answers. Home answers / (the app), the Stack
+# answers /healthz. HEALTH_TRIES overrides the count (half a second each).
+wait_for_url() {
+  local url="$1" label="$2" max_tries="${3:-60}" tries=0
+  [ -n "${HEALTH_TRIES:-}" ] && max_tries="$HEALTH_TRIES"
+  while ! curl -sf -o /dev/null "$url" 2>/dev/null; do
+    tries=$((tries + 1))
+    if [ "$tries" -ge "$max_tries" ]; then
+      log "${label} did not answer at ${url} in time."
+      return 1
+    fi
+    sleep 0.5
+  done
+  log "${label} is answering at ${url}"
+}
+
+# The port a previous install used, read back from its service file, so
+# an upgrade keeps the address people bookmarked.
+previous_home_port() {
+  local os="$1" port=""
+  if [ "$os" = "darwin" ]; then
+    port=$(sed -n 's#.*<key>PORT</key><string>\([0-9]*\)</string>.*#\1#p' "${HOME_PLIST:-/Library/LaunchDaemons/com.maipai.home.plist}" 2>/dev/null | head -n1)
+  else
+    port=$(sed -n 's#^Environment=PORT=\([0-9]*\)$#\1#p' "${HOME_UNIT:-/etc/systemd/system/maipai-home.service}" 2>/dev/null | head -n1)
+  fi
+  if valid_port "$port"; then echo "$port"; fi
+  return 0
+}
+
+# Prints a short note about what happens after a restart. Home is a
+# LaunchDaemon and starts by itself. The Stack is a per-user agent and
+# starts when that person logs in.
+print_reboot_note() {
+  local os="$1" auto="" vault=""
+  if [ "$os" = "darwin" ]; then
+    log "After a restart: Home starts by itself. The MaiPai Stack starts when the Mac's user logs in."
+    auto=$(defaults read /Library/Preferences/com.apple.loginwindow autoLoginUser 2>/dev/null || true)
+    vault=$(fdesetup status 2>/dev/null || true)
+    if [ -z "$auto" ]; then
+      log "To make that automatic, turn on automatic login: System Settings, Users and Groups, Automatic login."
+    fi
+    case "$vault" in *"is On"*) log "FileVault is on, which blocks automatic login. After a restart someone must log in once at the Mac for the Stack to start." ;; esac
+  else
+    log "After a restart: Home and the Stack both start by themselves."
+  fi
+}
+
+# ---- Upgrade safety: markers, data snapshot, rollback ----
+read_marker() { if [ -f "$1" ]; then tr -d '[:space:]' < "$1"; fi; }
+
+snapshot_data() {
+  local root="$1" from_tag="$2" ts dest
+  [ -d "${root}/data" ] || return 0
+  ts=$(date +%Y%m%d-%H%M%S)
+  dest="${root}/upgrade-backups/${ts}-from-${from_tag:-unknown}"
+  mkdir -p "$dest" || return 1
+  chmod 0700 "${root}/upgrade-backups" "$dest" 2>/dev/null || true
+  if ! tar -czf "${dest}/data.tar.gz" --exclude='data/logs' -C "$root" data; then
+    rm -rf "$dest"
+    return 1
+  fi
+  log "Saved a copy of your data to ${dest}/data.tar.gz"
+  prune_snapshots "${root}/upgrade-backups"
+}
+
+prune_snapshots() {
+  local dir="$1" entries=() line count i
+  while IFS= read -r line; do entries+=("$line"); done < <(ls -1 "$dir" 2>/dev/null | sort)
+  count=${#entries[@]}
+  i=0
+  while [ $((count - i)) -gt "$UPGRADE_KEEP" ]; do
+    rm -rf "${dir:?}/${entries[$i]}"
+    i=$((i + 1))
+  done
+}
+
+# The newest snapshot taken while upgrading away from <tag>.
+find_snapshot() {
+  local root="$1" tag="$2"
+  ls -1 "${root}/upgrade-backups" 2>/dev/null | sort | grep -- "-from-${tag}\$" | tail -n1 || true
+}
+
+restore_snapshot() {
+  local root="$1" tag="$2" snap ts
+  snap=$(find_snapshot "$root" "$tag")
+  [ -n "$snap" ] || { log "There is no saved data copy from ${tag}, so the data stays as it is."; return 0; }
+  ts=$(date +%Y%m%d-%H%M%S)
+  if [ -d "${root}/data" ]; then
+    mv "${root}/data" "${root}/data.rolled-back-${ts}" || return 1
+    log "Your newer data was kept at ${root}/data.rolled-back-${ts}"
+  fi
+  tar -xzf "${root}/upgrade-backups/${snap}/data.tar.gz" -C "$root" || return 1
+  log "Restored your data from ${snap}"
+}
+
+# ---- Logs: size-capped copies, daily, for the files launchd owns ----
+install_log_rotation() {
+  local os="$1" dir="$2" plist="${LOGROTATE_PLIST:-/Library/LaunchDaemons/com.maipai.logrotate.plist}"
+  [ "$os" = "darwin" ] || return 0
+  [ -f "${dir}/scripts/rotate-logs.sh" ] || { log "Log rotation script missing at ${dir}/scripts/rotate-logs.sh; skipping it."; return 0; }
+  cat >"$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.maipai.logrotate</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>${dir}/scripts/rotate-logs.sh</string>
+    <string>${dir}</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>LOG_MAX_MB</key><string>${LOG_ROTATE_MAX_MB}</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>4</integer><key>Minute</key><integer>15</integer></dict>
+  <key>RunAtLoad</key><false/>
+</dict>
+</plist>
+EOF
+  chmod 644 "$plist"
+  launchctl bootout system "$plist" 2>/dev/null || true
+  launchctl bootstrap system "$plist" 2>/dev/null || log "Could not register log rotation; logs will keep growing until you run it. Run: sudo launchctl bootstrap system ${plist}"
+}
+
 ensure_bun_system_wide() {
   local bun_home="$1" bun_bin="${1}/bin/bun" bun_version
   if [ -x "$bun_bin" ]; then
@@ -201,7 +468,7 @@ build_app() {
 }
 
 install_systemd_unit() {
-  local dir="$1" bun_bin="$2" port="$3"
+  local dir="$1" bun_bin="$2" port="$3" stack_port="${4:-$STACK_PORT_BASE}"
   local unit=/etc/systemd/system/maipai-home.service
   cat >"$unit" <<EOF
 [Unit]
@@ -214,6 +481,7 @@ User=${SERVICE_USER}
 WorkingDirectory=${dir}/backend
 Environment=NODE_ENV=production
 Environment=PORT=${port}
+Environment=MAIPAI_STACK_PORT=${stack_port}
 ExecStart=${bun_bin} run start
 Restart=on-failure
 RestartSec=5
@@ -250,8 +518,8 @@ ensure_service_user_linux() {
 }
 
 install_launchd_daemon() {
-  local dir="$1" bun_bin="$2" port="$3"
-  local plist=/Library/LaunchDaemons/com.maipai.home.plist
+  local dir="$1" bun_bin="$2" port="$3" stack_port="${4:-$STACK_PORT_BASE}"
+  local plist="${HOME_PLIST:-/Library/LaunchDaemons/com.maipai.home.plist}"
   mkdir -p "${dir}/data/logs"
   cat >"$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -270,6 +538,7 @@ install_launchd_daemon() {
   <dict>
     <key>NODE_ENV</key><string>production</string>
     <key>PORT</key><string>${port}</string>
+    <key>MAIPAI_STACK_PORT</key><string>${stack_port}</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
@@ -562,8 +831,10 @@ install_stack_service() {
 
   local install_service_argv=() argv_line
   while IFS= read -r argv_line; do install_service_argv+=("$argv_line"); done < <(stack_install_service_argv "$binary" "$stack_data_dir" "$stack_port" "$bun_bin")
-  sudo -u "$stack_user" env "${install_service_argv[@]}" \
-    || { log "The Stack's install-service command failed. The MaiPai Stack is required; installation cannot continue."; return 1; }
+  clear_quarantine_and_sign "$os" "$stack_dir" "$binary"
+  run_as_console_user "$os" "$stack_user" "${install_service_argv[@]}" \
+    || { log "The Stack's install-service command failed. The MaiPai Stack is required; installation cannot continue. On a Mac this usually means no one is logged in at the Mac's own screen: log in there, open Terminal, and run the installer again."; return 1; }
+  echo "$stack_port" > "${stack_dir}/.port" || { log "Could not write ${stack_dir}/.port. The MaiPai Stack is required; installation cannot continue."; return 1; }
   if [ "$os" = "linux" ]; then
     loginctl enable-linger "$stack_user" 2>/dev/null || true
   fi
@@ -574,7 +845,7 @@ install_stack_service() {
   while ! curl -sf "http://127.0.0.1:${stack_port}/healthz" >/dev/null 2>&1; do
     tries=$((tries + 1))
     if [ "$tries" -ge "$max_tries" ]; then
-      log "The Stack did not answer /healthz in time. The MaiPai Stack is required; installation cannot continue."
+      log "The Stack did not answer /healthz in time. The MaiPai Stack is required; installation cannot continue. Its log is ${stack_data_dir}/logs/stack.error.log."
       return 1
     fi
     sleep 0.5
@@ -604,8 +875,18 @@ setup_stack() {
   source_dir="${source_root}/stack"
   fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   fetch_stack_commons "$source_root" "$dry_run" || { log "Could not fetch the Commons packages the Stack needs. The MaiPai Stack is required; installation cannot continue. Read the message above, fix what it names, then run this installer again."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
-  build_stack_binary "$source_dir" "$stack_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
-  [ "$dry_run" = "yes" ] || rm -rf "$source_root"
+  # build-binary.sh deletes its OUT_DIR first, and stack/data (models,
+  # settings) lives inside stack/. Build into scratch, then copy only the
+  # compiled files across so a rebuild never touches the Stack's data.
+  local build_dir="${source_root}/output"
+  build_stack_binary "$source_dir" "$build_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] would copy the built files into ${stack_dir} (the Stack's data/ is not touched)"
+  else
+    publish_engine_stack_binary "$build_dir" "$stack_dir" "$(render_stack_binary_name "$os" "$arch")" \
+      || { log "Could not copy the built Stack files into ${stack_dir}. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_root"; return 1; }
+    rm -rf "$source_root"
+  fi
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
 }
 
@@ -683,7 +964,7 @@ setup_engine_computer() {
   sudo -u "$ENGINE_STACK_USER" env \
     "XDG_RUNTIME_DIR=/run/user/${engine_uid}" \
     "DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/${engine_uid}/bus" \
-    STACK_DATA_DIR="$ENGINE_STACK_DATA" PORT=8770 STACK_BUN_BIN="$bun_bin" \
+    STACK_DATA_DIR="$ENGINE_STACK_DATA" PORT="$STACK_PORT_BASE" STACK_BUN_BIN="$bun_bin" \
     "$binary" install-service
   local helper_dir="$PWD" helper_tmp=""
   if [ ! -f "${helper_dir}/scripts/engine-computer/maipai-engine" ]; then
@@ -701,27 +982,82 @@ setup_engine_computer() {
   log "Ready to pair. On MaiPai Home, open Settings, then Engines."
 }
 
+# What the failure trap needs to know: how far the install got.
+# ""         nothing on disk was changed yet
+# "stopped"  the old Home and Stack were stopped, the old files are intact
+# "replaced" the new files are in place, services not yet confirmed
+# "done"     finished
+INSTALL_STAGE=""
+INSTALL_ROOT_FOR_TRAP=""
+INSTALL_OS_FOR_TRAP=""
+
+restart_home_service() {
+  local os="$1"
+  if [ "$os" = "linux" ]; then
+    systemctl start maipai-home.service 2>/dev/null || true
+  elif [ -f /Library/LaunchDaemons/com.maipai.home.plist ]; then
+    launchctl bootstrap system /Library/LaunchDaemons/com.maipai.home.plist 2>/dev/null || true
+  fi
+}
+
+on_install_exit() {
+  local code=$? root="$INSTALL_ROOT_FOR_TRAP" os="$INSTALL_OS_FOR_TRAP"
+  trap - EXIT
+  [ "$code" -ne 0 ] || return 0
+  case "$INSTALL_STAGE" in
+    "")
+      log "The install stopped before changing anything on this computer. Read the error above, fix it, then run the installer again."
+      ;;
+    stopped)
+      restart_home_service "$os"
+      log "The upgrade stopped before any file was replaced. Home was started again on the version it had before. Your data was not touched. Read the error above, fix it, then run the installer again."
+      ;;
+    replaced)
+      log "The install stopped part way. Your data is safe: it is in ${root}/data, and a copy from before the upgrade is in ${root}/upgrade-backups."
+      log "To finish, fix what the error above names and run the same installer command again; it resumes where it stopped."
+      if [ -f "${root}/.previous-tag" ]; then
+        log "To go back to the previous version ($(read_marker "${root}/.previous-tag")) instead, run: sudo bash ${root}/scripts/install.sh --rollback"
+      fi
+      log "Logs: ${root}/data/logs/launchd.err.log"
+      ;;
+  esac
+}
+
 main() {
   local dry_run="no"
   local engine_computer="no"
   local plan_flag="" plan_flag_seen="no"
   local plan_flag_count=0
+  local version_flag="" rollback="no"
   while [ "$#" -gt 0 ]; do
     case "$1" in
       --dry-run) dry_run="yes" ;;
       --engine-computer) engine_computer="yes" ;;
+      --rollback) rollback="yes" ;;
+      --version)
+        [ "$#" -ge 2 ] || die "--version needs a release tag such as v0.1.0. Run bash scripts/install.sh --help for the next step."
+        version_flag="$2"; shift ;;
       --plan)
         [ "$#" -ge 2 ] || die "--plan needs a value: recommended, moderate, or minimal. Run bash scripts/install.sh --help for the next step."
         plan_flag="$2"; plan_flag_seen="yes"; plan_flag_count=$((plan_flag_count + 1)); shift ;;
       --help|-h)
-        log "Usage: install.sh [--dry-run] [--engine-computer] [--plan recommended|moderate|minimal]"
+        log "Usage: install.sh [--dry-run] [--engine-computer] [--plan recommended|moderate|minimal] [--version vX.Y.Z] [--rollback]"
         log "You can also set MAIPAI_PLAN to recommended, moderate, or minimal. The setup wizard still runs its checks before downloads."
+        log "--version installs a specific release instead of the latest. --rollback goes back to the previous release and the data copy taken before the last upgrade."
+        log "MAIPAI_PORT (default 3000) and MAIPAI_STACK_PORT (default 8770) change the ports."
         exit 0 ;;
       --*) die "Unknown option: $1. Run bash scripts/install.sh --help for allowed options." ;;
       *) die "Unexpected argument: $1. Run bash scripts/install.sh --help for allowed options." ;;
     esac
     shift
   done
+
+  valid_port "$APP_PORT" || die "MAIPAI_PORT is '${APP_PORT}', which is not a port number. Set it to a number from 1 to 65535, or unset it to use ${DEFAULT_APP_PORT}."
+  valid_port "$STACK_PORT_BASE" || die "MAIPAI_STACK_PORT is '${STACK_PORT_BASE}', which is not a port number. Set it to a number from 1 to 65535, or unset it to use 8770."
+  if [ -n "$version_flag" ]; then
+    valid_release_tag "$version_flag" || die "Invalid version '${version_flag}'. Use a release tag such as v0.1.0."
+    [ "$rollback" = "no" ] || die "--version and --rollback cannot be used together. --rollback picks the previous release by itself."
+  fi
 
   local requested_plan=""
   if [ "$plan_flag_seen" = "yes" ]; then
@@ -758,30 +1094,70 @@ main() {
     [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
     local bun_bin="${install_root}/.bun/bin/bun"
     log "[dry-run] MaiPai Stack install plan for ${os}/${arch} at ${install_root}"
+    log "[dry-run] checks before any change: required tools, a logged-in desktop session (macOS), $(plan_required_gb "${requested_plan:-recommended}") GB free disk for the ${requested_plan:-recommended} plan"
+    log "[dry-run] Home port ${APP_PORT} (or the next free one), Stack port ${STACK_PORT_BASE} (or the next free one)"
     record_setup_plan "${install_root}/data" "$requested_plan" yes
     log "[dry-run] STACK_TAG=${STACK_TAG}"
     setup_stack "$install_root" "$bun_bin" "$os" "$arch" "yes"
+    log "[dry-run] would wait for Home at http://127.0.0.1:${APP_PORT}/ and print the address to open"
     exit 0
   fi
 
   require_root
-  local tag
-  tag=$(latest_tag)
+  check_required_tools "$os"
+  check_console_session "$os" || exit 1
+
   local install_root
   [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
   local bun_home="${install_root}/.bun"
 
+  local installed_tag previous_tag
+  installed_tag=$(read_marker "${install_root}/.installed-tag")
+  previous_tag=$(read_marker "${install_root}/.previous-tag")
+
+  local tag
+  if [ "$rollback" = "yes" ]; then
+    [ -n "$previous_tag" ] || die "there is no earlier version to go back to: ${install_root}/.previous-tag does not exist. Rollback only works after an upgrade made by this installer."
+    tag="$previous_tag"
+  elif [ -n "$version_flag" ]; then
+    tag="$version_flag"
+  else
+    tag=$(latest_tag)
+  fi
+
+  # "upgrade": a finished install is here. "resume": a folder is here but
+  # an earlier run never finished. "fresh": nothing yet. record_setup_plan
+  # creates data/ before this point, so the folder alone proves nothing.
+  local kind="fresh"
+  if [ -n "$installed_tag" ]; then kind="upgrade"
+  elif [ -d "${install_root}/backend" ]; then kind="resume"
+  fi
+
+  local saved_plan
+  saved_plan=$(read_marker "${install_root}/data/setup-plan")
+  check_disk_space "$install_root" "${requested_plan:-${saved_plan:-recommended}}" "$kind"
+
   record_setup_plan "${install_root}/data" "$requested_plan" no
 
-  local upgrading="no"
-  [ -d "$install_root" ] && upgrading="yes"
-  local had_existing_stack="no"
+  INSTALL_ROOT_FOR_TRAP="$install_root"
+  INSTALL_OS_FOR_TRAP="$os"
+  trap on_install_exit EXIT
 
-  if [ "$upgrading" = "yes" ]; then
-    log "Existing install found at ${install_root} - upgrading to ${tag}."
+  local had_existing_stack="no"
+  local previous_port=""
+  if [ "$kind" != "fresh" ]; then
+    previous_port=$(previous_home_port "$os")
+    if [ "$rollback" = "yes" ]; then
+      log "Going back from ${installed_tag:-the current version} to ${tag}."
+    elif [ "$kind" = "upgrade" ]; then
+      log "Existing install ${installed_tag} found at ${install_root} - upgrading to ${tag}."
+    else
+      log "An earlier install at ${install_root} did not finish - continuing with ${tag}."
+    fi
     if [ "$os" = "linux" ]; then systemctl stop maipai-home.service 2>/dev/null || true
     else launchctl bootout system /Library/LaunchDaemons/com.maipai.home.plist 2>/dev/null || true
     fi
+    INSTALL_STAGE="stopped"
     # The Stack's own service stops too, for the same reason Home's
     # does: its binary lives inside the tree the rsync below replaces.
     # had_existing_stack, set here, is read again after setup_stack
@@ -794,38 +1170,58 @@ main() {
       existing_stack_user=$(cat "${install_root}/stack/.user")
       local existing_binary="${install_root}/stack/$(render_stack_binary_name "$os" "$arch")"
       if [ -n "$existing_stack_user" ] && [ -x "$existing_binary" ]; then
-        sudo -u "$existing_stack_user" "$existing_binary" stop 2>/dev/null || true
+        run_as_console_user "$os" "$existing_stack_user" "$existing_binary" stop 2>/dev/null || true
       fi
     fi
+    # The data copy is taken with everything stopped, so the database is
+    # not mid-write. A rollback keeps the newer data aside instead.
+    if [ "$kind" = "upgrade" ] && [ "$rollback" = "no" ]; then
+      snapshot_data "$install_root" "$installed_tag" \
+        || die "could not save a copy of your data before upgrading (is the disk full?). Nothing was changed. Free up space, then run the installer again."
+    fi
     rm -rf "${install_root}.new"
-    fetch_release_source "$tag" "${install_root}.new"
+    fetch_release_source "$tag" "${install_root}.new" \
+      || die "could not download ${REPO}@${tag}. Check that this computer can reach github.com, then run the installer again. Nothing was changed."
     # rsync --delete so a file the new release removed also disappears
     # here (a plain cp -a only ever adds/overwrites) - but data/,
     # backups/, received-backups/ (lib/paths.ts's own layout, all three
     # direct children of the install root, siblings of backend/), and
     # stack/data/ (the Stack's own equivalent, a child of stack/) are
     # real runtime state, never part of a release tarball, and must
-    # never be deleted just because they're absent from `.new`.
+    # never be deleted just because they're absent from `.new`. The same
+    # goes for the Bun runtime, the upgrade copies and the version markers.
     rsync -a --delete \
-      --exclude=/data --exclude=/backups --exclude=/received-backups --exclude=/stack \
+      --exclude=/data --exclude=/data.rolled-back-* --exclude=/backups --exclude=/received-backups \
+      --exclude=/stack --exclude=/.bun --exclude=/upgrade-backups \
+      --exclude=/.installed-tag --exclude=/.previous-tag \
       "${install_root}.new/" "${install_root}/"
     rm -rf "${install_root}.new"
+    INSTALL_STAGE="replaced"
+    if [ "$rollback" = "yes" ]; then
+      restore_snapshot "$install_root" "$tag" || die "could not restore the data copy from ${tag}. Your current data is still in ${install_root}/data. Run the installer with --rollback again, or restore a copy by hand from ${install_root}/upgrade-backups."
+    fi
   else
-    fetch_release_source "$tag" "$install_root"
+    fetch_release_source "$tag" "$install_root" \
+      || die "could not download ${REPO}@${tag}. Check that this computer can reach github.com, then run the installer again. Nothing was installed."
+    INSTALL_STAGE="replaced"
   fi
 
   # Chosen only now, after an existing Home has been stopped above: probed
   # while the old service still held its port, an upgrade moved Home to the
   # next free port (3001) every time, and the address in the final line and
-  # every bookmark changed with it.
+  # every bookmark changed with it. An upgrade keeps the port the last
+  # install used unless MAIPAI_PORT says otherwise.
+  local want_port="$APP_PORT"
+  if [ -z "${MAIPAI_PORT:-}" ] && [ -n "$previous_port" ]; then want_port="$previous_port"; fi
   local port
-  port=$(find_free_port "$APP_PORT")
-  if [ "$port" != "$APP_PORT" ]; then
-    log "Port ${APP_PORT} is already in use - using ${port} instead."
+  port=$(find_free_port "$want_port")
+  if [ "$port" != "$want_port" ]; then
+    log "Port ${want_port} is already in use - using ${port} instead."
   fi
 
   ensure_bun_system_wide "$bun_home"
   local bun_bin="${bun_home}/bin/bun"
+  clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
   build_app "$install_root" "$bun_bin"
   run_install_preflight "$bun_bin" "${install_root}/backend" "$port"
 
@@ -835,17 +1231,48 @@ main() {
     log "MaiPai Stack setup failed. Home requires the Stack. Home's service was not started."
     exit 1
   fi
+  local stack_port
+  stack_port=$(read_marker "${install_root}/stack/.port")
+  valid_port "$stack_port" || stack_port="$STACK_PORT_BASE"
 
   if [ "$os" = "linux" ]; then
     ensure_service_user_linux
-    install_systemd_unit "$install_root" "$bun_bin" "$port"
+    install_systemd_unit "$install_root" "$bun_bin" "$port" "$stack_port"
   else
-    install_launchd_daemon "$install_root" "$bun_bin" "$port"
+    install_launchd_daemon "$install_root" "$bun_bin" "$port" "$stack_port"
+    install_log_rotation "$os" "$install_root"
   fi
+
+  if ! wait_for_url "http://127.0.0.1:${port}/" "MaiPai Home" 120; then
+    log "Home did not come up. Its log: ${install_root}/data/logs/launchd.err.log"
+    log "Fix what the log names, then run the installer again; it resumes safely."
+    exit 1
+  fi
+  wait_for_url "http://127.0.0.1:${stack_port}/healthz" "The MaiPai Stack" 20 \
+    || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
+
+  # Markers last, so an install that died earlier is still seen as
+  # unfinished by the next run.
+  if [ "$rollback" = "yes" ]; then
+    printf '%s\n' "$tag" > "${install_root}/.installed-tag"
+    if [ -n "$installed_tag" ] && [ "$installed_tag" != "$tag" ]; then printf '%s\n' "$installed_tag" > "${install_root}/.previous-tag"; fi
+  else
+    if [ -n "$installed_tag" ] && [ "$installed_tag" != "$tag" ]; then printf '%s\n' "$installed_tag" > "${install_root}/.previous-tag"; fi
+    printf '%s\n' "$tag" > "${install_root}/.installed-tag"
+  fi
+  INSTALL_STAGE="done"
+  trap - EXIT
 
   log ""
   log "MaiPai Home ${tag} is installed and running at http://localhost:${port}"
+  if [ "$os" = "darwin" ]; then
+    local lan_name
+    lan_name=$(scutil --get LocalHostName 2>/dev/null || true)
+    [ -z "$lan_name" ] || log "From another device on your network: http://${lan_name}.local:${port}"
+  fi
   log "Open that address in a browser to finish setup."
+  log "Logs: ${install_root}/data/logs/ (Home), ${install_root}/stack/data/logs/ (Stack)."
+  print_reboot_note "$os"
 }
 
 # Guarded so scripts/install.test.ts and uninstall.sh can `source` this

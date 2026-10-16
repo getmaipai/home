@@ -295,8 +295,8 @@ describe("required Stack setup failures", () => {
   test.each([
     ["missing Stack user", 'find_console_user() { echo ""; }', "logged-in console user"],
     ["missing Stack binary", 'find_console_user() { echo marlow; }; render_stack_binary_name() { echo absent; }', "compiled Stack binary is missing"],
-    ["failed service install", 'find_console_user() { echo marlow; }; chown() { return 0; }; sudo() { return 1; }', "install-service command failed"],
-    ["health timeout", 'find_console_user() { echo marlow; }; chown() { return 0; }; sudo() { return 0; }; curl() { return 22; }; sleep() { :; }', "did not answer /healthz in time"],
+    ["failed service install", 'find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; run_as_console_user() { return 1; }', "install-service command failed"],
+    ["health timeout", 'find_console_user() { echo marlow; }; chown() { return 0; }; clear_quarantine_and_sign() { :; }; run_as_console_user() { return 0; }; curl() { return 22; }; sleep() { :; }', "did not answer /healthz in time"],
   ] as const)("fails when there is a %s", (_name, setup, message) => {
     const root = mkdtempSync(join(tmpdir(), "maipai-install-required-stack-"));
     mkdirSync(join(root, "stack"));
@@ -679,6 +679,7 @@ describe("engine computer installer cleanup", () => {
       `sha256_file() { case "$1" in *commons.tar.gz) echo "FIXTURE";; esac; }`,
       `commons_archive_sha256() { echo FIXTURE; }`,
       `build_stack_binary() { return 0; }`,
+      `publish_engine_stack_binary() { return 0; }`,
       `install_stack_service() { return 0; }`,
       `mkdir() { command mkdir -p "$@"; }`,
       `fetch_stack_source "${root}/stack" no`,
@@ -861,7 +862,7 @@ describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
   // and ../backend beside the script (neither exists under sudo or
   // `curl | bash`), and the port was probed before the old Home was
   // stopped on an upgrade, so every upgrade drifted to 3001.
-  function runMain(root: string, extra = "") {
+  function runMain(root: string, extra = "", args: string[] = []) {
     const trace = join(root, "trace");
     const stubs = `
       INSTALL_ROOT_DARWIN="${root}/install"
@@ -869,6 +870,14 @@ describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
       detect_os() { echo darwin; }
       detect_arch() { echo arm64; }
       require_root() { t require_root; }
+      check_required_tools() { t check_required_tools; }
+      check_console_session() { t check_console_session; }
+      check_disk_space() { t "check_disk_space $3"; }
+      snapshot_data() { t "snapshot_data $2"; }
+      clear_quarantine_and_sign() { t clear_quarantine_and_sign; }
+      install_log_rotation() { t install_log_rotation; }
+      wait_for_url() { t "wait_for_url $1"; }
+      print_reboot_note() { t print_reboot_note; }
       latest_tag() { echo v0.1.0; }
       record_setup_plan() { t record_setup_plan; }
       launchctl() { t "launchctl $1"; }
@@ -878,12 +887,12 @@ describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
       ensure_bun_system_wide() { t ensure_bun_system_wide; }
       build_app() { t "build_app $1 $2"; }
       run_install_preflight() { t "run_install_preflight $1 $2 $3"; }
-      setup_stack() { t setup_stack; }
-      install_launchd_daemon() { t "install_launchd_daemon $3"; }
+      setup_stack() { t setup_stack; mkdir -p "$1/stack"; echo 8771 > "$1/stack/.port"; }
+      install_launchd_daemon() { t "install_launchd_daemon $3 $4"; }
       ${extra}
     `;
     const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${stubs}
-main`]);
+main ${args.join(" ")}`]);
     const lines = existsSync(trace) ? readFileSync(trace, "utf8").trim().split("\n") : [];
     return { result, lines };
   }
@@ -895,15 +904,24 @@ main`]);
       expect(result.exitCode).toBe(0);
       expect(lines).toEqual([
         "require_root",
+        "check_required_tools",
+        "check_console_session",
+        "check_disk_space fresh",
         "record_setup_plan",
         "fetch_release_source v0.1.0",
         "find_free_port",
         "ensure_bun_system_wide",
+        "clear_quarantine_and_sign",
         `build_app ${root}/install ${root}/install/.bun/bin/bun`,
         `run_install_preflight ${root}/install/.bun/bin/bun ${root}/install/backend 3000`,
         "setup_stack",
-        "install_launchd_daemon 3000",
+        "install_launchd_daemon 3000 8771",
+        "install_log_rotation",
+        "wait_for_url http://127.0.0.1:3000/",
+        "wait_for_url http://127.0.0.1:8771/healthz",
+        "print_reboot_note",
       ]);
+      expect(readFileSync(join(root, "install", ".installed-tag"), "utf8").trim()).toBe("v0.1.0");
       expect(result.stdout.toString()).toContain("http://localhost:3000");
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
@@ -911,12 +929,19 @@ main`]);
   test("upgrade: the old Home is stopped before the port is probed", () => {
     const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
     mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
     try {
       const { result, lines } = runMain(root);
       expect(result.exitCode).toBe(0);
+      expect(lines).toContain("check_disk_space upgrade");
       expect(lines.indexOf("launchctl bootout")).toBeGreaterThanOrEqual(0);
       expect(lines.indexOf("launchctl bootout")).toBeLessThan(lines.indexOf("find_free_port"));
       expect(lines.indexOf("rsync")).toBeLessThan(lines.indexOf("find_free_port"));
+      // The data copy is taken after the stop and before any file is replaced.
+      expect(lines.indexOf("snapshot_data v0.0.9")).toBeGreaterThan(lines.indexOf("launchctl bootout"));
+      expect(lines.indexOf("snapshot_data v0.0.9")).toBeLessThan(lines.indexOf("rsync"));
+      expect(readFileSync(join(root, "install", ".installed-tag"), "utf8").trim()).toBe("v0.1.0");
+      expect(readFileSync(join(root, "install", ".previous-tag"), "utf8").trim()).toBe("v0.0.9");
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
@@ -928,5 +953,427 @@ main`]);
       expect(lines).not.toContain("setup_stack");
       expect(lines.some((line) => line.startsWith("install_launchd_daemon"))).toBe(false);
     } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("an upgrade keeps the port the last install used, unless MAIPAI_PORT is set", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
+    try {
+      const stubs = 'previous_home_port() { echo 3010; }; find_free_port() { t "find_free_port $1"; echo "$1"; }';
+      const { lines } = runMain(root, stubs);
+      expect(lines).toContain("find_free_port 3010");
+      const root2 = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+      try {
+        mkdirSync(join(root2, "install"));
+        writeFileSync(join(root2, "install", ".installed-tag"), "v0.0.9\n");
+        const set = runMain(root2, `${stubs}; MAIPAI_PORT=3500; APP_PORT=3500`);
+        expect(set.lines).toContain("find_free_port 3500");
+      } finally { rmSync(root2, { recursive: true, force: true }); }
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a failure after the old Home was stopped, before any file changed, starts the old Home again and says so", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
+    try {
+      const { result, lines } = runMain(root, 'fetch_release_source() { return 1; }; restart_home_service() { t restart_home_service; }');
+      expect(result.exitCode).toBe(1);
+      expect(lines).toContain("restart_home_service");
+      expect(lines).not.toContain("rsync");
+      const out = result.stdout.toString() + result.stderr.toString();
+      expect(out).toContain("could not download");
+      expect(out).toContain("Your data was not touched");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a failure after the files were replaced names the rerun and the rollback command", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
+    writeFileSync(join(root, "install", ".previous-tag"), "v0.0.8\n");
+    try {
+      const { result } = runMain(root, 'build_app() { die "the build failed"; }');
+      expect(result.exitCode).toBe(1);
+      const out = result.stdout.toString();
+      expect(out).toContain("Your data is safe");
+      expect(out).toContain(`sudo bash ${root}/install/scripts/install.sh --rollback`);
+      // The unfinished install is not recorded as the installed version.
+      expect(readFileSync(join(root, "install", ".installed-tag"), "utf8").trim()).toBe("v0.0.9");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("--rollback installs the previous tag, skips the data copy, restores the old one, and swaps the markers", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install"));
+    writeFileSync(join(root, "install", ".installed-tag"), "v0.0.9\n");
+    writeFileSync(join(root, "install", ".previous-tag"), "v0.0.8\n");
+    try {
+      const trace = join(root, "trace");
+      const stubs = `
+        INSTALL_ROOT_DARWIN="${root}/install"
+        t() { echo "$*" >> "${trace}"; }
+        detect_os() { echo darwin; }
+        detect_arch() { echo arm64; }
+        require_root() { :; }; check_required_tools() { :; }; check_console_session() { :; }; check_disk_space() { :; }
+        record_setup_plan() { :; }; launchctl() { :; }; rsync() { :; }
+        fetch_release_source() { t "fetch $1"; mkdir -p "$2/backend"; }
+        snapshot_data() { t snapshot_data; }
+        restore_snapshot() { t "restore_snapshot $2"; }
+        find_free_port() { echo "$1"; }; ensure_bun_system_wide() { :; }; clear_quarantine_and_sign() { :; }
+        build_app() { :; }; run_install_preflight() { :; }
+        setup_stack() { :; }; install_launchd_daemon() { :; }; install_log_rotation() { :; }
+        wait_for_url() { :; }; print_reboot_note() { :; }
+      `;
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${stubs}\nmain --rollback`]);
+      expect(result.exitCode).toBe(0);
+      const lines = readFileSync(trace, "utf8").trim().split("\n");
+      expect(lines).toEqual(["fetch v0.0.8", "restore_snapshot v0.0.8"]);
+      expect(readFileSync(join(root, "install", ".installed-tag"), "utf8").trim()).toBe("v0.0.8");
+      expect(readFileSync(join(root, "install", ".previous-tag"), "utf8").trim()).toBe("v0.0.9");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("--rollback with no earlier version stops with a plain message before touching anything", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    try {
+      const { result, lines } = runMain(root, "", ["--rollback"]);
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain("there is no earlier version to go back to");
+      expect(lines).not.toContain("rsync");
+      expect(lines).not.toContain("snapshot_data v0.0.9");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("--version installs that release and not the latest one", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    try {
+      const { result, lines } = runMain(root, "", ["--version", "v0.0.5"]);
+      expect(result.exitCode).toBe(0);
+      expect(lines).toContain("fetch_release_source v0.0.5");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a resumed install (folder present, never finished) does not take an upgrade snapshot and is not called an upgrade", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
+    mkdirSync(join(root, "install", "backend"), { recursive: true });
+    try {
+      const { result, lines } = runMain(root);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toContain("did not finish - continuing");
+      expect(lines).toContain("check_disk_space resume");
+      expect(lines.some((line) => line.startsWith("snapshot_data"))).toBe(false);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a bad MAIPAI_PORT or MAIPAI_STACK_PORT stops with the fix", () => {
+    for (const [name, message] of [["MAIPAI_PORT", "MAIPAI_PORT is 'abc'"], ["MAIPAI_STACK_PORT", "MAIPAI_STACK_PORT is 'abc'"]]) {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; main --dry-run`], { env: { ...process.env, [name]: "abc" } });
+      expect(result.exitCode).toBe(1);
+      expect(result.stderr.toString()).toContain(message);
+      expect(result.stderr.toString()).toContain("Set it to a number from 1 to 65535");
+    }
+  });
+});
+
+describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
+  const bash = (script: string, env: Record<string, string> = {}) =>
+    Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${script}`], { env: { ...process.env, ...env } });
+
+  test("valid_port and valid_release_tag", () => {
+    expect(bash("valid_port 3000 && valid_port 65535 && ! valid_port 0 && ! valid_port 70000 && ! valid_port abc && ! valid_port ''").exitCode).toBe(0);
+    expect(bash("valid_release_tag v0.1.0 && valid_release_tag v1.2.3-rc1 && ! valid_release_tag main && ! valid_release_tag search-assist-weights-v2").exitCode).toBe(0);
+  });
+
+  test("missing tools on a Mac point at the Command Line Tools with the exact command", () => {
+    const empty = mkdtempSync(join(tmpdir(), "maipai-nopath-"));
+    try {
+      const result = Bun.spawnSync(["/bin/bash", "-c", `source "${INSTALL_SH}"; check_required_tools darwin`], { env: { PATH: empty } });
+      expect(result.exitCode).toBe(1);
+      const err = result.stderr.toString();
+      expect(err).toContain("xcode-select --install");
+      expect(err).toContain("curl");
+      expect(err).toContain("run this installer again");
+    } finally { rmSync(empty, { recursive: true, force: true }); }
+  });
+
+  test("with every tool present the check passes (this machine)", () => {
+    expect(bash("check_required_tools darwin").exitCode).toBe(0);
+  });
+
+  test("the Stack build never needs python3 or Homebrew", () => {
+    const text = readFileSync(INSTALL_SH, "utf8");
+    expect(text).not.toContain("python3");
+    expect(text).not.toMatch(/\bbrew\b/);
+    expect(text).toContain("SKIP_VERIFY=1");
+  });
+
+  test("headless Mac: no console user stops with the reason and the command to run at the Mac's own screen", () => {
+    const result = bash('find_console_user() { echo ""; }; check_console_session darwin');
+    expect(result.exitCode).toBe(1);
+    const out = result.stdout.toString();
+    expect(out).toContain("nobody is logged in at this Mac's own screen");
+    expect(out).toContain("curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash");
+    expect(out).toContain("Nothing was installed");
+  });
+
+  test("a console user with no desktop session is also stopped", () => {
+    const result = bash('find_console_user() { echo marlow; }; id() { echo 501; }; launchctl() { return 113; }; check_console_session darwin');
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout.toString()).toContain("marlow is the console user but has no desktop session");
+  });
+
+  test("a logged-in console user passes, and Linux is never asked", () => {
+    expect(bash('find_console_user() { echo marlow; }; id() { echo 501; }; launchctl() { return 0; }; check_console_session darwin').exitCode).toBe(0);
+    expect(bash("check_console_session linux").exitCode).toBe(0);
+  });
+
+  test("run_as_console_user joins the user's login session and sets HOME on macOS", () => {
+    const result = bash('id() { echo 501; }; dscl() { echo "NFSHomeDirectory: /Users/marlow"; }; launchctl() { echo "launchctl $*"; }; sudo() { echo "sudo $*"; }; run_as_console_user darwin marlow STACK_DATA_DIR=/d /bin/x install-service');
+    const out = result.stdout.toString();
+    expect(out).toContain("launchctl asuser 501 sudo -u marlow env HOME=/Users/marlow STACK_DATA_DIR=/d /bin/x install-service");
+  });
+
+  test("plan_required_gb sizes the disk check to the plan", () => {
+    expect(bash("plan_required_gb minimal; plan_required_gb moderate; plan_required_gb recommended; plan_required_gb").stdout.toString().trim().split("\n")).toEqual(["14", "19", "26", "26"]);
+  });
+
+  test("too little free disk stops with the amount, the plan and the smaller plan to try", () => {
+    const result = bash("free_gb_at() { echo 12; }; check_disk_space /usr/local/maipai-home recommended fresh");
+    expect(result.exitCode).toBe(1);
+    const err = result.stderr.toString();
+    expect(err).toContain("12 GB free");
+    expect(err).toContain("26 GB needed for the recommended plan");
+    expect(err).toContain("--plan minimal needs 14 GB");
+  });
+
+  test("enough free disk passes, and an upgrade only needs room for the copy", () => {
+    expect(bash("free_gb_at() { echo 30; }; check_disk_space /x recommended fresh").exitCode).toBe(0);
+    expect(bash("free_gb_at() { echo 4; }; check_disk_space /x recommended upgrade").exitCode).toBe(0);
+    expect(bash("free_gb_at() { echo 2; }; check_disk_space /x recommended upgrade").exitCode).toBe(1);
+  });
+
+  test("free_gb_at reads the nearest folder that exists", () => {
+    const out = bash("free_gb_at /definitely/not/here/yet").stdout.toString().trim();
+    expect(Number(out)).toBeGreaterThan(0);
+  });
+
+  test("quarantine is cleared and an unsigned binary is signed on macOS only", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-sign-"));
+    const log = join(dir, "calls");
+    const stubs = `xattr() { echo "xattr $*" >> "${log}"; }; codesign() { echo "codesign $*" >> "${log}"; case "$1" in --verify) return 1;; esac; }`;
+    const bin = join(dir, "bin");
+    writeFileSync(bin, "", { mode: 0o755 });
+    try {
+      bash(`${stubs}; clear_quarantine_and_sign darwin "${dir}" "${bin}" "${dir}/missing"`);
+      const mac = readFileSync(log, "utf8");
+      expect(mac).toContain(`xattr -dr com.apple.quarantine ${dir}`);
+      expect(mac).toContain(`codesign --force --sign - ${bin}`);
+      expect(mac).not.toContain("missing");
+      rmSync(log);
+      bash(`${stubs}; clear_quarantine_and_sign linux "${dir}" "${bin}"`);
+      expect(existsSync(log)).toBe(false);
+      bash(`xattr() { :; }; codesign() { echo "codesign $*" >> "${log}"; return 0; }; clear_quarantine_and_sign darwin "${dir}" "${bin}"`);
+      expect(readFileSync(log, "utf8")).toBe(`codesign --verify ${bin}\n`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("wait_for_url answers, and times out with the URL named", () => {
+    expect(bash("curl() { return 0; }; wait_for_url http://127.0.0.1:3000/ Home 3").stdout.toString()).toContain("Home is answering at http://127.0.0.1:3000/");
+    const fail = bash("curl() { return 22; }; sleep() { :; }; wait_for_url http://127.0.0.1:3000/ Home 2");
+    expect(fail.exitCode).toBe(1);
+    expect(fail.stdout.toString()).toContain("Home did not answer at http://127.0.0.1:3000/ in time");
+  });
+
+  test("previous_home_port reads the port back from the launchd file and the systemd unit", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-prev-"));
+    try {
+      writeFileSync(join(dir, "p.plist"), "<dict>\n    <key>PORT</key><string>3010</string>\n</dict>\n");
+      writeFileSync(join(dir, "u.service"), "[Service]\nEnvironment=PORT=3020\n");
+      expect(bash("previous_home_port darwin", { HOME_PLIST: join(dir, "p.plist") }).stdout.toString().trim()).toBe("3010");
+      expect(bash("previous_home_port linux", { HOME_UNIT: join(dir, "u.service") }).stdout.toString().trim()).toBe("3020");
+      expect(bash("previous_home_port darwin", { HOME_PLIST: join(dir, "none") }).stdout.toString().trim()).toBe("");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("the reboot note says the Stack waits for login, and mentions automatic login and FileVault", () => {
+    const out = bash('defaults() { return 1; }; fdesetup() { echo "FileVault is On."; }; print_reboot_note darwin').stdout.toString();
+    expect(out).toContain("The MaiPai Stack starts when the Mac's user logs in");
+    expect(out).toContain("Automatic login");
+    expect(out).toContain("FileVault is on");
+    expect(bash("print_reboot_note linux").stdout.toString()).toContain("both start by themselves");
+  });
+});
+
+describe("Home service files carry both ports", () => {
+  test("the launchd plist sets PORT, MAIPAI_STACK_PORT and keeps Home running after a restart", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-plist-"));
+    try {
+      const plist = join(dir, "com.maipai.home.plist");
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; launchctl() { :; }; install_launchd_daemon "${dir}/app" /bun 3010 8771`], { env: { ...process.env, HOME_PLIST: plist } });
+      expect(result.exitCode).toBe(0);
+      const text = readFileSync(plist, "utf8");
+      expect(text).toContain("<key>PORT</key><string>3010</string>");
+      expect(text).toContain("<key>MAIPAI_STACK_PORT</key><string>8771</string>");
+      expect(text).toContain("<key>RunAtLoad</key><true/>");
+      expect(text).toContain("<key>KeepAlive</key><true/>");
+      expect(text).toContain(`${dir}/app/data/logs/launchd.err.log`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("without a Stack port argument the default is used", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-plist-"));
+    try {
+      const plist = join(dir, "p.plist");
+      Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; launchctl() { :; }; install_launchd_daemon "${dir}/app" /bun 3000`], { env: { ...process.env, HOME_PLIST: plist, MAIPAI_STACK_PORT: "9100" } });
+      expect(readFileSync(plist, "utf8")).toContain("<key>MAIPAI_STACK_PORT</key><string>9100</string>");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("the dry run shows a moved Stack port everywhere it is used", () => {
+    const result = Bun.spawnSync(["bash", "scripts/install.sh", "--dry-run"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, MAIPAI_STACK_PORT: "9100" } });
+    const out = result.stdout.toString();
+    expect(out).toContain("PORT=9100");
+    expect(out).toContain("would poll http://127.0.0.1:9100/healthz");
+    expect(out).not.toContain("8770");
+  });
+});
+
+describe("upgrade data copy and rollback", () => {
+  function fixture() {
+    const root = mkdtempSync(join(tmpdir(), "maipai-snap-"));
+    mkdirSync(join(root, "data", "logs"), { recursive: true });
+    writeFileSync(join(root, "data", "home.db"), "v1 data");
+    writeFileSync(join(root, "data", "logs", "big.log"), "log");
+    return root;
+  }
+  const bash = (script: string) => Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ${script}`]);
+
+  test("snapshot_data saves data/ (not logs) under upgrade-backups, named for the version it came from", () => {
+    const root = fixture();
+    try {
+      expect(bash(`snapshot_data "${root}" v0.0.9`).exitCode).toBe(0);
+      const names = readdirSync(join(root, "upgrade-backups"));
+      expect(names).toHaveLength(1);
+      expect(names[0]).toMatch(/^\d{8}-\d{6}-from-v0\.0\.9$/);
+      const listing = Bun.spawnSync(["tar", "-tzf", join(root, "upgrade-backups", names[0], "data.tar.gz")]).stdout.toString();
+      expect(listing).toContain("data/home.db");
+      expect(listing).not.toContain("big.log");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("only the newest two copies are kept", () => {
+    const root = fixture();
+    try {
+      for (const name of ["20260101-000000-from-v1", "20260102-000000-from-v2", "20260103-000000-from-v3", "20260104-000000-from-v4"]) {
+        mkdirSync(join(root, "upgrade-backups", name), { recursive: true });
+      }
+      bash(`prune_snapshots "${root}/upgrade-backups"`);
+      expect(readdirSync(join(root, "upgrade-backups")).sort()).toEqual(["20260103-000000-from-v3", "20260104-000000-from-v4"]);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("restore_snapshot puts the old data back and keeps the newer data aside", () => {
+    const root = fixture();
+    try {
+      bash(`snapshot_data "${root}" v0.0.9`);
+      writeFileSync(join(root, "data", "home.db"), "v2 data");
+      const result = bash(`restore_snapshot "${root}" v0.0.9`);
+      expect(result.exitCode).toBe(0);
+      expect(readFileSync(join(root, "data", "home.db"), "utf8")).toBe("v1 data");
+      const aside = readdirSync(root).find((n) => n.startsWith("data.rolled-back-"));
+      expect(aside).toBeDefined();
+      expect(readFileSync(join(root, aside as string, "home.db"), "utf8")).toBe("v2 data");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("restore_snapshot with no copy for that version leaves the data alone and says so", () => {
+    const root = fixture();
+    try {
+      const result = bash(`restore_snapshot "${root}" v9.9.9`);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toContain("There is no saved data copy from v9.9.9");
+      expect(readFileSync(join(root, "data", "home.db"), "utf8")).toBe("v1 data");
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("a rebuild of the Stack never touches stack/data", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-stack-keep-"));
+    mkdirSync(join(root, "stack", "data"), { recursive: true });
+    writeFileSync(join(root, "stack", "data", "models.keep"), "model");
+    const script = [
+      `fetch_stack_source() { :; }`,
+      `fetch_stack_commons() { :; }`,
+      // Same behavior as the Stack's build-binary.sh: it deletes its OUT_DIR first.
+      `build_stack_binary() { rm -rf "$2"; mkdir -p "$2/migrations" "$2/backend-src"; : > "$2/maipai-stack-darwin-arm64"; }`,
+      `install_stack_service() { :; }`,
+      `setup_stack "${root}" /bun darwin arm64 no`,
+    ].join("; ");
+    try {
+      const result = bash(script);
+      expect(result.exitCode, result.stdout.toString()).toBe(0);
+      expect(readFileSync(join(root, "stack", "data", "models.keep"), "utf8")).toBe("model");
+      expect(existsSync(join(root, "stack", "maipai-stack-darwin-arm64"))).toBe(true);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+});
+
+describe("rotate-logs.sh", () => {
+  const ROTATE = join(import.meta.dir, "rotate-logs.sh");
+
+  test("a log over the limit is copied to .1 and emptied; shifts older copies; keeps three", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-rotate-"));
+    const logs = join(root, "data", "logs");
+    mkdirSync(logs, { recursive: true });
+    mkdirSync(join(root, "stack", "data", "logs"), { recursive: true });
+    try {
+      writeFileSync(join(logs, "launchd.out.log"), "x".repeat(2 * 1024 * 1024));
+      writeFileSync(join(logs, "launchd.out.log.1"), "older1");
+      writeFileSync(join(logs, "launchd.out.log.2"), "older2");
+      writeFileSync(join(logs, "small.log"), "tiny");
+      writeFileSync(join(root, "stack", "data", "logs", "stack.log"), "y".repeat(2 * 1024 * 1024));
+      const result = Bun.spawnSync(["bash", ROTATE, root], { env: { ...process.env, LOG_MAX_MB: "1" } });
+      expect(result.exitCode).toBe(0);
+      expect(readFileSync(join(logs, "launchd.out.log"), "utf8")).toBe("");
+      expect(readFileSync(join(logs, "launchd.out.log.1"), "utf8")).toHaveLength(2 * 1024 * 1024);
+      expect(readFileSync(join(logs, "launchd.out.log.2"), "utf8")).toBe("older1");
+      expect(readFileSync(join(logs, "launchd.out.log.3"), "utf8")).toBe("older2");
+      expect(readFileSync(join(logs, "small.log"), "utf8")).toBe("tiny");
+      expect(readFileSync(join(root, "stack", "data", "logs", "stack.log"), "utf8")).toBe("");
+      expect(existsSync(join(root, "stack", "data", "logs", "stack.log.1"))).toBe(true);
+    } finally { rmSync(root, { recursive: true, force: true }); }
+  });
+
+  test("no folder argument or a bad LOG_MAX_MB stops with the fix", () => {
+    const none = Bun.spawnSync(["bash", ROTATE]);
+    expect(none.exitCode).toBe(1);
+    expect(none.stderr.toString()).toContain("give the MaiPai install folder");
+    const bad = Bun.spawnSync(["bash", ROTATE, "/tmp"], { env: { ...process.env, LOG_MAX_MB: "lots" } });
+    expect(bad.exitCode).toBe(1);
+    expect(bad.stderr.toString()).toContain("LOG_MAX_MB must be a whole number");
+  });
+
+  test("install_log_rotation writes a daily daemon that runs the script with the install folder", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-lr-"));
+    mkdirSync(join(dir, "scripts"));
+    writeFileSync(join(dir, "scripts", "rotate-logs.sh"), "");
+    try {
+      const plist = join(dir, "lr.plist");
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; launchctl() { :; }; install_log_rotation darwin "${dir}"`], { env: { ...process.env, LOGROTATE_PLIST: plist } });
+      expect(result.exitCode).toBe(0);
+      const text = readFileSync(plist, "utf8");
+      expect(text).toContain("com.maipai.logrotate");
+      expect(text).toContain(`<string>${dir}/scripts/rotate-logs.sh</string>`);
+      expect(text).toContain("StartCalendarInterval");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("uninstall.sh removes the log rotation daemon and offers the upgrade copies with the data", () => {
+    const text = readFileSync(join(import.meta.dir, "uninstall.sh"), "utf8");
+    expect(text).toContain("com.maipai.logrotate.plist");
+    expect(text).toContain("upgrade-backups");
+    expect(text).toContain("DELETE MY DATA");
+    expect(Bun.spawnSync(["bash", "-n", join(import.meta.dir, "uninstall.sh")]).exitCode).toBe(0);
   });
 });
