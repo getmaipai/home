@@ -9,6 +9,7 @@ import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingField } from "@/shell/pages/settings/SettingField";
 import { api, ApiError, type ResolvedSetting } from "@/lib/api";
 import type { KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 
 interface SettingsRendererProps {
   scope: "household" | "person" | "device";
@@ -89,6 +90,7 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
   const [writeError, setWriteError] = useState<string | null>(null);
   const [pendingKey, setPendingKey] = useState<string | null>(null);
   const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({});
+  const [removal, setRemoval] = useState<{ key: string; value: unknown; message: string } | null>(null);
 
   function replaceValue(next: ResolvedSetting) {
     queryClient.setQueryData<ResolvedSetting[]>(settingKey ? ["settings-values", scopeValue, settingKey] : ["settings-values", scopeValue], (prev) => (prev ?? []).map((v) => (v.key === next.key ? next : v)));
@@ -103,7 +105,10 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
       catch (first) {
         // CAP-GATE-01: turning a role off names the packages it removes; the
         // person confirms before anything is uninstalled.
-        if (first instanceof ApiError && first.message.includes("users will lose access") && window.confirm(first.message)) updated = await api.setSetting(scopeValue, key, value, true);
+        if (first instanceof ApiError && first.message.includes("users will lose access")) {
+          setRemoval({ key, value, message: first.message });
+          return false;
+        }
         else throw first;
       }
       replaceValue(updated);
@@ -150,6 +155,27 @@ export function SettingsRenderer({ scope, scopeValue, only, includeKeys, include
 
   return (
     <div className="flex flex-col gap-4">
+      <AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Turn this feature off?</AlertDialogTitle>
+            <AlertDialogDescription>{removal?.message}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={async () => {
+              if (!removal) return;
+              const pending = removal;
+              setRemoval(null);
+              setPendingKey(pending.key);
+              setWriteError(null);
+              try { replaceValue(await api.setSetting(scopeValue, pending.key, pending.value, true)); }
+              catch (e) { setWriteError(e instanceof ApiError ? e.message : "Could not save that change."); }
+              finally { setPendingKey(null); }
+            }}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       {writeError ? <div className="rounded-lg bg-muted px-3 py-2 text-sm text-destructive">{writeError}</div> : null}
       <AsyncState
         data={data}
