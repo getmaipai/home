@@ -11,7 +11,9 @@ export const VRAM_CHOICES = [8, 12, 16, 24, 32, 48, 64, 96, 128] as const;
 export interface PlanStepProps {
   /** Called once the install has started; the wizard then moves on. */
   onInstalled: () => void;
-  /** Reports whether Continue should be blocked until the person installs. */
+  /** Reports whether the wizard's own Continue should be blocked: true while
+   * the plan loads and while Install is available, false once Home cannot
+   * install from this screen and the person may go on without it. */
   onReady?: (ready: boolean) => void;
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
   readPlan?: (vramGb?: number) => Promise<{ wording: PlanWording }>;
@@ -37,7 +39,13 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   }, [vram, attempt, readPlan]);
 
   const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !wording.diskLine;
-  useEffect(() => { onReady?.(canInstall); }, [canInstall, onReady]);
+  // Continue stays blocked while the plan is still being read and while the
+  // Install button is the way forward; it opens only when Home cannot
+  // install from here (engine unreachable, below minimal, disk short), so
+  // the person is never able to step past a working install by accident.
+  const loading = !failed && wording === null;
+  const blockContinue = loading || canInstall;
+  useEffect(() => { onReady?.(blockContinue); }, [blockContinue, onReady]);
 
   async function install() {
     setBusy(true); setError(null);

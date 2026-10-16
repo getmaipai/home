@@ -17,13 +17,24 @@ function freshState(): SetupState {
 
 const GREEN_ROWS = [{ id: "engine", title: "Engine service", state: "green", text: "Home's AI is answering." }];
 let checklistOpen = 3;
-function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS) {
+const RECOMMENDED_PLAN = { plan: {}, wording: { level: "recommended", headline: "Recommended setup for this computer", detail: "Fits.", gets: ["Chat with Home"], needsMemoryAnswer: false, sizeLine: "Download: 40 GB", diskLine: null } };
+/** `plan` is what GET /api/setup/plan answers: the recommended plan by default, or "unreachable" for an engine that is not answering. */
+function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan: "recommended" | "unreachable" = "recommended") {
   const original = globalThis.fetch;
   let state: SetupState | { done: true } = structuredClone(initial);
   const posts: string[] = [];
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
+    if (url.includes("/api/setup/plan") && init?.method !== "POST") {
+      if (plan === "unreachable") return new Response(JSON.stringify({ error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }), { status: 503 });
+      return new Response(JSON.stringify(RECOMMENDED_PLAN), { status: 200 });
+    }
+    if (url.includes("/api/setup/install") && init?.method === "POST" && !("done" in state)) {
+      // The real route records the plan step itself when it starts the downloads.
+      state.steps = state.steps.map((step) => step.id === "plan" ? { ...step, status: "done", at: new Date().toISOString() } : step);
+      return new Response(JSON.stringify({ started: true, models: 2 }), { status: 200 });
+    }
     if (url.includes("/api/setup/checks/run")) return new Response(JSON.stringify({ rows: checkRows, state }), { status: 200 });
     if (url.includes("/api/setup-checklist")) return new Response(JSON.stringify(Array.from({ length: 5 }, (_, i) => ({ id: `item-${i}`, title: "Item", reason: "", done: i >= checklistOpen, open: { label: "Open", href: "/" } }))), { status: 200 });
     if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/data", models: "/data/models" }), { status: 200 });
@@ -125,7 +136,8 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Continue", "Choose where to store data");
       await advanceTo(rendered, "Continue", "Checking your computers");
       await advanceTo(rendered, "Continue", "Your setup plan");
-      await advanceTo(rendered, "Continue", "Create your owner account");
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Install and continue" })).toBeTruthy());
+      await advanceTo(rendered, "Install and continue", "Create your owner account");
       expect(rendered.container.textContent).toContain("Your AI");
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
@@ -232,6 +244,37 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Continue", "Checking your computers");
       await advanceTo(rendered, "Back", "Choose where to store data");
       expect(rendered.container.textContent).toContain("/Volumes/Big/home-data");
+    } finally { h.restore(); }
+  });
+
+  test("the plan screen's Continue is blocked while Install is the way forward", async () => {
+    // Found auditing the Mac Studio install: Continue sat beside "Install and
+    // continue", recorded the plan as deferred and started no download.
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Your setup plan"));
+      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Install and continue" })).toBeTruthy());
+      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
+      await advanceTo(rendered, "Install and continue", "Create your owner account");
+      expect(h.posts).toEqual(["plan"]);
+    } finally { h.restore(); }
+  });
+
+  test("the plan screen's Continue opens once the engine cannot build a plan, so setup is never stuck", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state, GREEN_ROWS, "unreachable");
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Home couldn't reach the AI engine to build a plan."));
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false));
+      expect(rendered.queryByRole("button", { name: "Install and continue" })).toBeNull();
+      await advanceTo(rendered, "Continue", "Create your owner account");
+      expect(h.posts).toEqual(["plan"]);
     } finally { h.restore(); }
   });
 
