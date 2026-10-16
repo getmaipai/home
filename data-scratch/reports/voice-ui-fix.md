@@ -4,6 +4,6 @@ The settings test fixture now answers the voice sample list request with an empt
 
 Validation:
 
-- `cd frontend && bun test` — 2,018 pass, 1 skipped, 0 failures across 229 files.
-- `cd frontend && bun run lint:ui-rules` — 23 pass, 0 failures.
-- `MAIPAI_COMMONS_DIR=/Users/jessetorres/Developer/github.com/getmaipai/commons bash scripts/check.sh --pre` — passed, frontend scope.
+- `cd frontend && bun test` - 2,018 pass, 1 skipped, 0 failures across 229 files.
+- `cd frontend && bun run lint:ui-rules` - 23 pass, 0 failures.
+- `MAIPAI_COMMONS_DIR=/Users/jessetorres/Developer/github.com/getmaipai/commons bash scripts/check.sh --pre` - passed, frontend scope.
