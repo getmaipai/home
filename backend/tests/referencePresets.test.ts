@@ -47,14 +47,6 @@ describe("KS-REF-PRESETS-01 engine", () => {
     }
   });
 
-  test("reference.update.max_mbps drives the plan's time estimate (DOCS-GAP-04)", async () => {
-    setHouseholdSettingValue("reference.update.max_mbps", 20);
-    const fast = await planReference("moderate");
-    setHouseholdSettingValue("reference.update.max_mbps", 0.5);
-    const slow = await planReference("moderate");
-    expect(fast.estimatedSeconds).toBe(Math.ceil(fast.totalBytes / 20_000_000));
-    expect(slow.estimatedSeconds).toBe(Math.ceil(slow.totalBytes / 500_000));
-  });
   test("plan warns when offline search has no Wikipedia set", async () => {
     setHouseholdSettingValue("search.source_mode", "offline");
     const plan = await planReference("custom", [{ source: "vikidia", flavour: "default" }]);

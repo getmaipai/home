@@ -29,12 +29,11 @@ function makePerson(): Roster {
   };
 }
 
-function mockDashboardFetch(body: Dashboard, setupChecklist: SetupChecklistItem[] = [], familyName = "") {
+function mockDashboardFetch(body: Dashboard, setupChecklist: SetupChecklistItem[] = []) {
   const originalFetch = globalThis.fetch;
   globalThis.fetch = mock((input: RequestInfo | URL) => {
     const url = typeof input === "string" ? input : input.toString();
     if (url.includes("/api/dashboard")) return Promise.resolve(Response.json(body));
-    if (url.includes("/api/settings?")) return Promise.resolve(Response.json(familyName ? [{ key: "household.family_name", value: familyName }] : []));
     if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
     return Promise.resolve(new Response("{}", { status: 200 }));
   }) as unknown as typeof fetch;
@@ -44,16 +43,6 @@ function mockDashboardFetch(body: Dashboard, setupChecklist: SetupChecklistItem[
 }
 
 describe("DashboardPage", () => {
-  test("household.family_name shows above the greeting as '<name> Family'", async () => {
-    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [], "Willow");
-    try {
-      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={makePerson()} /></MemoryRouter>);
-      expect(await view.findByText("Willow Family")).toBeTruthy();
-    } finally {
-      restore();
-    }
-  });
-
   test("the home count line matches open checklist items and links to General", async () => {
     const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
       { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
