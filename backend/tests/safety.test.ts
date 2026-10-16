@@ -59,7 +59,9 @@ function extremeValueFor(key: SettingsKey, places: { household: string; person: 
       if ((key.range as { multiple?: boolean } | undefined)?.multiple === true) {
         return db.select({ id: people.id }).from(people).all().map((row) => row.id);
       }
-      return db.select({ id: people.id }).from(people).limit(1).get()?.id;
+      // LIVE-VIEW-01: a list key that names adults only is stressed with the owner, never a child.
+      return db.select({ id: people.id }).from(people).where(eq(people.role, "owner")).limit(1).get()?.id
+        ?? db.select({ id: people.id }).from(people).limit(1).get()?.id;
     }
     case "location": {
       const range = key.range as { multiple?: boolean; allow_current?: boolean } | undefined;
