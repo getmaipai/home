@@ -204,22 +204,24 @@ check_required_tools() {
 # such session, and install-service would fail with a message about a
 # missing domain. Stop first, say why, and give the command to run at
 # the Mac itself.
+CONSOLE_PROBLEM=""
+CONSOLE_FIX_HINT="run the installer again."
 check_console_session() {
   local os="$1" user uid
   [ "$os" = "darwin" ] || return 0
   user=$(find_console_user darwin)
   if [ -z "$user" ]; then
+    CONSOLE_PROBLEM="Nobody is logged in at this Mac's own screen, and an SSH session does not count. The AI engine needs that desktop session to use the graphics chip. Log in at the Mac (Screen Sharing works), then press Try again."
     log "error: nobody is logged in at this Mac's own screen. An SSH session does not count."
     log "The MaiPai Stack runs as the logged-in person and needs that desktop session to use the GPU."
-    log "Nothing was installed. Fix: sit at the Mac (or use Screen Sharing), log in, open Terminal, and run:"
-    log "  curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash"
+    log "Fix: sit at the Mac (or use Screen Sharing), log in, then ${CONSOLE_FIX_HINT}"
     return 1
   fi
   uid=$(id -u "$user" 2>/dev/null || true)
   if [ -z "$uid" ] || ! launchctl print "gui/${uid}" >/dev/null 2>&1; then
+    CONSOLE_PROBLEM="${user} is the console user but has no desktop session Home can reach (the lock screen counts as logged out). Log in as ${user} at the Mac's own screen, then press Try again."
     log "error: ${user} is the console user but has no desktop session that this installer can reach."
-    log "Nothing was installed. Fix: log in as ${user} at the Mac's own screen (the lock screen counts as logged out), open Terminal, and run:"
-    log "  curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash"
+    log "Fix: log in as ${user} at the Mac's own screen (the lock screen counts as logged out), then ${CONSOLE_FIX_HINT}"
     return 1
   fi
 }
@@ -245,17 +247,12 @@ run_as_console_user() {
   fi
 }
 
-# Free disk needed, in GB, for each setup plan: the engine and its models
-# (about 10, 15 and 20 GB for minimal, moderate and recommended) plus room
-# for Bun, the build and Home's own data. An upgrade only needs room for
-# the new source and the data snapshot.
-plan_required_gb() {
-  case "${1:-recommended}" in
-    minimal) echo 14 ;;
-    moderate) echo 19 ;;
-    *) echo 26 ;;
-  esac
-}
+# Free disk the installer needs, in GB. Home alone is small (its source, Bun
+# and the frontend build). The Stack's build and engines need more, and are
+# checked when the setup wizard asks for the Stack (--stack-only), not here.
+# The AI models are sized by the Stack's own plan, which the wizard shows.
+HOME_REQUIRED_GB=3
+STACK_REQUIRED_GB=6
 
 nearest_existing_dir() {
   local p="$1"
@@ -268,14 +265,15 @@ free_gb_at() {
 }
 
 check_disk_space() {
-  local root="$1" plan="$2" kind="$3" need free
-  if [ "$kind" = "upgrade" ]; then need=3; else need=$(plan_required_gb "$plan"); fi
+  local root="$1" need="$2" what="${3:-Home}" free
   free=$(free_gb_at "$root")
   [ -n "$free" ] || { log "Could not read the free disk space for ${root}; continuing."; return 0; }
   if [ "$free" -lt "$need" ]; then
-    die "not enough free disk space: ${free} GB free where ${root} lives, ${need} GB needed for the ${plan:-recommended} plan. Free up space (empty the Trash, remove large files) or run the installer again with a smaller plan: --plan minimal needs $(plan_required_gb minimal) GB."
+    DISK_PROBLEM="This computer has ${free} GB free where ${root} lives, and ${what} needs ${need} GB. Free up space (empty the Trash, remove large files), then try again."
+    log "error: not enough free disk space: ${DISK_PROBLEM}"
+    return 1
   fi
-  log "Disk space: ${free} GB free, ${need} GB needed."
+  log "Disk space: ${free} GB free, ${need} GB needed for ${what}."
 }
 
 # macOS only. A downloaded binary carries the quarantine flag and an
@@ -467,6 +465,43 @@ build_app() {
   (cd "$dir/frontend" && "$bun_bin" install && "$bun_bin" run build)
 }
 
+# Home runs as the unprivileged service account on Linux, inside a
+# read-only sandbox, and the Stack step needs root and a normal filesystem
+# (it chowns the Stack's folder and registers a user service). So the step is
+# its own one-shot unit that Home starts, and the service account may run
+# exactly one command as root: start that unit. The scripts folder is
+# root-owned and not writable by the service account, so it cannot swap in a
+# different script.
+STACK_STEP_UNIT=maipai-stack-install.service
+install_stack_step_unit() {
+  local root="$1" unit="${STACK_STEP_UNIT_FILE:-/etc/systemd/system/${STACK_STEP_UNIT}}" rule="${SUDOERS_FILE:-/etc/sudoers.d/maipai-home}" tmp systemctl_bin
+  chown -R root:root "${root}/scripts" 2>/dev/null || true
+  chmod -R go-w "${root}/scripts" 2>/dev/null || true
+  mkdir -p "${root}/data/logs"
+  cat >"$unit" <<UNIT
+[Unit]
+Description=MaiPai Home: install the AI engine (started by the setup wizard)
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/bin/bash ${root}/scripts/install.sh --stack-only
+StandardOutput=append:${root}/data/logs/stack-install.log
+StandardError=append:${root}/data/logs/stack-install.log
+UNIT
+  systemctl daemon-reload 2>/dev/null || true
+  systemctl_bin=$(command -v systemctl || echo /usr/bin/systemctl)
+  tmp=$(mktemp)
+  printf '%s ALL=(root) NOPASSWD: %s start --no-block %s\n' "$SERVICE_USER" "$systemctl_bin" "$STACK_STEP_UNIT" > "$tmp"
+  if command -v visudo >/dev/null 2>&1 && ! visudo -cf "$tmp" >/dev/null 2>&1; then
+    rm -f "$tmp"
+    log "Could not write the rule that lets Home install the AI engine from the setup wizard. If the wizard cannot, run: sudo bash ${root}/scripts/install.sh --stack-only"
+    return 0
+  fi
+  install -m 0440 -o root -g root "$tmp" "$rule" 2>/dev/null || { cp "$tmp" "$rule" && chmod 0440 "$rule"; }
+  rm -f "$tmp"
+}
+
 install_systemd_unit() {
   local dir="$1" bun_bin="$2" port="$3" stack_port="${4:-$STACK_PORT_BASE}"
   local unit=/etc/systemd/system/maipai-home.service
@@ -542,6 +577,9 @@ install_launchd_daemon() {
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>
+  <!-- The setup wizard starts the AI engine install from Home. If Home restarts
+       while it runs, launchd must not kill that install. -->
+  <key>AbandonProcessGroup</key><true/>
   <key>StandardOutPath</key><string>${dir}/data/logs/launchd.out.log</string>
   <key>StandardErrorPath</key><string>${dir}/data/logs/launchd.err.log</string>
 </dict>
@@ -583,7 +621,14 @@ find_console_user() {
     # by a code review.
     user=$(stat -f%Su /dev/console)
   else
-    user=$(logname 2>/dev/null || echo "${SUDO_USER:-}")
+    # The person who ran the installer. The wizard starts the Stack step
+    # through sudo as the Home service account, so SUDO_USER is then the
+    # service account, not a person: the installer's own record wins.
+    local recorded="${INSTALL_USER_FILE:-${INSTALL_ROOT_LINUX}/.install-user}"
+    if [ -f "$recorded" ]; then user=$(tr -d '[:space:]' < "$recorded")
+    else user=$(logname 2>/dev/null || echo "${SUDO_USER:-}")
+    fi
+    [ "$user" = "$SERVICE_USER" ] && user=""
   fi
   [ "$user" = "root" ] && user=""
   echo "$user"
@@ -873,12 +918,16 @@ setup_stack() {
     source_root=$(mktemp -d)
   fi
   source_dir="${source_root}/stack"
+  STACK_PROBLEM="Home could not download the AI engine's source. Check that this computer can reach github.com, then press Try again."
+  stack_status running fetching
   fetch_stack_source "$source_dir" "$dry_run" || { log "Could not fetch the Stack's source. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   fetch_stack_commons "$source_root" "$dry_run" || { log "Could not fetch the Commons packages the Stack needs. The MaiPai Stack is required; installation cannot continue. Read the message above, fix what it names, then run this installer again."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   # build-binary.sh deletes its OUT_DIR first, and stack/data (models,
   # settings) lives inside stack/. Build into scratch, then copy only the
   # compiled files across so a rebuild never touches the Stack's data.
   local build_dir="${source_root}/output"
+  STACK_PROBLEM="The AI engine could not be built. The install log (${STACK_LOG_HINT:-the Home logs folder}) shows why. Press Try again."
+  stack_status running building
   build_stack_binary "$source_dir" "$build_dir" "$bun_bin" "$dry_run" || { log "Could not build the Stack binary. The MaiPai Stack is required; installation cannot continue."; [ "$dry_run" = "yes" ] || rm -rf "$source_root"; return 1; }
   if [ "$dry_run" = "yes" ]; then
     log "[dry-run] would copy the built files into ${stack_dir} (the Stack's data/ is not touched)"
@@ -887,6 +936,8 @@ setup_stack() {
       || { log "Could not copy the built Stack files into ${stack_dir}. The MaiPai Stack is required; installation cannot continue."; rm -rf "$source_root"; return 1; }
     rm -rf "$source_root"
   fi
+  STACK_PROBLEM="The AI engine was built but would not start. On a Mac this usually means nobody is logged in at the screen: log in there, then press Try again. Its log is ${stack_dir}/data/logs/stack.error.log."
+  stack_status running starting
   install_stack_service "$install_root" "$bun_bin" "$os" "$arch" "$dry_run"
 }
 
@@ -982,6 +1033,90 @@ setup_engine_computer() {
   log "Ready to pair. On MaiPai Home, open Settings, then Engines."
 }
 
+# ---------------------------------------------------------------------
+# The Stack step the setup wizard asks for (install.sh --stack-only).
+# Home's installer no longer builds the Stack: it brings Home up, and when
+# the person says this computer also runs the AI, Home starts this step
+# (backend/src/lib/stackInstall.ts) and shows the progress this writes. It
+# reuses setup_stack and every function above it; nothing is copied.
+# ---------------------------------------------------------------------
+
+json_escape() {
+  printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | tr '\n\t' '  '
+}
+
+# One small JSON file, replaced whole each time, that the Home backend reads.
+# state: running | failed | ready. stage: preflight | fetching | building |
+# starting (or null). problem: plain words with the next step (or null).
+stack_status() {
+  local state="$1" stage="${2:-}" problem="${3:-}" file="${STACK_STATUS_FILE:-}" stage_json="null" problem_json="null"
+  [ -n "$file" ] || return 0
+  [ -z "$stage" ] || stage_json="\"$(json_escape "$stage")\""
+  [ -z "$problem" ] || problem_json="\"$(json_escape "$problem")\""
+  mkdir -p "$(dirname "$file")" 2>/dev/null || return 0
+  printf '{"state":"%s","stage":%s,"problem":%s,"pid":%s,"updatedAt":"%s"}\n' \
+    "$state" "$stage_json" "$problem_json" "$$" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "${file}.tmp" \
+    && mv "${file}.tmp" "$file"
+}
+
+STACK_STAGE=""
+STACK_PROBLEM=""
+STACK_DONE="no"
+
+on_stack_exit() {
+  local code=$?
+  trap - EXIT
+  [ "$STACK_DONE" = "yes" ] && return 0
+  [ "$code" -ne 0 ] || code=1
+  stack_status failed "" "${STACK_PROBLEM:-The AI engine install stopped part way. Its log is ${STACK_LOG_HINT:-in the Home logs folder}. Press Try again; it picks up where it stopped.}"
+  return "$code"
+}
+
+stack_main() {
+  local dry_run="$1" os arch install_root bun_bin
+  os=$(detect_os)
+  arch=$(detect_arch)
+  [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
+  bun_bin="${install_root}/.bun/bin/bun"
+  # The wizard's Linux sudo rule gives a clean environment, so the port Home
+  # was installed with comes from its own record.
+  local recorded_port
+  recorded_port=$(read_marker "${install_root}/.stack-port-base")
+  if [ -z "${MAIPAI_STACK_PORT:-}" ] && valid_port "$recorded_port"; then STACK_PORT_BASE="$recorded_port"; fi
+
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] MaiPai Stack install plan for ${os}/${arch} at ${install_root}"
+    log "[dry-run] checks before any change: required tools, a logged-in desktop session (macOS), ${STACK_REQUIRED_GB} GB free disk for the build"
+    log "[dry-run] Stack port ${STACK_PORT_BASE} (or the next free one)"
+    log "[dry-run] STACK_TAG=${STACK_TAG}"
+    setup_stack "$install_root" "$bun_bin" "$os" "$arch" "yes"
+    return 0
+  fi
+
+  require_root
+  STACK_STATUS_FILE="${STACK_STATUS_FILE:-${install_root}/data/stack-install.json}"
+  STACK_LOG_HINT="${install_root}/data/logs/stack-install.log"
+  [ -d "${install_root}/backend" ] || die "Home is not installed at ${install_root}. Run the installer first."
+  trap on_stack_exit EXIT
+  stack_status running preflight
+
+  STACK_PROBLEM="This computer is missing a tool the AI engine needs. The install log (${STACK_LOG_HINT}) names it. Install it, then press Try again."
+  check_required_tools "$os"
+  STACK_PROBLEM=""
+  CONSOLE_FIX_HINT="press Try again in the setup wizard, or run: sudo bash ${install_root}/scripts/install.sh --stack-only"
+  if ! check_console_session "$os"; then STACK_PROBLEM="$CONSOLE_PROBLEM"; return 1; fi
+  if ! check_disk_space "$install_root" "$STACK_REQUIRED_GB" "the AI engine"; then STACK_PROBLEM="$DISK_PROBLEM"; return 1; fi
+
+  # Bun is part of Home's own install; this only fills a gap.
+  [ -x "$bun_bin" ] || { STACK_PROBLEM="Home's Bun runtime is missing at ${bun_bin}. Run the installer again, then press Try again."; return 1; }
+  # setup_stack sets the stage and the plain-words problem for each part.
+  setup_stack "$install_root" "$bun_bin" "$os" "$arch" "no" || return 1
+  STACK_DONE="yes"
+  stack_status ready
+  log "The MaiPai Stack is running. Home will find it at http://127.0.0.1:$(read_marker "${install_root}/stack/.port")"
+  print_reboot_note "$os"
+}
+
 # What the failure trap needs to know: how far the install got.
 # ""         nothing on disk was changed yet
 # "stopped"  the old Home and Stack were stopped, the old files are intact
@@ -1026,6 +1161,7 @@ on_install_exit() {
 main() {
   local dry_run="no"
   local engine_computer="no"
+  local stack_only="no"
   local plan_flag="" plan_flag_seen="no"
   local plan_flag_count=0
   local version_flag="" rollback="no"
@@ -1033,6 +1169,7 @@ main() {
     case "$1" in
       --dry-run) dry_run="yes" ;;
       --engine-computer) engine_computer="yes" ;;
+      --stack-only) stack_only="yes" ;;
       --rollback) rollback="yes" ;;
       --version)
         [ "$#" -ge 2 ] || die "--version needs a release tag such as v0.1.0. Run bash scripts/install.sh --help for the next step."
@@ -1041,7 +1178,9 @@ main() {
         [ "$#" -ge 2 ] || die "--plan needs a value: recommended, moderate, or minimal. Run bash scripts/install.sh --help for the next step."
         plan_flag="$2"; plan_flag_seen="yes"; plan_flag_count=$((plan_flag_count + 1)); shift ;;
       --help|-h)
-        log "Usage: install.sh [--dry-run] [--engine-computer] [--plan recommended|moderate|minimal] [--version vX.Y.Z] [--rollback]"
+        log "Usage: install.sh [--dry-run] [--engine-computer] [--stack-only] [--plan recommended|moderate|minimal] [--version vX.Y.Z] [--rollback]"
+        log "With no option this brings up MaiPai Home only. The setup wizard then installs the AI engine (the MaiPai Stack) if this computer should run it."
+        log "--stack-only installs just the AI engine on a computer that already runs Home. The setup wizard runs it for you; run it by hand only if the wizard says to."
         log "You can also set MAIPAI_PLAN to recommended, moderate, or minimal. The setup wizard still runs its checks before downloads."
         log "--version installs a specific release instead of the latest. --rollback goes back to the previous release and the data copy taken before the last upgrade."
         log "MAIPAI_PORT (default 3000) and MAIPAI_STACK_PORT (default 8770) change the ports."
@@ -1077,6 +1216,13 @@ main() {
   local arch
   arch=$(detect_arch)
 
+  if [ "$stack_only" = "yes" ]; then
+    [ "$engine_computer" = "no" ] && [ "$rollback" = "no" ] && [ -z "$version_flag" ] \
+      || die "--stack-only cannot be combined with --engine-computer, --rollback or --version."
+    stack_main "$dry_run"
+    exit $?
+  fi
+
   if [ "$engine_computer" = "yes" ]; then
     [ "$dry_run" = "yes" ] || require_root
     setup_engine_computer "$dry_run" "$os" "$arch"
@@ -1084,28 +1230,22 @@ main() {
   fi
 
   if [ "$dry_run" = "yes" ]; then
-    # A focused dry run: what the Stack half of this installer would do,
-    # against the values a real run on this machine would use. It does
-    # not also simulate Home's own pre-existing fetch/build/service
-    # steps above (those never supported a dry run before this item and
-    # adding it is out of this item's own scope) - running this script
-    # for real is still how Home's own half gets proven.
+    # A focused dry run of Home's own bring-up. The AI engine is not part
+    # of it: the setup wizard asks for it, and `--stack-only --dry-run`
+    # shows that plan.
     local install_root
     [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
-    local bun_bin="${install_root}/.bun/bin/bun"
-    log "[dry-run] MaiPai Stack install plan for ${os}/${arch} at ${install_root}"
-    log "[dry-run] checks before any change: required tools, a logged-in desktop session (macOS), $(plan_required_gb "${requested_plan:-recommended}") GB free disk for the ${requested_plan:-recommended} plan"
-    log "[dry-run] Home port ${APP_PORT} (or the next free one), Stack port ${STACK_PORT_BASE} (or the next free one)"
+    log "[dry-run] MaiPai Home install plan for ${os}/${arch} at ${install_root}"
+    log "[dry-run] checks before any change: required tools, ${HOME_REQUIRED_GB} GB free disk"
+    log "[dry-run] Home port ${APP_PORT} (or the next free one)"
     record_setup_plan "${install_root}/data" "$requested_plan" yes
-    log "[dry-run] STACK_TAG=${STACK_TAG}"
-    setup_stack "$install_root" "$bun_bin" "$os" "$arch" "yes"
+    log "[dry-run] the MaiPai Stack (the AI engine) is not installed now: the setup wizard installs it if you choose to run the AI on this computer"
     log "[dry-run] would wait for Home at http://127.0.0.1:${APP_PORT}/ and print the address to open"
     exit 0
   fi
 
   require_root
   check_required_tools "$os"
-  check_console_session "$os" || exit 1
 
   local install_root
   [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
@@ -1133,9 +1273,16 @@ main() {
   elif [ -d "${install_root}/backend" ]; then kind="resume"
   fi
 
-  local saved_plan
-  saved_plan=$(read_marker "${install_root}/data/setup-plan")
-  check_disk_space "$install_root" "${requested_plan:-${saved_plan:-recommended}}" "$kind"
+  # An earlier install that already has a Stack rebuilds it in this run (an
+  # upgrade, a rollback or a resume), so it needs the desktop session and the
+  # room for the build. A fresh install has neither: Home only.
+  local has_stack="no" disk_need="$HOME_REQUIRED_GB"
+  if [ -f "${install_root}/stack/.user" ]; then
+    has_stack="yes"
+    disk_need=$((HOME_REQUIRED_GB + STACK_REQUIRED_GB))
+    check_console_session "$os" || exit 1
+  fi
+  check_disk_space "$install_root" "$disk_need" "$( [ "$has_stack" = yes ] && echo 'Home and the AI engine' || echo Home )" || exit 1
 
   record_setup_plan "${install_root}/data" "$requested_plan" no
 
@@ -1193,7 +1340,7 @@ main() {
     rsync -a --delete \
       --exclude=/data --exclude=/data.rolled-back-* --exclude=/backups --exclude=/received-backups \
       --exclude=/stack --exclude=/.bun --exclude=/upgrade-backups \
-      --exclude=/.installed-tag --exclude=/.previous-tag \
+      --exclude=/.installed-tag --exclude=/.previous-tag --exclude=/.stack-port-base --exclude=/.install-user \
       "${install_root}.new/" "${install_root}/"
     rm -rf "${install_root}.new"
     INSTALL_STAGE="replaced"
@@ -1225,18 +1372,33 @@ main() {
   build_app "$install_root" "$bun_bin"
   run_install_preflight "$bun_bin" "${install_root}/backend" "$port"
 
-  # The Stack must be fully installed and configured before Home's own
-  # service starts.
-  if ! setup_stack "$install_root" "$bun_bin" "$os" "$arch" "no"; then
-    log "MaiPai Stack setup failed. Home requires the Stack. Home's service was not started."
-    exit 1
+  # Records for the wizard's Stack step, which runs later with a clean
+  # environment: the Stack port base and, on Linux, the person to run the
+  # Stack as.
+  printf '%s\n' "$STACK_PORT_BASE" > "${install_root}/.stack-port-base"
+  if [ "$os" = "linux" ] && [ -n "${SUDO_USER:-}" ] && [ "$SUDO_USER" != "root" ] && [ "$SUDO_USER" != "$SERVICE_USER" ]; then
+    printf '%s\n' "$SUDO_USER" > "${install_root}/.install-user"
   fi
+
+  # A Stack that was already here is rebuilt before Home starts, as it always
+  # was: its binary lives in the tree this run replaced. A fresh install has
+  # none; the setup wizard installs it when the person says this computer
+  # runs the AI.
   local stack_port
-  stack_port=$(read_marker "${install_root}/stack/.port")
+  if [ "$has_stack" = "yes" ]; then
+    if ! setup_stack "$install_root" "$bun_bin" "$os" "$arch" "no"; then
+      log "The MaiPai Stack could not be rebuilt. Home's service was not started."
+      exit 1
+    fi
+    stack_port=$(read_marker "${install_root}/stack/.port")
+  else
+    stack_port="$STACK_PORT_BASE"
+  fi
   valid_port "$stack_port" || stack_port="$STACK_PORT_BASE"
 
   if [ "$os" = "linux" ]; then
     ensure_service_user_linux
+    install_stack_step_unit "$install_root"
     install_systemd_unit "$install_root" "$bun_bin" "$port" "$stack_port"
   else
     install_launchd_daemon "$install_root" "$bun_bin" "$port" "$stack_port"
@@ -1248,8 +1410,10 @@ main() {
     log "Fix what the log names, then run the installer again; it resumes safely."
     exit 1
   fi
-  wait_for_url "http://127.0.0.1:${stack_port}/healthz" "The MaiPai Stack" 20 \
-    || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
+  if [ "$has_stack" = "yes" ]; then
+    wait_for_url "http://127.0.0.1:${stack_port}/healthz" "The MaiPai Stack" 20 \
+      || log "The Stack is not answering yet. Home will keep retrying; its log: ${install_root}/stack/data/logs/stack.error.log"
+  fi
 
   # Markers last, so an install that died earlier is still seen as
   # unfinished by the next run.
@@ -1271,8 +1435,14 @@ main() {
     [ -z "$lan_name" ] || log "From another device on your network: http://${lan_name}.local:${port}"
   fi
   log "Open that address in a browser to finish setup."
-  log "Logs: ${install_root}/data/logs/ (Home), ${install_root}/stack/data/logs/ (Stack)."
-  print_reboot_note "$os"
+  if [ "$has_stack" = "yes" ]; then
+    log "Logs: ${install_root}/data/logs/ (Home), ${install_root}/stack/data/logs/ (Stack)."
+    print_reboot_note "$os"
+  else
+    log "The setup wizard asks where the AI runs. If it runs on this computer, the wizard installs the AI engine then and shows its progress."
+    log "No browser at this computer? From another computer on your network, open that address with this computer's name in place of localhost."
+    log "Logs: ${install_root}/data/logs/"
+  fi
 }
 
 # Guarded so scripts/install.test.ts and uninstall.sh can `source` this

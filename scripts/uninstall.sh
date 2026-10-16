@@ -42,6 +42,10 @@ if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files 2>/dev/null
   sudo systemctl stop "${SERVICE_NAME}.service" 2>/dev/null || true
   sudo systemctl disable "${SERVICE_NAME}.service" 2>/dev/null || true
   sudo rm -f "/etc/systemd/system/${SERVICE_NAME}.service"
+  # The one-shot unit the setup wizard starts to install the AI engine, and
+  # the rule that lets Home start it.
+  sudo systemctl stop "${STACK_STEP_UNIT}" 2>/dev/null || true
+  sudo rm -f "/etc/systemd/system/${STACK_STEP_UNIT}" /etc/sudoers.d/maipai-home
   sudo systemctl daemon-reload
   echo "   Removed."
   removed_service=true

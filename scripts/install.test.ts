@@ -352,7 +352,7 @@ describe("detect_os / detect_arch", () => {
 
 describe("--dry-run", () => {
   test("prints the full Stack install plan and touches nothing - no root, no network, no filesystem writes", () => {
-    const { stdout, exitCode } = runScript(["--dry-run"]);
+    const { stdout, exitCode } = runScript(["--stack-only", "--dry-run"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("[dry-run] MaiPai Stack install plan for");
     expect(stdout).toContain("STACK_TAG=");
@@ -382,7 +382,7 @@ describe("--dry-run", () => {
     // asserting it was never called is a stronger proof than reading
     // the source: it would fail if that call were ever reintroduced,
     // anywhere in the dry-run path, not just at today's call site.
-    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_free_port() { echo "find_free_port WAS CALLED with: $*" >&2; exit 1; }; main --dry-run`]);
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_free_port() { echo "find_free_port WAS CALLED with: $*" >&2; exit 1; }; main --stack-only --dry-run`]);
     expect(result.exitCode).toBe(0);
     expect(result.stderr.toString()).not.toContain("find_free_port WAS CALLED");
   });
@@ -790,7 +790,7 @@ describe("piped execution (curl -fsSL ... | bash, this file's own documented usa
     // this file does, would never see it.
     const result = Bun.spawnSync(["bash", "-s", "--", "--dry-run"], { stdin: readFileSync(INSTALL_SH) });
     expect(result.exitCode).toBe(0);
-    expect(result.stdout.toString()).toContain("[dry-run] MaiPai Stack install plan for");
+    expect(result.stdout.toString()).toContain("[dry-run] MaiPai Home install plan for");
   });
 });
 
@@ -872,7 +872,7 @@ describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
       require_root() { t require_root; }
       check_required_tools() { t check_required_tools; }
       check_console_session() { t check_console_session; }
-      check_disk_space() { t "check_disk_space $3"; }
+      check_disk_space() { t "check_disk_space $2"; }
       snapshot_data() { t "snapshot_data $2"; }
       clear_quarantine_and_sign() { t clear_quarantine_and_sign; }
       install_log_rotation() { t install_log_rotation; }
@@ -897,7 +897,7 @@ main ${args.join(" ")}`]);
     return { result, lines };
   }
 
-  test("fresh install: preflight runs with the installed Bun against the fetched backend, after the build and before the Stack", () => {
+  test("fresh install: Home only. No Stack build, no console-session check, preflight after the build", () => {
     const root = mkdtempSync(join(tmpdir(), "maipai-main-order-"));
     try {
       const { result, lines } = runMain(root);
@@ -905,8 +905,7 @@ main ${args.join(" ")}`]);
       expect(lines).toEqual([
         "require_root",
         "check_required_tools",
-        "check_console_session",
-        "check_disk_space fresh",
+        "check_disk_space 3",
         "record_setup_plan",
         "fetch_release_source v0.1.0",
         "find_free_port",
@@ -914,13 +913,13 @@ main ${args.join(" ")}`]);
         "clear_quarantine_and_sign",
         `build_app ${root}/install ${root}/install/.bun/bin/bun`,
         `run_install_preflight ${root}/install/.bun/bin/bun ${root}/install/backend 3000`,
-        "setup_stack",
-        "install_launchd_daemon 3000 8771",
+        "install_launchd_daemon 3000 8770",
         "install_log_rotation",
         "wait_for_url http://127.0.0.1:3000/",
-        "wait_for_url http://127.0.0.1:8771/healthz",
-        "print_reboot_note",
       ]);
+      expect(existsSync(join(root, "install", "stack"))).toBe(false);
+      expect(readFileSync(join(root, "install", ".stack-port-base"), "utf8").trim()).toBe("8770");
+      expect(result.stdout.toString()).toContain("The setup wizard asks where the AI runs");
       expect(readFileSync(join(root, "install", ".installed-tag"), "utf8").trim()).toBe("v0.1.0");
       expect(result.stdout.toString()).toContain("http://localhost:3000");
     } finally { rmSync(root, { recursive: true, force: true }); }
@@ -933,7 +932,9 @@ main ${args.join(" ")}`]);
     try {
       const { result, lines } = runMain(root);
       expect(result.exitCode).toBe(0);
-      expect(lines).toContain("check_disk_space upgrade");
+      expect(lines).toContain("check_disk_space 3");
+      expect(lines).not.toContain("setup_stack");
+      expect(lines).not.toContain("check_console_session");
       expect(lines.indexOf("launchctl bootout")).toBeGreaterThanOrEqual(0);
       expect(lines.indexOf("launchctl bootout")).toBeLessThan(lines.indexOf("find_free_port"));
       expect(lines.indexOf("rsync")).toBeLessThan(lines.indexOf("find_free_port"));
@@ -1062,7 +1063,7 @@ main ${args.join(" ")}`]);
       const { result, lines } = runMain(root);
       expect(result.exitCode).toBe(0);
       expect(result.stdout.toString()).toContain("did not finish - continuing");
-      expect(lines).toContain("check_disk_space resume");
+      expect(lines).toContain("check_disk_space 3");
       expect(lines.some((line) => line.startsWith("snapshot_data"))).toBe(false);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
@@ -1112,10 +1113,9 @@ describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
   test("headless Mac: no console user stops with the reason and the command to run at the Mac's own screen", () => {
     const result = bash('find_console_user() { echo ""; }; check_console_session darwin');
     expect(result.exitCode).toBe(1);
-    const out = result.stdout.toString();
+    const out = result.stdout.toString() + result.stderr.toString();
     expect(out).toContain("nobody is logged in at this Mac's own screen");
-    expect(out).toContain("curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash");
-    expect(out).toContain("Nothing was installed");
+    expect(out).toContain("run the installer again.");
   });
 
   test("a console user with no desktop session is also stopped", () => {
@@ -1135,23 +1135,22 @@ describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
     expect(out).toContain("launchctl asuser 501 sudo -u marlow env HOME=/Users/marlow STACK_DATA_DIR=/d /bin/x install-service");
   });
 
-  test("plan_required_gb sizes the disk check to the plan", () => {
-    expect(bash("plan_required_gb minimal; plan_required_gb moderate; plan_required_gb recommended; plan_required_gb").stdout.toString().trim().split("\n")).toEqual(["14", "19", "26", "26"]);
+  test("the Home bring-up needs 3 GB and the AI engine step 6 GB, not the plan's models", () => {
+    expect(bash("echo $HOME_REQUIRED_GB $STACK_REQUIRED_GB").stdout.toString().trim()).toBe("3 6");
   });
 
-  test("too little free disk stops with the amount, the plan and the smaller plan to try", () => {
-    const result = bash("free_gb_at() { echo 12; }; check_disk_space /usr/local/maipai-home recommended fresh");
-    expect(result.exitCode).toBe(1);
-    const err = result.stderr.toString();
-    expect(err).toContain("12 GB free");
-    expect(err).toContain("26 GB needed for the recommended plan");
-    expect(err).toContain("--plan minimal needs 14 GB");
+  test("too little free disk stops with the amount and what to do", () => {
+    const result = bash('free_gb_at() { echo 2; }; check_disk_space /usr/local/maipai-home 3 Home || true; echo "problem=$DISK_PROBLEM"');
+    const out = result.stdout.toString() + result.stderr.toString();
+    expect(out).toContain("2 GB free");
+    expect(out).toContain("Home needs 3 GB");
+    expect(out).toContain("problem=This computer has 2 GB free");
+    expect(bash("free_gb_at() { echo 2; }; check_disk_space /x 3 Home").exitCode).toBe(1);
   });
 
-  test("enough free disk passes, and an upgrade only needs room for the copy", () => {
-    expect(bash("free_gb_at() { echo 30; }; check_disk_space /x recommended fresh").exitCode).toBe(0);
-    expect(bash("free_gb_at() { echo 4; }; check_disk_space /x recommended upgrade").exitCode).toBe(0);
-    expect(bash("free_gb_at() { echo 2; }; check_disk_space /x recommended upgrade").exitCode).toBe(1);
+  test("enough free disk passes", () => {
+    expect(bash("free_gb_at() { echo 30; }; check_disk_space /x 3 Home").exitCode).toBe(0);
+    expect(bash("free_gb_at() { echo 3; }; check_disk_space /x 3 Home").exitCode).toBe(0);
   });
 
   test("free_gb_at reads the nearest folder that exists", () => {
@@ -1232,7 +1231,7 @@ describe("Home service files carry both ports", () => {
   });
 
   test("the dry run shows a moved Stack port everywhere it is used", () => {
-    const result = Bun.spawnSync(["bash", "scripts/install.sh", "--dry-run"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, MAIPAI_STACK_PORT: "9100" } });
+    const result = Bun.spawnSync(["bash", "scripts/install.sh", "--stack-only", "--dry-run"], { cwd: join(import.meta.dir, ".."), env: { ...process.env, MAIPAI_STACK_PORT: "9100" } });
     const out = result.stdout.toString();
     expect(out).toContain("PORT=9100");
     expect(out).toContain("would poll http://127.0.0.1:9100/healthz");
@@ -1375,5 +1374,108 @@ describe("rotate-logs.sh", () => {
     expect(text).toContain("upgrade-backups");
     expect(text).toContain("DELETE MY DATA");
     expect(Bun.spawnSync(["bash", "-n", join(import.meta.dir, "uninstall.sh")]).exitCode).toBe(0);
+  });
+});
+
+describe("Home-first install: the Stack step is its own run (INSTALL-SPLIT-01)", () => {
+  function tmp(): string {
+    return mkdtempSync(join(tmpdir(), "install-split-"));
+  }
+
+  test("stack_status writes the small JSON the backend reads, with quotes escaped", () => {
+    const dir = tmp();
+    const file = join(dir, "data", "stack-install.json");
+    const r = bashCall(`STACK_STATUS_FILE="${file}"; stack_status running building 'say "hi"
+there'`);
+    expect(r.exitCode).toBe(0);
+    const json = JSON.parse(readFileSync(file, "utf8"));
+    expect(json.state).toBe("running");
+    expect(json.stage).toBe("building");
+    expect(json.problem).toBe('say "hi" there');
+    expect(typeof json.pid).toBe("number");
+    expect(typeof json.updatedAt).toBe("string");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("stack_status does nothing when no status file is set (the upgrade path)", () => {
+    expect(bashCall("unset STACK_STATUS_FILE; stack_status running building").exitCode).toBe(0);
+  });
+
+  test("a failed Stack step leaves state failed with the plain-words problem", () => {
+    const dir = tmp();
+    const file = join(dir, "s.json");
+    const r = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; STACK_STATUS_FILE="${file}"; trap on_stack_exit EXIT; STACK_PROBLEM="Out of room. Free space, then press Try again."; exit 3`]);
+    expect(r.exitCode).toBe(3);
+    const json = JSON.parse(readFileSync(file, "utf8"));
+    expect(json.state).toBe("failed");
+    expect(json.problem).toBe("Out of room. Free space, then press Try again.");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a failed Stack step with no named cause still says what to do", () => {
+    const dir = tmp();
+    const file = join(dir, "s.json");
+    Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; STACK_STATUS_FILE="${file}"; trap on_stack_exit EXIT; exit 1`]);
+    expect(JSON.parse(readFileSync(file, "utf8")).problem).toContain("Try again");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("a finished Stack step is not overwritten by the exit trap", () => {
+    const dir = tmp();
+    const file = join(dir, "s.json");
+    Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; STACK_STATUS_FILE="${file}"; trap on_stack_exit EXIT; stack_status ready; STACK_DONE=yes`]);
+    expect(JSON.parse(readFileSync(file, "utf8")).state).toBe("ready");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("--stack-only refuses to combine with --rollback, --version or --engine-computer", () => {
+    for (const extra of [["--rollback"], ["--version", "v1.0.0"], ["--engine-computer"]]) {
+      const r = Bun.spawnSync(["bash", INSTALL_SH, "--stack-only", "--dry-run", ...extra]);
+      expect(r.exitCode).not.toBe(0);
+    }
+  });
+
+  test("the Home-only dry run names the wizard as the way the AI engine gets installed", () => {
+    const { stdout, exitCode } = runScript(["--dry-run"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("[dry-run] MaiPai Home install plan for");
+    expect(stdout).toContain("setup wizard installs it");
+    expect(stdout).not.toContain("STACK_TAG=");
+  });
+
+  test("the Linux Stack step unit and sudoers rule allow exactly one command, no wildcard", () => {
+    const dir = tmp();
+    const unit = join(dir, "unit");
+    const rule = join(dir, "rule");
+    const r = bashCall(`STACK_STEP_UNIT_FILE="${unit}"; SUDOERS_FILE="${rule}"; systemctl() { :; }; chown() { :; }; visudo() { return 0; }; install() { cp "$5" "$7" 2>/dev/null || cp "\${@: -2:1}" "\${@: -1}"; }; install_stack_step_unit "${dir}/home"`);
+    expect(r.exitCode).toBe(0);
+    const u = readFileSync(unit, "utf8");
+    expect(u).toContain("Type=oneshot");
+    expect(u).toContain("User=root");
+    expect(u).toContain(`ExecStart=/bin/bash ${dir}/home/scripts/install.sh --stack-only`);
+    const line = readFileSync(rule, "utf8").trim();
+    expect(line).toMatch(/^maipai ALL=\(root\) NOPASSWD: \S*systemctl start --no-block maipai-stack-install\.service$/);
+    expect(line).not.toContain("*");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("on Linux the person who ran the installer is read from .install-user, and the service account never counts", () => {
+    const dir = tmp();
+    const file = join(dir, ".install-user");
+    writeFileSync(file, "marlow\n");
+    expect(bashCall(`INSTALL_USER_FILE="${file}"; find_console_user linux`).stdout).toBe("marlow");
+    writeFileSync(file, "maipai\n");
+    expect(bashCall(`INSTALL_USER_FILE="${file}"; find_console_user linux`).stdout).toBe("");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  test("the LaunchDaemon lets a running Stack install outlive a Home restart", () => {
+    expect(readFileSync(INSTALL_SH, "utf8")).toContain("<key>AbandonProcessGroup</key><true/>");
+  });
+
+  test("uninstall removes the Stack step unit and the sudoers rule, and copes with no Stack", () => {
+    const text = readFileSync(join(import.meta.dir, "uninstall.sh"), "utf8");
+    expect(text).toContain("STACK_STEP_UNIT");
+    expect(text).toContain("/etc/sudoers.d/maipai-home");
   });
 });
