@@ -30,7 +30,7 @@
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
-    "sha256": "fa77c7900de491c755f9273f3d594ad6dd100d960224bcb4281dbda111b8eef9",
+    "sha256": "e0b2d7602793ca180b18e90a13f529294da9b6c1ae4284a1ded6a883f945b55f",
     "source_commit": "ef5c067f7f3eeea840fb39e1ddde4a21f537b4a3",
     "catalog_path": "plugins/utilities/weather"
   }
