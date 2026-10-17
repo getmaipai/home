@@ -630,6 +630,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             const project = artifact ? undefined : event.value.project;
             // IMGGEN-UI-01: the picture job this turn started, drawn as a progress card and then the pictures.
             const picture = event.value.picture;
+            // VIDEO-GEN-06: and the video job this turn started, drawn as the kit player card.
+            const video = event.value.video;
             // TOOL-EVENTS-01: `toolTimelinePart` (above) is the one
             // definition, used here and by `buildContent()` mid-stream -
             // computed once so both the array-spread check and the part
@@ -710,6 +712,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 // one position from the start, so nothing has to jump.
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture)] : []),
+                ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video)] : []),
                 ...sourceParts,
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),

@@ -1,0 +1,43 @@
+// VIDEO-GEN-06: the video card's calls to Home (`/api/videos`). Data only; nothing here draws.
+import { ApiError } from "@/lib/api";
+
+export interface VideoClip { url: string; poster_url: string; width: number; height: number; seconds: number | null; seed: number | null; file_id: string; poster_file_id: string }
+export interface VideoItem {
+  id: string;
+  state: "queued" | "running" | "done" | "failed" | "cancelled";
+  percent: number;
+  label: string;
+  position: number | null;
+  started_at: number;
+  prompt: string;
+  kind: "generate" | "animate";
+  error: string | null;
+  clip: VideoClip | null;
+}
+export interface VideoCard { id: string; conversation_id: string | null; items: VideoItem[]; can_make_another: boolean; limits: string }
+export interface VideoStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; limits: string; styles: Array<{ id: string; name: string }> }
+export interface VideoAdapterRow { id: string; name: string; classification: "all-ages" | "adult-only"; enabled: boolean; trigger_words: string[]; licence: string; strength_default: number; bytes: number; source_url: string | null; added_at: string }
+export interface VideoSettings {
+  state: string; available: boolean; reason: string | null; tier: string | null; model_installed: boolean; limits: string;
+  enabled: boolean; adult_adapters: boolean; minors: string; adapters: VideoAdapterRow[];
+}
+
+async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const res = await fetch(path, { credentials: "include", ...init });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
+  if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
+  return body as T;
+}
+const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+export const videosApi = {
+  status: () => send<VideoStatus>("/api/videos/status"),
+  card: (id: string, signal?: AbortSignal) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
+  stop: (id: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  another: (id: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST" }),
+  animate: (input: { conversation_id: string; turn_id: string; file_id?: string; prompt?: string }) => send<VideoCard>("/api/videos/animate", json(input)),
+  settings: () => send<VideoSettings>("/api/videos/settings"),
+  setAdapter: (id: string, patch: { enabled?: boolean; classification?: "all-ages" | "adult-only" }) => send<VideoAdapterRow>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(patch) }),
+  removeAdapter: (id: string) => send<{ ok: true }>(`/api/videos/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  addAdapter: (form: FormData) => send<VideoAdapterRow>("/api/videos/adapters", { method: "POST", body: form }),
+};

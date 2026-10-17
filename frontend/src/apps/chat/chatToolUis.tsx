@@ -14,6 +14,8 @@ import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ImageGallery } from "@maipai/ui/src/elements/image-gallery";
 import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { picturesApi, type PictureCard } from "@/lib/picturesApi";
+import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
+import { videosApi, type VideoItem } from "@/lib/videosApi";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -493,4 +495,60 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
     );
   }
   return null;
+};
+
+// VIDEO-GEN-06: a video the person asked for. The turn names the job (`TurnValue.video`); the card polls Home for it.
+// One tool-call part, one shipped Element (the kit's VideoPlayer) per clip made in the turn: a progress card with an
+// elapsed clock and Stop while it is made (about two minutes), then the clip with poster, controls, loop, Download,
+// Share and Make another, or a plain failure line with Try again. Polling stops once nothing is being made.
+const VIDEO_POLL_MS = 1_000;
+const VIDEO_SETTLED = new Set(["done", "failed", "cancelled"]);
+
+function useVideoCard(id: string | undefined) {
+  return useQuery({
+    queryKey: ["video", id],
+    queryFn: ({ signal }) => videosApi.card(id!, signal),
+    enabled: id !== undefined,
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && q.state.data.items.every((item) => VIDEO_SETTLED.has(item.state))) ? false : VIDEO_POLL_MS),
+  });
+}
+
+function videoStatusOf(item: VideoItem): "queued" | "generating" | "ready" | "failed" | "cancelled" {
+  if (item.state === "done" && item.clip) return "ready";
+  if (item.state === "queued") return "queued";
+  if (item.state === "running") return "generating";
+  if (item.state === "cancelled") return "cancelled";
+  return "failed";
+}
+
+export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = useVideoCard(result?.id);
+  const navigate = useNavigate();
+  const card = query.data;
+  if (!result) return null;
+  if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that video" detail="Reload the chat to try again." retrying={false} /> : null;
+  // The newest clip of the turn is the one on show; earlier ones stay in the Library as files.
+  const item = card.items[card.items.length - 1];
+  if (!item) return null;
+  const refresh = () => { void query.refetch(); };
+  const status = videoStatusOf(item);
+  const clip = status === "ready" ? item.clip : null;
+  return (
+    <VideoPlayer
+      status={status}
+      prompt={item.prompt}
+      {...(clip ? { src: clip.url, poster: clip.poster_url, width: clip.width, height: clip.height } : {})}
+      progress={item.percent}
+      phaseLabel={item.label}
+      queuePosition={item.position}
+      startedAt={item.started_at}
+      hint={card.limits}
+      {...(item.error ? { error: item.error } : {})}
+      downloadName="video.mp4"
+      onStop={() => { void videosApi.stop(item.id).then(refresh).catch(refresh); }}
+      onRetry={() => { void videosApi.another(item.id).then(refresh).catch(refresh); }}
+      {...(clip ? { onShare: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) } : {})}
+      {...(card.can_make_another && status !== "failed" ? { onMakeAnother: () => { void videosApi.another(item.id).then(refresh).catch(refresh); } } : {})}
+    />
+  );
 };

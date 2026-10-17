@@ -51,6 +51,8 @@ import { useStatusApps } from "@/shell/useStatusApps";
 import { appStatusToSidebar } from "@/shell/statusApps";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { picturesApi } from "@/lib/picturesApi";
+import { videosApi } from "@/lib/videosApi";
+import { ReloadMainThreadContext } from "@/apps/chat/chatThreadContexts";
 import { Link } from "react-router-dom";
 import { sourcesFromMessage } from "@/apps/chat/chatSources";
 import { messageText } from "@/apps/chat/chatMessageText";
@@ -432,12 +434,52 @@ export function MakeVariationMenuItem() {
   );
 }
 
+/** VIDEO-GEN-06: "Animate this picture" in the More menu of a reply that made a picture: a 5 second clip that starts
+ * from the newest finished picture of that card. Shown only to a person who may make videos here, once the picture is
+ * done. The Stack accepts only a picture it made itself, so this is never offered on a picture the person uploaded. */
+const AnimateIcon = getIcon("sparkles");
+export function AnimatePictureMenuItem() {
+  const reload = useContext(ReloadMainThreadContext);
+  const queryClient = useQueryClient();
+  const pictureId = useAuiState((s) => {
+    const part = s.message.content.find((p) => p.type === "tool-call" && p.toolName === "picture");
+    return part && part.type === "tool-call" ? (part.result as { id?: string } | undefined)?.id : undefined;
+  });
+  const turnId = useAuiState((s) => (s.message.metadata?.custom as { turnId?: string } | undefined)?.turnId);
+  const hasVideo = useAuiState((s) => s.message.content.some((p) => p.type === "tool-call" && p.toolName === "video"));
+  const card = useQuery({ queryKey: ["picture", pictureId], queryFn: () => picturesApi.card(pictureId!), enabled: pictureId !== undefined, staleTime: 5_000 });
+  const status = useQuery({ queryKey: ["video-status"], queryFn: () => videosApi.status(), enabled: pictureId !== undefined, staleTime: 30_000 });
+  const [busy, setBusy] = useState(false);
+  const latest = card.data?.files[card.data.files.length - 1];
+  if (!pictureId || !turnId || hasVideo || !latest || !card.data?.conversation_id || !status.data?.can_make) return null;
+  const conversationId = card.data.conversation_id;
+  return (
+    <ActionBarMorePrimitive.Item
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
+      className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
+      disabled={busy}
+      onSelect={(e) => {
+        e.preventDefault();
+        setBusy(true);
+        void videosApi.animate({ conversation_id: conversationId, turn_id: turnId, file_id: latest.id })
+          .then(() => { void queryClient.invalidateQueries({ queryKey: ["video-status"] }); reload(); })
+          .catch(() => undefined)
+          .finally(() => setBusy(false));
+      }}
+    >
+      <AnimateIcon className="size-4" />
+      Animate this picture
+    </ActionBarMorePrimitive.Item>
+  );
+}
+
 export function AssistantMoreItems() {
   const temporary = useContext(TemporaryChatContext).on;
   return (
     <>
       <RememberThisMenuItem />
       <MakeVariationMenuItem />
+      <AnimatePictureMenuItem />
       {temporary ? null : <BranchInNewChatMenuItem />}
       <CompareWithBareModelMenuItem />
       <BareModeSwitchMenuItem />

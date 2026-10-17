@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-17T10:57:57.294Z",
-  "kitTag": "ui-v0.5.243",
+  "generatedAt": "2026-10-17T11:20:34.779Z",
+  "kitTag": "ui-v0.5.244",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -1374,6 +1374,14 @@
       "group": "other",
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": true
+    },
+    {
+      "file": "video-player.tsx",
+      "name": "video-player",
+      "group": "video",
+      "verdict": "wire-now",
+      "verdictReason": "The generated-clip card (progress with Stop, then the clip with poster, controls, loop, Download, Share, Make another); VIDEO-GEN-06 binds it as the chat's `video` tool part.",
       "implemented": true
     },
     {

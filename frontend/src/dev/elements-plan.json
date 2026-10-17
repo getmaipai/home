@@ -3582,6 +3582,25 @@
       "batch": null,
       "replacesHandBuilt": [],
       "realTurnToday": null
+    },
+    {
+      "file": "video-player.tsx",
+      "name": "video-player",
+      "group": "video",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "video"
+      ],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "The generated-clip card (progress with Stop, then the clip with poster, controls, loop, Download, Share, Make another); VIDEO-GEN-06 binds it as the chat's `video` tool part."
     }
   ]
 }

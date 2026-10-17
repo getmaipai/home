@@ -38,7 +38,7 @@ import {
 } from "@/apps/chat/chatThreadSlots";
 import { ChatMessageError } from "@/apps/chat/chatErrorSlot";
 import { ChatCitationLink } from "@/apps/chat/chatCitationLink";
-import { ArtifactCardToolRender, ConfirmToolRender, PictureProgressToolRender, PictureToolRender, ProjectToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
+import { ArtifactCardToolRender, ConfirmToolRender, PictureProgressToolRender, PictureToolRender, ProjectToolRender, VideoToolRender, SpecSheetToolRender, ToolTimelineToolRender } from "@/apps/chat/chatToolUis";
 import { ComposerAddMenu } from "@/apps/chat/composerAddMenu";
 import { ChatDateDivider } from "@/apps/chat/chatDateDivider";
 import { ComposerDictationWaveform } from "@/apps/chat/composerDictationWaveform";
@@ -78,6 +78,8 @@ export const TOOL_BINDINGS: readonly ToolBinding[] = [
   // IMGGEN-UI-01: a picture the person asked for: progress while it is made, then the pictures (or a plain failure).
   { toolName: "picture_progress", element: "job-progress", render: PictureProgressToolRender },
   { toolName: "picture", element: "image-gallery", render: PictureToolRender },
+  // VIDEO-GEN-06: a video the person asked for: progress while it is made, then the clip in the kit player (or a plain failure).
+  { toolName: "video", element: "video-player", render: VideoToolRender },
   { toolName: "tool_timeline", element: "tool-timeline", render: ToolTimelineToolRender, display: "inline" },
 ];
 

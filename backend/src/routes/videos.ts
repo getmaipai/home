@@ -65,10 +65,9 @@ export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean
   const group = root.turnId ? videoJobsForTurn(actor, root.turnId) : [root];
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
-  const done = jobs.filter((j) => j.state === "done").length;
   return {
     id: root.id, conversation_id: root.conversationId, items: jobs.map(itemView),
-    can_make_another: canMake && !active && done > 0 && jobs.length < 8, limits: VIDEO_LIMITS_LINE,
+    can_make_another: canMake && !active && jobs.length < 8, limits: VIDEO_LIMITS_LINE,
   };
 }
 
@@ -165,14 +164,14 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
 }
 
 const anotherRoute = createRoute({
-  method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed", middleware: [requireAuth] as const,
+  method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed (also Try again after a failed or stopped one)", middleware: [requireAuth] as const,
   request: { params: idParams },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card, with a new clip queued." }, ...refusals },
 });
 videosRoutes.openapi(anotherRoute, async (c) => {
   const actor = c.get("person");
   const source = getVideoJobFor(actor, c.req.valid("param").id);
-  if (!source || source.state !== "done") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
+  if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
   const blocked = await gateRoute(actor, source.prompt);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
   if (!source.conversationId) return c.json({ error: "That video isn't available any more." }, 404) as never;
