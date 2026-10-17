@@ -114,7 +114,7 @@ function loadApp(id: string): LoadedApp | null {
     if (doc === null) return { type: "unreadable" };
     if (doc !== undefined) pages.set(module, doc);
     return doc;
-  });
+  }, manifest.min_role);
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
@@ -139,7 +139,7 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
     if (doc === null) return { type: "unreadable" };
     if (doc !== undefined) pages.set(module, doc);
     return doc;
-  });
+  }, manifest.min_role);
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
@@ -166,6 +166,67 @@ export function appVisibleTo(
   return true;
 }
 
+/** NEWS-00: a page's own floor. A page may carry `min_role` to raise the package's floor (the lint refuses a page
+ * that lowers it; a role the ladder does not know falls back to the package's, so a bad value never opens a page). */
+export function pageMinRole(manifest: PackageManifest, entry: AppPageEntry): string {
+  const own = entry.min_role;
+  if (own === undefined) return manifest.min_role;
+  if (!meetsMinRole(own, manifest.min_role)) return manifest.min_role;
+  return own;
+}
+
+/** Whether the person's role clears one page's floor. Role only: age stays on the data path. */
+export function pageVisibleTo(person: Pick<PersonRow, "role">, manifest: PackageManifest, entry: AppPageEntry): boolean {
+  return meetsMinRole(person.role, pageMinRole(manifest, entry));
+}
+
+/** Every string under `bind.path` (a package binding) and `call.target` found anywhere in a page document. */
+function pageReferences(doc: unknown, packageId: string): { data: Set<string>; actions: Set<string> } {
+  const data = new Set<string>();
+  const actions = new Set<string>();
+  const actionPrefix = `/api/plugins/${packageId}/actions/`;
+  const walkNode = (node: unknown): void => {
+    if (Array.isArray(node)) { node.forEach(walkNode); return; }
+    if (typeof node !== "object" || node === null) return;
+    const obj = node as Record<string, unknown>;
+    const bind = obj.bind;
+    if (typeof bind === "object" && bind !== null && (bind as Record<string, unknown>).source === "package" && typeof (bind as Record<string, unknown>).path === "string") data.add((bind as { path: string }).path);
+    const call = obj.call;
+    if (typeof call === "object" && call !== null && typeof (call as Record<string, unknown>).target === "string") {
+      const target = (call as { target: string }).target;
+      if (target.startsWith(actionPrefix)) actions.add(target.slice(actionPrefix.length));
+    }
+    Object.values(obj).forEach(walkNode);
+  };
+  walkNode(doc);
+  return { data, actions };
+}
+
+/** The pages (entries) a data id or an action is reached from, by the bindings and call targets in the page documents. */
+function owningPages(app: LoadedApp, kind: "data" | "actions", id: string): AppPageEntry[] {
+  return (app.contributes.pages ?? []).filter((entry) => {
+    const doc = app.pages.get(entry.module);
+    return doc !== undefined && pageReferences(doc, app.manifest.id)[kind].has(id);
+  });
+}
+
+/** NEWS-00: may this person reach a data id (`data`) or an action (`actions`)? It names its page through the page
+ * documents; the person needs the floor of at least one page that uses it, so a call cannot reach data its page
+ * hides. An id no page uses keeps only the package's floor (a widget's data id, say). */
+export function appRouteAllowed(person: PersonRow, packageId: string, kind: "data" | "actions", id: string): boolean {
+  const app = visibleApp(person, packageId);
+  if (!app) return false;
+  const owners = owningPages(app, kind, id);
+  return owners.length === 0 || owners.some((entry) => pageVisibleTo(person, app.manifest, entry));
+}
+
+/** NEWS-00: the picture route of an app. A picture belongs to the whole app, so the person needs the floor of at
+ * least one of its pages. */
+export function appImageAllowed(person: PersonRow, packageId: string): boolean {
+  const app = visibleApp(person, packageId);
+  return !!app && (app.contributes.pages ?? []).some((entry) => pageVisibleTo(person, app.manifest, entry));
+}
+
 function visibleApp(person: PersonRow, id: string): LoadedApp | null {
   const app = loadApp(id);
   if (!app || app.problems.length > 0) return null;
@@ -189,6 +250,7 @@ export function listApps(person: PersonRow): AppRow[] {
     if (!appVisibleTo(person, app.manifest, status, unavailable)) continue;
     const index = app.contributes.pages!.find((page) => page.id === "index")!;
     if (index.nav === false) continue;
+    if (!pageVisibleTo(person, app.manifest, index)) continue;
     const manifest = app.manifest;
     rows.push({
       package: id,
@@ -198,7 +260,7 @@ export function listApps(person: PersonRow): AppRow[] {
       description: manifest.description,
       category: manifest.category,
       keywords: index.keywords ?? [],
-      sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
+      sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav && pageVisibleTo(person, manifest, page)).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
       to: `/apps/${id}`,
       incognito: manifest.incognito,
       ...(index.pinned_by_default ? { pinned_by_default: true } : {}),
@@ -216,7 +278,7 @@ export function getAppPage(person: PersonRow, packageId: string, pageId: string)
   if (!app) return NOT_FOUND;
   const entry = app.contributes.pages!.find((page) => page.id === pageId);
   const doc = entry ? app.pages.get(entry.module) : undefined;
-  if (!entry || doc === undefined) return { ok: false, status: 404, error: "no such page" };
+  if (!entry || doc === undefined || !pageVisibleTo(person, app.manifest, entry)) return { ok: false, status: 404, error: "no such page" };
   return { ok: true, status: 200, value: doc };
 }
 
@@ -253,7 +315,7 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   const app = visibleApp(person, packageId);
   if (!app) return NOT_FOUND;
   const entry: AppDataEntry | undefined = app.contributes.data?.find((d) => d.id === dataId);
-  if (!entry) return { ok: false, status: 404, error: "no such data" };
+  if (!entry || !appRouteAllowed(person, packageId, "data", dataId)) return { ok: false, status: 404, error: "no such data" };
   const asOf = new Date().toISOString();
   if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
 

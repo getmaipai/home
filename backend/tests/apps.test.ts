@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { entities, packageInstalls, packageStatus, settingsValues } from "@/db/schema";
 import { PACKAGES_DIR, installedPackageVersionDir } from "@/lib/paths";
-import { __resetAppCachesForTests, appPackageProblems, appVisibleTo, getAppData } from "@/lib/apps";
+import { __resetAppCachesForTests, appImageAllowed, appPackageProblems, appRouteAllowed, appVisibleTo, getAppData } from "@/lib/apps";
 import { __resetPackageCachesForTests, loadManifestOnly } from "@/lib/plugins";
 import type { PersonRow } from "@/types";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -31,7 +31,7 @@ const indexPage = {
 };
 const morePage = { type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "shopping" } }] };
 
-interface FixtureOptions { minRole?: string; platforms?: string[]; pages?: unknown; extraPage?: boolean; data?: unknown; requires?: string[]; pin?: { pinned_by_default?: boolean; pin_order?: number } }
+interface FixtureOptions { pageRoles?: Record<string, string>; minRole?: string; platforms?: string[]; pages?: unknown; extraPage?: boolean; data?: unknown; requires?: string[]; pin?: { pinned_by_default?: boolean; pin_order?: number } }
 
 function installFixtureApp(options: FixtureOptions = {}): string {
   const dir = installedPackageVersionDir(ID, VERSION);
@@ -45,8 +45,8 @@ function installFixtureApp(options: FixtureOptions = {}): string {
   if (options.requires) manifest.requires = options.requires;
   manifest.contributes = {
     pages: [
-      { id: "index", label: "Lists", icon: "list", nav: true, kind: "schema", module: "lists", keywords: ["shopping", "groceries"], ...(options.pin ?? {}) },
-      ...(options.extraPage === false ? [] : [{ id: "more", label: "More", icon: "calendar", nav: true, kind: "schema", module: "more" }]),
+      { id: "index", label: "Lists", icon: "list", nav: true, kind: "schema", module: "lists", keywords: ["shopping", "groceries"], ...(options.pin ?? {}), ...(options.pageRoles?.index ? { min_role: options.pageRoles.index } : {}) },
+      ...(options.extraPage === false ? [] : [{ id: "more", label: "More", icon: "calendar", nav: true, kind: "schema", module: "more", ...(options.pageRoles?.more ? { min_role: options.pageRoles.more } : {}) }]),
     ],
     data: options.data ?? [
       { id: "shopping", inputs: {} },
@@ -215,6 +215,88 @@ describe("who may see an app", () => {
     expect(appVisibleTo({ role: "owner" }, { ...m, requires: ["tts"] }, { status: "enabled" }, new Set(["tts"]))).toBe(false);
     expect(appVisibleTo({ role: "owner" }, m, { status: "disabled" }, new Set())).toBe(false);
     expect(appVisibleTo({ role: "guest" }, { ...m, min_role: "child" }, { status: "enabled" }, new Set())).toBe(false);
+  });
+});
+
+describe("a page's own min_role (NEWS-00)", () => {
+  // The index page binds `places` (a picker) and `shopping`; the More page binds `shopping` only, so `forecast`
+  // is bound by no page. The package floor is child; More raises it to teen.
+  const placesOnlyIndex = { type: "page", id: "lists", title: "Lists", body: [{ type: "picker", state: "place", label: "Place", bind: { source: "package", path: "places" }, item_key_field: "id", item_label_field: "label" }] };
+
+  test("a page above the viewer is absent from sections and 404 on its page route; a lower page still opens", async () => {
+    installFixtureApp({ minRole: "child", pageRoles: { more: "teen" } });
+    const { client: ownerClient } = await owner();
+    const teenClient = await teen(ownerClient);
+    const { client: childClient } = await child(ownerClient);
+    expect((await fixtureApps(childClient))[0]!.sections).toEqual([]);
+    expect((await childClient.get(`/api/plugins/${ID}/pages/more`)).status).toBe(404);
+    expect((await childClient.get(`/api/plugins/${ID}/pages/index`)).status).toBe(200);
+    expect((await fixtureApps(teenClient))[0]!.sections).toEqual([{ page: "more", label: "More", icon: "calendar" }]);
+    expect((await teenClient.get(`/api/plugins/${ID}/pages/more`)).status).toBe(200);
+  });
+
+  test("an index page above the viewer removes the app from the list and from search, and its pages are 404", async () => {
+    installFixtureApp({ minRole: "child", pageRoles: { index: "teen" } });
+    const { client: ownerClient } = await owner();
+    const { client: childClient } = await child(ownerClient);
+    expect(await fixtureApps(childClient)).toEqual([]);
+    expect((await childClient.get(`/api/plugins/${ID}/pages/index`)).status).toBe(404);
+    const miss = (await (await childClient.get("/api/search?q=groceries")).json()) as { groups: Array<{ kind: string }> };
+    expect(miss.groups.some((g) => g.kind === "app")).toBe(false);
+    expect((await fixtureApps(ownerClient))).toHaveLength(1);
+  });
+
+  test("a data id is reachable only through a page the viewer may open", async () => {
+    installFixtureApp({ minRole: "child", pageRoles: { more: "teen" }, pages: placesOnlyIndex });
+    const { client: ownerClient } = await owner();
+    const teenClient = await teen(ownerClient);
+    const { client: childClient } = await child(ownerClient);
+    // `shopping` is bound only by the teen page.
+    expect((await childClient.post(`/api/plugins/${ID}/data/shopping`, {})).status).toBe(404);
+    expect((await teenClient.post(`/api/plugins/${ID}/data/shopping`, {})).status).toBe(200);
+    // `places` is bound by the child-visible index page.
+    expect((await childClient.post(`/api/plugins/${ID}/data/places`, {})).status).toBe(200);
+  });
+
+  test("a data id and an action used by one open page and one raised page stay open to the lower role", () => {
+    installFixtureApp({ minRole: "child", pageRoles: { more: "teen" } });
+    const childPerson = { role: "child" } as PersonRow;
+    expect(appRouteAllowed(childPerson, ID, "data", "shopping")).toBe(true);
+  });
+
+  test("an action named only by a raised page is refused below it; an unused action keeps the package floor; images need one open page", () => {
+    const callPage = { type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "shopping" }, empty_state: { type: "empty_state", icon: "inbox", text: "None.", action: { call: { target: `/api/plugins/${ID}/actions/follow` } } } }] };
+    const dir = installFixtureApp({ minRole: "child", pageRoles: { more: "teen" }, pages: placesOnlyIndex });
+    writeFileSync(join(dir, "pages", "more.json"), JSON.stringify(callPage));
+    __resetAppCachesForTests();
+    const kid = { role: "child" } as PersonRow;
+    const teenPerson = { role: "teen" } as PersonRow;
+    expect(appRouteAllowed(kid, ID, "actions", "follow")).toBe(false);
+    expect(appRouteAllowed(teenPerson, ID, "actions", "follow")).toBe(true);
+    expect(appRouteAllowed(kid, ID, "actions", "unused")).toBe(true);
+    expect(appImageAllowed(kid, ID)).toBe(true);
+    expect(appImageAllowed({ role: "guest" } as PersonRow, ID)).toBe(false);
+  });
+
+  test("regression: a page that lowers the package floor is refused at install time and the app is not served", async () => {
+    const dir = installFixtureApp({ minRole: "adult", pageRoles: { more: "child" } });
+    const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8")) as PackageManifest;
+    expect(appPackageProblems(manifest, dir).join(" ")).toContain("a page may only raise the floor");
+    const { client: ownerClient } = await owner();
+    expect(await fixtureApps(ownerClient)).toEqual([]);
+  });
+
+  test("regression: a role the ladder does not know (member) is not a floor", async () => {
+    const dir = installFixtureApp({ minRole: "adult" });
+    const manifestPath = join(dir, "manifest.json");
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf-8"));
+    manifest.contributes.pages[0].min_role = "member";
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    __resetPackageCachesForTests();
+    __resetAppCachesForTests();
+    const { client: ownerClient } = await owner();
+    expect(await fixtureApps(ownerClient)).toEqual([]);
+    expect((await ownerClient.get(`/api/plugins/${ID}/pages/index`)).status).toBe(404);
   });
 });
 
