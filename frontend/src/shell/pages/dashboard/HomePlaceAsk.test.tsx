@@ -4,7 +4,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { HomePlaceAsk } from "./HomePlaceAsk";
 
-afterEach(() => cleanup());
+// api.settingsValues is replaced per test; restore the real one so later files in the same process are not polluted.
+const realSettingsValues = api.settingsValues;
+afterEach(() => {
+  cleanup();
+  api.settingsValues = realSettingsValues;
+});
 const view = (role: string) => {
   const person = { id: "p", display_name: "Sam", role } as never;
   const out = render(<QueryClientProvider client={new QueryClient()}><HomePlaceAsk person={person} /></QueryClientProvider>);
