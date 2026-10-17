@@ -15,11 +15,11 @@ The installer and the setup wizard size the disk from one table. It adds up what
 
 | Plan | For a Mac with | Free space needed |
 |---|---|---|
-| Recommended | 64 GB of memory or more | 85 GB |
+| Recommended | 64 GB of memory or more | 61 GB |
 | Moderate | 32 GB | 34 GB |
 | Minimal | 16 or 24 GB | 16 GB |
 
-A Mac with 128 GB of memory can also add two optional extras on the wizard's plan screen: more picture looks (Z-Image Turbo, slower but with more styles to add) and making videos. Adding both brings the Recommended plan to about 166 GB. The plan screen shows each part with its size, the total, and the free space on this computer. It turns the check green, amber or red as you turn parts on and off. Choose a smaller plan with `--plan moderate` or `--plan minimal` if the installer says there is not enough room.
+A Mac with 128 GB of memory can also add two optional extras on the wizard's plan screen: more picture looks (Z-Image Turbo, slower but with more styles to add) and making videos. Adding every optional extra on the plan screen (including Detailed videos and the faster chat engine) brings the Recommended plan to about 248 GB. The plan screen shows each part with its size, the total, and the free space on this computer. It turns the check green, amber or red as you turn parts on and off. Choose a smaller plan with `--plan moderate` or `--plan minimal` if the installer says there is not enough room.
 
 Home itself, with the AI engine program that runs the models, takes about 1.5 GB. The rest is the AI models and the tools they run on. The wizard installs the AI engine later, only if this computer runs the AI.
 

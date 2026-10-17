@@ -1261,9 +1261,9 @@ describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
 
   test("a shortfall stops with the need, the free space, the smaller-plan flags and nothing hard-coded", () => {
     const need = table.installer["p64.required_free_bytes"]! + 2 * GIB;
-    const { out, rc } = check("recommended", "full", 64, one(61 * GIB));
+    const { out, rc } = check("recommended", "full", 64, one(55 * GIB));
     expect(rc).toBe(1);
-    expect(out).toMatch(/This computer needs about \d+ GB free for the recommended setup; it has 61 GB\./);
+    expect(out).toMatch(/This computer needs about \d+ GB free for the recommended setup; it has 55 GB\./);
     expect(out).toContain(`about ${Math.ceil(need / GIB)} GB free`);
     expect(out).toContain("--plan moderate or --plan minimal");
   });

@@ -75,9 +75,9 @@ test("the verdict is green with room, amber when tight, red when short; only red
   const tight = wordPlan({ ...p64 }, [{ freeBytes: need + GIB, needs: ["home", "data", "ai"] }]);
   expect(tight.disk?.verdict.state).toBe("amber");
   expect(tight.diskLine).toBeNull();
-  const short = wordPlan({ ...p64 }, [{ freeBytes: 61 * GIB, needs: ["home", "data", "ai"] }]);
+  const short = wordPlan({ ...p64 }, [{ freeBytes: 50 * GIB, needs: ["home", "data", "ai"] }]);
   expect(short.disk?.verdict.state).toBe("red");
-  expect(short.diskLine).toMatch(/^This computer needs about \d+ GB free for the recommended setup; it has 61 GB\. Free up space, or choose a smaller plan\.$/);
+  expect(short.diskLine).toMatch(/^This computer needs about \d+ GB free for the recommended setup; it has 50 GB\. Free up space, or choose a smaller plan\.$/);
 });
 
 test("rows already installed cost nothing more when the Stack's plan marks them", () => {
