@@ -88,7 +88,7 @@ describe("fetch_stack_commons", () => {
     for (const [pkg, tag] of [["core", "core-v0.1.0"], ["spec", "spec-v0.1.136"]] as const) {
       const pkgDir = join(root, "archive", pkg, `commons-${tag}`, pkg);
       mkdirSync(pkgDir, { recursive: true });
-      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: `@maipai/${pkg}`, version: "0.0.1" }));
+      writeFileSync(join(pkgDir, "package.json"), JSON.stringify({ name: `@maipai/${pkg}`, version: "0.0.1", ...(pkg === "core" ? { dependencies: { "@maipai/spec": "file:../spec" } } : {}) }));
       const archive = join(root, `${tag}.tar.gz`);
       expect(Bun.spawnSync(["tar", "-czf", archive, "-C", join(root, "archive", pkg), `commons-${tag}`]).exitCode).toBe(0);
       const digest = Bun.spawnSync(["shasum", "-a", "256", archive]);
@@ -249,6 +249,8 @@ describe("fetch_stack_commons", () => {
         const resolved = join(install, "backend", "../../commons-tags", rel);
         expect(readFileSync(join(resolved, "package.json"), "utf8")).toContain("@maipai/");
       }
+      // core names spec as file:../spec; each tag has its own folder, so the installer links it (v0.2.0 failed bun install without this).
+      expect(readFileSync(join(install, "backend", "../../commons-tags/core-core-v0.1.0/spec/package.json"), "utf8")).toContain("@maipai/spec");
       // spec is named by both manifests but downloaded once; core once; the failed run above fetched core only.
       const urls = readFileSync(join(root, "urls"), "utf8").trim().split("\n");
       expect(urls.filter((u) => u.includes("spec-v0.1.136")).length).toBe(1);

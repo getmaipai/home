@@ -15,7 +15,8 @@ const data = join(scratch, "data");
 const git = (cwd: string, ...args: string[]) =>
   spawnSync("git", ["-C", cwd, ...args], { encoding: "utf8" });
 // scripts/wt.sh is a thin wrapper around the shared .github script; the fixture has no sibling checkout.
-const common = resolve(scripts, "..", spawnSync("git", ["-C", scripts, "rev-parse", "--git-common-dir"], { encoding: "utf8" }).stdout.trim());
+// Absolute on purpose: a relative common dir is relative to scripts/, so resolving it from the repo root broke this test in the main checkout.
+const common = spawnSync("git", ["-C", scripts, "rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8" }).stdout.trim();
 const sharedWt = process.env.MAIPAI_WT_SHARED || join(common, "..", "..", ".github", "standards", "bin", "wt.sh");
 const env = { ...process.env, MAIPAI_WT_SHARED: sharedWt, MAIPAI_WT_DATA: data, MAIPAI_HUB_LOCK_PATH: "", MAIPAI_MAIN_CHECKOUT: "", PORT: "" };
 delete (env as Record<string, string | undefined>).PORT;
@@ -62,6 +63,10 @@ afterAll(() => {
 });
 
 describe("app.sh port ownership", () => {
+  test("the shared wt.sh resolves from any checkout, main or worktree", () => {
+    expect(existsSync(sharedWt)).toBe(true);
+  });
+
   test("a worktree refuses an explicit 8787 and changes nothing", () => {
     const r = app(tree, ["start"], { PORT: "8787" });
     expect(r.status).toBe(1);

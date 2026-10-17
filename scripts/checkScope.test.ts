@@ -134,3 +134,13 @@ describe("check.sh's own compute_scope() (real bash, real git, not classifyScope
     expect(result.scope).toBe("docs");
   });
 });
+
+describe("check.sh run bare (no MAIPAI_COMMONS_DIR in the environment)", () => {
+  test("assigns MAIPAI_COMMONS_DIR before any use, so set -u cannot abort with 'unbound variable'", () => {
+    const lines = readFileSync(join(import.meta.dir, "check.sh"), "utf-8").split("\n");
+    const assigned = lines.findIndex((l) => /^\s*MAIPAI_COMMONS_DIR=/.test(l));
+    const firstUse = lines.findIndex((l) => /\$MAIPAI_COMMONS_DIR|\$\{MAIPAI_COMMONS_DIR\}/.test(l));
+    expect(assigned).toBeGreaterThan(-1);
+    expect(assigned).toBeLessThan(firstUse);
+  });
+});

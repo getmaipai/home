@@ -479,6 +479,24 @@ fetch_home_commons() {
     if [ -f "${work}/commons-tags/${cdir}/${pkg}/package.json" ]; then continue; fi
     fetch_one_stack_commons "$work" "$pkg" "$cdir" "$tag" || return 1
   done <<< "$deps"
+  link_commons_siblings "$work" "$deps"
+}
+
+# One Commons package can name another as file:../<name> (core and ui name spec). A checkout of
+# Commons has the packages side by side, but here each tag sits in its own folder, so the sibling
+# is missing and bun install fails on it. Point each such name at the folder Home already staged.
+link_commons_siblings() {
+  local work="$1" deps="$2" pkg cdir tag name sibling_dir
+  while read -r pkg cdir tag; do
+    [ -n "$pkg" ] || continue
+    for name in $(grep -oE '"file:\.\./[a-z0-9-]+"' "${work}/commons-tags/${cdir}/${pkg}/package.json" | sed -E 's/^"file:\.\.\/(.*)"$/\1/'); do
+      [ -e "${work}/commons-tags/${cdir}/${name}" ] && continue
+      sibling_dir=$(printf '%s\n' "$deps" | awk -v n="$name" '$1 == n { print $2; exit }')
+      [ -n "$sibling_dir" ] || continue
+      ln -s "../${sibling_dir}/${name}" "${work}/commons-tags/${cdir}/${name}" \
+        || die "Could not link ${name} next to ${pkg} in ${work}/commons-tags/${cdir}. Check that the folder is writable, then run the installer again."
+    done
+  done <<< "$deps"
 }
 
 build_app() {
