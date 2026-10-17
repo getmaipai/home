@@ -3,8 +3,8 @@ title: Install and start Home
 description: Run Home from source today, or use the installer for a background service. Stop, restart and uninstall.
 ---
 
-<Callout type="info" title="Pre-alpha">
-Home has no packaged installer yet. It runs from source, and an installer script exists for a service install. Nothing is deployed to a real household yet.
+<Callout type="info" title="Early release">
+Home is at 0.2.x. You can run it from source, or use the installer script for a background service. The first full install runs on a Mac Studio (2026-10-17).
 </Callout>
 
 ## 🧰 What you need
@@ -96,7 +96,15 @@ Home uses `MAIPAI_PORT` (default 3000). The Stack uses `MAIPAI_STACK_PORT` (defa
 
 ### Release, plan and version
 
-The installer installs the **latest published release**, never the main branch. If no release exists it stops with "could not find a published release ... there is nothing to install". Run from source until one does. `--version v0.1.0` installs a named release. Choose a setup plan with `--plan recommended`, `--plan moderate` or `--plan minimal`; the wizard reads it later.
+The installer installs the **latest published release**, never the main branch. If no release exists it stops with "could not find a published release ... there is nothing to install". Run from source until one does. `--version v0.2.5` installs a named release. To get the installer that was tested with that release, fetch it from the release tag: `curl -fsSL https://raw.githubusercontent.com/getmaipai/home/v0.2.5/scripts/install.sh | sudo bash -s -- --version v0.2.5`. Choose a setup plan with `--plan recommended`, `--plan moderate` or `--plan minimal`; the wizard reads it later.
+
+### Pins, Deno and the browser
+
+- **The Stack comes from a pin.** `STACK_TAG` in `scripts/install.sh` (and `scripts/engine-computer/maipai-engine`) is the Stack commit this Home release builds. The installer fetches that commit, never `main`. A Stack fix reaches installs only when a Home release moves the pin, so the Home commit that bumps `STACK_TAG` is the one that ships the fix.
+- **Commons tags are pinned by digest.** The installer fetches GitHub's archive for each Commons tag the Stack names and checks its SHA-256. A tag with no pinned digest stops the install. The installer stages Home's own Commons packages before `bun install`.
+- **Bun stands in for Node.** Some dependencies (such as `ssh2`) run an install script that expects `node`. The installer puts a temporary `node` shim that points at Bun on the `PATH` for the install and the build, then removes it. Bun is on the service `PATH` too, for package scripts. No Node is needed on the Mac.
+- **Deno is installed for you.** The installer downloads Deno 2.9.7, checks its published SHA-256, and puts it in `<install folder>/.deno/bin`, which is on the service `PATH`. The built-in data packages (music, news, sports, almanac) need it. If the download fails, those packages stay off and the install still finishes. The Deno cache is filled once at install, and the service reads it.
+- **The browser opens.** When Home answers, the installer opens the setup address in the console user's default browser (`open` on macOS, `xdg-open` on Linux) and ends its output with the address. Over SSH there is no desktop, so it only prints the address.
 
 ### Upgrade, resume and roll back
 

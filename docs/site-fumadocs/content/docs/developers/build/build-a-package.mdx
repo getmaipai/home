@@ -1,18 +1,37 @@
 ---
 title: Build a package
-description: "Planned page. Manifest, kinds, permissions, publish to the catalog."
+description: "Manifest, kinds, the app kind, permissions and publishing to the catalog."
 ---
 
-<Callout type="warn" title="Table of contents draft">This page is not written yet. This is the plan for it. Approve or change it before any writing starts.</Callout>
+A package is a folder with a `manifest.json`, an optional recipe and optional pages. Home runs it without a rebuild. The full rules live in the org standard, [PACKAGES.md](https://github.com/getmaipai/.github/blob/main/docs/PACKAGES.md). This page is the short tour.
 
-## What this page will cover
+## 🧩 Kinds
 
-Manifest, kinds, permissions, publish to the catalog.
+- **plugin**: tools the chat model can call, written as recipes (data, not code).
+- **app**: a plugin that also lists `contributes.pages`. It opens at `/apps/<package id>`, shows in search and favorites, and draws pages written as JSON. No React ships in a package.
 
-## Screenshots it will have (each with a caption)
+Weather is the first app. The chat tool and the app are one package and one recipe (`backend/packages/weather`).
 
-- None. Text only.
+## 📄 An app's pieces
 
-## Kept current by
+| Piece | Where | What it does |
+|---|---|---|
+| Manifest | `manifest.json` | `contributes.pages[]` (one `index` is required), `contributes.data[]`, `keywords` (up to 8), `min_role`, `returns_blocks` |
+| Pages | `pages/<module>.json` | `page` documents using only `page`, `section`, `empty_state`, `progress`, `detail_pane`, `answer_blocks` and `picker` |
+| Data | `POST /api/plugins/<id>/data/<data id>` | The host resolves the place and rounds coordinates; the page never sends raw ones |
+| Settings | `contributes.settings_area` | An area at `/settings/<id>` with a Settings gear in the app toolbar. Cards draw only the package's own `config[]` groups |
 
-Kept in step with the manifest schema from commons.
+Home checks all of this at install time and refuses a package that breaks a rule, such as a page that binds to a data id the manifest does not declare, or an area that reuses a built-in settings id.
+
+## ✅ Checks to carry
+
+- The `index` page and each section validate against `spec/ui/schema.json`.
+- A child, a teen and an adult each see, or do not see, the app as `min_role` says.
+- A data call with no network shows the plain empty state.
+- Fixtures use `192.0.2.x` and `example.com`.
+
+Uninstall hides the app and keeps its state, so a favorite returns on reinstall.
+
+## 🔗 Where the contract lives
+
+`commons`: `spec/schemas/manifest.schema.json`, `spec/ui/schema.json` and `spec/ui/app-check.ts` (from `spec-v0.1.153` and `ui-v0.5.239`). Home's design record is `docs/plans/app-kind-2026-10-16.md`, and the weather app is traced in `docs/BACKLOG.md` under WEATHER-APP-01.

@@ -3,7 +3,7 @@ title: Set up web search
 description: Choose where answers come from, connect SearXNG, and keep children and teens safe.
 ---
 
-Home answers most questions from the model and its offline reference library. When a question needs fresh facts, Home can search the web. Web search is off until you set it up.
+Home answers most questions from the model and its offline reference library. When a question needs fresh facts, Home can search the web. Adults can search the web right away, through DuckDuckGo, once Home's search service is ready. Teens and children search through your own SearXNG, so set that up for them.
 
 <Shot id="settings-search" />
 
@@ -28,7 +28,7 @@ SearXNG is a search service you run yourself. Home asks it for results, so no se
 3. Type its address in **Your own SearXNG (optional)**, for example `http://192.0.2.20:8080`.
 4. Ask Home something recent in **Chat**. A sources list appears under the reply.
 
-Until an address is set, Home says "Web search isn't set up yet". Library and Wikipedia lookups still work.
+Until an address is set, teens and children use the Library only, and Home says "Web search isn't set up yet" when a search needs a source it does not have. The wizard can also take this address, on its **Turn on web search** screen. Library and Wikipedia lookups still work.
 
 Home checks SearXNG every hour while it is healthy and every 15 minutes while it is not. A failing check appears under **Repairs**, with the step to take. Check the computer is on, the address is right and JSON output is enabled.
 
