@@ -91,6 +91,8 @@ describe("the picture claim guard", () => {
   });
 
   test("a turn where the tool is not offered never claims a picture", async () => {
+    // A child is in the cartoon lane by default (owner ruling 2026-10-17), so the tool is not offered to a child only while the home switch is off.
+    setHouseholdSettingValue("generation.kids", false);
     const child = (() => { db.update(peopleTable).set({ role: "child" }).where(eq(peopleTable.id, people.child.id)).run(); return db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!; })();
     await withStub({ calls: () => undefined, reply: () => "Your picture is being made, it will show up below." }, async (seen) => {
       const value = await turn(child, "make me a picture of a red fox");
