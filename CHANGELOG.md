@@ -7,6 +7,20 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.5] - 2026-10-17
+
+Sign-in works for 6-digit passcodes.
+
+### Sign-in
+- A 6-digit passcode no longer fires a wrong 4-digit attempt, so it no longer burns a failed try or locks the account.
+- The sign-in screen learns each account's passcode length and signs in at that length.
+
+### Chat
+- The empty chat rotates ten chat-only pictures, shuffled in each browser, never the same one twice in a row.
+
+### Fixes
+- The ChatPage test for a model that never reasons now matches the screen (INSTANT-01).
+
 ## [0.2.4] - 2026-10-17
 
 Setup is clearer, Home searches the web more safely, the voice sounds better, and chat feels calmer.
