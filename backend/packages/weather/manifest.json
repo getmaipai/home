@@ -1,10 +1,10 @@
 {
   "id": "weather",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",
-  "description": "Get the weather for a named place, or the person's own default place when none is named.",
+  "description": "Get the weather for a named place or your own default place, in chat or in the Weather app.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -71,7 +71,7 @@
       "attribution": "Weather data by Open-Meteo.com (CC BY 4.0)",
       "hosts": ["geocoding-api.open-meteo.com", "api.open-meteo.com"],
       "destination": "Open-Meteo (open-meteo.com), a free public weather API",
-      "when": "each time the family asks for the weather somewhere, and about once an hour in the background for your home place",
+      "when": "each time the family asks for the weather somewhere or opens a place in the Weather app, and about once an hour in the background for your home place",
       "what": "the place name you spoke or your saved place name; with Current location on, your device coordinates rounded to about 1 km (about 10 km for a child), sent for that request only and never stored; your home place name for the hourly refresh",
       "who": "Open-Meteo",
       "opt_in": true,
@@ -100,6 +100,30 @@
   "backup": "exclude",
   "background": false,
   "contributes": {
+    "pages": [
+      { "id": "index", "label": "Weather", "icon": "cloud-sun", "nav": true, "kind": "schema", "module": "index", "keywords": ["forecast", "rain", "snow", "temperature", "outside", "hourly"] }
+    ],
+    "data": [
+      { "id": "places", "surface": "weather", "rows": "places" },
+      { "id": "forecast", "surface": "weather", "refresh_s": 1800 }
+    ],
+    "settings_area": {
+      "id": "weather",
+      "title": "Weather",
+      "app": "/apps/weather",
+      "audience": { "min_role": "child" },
+      "groups": [{ "label": "Weather", "sections": ["places"] }],
+      "sections": [
+        {
+          "id": "places",
+          "label": "Places",
+          "icon": "map-pin",
+          "kind": "keys",
+          "cards": [{ "label": "Places", "group": "weather", "scope": "person" }],
+          "keywords": ["location", "city", "home", "current location", "saved places"]
+        }
+      ]
+    },
     "widgets": [
       {
         "id": "current",

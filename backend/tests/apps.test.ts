@@ -66,6 +66,12 @@ function installFixtureApp(options: FixtureOptions = {}): string {
 }
 
 beforeEach(() => resetDb());
+
+/** The fixture app's row in `GET /api/apps`; the bundled Weather app is in the list too and is not what these tests are about. */
+async function fixtureApps(client: TestClient): Promise<Array<Record<string, unknown>>> {
+  const rows = (await (await client.get("/api/apps")).json()) as Array<Record<string, unknown>>;
+  return rows.filter((row) => row.package === ID);
+}
 afterEach(() => {
   rmSync(installedPackageVersionDir(ID, VERSION), { recursive: true, force: true });
   __resetPackageCachesForTests();
@@ -83,15 +89,16 @@ describe("GET /api/apps", () => {
     expect((await new TestClient().get("/api/apps")).status).toBe(401);
   });
 
-  test("a package without pages is not an app: the bundled set lists none", async () => {
+  test("a package without pages is not an app: the bundled set lists only Weather", async () => {
     const { client } = await owner();
-    expect(await (await client.get("/api/apps")).json()).toEqual([]);
+    expect((await fixtureApps(client)).map((row) => row.package)).toEqual([]);
+    expect(((await (await client.get("/api/apps")).json()) as Array<{ package: string }>).map((row) => row.package)).toEqual(["weather"]);
   });
 
   test("an installed app lists with its launcher fields, sections and route", async () => {
     installFixtureApp();
     const { client } = await owner();
-    const rows = (await (await client.get("/api/apps")).json()) as Array<Record<string, unknown>>;
+    const rows = await fixtureApps(client);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({
       package: ID,
@@ -110,11 +117,12 @@ describe("GET /api/apps", () => {
   test("uninstalling hides it again", async () => {
     installFixtureApp();
     const { client } = await owner();
-    expect(((await (await client.get("/api/apps")).json()) as unknown[]).length).toBe(1);
+    const names = async () => (await fixtureApps(client)).map((row) => String(row.package));
+    expect(await names()).toEqual([ID]);
     db.delete(packageInstalls).where(eq(packageInstalls.packageId, ID)).run();
     __resetPackageCachesForTests();
     __resetAppCachesForTests();
-    expect(await (await client.get("/api/apps")).json()).toEqual([]);
+    expect(await names()).toEqual([]);
   });
 });
 
@@ -137,11 +145,11 @@ describe("who may see an app", () => {
     const teenClient = await teen(ownerClient);
     const { client: childClient } = await child(ownerClient);
     for (const hidden of [teenClient, childClient]) {
-      expect(await (await hidden.get("/api/apps")).json()).toEqual([]);
+      expect(await fixtureApps(hidden)).toEqual([]);
       expect((await hidden.get(`/api/plugins/${ID}/pages/index`)).status).toBe(404);
       expect((await hidden.post(`/api/plugins/${ID}/data/shopping`, {})).status).toBe(404);
     }
-    expect(((await (await ownerClient.get("/api/apps")).json()) as unknown[]).length).toBe(1);
+    expect(await fixtureApps(ownerClient)).toHaveLength(1);
     expect((await ownerClient.get(`/api/plugins/${ID}/pages/index`)).status).toBe(200);
   });
 
@@ -149,7 +157,7 @@ describe("who may see an app", () => {
     installFixtureApp({ minRole: "child" });
     const { client: ownerClient } = await owner();
     const { client: childClient } = await child(ownerClient);
-    expect(((await (await childClient.get("/api/apps")).json()) as unknown[]).length).toBe(1);
+    expect(await fixtureApps(childClient)).toHaveLength(1);
     expect((await childClient.get(`/api/plugins/${ID}/pages/index`)).status).toBe(200);
   });
 
@@ -157,7 +165,7 @@ describe("who may see an app", () => {
     installFixtureApp();
     db.insert(packageStatus).values({ packageId: ID, status: "disabled", lastSmokeAt: null, smokeOk: false, smokeMessage: "x" }).run();
     const { client } = await owner();
-    expect(await (await client.get("/api/apps")).json()).toEqual([]);
+    expect(await fixtureApps(client)).toEqual([]);
     expect((await client.get(`/api/plugins/${ID}/pages/index`)).status).toBe(404);
     expect((await client.post(`/api/plugins/${ID}/data/shopping`, {})).status).toBe(404);
   });
@@ -165,7 +173,7 @@ describe("who may see an app", () => {
   test("a package that does not run on home is hidden", async () => {
     installFixtureApp({ platforms: ["bot"] });
     const { client } = await owner();
-    expect(await (await client.get("/api/apps")).json()).toEqual([]);
+    expect(await fixtureApps(client)).toEqual([]);
     expect((await client.get(`/api/plugins/${ID}/pages/index`)).status).toBe(404);
   });
 
@@ -197,7 +205,7 @@ describe("GET /api/plugins/:id/pages/:pageId", () => {
   test("a package whose page binds outside its declared data is not served at all", async () => {
     installFixtureApp({ pages: { type: "page", id: "lists", title: "Lists", body: [{ type: "answer_blocks", bind: { source: "package", path: "elsewhere" } }] } });
     const { client } = await owner();
-    expect(await (await client.get("/api/apps")).json()).toEqual([]);
+    expect(await fixtureApps(client)).toEqual([]);
     expect((await client.get(`/api/plugins/${ID}/pages/index`)).status).toBe(404);
   });
 });

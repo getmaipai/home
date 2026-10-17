@@ -13,6 +13,11 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ### Added
 
+- The package is now the Weather app (`contributes.pages`, `contributes.data`, `settings_area`): it opens at `/apps/weather` with the
+  animated `weather_card` for the chosen place (hourly strip and 8-day outlook included) and a place picker that lists Current
+  location first (asked of the browser only on that choice), then the household home, then the person's own saved places. The chat
+  tool and the app are one package and one recipe; Open-Meteo stays the only outbound host.
+
 - The package builds a single weather card (`weather_card`: current
   conditions with an icon code, the next 24 hours, an 8-day outlook,
   Open-Meteo attribution) from the forecast call. The call also asks

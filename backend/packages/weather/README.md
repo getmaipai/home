@@ -3,8 +3,16 @@
 
 Ask MaiPai what the weather is like anywhere: the temperature right now,
 what the sky is doing, today's high and low, and the chance of rain. The
-answer shows a card for right now, a chart of the next 24 hours and a
-table of the next 7 days.
+answer is one weather card: right now, the next 24 hours and the next
+8 days.
+
+## The Weather app
+
+Open Weather from the app list to see the same card for any place you
+choose. The picker starts with Current location (your device asks you
+first, only when you pick it), then your home, then the places you saved.
+To add or remove a place, tap the gear. Nobody sees another person's
+saved places.
 
 ## Try it
 

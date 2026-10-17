@@ -1,0 +1,29 @@
+{
+  "type": "page",
+  "id": "weather",
+  "title": "Weather",
+  "body": [
+    {
+      "type": "picker",
+      "state": "place",
+      "label": "Place",
+      "placeholder": "Default place",
+      "leading": [
+        { "value": "current", "label": "Current location", "icon": "locate-fixed", "needs": "geolocation" }
+      ],
+      "bind": { "source": "package", "path": "places" },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "answer_blocks",
+      "kinds": ["weather_card"],
+      "bind": { "source": "package", "path": "forecast", "params": { "place": "$state.place", "current": "$state.place_geo" } },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "cloud-off",
+        "text": "The weather is not available right now. Check your connection and try again, or choose another place."
+      }
+    }
+  ]
+}

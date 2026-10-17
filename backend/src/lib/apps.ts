@@ -20,7 +20,7 @@ import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib
 import { resolvePackageDir } from "@/lib/packageResolve";
 import { parseCurrentLocation, resolveWeatherPlace } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
-import { getPersonSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { getPackageStatus, allPackageStatuses } from "@/lib/smoke";
 import type { PersonRow } from "@/types";
 
@@ -190,11 +190,20 @@ export function getAppPage(person: PersonRow, packageId: string, pageId: string)
 
 // ---- The data call -------------------------------------------------------------------------
 
+/** The rows a place picker lists: the household home first (when it is set and this person can read it), then the
+ * person's own saved places. Nobody sees another person's places: each id is read back through `getEntity(person, ...)`,
+ * which refuses what the asker may not see. A place that is both the home and a saved place is listed once. */
 function savedPlaceRows(person: PersonRow, surface: string): Array<{ id: string; label: string }> {
+  const rows: Array<{ id: string; label: string }> = [];
+  const homeId = getHouseholdSettingValue("household.home");
+  if (typeof homeId === "string") {
+    const home = getEntity(person, homeId);
+    if (home.ok && home.value?.kind === "place" && home.value.scope === "household") rows.push({ id: home.value.id, label: `${home.value.name} (home)` });
+  }
   const raw = getPersonSettingValue(person, `${surface}.places`);
   const ids = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
-  const rows: Array<{ id: string; label: string }> = [];
   for (const id of ids) {
+    if (rows.some((row) => row.id === id)) continue;
     const found = getEntity(person, id);
     if (found.ok && found.value?.kind === "place") rows.push({ id: found.value.id, label: found.value.name });
   }
