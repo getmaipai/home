@@ -1,6 +1,8 @@
+import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "bun:test";
 import {
   __setStackServiceRunnerForTests,
+  installRoot,
   HOME_STACK_PORT,
   startLocalStackService,
   stopLocalStackService,
@@ -38,5 +40,22 @@ describe("local Stack service commands", () => {
     __setStackServiceRunnerForTests((_binary, command) => commands.push(command));
     startLocalStackService();
     expect(commands).toEqual(["start"]);
+  });
+
+  // 2026-10-17: a test that reached the default runner executed the installed production Stack with stop/start.
+  test("the real runner refuses the installed Stack binary under a test run and never spawns it", () => {
+    delete process.env.MAIPAI_STACK_BINARY;
+    delete process.env.MAIPAI_INSTALL_ROOT;
+    expect(installRoot()).toBe("/usr/local/maipai-home");
+    for (const action of [stopLocalStackService, startLocalStackService]) {
+      expect(action).toThrow("Refusing to run");
+    }
+  });
+
+  test("a stub binary under the temp directory still runs, so the real runner stays testable", () => {
+    process.env.MAIPAI_STACK_BINARY = "/nonexistent-never-spawned";
+    expect(() => stopLocalStackService()).toThrow("Refusing to run");
+    process.env.MAIPAI_STACK_BINARY = `${tmpdir()}/maipai-no-such-stub`;
+    expect(() => stopLocalStackService()).toThrow(/ENOENT|no such file/i);
   });
 });

@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, realpathSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { DEFAULT_STACK_PORT, stackPort } from "./ports";
 
@@ -20,7 +21,23 @@ function binaryPath(): string {
   return join(installRoot(), "stack", `maipai-stack-${os}-${arch}`);
 }
 
+// 2026-10-17 04:31, 05:20, 05:30, 05:39: every `bun test` run in Home
+// executed the installed production Stack binary with `stop` then
+// `start` (remoteStackSettings.test.ts flips engines.stack.where without
+// a runner), which boots the real com.maipai.stack LaunchAgent out; the
+// start raced launchd's cleanup (error 37) and left it unloaded. Under
+// a test run the real runner now refuses any binary that is not inside
+// the OS temp directory, so no test can reach the installed Stack.
+function underTempDir(path: string): boolean {
+  const root = realpathSync(tmpdir());
+  const resolved = resolve(path);
+  return resolved === root || resolved.startsWith(root + sep) || resolved.startsWith(tmpdir() + sep);
+}
+
 function runStackServiceCommand(binary: string, command: StackServiceCommand, env: NodeJS.ProcessEnv): void {
+  if (process.env.NODE_ENV === "test" && !underTempDir(binary)) {
+    throw new Error(`Refusing to run "${binary} ${command}" from a test: it would control the installed MaiPai Stack. Set MAIPAI_STACK_BINARY to a stub under the temp directory or install a runner with __setStackServiceRunnerForTests.`);
+  }
   const result = spawnSync(binary, [command], { encoding: "utf8", env, timeout: 20_000 });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(result.stderr?.trim() || `MaiPai Stack ${command} command failed.`);
