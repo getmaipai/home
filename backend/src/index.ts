@@ -37,6 +37,7 @@ import { ensureSecretPepperReady } from "@/lib/secret";
 import { KeystoreProtectionFailedError } from "@/lib/keystore";
 import { recordBootGap, recordStatusSample, pruneStatusEvents } from "@/lib/statusHistory";
 import { runConfiguredInternetProbe } from "@/lib/internetProbe";
+import { warmStack } from "@/lib/stackWarmup";
 import { syncStackRequirementIssue } from "@/lib/stackRequirement";
 import { initSafetyAlarm } from "@/lib/safetyAlarm";
 import { migratePendingAsksThroughGate } from "@/lib/gate/pendingAskMigration";
@@ -88,6 +89,8 @@ ensureSetupState(restoreWasApplied ? "restore" : "wizard");
 try { startConfiguredEngineLinkIfSelected(); }
 catch (err) { console.error(`[index] engine link failed to start: ${(err as Error).message}`); }
 void syncStackRequirementIssue();
+// STACK-WARM-01: ask the Stack to have chat, memory and voice loaded so the first message is not a cold start.
+void warmStack();
 await recordBootGap();
 void recordStatusSample();
 

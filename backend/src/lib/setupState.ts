@@ -134,5 +134,7 @@ export function replaceSetupStep(
     hlc: nextHlc(),
   });
   db.update(setupState).set({ value: JSON.stringify({ ...next, ...(storageChoice ? { [STORAGE_CHOICE_KEY]: storageChoice } : {}), ...(memoryAnswerGb ? { [MEMORY_ANSWER_KEY]: memoryAnswerGb } : {}) }) }).where(eq(setupState.slot, 1)).run();
+  // The wizard just finished installing: have the models loaded before the first message.
+  if (done) void import("@/lib/stackWarmup").then((module) => module.warmStack()).catch(() => {});
   return next;
 }
