@@ -22,10 +22,11 @@ export function resolveDeclaredAdult(declared: unknown, requester: PersonRow): P
     const self = subjectEligibility(requester.id);
     return self.ok ? self.person : null;
   }
-  const adults = db.select().from(people).all().filter((person) => subjectEligibility(person.id).ok) as PersonRow[];
+  // The name is matched across everyone who ever lived here, so a child, a guest or a memorial that shares it makes the answer ambiguous and the request fails closed.
+  const adults = db.select().from(people).all() as PersonRow[];
   const exact = adults.filter((person) => norm(person.displayName) === wanted || (person.nickname && norm(person.nickname) === wanted));
-  if (exact.length === 1) return exact[0]!;
+  if (exact.length === 1) return subjectEligibility(exact[0]!.id).ok ? exact[0]! : null;
   if (exact.length > 1) return null;
   const first = adults.filter((person) => norm(person.displayName).split(" ")[0] === wanted || (person.nickname && norm(person.nickname).split(" ")[0] === wanted));
-  return first.length === 1 ? first[0]! : null;
+  return first.length === 1 && subjectEligibility(first[0]!.id).ok ? first[0]! : null;
 }

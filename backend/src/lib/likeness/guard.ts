@@ -26,8 +26,9 @@ export type StillAllowed = { ok: true } | { ok: false; line: string };
 
 /** Whether the person is still willing, read from their own settings right now. A person who made it of themselves is always willing. */
 export function likenessStillAllowed(likeness: JobLikeness): StillAllowed {
-  if (likeness.subject === likeness.requester) return { ok: true };
   const eligible = subjectEligibility(likeness.subject);
+  // Someone making it of themselves needs no one's yes, but must still be a living household adult.
+  if (likeness.subject === likeness.requester) return eligible.ok ? { ok: true } : { ok: false, line: "Stopped. This profile can no longer make pictures or videos that look like a person." };
   const person = eligible.ok ? eligible.person : db.select().from(people).where(eq(people.id, likeness.subject)).get();
   const name = person ? subjectName(person) : "That person";
   if (!eligible.ok) return { ok: false, line: stoppedLine(name) };

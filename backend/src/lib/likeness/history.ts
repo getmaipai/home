@@ -2,9 +2,9 @@
 // settings write path calls. No import of lib/settings.ts here (it imports this file), so the record of a change is
 // written by the same code that wrote the setting and cannot be skipped; the side effects of taking consent back
 // (stopping waiting jobs, queuing styles for removal) register themselves in revoke.ts.
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { db } from "@/db";
-import { likenessConsentEvents } from "@/db/schema";
+import { likenessConsentEvents, likenessUses } from "@/db/schema";
 import { newLikenessConsentId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 
@@ -43,15 +43,29 @@ let onRevoked: RevokeHandler | null = null;
 export function registerRevokeHandler(handler: RevokeHandler | null): void { onRevoked = handler; }
 
 /** Called by lib/settings.ts after a likeness switch was written (or reset). Records the change when it really changed and runs the revoke handler for an off. Turning the first switch off also turns the second off, so a later "on" never brings adult content back unasked. Returns the second switch's reset, if there was one, for the caller to write. */
-export function likenessSettingWritten(personId: string, key: string, value: unknown): { alsoReset?: string } {
+export function likenessSettingWritten(personId: string, key: string, value: unknown, before: { previous: boolean; adultContentStored: boolean }): { alsoReset?: string } {
   const option = LIKENESS_KEY_OPTION[key];
   if (!option) return {};
   const state: "on" | "off" = value === true ? "on" : "off";
-  if (lastRecordedState(personId, option) === state) return {};
-  recordConsentChange(personId, option, state);
-  if (state === "off") {
+  const last = lastRecordedState(personId, option);
+  // The record follows the history; the revoke follows the setting itself, so a value that arrived some other way (a restored backup)
+  // still stops what waits and removes the styles when the person turns it off.
+  if (last !== state) recordConsentChange(personId, option, state);
+  if (state === "off" && (before.previous || last === "on")) {
     try { onRevoked?.(personId, option); } catch (error) { console.error("[likeness] revoke handler failed", error instanceof Error ? error.name : "error"); }
-    if (option === "adults" && lastRecordedState(personId, "adult_content") === "on") return { alsoReset: "likeness.adult_content" };
   }
+  if (state === "off" && option === "adults" && (before.adultContentStored || lastRecordedState(personId, "adult_content") === "on")) return { alsoReset: "likeness.adult_content" };
   return {};
+}
+
+/** A person left (deleted, memorialised) or stopped being an adult: whatever of theirs is waiting stops and their saved styles are queued for removal, as if they had switched the first option off. */
+export function likenessPersonGone(personId: string): void {
+  try { onRevoked?.(personId, "adults"); } catch (error) { console.error("[likeness] revoke handler failed", error instanceof Error ? error.name : "error"); }
+}
+
+/** Erasure: their consent history and every record of their likeness being used (as subject) or of them using someone's (as requester) go with them. */
+export function forgetLikenessOfPerson(personId: string): void {
+  db.delete(likenessConsentEvents).where(eq(likenessConsentEvents.personId, personId)).run();
+  db.delete(likenessUses).where(or(eq(likenessUses.subjectPersonId, personId), eq(likenessUses.requesterPersonId, personId))).run();
+  likenessPersonGone(personId);
 }

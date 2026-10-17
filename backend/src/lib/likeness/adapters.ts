@@ -57,12 +57,16 @@ export function queueStyleRemoval(subjectPersonId: string): number {
 }
 
 let draining: Promise<number> | null = null;
+let drainAgain = false;
 
 /** Removes every queued style from the Stack's libraries and the household's switches. A style the Stack no longer has counts as removed; one it cannot be asked about stays queued for the next pass (boot, the next library read, the timer). Returns how many were removed. */
 export function drainStyleRemovals(): Promise<number> {
-  if (draining) return draining;
+  // A revoke that arrives while a pass is running is picked up by one more pass straight after it.
+  if (draining) { drainAgain = true; return draining; }
   draining = (async () => {
     let removed = 0;
+    do {
+    drainAgain = false;
     const rows = db.select().from(likenessAdapters).where(eq(likenessAdapters.state, "removal_queued")).all();
     for (const row of rows) {
       try {
@@ -72,6 +76,7 @@ export function drainStyleRemovals(): Promise<number> {
         removed += 1;
       } catch { /* the Stack did not answer: it stays queued and the next pass tries again */ }
     }
+    } while (drainAgain);
     return removed;
   })().finally(() => { draining = null; });
   return draining;

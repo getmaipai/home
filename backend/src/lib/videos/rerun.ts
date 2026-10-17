@@ -2,7 +2,7 @@
 // chat tool's (tool.ts): a picture made to look like a household adult, an attached photo of one, or a saved style of one
 // is used only if that adult agrees now, the photo shows exactly them, and the Stack gets a proof signed for that one
 // clip. A route is never a way around the tool's gates.
-import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
+import { preparePhotoUse, prepareStylesUse } from "@/lib/likeness/apply";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
 import { subjectEligibility } from "@/lib/likeness/consent";
 import type { JobLikeness } from "@/lib/likeness/guard";
@@ -77,8 +77,7 @@ export async function prepareVideoRerun(input: RerunInput): Promise<RerunResult>
     }
   }
   const used = input.styleIds.flatMap((id) => { const adapter = input.adapters.find((a) => a.id === id); return adapter ? [adapter] : []; });
-  const styled = used[0] ?? null;
-  const stylePrep = await prepareStyleUse({ medium: "video", audience: input.audience, style: styled, text: `${input.prompt} ${used.map((a) => a.name).join(" ")}`, depictsRealPerson: false, source: "chat" });
+  const stylePrep = await prepareStylesUse({ medium: "video", audience: input.audience, styles: used, text: `${input.prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat" });
   if (stylePrep.kind === "refused") return { ok: false, line: stylePrep.line, code: "likeness" };
   if (stylePrep.kind === "likeness" && photo && stylePrep.subjectId !== photo.subjectId) return { ok: false, line: "I can make something that looks like one person at a time. Use a style and a photo of the same adult, or leave one out.", code: "likeness" };
   if (stylePrep.kind === "likeness" && stylePrep.negativePrompt) negativePrompt = stylePrep.negativePrompt;
@@ -86,7 +85,7 @@ export async function prepareVideoRerun(input: RerunInput): Promise<RerunResult>
   const subjectPrep = stylePrep.kind === "likeness" ? stylePrep : photo;
   return {
     ok: true, image, imageSource, consentProof,
-    loras: used.map((a) => ({ id: a.id, strength: a.strength_default, ...(stylePrep.kind === "likeness" && a.id === styled?.id ? { likeness_proof: stylePrep.proof } : {}) })),
+    loras: used.map((a) => ({ id: a.id, strength: a.strength_default, ...(stylePrep.kind === "likeness" && stylePrep.proofs.has(a.id) ? { likeness_proof: stylePrep.proofs.get(a.id)! } : {}) })),
     negativePrompt, likeness, width, height,
     subject: subjectPrep ? { id: subjectPrep.subjectId, adultContent: likeness?.adult_content ?? false, way: photo ? "photo" : "style" } : null,
   };

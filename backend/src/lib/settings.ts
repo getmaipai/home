@@ -641,9 +641,14 @@ function assertCanSetLikeness(actor: PersonRow, targetId: string, value: unknown
   return { ok: false, status: 403, error: "Only the person themselves can say yes to pictures and videos that look like them. Ask them to open Settings, Pictures and videos on their own account." };
 }
 
+/** What the two switches held just before a write, so a switch-off acts on the setting itself and not only on the history. */
+function likenessBeforeWrite(personId: string, key: string): { previous: boolean; adultContentStored: boolean } {
+  return { previous: getSettingValueForPerson(personId, key) === true, adultContentStored: getSettingValueForPerson(personId, "likeness.adult_content") === true };
+}
+
 /** After a likeness switch was written: the dated record, the revoke handler, and the second switch following the first off. */
-function afterLikenessWrite(actor: PersonRow, personId: string, key: string, value: unknown): void {
-  const { alsoReset } = likenessSettingWritten(personId, key, value);
+function afterLikenessWrite(actor: PersonRow, personId: string, key: string, value: unknown, before: { previous: boolean; adultContentStored: boolean }): void {
+  const { alsoReset } = likenessSettingWritten(personId, key, value, before);
   if (alsoReset) setValue(actor, `person:${personId}`, alsoReset, false);
 }
 
@@ -724,8 +729,9 @@ export function setValue(
     }
   }
 
+  const likenessBefore = key in LIKENESS_KEY_OPTION && parsed.kind === "person" ? likenessBeforeWrite(parsed.id!, key) : null;
   const written = writeValue(scope, keyDef, value, responseContext(actor, responseSubject(actor, parsed), parsed.kind));
-  if (written.ok && key in LIKENESS_KEY_OPTION && parsed.kind === "person") afterLikenessWrite(actor, parsed.id!, key, value);
+  if (written.ok && likenessBefore) afterLikenessWrite(actor, parsed.id!, key, value, likenessBefore);
   return written;
 }
 
@@ -955,9 +961,10 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   if (!auth.ok) return auth;
 
 
+  const likenessBeforeReset = key in LIKENESS_KEY_OPTION && parsed.kind === "person" ? likenessBeforeWrite(parsed.id!, key) : null;
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
-  if (key in LIKENESS_KEY_OPTION && parsed.kind === "person") afterLikenessWrite(actor, parsed.id!, key, false);
+  if (likenessBeforeReset) afterLikenessWrite(actor, parsed.id!, key, false, likenessBeforeReset);
   const restored = key === COMPANIONS_ALLOWED_KEY && parsed.kind === "person" && parsed.id
     ? resolveLayeredScalar(keyDef, parsed.id, speakerAgeBand(responseSubject(actor, parsed), new Date()))
     : { value: keyDef.default, layer: "default" as const };

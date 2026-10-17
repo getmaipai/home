@@ -7,8 +7,15 @@ import { createVerify, createPublicKey, verify as verifySig } from "node:crypto"
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { people as peopleTable } from "@/db/schema";
+import { likenessConsentEvents, people as peopleTable } from "@/db/schema";
+import { declareStyleSubject, getStyleSubject } from "@/lib/likeness/adapters";
+import { resolveDeclaredAdult } from "@/lib/likeness/resolve";
+import { likenessStillAllowed } from "@/lib/likeness/guard";
+import { prepareStylesUse } from "@/lib/likeness/apply";
+import { consentHistory } from "@/lib/likeness/consent";
+import { forgetLikenessOfPerson } from "@/lib/likeness/history";
 import { setValue } from "@/lib/settings";
+import "@/lib/likeness/revoke";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { storeTemporaryChatImage } from "@/lib/attachments";
 import { runGenerateImage } from "@/lib/pictures/tool";
@@ -290,4 +297,60 @@ test("a proof minted by Home verifies and is single purpose", () => {
   const key = createPublicKey({ key: Buffer.from(proofPublicKey().spki, "base64"), format: "der", type: "spki" });
   expect(verifySig(null, Buffer.from(payload!), key, Buffer.from(signature!, "base64url"))).toBe(true);
   expect(createVerify).toBeDefined();
+});
+
+describe("review fixes", () => {
+  test("a switch that was 'on' with no history (a restored backup) still stops what waits and queues styles when turned off", async () => {
+    imageStack.pollsToFinish = 50;
+    switchOn(marlow);
+    declareStyleSubject({ adapterId: STYLE_ID, medium: "picture", subjectPersonId: marlow.id, classification: "adult-only", declaredBy: nadia.id });
+    const outcome = await run(nadia, portrait);
+    const jobId = (outcome.result?.data as { pictureJobId: string }).pictureJobId;
+    db.delete(likenessConsentEvents).run();
+    switchOff(marlow);
+    await until(() => getPictureJob(nadia, jobId)!.state === "failed", 3000);
+    expect(getStyleSubject("picture", STYLE_ID)!.state).not.toBe("active");
+  });
+
+  test("a name that a child or a guest shares with an adult is ambiguous and resolves to no one", () => {
+    const samLee = addPerson("Sam Lee", "adult");
+    expect(resolveDeclaredAdult("Sam", nadia)?.id).toBe(samLee.id);
+    addPerson("Sam Park", "child");
+    expect(resolveDeclaredAdult("Sam", nadia)).toBeNull();
+    expect(resolveDeclaredAdult("Sam Lee", nadia)?.id).toBe(samLee.id);
+    expect(resolveDeclaredAdult("Bramble", nadia)).toBeNull();
+  });
+
+  test("a person making it of themselves is stopped if they stop being an eligible adult while it waits", () => {
+    const job = { subject: nadia.id, requester: nadia.id, way: "photo" as const, adult_content: false };
+    expect(likenessStillAllowed(job).ok).toBe(true);
+    db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, nadia.id)).run();
+    expect(likenessStillAllowed(job).ok).toBe(false);
+  });
+
+  test("several styles: two different people are refused, and another adult-only style beside the likeness counts as adult content", async () => {
+    switchOn(marlow); switchOn(nadia);
+    declareStyleSubject({ adapterId: "lora-111", medium: "picture", subjectPersonId: marlow.id, classification: "adult-only", declaredBy: nadia.id });
+    declareStyleSubject({ adapterId: "lora-222", medium: "picture", subjectPersonId: nadia.id, classification: "adult-only", declaredBy: nadia.id });
+    const audience = { actor: bench.owner, band: "adult" as const, surface: "chat" as const, surfaceClass: "written" as const, spoken: false };
+    const two = await prepareStylesUse({ medium: "picture", audience, styles: [{ id: "lora-111", name: "A" }, { id: "lora-222", name: "B" }], text: "x", source: "chat" });
+    expect(two.kind).toBe("refused");
+    const withAdultStyle = await prepareStylesUse({ medium: "picture", audience, styles: [{ id: "lora-111", name: "A" }, { id: "lora-999", name: "Other", classification: "adult-only" }], text: "a portrait", source: "chat" });
+    expect(withAdultStyle.kind).toBe("refused");
+    switchOn(marlow, "likeness.adult_content");
+    const allowed = await prepareStylesUse({ medium: "picture", audience, styles: [{ id: "lora-111", name: "A" }, { id: "lora-999", name: "Other", classification: "adult-only" }], text: "a portrait", source: "chat" });
+    expect(allowed.kind).toBe("likeness");
+    if (allowed.kind === "likeness") expect([...allowed.proofs.keys()]).toEqual(["lora-111"]);
+  });
+
+  test("deleting a person stops what waits for them, queues their styles and erases their consent history and use records", async () => {
+    switchOn(marlow);
+    declareStyleSubject({ adapterId: STYLE_ID, medium: "picture", subjectPersonId: marlow.id, classification: "adult-only", declaredBy: nadia.id });
+    await run(nadia, portrait);
+    expect(likenessUseLog(marlow.id)).toHaveLength(1);
+    forgetLikenessOfPerson(marlow.id);
+    expect(likenessUseLog(marlow.id)).toHaveLength(0);
+    expect(consentHistory(marlow.id)).toHaveLength(0);
+    expect(getStyleSubject("picture", STYLE_ID)!.state).not.toBe("active");
+  });
 });
