@@ -3688,6 +3688,26 @@
       "replacesHandBuilt": [],
       "realTurnToday": null,
       "verdictReason": "The image editor's one canvas layer for strokes and masks; used only through that Element."
+    },
+    {
+      "file": "music-track.tsx",
+      "name": "music-track",
+      "group": "music",
+      "verdict": "wire-after",
+      "backendNeeded": "generate_music job (MUSIC-GEN rows)",
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "generate_music (MUSIC-GEN rows)"
+      ],
+      "size": "S",
+      "showcaseScenario": "",
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": false,
+      "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements.",
+      "verdictReason": "MUSIC-GEN-04's generation card Element (ui-v0.5.260); the music generation slices wire it to the generate_music job card when they land; nothing in Home uses it yet."
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T18:38:10.139Z",
+  "generatedAt": "2026-10-17T19:00:31.954Z",
   "kitTag": "ui-v0.5.261",
   "items": [
     {
@@ -784,9 +784,10 @@
       "file": "music-track.tsx",
       "name": "music-track",
       "group": "music",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
-      "implemented": false
+      "verdict": "wire-after",
+      "verdictReason": "MUSIC-GEN-04's generation card Element (ui-v0.5.260); the music generation slices wire it to the generate_music job card when they land; nothing in Home uses it yet.",
+      "implemented": false,
+      "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
     },
     {
       "file": "number-ticker.tsx",
