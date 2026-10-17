@@ -18,8 +18,10 @@ import type { AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { BANDS, FEED_LISTS, isBand, pollIntervalSeconds, shelfEnabled } from "./shelfPolicy";
 import { checkFeedAddress, splitFeedAddresses } from "./feedAddresses";
-import { createFeed, deleteFeed, listFeeds, updateFeed } from "./feedStore";
+import { createFeed, deleteFeed, findFeedByUrl, listFeeds, updateFeed } from "./feedStore";
 import { sharedShelfStore, type ShelfStore } from "./shelfStore";
+
+import { reportShelfEvent } from "./shelfEvents";
 
 const RANK: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 
@@ -91,6 +93,10 @@ export function syncShelfFeeds(options: { nowIso?: string; store?: ShelfStore | 
   let removed = 0;
   const existing = new Map(listFeeds("news").map((feed) => [feed.url, feed] as const));
   for (const [url, want] of desired) {
+    if (findFeedByUrl(url)?.purpose === "podcast") {
+      reportShelfEvent("purpose_conflict");
+      continue;
+    }
     const have = existing.get(url);
     if (!have) {
       createFeed({ url, title: want.title, publisher: want.publisher, band: want.band, packageId: want.packageId, pollIntervalS: interval, provenance: want.provenance, nowIso });

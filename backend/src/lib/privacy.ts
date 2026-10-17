@@ -163,8 +163,8 @@ export function platformConnections(): PrivacyConnection[] {
     // the same poller; a copy saved on the hub is fetched from the show's own server. Listening to an unsaved episode is the person's own
     // device talking to the show's server, not Home, so it is not a Home connection and says so in the Podcasts help.
     row("platform:podcast-feeds", podcastFeedHosts().join(", ") || null, {
-      when: "automatically, about every hour at most (a show's own pace can be slower), only while nobody is using MaiPai, for each show an admin follows in Podcasts. Remove the show to stop it. When someone presses Save on the hub, Home also downloads that one episode and the show's picture from the show's server.",
-      what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request), plus your home's internet address. No name, device ID or cookie goes with it. Nothing anyone in the house said, asked, listened to, or saved.",
+      when: "automatically, about every hour at most (a show's own pace can be slower), only while nobody is using MaiPai, for each show an admin follows in Podcasts. Remove the show to stop it. Home fetches the show's picture when it reads a new show. Pressing Save downloads an episode. Keep rules also download episodes automatically after each poll or a rule change.",
+      what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request). Feed, episode and picture hosts, including CDNs and redirect hosts, receive the requested address and your home's internet address. No name, device ID or cookie goes with it. No chat or listening history is sent.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",

@@ -28,7 +28,7 @@ import { bumpShelfCounter } from "./shelfCounters";
 import { feedIsWanted } from "./shelfPolicy";
 import { MIN_POLL_INTERVAL_S, listFeeds, updateFeed, type FeedRecord } from "./feedStore";
 import { sharedShelfStore, type ShelfStore } from "./shelfStore";
-import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS } from "@/lib/media/podcasts";
+import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS, queuePodcastAutoRules, sourceRowForFeed } from "@/lib/media/podcasts";
 
 import { HOME_USER_AGENT } from "@/lib/outbound";
 export const MAX_BACKOFF_S = 86_400;
@@ -66,6 +66,7 @@ export { parseRetryAfter };
 function feedMaxAgeSeconds(cacheControl: string | null): number | null { return maxAgeSeconds(cacheControl); }
 
 class RateLimited extends Error {}
+export class RedirectLimitError extends Error {}
 
 function charsetOf(contentType: string | null): string {
   const match = contentType ? /charset=["']?([\w.:-]+)/i.exec(contentType) : null;
@@ -97,6 +98,7 @@ async function validateHop(url: URL, dns: DnsLookup | undefined): Promise<void> 
 }
 
 export interface HopOptions {
+  maxRedirects?: number;
   /** The per-host pacing bucket: feeds share `feed`, enclosure downloads have their own. */
   bucket?: { prefix: string; capacity: number; refillPerSecond: number };
   accept?: string;
@@ -106,6 +108,7 @@ export interface HopOptions {
 /** One guarded GET (a feed, or an enclosure): every hop passes the SSRF guard, redirects are followed by hand, the host is paced, no
  * cookies and no referrer. Shared by the poller and the podcast Save so there is one outbound path. */
 export async function guardedGet(address: string, deps: PollDeps, now: () => number, signal: AbortSignal, options: HopOptions = {}): Promise<Response> {
+  const maxRedirects = options.maxRedirects ?? MAX_REDIRECTS;
   const fetcher = deps.fetch ?? fetch;
   const pinned = fetcher === platformFetch;
   const headers: Record<string, string> = { "User-Agent": HOME_USER_AGENT, Accept: options.accept ?? "*/*" };
@@ -124,12 +127,12 @@ export async function guardedGet(address: string, deps: PollDeps, now: () => num
     }
     if (hop > 0 && url.host !== firstHost) { delete headers["If-None-Match"]; delete headers["If-Modified-Since"]; }
     const response = pinned
-      ? await guardedFetch(url, { method: "GET", redirect: "manual", signal, maxRedirects: MAX_REDIRECTS, headers })
+      ? await guardedFetch(url, { method: "GET", redirect: "manual", signal, maxRedirects, headers })
       : await fetcher(url, { method: "GET", redirect: "manual", signal, headers, credentials: "omit", referrerPolicy: "no-referrer" });
     if (response.status >= 300 && response.status < 400 && response.status !== 304) {
       const location = response.headers.get("location");
       await response.body?.cancel().catch(() => undefined);
-      if (!location || hop >= MAX_REDIRECTS) throw new Error("too many redirects");
+      if (!location || hop >= maxRedirects) throw new RedirectLimitError("The server sent too many redirects or left out the next address. Try again later or use a direct feed or episode address.");
       url = new URL(location, url);
       continue;
     }
@@ -328,6 +331,8 @@ export async function pollFeed(feed: FeedRecord, deps: PollDeps = {}): Promise<P
     if (response.status === 304) {
       await response.body?.cancel().catch(() => undefined);
       bumpShelfCounter("responses_304");
+      const source = feed.purpose === "podcast" ? sourceRowForFeed(feed.id) : null;
+      if (source) queuePodcastAutoRules(source.id, deps, now());
       updateFeed(feed.id, { failCount: 0, quietUntil: null, nextPollAt: new Date(now() + interval() * 1000).toISOString() }, nowIso());
       return "not_modified";
     }

@@ -2,14 +2,16 @@
 // support and the item's own media type (no transcoding here: MEDIA-PLAYER-01 and the Stack's media.transcode own that); a saved copy
 // comes from the household file store. Every path is resolved inside its root, symbolic links included, so a name in the database can
 // never reach a file outside the folder an admin chose.
+import { createHash } from "node:crypto";
 import { realpathSync, statSync } from "node:fs";
 import { resolve, sep } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { mediaSources } from "@/db/schema";
+import { attachments, mediaSources } from "@/db/schema";
 import { attachmentFilePath, getAttachment, readAttachment } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 import type { MediaItem } from "./model";
+import { readableItem } from "./access";
 import { IMAGE_TYPES } from "./kinds";
 import { readEmbeddedCover } from "./parsers/audioTags";
 import { readEpubCover } from "./parsers/epub";
@@ -67,11 +69,45 @@ function bytesResponse(source: { size: number; slice(start?: number, end?: numbe
   });
 }
 
+/** Internal only: the caller has reloaded the item's own gate and uses its stored file reference. */
+function fetchedBlob(id: string) {
+  const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (row?.origin !== "fetched") return null;
+  const path = attachmentFilePath(row.storagePath);
+  try {
+    const info = statSync(path);
+    if (!info.isFile() || info.size !== row.size) return null;
+    return { path, file: Bun.file(path), mediaType: row.mediaType, sha256: row.sha256, version: `${row.sha256}:${info.size}:${info.mtimeMs}` };
+  } catch { return null; }
+}
+
+// The file store's integrity boundary, with bounded memory: a copy is hashed once per on-disk version (size and mtime), so a Range seek
+// on a 400 MB episode does not re-read the whole file. A changed file has a new mtime and is hashed again.
+const verifiedVersions = new Map<string, string>();
+async function verifiedFetchedBlob(id: string) {
+  const fetched = fetchedBlob(id);
+  if (!fetched) return null;
+  if (verifiedVersions.get(id) === fetched.version) return fetched;
+  try {
+    const hash = createHash("sha256");
+    for await (const chunk of fetched.file.stream()) hash.update(chunk);
+    if (hash.digest("hex") !== fetched.sha256) { verifiedVersions.delete(id); return null; }
+    if (verifiedVersions.size > 2000) verifiedVersions.clear();
+    verifiedVersions.set(id, fetched.version);
+    return fetched;
+  } catch { return null; }
+}
+
 export type ServeResult = Response | { error: string; status: 404 | 422 };
 
 export async function serveItemBytes(actor: PersonRow, item: MediaItem, rangeHeader: string | undefined): Promise<ServeResult> {
+  const gated = readableItem(actor, item.id);
+  if (!gated) return { error: "This item is not available. Open your library and choose an available item.", status: 404 };
+  item = gated;
   const location = item.location as { file_id?: string; root_id?: string; path?: string; url?: string };
   if (location.file_id) {
+    const fetched = await verifiedFetchedBlob(location.file_id);
+    if (fetched) return bytesResponse(fetched.file, item.media_type, parseRange(rangeHeader, fetched.file.size));
     const read = readAttachment(actor, location.file_id);
     if (!read.ok) return { error: "That file is not available to you.", status: 404 };
     const blob = new Blob([read.value.bytes as never]);
@@ -90,9 +126,14 @@ export async function serveItemBytes(actor: PersonRow, item: MediaItem, rangeHea
 }
 
 export async function serveItemArtwork(actor: PersonRow, item: MediaItem): Promise<ServeResult> {
+  const gated = readableItem(actor, item.id);
+  if (!gated) return { error: "This picture is not available. Open your library and choose an available item.", status: 404 };
+  item = gated;
   const art = item.artwork as { file_id?: string; path?: string } | null;
   if (!art) return { error: "No picture for this item.", status: 404 };
   if (art.file_id) {
+    const fetched = await verifiedFetchedBlob(art.file_id);
+    if (fetched) return new Response(fetched.file, { headers: { ...BASE_HEADERS, "content-type": fetched.mediaType } });
     const read = readAttachment(actor, art.file_id);
     if (!read.ok) return { error: "That picture is not available to you.", status: 404 };
     return new Response(read.value.bytes as never, { status: 200, headers: { ...BASE_HEADERS, "cache-control": "private, max-age=300", "content-type": read.value.record.media_type } });
@@ -111,11 +152,15 @@ export async function serveItemArtwork(actor: PersonRow, item: MediaItem): Promi
 
 /** Availability and HTTP date from the same guarded locations as serveItemBytes, without loading the stream. */
 export function itemByteMetadata(actor: PersonRow, item: MediaItem): { modified: Date; size: number } | null {
+  const gated = readableItem(actor, item.id);
+  if (!gated) return null;
+  item = gated;
   const location = item.location as { file_id?: string; root_id?: string; path?: string };
   let path: string | null = null;
   if (location.file_id) {
     const found = getAttachment(actor, location.file_id);
     if (found.ok) path = attachmentFilePath(found.value.storage_path);
+    else path = fetchedBlob(location.file_id)?.path ?? null;
   } else if (location.root_id && location.path !== undefined) path = resolveUnderRoot(item.source_id, location.path);
   if (!path) return null;
   try {

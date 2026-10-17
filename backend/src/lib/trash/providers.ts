@@ -1,3 +1,4 @@
+import { isPodcastCopyTrash } from "./podcastCopies";
 import { and, eq, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaCollections, mediaItems, mediaProgress, mediaSources } from "@/db/schema";
@@ -26,7 +27,7 @@ function envelope(kind: string, row: { id: string; title: string; deletedAt: str
     can_restore: row.trashUntil !== null && row.trashUntil > new Date().toISOString(), can_purge: true };
 }
 function itemRows(person: PersonRow): Item[] {
-  return db.select().from(mediaItems).where(isNotNull(mediaItems.deletedAt)).all().filter((row) => mayManage(person, row));
+  return db.select().from(mediaItems).where(isNotNull(mediaItems.deletedAt)).all().filter((row) => !isPodcastCopyTrash(row) && mayManage(person, row));
 }
 /** Parts follow their book only when they were trashed together. */
 function family(row: Item): Item[] {
@@ -68,7 +69,7 @@ registerTrashProvider({
   },
   purgeExpired(now) {
     const rows = db.select().from(mediaItems).where(and(isNotNull(mediaItems.deletedAt), lte(mediaItems.trashUntil, now.toISOString()))).all();
-    for (const row of rows) purgeItem(row);
+    for (const row of rows) if (!isPodcastCopyTrash(row)) purgeItem(row);
   },
 });
 function collectionRows(person: PersonRow) {

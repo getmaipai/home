@@ -343,7 +343,8 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   // A child's screen never counts down to the next video by itself (the Player's autoplay needs `up_next`).
   const queue = allowlistOnly(person) ? undefined : upNextItems(person, appId, item, 1)[0];
   const seconds = progress && "seconds" in progress.position ? progress.position.seconds : undefined;
-  const direct = (item.location as { url?: string }).url;
+  const address = (item.location as { url?: string }).url;
+  const direct = item.kind === "podcast_episode" ? address?.replace(/^http:\/\//i, "https://") : address;
   const view: MediaItemView = {
     // A stream-only item (a podcast episode not saved yet) plays from its own address on the person's device; the hub never relays it.
     ...base, channel: item.subtitle, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),

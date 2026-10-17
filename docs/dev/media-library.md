@@ -90,7 +90,8 @@ Guests get no rows. Unknown kinds, missing records and forbidden records all ret
 `GET /api/trash` returns `{ rows }` with kind, id, title, deleted_at, trash_until and the two action flags. `POST
 /api/trash/{kind}/{id}/restore` clears the envelope and source archive path within the keep window. `DELETE
 /api/trash/{kind}/{id}` removes the row and its progress, preserving the archive. A folder audiobook's parts follow its action
-when they were trashed together. No file on disk is deleted. Purging an expired scanner-pruned row also archives its path.
+when they were trashed together. Scanned root files are never deleted. A fetched saved copy is unlinked on purge only when no other item or Trash row references it.
+Purging an expired scanner-pruned row also archives its path.
 Purging also discards held progress ticks so a later timer cannot recreate progress for a removed item. A scan refreshes the
 archive after parsing yields, and skips archived chapter paths as well as parent paths. The sweeper runs at boot and every six hours, independently per provider; a failed kind retries next time.
 
@@ -224,7 +225,7 @@ belongs with the Ask record work.
 ## Podcasts (MEDIA-PODCASTS-01)
 
 Podcasts are `feed` records with `purpose: "podcast"` read by the ONE shelf poller (`lib/shelf/shelfPoller.ts`: conditional GET, one request
-per host, backoff, the SSRF guard). Migration 0108 (schema version 65) adds `feeds.purpose` (default `news`), `attachments.origin` (default
+per host, backoff, the SSRF guard). Migration 0111 (schema version 68) adds `feeds.purpose` (default `news`), `attachments.origin` (default
 `sent`) and `attachments.media_source_id`. `listFeeds(purpose?)`: the news shelf (`shelfRead`, `syncShelfFeeds`) asks for `news`, so a
 podcast feed is never read as news and never deleted by the settings sync. `pollDueFeeds` polls both purposes; a podcast feed is polled while
 it has a live, unpaused source (the news-shelf switch and tick-boxes do not apply), at the source's `poll_minutes`. The size cap is 8 MB for a
@@ -232,7 +233,7 @@ podcast feed (2 MB for news).
 
 **One outbound path.** `guardedGet` (exported from the poller) is the shared GET: every hop through the guard, redirects by hand, per-host
 pacing, honest user agent, no cookies or referrer. Feeds use bucket `feed` (one a minute per host), enclosure downloads `enclosure` (5, one
-more every 10 s), the show's picture `art`. Tests inject `deps.fetch` (the fixture host mapped onto Bun.serve on 127.0.0.1) and a stub DNS;
+more every 10 s), the show's picture `art`. Tests inject an in-memory `deps.fetch` and a stub DNS;
 the guard is unchanged. A route-triggered poll or Save uses `__setPodcastFetchDepsForTests` in tests.
 
 **Ingest** (`lib/media/podcasts.ts`, `ingestPodcastFeed`): the poller hands the body over; feedsmith parses RSS, Atom or JSON feeds; each episode
@@ -245,14 +246,30 @@ at it. The source's label becomes the show title. A guid in `media_sources.archi
 `removeItem` and the trash purge archive the guid when there is no path).
 
 **Files.** `lib/media/fetchedFiles.ts` writes `origin: fetched` copies (retention `kept`, `provenance.media_source_id`) into the same blob store
-as chat uploads (same caps, dedupe by sha256, same reconcile job) and shares each to the household so every reader of the episode can read
-the bytes. `provenance` text is `podcast:manual`, `podcast:auto` or `podcast:art`; identical bytes are one file and a manual save outranks an
-auto one. `media_items` keeps `loc_url` beside `loc_file_id`: Save sets the file id, Unsave clears it and the item streams again.
+as chat uploads (same caps and reconcile job). Fetched files never get household shares. Files access ignores even old share pointers
+for fetched files: only their owner or an admin may read them there. Other listeners use `serveItemBytes` or `serveItemArtwork`, which
+reload `readableItem` before opening the saved file, enforcing the source audience and band. Fetched playback verifies sha256 with a
+disk stream before serving, including Range requests. Removing a show does not expose its copies. `provenance` text is
+`podcast:manual`, `podcast:auto` or `podcast:art`; dedupe requires fetched origin, the same owner, source and media type, so it cannot
+adopt a private chat upload. A manual save outranks an auto one. `media_items` keeps `loc_url` beside `loc_file_id`: Save sets the file id, Unsave clears it and the item streams again.
 
-**Save** (`saveEpisode`): adults only (`mayManageSaves`); the enclosure through `guardedGet` (https only, 400 MB, 15 minutes), content type
-from the response, `fingerprint` the sha256. **Keep rules** (`applyAutoRules`, after each poll and when a rule changes): `auto.save: "audio"`
+**Save** (`saveEpisode`): adults only (`mayManageSaves`); the enclosure through `guardedGet` (https only, five redirects, 400 MB, 15 minutes),
+content type from the response, `fingerprint` the sha256. An old http enclosure uses its https form for streaming and saving. The owner's
+cap is checked against the feed's declared size before GET and Content-Length before reading the body. Unknown or incorrect lengths are
+bounded during the stream too. Downloads go to a private temporary file while hashing, then rename into the store; failures cancel the
+reader and remove the temporary file. No full enclosure buffer is built. **Keep rules** (`applyAutoRules`, after each poll, including a 304, and when a rule changes): `auto.save: "audio"`
 with `keep_latest` N saves the newest N and releases auto copies that fell outside N; `remove_watched` releases an auto copy when everyone who
-has progress finished it. A copy a person saved by hand is never released by the rules.
+has progress finished it. A copy a person saved by hand is never released by the rules. Polling only queues work on a serial background lane, so a slow enclosure
+does not hold the ten-feed tick. A per-source in-flight guard coalesces overlapping runs. Jobs recheck the live source and item after
+downloading, so an unsubscribe during a download cannot attach a new saved copy.
+
+**Unsave and Trash.** Only the file owner or an adult admin may remove a saved copy. Unsave returns the episode to streaming and places
+a snapshot in the existing household Trash registry as `podcast_copy`, using a trashed `media_items` envelope (30 days, no migration).
+It keeps the bytes and their storage charge until purge; restore reattaches them when the original episode is readable and has no copy.
+The ordinary media-item provider excludes these snapshots, so it cannot bypass copy ownership or archive the live episode. A purge
+unlinks only when no item, including another Trash row, uses the file. Automatic pruning uses the same Trash path. Unsubscribe removes
+the show's fetched art and clears its artwork references; legacy shared art is removed after the last show releases it. Saved
+episode files remain private.
 
 **Host extension.** `appHost.ts` exports its helpers and gains `registerMediaAppData(appId, hook)` and `registerItemView(appId, hook)`;
 `laterKindOf(appId)` names the standing list (Watch later, or the queue for Podcasts); `rowOf` draws a podcast row's second line as
@@ -262,10 +279,17 @@ item fields `saved`, `queued`, `speed`, `skip_intro_s`, `skip_outro_s` (a first 
 `position >= duration - skip_outro_s` as finished and sends `completed`). `routes/podcastApp.ts` adds under `/api/plugins/podcasts`:
 `queue` (toggle), `save` (`on: false` removes the copy), `bookmark` (`media-progress.marks`), and for an adult admin `subscribe`,
 `unsubscribe`, `source` (speed, skip seconds, `auto`, `paused`, `visible_to`), `opml/import` (`{ opml }`) and `GET opml/export`.
-OPML uses feedsmith's reader and writer; the export holds feed addresses only.
+OPML uses feedsmith's reader and writer; the export holds feed addresses only. Import does not poll each new show: the new feeds are
+already due for the normal tick (at most ten per tick). News settings sync skips addresses already owned by Podcasts and reports a
+closed typed event without an address or record identifier; a sync failure is isolated so due podcast polling continues.
 
 **Package** `backend/packages/podcasts` (pages index, shows, episodes, queue, saved, play; the first tab reads "Listen now", `homeLabelOf` in
-`shell/mediaApps.ts`). The privacy row is `platform:podcast-feeds` (hosts of followed shows).
+`shell/mediaApps.ts`). The privacy row is `platform:podcast-feeds` (hosts of followed shows). It also discloses automatic keep-rule downloads and the home IP
+seen by episode, picture, CDN and redirect hosts.
+
+Focused verification without servers or real network: `cd backend && bun test --config=./bunfig.podcasts.toml tests/podcasts.test.ts`.
+This lane uses a disposable data directory under the worktree, fake Stack responses, fake feed responses, and rejects server starts
+and uninjected fetch calls. The normal test lane uses its usual preload.
 
 **Not built, and why.** Adding a show and importing OPML have no form on a package page (no text input node), so they are API only, as media
 sources are. Per-show speed is stored and listed but the audio session applies the person's own podcast speed (a session override needs the

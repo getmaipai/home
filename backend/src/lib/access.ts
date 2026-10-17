@@ -7,7 +7,7 @@
 // an equivalent inline check elsewhere).
 import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { people, shares } from "@/db/schema";
+import { attachments, people, shares } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { isOwnerOrAdminRole, canHaveTemporaryChatRole } from "@/wire";
 
@@ -85,9 +85,14 @@ export function listActivePeople(): PersonRow[] {
 // its owner always, and to anyone a live share.schema.json pointer
 // names - by person id, or by the literal "household" (every active
 // person in it, since a household has no membership list of its own
-// beyond "every active person" today).
+// beyond "every active person" today). Fetched media is the exception: only
+// its owner or an admin reads through Files, even if old shares still exist.
+// Other listeners go through the media item's band and source gate.
 export function canAccessFile(actor: PersonRow, ownerPersonId: string, fileId: string): boolean {
+  const file = db.select({ origin: attachments.origin, owner: attachments.ownerPersonId }).from(attachments).where(eq(attachments.id, fileId)).get();
+  if (!file || file.owner !== ownerPersonId) return false;
   if (actor.id === ownerPersonId) return true;
+  if (file.origin === "fetched") return isOwnerOrAdmin(actor);
   const rows = db.select({ to: shares.to }).from(shares).where(eq(shares.fileId, fileId)).all();
   return rows.some((row) => row.to === "household" || row.to === actor.id);
 }

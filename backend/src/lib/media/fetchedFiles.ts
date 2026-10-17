@@ -1,10 +1,6 @@
-// MEDIA-PODCASTS-01: the household file store's `origin: fetched` writer (spec file.origin): a copy the hub fetched for a media source
-// an adult chose (a podcast episode, a show's picture). It is the same blob store as a chat upload (content-addressed by sha256, the
-// same caps, the same reconcile job); the difference is the record: origin fetched, retention kept (no conversation owns it) and
-// provenance.media_source_id. A saved copy belongs to the household's library, so it is shared to the household at once: the people
-// who may see the episode (media band and the source's visible_to decide that) can read its bytes.
+// Fetched copies are owner-scoped files. Other listeners read only through the media item's band and source gate.
 import { createHash } from "node:crypto";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { closeSync, openSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
 import { resolve } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -12,66 +8,107 @@ import { attachments, shares } from "@/db/schema";
 import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
 import { attachmentFilePath, toRecord } from "@/lib/attachments";
 import { nextHlc } from "@/lib/hlc";
-import { newFileId, newShareId } from "@/lib/id";
+import { newFileId } from "@/lib/id";
 import { attachmentsDir, ensureDataDir } from "@/lib/paths";
 import { checkStorageCap } from "@/lib/storage/usage";
 import type { PersonRow } from "@/types";
 
 export type FetchedFile = ReturnType<typeof toRecord>;
 export type FetchedFileResult = { ok: true; value: FetchedFile } | { ok: false; status: 400 | 403 | 500; error: string };
+interface Metadata { mediaType: string; mediaSourceId: string; note: string }
+export interface FetchedFileInput extends Metadata { bytes: Uint8Array }
+const invalidType = (): FetchedFileResult => ({ ok: false, status: 400, error: "That download is not a file type Home can keep. Try playing it from the show's website." });
+const normalizedType = (type: string): string => type.split(";")[0]!.trim().toLowerCase();
 
-export interface FetchedFileInput {
-  mediaType: string;
-  bytes: Uint8Array;
-  mediaSourceId: string;
-  /** "podcast:manual" or "podcast:auto": auto copies may be removed by the source's keep rules, manual ones never are. */
-  note: string;
-}
-
-function shareToHousehold(ownerId: string, fileId: string): void {
-  const already = db.select().from(shares).where(and(eq(shares.fileId, fileId), eq(shares.to, "household"))).get();
-  if (already) return;
-  db.insert(shares).values({ id: newShareId(), fileId, fromPersonId: ownerId, to: "household", provenance: "media-source:fetched", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
-}
-
-/** Stores fetched bytes for `owner` (the adult who asked, or who made the source). Identical bytes already in the store are reused. */
-export function createFetchedFile(owner: PersonRow, input: FetchedFileInput): FetchedFileResult {
-  const mediaType = input.mediaType.split(";")[0]!.trim().toLowerCase();
-  if (!FileRecordSchema.shape.media_type.safeParse(mediaType).success) return { ok: false, status: 400, error: "That download is not a kind of file the hub can keep." };
-  const bytes = new Uint8Array(input.bytes);
-  const sha256 = createHash("sha256").update(bytes).digest("hex");
-  const existing = db.select().from(attachments).where(eq(attachments.sha256, sha256)).get();
-  if (existing) {
-    // Same bytes: one blob. A manual save outranks an auto one so the keep rules never delete what a person asked for.
-    if (input.note === "podcast:manual" && existing.provenance !== "podcast:manual" && existing.origin === "fetched") {
-      db.update(attachments).set({ provenance: "podcast:manual" }).where(eq(attachments.id, existing.id)).run();
-    }
-    shareToHousehold(existing.ownerPersonId, existing.id);
-    return { ok: true, value: toRecord(db.select().from(attachments).where(eq(attachments.id, existing.id)).get()!) };
+function existingCopy(owner: PersonRow, input: Metadata, sha256: string): FetchedFile | null {
+  // Never adopt a chat upload, another person's file, or another source's artwork.
+  const existing = db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "fetched"), eq(attachments.mediaType, normalizedType(input.mediaType)), eq(attachments.ownerPersonId, owner.id), eq(attachments.mediaSourceId, input.mediaSourceId))).get();
+  if (!existing) return null;
+  if (input.note === "podcast:manual" && existing.provenance === "podcast:auto") {
+    db.update(attachments).set({ provenance: input.note, hlc: nextHlc() }).where(eq(attachments.id, existing.id)).run();
+    existing.provenance = input.note;
   }
-  const cap = checkStorageCap(owner.role, owner.id, bytes.byteLength);
-  if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
-  const id = newFileId();
+  return toRecord(existing);
+}
+
+function storeRow(owner: PersonRow, input: Metadata, id: string, size: number, sha256: string, write: (path: string) => void): FetchedFileResult {
   const storagePath = `people/${owner.id}/attachments/${id}`;
   const filePath = attachmentFilePath(storagePath);
-  ensureDataDir(resolve(attachmentsDir, owner.id, "attachments"));
   const row = {
-    id, ownerPersonId: owner.id, conversationId: null, turnId: null, mediaType, size: bytes.byteLength, sha256, storagePath, retention: "kept" as const,
+    id, ownerPersonId: owner.id, conversationId: null, turnId: null, mediaType: normalizedType(input.mediaType), size, sha256, storagePath, retention: "kept" as const,
     provenance: input.note, origin: "fetched", mediaSourceId: input.mediaSourceId, createdAt: new Date().toISOString(), hlc: nextHlc(),
   };
   const record = toRecord(row);
-  writeFileSync(filePath, bytes, { mode: 0o600 });
-  try {
-    db.insert(attachments).values(row).run();
-  } catch (error) {
-    try { unlinkSync(filePath); } catch { /* the database error is the one to report */ }
-    throw error;
-  }
-  shareToHousehold(owner.id, id);
+  write(filePath);
+  try { db.insert(attachments).values(row).run(); }
+  catch (error) { try { unlinkSync(filePath); } catch { /* already gone */ } throw error; }
   return { ok: true, value: record };
 }
 
-/** Removes a fetched copy no media item points at any more (the bytes, the row and its shares). Returns whether anything was removed. */
+/** Small fetched assets, such as artwork. No second buffer and no share pointer. */
+export function createFetchedFile(owner: PersonRow, input: FetchedFileInput): FetchedFileResult {
+  if (!FileRecordSchema.shape.media_type.safeParse(normalizedType(input.mediaType)).success) return invalidType();
+  const sha256 = createHash("sha256").update(input.bytes).digest("hex");
+  const existing = existingCopy(owner, input, sha256);
+  if (existing) return { ok: true, value: existing };
+  const cap = checkStorageCap(owner.role, owner.id, input.bytes.byteLength);
+  if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
+  ensureDataDir(resolve(attachmentsDir, owner.id, "attachments"));
+  return storeRow(owner, input, newFileId(), input.bytes.byteLength, sha256, (path) => writeFileSync(path, input.bytes, { mode: 0o600 }));
+}
+
+/** Stream into a private temporary file in the destination directory, hash once, then atomically rename. */
+export async function createFetchedFileFromResponse(owner: PersonRow, input: Metadata, response: Response, limit: number): Promise<FetchedFileResult> {
+  const reader = response.body?.getReader();
+  if (!reader) return { ok: false, status: 400, error: "The episode has no audio data. Try playing it from the show's website." };
+  const id = newFileId();
+  const directory = resolve(attachmentsDir, owner.id, "attachments");
+  const temporary = resolve(directory, `.${id}.download`);
+  let fd: number | undefined;
+  let finished = false;
+  try {
+    if (!FileRecordSchema.shape.media_type.safeParse(normalizedType(input.mediaType)).success) return invalidType();
+    const declared = Number(response.headers.get("content-length") ?? 0);
+    if (Number.isFinite(declared) && declared > 0) {
+      const cap = checkStorageCap(owner.role, owner.id, declared);
+      if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
+      if (declared > limit) return { ok: false, status: 400, error: "The episode is larger than 400 MB. Play it from the show's website instead." };
+    }
+    ensureDataDir(directory);
+    fd = openSync(temporary, "wx", 0o600);
+    const hash = createHash("sha256");
+    let size = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      const cap = checkStorageCap(owner.role, owner.id, size);
+      if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
+      if (size > limit) return { ok: false, status: 400, error: "The episode is larger than 400 MB. Play it from the show's website instead." };
+      hash.update(value);
+      let offset = 0;
+      while (offset < value.byteLength) offset += writeSync(fd, value, offset, value.byteLength - offset);
+    }
+    finished = true;
+    closeSync(fd);
+    fd = undefined;
+    if (size === 0) return { ok: false, status: 400, error: "The episode has no audio data. Try playing it from the show's website." };
+    const sha256 = hash.digest("hex");
+    const existing = existingCopy(owner, input, sha256);
+    if (existing) return { ok: true, value: existing };
+    // Recheck after yielding: other jobs may have consumed space during the download.
+    const cap = checkStorageCap(owner.role, owner.id, size);
+    if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
+    return storeRow(owner, input, id, size, sha256, (path) => renameSync(temporary, path));
+  } finally {
+    if (!finished) await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+    if (fd !== undefined) closeSync(fd);
+    try { unlinkSync(temporary); } catch { /* renamed or never created */ }
+  }
+}
+
+/** Only call once no media item (including Trash) references the copy. */
 export function removeFetchedFile(fileId: string): boolean {
   const row = db.select().from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.origin, "fetched"))).get();
   if (!row) return false;

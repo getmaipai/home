@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
 import { coerceNumber, mediaAppAllowed } from "@/lib/media/appHost";
-import { applyAutoRules, exportOpml, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
+import { queuePodcastAutoRules, exportOpml, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 
@@ -77,7 +77,7 @@ export function podcastRoutes() {
     });
     if (!result.ok) return fail(c, result);
     // A changed keep rule takes effect now, not at the next poll.
-    if (auto) void applyAutoRules(result.value.id);
+    if (auto) queuePodcastAutoRules(result.value.id);
     return c.json({ ok: true as const }, 200);
   });
 
@@ -87,7 +87,7 @@ export function podcastRoutes() {
     const body = await bodyOf(c);
     const result = importOpml(person, typeof body.opml === "string" ? body.opml : "");
     if (!result.ok) return fail(c, result);
-    for (const feedId of result.value.feedIds) void pollPodcastNow(feedId);
+    // createFeed marks every imported feed due. The normal tick takes at most ten.
     return c.json({ ok: true as const, added: result.value.added, already: result.value.already, skipped: result.value.skipped }, 200);
   });
 

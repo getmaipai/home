@@ -1,22 +1,30 @@
-// MEDIA-PODCASTS-01: podcasts through the ONE shelf poller and the shared media-app host. A localhost fixture feed (tests/fixtures/podcast/
-// feed.xml.tmpl, three episodes, the middle one explicit) is served by Bun.serve on 127.0.0.1; the poller's injectable fetch maps the
-// fixture's public-looking host onto it and a stub DNS answers a public address, so the SSRF guard runs unchanged. Nothing leaves the machine.
-import { afterAll, beforeAll, beforeEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+// Podcasts use an in-memory fake fetch and public DNS fixture. No server or network is needed.
+import { beforeEach, describe, expect, test } from "bun:test";
+import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, mediaItems, mediaSources, shares } from "@/db/schema";
+import { attachments, mediaItems, mediaSources, shares, people } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { removeItem } from "@/lib/media/items";
-import { __setPodcastFetchDepsForTests, applyAutoRules, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
-import { getFeed, updateFeed } from "@/lib/shelf/feedStore";
+import { __setPodcastFetchDepsForTests, applyAutoRules, queuePodcastAutoRules, drainPodcastAutoRules, saveEpisode, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
+import { getFeed, listFeeds, updateFeed } from "@/lib/shelf/feedStore";
 import { privacyConnections } from "@/lib/privacy";
 import { pollFeed, type PollDeps } from "@/lib/shelf/shelfPoller";
 import { __resetShelfCountersForTests } from "@/lib/shelf/shelfCounters";
+
+import { createFetchedFile } from "@/lib/media/fetchedFiles";
+import { attachmentFilePath, readAttachment } from "@/lib/attachments";
+import { createShare } from "@/lib/shares";
+import { purgeExpired } from "@/lib/trash/registry";
+import { nextHlc } from "@/lib/hlc";
+import { newMediaItemId, newShareId } from "@/lib/id";
+import { setHouseholdSettingValue } from "@/lib/settings";
+import { syncShelfFeeds } from "@/lib/shelf/shelfFeeds";
+import { runShelfTick } from "@/lib/shelf/shelfJobs";
 
 const HOST = "https://pod.example.com";
 const EPISODE_BYTES = new Uint8Array(4096).map((_, index) => (index * 7) % 251);
@@ -25,7 +33,6 @@ const episodeBytes = (n: number): Uint8Array => EPISODE_BYTES.map((value, index)
 const ART_BYTES = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==", "base64"));
 
 interface Call { path: string; headers: Record<string, string> }
-let server: ReturnType<typeof Bun.serve>;
 let calls: Call[];
 let feedXml: string;
 let feedEtag: string;
@@ -35,11 +42,8 @@ const template = readFileSync(join(import.meta.dir, "fixtures/podcast/feed.xml.t
 const feedFor = (extraItem = ""): string => template.replaceAll("__BASE__", HOST).replace("</channel>", `${extraItem}</channel>`);
 const episode4 = `<item><title>Question 4</title><guid isPermaLink="false">urn:sprout:ep4</guid><pubDate>Fri, 14 Oct 2026 06:00:00 GMT</pubDate><description>Episode 4.&lt;br&gt;0:00 Hello&lt;br&gt;1:00 The big idea&lt;br&gt;2:30 Goodbye</description><enclosure url="${HOST}/sprout-ep4.mp3" length="4096" type="audio/mpeg"/><itunes:duration>00:03:10</itunes:duration></item>`;
 
-beforeAll(() => {
-  server = Bun.serve({
-    hostname: "127.0.0.1",
-    port: 0,
-    fetch(request) {
+const fixtureFetch = async (input: URL | string, init?: RequestInit): Promise<Response> => {
+      const request = new Request(String(input), init);
       const url = new URL(request.url);
       const headers: Record<string, string> = {};
       request.headers.forEach((value, key) => { headers[key] = value; });
@@ -52,17 +56,14 @@ beforeAll(() => {
       const ep = /^\/sprout-ep(\d)\.mp3$/.exec(url.pathname);
       if (ep) return new Response(episodeBytes(Number(ep[1])), { headers: { "content-type": "audio/mpeg" } });
       return new Response("no", { status: 404 });
-    },
-  });
-});
-afterAll(() => { server.stop(true); });
+};
 
 let clock = Date.parse("2026-10-15T12:00:00Z");
 const publicDns = async () => ({ address: "93.184.216.34", family: 4 });
 const deps: PollDeps = {
   dnsLookup: publicDns,
   now: () => clock,
-  fetch: ((input: URL | string, init?: RequestInit) => fetch(String(input).replace(HOST, `http://127.0.0.1:${server.port}`), init)) as typeof fetch,
+  fetch: fixtureFetch as unknown as typeof fetch,
 };
 const later = (seconds = 3600) => { clock += seconds * 1000; };
 
@@ -82,7 +83,7 @@ type Row = { id: string; title: string; channel: string | null; copy_label: stri
 
 async function setup() {
   const owner = new TestClient();
-  await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+  await owner.post("/api/auth/setup", { displayName: "Atlas", secret: "correcthorse" });
   const signIn = async (displayName: string, role: string) => {
     const made = await owner.post("/api/people", { displayName, role, secret: "0000", ...(role === "child" ? { birthdate: "2018-03-01" } : {}) });
     const created = (await made.json()) as { id: string };
@@ -90,7 +91,7 @@ async function setup() {
     await client.post("/api/auth/verify-secret", { personId: created.id, secret: "0000" });
     return { client, id: created.id };
   };
-  const adult = await signIn("Marlow", "adult");
+  const adult = await signIn("Nova", "adult");
   const child = await signIn("Sprout", "child");
   const data = async <T = Row[]>(client: TestClient, id: string, body: Record<string, unknown> = {}) => (await client.post(`/api/plugins/podcasts/data/${id}`, body)).json() as Promise<T>;
   /** Adds the fixture show by the route, then polls its feed once (the route's own background poll fails harmlessly first: no clock moves). */
@@ -104,7 +105,7 @@ async function setup() {
     const { source_id } = (await res.json()) as { source_id: string };
     return { sourceId: source_id, feedId: db.select().from(mediaSources).where(eq(mediaSources.id, source_id)).get()!.feedId! };
   };
-  const poll = async (feedId: string) => { later(); return pollFeed(getFeed(feedId)!, deps); };
+  const poll = async (feedId: string) => { later(); const result = await pollFeed(getFeed(feedId)!, deps); await drainPodcastAutoRules(); return result; };
   const idOf = async (title: string) => (await data(adult.client, "episodes")).find((row) => row.title === title)!.id;
   return { owner, adult, child, data, subscribe, poll, idOf };
 }
@@ -181,10 +182,10 @@ describe("the one poller reads a podcast feed", () => {
     expect(await saved.json()).toMatchObject({ ok: true, on: true, label: "Saved" });
     const file = db.select().from(attachments).all().find((candidate) => candidate.provenance === "podcast:manual")!;
     expect(file).toMatchObject({ origin: "fetched", mediaType: "audio/mpeg", retention: "kept", size: EPISODE_BYTES.length });
-    expect(db.select().from(shares).all().some((share) => share.fileId === file.id && share.to === "household")).toBe(true);
+    expect(db.select().from(shares).all().some((share) => share.fileId === file.id && share.to === "household")).toBe(false);
     const item = await data<{ src: string; saved: boolean; copy_label: string }>(adult.client, "item", { id });
     expect(item).toMatchObject({ src: `/api/media/items/${id}/content`, saved: true, copy_label: "Saved" });
-    // Another adult reads the bytes (a household share), with Range.
+    // Another adult reads the bytes through the media gate, with Range.
     const range = await adult.client.get(`/api/media/items/${id}/content`, { range: "bytes=10-19" });
     expect(range.status).toBe(206);
     expect(new Uint8Array(await range.arrayBuffer())).toEqual(EPISODE_BYTES.slice(10, 20));
@@ -192,7 +193,8 @@ describe("the one poller reads a podcast feed", () => {
     // The feed's address is kept: Unsave goes back to streaming and removes the copy.
     const removed = await owner.post("/api/plugins/podcasts/save", { media_id: id, on: false });
     expect(await removed.json()).toMatchObject({ on: false, label: "Not saved" });
-    expect(db.select().from(attachments).all().filter((candidate) => candidate.provenance === "podcast:manual")).toHaveLength(0);
+    expect(db.select().from(attachments).all().filter((candidate) => candidate.provenance === "podcast:manual")).toHaveLength(1);
+    expect(((await (await owner.get("/api/trash")).json()) as { rows: unknown[] }).rows).toHaveLength(1);
     expect((await data<{ src: string }>(adult.client, "item", { id })).src).toBe(`${HOST}/sprout-ep3.mp3`);
   });
 
@@ -318,6 +320,9 @@ describe("the privacy page", () => {
     expect(row.destination).toBe("pod.example.com");
     expect(row.what).toMatch(/conditional request/);
     expect(row.what).toMatch(/No name, device ID or cookie/);
+    expect(row.when).toMatch(/keep rules/i);
+    expect(row.what).toMatch(/picture.*hosts|hosts.*picture/);
+    expect(row.what).toMatch(/redirect/);
     await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
     expect(privacyConnections().some((candidate) => candidate.id === "platform:podcast-feeds")).toBe(false);
   });
@@ -344,5 +349,282 @@ describe("OPML", () => {
     expect(result.skipped[0]!.reason).toMatch(/https/);
     expect(db.select().from(mediaSources).all().filter((row) => row.kind === "feed" && !row.deletedAt)).toHaveLength(1);
     expect((await owner.post("/api/plugins/podcasts/opml/import", { opml: "not xml at all" })).status).toBe(400);
+  });
+});
+
+
+describe("Podcasts review regressions", () => {
+  test("fetched files ignore legacy household shares; only gated media routes serve an explicit copy", async () => {
+    const { owner, adult, child, subscribe, poll, idOf } = await setup();
+    const { sourceId, feedId } = await subscribe([child.id, adult.id]);
+    await poll(feedId);
+    // Allow the admin to make the save, then restore the source audience.
+    db.update(mediaSources).set({ visibleTo: '"household"' }).where(eq(mediaSources.id, sourceId)).run();
+    const id = await idOf("Question 2");
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id })).status).toBe(200);
+    const file = db.select().from(attachments).all().find((row) => row.provenance === "podcast:manual")!;
+    const atlas = db.select().from(people).where(eq(people.id, file.ownerPersonId)).get()!;
+    expect(createShare(atlas, { fileId: file.id, to: "household" }).ok).toBe(false);
+    expect(db.select().from(shares).all().filter((row) => row.fileId === file.id)).toEqual([]);
+    // Old installations may still have these pointers. They must grant no access.
+    db.insert(shares).values({ id: newShareId(), fileId: file.id, fromPersonId: file.ownerPersonId, to: "household", provenance: "fixture", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    const guestMade = await owner.post("/api/people", { displayName: "Pippa", role: "guest", secret: "0000" });
+    const guestId = ((await guestMade.json()) as { id: string }).id;
+    const guest = new TestClient();
+    await guest.post("/api/auth/verify-secret", { personId: guestId, secret: "0000" });
+    for (const client of [child.client, guest, adult.client]) {
+      const files = await (await client.get("/api/files")).json() as Array<{ file: { id: string } }>;
+      expect(files.some((row) => row.file.id === file.id)).toBe(false);
+      expect((await client.get(`/api/files/${file.id}/content`)).status).toBe(404);
+    }
+    expect((await child.client.get(`/api/media/items/${id}/content`)).status).toBe(404);
+    expect((await adult.client.get(`/api/media/items/${id}/content`)).status).toBe(200);
+    expect((await adult.client.get(`/api/media/items/${id}/artwork`)).status).toBe(200);
+    db.update(mediaSources).set({ visibleTo: JSON.stringify([child.id]) }).where(eq(mediaSources.id, sourceId)).run();
+    expect((await adult.client.get(`/api/media/items/${id}/content`)).status).toBe(404);
+    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    expect((await child.client.get(`/api/files/${file.id}/content`)).status).toBe(404);
+  });
+
+  test("dedupe never reuses a chat upload or another owner's fetched file", async () => {
+    const { adult, subscribe } = await setup();
+    const { sourceId } = await subscribe();
+    const atlas = db.select().from(people).all().find((row) => row.role === "owner")!;
+    const nova = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const input = { mediaType: "audio/mpeg", bytes: EPISODE_BYTES, mediaSourceId: sourceId, note: "podcast:auto" };
+    const first = createFetchedFile(atlas, input);
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    db.update(attachments).set({ origin: "sent", provenance: "private-chat" }).where(eq(attachments.id, first.value.id)).run();
+    const second = createFetchedFile(atlas, input);
+    const third = createFetchedFile(nova, input);
+    expect(second.ok && second.value.id).not.toBe(first.value.id);
+    expect(third.ok && third.value.id).not.toBe(second.ok && second.value.id);
+    expect(db.select().from(shares).all()).toEqual([]);
+    expect(db.select().from(attachments).where(eq(attachments.id, first.value.id)).get()!.provenance).toBe("private-chat");
+  });
+
+  test("OPML import only schedules due feeds and makes no per-feed requests", async () => {
+    const { owner } = await setup();
+    let requests = 0;
+    __setPodcastFetchDepsForTests({ ...deps, fetch: (async () => { requests++; return new Response("offline", { status: 503 }); }) as unknown as typeof fetch });
+    const opml = `<opml version="2.0"><head/><body>${Array.from({ length: 200 }, (_, i) => `<outline type="rss" xmlUrl="https://pod${i}.example.com/feed.xml"/>`).join("")}</body></opml>`;
+    expect(await (await owner.post("/api/plugins/podcasts/opml/import", { opml })).json()).toMatchObject({ added: 200 });
+    expect(requests).toBe(0);
+    expect(listFeeds("podcast")).toHaveLength(200);
+    expect(listFeeds("podcast").every((feed) => Date.parse(feed.next_poll_at) <= Date.now())).toBe(true);
+  });
+
+  test("a slow auto-save does not hold the poll tick and one source never runs twice", async () => {
+    const { subscribe } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    db.update(mediaSources).set({ auto: JSON.stringify({ save: "audio", keep_latest: 1, remove_watched: false }) }).where(eq(mediaSources.id, sourceId)).run();
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => { release = resolve; });
+    let downloads = 0;
+    let started!: () => void;
+    const downloading = new Promise<void>((resolve) => { started = resolve; });
+    const slow: PollDeps = { ...deps, fetch: (async (input: URL | string, init?: RequestInit) => {
+      if (String(input).endsWith(".mp3")) { downloads++; started(); await held; }
+      return fixtureFetch(input, init);
+    }) as unknown as typeof fetch };
+    later();
+    const result = await Promise.race([pollFeed(getFeed(feedId)!, slow), new Promise((resolve) => setTimeout(() => resolve("held-by-download"), 100))]);
+    try {
+      expect(result).toBe("ok");
+      await downloading;
+      const duplicate = applyAutoRules(sourceId, slow, clock);
+      queuePodcastAutoRules(sourceId, slow, clock);
+      expect(downloads).toBe(1);
+      release();
+      await duplicate;
+      await drainPodcastAutoRules();
+      expect(downloads).toBe(1);
+    } finally { release(); await drainPodcastAutoRules(); }
+  });
+
+  test("keep rules can save a show named only for a child while its copies stay behind the item gate", async () => {
+    const { owner, child, subscribe, poll } = await setup();
+    const { sourceId, feedId } = await subscribe([child.id]);
+    await owner.post("/api/plugins/podcasts/source", { source_id: sourceId, auto: { save: "audio", keep_latest: 1 } });
+    await poll(feedId);
+    const episode = db.select().from(mediaItems).all().find((row) => row.title === "Question 3" && !row.deletedAt)!;
+    expect(episode.locFileId).not.toBeNull();
+    expect((await child.client.get(`/api/media/items/${episode.id}/content`)).status).toBe(200);
+    expect((await child.client.get(`/api/files/${episode.locFileId}/content`)).status).toBe(404);
+  });
+
+  test("a 304 check queues keep rules without downloading inside the tick", async () => {
+    const { adult, data, subscribe, poll } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    db.update(mediaSources).set({ auto: JSON.stringify({ save: "audio", keep_latest: 1 }) }).where(eq(mediaSources.id, sourceId)).run();
+    expect(await poll(feedId)).toBe("not_modified");
+    expect((await data(adult.client, "saved")).map((row) => row.title)).toEqual(["Question 3"]);
+  });
+
+  test("media playback keeps the saved file integrity check without a full-file buffer", async () => {
+    const { owner, adult, subscribe, poll, idOf } = await setup();
+    const { feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    await owner.post("/api/plugins/podcasts/save", { media_id: id });
+    const file = db.select().from(attachments).all().find((row) => row.provenance === "podcast:manual")!;
+    writeFileSync(attachmentFilePath(file.storagePath), new Uint8Array(file.size).fill(99));
+    expect((await adult.client.get(`/api/media/items/${id}/content`)).status).toBe(404);
+  });
+
+  test("storage caps reject a known enclosure before GET and a header before reading its body", async () => {
+    const { subscribe, poll, idOf } = await setup();
+    const { feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    const atlas = db.select().from(people).all().find((row) => row.role === "owner")!;
+    setHouseholdSettingValue("storage.person.default_cap_bytes", 1000);
+    let fetched = 0;
+    let cancelled = false;
+    const fake: PollDeps = { ...deps, fetch: (async () => {
+      fetched++;
+      return new Response(new ReadableStream({ cancel() { cancelled = true; } }), { headers: { "content-length": "4096", "content-type": "audio/mpeg" } });
+    }) as unknown as typeof fetch };
+    expect((await saveEpisode(atlas, id, { deps: fake })).ok).toBe(false);
+    expect(fetched).toBe(0);
+    db.update(mediaItems).set({ size: null }).where(eq(mediaItems.id, id)).run();
+    expect((await saveEpisode(atlas, id, { deps: fake })).ok).toBe(false);
+    expect(fetched).toBe(1);
+    expect(cancelled).toBe(true);
+    expect(db.select().from(attachments).all().filter((row) => row.provenance === "podcast:manual")).toEqual([]);
+  });
+
+  test("an unknown-length download stops at the cap and leaves no file record", async () => {
+    const { subscribe, poll, idOf } = await setup();
+    const { feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    db.update(mediaItems).set({ size: null }).where(eq(mediaItems.id, id)).run();
+    const atlas = db.select().from(people).all().find((row) => row.role === "owner")!;
+    setHouseholdSettingValue("storage.person.default_cap_bytes", 1000);
+    let cancelled = false;
+    let pulls = 0;
+    const fake: PollDeps = { ...deps, fetch: (async () => new Response(new ReadableStream({
+      pull(controller) { pulls++; controller.enqueue(new Uint8Array(600)); },
+      cancel() { cancelled = true; },
+    }), { headers: { "content-type": "audio/mpeg" } })) as unknown as typeof fetch };
+    const result = await saveEpisode(atlas, id, { deps: fake });
+    expect(result.ok).toBe(false);
+    expect(cancelled).toBe(true);
+    expect(pulls).toBeLessThanOrEqual(3);
+    const directory = join(attachmentFilePath(db.select().from(attachments).all()[0]!.storagePath), "..");
+    expect(readdirSync(directory).some((name) => name.endsWith(".download"))).toBe(false);
+    expect(db.select().from(attachments).all().filter((row) => row.provenance === "podcast:manual")).toEqual([]);
+  });
+
+  test("news skips a podcast address and a sync failure cannot stop due podcast polling", async () => {
+    const { subscribe } = await setup();
+    const { feedId } = await subscribe();
+    setHouseholdSettingValue("news.feeds.adult", `${HOST}/feed.xml`);
+    expect(() => syncShelfFeeds({ store: null })).not.toThrow();
+    expect(getFeed(feedId)!.purpose).toBe("podcast");
+    const failingStore = { forgetFeed() { throw new Error("fixture failure"); } } as unknown as NonNullable<PollDeps["store"]>;
+    const { createFeed } = await import("@/lib/shelf/feedStore");
+    createFeed({ url: "https://unused.example.com/feed.xml", title: "Nova", publisher: "Nova", band: "adult", pollIntervalS: 3600, nowIso: new Date(clock).toISOString(), provenance: "fixture" });
+    later();
+    updateFeed(feedId, { nextPollAt: new Date(clock).toISOString(), quietUntil: null }, new Date(clock).toISOString());
+    await runShelfTick({ ...deps, busy: () => false, store: failingStore });
+    expect(db.select().from(mediaItems).all().filter((row) => row.kind === "podcast_episode")).toHaveLength(3);
+  });
+
+  test("only a copy owner or admin may unsave; the copy goes to restorable household Trash", async () => {
+    const { owner, adult, child, subscribe, poll, idOf } = await setup();
+    const { feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 2");
+    await owner.post("/api/plugins/podcasts/save", { media_id: id });
+    const file = db.select().from(attachments).all().find((row) => row.provenance === "podcast:manual")!;
+    expect((await adult.client.post("/api/plugins/podcasts/save", { media_id: id, on: false })).status).toBe(403);
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id, on: false })).status).toBe(200);
+    expect(existsSync(attachmentFilePath(file.storagePath))).toBe(true);
+    const trash = await (await owner.get("/api/trash")).json() as { rows: Array<{ id: string; kind: string }> };
+    expect(trash.rows).toHaveLength(1);
+    const copy = trash.rows[0]!;
+    expect((await (await child.client.get("/api/trash")).json() as { rows: unknown[] }).rows).toEqual([]);
+    expect((await adult.client.post(`/api/trash/${copy.kind}/${copy.id}/restore`)).status).toBe(404);
+    expect((await owner.post(`/api/trash/${copy.kind}/${copy.id}/restore`)).status).toBe(200);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.locFileId).toBe(file.id);
+    // An admin can also remove a copy owned by an adult.
+    db.update(attachments).set({ ownerPersonId: adult.id }).where(eq(attachments.id, file.id)).run();
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id, on: false })).status).toBe(200);
+    const secondTrash = ((await (await owner.get("/api/trash")).json()) as { rows: Array<{ id: string; kind: string }> }).rows[0]!;
+    expect((await owner.post(`/api/trash/media_item/${secondTrash.id}/restore`)).status).toBe(404);
+    expect((await adult.client.request(`/api/trash/${secondTrash.kind}/${secondTrash.id}`, { method: "DELETE" })).status).toBe(200);
+    expect(existsSync(attachmentFilePath(file.storagePath))).toBe(false);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.deletedAt).toBeNull();
+    expect(JSON.parse(db.select().from(mediaSources).where(eq(mediaSources.id, file.mediaSourceId!)).get()!.archive)).toEqual([]);
+  });
+
+  test("copy expiry uses the copy provider and leaves the streaming episode and its guid alone", async () => {
+    const { owner, subscribe, poll, idOf } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    await owner.post("/api/plugins/podcasts/save", { media_id: id });
+    const file = db.select().from(attachments).all().find((row) => row.provenance === "podcast:manual")!;
+    await owner.post("/api/plugins/podcasts/save", { media_id: id, on: false });
+    purgeExpired(new Date(Date.now() + 31 * 86_400_000));
+    expect(existsSync(attachmentFilePath(file.storagePath))).toBe(false);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.deletedAt).toBeNull();
+    expect(JSON.parse(db.select().from(mediaSources).where(eq(mediaSources.id, sourceId)).get()!.archive)).toEqual([]);
+  });
+
+  test("http enclosures use https for stream and save; five redirects work and a sixth explains the next step", async () => {
+    const { adult, data, subscribe, poll, idOf } = await setup();
+    const { feedId } = await subscribe();
+    feedXml = feedXml.replaceAll(`${HOST}/sprout-ep`, "http://pod.example.com/sprout-ep");
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    expect((await data<{ src: string }>(adult.client, "item", { id })).src).toBe(`${HOST}/sprout-ep3.mp3`);
+    const atlas = db.select().from(people).all().find((row) => row.role === "owner")!;
+    let hops = 0;
+    const redirecting: PollDeps = { ...deps, fetch: (async (input: URL | string) => {
+      expect(String(input).startsWith("https://")).toBe(true);
+      return hops++ < 5 ? new Response(null, { status: 302, headers: { location: `${HOST}/hop${hops}` } }) : new Response(EPISODE_BYTES, { headers: { "content-type": "audio/mpeg" } });
+    }) as unknown as typeof fetch };
+    expect((await saveEpisode(atlas, id, { deps: redirecting })).ok).toBe(true);
+    db.update(mediaItems).set({ locFileId: null }).where(eq(mediaItems.id, id)).run();
+    later();
+    const looping: PollDeps = { ...deps, fetch: (async () => new Response(null, { status: 302, headers: { location: `${HOST}/loop` } })) as unknown as typeof fetch };
+    const failed = await saveEpisode(atlas, id, { deps: looping });
+    expect(failed.ok).toBe(false);
+    if (!failed.ok) expect(failed.error).toMatch(/redirect.*[Tt]ry|redirect.*[Aa]sk/);
+  });
+
+  test("legacy shared art survives the first unsubscribe and is removed after the last show stops using it", async () => {
+    const { owner, subscribe, poll } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    const episode = db.select().from(mediaItems).all()[0]!;
+    const art = db.select().from(attachments).all().find((row) => row.provenance === "podcast:art")!;
+    const secondId = await subscribeAgainHidden(owner);
+    db.insert(mediaItems).values({ ...episode, id: newMediaItemId(), sourceId: secondId }).run();
+    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    expect(existsSync(attachmentFilePath(art.storagePath))).toBe(true);
+    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: secondId });
+    expect(existsSync(attachmentFilePath(art.storagePath))).toBe(false);
+    expect(db.select().from(attachments).where(eq(attachments.id, art.id)).get()).toBeUndefined();
+  });
+
+  test("unsubscribe removes the show's fetched art but keeps its saved episodes private", async () => {
+    const { owner, child, subscribe, poll, idOf } = await setup();
+    const { sourceId, feedId } = await subscribe();
+    await poll(feedId);
+    await owner.post("/api/plugins/podcasts/save", { media_id: await idOf("Question 2") });
+    const art = db.select().from(attachments).all().find((row) => row.provenance === "podcast:art")!;
+    const copy = db.select().from(attachments).all().find((row) => row.provenance === "podcast:manual")!;
+    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    expect(db.select().from(attachments).where(eq(attachments.id, art.id)).get()).toBeUndefined();
+    expect(existsSync(attachmentFilePath(art.storagePath))).toBe(false);
+    expect(db.select().from(attachments).where(eq(attachments.id, copy.id)).get()).toBeDefined();
+    const sprout = db.select().from(people).where(eq(people.id, child.id)).get()!;
+    expect(readAttachment(sprout, copy.id).ok).toBe(false);
   });
 });

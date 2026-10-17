@@ -74,6 +74,7 @@ export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpR
     return { ok: false, status: 403, error: "you do not have access to this file" };
   }
 
+  if (file.origin === "fetched") return { ok: false, status: 403, error: "Saved media files cannot be shared through Files. Change the show's audience in Podcasts instead." };
   const to = input.to.trim();
   if (!isValidShareTarget(to)) {
     return { ok: false, status: 400, error: "the household does not have that person" };
@@ -290,6 +291,7 @@ export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
       : [],
   );
   for (const file of sharedFiles) {
+    if (!canAccessFile(actor, file.ownerPersonId, file.id)) continue;
     // An orphaned pointer (the file itself was deleted) simply has no
     // matching row here - nothing to list, no special case needed.
     const formerOwnerName = departed.get(file.ownerPersonId) ?? null;

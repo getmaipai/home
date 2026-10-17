@@ -437,7 +437,7 @@ with the most hard-won logic and no UI, so it proves the stack move before any p
 | Media fetch and subscriptions | the host the person named (a YouTube URL, a feed host) through the Stack media service | the URL the person pasted or the channel they followed, one real client identity, nothing of the household | per source; an admin adds or removes sources; a child cannot |
 | SponsorBlock | `sponsor.ajay.app` | the video id of a copy about to play | `media.sponsorblock` per person, off for a child |
 | Pinned binaries | the Stack's pinned download hosts for ffmpeg and yt-dlp | nothing; a version check at the update cadence | the Stack's update setting |
-| Podcast feeds | each feed host | a conditional GET, no identity | per source |
+| Podcast feeds | feed, episode and picture hosts, including CDNs and redirect hosts | feed checks use conditional GET; pictures, manual saves and keep rules download from these hosts, which receive the requested address and the home's IP; keep rules run automatically after each poll or a rule change; no name, device ID, cookie, chat or listening history | per source |
 | Offline devices | none; the device talks to the hub only | | Settings, Devices |
 
 No MaiPai-operated service is in any path; no analytics; the privacy page gains these rows.

@@ -11,14 +11,18 @@ import { nextHlc } from "@/lib/hlc";
 import { newMediaItemId, newMediaSourceId } from "@/lib/id";
 import { checkFeedAddress } from "@/lib/shelf/feedAddresses";
 import { createFeed, deleteFeed, findFeedByUrl, getFeed, listFeeds, MIN_POLL_INTERVAL_S, type FeedRecord } from "@/lib/shelf/feedStore";
-import { guardedGet, pollFeed, RateLimited, readBytesLimited, type PollDeps } from "@/lib/shelf/shelfPoller";
+import { guardedGet, pollFeed, RateLimited, RedirectLimitError, readBytesLimited, type PollDeps } from "@/lib/shelf/shelfPoller";
 import { SsrfBlockedError } from "@maipai/core/src/ssrfGuard";
 import type { PersonRow } from "@/types";
-import { isMediaAdmin, liveSourceById } from "./access";
+import { isMediaAdmin, liveSourceById, readableItem } from "./access";
 import { bandOkAtIngest, mediaBandOf } from "./band";
-import { createFetchedFile, removeFetchedFile } from "./fetchedFiles";
+import { createFetchedFile, createFetchedFileFromResponse, removeFetchedFile } from "./fetchedFiles";
 import { mediaTypeOfExtension } from "./kinds";
 import { itemFromRow, itemToRow, MediaItem, sourceFromRow, type MediaItemRow, type MediaSource } from "./model";
+import { checkStorageCap } from "@/lib/storage/usage";
+import { mayManagePodcastCopy, trashPodcastCopy } from "@/lib/trash/podcastCopies";
+import { trackBackgroundWork } from "@/lib/backgroundWork";
+import { reportShelfEvent } from "@/lib/shelf/shelfEvents";
 import { archivePath, removeSource } from "./sources";
 
 const MAX_EPISODES_PER_FEED = 200;
@@ -226,7 +230,17 @@ export function unsubscribePodcast(actor: PersonRow, sourceId: string): Outcome<
   if (!isMediaAdmin(actor) || mediaBandOf(actor) !== "adult") return { ok: false, status: 403, error: "Only an adult admin can remove a show." };
   const row = db.select().from(mediaSources).where(and(eq(mediaSources.id, sourceId), eq(mediaSources.kind, "feed"), isNull(mediaSources.deletedAt))).get();
   if (!row) return { ok: false, status: 404, error: "That show is not in your list." };
+  // Older copies could be deduped across sources. Include referenced art as well as files created for this source.
+  const referencedArt = new Set(db.select({ artwork: mediaItems.artwork }).from(mediaItems).where(eq(mediaItems.sourceId, row.id)).all()
+    .map((item) => item.artwork ? (JSON.parse(item.artwork) as { file_id?: string }).file_id : undefined));
+  const artIds = new Set(db.select().from(attachments).where(and(eq(attachments.origin, "fetched"), eq(attachments.provenance, "podcast:art"))).all()
+    .filter((file) => file.mediaSourceId === row.id || referencedArt.has(file.id)).map((file) => file.id));
   removeSource(row.id);
+  db.update(mediaItems).set({ artwork: null, hlc: nextHlc() }).where(eq(mediaItems.sourceId, row.id)).run();
+  for (const artId of artIds) {
+    const used = db.select({ artwork: mediaItems.artwork, fileId: mediaItems.locFileId }).from(mediaItems).all().some((item) => item.fileId === artId || (item.artwork && (JSON.parse(item.artwork) as { file_id?: string }).file_id === artId));
+    if (!used) removeFetchedFile(artId);
+  }
   if (row.feedId) deleteFeed(row.feedId);
   return { ok: true, value: { id: row.id } };
 }
@@ -289,7 +303,7 @@ async function fetchShowArt(source: MediaSource, imageUrl: string, deps: PollDep
     if (!/^image\/(jpeg|png|webp|gif)$/.test(type)) { await response.body?.cancel().catch(() => undefined); return null; }
     const bytes = await readBytesLimited(response, MAX_ART_BYTES);
     const owner = personById(source.owner_person_id);
-    if (!bytes || !owner) return null;
+    if (!bytes || !owner || !liveSourceById(source.id)) return null;
     const stored = createFetchedFile(owner, { mediaType: type, bytes, mediaSourceId: source.id, note: "podcast:art" });
     return stored.ok ? stored.value.id : null;
   } catch {
@@ -345,7 +359,7 @@ export async function ingestPodcastFeed(feed: FeedRecord, body: string, deps: Po
     else db.insert(mediaItems).values(values).run();
   }
   db.update(mediaSources).set({ lastCheckedAt: nowIso, lastStatus: "ok", failures: 0, backoffUntil: null }).where(eq(mediaSources.id, source.id)).run();
-  await applyAutoRules(source.id, deps, nowMs);
+  queuePodcastAutoRules(source.id, deps, nowMs);
 }
 
 // ---- save, unsave, the keep rules ---------------------------------------------------------------------------------------------------
@@ -368,7 +382,8 @@ export async function saveEpisode(actor: PersonRow, itemId: string, options: Sav
   const row = itemRow(itemId);
   const source = row ? liveSourceById(row.sourceId) : null;
   if (!row || row.deletedAt || row.kind !== "podcast_episode" || !source || source.kind !== "feed") return { ok: false, status: 404, error: "That episode is not in your podcasts." };
-  if (!options.auto && !mayManageSaves(actor)) return { ok: false, status: 403, error: "Only an adult can save an episode on the hub. You can still play it." };
+  if (!mayManageSaves(actor)) return { ok: false, status: 403, error: "Only an adult can save an episode on the hub. You can still play it." };
+  if (!options.auto && !readableItem(actor, row.id)) return { ok: false, status: 404, error: "That episode is not available to you. Choose an episode from your Podcasts list." };
   if (row.locFileId) {
     // A person's own Save of a copy the keep rules made turns it into a manual one, which the rules never remove.
     if (!options.auto) db.update(attachments).set({ provenance: "podcast:manual" }).where(and(eq(attachments.id, row.locFileId), eq(attachments.origin, "fetched"))).run();
@@ -376,25 +391,31 @@ export async function saveEpisode(actor: PersonRow, itemId: string, options: Sav
   }
   if (!row.locUrl) return { ok: false, status: 422, error: "This episode has no address to save from." };
   const owner = options.auto ? personById(source.owner_person_id) ?? actor : actor;
+  const preflight = checkStorageCap(owner.role, owner.id, row.size ?? 1);
+  if (!preflight.ok) return { ok: false, status: 403, error: preflight.error! };
   const deps = options.deps ?? routeDeps;
   const now = options.now ?? Date.now;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
   try {
-    const response = await guardedGet(row.locUrl, deps, now, controller.signal, { accept: "audio/*, video/*;q=0.8, */*;q=0.5", bucket: ENCLOSURE_RATE });
+    const response = await guardedGet(httpsPodcastAddress(row.locUrl), deps, now, controller.signal, { maxRedirects: 5, accept: "audio/*, video/*;q=0.8, */*;q=0.5", bucket: ENCLOSURE_RATE });
     if (response.status !== 200) {
       await response.body?.cancel().catch(() => undefined);
       return { ok: false, status: 502, error: `The show's server would not send the episode (it answered ${response.status}). Try again later.` };
     }
-    const bytes = await readBytesLimited(response, MAX_ENCLOSURE_BYTES);
-    if (!bytes || bytes.byteLength === 0) return { ok: false, status: 422, error: "The episode is empty or too large to keep (the limit is 400 MB). It still plays from the show's server." };
     const header = (response.headers.get("content-type") ?? "").split(";")[0]!.trim().toLowerCase();
     const mediaType = /^(audio|video)\//.test(header) ? header : row.mediaType;
-    const stored = createFetchedFile(owner, { mediaType, bytes, mediaSourceId: source.id, note: options.auto ? "podcast:auto" : "podcast:manual" });
+    const stored = await createFetchedFileFromResponse(owner, { mediaType, mediaSourceId: source.id, note: options.auto ? "podcast:auto" : "podcast:manual" }, response, MAX_ENCLOSURE_BYTES);
     if (!stored.ok) return { ok: false, status: stored.status === 403 ? 403 : 422, error: stored.error };
+    const current = itemRow(row.id);
+    if (!current || current.deletedAt || !liveSourceById(source.id) || (current.locFileId && current.locFileId !== stored.value.id)) {
+      if (!db.select({ id: mediaItems.id }).from(mediaItems).where(eq(mediaItems.locFileId, stored.value.id)).get()) removeFetchedFile(stored.value.id);
+      return { ok: false, status: 409, error: "The episode changed while it was downloading. Open Podcasts and try Save again." };
+    }
     db.update(mediaItems).set({ locFileId: stored.value.id, size: stored.value.size, fingerprint: stored.value.sha256, mediaType, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
     return { ok: true, value: itemFromRow(itemRow(row.id)!) };
   } catch (error) {
+    if (error instanceof RedirectLimitError) return { ok: false, status: 502, error: "The episode server sent more than five redirects or left out the next address. Try again later or ask the show for a direct episode link." };
     if (error instanceof SsrfBlockedError) return { ok: false, status: 422, error: "That episode lives at an address the hub does not fetch from (it must be a public https address). It still plays from the show's server." };
     if (error instanceof RateLimited) return { ok: false, status: 502, error: "The hub just fetched from that server. Wait a few seconds and press Save again." };
     return { ok: false, status: 502, error: "The hub could not download the episode. Check the internet connection and try again." };
@@ -408,15 +429,18 @@ export function unsaveEpisode(actor: PersonRow, itemId: string): Outcome<MediaIt
   if (!mayManageSaves(actor)) return { ok: false, status: 403, error: "Only an adult can remove a saved episode." };
   const row = itemRow(itemId);
   if (!row || row.deletedAt || row.kind !== "podcast_episode") return { ok: false, status: 404, error: "That episode is not in your podcasts." };
+  if (row.locFileId && !mayManagePodcastCopy(actor, row.locFileId)) return { ok: false, status: 403, error: "Only the person who saved this copy or an adult admin can remove it. Ask them to remove it." };
   if (row.locFileId) releaseCopy(row);
   return { ok: true, value: itemFromRow(itemRow(row.id)!) };
 }
 
 function releaseCopy(row: MediaItemRow): void {
-  const fileId = row.locFileId!;
-  db.update(mediaItems).set({ locFileId: null, fingerprint: null, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
-  const stillUsed = db.select({ id: mediaItems.id }).from(mediaItems).where(eq(mediaItems.locFileId, fileId)).get();
-  if (!stillUsed) removeFetchedFile(fileId);
+  trashPodcastCopy(row);
+}
+
+/** Prefer secure enclosure playback and download, including old feeds that still list http addresses. */
+export function httpsPodcastAddress(address: string): string {
+  return address.replace(/^http:\/\//i, "https://");
 }
 
 /** "Deleted stays gone" for a feed item: its guid joins the source's archive so no later poll brings it back. */
@@ -430,12 +454,44 @@ function completedByEveryone(itemId: string): boolean {
 }
 
 /** Runs after each poll: save the newest N, and remove auto-saved copies that fell outside the newest N or that everyone has played. */
-export async function applyAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now()): Promise<{ saved: number; removed: number }> {
+type AutoOutcome = { saved: number; removed: number };
+const autoInFlight = new Map<string, Promise<AutoOutcome>>();
+const autoQueue = new Map<string, { deps: PollDeps; nowMs: number }>();
+let autoWorker: Promise<void> | null = null;
+
+/** One bounded, serial background lane. Polling only enqueues; downloads start on a later event-loop turn. */
+export function queuePodcastAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now()): void {
+  if (autoInFlight.has(sourceId)) return;
+  autoQueue.set(sourceId, { deps, nowMs });
+  if (autoWorker) return;
+  autoWorker = trackBackgroundWork((async () => {
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    while (autoQueue.size) {
+      const [id, job] = autoQueue.entries().next().value!;
+      autoQueue.delete(id);
+      try { await applyAutoRules(id, job.deps, job.nowMs); }
+      catch { reportShelfEvent("podcast_keep_failed"); }
+    }
+  })().finally(() => { autoWorker = null; }));
+}
+export async function drainPodcastAutoRules(): Promise<void> {
+  while (autoWorker) await autoWorker;
+}
+
+/** Coalesce callers for a source, including a rule change during a queued download. */
+export function applyAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now()): Promise<AutoOutcome> {
+  const active = autoInFlight.get(sourceId);
+  if (active) return active;
+  const work = runAutoRules(sourceId, deps, nowMs).finally(() => { autoInFlight.delete(sourceId); });
+  autoInFlight.set(sourceId, work);
+  return work;
+}
+async function runAutoRules(sourceId: string, deps: PollDeps, nowMs: number): Promise<AutoOutcome> {
   const source = liveSourceById(sourceId);
   const outcome = { saved: 0, removed: 0 };
   if (!source || source.kind !== "feed" || (source.auto.save === "none" && !source.auto.remove_watched)) return outcome;
   const owner = personById(source.owner_person_id);
-  if (!owner) return outcome;
+  if (!owner || !mayManageSaves(owner)) return outcome;
   const rows = db.select().from(mediaItems).where(and(eq(mediaItems.sourceId, sourceId), isNull(mediaItems.deletedAt), eq(mediaItems.hidden, false))).all()
     .sort((a, b) => publishedOf(b).localeCompare(publishedOf(a)));
   const keep = source.auto.keep_latest ?? (source.auto.save === "audio" ? 1 : 0);
@@ -477,7 +533,7 @@ export interface OpmlResult {
   added: number;
   already: number;
   skipped: Array<{ url: string; reason: string }>;
-  /** The new shows' feeds, so the caller can poll each once. */
+  /** New shows are already due; the normal ten-feed tick polls them without fan-out. */
   feedIds: string[];
 }
 

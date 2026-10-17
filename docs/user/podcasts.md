@@ -33,7 +33,7 @@ When you come back to an episode, it starts where you stopped. A show can also s
 Under the player you see three buttons:
 
 - **Add to queue** puts the episode in **Up next**. Press it again to take it out. A finished episode leaves your queue by itself.
-- **Save on the hub** keeps a copy on the hub for everyone in the home. It plays with the internet off. Only grown-ups can save or remove a copy. Press it again to remove the copy. The episode still plays from the show's website.
+- **Save on the hub** keeps a copy on the hub for people who may see that episode. It plays with the internet off. Only grown-ups can save a copy. The person who saved it or a grown-up admin can remove it. Press it again to move the copy to Trash for 30 days. You can restore it from Settings, Storage, Trash. The episode still plays from the show's website.
 - **Bookmark** marks the place you are at. Your bookmarks show on the **Saved** tab.
 
 ## Saved
@@ -48,14 +48,18 @@ You see only the shows a grown-up chose for you, and only the episodes marked cl
 
 Only a grown-up with an admin account can add or remove a show. A show needs its feed address, which starts with `https://`. You can also bring all your shows from another podcast app: export an **OPML** file there and import it here. An admin can export the list from Home too.
 
-Home checks each show about every hour while nobody is using it. It asks the show's website only for what changed, and it sends no name, device or cookie. It never looks at what you listen to.
+Home checks each show about every hour while nobody is using it. It asks for what changed and gets the show's picture. Save gets one episode. Keep rules also get episodes on their own after a check or a rule change.
+
+The feed, episode and picture websites see your home's internet address and the address of the file requested. Other sites that send the files or pass the request along see these too. Home sends no name, device ID, cookie, chat or listening history.
+
+A list of imported shows is checked in small groups over time. Removing a show stops its checks and removes its saved picture. Saved episodes stay private in Storage.
 
 ## What Home keeps
 
 For each show an admin can choose:
 
-- **Keep the newest** a number of episodes saved on the hub. Home saves new ones when they arrive and removes the older copies it saved. It never removes a copy someone saved by hand.
-- **Remove played** episodes after everyone who started them has finished.
+- **Keep the newest** a number of episodes saved on the hub. Home queues new copies after each check and moves older copies it saved to Trash. It never removes a copy someone saved by hand.
+- **Remove played** moves copies to Trash after everyone who started them has finished.
 - Seconds to skip at the start and the end. A show can also hold a **speed**, which the list shows. The player still uses your own podcast speed for now.
 
 When you delete an episode, it stays deleted. A new check of the show does not bring it back.

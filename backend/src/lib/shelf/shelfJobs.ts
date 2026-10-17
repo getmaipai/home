@@ -2,6 +2,7 @@
 // jobs, registered in index.ts): a 15-minute poll tick and a daily prune.
 import { sweepNewsPictures } from "@/lib/news/pictures";
 import { pruneReads } from "@/lib/news/records";
+import { reportShelfEvent } from "./shelfEvents";
 import { bumpShelfCounter } from "./shelfCounters";
 import { pollDueFeeds, type PollDeps } from "./shelfPoller";
 import { retentionDays, shelfEnabled } from "./shelfPolicy";
@@ -11,7 +12,8 @@ import { syncShelfFeeds } from "./shelfFeeds";
 /** Brings the feeds table in line with the settings, then polls what is due. */
 export async function runShelfTick(deps: PollDeps = {}): Promise<void> {
   const now = deps.now ?? Date.now;
-  syncShelfFeeds({ nowIso: new Date(now()).toISOString(), store: deps.store });
+  try { syncShelfFeeds({ nowIso: new Date(now()).toISOString(), store: deps.store }); }
+  catch { reportShelfEvent("sync_failed"); }
   // Podcast feeds are the household's own subscriptions: the news shelf switch does not stop them.
   await pollDueFeeds(deps, shelfEnabled() ? ["news", "podcast"] : ["podcast"]);
 }
