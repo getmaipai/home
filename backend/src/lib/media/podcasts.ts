@@ -237,10 +237,14 @@ export function unsubscribePodcast(actor: PersonRow, sourceId: string): Outcome<
     .filter((file) => file.mediaSourceId === row.id || referencedArt.has(file.id)).map((file) => file.id));
   removeSource(row.id);
   db.update(mediaItems).set({ artwork: null, hlc: nextHlc() }).where(eq(mediaItems.sourceId, row.id)).run();
-  for (const artId of artIds) {
-    const used = db.select({ artwork: mediaItems.artwork, fileId: mediaItems.locFileId }).from(mediaItems).all().some((item) => item.fileId === artId || (item.artwork && (JSON.parse(item.artwork) as { file_id?: string }).file_id === artId));
-    if (!used) removeFetchedFile(artId);
+  // One scan for the files every remaining item still uses, not one per picture.
+  const stillUsed = new Set<string>();
+  for (const item of db.select({ artwork: mediaItems.artwork, fileId: mediaItems.locFileId }).from(mediaItems).all()) {
+    if (item.fileId) stillUsed.add(item.fileId);
+    const art = item.artwork ? (JSON.parse(item.artwork) as { file_id?: string }).file_id : undefined;
+    if (art) stillUsed.add(art);
   }
+  for (const artId of artIds) if (!stillUsed.has(artId)) removeFetchedFile(artId);
   if (row.feedId) deleteFeed(row.feedId);
   return { ok: true, value: { id: row.id } };
 }
@@ -384,6 +388,11 @@ export async function saveEpisode(actor: PersonRow, itemId: string, options: Sav
   if (!row || row.deletedAt || row.kind !== "podcast_episode" || !source || source.kind !== "feed") return { ok: false, status: 404, error: "That episode is not in your podcasts." };
   if (!mayManageSaves(actor)) return { ok: false, status: 403, error: "Only an adult can save an episode on the hub. You can still play it." };
   if (!options.auto && !readableItem(actor, row.id)) return { ok: false, status: 404, error: "That episode is not available to you. Choose an episode from your Podcasts list." };
+  if (row.locFileId && !db.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, row.locFileId)).get()) {
+    // The copy's file is gone (its owner left the household): forget the dangling reference and save afresh.
+    db.update(mediaItems).set({ locFileId: null, fingerprint: null, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
+    row.locFileId = null;
+  }
   if (row.locFileId) {
     // A person's own Save of a copy the keep rules made turns it into a manual one, which the rules never remove.
     if (!options.auto) db.update(attachments).set({ provenance: "podcast:manual" }).where(and(eq(attachments.id, row.locFileId), eq(attachments.origin, "fetched"))).run();
@@ -435,7 +444,10 @@ export function unsaveEpisode(actor: PersonRow, itemId: string): Outcome<MediaIt
 }
 
 function releaseCopy(row: MediaItemRow): void {
-  trashPodcastCopy(row);
+  const file = row.locFileId ? db.select({ id: attachments.id }).from(attachments).where(eq(attachments.id, row.locFileId)).get() : null;
+  if (file) { trashPodcastCopy(row); return; }
+  // A dangling reference (the file left with its owner) has nothing to trash: just clear it.
+  db.update(mediaItems).set({ locFileId: null, fingerprint: null, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
 }
 
 /** Prefer secure enclosure playback and download, including old feeds that still list http addresses. */
@@ -459,20 +471,26 @@ const autoInFlight = new Map<string, Promise<AutoOutcome>>();
 const autoQueue = new Map<string, { deps: PollDeps; nowMs: number }>();
 let autoWorker: Promise<void> | null = null;
 
-/** One bounded, serial background lane. Polling only enqueues; downloads start on a later event-loop turn. */
+/** One bounded, serial background lane. Polling only enqueues; downloads start on a later event-loop turn. A request for a source
+ * whose run is in progress is queued again, so a rule change made during a download still applies once that run ends. */
 export function queuePodcastAutoRules(sourceId: string, deps: PollDeps = routeDeps, nowMs = Date.now()): void {
-  if (autoInFlight.has(sourceId)) return;
   autoQueue.set(sourceId, { deps, nowMs });
   if (autoWorker) return;
-  autoWorker = trackBackgroundWork((async () => {
-    await new Promise<void>((resolve) => setTimeout(resolve, 0));
-    while (autoQueue.size) {
-      const [id, job] = autoQueue.entries().next().value!;
-      autoQueue.delete(id);
-      try { await applyAutoRules(id, job.deps, job.nowMs); }
-      catch { reportShelfEvent("podcast_keep_failed"); }
-    }
-  })().finally(() => { autoWorker = null; }));
+  autoWorker = trackBackgroundWork(runAutoQueue());
+}
+async function runAutoQueue(): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 0));
+  for (;;) {
+    const next = autoQueue.entries().next();
+    // Cleared in the same synchronous step that finds the queue empty, so a later enqueue always starts a new worker.
+    if (next.done) { autoWorker = null; return; }
+    const [id, job] = next.value;
+    autoQueue.delete(id);
+    try {
+      await autoInFlight.get(id)?.catch(() => undefined);
+      await applyAutoRules(id, job.deps, job.nowMs);
+    } catch { reportShelfEvent("podcast_keep_failed"); }
+  }
 }
 export async function drainPodcastAutoRules(): Promise<void> {
   while (autoWorker) await autoWorker;

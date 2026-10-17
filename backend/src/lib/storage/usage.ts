@@ -10,6 +10,7 @@
 // only the one owner_person_id this sums against, so a shared file counts
 // once, against its owner, and never against a recipient by construction:
 // there is no join through a share pointer here that could double it.
+import { statSync } from "node:fs";
 import { relative } from "node:path";
 import { eq, isNotNull, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -194,7 +195,12 @@ const RECONCILE_ISSUE_KEY = "file_reconcile";
  * lib/storage.ts's shared walkFiles() rather than its own recursion. */
 function filesOnDisk(): Set<string> {
   const found = new Set<string>();
-  walkFiles(attachmentsDir, (full) => found.add(relative(dataDir, full).replaceAll("\\", "/")));
+  walkFiles(attachmentsDir, (full) => {
+    // A podcast download in progress (fetchedFiles.ts writes `.<id>.download`, then renames) is not an orphan. One left over an hour
+    // is a crash leftover and is reported like any other.
+    if (/[\\/]\.[^\\/]+\.download$/.test(full) && Date.now() - statSync(full).mtimeMs < 3_600_000) return;
+    found.add(relative(dataDir, full).replaceAll("\\", "/"));
+  });
   return found;
 }
 

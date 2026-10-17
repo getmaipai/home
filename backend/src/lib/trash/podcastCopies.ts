@@ -18,7 +18,9 @@ export const isPodcastCopyTrash = (row: Pick<MediaItemRow, "provenance">): boole
 export function mayManagePodcastCopy(person: PersonRow, fileId: string): boolean {
   if (person.role === "guest" || mediaBandOf(person) !== "adult") return false;
   const file = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
-  return file?.origin === "fetched" && (file.ownerPersonId === person.id || isMediaAdmin(person));
+  // A dangling reference (the file left with its owner) is an admin's to clear.
+  if (!file) return isMediaAdmin(person);
+  return file.origin === "fetched" && (file.ownerPersonId === person.id || isMediaAdmin(person));
 }
 
 /** Detach only this item; a file still used by another live episode stays available there. */

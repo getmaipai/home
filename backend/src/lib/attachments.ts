@@ -43,7 +43,8 @@ export function checkAttachmentCapacity(actor: PersonRow, mediaTypeInput: string
     return { ok: false, status: 400, error: "invalid attachment media type" };
   }
   const sha256 = createHash("sha256").update(bytesInput).digest("hex");
-  if (db.select({ id: attachments.id }).from(attachments).where(eq(attachments.sha256, sha256)).get()) {
+  // Only another chat upload counts: a fetched media copy is owner-only and never adopted by an upload (MEDIA-PODCASTS-01).
+  if (db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"))).get()) {
     return { ok: true, value: null };
   }
   const capCheck = checkStorageCap(actor.role, actor.id, bytesInput.byteLength);
@@ -197,7 +198,7 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   // (storage/usage.ts) is the sum of `size` over File rows that exist,
   // and a dedupe never adds one, so charging the cap here would refuse a
   // person for bytes that were never going to land on disk a second time.
-  const existing = input.deduplicate === false ? undefined : db.select().from(attachments).where(eq(attachments.sha256, sha256)).get();
+  const existing = input.deduplicate === false ? undefined : db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"))).get();
   if (existing) {
     if (existing.ownerPersonId !== actor.id) grantDedupeShare(existing.ownerPersonId, actor.id, existing.id);
     return { ok: true, value: toRecord(existing) };

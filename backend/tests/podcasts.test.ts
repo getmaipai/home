@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, mediaItems, mediaSources, shares, people } from "@/db/schema";
+import { attachments, conversationTurns, mediaItems, mediaSources, shares, people } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -17,11 +17,12 @@ import { pollFeed, type PollDeps } from "@/lib/shelf/shelfPoller";
 import { __resetShelfCountersForTests } from "@/lib/shelf/shelfCounters";
 
 import { createFetchedFile } from "@/lib/media/fetchedFiles";
-import { attachmentFilePath, readAttachment } from "@/lib/attachments";
+import { attachmentFilePath, createAttachment, readAttachment } from "@/lib/attachments";
+import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { createShare } from "@/lib/shares";
 import { purgeExpired } from "@/lib/trash/registry";
 import { nextHlc } from "@/lib/hlc";
-import { newMediaItemId, newShareId } from "@/lib/id";
+import { newConversationTurnId, newMediaItemId, newShareId } from "@/lib/id";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { syncShelfFeeds } from "@/lib/shelf/shelfFeeds";
 import { runShelfTick } from "@/lib/shelf/shelfJobs";
@@ -402,6 +403,44 @@ describe("Podcasts review regressions", () => {
     expect(third.ok && third.value.id).not.toBe(second.ok && second.value.id);
     expect(db.select().from(shares).all()).toEqual([]);
     expect(db.select().from(attachments).where(eq(attachments.id, first.value.id)).get()!.provenance).toBe("private-chat");
+  });
+
+  test("a chat upload with a saved episode's bytes gets its own file, never the fetched copy or a share to it", async () => {
+    const { adult, subscribe } = await setup();
+    const { sourceId } = await subscribe();
+    const atlas = db.select().from(people).all().find((row) => row.role === "owner")!;
+    const fetched = createFetchedFile(atlas, { mediaType: "audio/mpeg", bytes: EPISODE_BYTES, mediaSourceId: sourceId, note: "podcast:manual" });
+    expect(fetched.ok).toBe(true);
+    if (!fetched.ok) return;
+    const nova = db.select().from(people).where(eq(people.id, adult.id)).get()!;
+    const conversation = resolveOrCreateConversation(nova, "chat");
+    if (!conversation.ok) throw new Error(conversation.error);
+    const turnId = newConversationTurnId();
+    db.insert(conversationTurns).values({ id: turnId, personId: nova.id, surface: "chat", conversationId: conversation.value.id, userText: "note", replyText: "ok",
+      source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    const upload = createAttachment(nova, { conversationId: conversation.value.id, turnId, mediaType: "audio/mpeg", bytes: EPISODE_BYTES });
+    expect(upload.ok).toBe(true);
+    if (!upload.ok) return;
+    expect(upload.value.id).not.toBe(fetched.value.id);
+    expect(db.select().from(shares).all().filter((row) => row.fileId === fetched.value.id)).toEqual([]);
+    expect(readAttachment(nova, upload.value.id).ok).toBe(true);
+  });
+
+  test("a saved copy whose file left with its owner can be cleared by an admin and saved again", async () => {
+    const { owner, subscribe, poll, idOf } = await setup();
+    const { feedId } = await subscribe();
+    await poll(feedId);
+    const id = await idOf("Question 3");
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id })).status).toBe(200);
+    const fileId = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.locFileId!;
+    db.delete(attachments).where(eq(attachments.id, fileId)).run();
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id, on: false })).status).toBe(200);
+    expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.locFileId).toBeNull();
+    db.update(mediaItems).set({ locFileId: fileId }).where(eq(mediaItems.id, id)).run();
+    expect((await owner.post("/api/plugins/podcasts/save", { media_id: id })).status).toBe(200);
+    const saved = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.locFileId;
+    expect(saved).not.toBe(fileId);
+    expect(db.select().from(attachments).where(eq(attachments.id, saved!)).get()).toBeTruthy();
   });
 
   test("OPML import only schedules due feeds and makes no per-feed requests", async () => {
