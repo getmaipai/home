@@ -12,8 +12,8 @@ import { syncShelfFeeds } from "./shelfFeeds";
 export async function runShelfTick(deps: PollDeps = {}): Promise<void> {
   const now = deps.now ?? Date.now;
   syncShelfFeeds({ nowIso: new Date(now()).toISOString(), store: deps.store });
-  if (!shelfEnabled()) return;
-  await pollDueFeeds(deps);
+  // Podcast feeds are the household's own subscriptions: the news shelf switch does not stop them.
+  await pollDueFeeds(deps, shelfEnabled() ? ["news", "podcast"] : ["podcast"]);
 }
 
 export function pruneShelf(nowMs: number = Date.now(), store: ShelfStore | null = sharedShelfStore()): number {

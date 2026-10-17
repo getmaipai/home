@@ -1,0 +1,51 @@
+{
+  "type": "page",
+  "id": "episodes",
+  "title": "Episodes",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "picker",
+      "state": "show",
+      "label": "Show",
+      "placeholder": "All shows",
+      "bind": {
+        "source": "package",
+        "path": "channels"
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Episodes",
+      "bind": {
+        "source": "package",
+        "path": "episodes",
+        "params": {
+          "channel": "$state.show"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "headphones",
+        "text": "No episodes yet. They show up when a show you follow has one."
+      }
+    }
+  ]
+}

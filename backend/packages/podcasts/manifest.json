@@ -1,0 +1,189 @@
+{
+  "id": "podcasts",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "Media",
+  "display": "Podcasts",
+  "description": "Listen to the shows your home follows: new episodes play right away from the show, and a copy saved on the hub plays with the internet off.",
+  "routing": {
+    "examples": [
+      "open podcasts",
+      "play the newest episode of my podcast",
+      "continue my podcast",
+      "what is in my podcast queue",
+      "which podcast episodes are saved on the hub"
+    ],
+    "patterns": []
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "degraded",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "pages": [
+      {
+        "id": "index",
+        "label": "Listen now",
+        "icon": "mic",
+        "nav": true,
+        "kind": "schema",
+        "module": "index",
+        "keywords": [
+          "podcast",
+          "podcasts",
+          "episode",
+          "listen",
+          "show",
+          "audio"
+        ]
+      },
+      {
+        "id": "shows",
+        "label": "Shows",
+        "icon": "library",
+        "nav": true,
+        "kind": "schema",
+        "module": "shows"
+      },
+      {
+        "id": "episodes",
+        "label": "Episodes",
+        "icon": "headphones",
+        "nav": true,
+        "kind": "schema",
+        "module": "episodes"
+      },
+      {
+        "id": "queue",
+        "label": "Queue",
+        "icon": "list",
+        "nav": true,
+        "kind": "schema",
+        "module": "queue"
+      },
+      {
+        "id": "saved",
+        "label": "Saved",
+        "icon": "hard-drive",
+        "nav": true,
+        "kind": "schema",
+        "module": "saved"
+      },
+      {
+        "id": "play",
+        "label": "Listen",
+        "icon": "play",
+        "nav": false,
+        "kind": "schema",
+        "module": "play"
+      }
+    ],
+    "data": [
+      {
+        "id": "continue",
+        "rows": "list"
+      },
+      {
+        "id": "new",
+        "rows": "list"
+      },
+      {
+        "id": "queue",
+        "rows": "list"
+      },
+      {
+        "id": "saved",
+        "rows": "list"
+      },
+      {
+        "id": "shows",
+        "rows": "list"
+      },
+      {
+        "id": "episodes",
+        "rows": "list"
+      },
+      {
+        "id": "channels",
+        "rows": "list"
+      },
+      {
+        "id": "bookmarks",
+        "rows": "list"
+      },
+      {
+        "id": "item",
+        "rows": "list"
+      },
+      {
+        "id": "up-next",
+        "rows": "list"
+      }
+    ],
+    "settings_area": {
+      "id": "podcasts",
+      "title": "Podcasts",
+      "app": "/apps/podcasts",
+      "audience": {
+        "min_role": "child"
+      },
+      "groups": [
+        {
+          "label": "Podcasts",
+          "sections": [
+            "speed",
+            "storage"
+          ]
+        }
+      ],
+      "sections": [
+        {
+          "id": "speed",
+          "label": "Podcast speed",
+          "icon": "gauge",
+          "kind": "link",
+          "href": "/settings/account/voice",
+          "keywords": [
+            "playback",
+            "speed",
+            "faster",
+            "slower"
+          ]
+        },
+        {
+          "id": "storage",
+          "label": "Saved episodes and storage",
+          "icon": "hard-drive",
+          "kind": "link",
+          "href": "/settings/home/storage",
+          "min_role": "admin",
+          "keywords": [
+            "saved copies",
+            "episodes",
+            "trash"
+          ]
+        }
+      ]
+    }
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "static"
+  },
+  "incognito": "unaffected"
+}

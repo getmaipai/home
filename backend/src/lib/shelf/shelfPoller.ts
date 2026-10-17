@@ -28,11 +28,14 @@ import { bumpShelfCounter } from "./shelfCounters";
 import { feedIsWanted } from "./shelfPolicy";
 import { MIN_POLL_INTERVAL_S, listFeeds, updateFeed, type FeedRecord } from "./feedStore";
 import { sharedShelfStore, type ShelfStore } from "./shelfStore";
+import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS } from "@/lib/media/podcasts";
 
 import { HOME_USER_AGENT } from "@/lib/outbound";
 export const MAX_BACKOFF_S = 86_400;
 export const MAX_FEEDS_PER_TICK = 10;
 const MAX_BYTES = 2 * 1024 * 1024;
+/** A podcast feed lists every episode ever made, so its cap is higher than a news feed's (MEDIA-PODCASTS-01). */
+const MAX_PODCAST_FEED_BYTES = 8 * 1024 * 1024;
 const MAX_ITEMS_PER_FEED = 50;
 const MAX_REDIRECTS = 3;
 const TIMEOUT_MS = 20_000;
@@ -93,23 +96,30 @@ async function validateHop(url: URL, dns: DnsLookup | undefined): Promise<void> 
   await assertNotPrivateHost(url.hostname, dns);
 }
 
-async function request(feed: FeedRecord, deps: PollDeps, now: () => number, signal: AbortSignal): Promise<Response> {
+export interface HopOptions {
+  /** The per-host pacing bucket: feeds share `feed`, enclosure downloads have their own. */
+  bucket?: { prefix: string; capacity: number; refillPerSecond: number };
+  accept?: string;
+  conditional?: { etag?: string | null; lastModified?: string | null };
+}
+
+/** One guarded GET (a feed, or an enclosure): every hop passes the SSRF guard, redirects are followed by hand, the host is paced, no
+ * cookies and no referrer. Shared by the poller and the podcast Save so there is one outbound path. */
+export async function guardedGet(address: string, deps: PollDeps, now: () => number, signal: AbortSignal, options: HopOptions = {}): Promise<Response> {
   const fetcher = deps.fetch ?? fetch;
   const pinned = fetcher === platformFetch;
-  const headers: Record<string, string> = {
-    "User-Agent": HOME_USER_AGENT,
-    Accept: "application/atom+xml, application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, application/feed+json;q=0.8",
-  };
-  if (feed.etag) headers["If-None-Match"] = feed.etag;
-  if (feed.last_modified) headers["If-Modified-Since"] = feed.last_modified;
-  let url = new URL(feed.url);
+  const headers: Record<string, string> = { "User-Agent": HOME_USER_AGENT, Accept: options.accept ?? "*/*" };
+  if (options.conditional?.etag) headers["If-None-Match"] = options.conditional.etag;
+  if (options.conditional?.lastModified) headers["If-Modified-Since"] = options.conditional.lastModified;
+  const bucket = options.bucket ?? { prefix: "feed", ...HOST_RATE };
+  let url = new URL(address);
   const firstHost = url.host;
   const paced = new Set<string>();
   for (let hop = 0; ; hop++) {
     await validateHop(url, deps.dnsLookup);
     const host = url.hostname.toLowerCase();
     if (!paced.has(host)) {
-      if (!tryConsume(`net:feed:${host}`, HOST_RATE, now())) throw new RateLimited();
+      if (!tryConsume(`net:${bucket.prefix}:${host}`, bucket, now())) throw new RateLimited();
       paced.add(host);
     }
     if (hop > 0 && url.host !== firstHost) { delete headers["If-None-Match"]; delete headers["If-Modified-Since"]; }
@@ -125,6 +135,36 @@ async function request(feed: FeedRecord, deps: PollDeps, now: () => number, sign
     }
     return response;
   }
+}
+
+export { RateLimited };
+
+function request(feed: FeedRecord, deps: PollDeps, now: () => number, signal: AbortSignal): Promise<Response> {
+  return guardedGet(feed.url, deps, now, signal, {
+    accept: "application/atom+xml, application/rss+xml, application/xml;q=0.9, text/xml;q=0.8, application/feed+json;q=0.8",
+    conditional: { etag: feed.etag, lastModified: feed.last_modified },
+  });
+}
+
+/** The bytes of a response up to `limit` (null when it is longer); streamed, so a long download is never held twice. */
+export async function readBytesLimited(response: Response, limit: number): Promise<Uint8Array | null> {
+  const declared = Number(response.headers.get("content-length"));
+  if (Number.isFinite(declared) && declared > limit) { await response.body?.cancel().catch(() => undefined); return null; }
+  const reader = response.body?.getReader();
+  if (!reader) return null;
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    size += value.byteLength;
+    if (size > limit) { await reader.cancel(); return null; }
+    chunks.push(value);
+  }
+  const bytes = new Uint8Array(size);
+  let offset = 0;
+  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
+  return bytes;
 }
 
 interface Entry { url: string; title: string; summary: string; published: string | null; image?: string }
@@ -274,7 +314,7 @@ export async function pollFeed(feed: FeedRecord, deps: PollDeps = {}): Promise<P
     return "backoff";
   };
   // A store that cannot open is a local fault, not the server's: skip without touching the feed's back-off.
-  if (!store) return "backoff";
+  if (!store && feed.purpose !== "podcast") return "backoff";
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -282,7 +322,8 @@ export async function pollFeed(feed: FeedRecord, deps: PollDeps = {}): Promise<P
     const response = await request(feed, deps, now, controller.signal);
     const interval = (): number => {
       const age = feedMaxAgeSeconds(response.headers.get("cache-control"));
-      return Math.min(MAX_BACKOFF_S, Math.max(MIN_POLL_INTERVAL_S, feed.poll_interval_s, age ?? 0));
+      const own = feed.purpose === "podcast" ? (podcastPollIntervalS(feed) ?? feed.poll_interval_s) : feed.poll_interval_s;
+      return Math.min(MAX_BACKOFF_S, Math.max(MIN_POLL_INTERVAL_S, own, age ?? 0));
     };
     if (response.status === 304) {
       await response.body?.cancel().catch(() => undefined);
@@ -295,10 +336,15 @@ export async function pollFeed(feed: FeedRecord, deps: PollDeps = {}): Promise<P
       bumpShelfCounter("poll_failed");
       return fail(parseRetryAfter(response.headers.get("retry-after"), now()));
     }
+    const podcast = feed.purpose === "podcast";
+    const limit = podcast ? MAX_PODCAST_FEED_BYTES : MAX_BYTES;
     const declared = Number(response.headers.get("content-length"));
-    const body = Number.isFinite(declared) && declared > MAX_BYTES ? null : await readLimited(response, MAX_BYTES);
+    const body = Number.isFinite(declared) && declared > limit ? null : await readLimited(response, limit);
     if (body === null) { bumpShelfCounter("poll_failed"); return fail(null); }
-    try { await ingest(feed, body, deps, now(), store); }
+    try {
+      if (podcast) await ingestPodcastFeed(feed, body, deps, now());
+      else await ingest(feed, body, deps, now(), store!);
+    }
     catch { bumpShelfCounter("poll_failed"); return fail(null); }
     updateFeed(feed.id, {
       etag: response.headers.get("etag"),
@@ -330,14 +376,15 @@ let running = false;
 
 /** One tick of the idle queue: the due, wanted feeds, one at a time, oldest
  * due first, stopping the moment a person starts using the house. */
-export async function pollDueFeeds(deps: PollDeps = {}): Promise<{ polled: number; skippedBusy: boolean }> {
+export async function pollDueFeeds(deps: PollDeps = {}, purposes: ReadonlyArray<"news" | "podcast"> = ["news", "podcast"]): Promise<{ polled: number; skippedBusy: boolean }> {
   if (running) return { polled: 0, skippedBusy: false };
   running = true;
   try {
     const now = deps.now ?? Date.now;
     const busy = deps.busy ?? ((): boolean => turnActiveWithin(DEFAULT_IDLE_WINDOW_MS));
     const due = listFeeds()
-      .filter((feed) => feedIsWanted({ band: feed.band, packageId: feed.package_id ?? null, enabled: feed.enabled }))
+      .filter((feed) => purposes.includes(feed.purpose ?? "news"))
+      .filter((feed) => (feed.purpose === "podcast" ? podcastFeedIsWanted(feed) : feedIsWanted({ band: feed.band, packageId: feed.package_id ?? null, enabled: feed.enabled })))
       .filter((feed) => Date.parse(feed.next_poll_at) <= now() && (!feed.quiet_until || Date.parse(feed.quiet_until) <= now()))
       .sort((a, b) => Date.parse(a.next_poll_at) - Date.parse(b.next_poll_at))
       .slice(0, MAX_FEEDS_PER_TICK);

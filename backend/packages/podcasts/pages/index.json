@@ -1,0 +1,143 @@
+{
+  "type": "page",
+  "id": "index",
+  "title": "Listen now",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "split_view",
+      "aside_label": "Your shows",
+      "main": [
+        {
+          "type": "media_shelf",
+          "heading": "Up next",
+          "bind": {
+            "source": "package",
+            "path": "queue"
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "item_progress_field": "progress",
+          "item_badge_field": "copy_label",
+          "item_meta_field": "duration_s",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "hide_when_empty": true,
+          "see_all": {
+            "label": "See all",
+            "action": {
+              "navigate": {
+                "to": "/apps/podcasts/queue"
+              }
+            }
+          },
+          "on_select": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        },
+        {
+          "type": "media_shelf",
+          "heading": "Continue listening",
+          "bind": {
+            "source": "package",
+            "path": "continue"
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "item_progress_field": "progress",
+          "item_badge_field": "copy_label",
+          "item_meta_field": "duration_s",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "hide_when_empty": true,
+          "on_select": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        },
+        {
+          "type": "media_shelf",
+          "heading": "New episodes",
+          "bind": {
+            "source": "package",
+            "path": "new"
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "item_progress_field": "progress",
+          "item_badge_field": "copy_label",
+          "item_meta_field": "duration_s",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "hide_when_empty": true,
+          "see_all": {
+            "label": "See all",
+            "action": {
+              "navigate": {
+                "to": "/apps/podcasts/episodes"
+              }
+            }
+          },
+          "on_select": {
+            "play": {
+              "media_id": "{id}"
+            }
+          }
+        }
+      ],
+      "aside": [
+        {
+          "type": "media_shelf",
+          "heading": "Your shows",
+          "bind": {
+            "source": "package",
+            "path": "shows"
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{summary}",
+          "item_media_field": "thumbnail",
+          "item_progress_field": "progress",
+          "item_badge_field": "copy_label",
+          "item_meta_field": "duration_s",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "see_all": {
+            "label": "See all",
+            "action": {
+              "navigate": {
+                "to": "/apps/podcasts/shows"
+              }
+            }
+          },
+          "on_select": {
+            "navigate": {
+              "to": "/apps/podcasts/episodes",
+              "state": {
+                "show": "{title}"
+              }
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "mic",
+            "text": "No shows yet. An admin can add a show with Settings, then Podcasts."
+          }
+        }
+      ]
+    }
+  ]
+}

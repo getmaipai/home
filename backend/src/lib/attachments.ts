@@ -93,9 +93,9 @@ export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
   const parsed = FileRecordSchema.safeParse({
     id: row.id,
     owner_person_id: row.ownerPersonId,
-    // Every attachment this module creates is a chat upload - the old
-    // record's only case, and the one origin value that applies here.
-    origin: "sent",
+    // A chat upload is "sent"; MEDIA-PODCASTS-01 adds "fetched" (a copy the
+    // hub fetched for a media source, lib/media/fetchedFiles.ts).
+    origin: row.origin === "fetched" ? "fetched" : "sent",
     kind: kindForMediaType(row.mediaType),
     media_type: row.mediaType,
     size: row.size,
@@ -112,6 +112,7 @@ export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
       package_id: null,
       job_id: null,
       requested_by_person_id: null,
+      media_source_id: row.origin === "fetched" ? (row.mediaSourceId ?? null) : null,
       note: row.provenance,
     },
     created_at: row.createdAt,
@@ -227,6 +228,8 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
     storagePath,
     retention: "conversation" as const,
     provenance,
+    origin: "sent",
+    mediaSourceId: null,
     createdAt: new Date().toISOString(),
     hlc: nextHlc(),
   };

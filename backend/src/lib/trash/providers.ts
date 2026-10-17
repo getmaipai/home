@@ -5,6 +5,7 @@ import { nextHlc } from "@/lib/hlc";
 import { isMediaAdmin, sourceVisibleTo } from "@/lib/media/access";
 import { bandAllows, bandOkAtIngest, mediaBandOf } from "@/lib/media/band";
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
+import { removeFetchedFile } from "@/lib/media/fetchedFiles";
 import { discardItemProgress } from "@/lib/media/progress";
 import { archivePath } from "@/lib/media/sources";
 import type { PersonRow } from "@/types";
@@ -34,11 +35,13 @@ function family(row: Item): Item[] {
 function purgeItem(row: Item): void {
   db.transaction(() => {
     const rows = family(row);
-    for (const item of rows) if (item.locPath) archivePath(item.sourceId, item.locPath);
+    for (const item of rows) { const gone = item.locPath ?? item.externalId; if (gone) archivePath(item.sourceId, gone); }
     const ids = rows.map((item) => item.id);
     discardItemProgress(ids);
     db.delete(mediaProgress).where(inArray(mediaProgress.mediaId, ids)).run();
     db.delete(mediaItems).where(inArray(mediaItems.id, ids)).run();
+    // A purged podcast episode takes its saved copy with it when no other item uses the file (only fetched copies; a chat upload is never touched).
+    for (const item of rows) if (item.locFileId && !db.select({ id: mediaItems.id }).from(mediaItems).where(eq(mediaItems.locFileId, item.locFileId)).get()) removeFetchedFile(item.locFileId);
   });
 }
 registerTrashProvider({
@@ -50,7 +53,7 @@ registerTrashProvider({
     db.transaction(() => {
       const rows = family(row);
       const source = db.select().from(mediaSources).where(eq(mediaSources.id, row.sourceId)).get()!;
-      const paths = new Set(rows.map((item) => item.locPath));
+      const paths = new Set(rows.map((item) => item.locPath ?? item.externalId));
       const archive = (JSON.parse(source.archive) as string[]).filter((path) => !paths.has(path));
       db.update(mediaSources).set({ archive: JSON.stringify(archive), hlc: nextHlc() }).where(eq(mediaSources.id, source.id)).run();
       db.update(mediaItems).set({ deletedAt: null, trashUntil: null, missingSince: null, hlc: nextHlc() }).where(inArray(mediaItems.id, rows.map((item) => item.id))).run();

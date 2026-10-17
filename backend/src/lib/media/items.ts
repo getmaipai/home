@@ -165,7 +165,9 @@ export function removeItem(id: string): boolean {
   const until = new Date(now.getTime() + TRASH_DAYS * 24 * 3600 * 1000);
   const ids = [row.id, ...db.select({ id: mediaItems.id }).from(mediaItems).where(eq(mediaItems.parentId, row.id)).all().map((part) => part.id)];
   db.update(mediaItems).set({ deletedAt: now.toISOString(), trashUntil: until.toISOString(), missingSince: null, hlc: nextHlc() }).where(inArray(mediaItems.id, ids)).run();
-  if (row.locPath) archivePath(row.sourceId, row.locPath);
+  // A file on a root is remembered by path, a feed episode by its guid (MEDIA-PODCASTS-01): a re-scan or a re-poll never brings it back.
+  const gone = row.locPath ?? row.externalId;
+  if (gone) archivePath(row.sourceId, gone);
   return true;
 }
 

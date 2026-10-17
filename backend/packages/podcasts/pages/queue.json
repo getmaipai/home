@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "id": "queue",
+  "title": "Queue",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Queue",
+      "bind": {
+        "source": "package",
+        "path": "queue"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "list",
+        "text": "Your queue is empty. Choose Add to queue on an episode and it waits here."
+      }
+    }
+  ]
+}

@@ -701,6 +701,8 @@ export const attachments = sqliteTable(
     storagePath: text("storage_path").notNull(),
     retention: text("retention").notNull().default("conversation"),
     provenance: text("provenance").notNull(),
+    origin: text("origin").notNull().default("sent"), // MEDIA-PODCASTS-01: sent | fetched (a copy the hub fetched for a media source)
+    mediaSourceId: text("media_source_id"), // set when origin is fetched
     createdAt: text("created_at").notNull(),
     hlc: text("hlc").notNull(),
   },
@@ -908,6 +910,7 @@ export const feeds = sqliteTable(
     band: text("band").notNull(), // child|teen|adult
     packageId: text("package_id"), // the feed-list package, null for an admin's own feed
     personId: text("person_id"),
+    purpose: text("purpose").notNull().default("news"), // MEDIA-PODCASTS-01: news | podcast
     etag: text("etag"),
     lastModified: text("last_modified"),
     pollIntervalS: integer("poll_interval_s").notNull(),

@@ -5,6 +5,8 @@
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { appRouteAllowed } from "@/lib/apps";
+import "@/lib/media/podcastApp"; // registers the Podcasts data ids and item view with the shared host
+import { podcastRoutes } from "./podcastApp";
 import { coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
@@ -43,7 +45,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
     return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
   });
 
-  for (const [path, kind] of [["watch-later", "watch_later"], ["like", "liked"]] as const) {
+  const lists: ReadonlyArray<readonly [string, "watch_later" | "liked" | "queue"]> = appId === "podcasts" ? [["queue", "queue"]] : [["watch-later", "watch_later"], ["like", "liked"]];
+  for (const [path, kind] of lists) {
     routes.post(`/${path}`, requireAuth, async (c, next) => {
       const person = c.get("person");
       if (!mediaAppAllowed(person, appId)) return next();
@@ -52,6 +55,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
       return result.ok ? c.json({ ok: true as const, ...result.value }, 200) : c.json({ error: result.error }, result.status);
     });
   }
+
+  if (appId === "podcasts") routes.route("/", podcastRoutes());
 
   return routes;
 }

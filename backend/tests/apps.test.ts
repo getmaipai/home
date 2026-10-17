@@ -89,10 +89,10 @@ describe("GET /api/apps", () => {
     expect((await new TestClient().get("/api/apps")).status).toBe(401);
   });
 
-  test("a package without pages is not an app: the bundled set lists only News, Videos and Weather", async () => {
+  test("a package without pages is not an app: the bundled set lists only News, Podcasts, Videos and Weather", async () => {
     const { client } = await owner();
     expect((await fixtureApps(client)).map((row) => row.package)).toEqual([]);
-    expect(((await (await client.get("/api/apps")).json()) as Array<{ package: string }>).map((row) => row.package)).toEqual(["news", "videos", "weather"]);
+    expect(((await (await client.get("/api/apps")).json()) as Array<{ package: string }>).map((row) => row.package)).toEqual(["news", "podcasts", "videos", "weather"]);
   });
 
   test("an installed app lists with its launcher fields, sections and route", async () => {

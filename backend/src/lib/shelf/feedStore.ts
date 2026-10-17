@@ -23,6 +23,7 @@ function toRecord(row: FeedRow): FeedRecord | null {
     band: row.band,
     ...(row.packageId ? { package_id: row.packageId } : {}),
     ...(row.personId ? { person_id: row.personId } : {}),
+    ...(row.purpose === "podcast" ? { purpose: "podcast" } : {}),
     ...(row.etag ? { etag: row.etag } : {}),
     ...(row.lastModified ? { last_modified: row.lastModified } : {}),
     poll_interval_s: row.pollIntervalS,
@@ -36,8 +37,10 @@ function toRecord(row: FeedRow): FeedRecord | null {
   return parsed.success ? parsed.data : null;
 }
 
-export function listFeeds(): FeedRecord[] {
-  return db.select().from(feeds).all().map(toRecord).filter((feed): feed is FeedRecord => feed !== null);
+/** Every feed, or only the news feeds or only the podcast feeds (MEDIA-PODCASTS-01: one table, one poller, two purposes). */
+export function listFeeds(purpose?: "news" | "podcast"): FeedRecord[] {
+  const all = db.select().from(feeds).all().map(toRecord).filter((feed): feed is FeedRecord => feed !== null);
+  return purpose ? all.filter((feed) => (feed.purpose ?? "news") === purpose) : all;
 }
 
 export function getFeed(id: string): FeedRecord | null {
@@ -59,6 +62,7 @@ export interface NewFeed {
   pollIntervalS: number;
   provenance: string;
   nowIso: string;
+  purpose?: "news" | "podcast";
 }
 
 export function createFeed(input: NewFeed): FeedRecord {
@@ -69,6 +73,7 @@ export function createFeed(input: NewFeed): FeedRecord {
     publisher: input.publisher,
     band: input.band,
     ...(input.packageId ? { package_id: input.packageId } : {}),
+    ...(input.purpose === "podcast" ? { purpose: "podcast" } : {}),
     poll_interval_s: Math.max(MIN_POLL_INTERVAL_S, Math.floor(input.pollIntervalS)),
     next_poll_at: input.nowIso,
     fail_count: 0,
@@ -78,7 +83,7 @@ export function createFeed(input: NewFeed): FeedRecord {
   });
   db.insert(feeds).values({
     id: record.id, url: record.url, title: record.title, publisher: record.publisher, band: record.band,
-    packageId: record.package_id ?? null, personId: null, etag: null, lastModified: null,
+    packageId: record.package_id ?? null, personId: null, purpose: input.purpose ?? "news", etag: null, lastModified: null,
     pollIntervalS: record.poll_interval_s, nextPollAt: record.next_poll_at, failCount: 0, quietUntil: null,
     enabled: true, hlc: record.hlc, provenance: record.provenance, createdAt: input.nowIso, updatedAt: input.nowIso,
   }).run();

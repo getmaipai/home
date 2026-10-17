@@ -1,0 +1,108 @@
+// MEDIA-PODCASTS-01: the Podcasts app's half of the shared media-app host (appHost.ts). It adds the data ids the shared ones do not have
+// (`shows`, `episodes`, `saved`, `bookmarks`) and the fields a podcast item view carries (saved, queued, the show's skip-intro start).
+// Rows go through the same `queryItems` (band, source `visible_to`, allowlist for a child), so a child sees only child-cleared shows and
+// never an explicit episode, exactly as in Videos. Registered by importing this file (routes/mediaApps.ts does).
+import { eq } from "drizzle-orm";
+import { mediaItems } from "@/db/schema";
+import type { PersonRow } from "@/types";
+import { liveSourceById } from "./access";
+import { allowedSources, readableIn, artworkUrl, collectionIds, contextFor, copyLabelOf, queryItems, registerItemView, registerMediaAppData, rowOf, rowsOf, type DataParams, type MediaRow } from "./appHost";
+import { getProgress, getProgressMany, recentProgress } from "./progress";
+import type { MediaItem, MediaSource } from "./model";
+
+const APP = "podcasts" as const;
+const publishedOf = (item: MediaItem): string => item.external?.published_at ?? item.added_at;
+
+/** "Keeps the newest 3 · Speed 1.2x" or "Streams only": what a show does, in the person's words. */
+export function showRulesLine(source: MediaSource): string {
+  const parts: string[] = [];
+  if (source.auto.save === "audio") parts.push(`Keeps the newest ${source.auto.keep_latest ?? 1}`);
+  else parts.push("Streams only");
+  if (source.speed) parts.push(`Speed ${source.speed}x`);
+  if (source.skip_intro_s > 0) parts.push(`Skips first ${source.skip_intro_s} s`);
+  if (source.skip_outro_s > 0) parts.push(`Skips last ${source.skip_outro_s} s`);
+  return parts.join(" · ");
+}
+
+function showRows(person: PersonRow): MediaRow[] {
+  const rows: MediaRow[] = [];
+  for (const source of allowedSources(person).filter((candidate) => candidate.kind === "feed")) {
+    const items = queryItems(person, APP, { where: eq(mediaItems.sourceId, source.id), limit: 500 });
+    if (items.length === 0) continue; // a child's list has no show with nothing child-cleared in it
+    const art = items.find((item) => item.artwork);
+    rows.push({
+      id: source.id, title: source.label, channel: items[0]!.artist ?? `${items.length} episodes`, summary: showRulesLine(source), kind: "podcast_episode",
+      thumbnail: art ? artworkUrl(art) : null, backdrop: art ? artworkUrl(art) : null, duration_s: null, copy_label: "",
+    });
+  }
+  return rows.sort((a, b) => a.title.localeCompare(b.title));
+}
+
+function episodesOf(person: PersonRow, params: DataParams, limit: number, savedOnly = false): MediaItem[] {
+  const show = params.channel;
+  const items = queryItems(person, APP, { where: show ? eq(mediaItems.subtitle, show) : undefined, limit: Math.max(limit, 200) });
+  return items.filter((item) => !savedOnly || !(item.location as { url?: string }).url).sort((a, b) => publishedOf(b).localeCompare(publishedOf(a))).slice(0, limit);
+}
+
+/** "Today", "Yesterday", "Tue", "Oct 10": how long ago, the way Apple Podcasts says it. */
+export function whenLabel(iso: string, now = new Date()): string {
+  const day = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const then = new Date(iso);
+  const days = Math.round((day(now) - day(then)) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return then.toLocaleDateString("en-US", { weekday: "short" });
+  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+/** An episode row for the lists: the eyebrow line is the date and the show, the summary the show notes' first line. */
+function episodeRows(person: PersonRow, items: readonly MediaItem[]): MediaRow[] {
+  const base = rowsOf(person, items);
+  return base.map((row, index) => ({ ...row, channel: `${whenLabel(publishedOf(items[index]!))} · ${items[index]!.subtitle ?? ""}`.replace(/ · $/, "") }));
+}
+
+function bookmarkRows(person: PersonRow, limit: number): MediaRow[] {
+  const rows: MediaRow[] = [];
+  const ids = recentProgress(person.id, 200).filter((progress) => progress.marks.length > 0).map((progress) => progress.media_id);
+  for (const progress of getProgressMany(person.id, ids)) {
+    const item = readableIn(person, APP, progress.media_id);
+    if (!item) continue;
+    const context = contextFor(person, [item]);
+    for (const mark of progress.marks) {
+      const base = rowOf(item, context);
+      rows.push({ ...base, id: item.id, summary: `Bookmark at ${clock(mark.at_s)}${mark.label ? `: ${mark.label}` : ""}`, duration_s: null });
+    }
+    if (rows.length >= limit) break;
+  }
+  return rows.slice(0, limit);
+}
+
+const clock = (seconds: number): string => {
+  const whole = Math.max(0, Math.floor(seconds));
+  const h = Math.floor(whole / 3600);
+  const m = Math.floor((whole % 3600) / 60);
+  const s = whole % 60;
+  return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+};
+
+registerMediaAppData(APP, (person, dataId, params) => {
+  const limit = Math.min(Math.max(params.limit ?? 40, 1), 200);
+  switch (dataId) {
+    case "shows": return showRows(person);
+    case "episodes": return episodeRows(person, episodesOf(person, params, limit));
+    case "saved": return episodeRows(person, episodesOf(person, params, limit, true));
+    case "bookmarks": return bookmarkRows(person, limit);
+    default: return null;
+  }
+});
+
+registerItemView(APP, (person, item, view) => {
+  const source = liveSourceById(item.source_id);
+  const saved = !(item.location as { url?: string }).url;
+  const out = { ...view, saved, queued: collectionIds(person, "queue").includes(item.id), copy_label: copyLabelOf(item) };
+  if (!source) return out;
+  // The show's "skip the first N seconds": a first listen starts there. (A resume keeps the person's own place.)
+  const progress = getProgress(person.id, item.id);
+  if (out.position_s === undefined && !progress && source.skip_intro_s > 0) out.position_s = source.skip_intro_s;
+  return { ...out, ...(source.speed ? { speed: source.speed } : {}), skip_intro_s: source.skip_intro_s, skip_outro_s: source.skip_outro_s };
+});

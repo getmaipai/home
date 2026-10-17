@@ -20,7 +20,7 @@ export function visibleFeedIds(band: AgeBand): string[] {
   // An admin's feed counts only while its address is still in the box, so a
   // removal takes effect at once, before the next tick deletes the row.
   const typed = adminAddresses();
-  return listFeeds()
+  return listFeeds("news")
     .filter((feed) => feed.package_id || typed.get(feed.url) === feed.band)
     .filter((feed) => feedVisibleTo({ band: feed.band, packageId: feed.package_id ?? null, enabled: feed.enabled }, band, ticked))
     .map((feed) => feed.id);

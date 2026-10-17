@@ -89,7 +89,7 @@ export function syncShelfFeeds(options: { nowIso?: string; store?: ShelfStore | 
 
   let created = 0;
   let removed = 0;
-  const existing = new Map(listFeeds().map((feed) => [feed.url, feed] as const));
+  const existing = new Map(listFeeds("news").map((feed) => [feed.url, feed] as const));
   for (const [url, want] of desired) {
     const have = existing.get(url);
     if (!have) {

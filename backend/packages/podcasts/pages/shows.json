@@ -1,0 +1,39 @@
+{
+  "type": "page",
+  "id": "shows",
+  "title": "Shows",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Shows",
+      "bind": {
+        "source": "package",
+        "path": "shows"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/podcasts/episodes",
+          "state": {
+            "show": "{title}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "mic",
+        "text": "No shows yet. An admin can add a show with Settings, then Podcasts."
+      }
+    }
+  ]
+}
