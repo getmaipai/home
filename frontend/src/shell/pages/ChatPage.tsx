@@ -1329,7 +1329,12 @@ export function ChatPage({ person }: { person: Roster }) {
     open: voiceOpen,
     onOpenChange: closeAwareSetVoiceOpen,
     installationNotice: chatAvailability === "unavailable" && composerNotice?.text.startsWith("The AI is still installing.") === true,
-    onProblem: (kind: VoiceFailureKind) => kind === "microphone_blocked" ? void micGate.request() : toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" }),
+    onProblem: (kind: VoiceFailureKind) => {
+      const line = () => toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" });
+      if (kind !== "microphone_blocked") return line();
+      // Diagnose only: the browser allows the mic here, so the failure is something else; say so once, never reopen.
+      void micGate.diagnose().then((ok) => { if (ok) line(); });
+    },
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,
     liveVoiceActiveRef,

@@ -16,14 +16,15 @@ export function useMicGate(onGranted: () => void, deps?: MicProbeDeps) {
   const depsRef = useRef(deps);
   depsRef.current = deps;
 
-  const request = useCallback(async () => {
+  const run = useCallback(async (open: boolean) => {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
       const result = await probeMic(depsRef.current);
       if (result.ok) {
         setProblem(null);
-        onGrantedRef.current();
+        if (open) onGrantedRef.current();
+        return result;
       } else {
         setProblem(result.problem);
       }
@@ -31,6 +32,12 @@ export function useMicGate(onGranted: () => void, deps?: MicProbeDeps) {
       inFlight.current = false;
     }
   }, []);
+  const request = useCallback(() => run(true), [run]);
+  // After a session that was already open failed to capture: show the help
+  // when the browser blocks the mic, but never reopen the session. Reopening
+  // here made a capture failure the probe cannot see loop open -> fail ->
+  // probe ok -> open, many times a second.
+  const diagnose = useCallback(() => run(false), [run]);
 
   // While the help is up, the person is off changing a setting: notice
   // when it flips to granted (read only) and start for them.
@@ -60,7 +67,7 @@ export function useMicGate(onGranted: () => void, deps?: MicProbeDeps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are test-only and stable.
   }, [problem, request]);
 
-  return { problem, request, dismiss: () => setProblem(null) };
+  return { problem, request, diagnose, dismiss: () => setProblem(null) };
 }
 
 const TITLES: Record<MicProblem, string> = {

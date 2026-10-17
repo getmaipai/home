@@ -27,6 +27,25 @@ describe("useMicGate", () => {
   });
 });
 
+describe("useMicGate.diagnose (regression: open/close loop on a capture failure)", () => {
+  test("a passing probe never opens the session again, and reports ok once", async () => {
+    const onGranted = mock(() => {});
+    const { result } = renderHook(() => useMicGate(onGranted, { isSecureContext: true, query: async () => "granted", getUserMedia: async () => stream }));
+    let ok: unknown;
+    await act(async () => { ok = await result.current.diagnose(); });
+    expect(ok).toBeTruthy();
+    expect(onGranted).not.toHaveBeenCalled();
+  });
+  test("a blocked mic still shows the help and returns nothing", async () => {
+    const onGranted = mock(() => {});
+    const { result } = renderHook(() => useMicGate(onGranted, { isSecureContext: true, query: async () => "denied", getUserMedia: async () => stream }));
+    let ok: unknown = "unset";
+    await act(async () => { ok = await result.current.diagnose(); });
+    expect(ok).toBeUndefined();
+    expect(result.current.problem).toBe("denied");
+  });
+});
+
 describe("micHelp", () => {
   test("denied on Safari lists the Safari path and the macOS layer", () => {
     const help = micHelp("denied", "Version/17 Safari/605");
