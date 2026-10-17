@@ -1,6 +1,6 @@
 {
   "name": "@maipai/home-backend",
-  "version": "0.2.14",
+  "version": "0.2.15",
   "private": true,
   "description": "MaiPai Home hub server: identity and sign-in, people, the household API. See docs/dev.md.",
   "license": "AGPL-3.0",

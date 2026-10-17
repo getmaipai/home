@@ -7,8 +7,27 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-### Media library
+### Storage
 - Storage now has one Trash for deleted media, playlists and watchlists. Restore an item within 30 days, or confirm Delete forever. Home clears expired items at startup and every six hours; deleted paths stay out of new scans. Children see only their own safe items. Lists and memories will join later.
+
+## [0.2.15] - 2026-10-17
+
+Chat looks things up for live-status questions, and pictures can be edited in words from chat.
+
+### Chat
+- A question about whether a service is down right now ("is cloud flare down") is searched instead of answered from memory. A typed "cloud flare" finds "Cloudflare", and a search the model started but did not finish is recovered as a search.
+- Live voice no longer ends a call in the middle of a sentence when its quiet-window timer fires late.
+
+### Pictures and videos
+- Edit a picture in words from chat: remove people, remove the background, upscale, change the sky, the colour or an object, or add a person from a second picture. The result is the next version of the picture.
+- When an edit leaves people in the picture alone, they are restored from the original and checked unchanged. If Home cannot account for every person in the picture, it refuses the edit instead of guessing.
+- Whether a photo shows an adult who agreed is decided only by what the person says in their own message, never by the model's guess. A new household setting, Settings, Pictures, turns off the extra questions and warnings about people. It is off by default, and the safety rules for children and for real people never turn off.
+
+### Reliability
+- The web app loads its pages on first visit instead of all at once, so the first download is smaller.
+- The Stack is updated to the build that repairs tool names the chat engine mangles and carries the media service and the music engine (no page uses them yet).
+
+### Media library
 - Home can scan library folders on this computer or on a mounted network share and list what is in them: videos, shows, films, music, books and audiobooks, with posters, covers, chapters and tags. An owner or admin adds a folder and can rescan it; children see only the titles cleared for a child. No page uses it yet.
 - Home remembers where each person stopped in a video, episode, podcast, audiobook or book, on every screen. The newest place wins, a finished title stays finished, and a child's place is saved only from the child's own screen. Liked, watch later and up next exist for everyone, and playlists, watchlists and pins can be made. The "Pick up where you left off" data now includes unfinished titles beside chats.
 
