@@ -19,7 +19,7 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **When it happens:** Home asks Open-Meteo when someone asks about weather. About once an hour, it also refreshes the home place in the background. It skips this refresh if no home place is set.
 
-**What it sends:** A weather request sends the place name you said to Open-Meteo. If your weather default is Current location, it sends your device's coordinates instead, rounded to about 1 km (about 10 km for a child). Home uses them for that one request and never stores them. The hourly refresh sends your saved home place. Open-Meteo's geocoding service may also receive a place name.
+**What it sends:** A weather request sends the place name you said to Open-Meteo. If your weather default is Current location, it sends your device's coordinates instead, rounded to about 1 km (about 10 km for a child). Home uses them for that one request and never stores them. The hourly refresh sends your saved home place. Choosing the home place on the Home page, with **Use my location** or a typed city, uses a list of cities built into Home. Nothing leaves your house for that step. Open-Meteo's geocoding service may also receive a place name.
 
 **Who can use it:** Everyone. The package floor is child.
 
@@ -173,11 +173,11 @@ Open **Settings**, then **Privacy**. This page lists the connections Home can ma
 
 **What it is for:** Searching the live web, reading a page, looking up one word online, or finding a saved copy of a missing page.
 
-**When it happens:** If SearXNG is the chosen source, Home sends a search to your SearXNG server. It may read up to three pages from results. It fetches a page you ask it to explain or link to. It asks Wiktionary only when an adult looks up one word, the home dictionary has no answer, and **Look up words online** is on. It asks Wikipedia only for an adult search with no result and no match in the home library. It asks the Wayback Machine only for a missing page in a teen or adult search. Children never use those three fallbacks. They also stay off in **Library only** mode.
+**When it happens:** If SearXNG is the chosen source, Home sends a search to your SearXNG server. If DuckDuckGo is on (it is on for adults when SearXNG is not set up), an adult's search also goes to DuckDuckGo from a small search service on your computer. It may read up to three pages from results. It fetches a page you ask it to explain or link to. It asks Wiktionary only when an adult looks up one word, the home dictionary has no answer, and **Look up words online** is on. It asks Wikipedia only for an adult search with no result and no match in the home library. It asks the Wayback Machine only for a missing page in a teen or adult search. Children never use those three fallbacks. They also stay off in **Library only** mode.
 
-**What it sends:** The SearXNG source gets your search words and sends them to its chosen search engines. If an adult has added a Brave key, adult searches also go to Brave. Children and teens do not use Brave. A page site gets a normal request for its page, not your search. Wiktionary gets one word. Wikipedia gets the search words. Wayback gets the missing page's address. These sites also see your home's internet address.
+**What it sends:** The SearXNG source gets your search words and sends them to its chosen search engines. DuckDuckGo gets the same words and your home's internet address, and nothing else. If an adult has added a Brave key, adult searches also go to Brave. Children and teens do not use Brave. A page site gets a normal request for its page, not your search. Wiktionary gets one word. Wikipedia gets the search words. Wayback gets the missing page's address. These sites also see your home's internet address.
 
-**Who can use it:** Everyone. The package floor is child. Children and teens use SearXNG only. They do not use Wikipedia fallback, Wiktionary or Wayback.
+**Who can use it:** Everyone. The package floor is child. Children and teens use SearXNG only, unless an owner or admin turns on **DuckDuckGo for teens and children** in **Settings > Search**. They do not use Wikipedia fallback, Wiktionary or Wayback.
 
 **How to clear what it saved:** Home keeps page copies for up to one week, or one day for a news page. In **Settings > Search**, set **Search fetch cache limit (GB)** to 0 to stop saving pages. Old copies are removed by the daily cleanup. See [Set up web search](web-search.md) for this setting. SearXNG and the other sites set how long they keep their own records. Web search needs no key or account.
 

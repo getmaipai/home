@@ -7,7 +7,7 @@ description: How to connect MaiPai to your own SearXNG search server, use it awa
 
 ## What web search needs
 
-Web search needs the address of a SearXNG server you run today. MaiPai sends your search words to that server. MaiPai’s own search service is coming (STACK-SEARCH-01). Web search stays off until you give MaiPai the address.
+Web search works with no setup for adults. Home's own small search service reaches DuckDuckGo for them. You can also run your own SearXNG server. It is the main source for teens and children. MaiPai sends your search words to the source you chose. Home's own SearXNG, run by the AI engine, is planned (STACK-SEARCH-01).
 
 The model decides when a question needs a search. You do not have to press a button.
 

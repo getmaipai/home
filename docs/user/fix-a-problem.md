@@ -27,7 +27,7 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 
 ## If voice input doesn't work
 
-- Make sure your browser has permission to use your microphone.
+- Make sure your browser has permission to use your microphone. If Home shows a help box when you start a voice conversation, follow it, then press **Try again**. See [Talking to Home](voice.md).
 - If the connection to your hub drops, check that the hub is on, then tap the waveform to start again.
 - If Home says its listening engine is not running, type your message instead, or open Repairs to check it. Ask an owner or admin if you cannot open Repairs.
 - If Home cannot speak a reply, read it on screen. Voice will try again on your next question.
@@ -35,7 +35,8 @@ MaiPai updates itself the next time you open it. If a page still looks old after
 
 ## If you can't sign in
 
-- Double check your PIN or password.
+- Double check your PIN or password. A PIN shows as one box per digit, and Home signs you in when the last box is full.
+- After 5 wrong tries the account locks, first for 30 seconds, then longer each time. A countdown shows. Wait for it to end, then try the right code. See [Sign in](sign-in.md).
 - Ask an owner or admin to check your account. They can do this under **Settings** > **Users**, or reset your PIN there.
 - If you're signed in on another device that's misbehaving, open **Settings**, then **Devices & sessions** (under Me), and sign that device out.
 

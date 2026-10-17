@@ -29,7 +29,9 @@ Open Terminal on the Mac and paste this one line. A plain SSH connection works t
 curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install.sh | sudo bash
 ```
 
-This installs Home only, so it takes about a minute. When Home answers, the installer prints the address to open, such as `http://localhost:3000`. Open it in a browser to start the setup wizard.
+This installs Home only, so it takes about a minute. The installer also installs Deno (version 2.9.7, checked against a published checksum) into Home's own folder, so the built-in data packages work. You do not need Node, Deno or Bun on the Mac first. The installer uses its own Bun for every step.
+
+When Home answers, the installer opens the setup address in your default browser, such as `http://localhost:3000`, and prints the same address as its last line. If no browser opens (for example over SSH), open that address yourself to start the setup wizard.
 
 If it stops, read the last lines. They say what went wrong and what to do. Fix that, then run the same line again. It picks up where it stopped and does not hurt anything already installed.
 
@@ -42,7 +44,7 @@ The wizard asks where the AI runs.
 
 The plan lists what you get, including voice ("Voice: talk to Home"). The browser asks for the microphone the first time you use voice, not during setup.
 
-If Home's own web search is not ready when the plan finishes, one more screen, **Turn on web search**, asks for the address of a SearXNG you run on your home network. Press **Test** to check it and **Save** to use it, or **Skip for now**. Skipping turns on DuckDuckGo search for adults. You can change this later in **Settings**, then **Search**.
+If Home's own web search is not ready when the plan finishes, one more screen, **Turn on web search**, asks for the address of a SearXNG you run on your home network. Press **Test**. **Continue** turns on once the test for that exact address passes. Leave the address empty and press **Continue** to skip it, which turns on DuckDuckGo search for adults. You can change this later in **Settings**, **Home settings**, then **Search**. See [Set up your hub](getting-started.md) for every wizard screen.
 
 The engine needs the Mac's logged-in desktop to use the graphics chip. If nobody is logged in at the Mac, the bar stops and says so. Log in at the Mac and press Try again.
 
@@ -91,11 +93,13 @@ Run the same install line again. If the AI engine is already installed, it is re
 
 Home keeps the same address it had before.
 
-To install one exact version, add `--version` and the release name.
+To install one exact version, fetch the installer from that release's tag and add `--version` with the same name. This is the safest way, because the installer you run is the one that was tested with that release.
 
 ```bash
-sudo bash /usr/local/maipai-home/scripts/install.sh --version v0.1.0
+curl -fsSL https://raw.githubusercontent.com/getmaipai/home/v0.2.5/scripts/install.sh | sudo bash -s -- --version v0.2.5
 ```
+
+Each release carries its own AI engine. The installer builds the engine from the exact version that release names, not from the newest code. So a fix to the engine reaches your Mac only when you install a Home release that includes it.
 
 ## Go back one version
 
@@ -142,6 +146,7 @@ curl -fsSL https://raw.githubusercontent.com/getmaipai/home/main/scripts/install
 | "not enough free disk space" | Free up space, then run the install line again, or press Try again in the wizard. |
 | "could not download" | Check the Mac's internet connection, then run the install line again. |
 | macOS says it cannot verify a program | Open System Settings, then Privacy and Security, and choose Allow Anyway. Then run the install line again. |
+| "Home is already running" with a lock file | Another copy of Home is running on this Mac, usually one started from a developer folder. Stop it, then run the install line again. |
 | Home did not come up | Read the last lines of `/usr/local/maipai-home/data/logs/launchd.err.log`. Fix what they name, then run the install line again. |
 | The engine does not answer after a restart | Log in at the Mac. The engine starts at login. |
 

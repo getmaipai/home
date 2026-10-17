@@ -12,7 +12,19 @@ Chat is where you talk to MaiPai, by typing or by voice.
 
 MaiPai's answer appears below your message. Chat follows the newest text while a reply is coming in. If you scroll up, tap the down arrow to return to the latest message.
 
-If you leave a chat while MaiPai is replying, the chat gets a title when you return. You do not need to wait for the reply to finish.
+The message box takes focus when you open Chat and when a menu closes, so you can start typing right away.
+
+Each chat gets a title from your first message at once. Soon after, Home replaces it with a short title the fast helper model writes. A chat that only says hello stays **New chat** until there is something to title. You do not need to wait for the reply to finish.
+
+When you open Chat, the empty chat shows one of ten pictures. The picture changes from one visit to the next.
+
+## Thinking, and what the words mean
+
+Some models think before they answer. Home keeps that thinking folded away by default. While the model thinks you see a calm label with a plain word that changes every 10 to 14 seconds. When it is done, the label reads **Thought for 12s**, with the number of seconds. Tap it to read the reasoning. Home remembers whether you like it open or closed.
+
+If you use reduced motion on your device, the label stays **Thinking** and does not change.
+
+A model like Muse Glimmer thinks on every turn. For those models the message box shows a short **Thinking** badge instead of a mode picker. Hover or focus the badge to see why. An Instant mode for these models is planned, but it is not available yet.
 
 ## What MaiPai can look up
 
@@ -23,7 +35,7 @@ Ask MaiPai to look something up and you get a real answer, not a guess. Just ask
 - "Who directed Cobra?"
 - "Search the web for tonight's game score"
 
-Weather, word meanings, trivia, and film lookups work right away. Web search takes one more step. An adult sets it up first, in **Settings**, **AI & connections**, **Integrations**, by adding the address of your own search server. When you search, MaiPai reads a few of the pages it finds, so the answer comes from what they say.
+Weather, word meanings, trivia, and film lookups work right away. Web search is on for adults when Home's search is ready. It uses your own SearXNG if one is set up, and DuckDuckGo otherwise. Teens and children use the Library and your own SearXNG unless an owner or admin allows more. See [Set up web search](web-search.md). When you search, MaiPai reads a few of the pages it finds, so the answer comes from what they say. If a lookup finds nothing, Home says what is missing and what to do. It never leaves you with an empty reply. For the weather, see [Weather](weather.md).
 
 See the [Privacy](privacy.md) page for what each one sends, and to whom.
 
@@ -39,7 +51,7 @@ If you type in a saved chat and leave before sending, Chat keeps your draft on t
 
 ## If the AI is starting
 
-If you see **Starting your AI**, wait for it to finish. You can type while it starts. The send button works again once it's ready.
+If you see **Starting your AI**, wait for it to finish. You can type while it starts. The send button waits and reads **Getting ready, one moment** while the AI warms up, then works again. Home loads the chat model when it starts, so the first reply after a restart is quicker than it used to be.
 
 ## If the connection drops
 
@@ -53,7 +65,7 @@ Sometimes MaiPai's AI stops for a while, for example while the computer restarts
 
 ## Talk instead of type
 
-Tap the microphone icon next to the message box and start speaking. MaiPai listens, turns your words into text, and sends it once you stop talking.
+Tap the microphone icon next to the message box and start speaking. MaiPai listens, turns your words into text, and sends it once you stop talking. The first time, your browser asks for the microphone. If it says no, Home shows help for your browser. See [Talking to Home](voice.md).
 
 You can talk over Home or tap Stop, and it will stop speaking and listen.
 
@@ -63,7 +75,7 @@ Open **Chat status**, then tap **Wake word** to turn on the wake-word listener. 
 
 ## Chat options and status
 
-The message box grows as you type. Choose **Instant** or **Thinking** when your model supports those modes.
+The message box grows as you type. When your model can switch, choose **Instant** or **Thinking**. Models that always think show the **Thinking** badge instead (see above).
 
 Open **Chat status** to see the Brain, Mouth, Ears and Eyes indicators. Each shows what is ready and what needs attention. Archived chats are available from the chat history.
 
@@ -108,9 +120,9 @@ The setting is off by default, and children do not see the stats at all.
 
 ## Attach a document or picture
 
-Tap the **+** button next to the message box, choose a document or a picture from your device, and it appears as a small tile above the box. On a phone, **Take a photo** opens the camera. You can also paste a picture or drag it onto the chat. Tap the **x** on a tile to take it back out. Type your question, then send. MaiPai reads a document and answers about it.
+Tap the **+** button next to the message box. The menu opens above the plus, one short row for each choice. Choose a document or a picture from your device, and it appears as a small tile above the box. On a phone, **Take a photo** opens the camera. You can also paste a picture, or drag a file anywhere onto the chat page. Tap the **x** on a tile to take it back out. Type your question, then send. MaiPai reads a document and answers about it.
 
-Pictures you send show as small thumbnails above your message. Tap one to see it full size. MaiPai cannot see pictures yet: it knows you sent one and what the file is called, and it tells you it can't look at it. You can add up to 4 pictures to a message, each up to 10 MB.
+Pictures you send show as small thumbnails above your message. Tap one to see it full size. On computers with 32 GB of memory or more, the chat model (Muse Glimmer) looks at the picture and answers about what is in it. Big pictures are shrunk to 2000 pixels on the long side first. iPhone photos in the HEIC format work too. On a smaller computer the model cannot see pictures. The **+** menu then says why pictures are off, and MaiPai tells you it can't look at the picture. You can add up to 4 pictures to a message, each up to 10 MB.
 
 Pictures are cleaned before they are saved: the hidden details a camera adds (like where the photo was taken) are removed. Children cannot send pictures until a parent turns on **Send photos in chat** for them. Teens and adults can send pictures from the start.
 
@@ -136,7 +148,7 @@ A project keeps chats about one thing together, like a garden plan or a school s
 
 Use the chat list beside the conversation to find a chat. Type in **Search chats** to search the list. On a narrow screen, open the chat list from its button. Use the collapse button to hide the list and make more room for the conversation. Reopen it from the same button.
 
-Open **More options** beside a chat to rename or delete it. Deleting asks you to confirm first.
+Open **More options** beside a chat to rename, pin, archive or delete it. The menu at the top of a chat has the same choices: **Rename**, **Pin** or **Unpin**, **Archive** and **Delete**, then **Read replies aloud** below a line. Deleting asks you to confirm first.
 
 Open **Conversations** from navigation for bulk actions and parental oversight:
 

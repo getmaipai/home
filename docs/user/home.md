@@ -1,18 +1,27 @@
 ---
 title: The Home screen
-description: What you'll see when you open MaiPai, and how to use it.
+description: What you see when you open MaiPai, and how to use it.
 ---
 
-Home opens when you sign in. It shows how many people are in your home, any updates, open repairs, engines, usage, and recent activity.
+Home is the first page after you sign in. It is short on purpose. It says hello, lets you ask a question, and shows a quick look at your day.
 
-## What's on the screen
+## What is on the screen
 
-- **Status cards.** See the number of people, updates, open repairs, and engine status.
-- **Turns per day.** See how often people use MaiPai.
-- **Recent activity.** See what has happened on this hub. It is empty when there is nothing to show.
+- **A greeting** with your name.
+- **An ask box.** Type a question and press Enter. Chat opens with your words already in the message box. Nothing is sent until you press send, so you can change them first. Three starter buttons under the box fill in a common question for you. While the AI is still installing, the box says so.
+- **Today.** A few cards from the apps in your house, like the weather. You only see cards you are allowed to see. A card is left out when it has nothing to show.
+- **Ask a grown-up to set the home location.** Teens and children may see this line when the household's home place is not set yet. See [Weather](weather.md).
+
+If you are an owner or an admin you also see:
+
+- **Updates** and **Repairs** buttons at the top, to look after the hub.
+- **Getting started.** Up to three setup steps that are not done yet, each with a button to open it and a **Skip** button. When more are left, a link opens the rest in **Settings**. The card goes away when all steps are done.
+- **A place question.** Until the household's home place is set, Home asks where home is. Press **Use my location**, or type a city. Home then asks you to confirm, like "Chicago, Illinois?".
 
 ## Start a conversation
 
-Open **Chat** in the navigation to ask a question and continue the conversation there.
+Use the ask box, or open **Chat** in the navigation.
 
-![The Home page, with people, update, repair, and engine cards, a use chart, and recent activity](../assets/screens/home-desktop-light.png)
+## What changed
+
+Older versions showed counts of people, updates and repairs, a chart and a list of recent activity. Those are gone. Updates and Repairs are one tap away at the top, and Settings shows the rest.
