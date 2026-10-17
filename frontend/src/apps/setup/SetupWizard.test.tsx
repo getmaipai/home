@@ -374,7 +374,7 @@ describe("SetupWizard", () => {
     } finally { h.restore(); }
   });
 
-  test("the Web search screen follows the plan only when Home's own search is not ready; Skip for now turns DuckDuckGo on for adults and goes on", async () => {
+  test("the Web search screen follows the plan only when Home's own search is not ready; an empty address and Continue turn DuckDuckGo on for adults and go on", async () => {
     for (const searchNeeded of [true, false]) {
       const state = freshState();
       for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
@@ -395,7 +395,7 @@ describe("SetupWizard", () => {
         if (!searchNeeded) { await advanceTo(rendered, "Continue", "Create your owner account"); expect(searchBodies).toEqual([]); continue; }
         await advanceTo(rendered, "Continue", "Turn on web search");
         expect(rendered.container.textContent).toContain("SearXNG address");
-        await advanceTo(rendered, "Skip for now", "Create your owner account");
+        await advanceTo(rendered, "Continue", "Create your owner account");
         expect(searchBodies).toEqual([{ ddgs_default: true }]);
         expect(h.posts).not.toContain("web_search");
       } finally { h.restore(); cleanup(); }
