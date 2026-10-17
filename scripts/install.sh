@@ -248,6 +248,28 @@ run_as_console_user() {
   fi
 }
 
+# Opens the finished install's address in the person's default browser.
+# macOS: the installer is root, so open it as the console user inside
+# their login session. Linux: only with a desktop session (DISPLAY or
+# WAYLAND_DISPLAY) and xdg-open. Never fails the install.
+open_setup_page() {
+  local os="$1" url="$2" dry_run="${3:-no}" user
+  user=$(find_console_user "$os" 2>/dev/null || true)
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] would open ${url} in the default browser as ${user:-<no console user found>}"
+    return 0
+  fi
+  [ -n "$user" ] || return 0
+  if [ "$os" = "darwin" ]; then
+    run_as_console_user darwin "$user" open "$url" >/dev/null 2>&1 \
+      || log "Could not open the browser for you. Open the address below by hand."
+  elif [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ] && command -v xdg-open >/dev/null 2>&1; then
+    run_as_console_user linux "$user" "DISPLAY=${DISPLAY:-}" "WAYLAND_DISPLAY=${WAYLAND_DISPLAY:-}" xdg-open "$url" >/dev/null 2>&1 \
+      || log "Could not open the browser for you. Open the address below by hand."
+  fi
+  return 0
+}
+
 # Free disk the installer needs, in GB. Home alone is small (its source, Bun
 # and the frontend build). The Stack's build and engines need more, and are
 # checked when the setup wizard asks for the Stack (--stack-only), not here.
@@ -1333,6 +1355,7 @@ main() {
     record_setup_plan "${install_root}/data" "$requested_plan" yes
     log "[dry-run] the MaiPai Stack (the AI engine) is not installed now: the setup wizard installs it if you choose to run the AI on this computer"
     log "[dry-run] would wait for Home at http://127.0.0.1:${APP_PORT}/ and print the address to open"
+    open_setup_page "$os" "http://localhost:${APP_PORT}" yes
     exit 0
   fi
 
@@ -1526,7 +1549,6 @@ main() {
     lan_name=$(scutil --get LocalHostName 2>/dev/null || true)
     [ -z "$lan_name" ] || log "From another device on your network: http://${lan_name}.local:${port}"
   fi
-  log "Open that address in a browser to finish setup."
   if [ "$has_stack" = "yes" ]; then
     log "Logs: ${install_root}/data/logs/ (Home), ${install_root}/stack/data/logs/ (Stack)."
     print_reboot_note "$os"
@@ -1535,6 +1557,9 @@ main() {
     log "No browser at this computer? From another computer on your network, open that address with this computer's name in place of localhost."
     log "Logs: ${install_root}/data/logs/"
   fi
+  open_setup_page "$os" "http://localhost:${port}" || true
+  log ""
+  log "Open this address to finish setup: http://localhost:${port}"
 }
 
 # Guarded so scripts/install.test.ts and uninstall.sh can `source` this

@@ -451,6 +451,27 @@ describe("--dry-run", () => {
   });
 });
 
+describe("open_setup_page", () => {
+  test("dry-run prints what it would open and opens nothing", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo marlow; }; run_as_console_user() { echo OPENED; }; open_setup_page darwin http://localhost:3000 yes`]);
+    const out = result.stdout.toString() + result.stderr.toString();
+    expect(out).toContain("[dry-run] would open http://localhost:3000 in the default browser as marlow");
+    expect(out).not.toContain("OPENED");
+  });
+  test("a failed open is not fatal and says to open the address by hand", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo marlow; }; run_as_console_user() { return 1; }; open_setup_page darwin http://localhost:3000; echo rc=$?`]);
+    const out = result.stdout.toString() + result.stderr.toString();
+    expect(out).toContain("Open the address below by hand");
+    expect(out).toContain("rc=0");
+  });
+  test("no console user: skips silently", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; find_console_user() { echo; }; run_as_console_user() { echo OPENED; }; open_setup_page darwin http://localhost:3000; echo rc=$?`]);
+    const out = result.stdout.toString() + result.stderr.toString();
+    expect(out).not.toContain("OPENED");
+    expect(out).toContain("rc=0");
+  });
+});
+
 describe("setup plan option", () => {
   function planCall(args: string[], env: Record<string, string | undefined> = {}, existing = "") {
     const root = mkdtempSync(join(tmpdir(), "maipai-setup-plan-"));
