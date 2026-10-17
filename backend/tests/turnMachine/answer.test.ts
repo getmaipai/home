@@ -97,6 +97,18 @@ describe("answerNode: a failed generation is told by its kind (THIN-DL-02)", () 
     expect(failureLine("engine_computer" as FailureKind, false, true)).toBe("I can't reach the engine computer from here. Your message is safe; send it again when you are home or once the connection is back.");
     expect(failureLine("engine_computer" as FailureKind, true, true)).toBe(FAILURE_COPY.unreachable.minor);
   });
+  test("a picture or video job already started: the failed phrasing round says it is coming, never that something went wrong", async () => {
+    const picture = { ...ADULT, outcomes: [{ callId: "c1", packageId: "generate_image", status: "succeeded", via: "tool_call", args: {}, durationMs: 0, result: { reply: { text: "x" }, data: { pictureJobId: "pic-1" }, actions: [] } }] } as unknown as TurnState;
+    const video = { ...ADULT, outcomes: [{ callId: "c2", packageId: "generate_video", status: "succeeded", via: "tool_call", args: {}, durationMs: 0, result: { reply: { text: "x" }, data: { videoJobId: "vid-1" }, actions: [] } }] } as unknown as TurnState;
+    const a = await answerNode(picture, { kind: "model_failed", failure: "other" }, SIGNAL);
+    const b = await answerNode(video, { kind: "model_failed", failure: "other" }, SIGNAL);
+    expect(a.output.text).toContain("Your picture is being made");
+    expect(b.output.text).toContain("Your video is being made");
+    expect(picture.failedGenerationReply).toBe(true);
+    // a failed start (no job id) keeps the ordinary line
+    const none = { ...ADULT, outcomes: [{ callId: "c3", packageId: "generate_image", status: "failed", via: "tool_call", args: {}, durationMs: 0 }] } as unknown as TurnState;
+    expect((await answerNode(none, { kind: "model_failed", failure: "other" }, SIGNAL)).output.text).toBe(FAILURE_COPY.other.adult);
+  });
   test("a failure with no kind still gets the plain other-kind line", async () => {
     const { output } = await answerNode(ADULT, { kind: "model_failed" }, SIGNAL);
     expect(output.text).toBe(failureLine("other", false));

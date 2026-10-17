@@ -8,7 +8,7 @@
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { engineComputerAwayFromHome, failureLine, type FailureKind } from "@/lib/generationFailure";
-import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { COMPOSE_FAILURE_LINE, pictureForOutcomes, videoForOutcomes } from "@/lib/composer";
 import { PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { VIDEO_NOT_HERE_LINE, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 
@@ -100,6 +100,10 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
 
 /** The last-resort line when a lookup was missed and the model wrote no words at all. Says what is
  * missing and what to do (STYLE.md); never the raw error, never a made-up fact. */
+/** The reply when the picture or video was started but the words about it could not be written. */
+export const PICTURE_STARTED_LINE = "Your picture is being made. It will show up right below when it is ready.";
+export const VIDEO_STARTED_LINE = "Your video is being made. It takes about two minutes and will show up right below when it is ready.";
+
 export function missedLookupLine(outcomes: readonly ToolExecutionOutcome[]): string {
   const web = outcomes.some((o) => o.packageId === "websearch");
   return web
@@ -166,6 +170,11 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
     // rather than re-typed so the two copies can't drift.
     case "model_failed":
       state.failedGenerationReply = true;
+      // A picture or video job was already started when the phrasing round failed (seen live three times: the chat
+      // stream ended while the job began). "Something went wrong while writing that" would be false and would make
+      // the person ask again, so a second job; the job is real and its card is coming, so say that.
+      if (pictureForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: PICTURE_STARTED_LINE, sources: [] } };
+      if (videoForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: VIDEO_STARTED_LINE, sources: [] } };
       // THIN-DL-02: the line follows the failure kind (generationFailure.ts),
       // never the generic apology.
       return { outcome: { ok: true }, output: { text: failureLine(input.failure ?? "other", state.plan?.age_band !== "adult", engineComputerAwayFromHome()), sources: [] } };
