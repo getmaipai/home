@@ -15,6 +15,7 @@ Open **Videos** from the apps list or from your favorites. At the top you see fo
 - **Continue watching** shows videos you started and did not finish. A thin bar under each picture shows how far you got.
 - **Recently added** shows the newest videos. **More from your most watched** shows other videos from the place you watch most.
 - **Watch again** shows videos you finished.
+- **Everything in your library** lists all your videos.
 
 A badge on a picture says **Saved** when the video is stored on your hub.
 
@@ -41,7 +42,7 @@ Press **Watch later** on the Home picture to save a video. Press it again to tak
 
 ## If you are a child
 
-You see the videos your family has cleared for children. You do not see the Home pictures or the lists of new videos, so nothing surprising shows up. If you cannot find a video, ask a grown-up.
+You see the videos your family has cleared for children. You do not see the big picture or the lists of new videos, so nothing surprising shows up. **Everything in your library** and **Library** show all your videos. If you cannot find a video, ask a grown-up.
 
 ## Add videos
 

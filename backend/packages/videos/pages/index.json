@@ -41,7 +41,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "No videos yet. Ask an admin to add a video folder in Settings, Saved videos and storage."
+        "text": "Nothing featured right now."
       }
     },
     {
@@ -67,7 +67,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "Nothing to continue yet. Videos you start show up here."
+        "text": "Nothing to continue yet."
       }
     },
     {
@@ -93,7 +93,7 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "film",
-        "text": "Nothing new from the channels you follow."
+        "text": "Nothing new right now."
       }
     },
     {
@@ -172,6 +172,32 @@
         "type": "empty_state",
         "icon": "film",
         "text": "Videos you finish show up here."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Everything in your library",
+      "bind": {
+        "source": "package",
+        "path": "library"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No videos in the library yet. An admin can add a video folder in Settings, Home, Storage."
       }
     }
   ]
