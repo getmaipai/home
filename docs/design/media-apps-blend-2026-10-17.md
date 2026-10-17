@@ -51,7 +51,7 @@ slices of this layer, in Home's stack, with the same record shapes.
 | `blobs`, `media_assets`, downloaded podcast files, yt-dlp output | the household `file` record (`attachments` table today), content-addressed by sha256, with the new origin `fetched` | household storage record; PACKAGES.md "a person's output is a household record" |
 | `download_jobs`, heavyGate, transcode and faststart workers | the Stack `media` service: pinned ffmpeg, ffprobe and yt-dlp, one FIFO, jobs through the Stack job API (`stack-job` record, the PROJECT-MEDIA-01 step) | RULES 11 precedent KS-STACK-REF-01 (kiwix moved to the Stack as the `reference` service) |
 | `device_tokens`, `device-scope.js`, the four `/api/offline/*` routes | Home's `devices` and `device_tokens` tables plus a default-deny scope; routes under `/api/media/offline/*` | section 9 |
-| Podcast poller, `lib/podcast/feeds.ts` | the KS-05 shelf poller (feedsmith, conditional GET, per-host concurrency 1, backoff, SSRF guard); `feed` gains `kind: podcast` | principle 1 |
+| Podcast poller, `lib/podcast/feeds.ts` | the KS-05 shelf poller (feedsmith, conditional GET, per-host concurrency 1, backoff, SSRF guard); `feed` gains `purpose: podcast` | principle 1 |
 | `lib/auth/visibility.js` restrictions | the person's band (child, teen, adult), share pointers, and `media.allowlist_only` for a child | RULES 0 |
 | `player.js`, `VideoPlayer.tsx`, `radioEngine.ts`, `PodcastPlayerBar` | one kit `Player` primitive (video, audio and reader-audio layouts) placed by each app's page; the shell owns the docked mini bar and the audio session | rule 9b, UI.md "the player bar, player hooks" |
 | Home rows, Feed mode, search registry | Home page "Pick up where you left off" (media rows join it), the global Search (one provider per media kind), Feed mode as a Videos app page later | home-page-2026-10-17.md, section 12 |
@@ -140,7 +140,7 @@ Verdicts: **keep** (build as designed in the target), **port** (carry the logic,
 
 | Feature | LD | FT | Target | Verdict |
 |---|---|---|---|---|
-| RSS subscriptions, one feed row shared by the household, membership per person | yes | per server | `media-source` kind `feed` with `feed.kind: podcast`; the KS-05 poller | keep |
+| RSS subscriptions, one feed row shared by the household, membership per person | yes | per server | `media-source` kind `feed` with `feed.purpose: podcast`; the KS-05 poller | keep |
 | Conditional GET, backoff, feed URL kept out of backups | yes | yes | the shelf poller already does conditional GET; the URL is a `media-source` field, excluded from the export like other secrets if it carries a token | keep |
 | Podcasting 2.0 tags: chapters, transcript, persons, funding, soundbite; `itunes:explicit` | yes | basic | feedsmith reads them; `media-item.advisory` from explicit | keep LD's coverage |
 | Directory search (iTunes Search, PodcastIndex) | yes | no | opt-in, adults; a child subscribes through a parent | later |
@@ -227,25 +227,25 @@ All four carry `id`, `created_at`, `hlc` and `provenance` like every spec record
 listed does not exist.
 
 **`media-item`** (`spec/schemas/media-item.schema.json`, id `media-…`): `kind` (video, episode, film, track, podcast_episode,
-book, audiobook, chapter), `title`, `subtitle`, `source_id`, `location` (one of `{file_id}` for a saved copy in the household
+book, audiobook, chapter), `title`, `subtitle`, `description` (plain text), `source_id`, `parent_id` (a `chapter`'s audiobook), `location` (one of `{file_id}` for a saved copy in the household
 store, `{root_id, path}` for a file on a library root, `{url}` for a stream-only item such as a podcast episode not yet saved),
 `media_type`, `duration_s`, `size`, `width`, `height`, `video_codec`, `audio_codec`, `playable` (original, transcode, none; FT's
 rule), `artwork` (a `file_id` or a path under the item's root), `previews` (`{storyboard_file_id, clip_file_id}`), `chapters[]`
 (`{start_s, title, source: manual | embedded | description}`), `subtitles[]` (`{lang, label, file_id}`), `series`, `season`,
-`episode`, `artist`, `album`, `album_artist`, `track_no`, `disc_no`, `year`, `genre`, `author`, `locator_kind` (cfi, page, none),
+`episode`, `artist`, `album`, `album_artist`, `track_no`, `disc_no`, `year`, `genre`, `author`, `narrator`, `series_index` (a book's place in its series), `locator_kind` (cfi, page, none),
 `external` (`{extractor, id, url, channel_id, channel_name, published_at}` for anything fetched from the web), `advisory`
 (`{explicit: bool, source: tag | feed | platform | classifier | adult}`), `band_ok` (child, teen, adult: the lowest band that may
-see the title, description and artwork; computed at ingest like KS-05's `band_ok`), `added_at`, `fingerprint` (`size-mtime` for a
+see the title, description and artwork; computed at ingest like KS-05's `band_ok`), `verified_by_person_id` (the adult who marked a web item fine for a lower band), `added_at`, `fingerprint` (`size-mtime` for a
 root file; the sha256 for a saved copy), `hidden`. Identity: one item per `(source_id, external.id)` or per
 `(root_id, path)`; a re-scan updates, never duplicates (FT's merge rule keeps the newer `last_served_at`). Deletion is not a
 field here: it is the record envelope's `deleted_at` and `trash_until` (section 12, TRASH-01), one definition for every record.
 
 **`media-source`** (`media-source.schema.json`, id `msrc-…`): `kind` (root, feed, channel, link), `scope` (household or person)
 with `owner_person_id` when person, `label`, `root` (`{mount_id, path, kinds[]}` for a root; `nas_mounts` rows become these),
-`feed_id` (for a podcast, the `feed` record; `feed.kind` gains `podcast`), `url` (channel or link), `extractor`, `auto`
+`feed_id` (for a podcast, the `feed` record; `feed.purpose` is `podcast`), `url` (channel or link), `extractor`, `auto`
 (`{save: none | audio | video, keep_latest: n, remove_watched: bool, max_per_check: n, max_duration_s, min_duration_s,
 skip_shorts, cutoff_date, quality_max_height}`), `poll_minutes`, `paused`, `last_checked_at`, `last_status`, `failures`,
-`backoff_until`, `visible_to` (household or a person list), `archive` (the "deleted stays gone" ids). Roots of different kinds may
+`backoff_until`, `speed`, `skip_intro_s` and `skip_outro_s` (per-source playback, section 4 Podcasts), `visible_to` (household or a person list), `archive` (the "deleted stays gone" ids). Roots of different kinds may
 not overlap (FT's rule, enforced at save).
 
 **`media-progress`** (`media-progress.schema.json`, id `mprg-…`): `person_id`, `media_id`, `position` (one of
@@ -267,7 +267,7 @@ household by a pointer when the source is household-scoped. Bytes stored once pe
 "highest quality anyone asked for" becomes: a second request at a higher ceiling replaces the blob and keeps the record. Saved
 copies count against the owner's cap (STORE-CAP-01); a full cap stops auto-save for that person with a plain line, never a purge.
 
-**`feed.kind`** gains `podcast`; **`device`** gains `offline_scope` (the default-deny route allowlist for a paired offline device);
+**`feed.purpose`** (`news` or `podcast`, absent reads as news) is new: NEWS-00 made `feed.kind` the format (rss, atom, json), so the content is its own field (MEDIA-SPEC-01, architect-approved 2026-10-17); **`device`** gains `offline_scope` (the default-deny route allowlist for a paired offline device);
 **`stack-job.kind`** gains `media.fetch`, `media.probe`, `media.transcode`, `media.preview`, `media.chapter_snap`, `media.tts`.
 
 Fixtures: one of each record, the Python package regenerated, tag cut, Home pin bumped (`docs/PINNING.md`). Robot: the records
@@ -407,7 +407,7 @@ code), full `check.sh` and a medium review for the device-token and offline rout
 
 | # | Slice | Size | Repo | Owner | What lands | Acceptance |
 |---|---|---|---|---|---|---|
-| 1 | MEDIA-SPEC-01 records | S | commons | Claude | the four records, `file.origin: fetched`, `feed.kind: podcast`, `device.offline_scope`, the Stack job kinds, fixtures, Python regen, tag, Home pin | ajv fixtures pass; round-trip tests; pin bumped |
+| 1 | MEDIA-SPEC-01 records | S | commons | Claude | the four records, `file.origin: fetched`, `feed.purpose: podcast`, `device.offline_scope`, the Stack job kinds, fixtures, Python regen, tag, Home pin | ajv fixtures pass; round-trip tests; pin bumped |
 | 2 | MEDIA-STACK-01 media service | M | stack | Claude | pinned ffmpeg, ffprobe and yt-dlp (sha256, the reference service's download job), `media.probe`, `media.fetch`, `media.transcode`, `media.preview` jobs on the one idle lane, the limiter and quiet mode per host, privacy rows on `/stack/v1/privacy` | a fetch of one public test video at a stated budget; a 429 fixture trips quiet mode; FIFO never wedges (FT's heavyGate tests ported) |
 | 3 | MEDIA-LIB-01 roots and scan | M | home | coworker | `media-source` kind `root` over `nas_mounts`, the scan orchestrator (FT port), the TV, music, book and audiobook parsers, `media-item` writes, prune guards, duplicate finder | a fixture tree of every kind scans to the expected items twice with no duplicates; a removed root defers prune; tests beside each parser |
 | 4 | MEDIA-PROGRESS-01 | S | home | coworker | `media-progress` and `media-collection` tables and routes, `mergeProgress` with FT's cases, latches, the Continue provider for the Home page | the merge table passes; a child's row is never written by another person; Pick up shows a media row |
@@ -416,7 +416,7 @@ code), full `check.sh` and a medium review for the device-token and offline rout
 | 7 | MEDIA-VIDEOS-01 app | M | catalog, then Home's bundled set | coworker | the Videos package: index with FT's home rows and the billboard, Library, Watch page, Watch later, History, settings area, `min_role: child` with allowlist default, offline sentence | opens from the library at `/apps/videos`; a saved copy plays and resumes; captures at 1440 and 390 in both themes opened and judged; a child sees only `band_ok` items |
 | 8 | MEDIA-ONLINE-01 sources | M | home | coworker | `media-source` kinds `channel` and `link`, `POST /api/media/fetch`, subscriptions polling through the Stack job at a person's pace, `auto` rules, SponsorBlock chips per person, the quality ceiling, privacy page rows, the user doc | one subscription with `max_per_check: 2` fetches two items and stops; the budget is in the commit; a child cannot add a source |
 | 9 | MEDIA-OFFLINE-01 device offline | M | home | coworker | the four device-scoped offline routes, `offline_scope` middleware, playability, transcode-on-save, the Chromium service-worker bucket, Settings, Devices; the hub-only mode copy | FT's offline integration tests ported; WebKit gets no fetch handler (test on the user agent); full gate, review medium |
-| 10 | MEDIA-PODCASTS-01 app | M | catalog | coworker | the Podcasts package over `feed.kind: podcast` and the shelf poller, stream and save, auto-save, per-source speed and skips, bookmarks, OPML in and out | a real feed's newest episode streams, saves, resumes; conditional GET proven; a child's explicit episode hidden |
+| 10 | MEDIA-PODCASTS-01 app | M | catalog | coworker | the Podcasts package over `feed.purpose: podcast` and the shelf poller, stream and save, auto-save, per-source speed and skips, bookmarks, OPML in and out | a real feed's newest episode streams, saves, resumes; conditional GET proven; a child's explicit episode hidden |
 | 11 | MEDIA-MUSIC-01 app | M | catalog | coworker | the Music package: Albums, Artists, Songs, Liked, playlists, FT's local radio, the queue | a scanned album plays through in order; radio from a seed stays inside the person's library; explicit masked for a child |
 | 12 | MEDIA-BOOKS-01 app | M | catalog, commons (`Reader`) | coworker | the Books package: EPUB and PDF reader (kit `Reader`), locators, read-aloud through the Stack `tts` role with FT's chunker, audiobooks with chapters, series, listen-and-read linking | a book resumes at its CFI; an m4b lists chapters and resumes mid-chapter; read-aloud passes the child floor |
 | 13 | MEDIA-SHOWS-01 app | M | catalog | coworker | the Shows and Films package: Netflix layout, seasons, episode list, skip intro from chapters, watchlist | a fixture show of two seasons; the next episode offer; captures judged |
