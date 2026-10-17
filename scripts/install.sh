@@ -39,9 +39,10 @@ STACK_REPO="getmaipai/stack"
 # HOME-STACK-01: the Stack has no release of its own, so this is a
 # commit, not a tag - bumped by whoever cuts a Home release, to whatever
 # stack commit that release is meant to carry (docs/dev.md's own "What
-# Home's release carries" paragraph). Today's value adds vision URL
-# binding to the Stack supervisor and runs the embed role on the processor (STACK-EMBED-02).
-STACK_TAG="dbc7bacb5e1b2ad0c74d78b203307a80e1fa0e0f"
+# Home's release carries" paragraph). Today's value binds Muse Glimmer 30B
+# as the chat model above 24 GB (STACK-MUSE-01, owner's rule 2026-10-16)
+# on top of vision URL binding and the embed role on the processor.
+STACK_TAG="51bd657e2576b005d84e93eb3892d6af7fb25096"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot

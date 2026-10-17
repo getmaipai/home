@@ -26,6 +26,7 @@ place on day one.
 |---|---|---|---|
 | llama-server b10797, macOS arm64 | the pinned archive (`engineCatalog.ts`) | small | already under `data/engines` on this Mac |
 | Qwen3.8-27B | GGUF at Q6 for llama-server, the official repository at a pinned revision | about 22 GB `(?)` | MEASURE-02's first Studio candidate |
+| Muse Glimmer 30B, KQuant-Dynamic Q4_K_XL | GGUF, `meta-models/Muse-Glimmer-30B-GGUF` at revision `70bf1b6`, sha256 pinned in the Stack and Home catalogs | 19.7 GB | the chat pin from 64 GB up (STACK-MUSE-01, 2026-10-16); the Studio's first chat model, not a candidate |
 | Qwen3.6-35B-A3B | GGUF at Q6, pinned | about 29 GB `(?)` | the second candidate |
 | Qwen3.8-27B-Splash | Splash's package (4-bit, with its DFlash 2 draft and the vision encoder) | 17.4 GB | Splash ships 4-bit only; both quantizations are measured (decision 4) |
 | Qwen3.6-35B-A3B-Splash | the same | 20.9 GB | |

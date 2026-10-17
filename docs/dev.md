@@ -37161,3 +37161,39 @@ and bunfig's `timeout` key is ignored. The three ledger entries are removed.
 The gate run on this fix went red once more, on `frontend/src/apps/chat/liveVoiceSession.test.tsx`'s no_speech test: it asserted
 "Listening" 30 ms after a fixed sleep, and under full-gate load the first "Listening" arrived late enough that the 150 ms
 no_speech reconnect was still mid-flight ("Connecting"). It now waits for the second socket and then for the listening state.
+
+## Muse Glimmer 30B is the chat model above 24 GB (STACK-MUSE-01, 2026-10-16)
+
+Owner's rule, 2026-10-16: the Qwen3 8B chat entries are for machines
+with 24 GB or less; every larger machine runs Muse Glimmer 30B. Nothing
+changes in the wizard: it still shows no model choice, because the
+choice is the Stack's per-tier binding (`PROFILE_MODEL_BINDINGS` in
+`stack/backend/src/profiles.ts`), and Home's installer pins the Stack
+commit that carries it (`STACK_TAG` in `scripts/install.sh` and
+`scripts/engine-computer/maipai-engine`, bumped to the STACK-MUSE-01
+commit here).
+
+| Machine | Tier | Chat model |
+|---|---|---|
+| 16 or 24 GB | p16 | Qwen3 8B Q4_K_M (5.0 GB), unchanged |
+| 32 GB | p32 | Muse Glimmer 30B KQuant 17GB Q4_K_M (16.8 GB) |
+| 64 GB and up, the Studio included | p64, p128 | Muse Glimmer 30B KQuant-Dynamic Q4_K_XL (19.7 GB) |
+
+Home's own catalog (`backend/src/lib/modelCatalog.ts`) mirrors the two
+Stack pins under the same ids, revision, sha256 and byte counts, for
+the two things Home decides itself: the thinking mode and the turn
+budget. Muse reasons on every turn and has no off switch (its template
+takes `reasoning_strength`, which the Stack launches at `low`), so both
+records say `thinking_mode: "always"`: budget.ts keeps the thinking
+budget, host.ts reports the mode, and the per-request `enable_thinking`
+kwarg llm.ts sends is simply ignored by the template. The turn budget
+is the 8B's with longer deadlines (model 30 s, total 60 s); the measured
+block is a placeholder until STUDIO-EVAL-01 runs the tool-calling bench
+on the Studio. The reasoning for the per-tier split, and the
+llama-server details (b10797 parses Muse's tool calls natively and
+returns its reasoning as `reasoning_content`), are in the Stack's
+`docs/dev.md`, "The chat pin above 24 GB".
+
+Not done here: no Muse file has been downloaded or run on the Studio
+(19.7 GB, the owner's call), so tokens per second, load time and the
+bench numbers are still unmeasured.

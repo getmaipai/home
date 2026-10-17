@@ -113,6 +113,128 @@ export const CATALOG: ModelCapabilities[] = [
       },
     },
   }),
+  // STACK-MUSE-01 (owner's rule 2026-10-16): Muse Glimmer 30B is the chat
+  // model on every machine above 24 GB. The Stack binds it per tier
+  // (p64 and p128 take this KQuant-Dynamic Q4_K_XL); this record mirrors the Stack's pin (same id, revision,
+  // sha256 and bytes) so Home knows its thinking mode and turn budget.
+  // Dense 29.6B, 52 layers, 2 KV heads, 131072 context, Apache-2.0.
+  ModelCapabilities.parse({
+    id: "muse-glimmer-30b-q4-k-xl",
+    role: "chat",
+    label: "Muse Glimmer 30B (Q4_K_XL)",
+    license: "Apache-2.0",
+    engine: "llama-server",
+    implemented: true,
+    quality_tier: "high",
+    tags: ["recommended"],
+    pros: ["Stronger reasoning and tool use than the 8B", "131k context"],
+    cons: ["Needs a machine with more than 24 GB of memory", "Reasons on every turn, so replies start later"],
+    // Muse's template reasons on every turn and has no off switch: the
+    // Stack launches it at reasoning_strength "low" (STACK-MUSE-01) and
+    // the per-request enable_thinking kwarg Home sends is ignored.
+    thinking_mode: "always",
+    // Meta's own GGUF repo, pinned to one revision; sha256 is the file's
+    // git-lfs oid, the same value the Stack verifies on download.
+    download: {
+      url: "https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/70bf1b61ac09f91b24d39038091b41c582bc5d7a/Muse-Glimmer-30B-KQuant-Dynamic-Q4_K_XL.gguf",
+      sha256: "ac7023d6a4c704eb9af54ab53e476a66b7f5b6c0ef2fc4a8dde5253c291a6c38",
+      approx_bytes: 19_653_960_832,
+    },
+    sizing: {
+      kind: "transformer_gguf",
+      param_count_billion: 29.6,
+      // bits_per_weight and the overhead fraction together reproduce the
+      // pinned file's size (19.65 GB) within 1% (modelCatalog.test.ts).
+      bits_per_weight: 5.2,
+      gguf_overhead_fraction: 0.02,
+      num_layers: 52,
+      num_kv_heads: 2,
+      head_dim: 128,
+      max_context: 131072,
+    },
+    // The 8B's budget with longer deadlines for a 30B that reasons first;
+    // the measured block is a placeholder until STUDIO-EVAL-01 runs the
+    // tool-calling bench on the Studio (measured.on says so).
+    turn_budget: {
+      rounds: 1,
+      max_tools: 16,
+      always_search: true,
+      model_transitions: true,
+      context_tokens: 2048,
+      thinking_budget_tokens: 0,
+      thinking_budget_tokens_toggled: 512,
+      thinking_for_minors: false,
+      reply_ceiling_tokens: 1536,
+      deadlines_ms: { model: 30000, tool: 10000, total: 60000 },
+      measured: {
+        false_call_rate: 0,
+        inverse_miss_rate: 0,
+        rewrite_pass_rate: 0,
+        on: "not yet measured for this model: STUDIO-EVAL-01's tool-calling bench on the Studio records the real values; the 8B's budget shape is carried with longer deadlines until then",
+      },
+    },
+  }),
+  // STACK-MUSE-01 (owner's rule 2026-10-16): Muse Glimmer 30B is the chat
+  // model on every machine above 24 GB. The Stack binds it per tier
+  // (p32 takes this 17 GB Q4_K_M so the 4B judge still fits); this record mirrors the Stack's pin (same id, revision,
+  // sha256 and bytes) so Home knows its thinking mode and turn budget.
+  // Dense 29.6B, 52 layers, 2 KV heads, 131072 context, Apache-2.0.
+  ModelCapabilities.parse({
+    id: "muse-glimmer-30b-q4-k-m",
+    role: "chat",
+    label: "Muse Glimmer 30B (Q4_K_M)",
+    license: "Apache-2.0",
+    engine: "llama-server",
+    implemented: true,
+    quality_tier: "high",
+    tags: ["recommended"],
+    pros: ["Stronger reasoning and tool use than the 8B", "131k context"],
+    cons: ["Needs a machine with more than 24 GB of memory", "Reasons on every turn, so replies start later"],
+    // Muse's template reasons on every turn and has no off switch: the
+    // Stack launches it at reasoning_strength "low" (STACK-MUSE-01) and
+    // the per-request enable_thinking kwarg Home sends is ignored.
+    thinking_mode: "always",
+    // Meta's own GGUF repo, pinned to one revision; sha256 is the file's
+    // git-lfs oid, the same value the Stack verifies on download.
+    download: {
+      url: "https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/70bf1b61ac09f91b24d39038091b41c582bc5d7a/Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+      sha256: "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+      approx_bytes: 16_756_683_904,
+    },
+    sizing: {
+      kind: "transformer_gguf",
+      param_count_billion: 29.6,
+      // bits_per_weight and the overhead fraction together reproduce the
+      // pinned file's size (16.76 GB) within 1% (modelCatalog.test.ts).
+      bits_per_weight: 4.44,
+      gguf_overhead_fraction: 0.02,
+      num_layers: 52,
+      num_kv_heads: 2,
+      head_dim: 128,
+      max_context: 131072,
+    },
+    // The 8B's budget with longer deadlines for a 30B that reasons first;
+    // the measured block is a placeholder until STUDIO-EVAL-01 runs the
+    // tool-calling bench on the Studio (measured.on says so).
+    turn_budget: {
+      rounds: 1,
+      max_tools: 16,
+      always_search: true,
+      model_transitions: true,
+      context_tokens: 2048,
+      thinking_budget_tokens: 0,
+      thinking_budget_tokens_toggled: 512,
+      thinking_for_minors: false,
+      reply_ceiling_tokens: 1536,
+      deadlines_ms: { model: 30000, tool: 10000, total: 60000 },
+      measured: {
+        false_call_rate: 0,
+        inverse_miss_rate: 0,
+        rewrite_pass_rate: 0,
+        on: "not yet measured for this model: STUDIO-EVAL-01's tool-calling bench on the Studio records the real values; the 8B's budget shape is carried with longer deadlines until then",
+      },
+    },
+  }),
   // VISION-02: Qwen3-VL-8B-Instruct, the chat model that reads pictures
   // itself (the Stack's VISION-02b pin, the same revision and hashes).
   // The Instruct edition has no thinking mode (its template has no switch

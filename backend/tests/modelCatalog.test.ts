@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { CATALOG, fitsWithin, kvCacheBytes, weightsBytes, recommend } from "@/lib/modelCatalog";
+import { CATALOG, fitsWithin, kvCacheBytes, weightsBytes, recommend, thinkingModeFor } from "@/lib/modelCatalog";
 import { resolveTurnBudget } from "@/lib/turnMachine/budget";
 import type { HardwareInfo } from "@/lib/hardware";
 
@@ -113,5 +113,66 @@ describe("TOOL-OFFER-01: recall remains explicitly off", () => {
       if (model.role !== "chat" || !model.turn_budget) continue;
       expect(resolveTurnBudget(model.id, "adult").tools_offered).not.toContain("recall");
     }
+  });
+});
+
+// STACK-MUSE-01 (owner's rule 2026-10-16): the chat pin above 24 GB is
+// Muse Glimmer 30B; Home mirrors the Stack's two pins so it knows their
+// thinking mode and turn budget.
+describe("Muse Glimmer 30B (STACK-MUSE-01)", () => {
+  const pins = [
+    {
+      id: "muse-glimmer-30b-q4-k-xl",
+      file: "Muse-Glimmer-30B-KQuant-Dynamic-Q4_K_XL.gguf",
+      sha256: "ac7023d6a4c704eb9af54ab53e476a66b7f5b6c0ef2fc4a8dde5253c291a6c38",
+      bytes: 19_653_960_832,
+    },
+    {
+      id: "muse-glimmer-30b-q4-k-m",
+      file: "Muse-Glimmer-30B-KQuant-17GB-Q4_K_M.gguf",
+      sha256: "4cc57c0f51040a226e5a72cc47b7613f7772950e460a665f7083de89f183f60e",
+      bytes: 16_756_683_904,
+    },
+  ];
+
+  test("both pins are catalogued with the Stack's revision, sha256 and bytes", () => {
+    for (const pin of pins) {
+      const model = CATALOG.find((m) => m.id === pin.id);
+      expect(model).toBeDefined();
+      expect(model?.role).toBe("chat");
+      expect(model?.download?.url).toBe(
+        `https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/70bf1b61ac09f91b24d39038091b41c582bc5d7a/${pin.file}`,
+      );
+      expect(model?.download?.sha256).toBe(pin.sha256);
+      expect(model?.download?.approx_bytes).toBe(pin.bytes);
+    }
+  });
+
+  test("the sizing reproduces each pinned file's size within 1%", () => {
+    for (const pin of pins) {
+      const model = CATALOG.find((m) => m.id === pin.id)!;
+      const bytes = weightsBytes(model.sizing as never);
+      expect(Math.abs(bytes - pin.bytes) / pin.bytes).toBeLessThan(0.01);
+    }
+  });
+
+  test("Muse always reasons: thinking mode is 'always', and its budget resolves for an adult", () => {
+    for (const pin of pins) {
+      expect(thinkingModeFor(pin.id)).toBe("always");
+      const budget = resolveTurnBudget(pin.id, "adult");
+      expect(budget.deadlines_ms.model).toBe(30000);
+      expect(budget.deadlines_ms.total).toBe(60000);
+    }
+    expect(thinkingModeFor("qwen3-8b-instruct-q4-k-m")).toBe("switchable");
+  });
+
+  test("the Studio (128 GB unified) fits both Muse files; a 24 GB Mac still ranks the 8B first", () => {
+    // Which file a machine actually runs is the Stack's tier binding
+    // (p16 keeps the 8B, p32 the Q4_K_M, p64 and p128 the Q4_K_XL); Home's
+    // fit check only has to agree that the Studio can hold either.
+    const studio = recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 128 }));
+    for (const pin of pins) expect(studio.find((f) => f.model.id === pin.id)?.fits).toBe(true);
+    const laptop = recommend("chat", hw({ isAppleSilicon: true, unifiedMemoryGb: 24 }));
+    expect(laptop[0]?.model.id).toBe("qwen3-8b-instruct-q4-k-m");
   });
 });
