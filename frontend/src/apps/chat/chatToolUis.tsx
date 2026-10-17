@@ -479,6 +479,7 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
       <ImageGallery
         images={galleryImagesOf(card)}
         maxVisible={4}
+        size="large"
         {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: (image: { id: string; src: string; alt: string }) => (edit.canEdit ? edit.canEdit(target(image)) : true), editLabel: edit.label ?? "Edit picture" } : {})}
       />
     );
