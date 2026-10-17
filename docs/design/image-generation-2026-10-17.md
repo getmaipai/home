@@ -77,6 +77,10 @@ downloads go through the Stack's one downloader and show on the privacy page as 
 else leaves. No prompt, picture or provenance is ever sent anywhere. Backups: generated pictures follow the `file` record's
 retention and the person's backup setting; the provenance record is `hot` with it.
 
+Cross-app features (the [media apps blend note, section 12](media-apps-blend-2026-10-17.md#12-cross-app-platform-features-from-filetube)):
+a generation job runs on the Stack's one heavy-job lane beside model downloads and media jobs, never a queue of its own; a
+failed job notifies as `download_failed`-class time-sensitive; a deleted picture goes to the one household trash with restore.
+
 ## Kit Elements and parts (rule 9, 9b)
 
 In chat: `image-generation`, `image`, `artifact-card` (ED-025's actions slot),

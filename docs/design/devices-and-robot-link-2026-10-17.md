@@ -87,6 +87,11 @@ page (ROBOT-ENDPOINTS-01's row). A robot with no hub answers from its own copies
 live view is hub-only, adult-only, with the robot's own light on while it streams (LIVE-VIEW-01). Nothing about a device
 leaves the house; the robot's assets come from the hub's store, downloaded once by the Stack.
 
+Cross-app features (the [media apps blend note, section 12](media-apps-blend-2026-10-17.md#12-cross-app-platform-features-from-filetube)):
+handoff and remote ("continue here", "play on the TV") ride the existing `device_states` and `device_commands` this note
+already names; the kit cast slot lists the devices this page knows, and a device's `offline_scope` (Keep on this device) is
+set here, never per app.
+
 ## Kit Elements and parts (rule 9b)
 
 `card`, `badge` (the state pill), `button`, `dialog` (pairing code, forget), `data-table` (the link page's counts), `alert`

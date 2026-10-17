@@ -12,9 +12,10 @@ handoff, audit, bench result or research pass that was never a design and is kep
 The audit's retirement rule: a record moves to [`retired/`](retired/) only when its whole content is replaced by a named
 record or rule. A partly superseded record stays where it is, because the markers inside it are the record.
 
-Cross-app platform features (offline downloads, resume, queues, collections and the rest that FileTube taught) are being
-written up by the media apps blend note of 2026-10-17 (`media-apps-blend-2026-10-17.md`, its "Cross-app platform features
-from FileTube" section); a new design that queues work or keeps a collection cites that section once it lands.
+Cross-app platform features (keep on this device, resume and continue, the shell audio session with its sleep timer and
+Media Session, search providers, Save to Home, one household trash, handoff, the Stack's heavy-job lane) are decided once in
+[the media apps blend note, section 12](media-apps-blend-2026-10-17.md#12-cross-app-platform-features-from-filetube); a
+design that queues work, resumes something or keeps a collection cites that section rather than defining its own.
 
 ## Current designs in `docs/design/`
 
@@ -34,7 +35,8 @@ from FileTube" section); a new design that queues work or keeps a collection cit
 | [image-generation-2026-10-17.md](image-generation-2026-10-17.md) | new 2026-10-17, no code | PICTURES-01 to -05 (to be cut; today "Image generation (L)" and CHAT-MEDIA-01 in Generation) |
 | [devices-and-robot-link-2026-10-17.md](devices-and-robot-link-2026-10-17.md) | new 2026-10-17, no code | ROBOTLINK-01, -02, ROBOTLINK-BENCH-01, DEVICES-01 to -03 (to be cut; today the Portability "Sync engine decision" and "A Device record and spec/link" rows) |
 | [stories-2026-10-17.md](stories-2026-10-17.md) | new 2026-10-17, no code | STORIES-01 to -04 (to be cut; today PROJECT-PACK-01, -02 in Projects) |
-| media apps blend, news app, kid mode voice (2026-10-17) | written by other sessions the same day; listed here when they land | their own rows |
+| [media-apps-blend-2026-10-17.md](media-apps-blend-2026-10-17.md) (and its [sources](media-apps-blend-2026-10-17-sources.md)) | current; section 12 is the cross-app platform record | Media apps: MEDIA-SPEC-01 to MEDIA-GO-01, AUDIO-SESSION-01, KEEP-OFFLINE-01, SAVE-TO-HOME-01, TRASH-01, HANDOFF-01 |
+| news app, kid mode voice (2026-10-17) | written by other sessions the same day; listed here when they land | their own rows |
 
 ## Current design records in `docs/plans/`
 
