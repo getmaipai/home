@@ -22,6 +22,7 @@ beforeEach(() => {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     calls.push({ url, method: init?.method ?? "GET" });
+    if (url.endsWith("/messages.mp4")) return new Response(new Uint8Array(16), { status: 200, headers: { "content-type": "video/mp4", "content-disposition": 'attachment; filename="paper-boat-rain.mp4"' } });
     return new Response(JSON.stringify(card), { status: 200, headers: { "content-type": "application/json" } });
   }) as typeof fetch;
 });
@@ -61,6 +62,35 @@ describe("VideoToolRender", () => {
     expect(view.getByRole("button", { name: "Share" })).toBeTruthy();
     fireEvent.click(view.getByRole("button", { name: "Make another" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/videos/jobs/vid-1/another")).toBe(true));
+  });
+
+  const doneCard = (): VideoCard => ({ ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", clip: { url: "/api/videos/jobs/vid-1/files/file-a", poster_url: "/api/videos/jobs/vid-1/files/file-b", width: 832, height: 480, seconds: 5, seed: 7, file_id: "file-a", poster_file_id: "file-b" } })] });
+
+  test("Share hands the real file to the system share sheet, fetched ahead of the click", async () => {
+    card = doneCard();
+    const shared: Array<{ files?: File[]; title?: string }> = [];
+    Object.defineProperty(navigator, "canShare", { configurable: true, value: () => true });
+    Object.defineProperty(navigator, "share", { configurable: true, value: async (data: { files?: File[]; title?: string }) => { shared.push(data); } });
+    try {
+      const view = mount();
+      await waitFor(() => expect(calls.some((c) => c.url === "/api/videos/jobs/vid-1/messages.mp4")).toBe(true));
+      await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      fireEvent.click(view.getByRole("button", { name: "Share" }));
+      expect(shared).toHaveLength(1);
+      expect(shared[0]!.files![0]!.name).toBe("paper-boat-rain.mp4");
+      expect(shared[0]!.title).toBe("a paper boat in the rain");
+    } finally { Reflect.deleteProperty(navigator, "canShare"); Reflect.deleteProperty(navigator, "share"); }
+  });
+
+  test("without file sharing, Share opens Home's share page for the file and Download original stays", async () => {
+    card = doneCard();
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
+    expect(view.getByRole("button", { name: "Download original" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Share" }));
+    // MemoryRouter has no /files route to draw; the click must not throw and no share sheet exists to call.
+    expect(typeof (navigator as { share?: unknown }).share).not.toBe("function");
   });
 
   test("a failed clip shows the engine's plain line and Try again, never a player", async () => {

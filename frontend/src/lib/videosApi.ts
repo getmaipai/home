@@ -32,6 +32,8 @@ const json = (body: unknown): RequestInit => ({ method: "POST", headers: { "cont
 
 export const videosApi = {
   status: () => send<VideoStatus>("/api/videos/status"),
+  /** The clip prepared for texting (a sound track, a name from the prompt). */
+  messagesUrl: (id: string) => `/api/videos/jobs/${encodeURIComponent(id)}/messages.mp4`,
   card: (id: string, signal?: AbortSignal) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   another: (id: string) => send<VideoCard>(`/api/videos/jobs/${encodeURIComponent(id)}/another`, { method: "POST" }),

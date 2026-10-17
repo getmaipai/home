@@ -17,6 +17,7 @@ import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
+import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -528,6 +529,18 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
   const query = useVideoCard(result?.id);
   const navigate = useNavigate();
   const card = query.data;
+  // The messaging copy is fetched when the clip is on the card, so Share can call the system share sheet inside the click
+  // (a share call after an await loses the user gesture and Safari refuses it).
+  const readyItem = card?.items[card.items.length - 1];
+  const readyId = readyItem && videoStatusOf(readyItem) === "ready" ? readyItem.id : undefined;
+  const prepared = useQuery({
+    queryKey: ["video-messages", readyId],
+    queryFn: ({ signal }) => prepareClip(videosApi.messagesUrl(readyId!), signal),
+    enabled: readyId !== undefined,
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+    retry: false,
+  });
   if (!result) return null;
   if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that video" detail="Reload the chat to try again." retrying={false} /> : null;
   // The newest clip of the turn is the one on show; earlier ones stay in the Library as files.
@@ -547,10 +560,15 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       startedAt={item.started_at}
       hint={card.limits}
       {...(item.error ? { error: item.error } : {})}
-      downloadName="video.mp4"
+      downloadName={prepared.data?.name ?? "video.mp4"}
       onStop={() => { void videosApi.stop(item.id).then(refresh).catch(refresh); }}
       onRetry={() => { void videosApi.another(item.id).then(refresh).catch(refresh); }}
-      {...(clip ? { onShare: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) } : {})}
+      {...(clip ? {
+        // Download saves the file a phone can text (a sound track, named after the prompt); the original stays one button away.
+        onDownload: () => saveClip({ ...(prepared.data ? { blob: prepared.data.blob } : {}), url: videosApi.messagesUrl(item.id), name: prepared.data?.name ?? "video.mp4" }),
+        onShare: () => { void shareClip({ prepared: prepared.data, title: item.prompt, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) }); },
+        actions: <Button type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
+      } : {})}
       {...(card.can_make_another && status !== "failed" ? { onMakeAnother: () => { void videosApi.another(item.id).then(refresh).catch(refresh); } } : {})}
     />
   );

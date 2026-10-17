@@ -8,6 +8,8 @@ import { __resetVideoJobsForTests, __setVideoPollMsForTests } from "@/lib/videos
 
 export interface FakeVideoJob { id: string; body: Record<string, unknown>; polls: number; state: "queued" | "running" | "done" | "failed" | "cancelled"; deleted: boolean }
 export interface FakeVideoStack {
+  /** Titles the Stack was asked to write into a messaging copy (the x-title header, decoded). */
+  converted: string[];
   jobs: FakeVideoJob[];
   submitted: Array<Record<string, unknown>>;
   pollsToFinish: number;
@@ -31,6 +33,12 @@ export function testMp4(): Uint8Array {
   for (let i = 32; i < bytes.length; i += 1) bytes[i] = i % 251;
   return bytes;
 }
+/** The same bytes with a sound track's handler box in them, as the Stack's messaging copy has. */
+export function testMp4WithSound(): Uint8Array {
+  const bytes = testMp4();
+  bytes.set([0, 0, 0, 33, 0x68, 0x64, 0x6c, 0x72, 0, 0, 0, 0, 0, 0, 0, 0, 0x73, 0x6f, 0x75, 0x6e], 100);
+  return bytes;
+}
 export function testJpeg(): Uint8Array {
   const bytes = new Uint8Array(512);
   bytes.set([0xff, 0xd8, 0xff, 0xe0], 0);
@@ -42,7 +50,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, loras: [...TEST_VIDEO_LORAS],
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, loras: [...TEST_VIDEO_LORAS],
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
@@ -59,6 +67,10 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       const job: FakeVideoJob = { id: `vjob-${fake.jobs.length + 1}`, body, polls: 0, state: "queued", deleted: false };
       fake.jobs.push(job);
       return json({ created: 1, job: job.id, data: [] }, 202);
+    }
+    if (method === "POST" && path === "/v1/videos/messages") {
+      fake.converted.push(decodeURIComponent(new Headers(init?.headers).get("x-title") ?? ""));
+      return new Response(testMp4WithSound(), { status: 200, headers: { "content-type": "video/mp4" } });
     }
     const jobMatch = path.match(/^\/v1\/videos\/generations\/([^/]+)(?:\/(video\.mp4|poster\.jpg))?$/);
     if (jobMatch) {

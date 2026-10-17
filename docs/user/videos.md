@@ -15,7 +15,15 @@ Type "make a short video of a paper boat in the rain". Home answers in a few wor
 
 Videos are 5 seconds at 480p and take about 2 minutes. If Home is busy making a picture or another video, the card says so and your video starts when the other one is done. You can have one video in the making at a time.
 
-When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to open it in your Library, or **Make another** for a new one from the same words.
+When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words.
+
+## Send a video in a text
+
+Press **Share** on the card. On an iPhone, iPad or Mac in Safari, your device's own share sheet opens with the video attached, so you can pick Messages, AirDrop or Mail. On a browser that cannot share a file, **Share** opens the video in your Library instead, where you can make a link.
+
+**Download** saves a copy made for texting, named after your words (for example `paper-boat-in-the-rain.mp4`). It has a silent sound track, which phones expect from a video. If you want the exact file the engine made, press **Download original**.
+
+If a video will not send from a file you saved, use **Share** on the card instead of dragging the file into Messages.
 
 ## Make a picture move
 

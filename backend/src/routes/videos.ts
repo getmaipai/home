@@ -11,6 +11,7 @@ import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, for
 import { cancelVideoJob, clipUrl, getVideoJobFor, loadGeneratedReference, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
+import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId, VIDEO_SIZES } from "@/lib/videos/tool";
 import { and, eq } from "drizzle-orm";
@@ -144,6 +145,26 @@ videosRoutes.openapi(fileRoute, (c) => {
   }
   headers["content-length"] = String(total);
   return new Response(file.bytes, { status: 200, headers }) as never;
+});
+
+const messagesRoute = createRoute({
+  method: "get", path: "/jobs/{id}/messages.mp4", tags: ["Videos"], summary: "The clip prepared for texting: a sound track so a phone treats it as a video, a name from the prompt", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "video/mp4": { schema: z.string() } }, description: "The mp4 as a download named after the prompt (paper-boat-in-the-rain.mp4). A clip made before the Stack added a silent AAC track is converted by the Stack on first request." }, ...errorResponses({ 401: "Not signed in", 404: "No such video" }) },
+});
+videosRoutes.openapi(messagesRoute, async (c) => {
+  const actor = c.get("person");
+  const job = getVideoJobFor(actor, c.req.valid("param").id);
+  const first = job?.state === "done" ? job.files[0] : undefined;
+  const file = job && first ? readVideoFile(actor, job, first.id) : null;
+  if (!job || !first || !file) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
+  let bytes: Uint8Array;
+  try { bytes = await messagesCopyOf(first.id, file.bytes, videoTitle(job.prompt)); } catch (error) {
+    if (error instanceof StackVideoError) return c.json({ error: `I couldn't prepare the video for texting. ${error.message}`, code: error.code }, error.status >= 500 ? 503 : 422) as never;
+    throw error;
+  }
+  const name = videoFileName(job.prompt);
+  return new Response(bytes, { status: 200, headers: { "content-type": "video/mp4", "content-length": String(bytes.byteLength), "content-disposition": `attachment; filename="${name}"`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
 const cancelRoute = createRoute({

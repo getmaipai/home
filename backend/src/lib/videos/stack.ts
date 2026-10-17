@@ -132,6 +132,13 @@ export async function submitVideo(body: VideoBody): Promise<{ job: string; done:
   return failure(res);
 }
 
+/** Asks the Stack to prepare an mp4 for messaging apps (a silent AAC track, a title, at most 20 MB). The title (from the prompt) travels in a header, percent-encoded, never in the URL. Nothing is kept on the Stack. */
+export async function convertForMessages(bytes: Uint8Array, title: string): Promise<Uint8Array> {
+  const res = await request("/v1/videos/messages", { method: "POST", headers: { "content-type": "video/mp4", "x-title": encodeURIComponent(title) }, body: new Blob([bytes as unknown as ArrayBuffer], { type: "video/mp4" }), timeoutMs: 120_000 });
+  if (!res.ok) return failure(res);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 export async function getVideoJob(job: string): Promise<StackVideoJob> {
   const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}`, { method: "GET" });
   if (!res.ok) return failure(res);

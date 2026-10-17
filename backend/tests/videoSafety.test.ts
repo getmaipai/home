@@ -22,6 +22,7 @@ import { getVideoJobFor, startVideoJob } from "@/lib/videos/jobs";
 import { __setVideoStatusForTests } from "@/lib/videos/ready";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
+import { hasAudioTrack, videoFileName } from "@/lib/videos/messagesCopy";
 import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
 import { until } from "./pictureFixture";
 import { TestClient } from "./client";
@@ -312,6 +313,34 @@ describe("the routes", () => {
     expect((await owner.client.get(`/api/videos/jobs/${job.id}/files/file-other`)).status).toBe(404);
   });
 
+  test("the messaging copy is named from the prompt, and a clip without sound is converted by the Stack once", async () => {
+    const { __resetMessagesCopiesForTests } = await import("@/lib/videos/messagesCopy");
+    __resetMessagesCopiesForTests();
+    const owner = await signedIn("Sage", "owner");
+    const job = await finishedJob(owner.actor);
+    const res = await owner.client.get(`/api/videos/jobs/${job.id}/messages.mp4`);
+    expect(res.status).toBe(200);
+    expect(res.headers.get("content-type")).toBe("video/mp4");
+    expect(res.headers.get("content-disposition")).toBe('attachment; filename="paper-boat.mp4"');
+    const body = new Uint8Array(await res.arrayBuffer());
+    expect(hasAudioTrack(body)).toBe(true);
+    expect(fake.converted).toEqual(["a paper boat"]);
+    await owner.client.get(`/api/videos/jobs/${job.id}/messages.mp4`);
+    expect(fake.converted).toHaveLength(1);
+    // The original download is untouched: the stored bytes, no sound track.
+    const file = getVideoJobFor(owner.actor, job.id)!.files[0]!;
+    const original = new Uint8Array(await (await owner.client.get(`/api/videos/jobs/${job.id}/files/${file.id}`)).arrayBuffer());
+    expect(hasAudioTrack(original)).toBe(false);
+    expect((await owner.client.get("/api/videos/jobs/vid-nope/messages.mp4")).status).toBe(404);
+  });
+
+  test("a stranger cannot fetch the messaging copy of a clip", async () => {
+    const owner = await signedIn("Sage", "owner");
+    const job = await finishedJob(owner.actor);
+    const stranger = new TestClient();
+    expect((await stranger.get(`/api/videos/jobs/${job.id}/messages.mp4`)).status).toBe(401);
+  });
+
   test("Stop cancels a clip that is being made and frees the Stack", async () => {
     fake.pollsToFinish = 1000;
     const owner = await signedIn("Sage", "owner");
@@ -355,5 +384,16 @@ describe("the routes", () => {
     expect(body.enabled).toBe(true);
     expect(body.minors).toContain("off for children and teens");
     expect(body.adapters.map((a) => a.classification).sort()).toEqual(["adult-only", "all-ages"]);
+  });
+});
+
+describe("messaging file names", () => {
+  test("a file is named after the prompt", () => {
+    expect(videoFileName("A paper boat in the rain")).toBe("paper-boat-rain.mp4");
+    expect(videoFileName("Make me a video of a golden retriever puppy chasing a red ball across the lawn")).toBe("golden-retriever-puppy-chasing-red-ball.mp4");
+    expect(videoFileName("café à la crème!!")).toBe("cafe-la-creme.mp4");
+    expect(videoFileName("the a an")).toBe("the-a-an.mp4");
+    expect(videoFileName("???")).toBe("video.mp4");
+    expect(videoFileName("x".repeat(200))).toHaveLength(52);
   });
 });
