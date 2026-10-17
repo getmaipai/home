@@ -2,6 +2,7 @@
 // thinking indicator, welcome, reasoning group, sources and message footer),
 // moved verbatim out of ChatPage.tsx (SHARED-THREAD-01). ChatThread.tsx
 // hands them to the kit Thread.
+import { CHAT_ART_HEIGHT, CHAT_ART_WIDTH, nextChatArt } from "@/apps/chat/chatArt";
 import { useReplyFeedbackForm } from "@/apps/chat/chatFeedbackDialog";
 import { FeedbackDialog } from "@maipai/ui/src/elements/feedback-dialog";
 import { MemoryChips } from "@maipai/ui/src/elements/memory-chips";
@@ -485,10 +486,11 @@ export function ChatWelcome() {
   const { on } = useContext(TemporaryChatContext);
   const aui = useAui();
   const engineDown = useEngineDownReason();
+  const [art] = useState(() => nextChatArt());
   return (
     <>
       <EngineStartingLoader />
-      {engineDown === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="mx-auto mb-2 h-auto w-40 max-w-full sm:w-52" />}
+      <img src={art.src} alt={art.alt} width={CHAT_ART_WIDTH} height={CHAT_ART_HEIGHT} loading="lazy" className="mx-auto mb-2 h-auto w-40 max-w-full sm:w-52" />
       <EmptyState>
         <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting>
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
