@@ -84,7 +84,8 @@ decide (rule 1). In the editor, **Comment** now also takes a painted `mask` and 
   The Stack's `people_mask` outlines every person; the picture model edits the whole picture; every pixel inside every outline is then put back from the original (a soft edge only outside),
   and the result is proved identical to the original inside the outlines (`freezePeople`: a pixel that differs is an error, never a picture). The model states in `affects_people` whether the
   change is about a person; an edit that is (their look, clothes or face, adding a person) goes through the likeness rules above and the finished-picture age check, as before. If the person finder
-  finds no one although the household's model counted people, nothing is changed.
+  finds no one although the household's model counted people, nothing is changed. Measured on the two-person street picture ("make the sky clear", Klein 4 steps, real Vision outlines):
+  115,283 pixels inside the outlines, 115,277 of them changed by the raw edit, 0 differ after the freeze. Limit: the model redraws the background (it moved buildings and trees), so a seam can show where the original people meet the new background.
 - The original is never touched. The result is the next version of the picture (image-edit provenance), so **Edit** shows Original and Undo. Temporary and Incognito chats keep versions in memory.
 - No picture, mask or instruction is logged.
 
