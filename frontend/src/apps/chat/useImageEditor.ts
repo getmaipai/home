@@ -131,11 +131,15 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
       },
       onComment: async (request, ctl): Promise<{ message: string; pending?: ImageEditorPending }> => {
         ctl.onProgress({ percent: null, label: "Sending your change" });
-        let progress = await imageEditApi.comment(open.conversationId, sourceId, request, ctl.signal);
+        // The start request is not aborted with Stop: the server may already have a job, and its id is what Stop needs.
+        let progress = await imageEditApi.comment(open.conversationId, sourceId, request);
+        const stop = (job: string) => { void imageEditApi.cancel(job).catch(() => undefined); };
         while (progress.state === "queued" || progress.state === "running") {
+          const job = progress.job;
+          if (ctl.signal.aborted) { stop(job); throw new DOMException("Cancelled", "AbortError"); }
           ctl.onProgress({ percent: progress.percent, label: progress.label });
-          try { await wait(700, ctl.signal); } catch (error) { void imageEditApi.cancel(progress.job).catch(() => undefined); throw error; }
-          progress = await imageEditApi.poll(progress.job, ctl.signal);
+          try { await wait(700, ctl.signal); } catch (error) { stop(job); throw error; }
+          try { progress = await imageEditApi.poll(job, ctl.signal); } catch (error) { if (ctl.signal.aborted) stop(job); throw error; }
         }
         if (progress.state === "done") {
           const { token, url, width, height } = progress.preview;

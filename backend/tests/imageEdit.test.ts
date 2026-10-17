@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { attachments, people } from "@/db/schema";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { newConversationTurnId } from "@/lib/id";
-import { __resetImageEditForTests, __setImageToolsForTests } from "@/lib/imageEdit";
+import { __resetImageEditForTests, __setImageToolsForTests, regionForStack } from "@/lib/imageEdit";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import type { StackClient, StackImageToolsStatus } from "@/lib/stack/client";
 import { StackError } from "@/lib/stack/errors";
@@ -66,6 +66,16 @@ function editForm(conversationId: string, fields: Record<string, string>, mask?:
   if (mask) form.append("mask", new File([mask], "mask.png", { type: "image/png" }));
   return form;
 }
+
+describe("regionForStack", () => {
+  test("a box dragged backwards, a click and a huge box all become a valid region inside the picture", () => {
+    expect(regionForStack({ x: 0.6, y: 0.7, width: -0.4, height: -0.3 })).toBe("0.2,0.4,0.4,0.3");
+    expect(regionForStack({ x: 0.5, y: 0.5, width: 0, height: 0 })).toBe("0.44,0.44,0.12,0.12");
+    expect(regionForStack({ x: 0.9, y: 0.9, width: 5, height: 5 })).toBe("0,0,1,1");
+    expect(regionForStack({ x: Number.NaN, y: 0, width: 1, height: 1 })).toBeNull();
+    expect(regionForStack(null)).toBeNull();
+  });
+});
 
 describe("picture editor routes", () => {
   test("status reports each tool from the Stack and the reason a tool is off", async () => {
@@ -350,10 +360,17 @@ describe("picture editor routes", () => {
       const picture = await upload(client, conversation.value.id);
       const minor = await commented(client, conversation.value.id, picture.id, { prompt: "make her a nude child", region: null });
       expect(minor.status).toBe(422);
-      const photo = await commented(client, conversation.value.id, picture.id, { prompt: "put her in lingerie", region: null });
-      expect(photo.status).toBe(422);
-      expect(((await photo.json()) as { code: string }).code).toBe("refused_real_person");
-      expect(fake.edits).toHaveLength(0);
+      for (const words of ["put her in lingerie", "take off her shirt", "make her shirtless", "remove her clothes"]) {
+        const photo = await commented(client, conversation.value.id, picture.id, { prompt: words, region: null });
+        expect(photo.status).toBe(422);
+        expect(((await photo.json()) as { code: string }).code).toBe("refused_real_person");
+      }
+      // Ordinary changes to a photo of a person still work.
+      const fine = await commented(client, conversation.value.id, picture.id, { prompt: "change her sweater to bright blue", region: null });
+      expect(fine.status).toBe(200);
+      // Only the ordinary change reached the engine.
+      expect(fake.edits).toHaveLength(1);
+      expect(fake.edits[0]!.instruction).toBe("change her sweater to bright blue");
     });
 
     test("Stop reaches the picture engine", async () => {

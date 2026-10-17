@@ -34,7 +34,7 @@ import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
-import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, mentionsSexualContent, type PictureAudience } from "@/lib/pictures/policy";
+import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import { speakerAgeBand } from "@/lib/ageBand";
@@ -62,7 +62,7 @@ const JOB_TTL_MS = 60 * 60_000;
 export const EDIT_WAIT_MS = 2500;
 
 export const PICTURES_OFF_REASON = "Picture editing is off for this profile. A parent can turn pictures on in settings.";
-export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing a change needs a picture-making model, and none is installed on this computer.";
+export const COMMENT_NOT_SET_UP = "Picture creation isn't set up yet. Describing a change needs a picture-making model that is installed and running on this computer. An admin can check Settings, Pictures and videos.";
 
 // ---------------------------------------------------------------- tools status
 
@@ -399,17 +399,19 @@ function clamp01(value: number): number { return Math.min(1, Math.max(0, Number.
 
 /** The normalized x,y,w,h the Stack takes, from the editor's box. A click (no size) becomes a small box around the point; a box is kept inside the picture. */
 export function regionForStack(region: CommentRegion | null | undefined): string | null {
-  if (!region) return null;
-  let { x, y, width, height } = region;
+  if (!region || ![region.x, region.y, region.width, region.height].every(Number.isFinite)) return null;
+  // A box dragged right to left or bottom to top has a negative size: take its other corner.
+  let x = region.width < 0 ? region.x + region.width : region.x;
+  let y = region.height < 0 ? region.y + region.height : region.y;
+  let width = Math.abs(region.width);
+  let height = Math.abs(region.height);
   const MIN = 0.12;
-  const cx = clamp01(x + width / 2);
-  const cy = clamp01(y + height / 2);
-  if (width < MIN) { width = MIN; x = cx - MIN / 2; }
-  if (height < MIN) { height = MIN; y = cy - MIN / 2; }
-  x = Math.min(clamp01(x), 1 - Math.min(width, 1));
-  y = Math.min(clamp01(y), 1 - Math.min(height, 1));
-  width = Math.min(width, 1 - x);
-  height = Math.min(height, 1 - y);
+  if (width < MIN) { x -= (MIN - width) / 2; width = MIN; }
+  if (height < MIN) { y -= (MIN - height) / 2; height = MIN; }
+  width = Math.min(width, 1);
+  height = Math.min(height, 1);
+  x = Math.min(clamp01(x), 1 - width);
+  y = Math.min(clamp01(y), 1 - height);
   return [x, y, width, height].map((n) => Number(n.toFixed(4))).join(",");
 }
 
@@ -423,8 +425,8 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const refused = refusePrompt(prompt);
   if (refused) throw new ImageEditError(422, PROMPT_REFUSAL_LINE[refused], `refused_${refused}`);
   // A picture the person did not generate here (an upload) may show a real person: it is never changed into something sexual.
-  const generated = await isGeneratedPicture(source);
-  if (!generated && mentionsSexualContent(prompt)) throw new ImageEditError(422, PROMPT_REFUSAL_LINE.real_person, "refused_real_person");
+  const generated = await isGeneratedPicture(actor, source);
+  if (!generated && asksToUndress(prompt)) throw new ImageEditError(422, PROMPT_REFUSAL_LINE.real_person, "refused_real_person");
   const comment = await commentState(actor);
   if (!comment.enabled) throw new ImageEditError(503, comment.reason ?? COMMENT_NOT_SET_UP, "not_set_up");
   const region = regionForStack(input.region);
@@ -433,6 +435,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   form.append("operation", region ? "edit_masked" : "edit");
   form.append("instruction", prompt);
   if (region) form.append("region", region);
+  // timeout_ms is how long the Stack holds this request for a finished picture before it answers 202 with the job id: 1 asks for the id at once, and Home polls.
   form.append("timeout_ms", "1");
   try {
     const { job } = await submitEdit(form);
@@ -456,10 +459,10 @@ function commentErrorFrom(error: unknown): ImageEditError {
   return editErrorFrom(error);
 }
 
-async function isGeneratedPicture(source: SourcePicture): Promise<boolean> {
-  if (source.temporary) return source.name === "Generated picture";
+async function isGeneratedPicture(actor: PersonRow, source: SourcePicture): Promise<boolean> {
+  if (source.temporary) return getTemporaryChatImageForReader(actor, source.conversationId, source.rootId)?.generated === true;
   const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
-  return Boolean(row?.provenance.startsWith("picture-gen:"));
+  return typeof row?.provenance === "string" && row.provenance.startsWith("picture-gen:");
 }
 
 async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promise<EditProgress> {
@@ -476,16 +479,25 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
   }
   if (status.state === "cancelled") { jobs.delete(jobId); return { state: "cancelled", error: "The change was cancelled. Nothing was changed.", code: "cancelled" }; }
   if (status.state === "failed") { jobs.delete(jobId); return { state: "failed", error: status.error ?? "The picture engine could not make that change. Try again, or describe it differently.", code: status.code ?? "failed" }; }
-  const source = loadSource(actor, job.conversationId, job.sourceId, true);
   job.finalising = (async () => {
+    // The finished picture is kept as a preview first; the engine's copy is deleted only after that worked.
+    const source = loadSource(actor, job.conversationId, job.sourceId, true);
     const png = await fetchPicture(jobId, 0);
     const meta = await sharp(png).metadata();
     const made = status.data[0];
-    void cancelOrDelete(jobId);
-    return keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms });
+    const kept = keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms });
+    await cancelOrDelete(jobId);
+    return kept;
   })();
-  job.finalising.catch(() => { job.finalising = undefined; });
-  return { state: "done", preview: await job.finalising };
+  try {
+    return { state: "done", preview: await job.finalising };
+  } catch (error) {
+    // A picture that cannot be kept ends the job here, with the engine's copy removed, instead of failing on every poll.
+    jobs.delete(jobId);
+    void cancelOrDelete(jobId);
+    const mapped = commentErrorFrom(error);
+    return { state: "failed", error: mapped.message, code: mapped.code };
+  }
 }
 
 export function __resetImageEditForTests(): void { previews.clear(); jobs.clear(); toolsStatusForTests = undefined; imageEngineForTests = undefined; }

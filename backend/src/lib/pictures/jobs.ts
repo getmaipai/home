@@ -161,7 +161,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       if (!conversationId) throw new Error("no conversation");
       if (job.temporary) {
         const id = newFileId();
-        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width: info.width, height: info.height, bytes: raw });
+        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width: info.width, height: info.height, bytes: raw, generated: true });
         files.push({ id, width: info.width, height: info.height, ...meta });
         continue;
       }
