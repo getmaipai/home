@@ -11,8 +11,8 @@ import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
 import { HOSTED_SEARCH_SETTINGS_KEYS } from "@/settings/hostedSearchKeys";
-import { MINOR_DDGS_SETTINGS_KEYS } from "@/settings/minorDdgsKeys";
-import { ddgsConfigured } from "@/lib/retrieval/ddgsSource";
+import { MINOR_DDGS_SETTINGS_KEYS, MINOR_DDGS_KEY } from "@/settings/minorDdgsKeys";
+import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
 import { SPEC_DIR } from "./specDir.js";
 import { PACKAGES_DIR } from "./paths";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
@@ -105,9 +105,30 @@ export function getRegistry(): SettingsKey[] {
   // not yet own wakeword installation; keep this gate tied to the real
   // downloadable asset state.
   const visible = areWakewordAssetsInstalled() ? cached : cached.filter((key) => key.key !== WAKEWORD_SETTING_KEY);
-  // SEARCH-DDGS-TEEN-01: the DuckDuckGo-for-minors control exists only while DuckDuckGo search itself is set up on this
-  // computer. Hidden, it reads as off (sourceMode.ts fails closed on an unreadable value).
-  return ddgsConfigured() ? visible : visible.filter((key) => key.key !== "search.ddgs_for_minors");
+  // SEARCH-DDGS-TEEN-01: the DuckDuckGo-for-minors control exists while DuckDuckGo search is set up on this computer, and
+  // also whenever its stored value is not "off" (so an admin can always see and turn off a choice made earlier, even after
+  // the sidecar went away). Hidden only when it is off AND the sidecar is unset; hidden, it reads as off.
+  if (ddgsConfigured()) return visible;
+  return storedMinorDdgs() !== "off" ? visible.map(noteMinorDdgsWhenUnconfigured) : visible.filter((key) => key.key !== MINOR_DDGS_KEY);
+}
+
+/** The raw stored value of one household key, supplied by settings.ts at load (it owns the database and the cache).
+ * Registered, not imported, because settings.ts imports this file. `fallback` is what a key with no row reads as. */
+let storedHouseholdReader: ((key: string, fallback: unknown) => unknown) | null = null;
+export function registerStoredHouseholdReader(read: (key: string, fallback: unknown) => unknown): void {
+  storedHouseholdReader = read;
+}
+function storedMinorDdgs(): unknown {
+  try {
+    return storedHouseholdReader?.(MINOR_DDGS_KEY, "off") ?? "off";
+  } catch {
+    return "off";
+  }
+}
+const MINOR_DDGS_UNSET_NOTE = "DuckDuckGo search is not set up on this computer, so this has no effect until it is.";
+function noteMinorDdgsWhenUnconfigured(key: SettingsKey): SettingsKey {
+  if (key.key !== MINOR_DDGS_KEY) return key;
+  return { ...key, help: `${MINOR_DDGS_UNSET_NOTE} ${key.help}`, copy: key.copy ? { ...key.copy, does: `${MINOR_DDGS_UNSET_NOTE} ${key.copy.does}` } : key.copy };
 }
 
 export function getRegistryKey(key: string): SettingsKey | undefined {

@@ -197,7 +197,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
         uncached = weatherPlace.uncached;
       }
     }
-    const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt, ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
+    const raced = await withDeadline(runPlugin(tool, state.actor, weatherArgs ?? runArgs, { id: state.turnId, conversationId: state.conversationId }, { signal, deadlineAt: input.deadlineAt, spoken: spokenSearch, ...(hostInputs ? { hostInputs, uncached } : {}) }), signal);
     const durationMs = Date.now() - startedAt;
     if (raced === "deadline") {
       const outcome = outcomeOf({ callId, packageId: tool, status: "failed", via: "tool_call", args, errorCode: "deadline_exceeded", durationMs, failureKind: "timed_out", detail: "the tool deadline passed before the call returned" });

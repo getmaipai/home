@@ -139,13 +139,21 @@ feature: the findings above still hold and the setting says so.
   One definition, and the ladder cannot express the odd state "children yes, teens no". Owner and admin write only (the
   generic household write rule in `settings.ts`); a teen or child is refused. It is declared in
   `backend/src/settings/minorDdgsKeys.ts` and merged like `search.brave_api_key` until a commons spec tag carries it. It
-  is hidden while the ddgs helper is not set up, so it reads as off. Its help text: "DuckDuckGo's own filter is not
+  is hidden only while the ddgs helper is not set up AND its value is off (hidden, it reads as off). A stored
+  Teens or Teens and children stays visible without the helper, with the note "DuckDuckGo search is not set up on this
+  computer, so this has no effect until it is", so an admin can always turn it off. Its help text: "DuckDuckGo's own filter is not
   guaranteed. Adult results may reach this age group. Leave this off unless you accept that."
 - **Enforcement** (`sourceMode.ts` `minorDdgsAllowed`, `webSources.ts` `webSourcesFor`, `ddgsSource.ts`): ddgs opens for a
   band only through `effectiveMode`, so the band's web switch, the child temporary-chat rule and the blocklist-loading
   hold all still apply. For a minor ddgs also needs SearXNG picked in `search.web_sources` (never the sole pick), SearXNG
-  leads the blend whatever the stored order, and a spoken turn (voice, robot) keeps SearXNG alone. A guest is still
-  refused. `ddgsSearch` repeats those locks. It sends `safesearch=on` for a minor; the sidecar passes it to the library,
+  leads the blend whatever the stored order, and a spoken turn (voice, robot) keeps SearXNG alone. Whether a turn is
+  spoken comes from the turn's own surface, not from model-visible arguments: the tool node passes `spoken` (its planned
+  surface class) to the package host, and a caller that says nothing (a direct plugin run) counts as spoken for a minor;
+  the `spoken` argument is a second signal (`lib/spokenArg.ts` is its one parse). A guest is still refused. `ddgsSearch`
+  repeats those locks, and for a minor also the query refusal (an email, phone or id number is never sent) and the row
+  floor (`retrieval/minorRowFloor.ts`: blocked site, unsafe title or snippet), the same single definition
+  `floorSearchResult` uses for the SearXNG leg. The sidecar address lives in `retrieval/ddgsConfig.ts` (no imports), so the
+  settings registry no longer sits in an import cycle with the search code. It sends `safesearch=on` for a minor; the sidecar passes it to the library,
   which may ignore it. Result handling is the minor path already used for blends: `floorSearchResult`, the adult-site
   host list, page cleaning, the output gate. Hosted search stays adult only.
 - **Wizard:** the Web search screen (shown only when SearXNG is not ready) says: "Until SearXNG is set up, teens and

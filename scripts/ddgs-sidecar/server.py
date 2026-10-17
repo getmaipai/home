@@ -19,6 +19,7 @@ Run: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 """
 import json
 import os
+from typing import Optional
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -33,7 +34,7 @@ BLOCK_WORDS = ("ratelimit", "rate limit", "429", "403", "202", "captcha", "block
 SAFESEARCH = ("on", "moderate", "off")
 
 
-def search(query: str, limit: int, safesearch: str | None = None) -> list[dict]:
+def search(query: str, limit: int, safesearch: Optional[str] = None) -> list[dict]:
     try:
         if safesearch:
             hits = CLIENT.text(query, safesearch=safesearch, max_results=limit)

@@ -15,7 +15,8 @@ import type { AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { effectiveMode, minorDdgsAllowed, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
-import { ddgsConfigured, ddgsSearch } from "@/lib/retrieval/ddgsSource";
+import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
+import { ddgsSearch } from "@/lib/retrieval/ddgsSource";
 
 export const WEB_SOURCES_KEY = "search.web_sources";
 export const DEFAULT_WEB_SOURCES = ["searxng"] as const;
@@ -50,6 +51,9 @@ export interface WebSearchContext {
   deadlineAt?: number;
   /** The asker's role; a guest carries no age signal and never reaches ddgs. */
   role?: string;
+  /** Whether the turn is spoken (voice, Wyoming, robot), from the turn's own surface. A minor's ddgs search needs this to
+   * be `false`; unset counts as spoken (SEARCH-DDGS-TEEN-01). */
+  spoken?: boolean;
 }
 /** Rows-only search functions for sources other than SearXNG (whose step lives in packageHost.ts,
  * next to its tiers, cache and engine health). */

@@ -49,7 +49,7 @@ Teens and children use SearXNG alone. An admin can change that. Once DuckDuckGo 
 
 Read this first. DuckDuckGo's own filter is not guaranteed, and the tool MaiPai uses to reach it often ignores the strict setting MaiPai asks for. Adult results may reach this age group. Leave this off unless you accept that.
 
-When it is on, DuckDuckGo is a second source beside SearXNG, never the only one. MaiPai still asks for the strictest SafeSearch, blocks adult sites, checks the pages it reads and checks every answer. Searches spoken to a voice or robot still use SearXNG alone, and so do guests. Until SearXNG is set up, teens and children use the Library only unless you turn this on.
+When it is on, DuckDuckGo is a second source beside SearXNG, never the only one. MaiPai still asks for the strictest SafeSearch, blocks adult sites, checks the pages it reads and checks every answer. Searches spoken to a voice or robot still use SearXNG alone, and so do guests. A search with an email address, phone number or ID number in it is never sent, and a DuckDuckGo result from a blocked site or with an unsafe snippet is dropped, exactly as for SearXNG. If DuckDuckGo is not running on this computer, the setting shows a note and has no effect until it is. Until SearXNG is set up, teens and children use the Library only unless you turn this on.
 
 ## Using search when you are away from home
 

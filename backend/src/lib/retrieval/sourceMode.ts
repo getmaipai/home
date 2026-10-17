@@ -24,6 +24,8 @@
 // Counters carry a fixed name and at most an age band (rule 6a).
 import type { AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { MINOR_DDGS_KEY } from "@/settings/minorDdgsKeys";
+export { MINOR_DDGS_KEY };
 import { listsReadyForBand } from "@/lib/blocklists/listStore";
 import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 
@@ -82,7 +84,6 @@ function overrideMode(source: "wikimedia" | "web"): SourceMode | null {
  * admin switched it on for that band. `off` (default) | `teens` | `teens_and_children`. Children are never on without
  * `teens_and_children`. A value that cannot be read, or an unknown one, is off (fail closed). This is only the band's
  * permission; webSources.ts still needs ddgs built, picked and beside SearXNG, and the band's web switch still decides first. */
-export const MINOR_DDGS_KEY = "search.ddgs_for_minors";
 export function minorDdgsAllowed(band: AgeBand): boolean {
   if (band === "adult") return false;
   try {

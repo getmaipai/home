@@ -77,6 +77,8 @@ import { waybackCopy } from "@/lib/retrieval/wayback";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
+import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
+import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
 import { findOrCreateStandingList, addItem as addListItem } from "@/lib/lists";
@@ -1495,12 +1497,6 @@ function wantsPages(input: { read_page?: unknown } | undefined): boolean {
   return input?.read_page === true || input?.read_page === "true";
 }
 
-/** THIN-4F: the tool node marks a spoken turn's search with `spoken`
- * (the recipe forwards it as a string, an unset one stays "{spoken}"). */
-function wantsSpoken(input: { spoken?: unknown } | undefined): boolean {
-  return input?.spoken === true || input?.spoken === "true";
-}
-
 /** One entry per url (a row with no url is keyed by its title and
  * snippet): an engine mix can return the same page several times, and
  * each copy would take a source number and a page fetch. */
@@ -1620,7 +1616,7 @@ export function floorSearchResult(result: SearxngSearchResult, band: MinorBand):
   // MINOR-SEARCH-01e-5: a row or page on a blocked site is dropped; a blocked image or thumbnail address is
   // stripped from a row that is otherwise fine. Counted by list id (hostLists.ts), never by site.
   const rows = result.rows
-    .filter((row) => !trips(`${row.title}. ${row.snippet ?? ""}`) && urlAllowedFor(band, row.url))
+    .filter((row) => minorRowAllowed(band, row))
     .map((row) => {
       const imageOk = !row.image || urlAllowedFor(band, row.image);
       const thumbOk = !row.thumbnail || urlAllowedFor(band, row.thumbnail);
@@ -1953,7 +1949,7 @@ function mapWriteFailure(status: number, error: string): never {
  * together in scope (the conversation a turn belongs to), so building
  * one object at the call site is the natural shape, not friction added
  * for its own sake. */
-export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture } = {}): Host {
+export function createHost(actor: PersonRow, manifest: PackageManifest, secrets: readonly string[] = [], turn?: { id: string; conversationId?: string }, runtime: { signal?: AbortSignal; deadlineAt?: number; capture?: BlockCapture; spoken?: boolean } = {}): Host {
   const hasPermission = (perm: string) => manifest.permissions?.includes(perm) ?? false;
 
   function requirePermission(perm: string): void {
@@ -2368,7 +2364,11 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             if (hosted) return hosted;
             const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
             // SEARCH-SOURCES-01: several picked sources run at once and blend by rank; one source (the default) is the old path unchanged.
-            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary, wantsSpoken(args as { spoken?: unknown } | undefined)).filter((id) => !(id === "ddgs" && actor.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
+            // SEARCH-DDGS-TEEN-01: whether this is a spoken turn comes from the turn's own surface (`runtime.spoken`, set by the
+            // tool node and the commands node from the planned surface class), never from the model-visible args alone. A caller
+            // that does not say (a direct API run) counts as spoken, so a minor stays on SearXNG there; the args flag is a second signal.
+            const spokenTurn = runtime.spoken !== false || wantsSpoken(args as { spoken?: unknown } | undefined);
+            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary, spokenTurn).filter((id) => !(id === "ddgs" && actor.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
             if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
             if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(args, searxOpts);
             const rowsOnly = { ...(args as object), read_page: false };
@@ -2376,7 +2376,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
               if (id === "searxng") return searxngSearch(rowsOnly, searxOpts);
               const search = webSourceSearch(id);
               if (!search) return Promise.reject(new Error(`web source ${id} is not available`));
-              return search({ args: rowsOnly, band, signal: runtime.signal, deadlineAt: runtime.deadlineAt, role: actor.role });
+              return search({ args: rowsOnly, band, signal: runtime.signal, deadlineAt: runtime.deadlineAt, role: actor.role, spoken: spokenTurn });
             }));
             return attachSearchPages(blended, args, band === "adult" ? undefined : band, runtime.signal, temporary);
           };

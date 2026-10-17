@@ -12,9 +12,12 @@
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { tryConsume } from "@/lib/rateLimiter";
 import { minorDdgsAllowed } from "@/lib/retrieval/sourceMode";
+import { ddgsBaseUrl } from "@/lib/retrieval/ddgsConfig";
+import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
+import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
+import { wantsSpoken } from "@/lib/spokenArg";
 import type { WebRows, WebRow, WebSearchContext } from "@/lib/retrieval/webSources";
 
-export const DDGS_URL_ENV = "MAIPAI_DDGS_URL";
 /** What the privacy page names: the site the sidecar's search words reach. */
 export const DDGS_DESTINATION_HOST = "duckduckgo.com";
 
@@ -42,20 +45,6 @@ export function ddgsQuietUntil(): number {
   return quietUntil;
 }
 
-/** The sidecar's address, or null when none is set. Loopback only: the sidecar runs beside Home. */
-export function ddgsBaseUrl(): URL | null {
-  const raw = process.env[DDGS_URL_ENV]?.trim();
-  if (!raw) return null;
-  try {
-    const url = new URL(raw);
-    const loopback = url.hostname === "127.0.0.1" || url.hostname === "localhost" || url.hostname === "[::1]";
-    return (url.protocol === "http:" || url.protocol === "https:") && loopback ? url : null;
-  } catch {
-    return null;
-  }
-}
-export const ddgsConfigured = (): boolean => ddgsBaseUrl() !== null;
-
 function openQuietMode(): void {
   quietUntil = clock() + QUIET_WINDOWS_MS[Math.min(blockCount, QUIET_WINDOWS_MS.length - 1)]!;
   blockCount += 1;
@@ -79,13 +68,15 @@ const UNAVAILABLE = "DuckDuckGo search isn't answering right now. Home will try 
 
 export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
   const minor = ctx.band !== "adult";
-  const spokenArg = (ctx.args as { spoken?: unknown } | undefined)?.spoken;
-  const spoken = spokenArg === true || spokenArg === "true";
+  // A minor's turn must be affirmed as not spoken by the caller (the turn's own surface, packageHost.ts); the `spoken` arg is a second signal.
+  const spoken = ctx.spoken !== false || wantsSpoken(ctx.args as { spoken?: unknown } | undefined);
   if (ctx.role === "guest" || (minor && (spoken || !minorDdgsAllowed(ctx.band)))) throw new HostError("permission_denied", "DuckDuckGo search is not allowed for this profile.");
   const base = ddgsBaseUrl();
   if (!base) throw new HostError("search_unavailable", "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source.");
   const query = (ctx.args as { query?: unknown } | undefined)?.query;
   if (typeof query !== "string" || query.length === 0) throw new HostError("invalid_input", `ddgs search needs a string "query" argument`);
+  // The same query refusal SearXNG's leg gets (MINOR-SEARCH-01f): a minor's words with a closed personal detail never leave the house.
+  if (minor && minorQueryHit(query, ctx.band)) throw new HostError("invalid_input", MINOR_QUERY_PERSONAL_NOTE);
   if (clock() < quietUntil) throw new HostError("search_unavailable", UNAVAILABLE);
   // After a block, only one request at a time may test whether the service is answering again.
   if (blockCount > 0 && probing) throw new HostError("search_unavailable", UNAVAILABLE);
@@ -119,7 +110,10 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
       const rowUrl = cleanUrl(item.url);
       if (typeof item.title !== "string" || item.title.trim() === "" || !rowUrl) continue;
       const snippet = typeof item.snippet === "string" ? item.snippet.trim() : "";
-      rows.push({ title: item.title.trim(), url: rowUrl, snippet: snippet || null });
+      const row: WebRow = { title: item.title.trim(), url: rowUrl, snippet: snippet || null };
+      // The same per-row floor every minor result passes (minorRowFloor.ts): a blocked site or an unsafe title or snippet is dropped here too.
+      if (minor && !minorRowAllowed(ctx.band, row)) continue;
+      rows.push(row);
     }
     // A normal answer (even an empty one) ends the back-off ladder.
     blockCount = 0;

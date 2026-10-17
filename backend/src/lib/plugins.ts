@@ -555,7 +555,7 @@ export async function runPlugin(
   actor: PersonRow,
   inputs: Record<string, unknown>,
   turn?: { id: string; conversationId?: string },
-  options: { signal?: AbortSignal; deadlineAt?: number; hostInputs?: Record<string, unknown>; uncached?: boolean } = {},
+  options: { signal?: AbortSignal; deadlineAt?: number; hostInputs?: Record<string, unknown>; uncached?: boolean; spoken?: boolean } = {},
 ): Promise<PluginOpResult<PluginResult>> {
   // PLACE-WEATHER-01: latitude and longitude are host-only recipe inputs. A model
   // or a direct caller can never supply them; the runner merges its own after

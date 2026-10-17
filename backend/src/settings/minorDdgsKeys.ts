@@ -4,9 +4,11 @@
 // is one line (delete this file once the tag lands). Read only through sourceMode.ts `minorDdgsAllowed`.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
+export const MINOR_DDGS_KEY = "search.ddgs_for_minors";
+
 export const MINOR_DDGS_SETTINGS_KEYS: SettingsKey[] = [
   SettingsKey.parse({
-    key: "search.ddgs_for_minors",
+    key: MINOR_DDGS_KEY,
     scope: "household",
     selector: "select",
     range: { options: ["off", "teens", "teens_and_children"] },

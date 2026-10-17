@@ -7,7 +7,7 @@ import { checkFeedAddressBox } from "@/lib/shelf/feedAddresses";
 import { eq, and, isNull, like } from "drizzle-orm";
 import { db } from "@/db";
 import { settingsValues, people, entities } from "@/db/schema";
-import { getRegistry, getRegistryKey } from "@/lib/settingsRegistry";
+import { getRegistry, getRegistryKey, registerStoredHouseholdReader } from "@/lib/settingsRegistry";
 import { calledAdminForOwnSettings } from "@/lib/relationships";
 import { nextHlc, compareHlc, seedHlc } from "@/lib/hlc";
 import { isOwnerOrAdmin, canAccessPerson, getPersonRole } from "@/lib/access";
@@ -873,6 +873,17 @@ function resolveStoredValue(scope: string, keyDef: SettingsKey): unknown {
   settingsCache.set(cacheKey, value);
   return value;
 }
+
+// The registry decides whether a key is shown from the stored value of one household key (settingsRegistry.ts
+// getRegistry), so it reads through this cached raw reader. A key with no row reads as `fallback` (its default).
+registerStoredHouseholdReader((key, fallback) => {
+  const cacheKey = settingsCacheKey("household", key);
+  if (settingsCache.has(cacheKey)) return settingsCache.get(cacheKey);
+  const row = db.select({ value: settingsValues.value }).from(settingsValues).where(and(eq(settingsValues.scope, "household"), eq(settingsValues.key, key))).get();
+  const value = row ? JSON.parse(row.value) : fallback;
+  settingsCache.set(cacheKey, value);
+  return value;
+});
 
 /** Reset a key back to its registry default: a real delete (this table
  * makes no "never hard-deletes" promise the way memory does; there's no
