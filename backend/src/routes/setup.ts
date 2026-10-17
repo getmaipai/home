@@ -25,7 +25,7 @@ import { checkPlacement } from "@/lib/placement";
 import { getSetupState, PRE_OWNER_STEPS, replaceSetupStep, SETUP_STEP_IDS, type SetupStepId } from "@/lib/setupState";
 import { db } from "@/db";
 import { people } from "@/db/schema";
-import { runSetupChecks, healthItems } from "@/setup/checks/checks";
+import { runSetupChecks, healthItems, webSearchNeedsSetup } from "@/setup/checks/checks";
 import { startSetupDownloads } from "@/setup/checks/setupDownloads";
 import { beginInstall, engineNeedsInstall, previewPlan } from "@/lib/installActions";
 import { startEngineInstall } from "@/lib/stackInstall";
@@ -55,7 +55,7 @@ setupRoutes.route("/", setupHostTuneRoutes);
 
 const checksRoute = createRoute({
   method: "post", path: "/checks/run", tags: ["Setup"], summary: "Run setup checks and persist their health items",
-  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState, searchCandidate: z.string().nullable() }) } }, description: "The ordered check rows and updated setup state." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ rows: z.array(z.object({ id: z.string(), title: z.string(), state: z.enum(["green", "amber", "red", "idle"]), text: z.string() })), state: SetupState, searchCandidate: z.string().nullable(), searchNeeded: z.boolean() }) } }, description: "The ordered check rows and updated setup state. searchNeeded: setup should offer the Web search screen." } },
 });
 const allowTailnetErrorSchema = z.object({ error: z.string(), next: z.string().optional() });
 setupRoutes.openapi(checksRoute, async (c) => {
@@ -72,7 +72,7 @@ setupRoutes.openapi(checksRoute, async (c) => {
   }
   const state = replaceSetupStep("checks", { status: rows.some((row) => row.state === "red") ? "failed" : "done", checks: healthItems(rows), engine });
   if (passed) void startSetupDownloads().catch(() => {});
-  return c.json({ rows: rows.map(({ id, title, state, text, action, actionLabel, actionRoute }) => ({ id, title, state, text, ...(action ? { action, actionLabel, actionRoute } : {}) })), state, searchCandidate: candidatesOut.find((item) => item.status === "pass")?.url ?? null }, 200);
+  return c.json({ rows: rows.map(({ id, title, state, text, action, actionLabel, actionRoute }) => ({ id, title, state, text, ...(action ? { action, actionLabel, actionRoute } : {}) })), state, searchCandidate: candidatesOut.find((item) => item.status === "pass")?.url ?? null, searchNeeded: webSearchNeedsSetup(rows) }, 200);
 });
 
 const installStatusRoute = createRoute({
@@ -130,21 +130,46 @@ setupRoutes.openapi(engineInstallRoute, (c) => {
 });
 
 const useSearchCandidateRoute = createRoute({
-  method: "post", path: "/search/use-candidate", tags: ["Setup"], summary: "Choose a discovered local SearXNG",
-  request: { body: { content: { "application/json": { schema: z.object({ url: z.string().url() }) } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.literal(true) }) } }, description: "The chosen SearXNG address was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not a passing loopback SearXNG." } },
+  method: "post", path: "/search/use-candidate", tags: ["Setup"], summary: "Test or save the SearXNG address, or skip it and keep DuckDuckGo for adults",
+  request: { body: { content: { "application/json": { schema: z.object({
+    url: z.string().optional(),
+    /** Run the same checks but save nothing: the Test button. */
+    dry_run: z.boolean().optional(),
+    /** With no url: setup is skipping SearXNG, so DuckDuckGo (adults only) is turned on (owner ruling 2026-10-17). */
+    ddgs_default: z.boolean().optional(),
+  }).strict() } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.boolean() }) } }, description: "The address passed. saved is false for a Test; true once it, or the skip choice, was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not a passing SearXNG on the home network." } },
 });
+// The checker paces repeat probes of one address, so Test then Save would fail the second check. A pass from Test
+// stands for the same address for a few minutes; Save then skips the second probe.
+let searchTestPassed: { url: string; at: number } | null = null;
+const SEARCH_TEST_VALID_MS = 5 * 60_000;
 setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
   if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead." }, 400);
-  const { url } = c.req.valid("json");
-  let parsed: URL;
-  try { parsed = new URL(url); } catch { return c.json({ error: "Choose a SearXNG found on this computer." }, 400); }
-  if (parsed.protocol !== "http:" || parsed.hostname !== "127.0.0.1" || ![8888, 8080].includes(Number(parsed.port))) return c.json({ error: "Choose a SearXNG found on this computer." }, 400);
-  const { checkSearchInstance } = await import("@/lib/searchInstanceCheck");
-  const status = await checkSearchInstance({ candidateBaseUrl: url });
-  if (!status.checks.length || status.checks.some((check) => check.state !== "pass")) return c.json({ error: status.checks.find((check) => check.state !== "pass")?.fix ?? "Web search isn't ready yet." }, 400);
-  const saved = setHouseholdSettingValue("search.searxng_url", parsed.toString().replace(/\/$/, ""));
-  return saved.ok ? c.json({ saved: true as const }, 200) : c.json({ error: saved.error }, 400);
+  const { url, dry_run: dryRun, ddgs_default: ddgsDefault } = c.req.valid("json");
+  if (url === undefined) {
+    // Skipping SearXNG: adults get DuckDuckGo by default (it answers once its helper runs). Nothing else is saved.
+    if (dryRun || !ddgsDefault) return c.json({ error: "Type the SearXNG address first, then press Test." }, 400);
+    const picked = setHouseholdSettingValue("search.web_sources", ["searxng", "ddgs"]);
+    return picked.ok ? c.json({ saved: true }, 200) : c.json({ error: picked.error }, 400);
+  }
+  const { parseSearchAddress } = await import("@/lib/setupSearchAddress");
+  const parsed = parseSearchAddress(url);
+  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
+  const address = parsed.url.toString().replace(/\/$/, "");
+  const alreadyPassed = !dryRun && searchTestPassed?.url === address && Date.now() - searchTestPassed.at < SEARCH_TEST_VALID_MS;
+  if (!alreadyPassed) {
+    const { checkSearchInstance } = await import("@/lib/searchInstanceCheck");
+    const status = await checkSearchInstance({ candidateBaseUrl: address });
+    if (!status.checks.length || status.checks.some((check) => check.state !== "pass")) {
+      searchTestPassed = null;
+      return c.json({ error: status.checks.find((check) => check.state !== "pass")?.fix ?? "Home couldn't reach a search service at that address. Check the address and that the service is running, then press Test." }, 400);
+    }
+    if (dryRun) { searchTestPassed = { url: address, at: Date.now() }; return c.json({ saved: false }, 200); }
+  }
+  searchTestPassed = null;
+  const saved = setHouseholdSettingValue("search.searxng_url", address);
+  return saved.ok ? c.json({ saved: true }, 200) : c.json({ error: saved.error }, 400);
 });
 
 const allowTailnetRoute = createRoute({

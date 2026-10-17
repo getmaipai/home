@@ -17,7 +17,7 @@ import { isStackConfigured } from "@/lib/stackEngine";
 import { getHouseholdSettingValue } from "@/lib/settings";
 
 export type CheckState = "green" | "amber" | "red" | "idle";
-export type SetupCheck = { id: string; title: string; state: CheckState; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup"; item?: { code: string; severity: "critical" | "error" | "warning"; title: string; text: string; since: string; cause: string; fix?: { label: string; action: "retry_download" | "reinstall_engine" } } };
+export type SetupCheck = { id: string; title: string; state: CheckState; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup"; searchInstalling?: true; item?: { code: string; severity: "critical" | "error" | "warning"; title: string; text: string; since: string; cause: string; fix?: { label: string; action: "retry_download" | "reinstall_engine" } } };
 export type CheckDeps = {
   hardware?: () => Promise<Record<string, unknown>>;
   catalog?: () => Promise<Record<string, unknown>>;
@@ -51,7 +51,7 @@ async function searchRows(deps: CheckDeps, now: Date): Promise<SetupCheck[]> {
     return [makeRow("web-search", "Web search", passing ? "green" : "amber", passing ? "Web search is ready." : status?.checks.find((check) => check.state !== "pass")?.fix ?? "Web search isn't ready yet. Home can continue without it.", "The configured SearXNG check.", undefined, now)];
   }
   const stackState = deps.stackSearchState?.() ?? (isStackConfigured() ? "absent" : "ready");
-  if (stackState === "installing") return [makeRow("web-search", "Web search", "amber", "Web search is still installing...", "The Stack reports its search service installing.", undefined, now)];
+  if (stackState === "installing") return [{ ...makeRow("web-search", "Web search", "amber", "Web search is still installing...", "The Stack reports its search service installing.", undefined, now), searchInstalling: true }];
   if (stackState === "absent") return [makeRow("web-search", "Web search", "amber", "Web search isn't ready yet. Home can continue without it.", "The Stack has no ready search service.", undefined, now)];
   const candidates: Array<{ url: string; status: "pass" | "fail" }> = await (deps.searchCandidates ? deps.searchCandidates() : (async () => {
     const found: Array<{ url: string; status: "pass" | "fail" }> = [];
@@ -200,4 +200,11 @@ async function selectedModelIds(deps: CheckDeps): Promise<string[]> {
 
 export function healthItems(rows: readonly SetupCheck[]) {
   return rows.flatMap((row) => row.item ? [row.item] : []);
+}
+
+/** SETUP-SEARCH-02: whether setup should offer the "Web search" screen: the row is not green and the Stack is not
+ * still installing search. (Once STACK-SEARCH-01 reports a ready search service the row is green and this is false.) */
+export function webSearchNeedsSetup(rows: SetupCheck[]): boolean {
+  const row = rows.find((item) => item.id === "web-search");
+  return Boolean(row) && row!.state !== "green" && !row!.searchInstalling;
 }

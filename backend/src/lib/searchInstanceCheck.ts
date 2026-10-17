@@ -1,4 +1,5 @@
 import { networkInterfaces } from "node:os";
+import { parseSearchAddress } from "@/lib/setupSearchAddress";
 import engineCatalogJson from "@maipai/spec/search/searxng-engines.json" with { type: "json" };
 import { SearxngEngines } from "@maipai/spec/gen/ts/searxng-engines.js";
 import { db } from "@/db";
@@ -378,10 +379,11 @@ export async function checkSearchInstance(options: CheckerOptions = {}): Promise
   let configured: { configured: boolean; baseUrl: string | null };
   if (candidate) {
     try {
-      const parsed = new URL(candidate);
-      const loopback = parsed.hostname === "127.0.0.1" || parsed.hostname === "localhost" || parsed.hostname === "[::1]";
-      configured = parsed.protocol === "http:" && loopback && !parsed.username && !parsed.password
-        ? { configured: true, baseUrl: parsed.toString().replace(/\/$/, "") }
+      // SETUP-SEARCH-02: a candidate is an address on this computer or the home network (http or https, no sign-in
+      // inside it); setupSearchAddress.ts holds the one rule the setup route shares.
+      const parsed = parseSearchAddress(candidate);
+      configured = parsed.ok
+        ? { configured: true, baseUrl: parsed.url.toString().replace(/\/$/, "") }
         : { configured: true, baseUrl: null };
     } catch { configured = { configured: true, baseUrl: null }; }
   } else configured = configuredUrl();

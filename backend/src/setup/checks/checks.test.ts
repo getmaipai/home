@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { isSupportedInstallPlatform } from "@/lib/installPreflight";
 import { checkNvidiaSysmemFallback } from "./nvidiaSysmemFallback";
 import { interpretTailscaleStatusJson } from "@/lib/tailscale";
-import { runSetupChecks } from "./checks";
+import { runSetupChecks, webSearchNeedsSetup } from "./checks";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { resetDb } from "../../../tests/reset-db";
 
@@ -36,6 +36,16 @@ describe("setup check row helpers", () => {
     const candidate = await runSetupChecks({ ...common, searchCandidates: async () => [{ url: "http://127.0.0.1:8080", status: "fail" }] });
     expect(candidate.find((row) => row.id === "web-search")?.state).toBe("amber");
     expect([ready, noStack, installing, candidate].flatMap((rows) => rows.filter((row) => row.id === "web-search")).every((row) => row.state !== "red")).toBe(true);
+  });
+  test("the Web search screen is offered unless the row is green or the Stack is still installing search", async () => {
+    resetDb();
+    const common = { health: async () => ({ ok: true }), hardware: async () => ({ hardware: { platform: "darwin", arch: "arm64" }, proposed: { level: "Minimal" } }), catalog: async () => ({ models: [] }), modelDisk: async () => ({ status: "green" as const }), hubDisk: async () => ({ status: "green" as const }), homeNetwork: async () => true };
+    expect(webSearchNeedsSetup(await runSetupChecks({ ...common, stackSearchState: () => "absent" }))).toBe(true);
+    expect(webSearchNeedsSetup(await runSetupChecks({ ...common, stackSearchState: () => "installing" }))).toBe(false);
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:8080");
+    expect(webSearchNeedsSetup(await runSetupChecks({ ...common, configuredSearchStatus: async () => "pass" }))).toBe(false);
+    expect(webSearchNeedsSetup(await runSetupChecks({ ...common, configuredSearchStatus: async () => "fail" }))).toBe(true);
+    setHouseholdSettingValue("search.searxng_url", "");
   });
   test("synthetic Tailscale states produce matching peer and route rows", async () => {
     setHouseholdSettingValue("engines.stack.where", "another_computer");
