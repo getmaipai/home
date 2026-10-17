@@ -118,6 +118,49 @@ describe("offline admission", () => {
   });
 });
 
+describe("review fixes: device kinds, minors, If-Range, last-seen", () => {
+  test("a robot, tv or pod can never hold media.offline, by the route or by a forced row", async () => {
+    const s = await setup();
+    for (const kind of ["robot", "tv", "pod"] as const) {
+      const issued = issueDeviceToken(s.actor.id, kind, "atlas");
+      const path = `/api/devices/${issued.deviceId}/offline-scope`;
+      expect((await s.owner.request(path, { method: "PATCH", body: { offline_scope: ["media.offline"] } })).status).toBe(400);
+      db.update(devices).set({ offlineScope: '["media.offline"]' }).where(eq(devices.id, issued.deviceId)).run();
+      const res = await s.client.get(`${base}/manifest?id=${s.id}`, auth(issued.token));
+      expect(res.status).toBe(403);
+    }
+  });
+  test("a minor keeps media only on a device a guardian granted; neither their browser session nor their own PATCH can", async () => {
+    const s = await setup(); s.allow();
+    const made = await (await s.owner.post("/api/people", { displayName: "sprout", role: "child", secret: "0000", birthdate: "2018-03-01" })).json() as { id: string };
+    const child = new TestClient(); await child.post("/api/auth/verify-secret", { personId: made.id, secret: "0000" });
+    db.update(mediaItems).set({ bandOk: "child" }).run();
+    expect((await child.get(`${base}/manifest?id=${s.id}`)).status).toBe(403); // browser session, no grant
+    const issued = issueDeviceToken(made.id, "phone", "sprout");
+    const path = `/api/devices/${issued.deviceId}/offline-scope`;
+    expect((await child.request(path, { method: "PATCH", body: { offline_scope: ["media.offline"] } })).status).toBe(403);
+    expect((await s.client.get(`${base}/manifest?id=${s.id}`, auth(issued.token))).status).toBe(403);
+    expect((await s.owner.request(path, { method: "PATCH", body: { offline_scope: ["media.offline"] } })).status).toBe(200);
+    expect((await s.client.get(`${base}/manifest?id=${s.id}`, auth(issued.token))).status).toBe(200);
+  });
+  test("If-Range with a date must equal Last-Modified to the second", async () => {
+    const s = await setup(); s.allow();
+    const modified = (await s.get(`/file/media/${s.id}`)).headers.get("last-modified")!;
+    expect((await s.get(`/file/media/${s.id}`, { Range: "bytes=2-4", "If-Range": modified })).status).toBe(206);
+    expect((await s.get(`/file/media/${s.id}`, { Range: "bytes=2-4", "If-Range": "Fri, 01 Jan 2027 00:00:00 GMT" })).status).toBe(200);
+  });
+  test("an admitted bearer writes last_seen_at at most once a minute", async () => {
+    const s = await setup(); s.allow();
+    const recent = iso(Date.now() - 10_000);
+    db.update(deviceTokens).set({ lastSeenAt: recent }).run();
+    await s.get(`/manifest?id=${s.id}`);
+    expect(db.select().from(deviceTokens).get()!.lastSeenAt).toBe(recent);
+    db.update(deviceTokens).set({ lastSeenAt: iso(Date.now() - 120_000) }).run();
+    await s.get(`/manifest?id=${s.id}`);
+    expect(Date.parse(db.select().from(deviceTokens).get()!.lastSeenAt!)).toBeGreaterThan(Date.now() - 5_000);
+  });
+});
+
 describe("manifest, file and status", () => {
   test("manifest validates against spec, with hub-only assets, chapters and this person's progress", async () => {
     const s = await setup(); s.allow();

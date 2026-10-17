@@ -27283,6 +27283,16 @@
               }
             }
           },
+          "400": {
+            "description": "A robot, TV or pod cannot keep media",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "401": {
             "description": "Sign in",
             "content": {
@@ -27294,7 +27304,7 @@
             }
           },
           "403": {
-            "description": "Use your own browser to manage permissions",
+            "description": "Use your own browser, and ask a grown-up if you are a child or teen",
             "content": {
               "application/json": {
                 "schema": {

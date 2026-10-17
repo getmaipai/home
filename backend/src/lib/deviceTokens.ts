@@ -23,7 +23,10 @@ import { deviceTokens, devices, people } from "@/db/schema";
 import { newDeviceTokenId } from "@/lib/id";
 import { createDevice, touchDevice, type DeviceKind } from "@/lib/devices";
 
-const TTL_MS = 365 * 24 * 60 * 60 * 1000; // a year - a family TV should not be re-paired quarterly
+// The token lives a year, but a household rule revokes any device token (every kind, a TV included) that has not been used
+// for 180 days: such a device pairs again. `resolveDeviceToken` enforces it on every request and redeem also refuses disabled,
+// deleted and memorialized people and orphaned devices. See docs/dev/media-offline.md.
+const TTL_MS = 365 * 24 * 60 * 60 * 1000;
 const MAX_PER_PERSON = 20;
 
 export function hashDeviceToken(token: string): string {

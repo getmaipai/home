@@ -1,11 +1,13 @@
 import { createMiddleware } from "hono/factory";
 import { getCookie } from "hono/cookie";
 import type { Context } from "hono";
-import { eq, gt, and, isNull } from "drizzle-orm";
+import { eq, gt, and, isNull, lt, or } from "drizzle-orm";
 import { db } from "@/db";
 import { sessions, people, deviceTokens } from "@/db/schema";
 import { hashSessionToken } from "@/lib/session";
 import { resolveDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
+import { mayHoldMediaOffline } from "@/lib/devices";
+import { mediaBandOf } from "@/lib/media/band";
 import { resolveApiToken } from "@/lib/apiToken";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
@@ -368,20 +370,28 @@ export function requireDeviceScope(scope: "media.offline" | "offline.records") {
       const device = identity ? getDeviceById(identity.deviceId) : null;
       // `device_revoked` is the one code the browser treats as "wipe kept copies"; a missing scope is not a revocation.
       if (!identity || !device) return c.json({ error: "This device is no longer paired with Home. Pair it again to keep files.", code: "device_revoked" }, 403);
-      if (!device.offlineScope.includes(scope)) {
+      if (!device.offlineScope.includes(scope) || (scope === "media.offline" && !mayHoldMediaOffline(device))) {
         return c.json({ error: "This device cannot keep these files. Sign in to Home and check its offline permission, or pair it again.", code: "offline_scope_missing" }, 403);
       }
       c.set("person", identity.person);
       c.set("deviceId", device.id);
-      db.update(deviceTokens).set({ lastSeenAt: new Date().toISOString() }).where(eq(deviceTokens.tokenHash, hashDeviceToken(match![1]!))).run();
+      // At most one write a minute per token: a range-heavy player must not turn into a write per request.
+      const stamp = Date.now();
+      db.update(deviceTokens).set({ lastSeenAt: new Date(stamp).toISOString() })
+        .where(and(eq(deviceTokens.tokenHash, hashDeviceToken(match![1]!)), or(isNull(deviceTokens.lastSeenAt), lt(deviceTokens.lastSeenAt, new Date(stamp - 60_000).toISOString())))).run();
     } else {
       const result = authenticate(c);
       if (result instanceof Response) return result;
       const token = getCookie(c, "session")!;
       const deviceId = resolveSessionDeviceId(token);
       // Redeeming a device bearer for a cookie must not bypass the offline scope.
-      if (deviceId && !getDeviceById(deviceId)?.offlineScope.includes(scope)) {
-        return c.json({ error: "This device has no offline permission. Sign in on your own browser to change it." }, 403);
+      const sessionDevice = deviceId ? getDeviceById(deviceId) : null;
+      if (deviceId && (!sessionDevice?.offlineScope.includes(scope) || (scope === "media.offline" && !mayHoldMediaOffline(sessionDevice)))) {
+        return c.json({ error: "This device has no offline permission. Sign in on your own browser to change it.", code: "offline_scope_missing" }, 403);
+      }
+      // A child or teen keeps media only on a device a grown-up granted: a plain browser session has no device to grant.
+      if (!deviceId && scope === "media.offline" && mediaBandOf(result) !== "adult") {
+        return c.json({ error: "A grown-up needs to allow keeping media on this device. Ask a grown-up to turn it on in Settings, Devices.", code: "guardian_grant_required" }, 403);
       }
       c.set("person", result);
       if (deviceId) c.set("deviceId", deviceId);

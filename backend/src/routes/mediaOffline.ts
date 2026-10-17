@@ -24,6 +24,7 @@ function playableItem(item: MediaItem | null): MediaItem | null {
   return { ...item, playable: decidePlayable({ ext: extensionOf(location.path ?? ""), hasVideo: item.video_codec !== null, hasAudio: item.audio_codec !== null, videoCodec: item.video_codec, audioCodec: item.audio_codec }) };
 }
 
+const SUBTITLE_TYPES = new Set(["text/vtt", "text/plain", "application/x-subrip", "text/srt"]);
 const missing = "This item is not available to you on Home. Check your library, then try again.";
 const errors = errorResponses({ 401: "Sign in to Home", 403: "Pair this device again or check its offline permission", 404: "Check the library for this item" });
 
@@ -81,7 +82,9 @@ mediaOfflineRoutes.openapi(file, async (c) => {
     const track = item.subtitles[c.req.valid("query").track ?? 0];
     const read = track ? readAttachment(actor, track.file_id) : null;
     if (!read?.ok) return c.json({ error: "This subtitle is not available. Try keeping the item again later." }, 404);
-    return new Response(read.value.bytes as never, { headers: { "Content-Type": read.value.record.media_type, "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+    // Only caption types are served, always as text/vtt, sandboxed: a stored file can never run as a page or script.
+    if (!SUBTITLE_TYPES.has(read.value.record.media_type.split(";")[0]!.trim().toLowerCase())) return c.json({ error: "This subtitle is not available. Try keeping the item again later." }, 404);
+    return new Response(read.value.bytes as never, { headers: { "Content-Type": "text/vtt; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox" } });
   }
   if (item.playable === "none") return c.json({ error: "This file cannot play on this device. Choose another item." }, 409);
   if (item.playable !== "original") {
@@ -94,7 +97,7 @@ mediaOfflineRoutes.openapi(file, async (c) => {
   const etag = JSON.stringify(item.fingerprint);
   const modified = metadata.modified.toUTCString();
   const ifRange = c.req.header("if-range");
-  const dateMatches = ifRange !== undefined && !ifRange.startsWith('"') && !ifRange.startsWith("W/") && Number.isFinite(Date.parse(ifRange)) && Math.floor(metadata.modified.getTime() / 1000) <= Math.floor(Date.parse(ifRange) / 1000);
+  const dateMatches = ifRange !== undefined && !ifRange.startsWith('"') && !ifRange.startsWith("W/") && Number.isFinite(Date.parse(ifRange)) && Math.floor(metadata.modified.getTime() / 1000) === Math.floor(Date.parse(ifRange) / 1000);
   const range = !ifRange || ifRange === etag || dateMatches ? c.req.header("range") : undefined;
   const response = await serveItemBytes(actor, item, range);
   if (!(response instanceof Response)) return c.json({ error: "This file could not be read. Check its library folder, then try again." }, response.status);

@@ -145,3 +145,9 @@ function parseOfflineScope(value: string): string[] {
 export function setDeviceOfflineScope(id: string, scopes: Array<"media.offline" | "offline.records">): void {
   db.update(devices).set({ offlineScope: JSON.stringify([...new Set(scopes)]), updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(devices.id, id)).run();
 }
+
+/** Shared surfaces (the robot, a TV, a pod) never keep media: they would read one person's library for everyone in the room. */
+export const OFFLINE_NEVER_KINDS: readonly DeviceKind[] = ["robot", "tv", "pod"];
+export function mayHoldMediaOffline(device: Pick<Device, "kind">): boolean {
+  return !OFFLINE_NEVER_KINDS.includes(device.kind);
+}

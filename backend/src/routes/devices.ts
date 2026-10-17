@@ -10,7 +10,8 @@ import { upgradeWebSocket } from "hono/bun";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
 import { requireAuth, requireRole, requireDeviceSession, resolveHumanSession } from "@/middleware/auth";
-import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById, setDeviceOfflineScope } from "@/lib/devices";
+import { mediaBandOf } from "@/lib/media/band";
+import { mayHoldMediaOffline, listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById, setDeviceOfflineScope } from "@/lib/devices";
 import { getDeviceState, getPendingMotorRebootOffer, markMotorRebootAnswered, resolveRequestDevice, stateForViewer, upsertDeviceState } from "@/lib/deviceStates";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
@@ -570,7 +571,7 @@ const offlineScopeRoute = createRoute({
   method: "patch", path: "/{id}/offline-scope", tags: ["Devices"], summary: "Set a device's default-deny offline permissions (owner or admin)",
   middleware: [requireAuth] as const,
   request: { params: z.object({ id: z.string() }), body: { content: { "application/json": { schema: z.object({ offline_scope: z.array(z.enum(["media.offline", "offline.records"])).max(2) }).strict() } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Permission saved. New byte requests use it immediately." }, ...errorResponses({ 401: "Sign in", 403: "Use your own browser to manage permissions", 404: "Device missing or owned by someone else" }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Permission saved. New byte requests use it immediately." }, ...errorResponses({ 400: "A robot, TV or pod cannot keep media", 401: "Sign in", 403: "Use your own browser, and ask a grown-up if you are a child or teen", 404: "Device missing or owned by someone else" }) },
 });
 devicesRoutes.openapi(offlineScopeRoute, (c) => {
   const session = getCookie(c, "session");
@@ -578,6 +579,10 @@ devicesRoutes.openapi(offlineScopeRoute, (c) => {
   const actor = c.get("person");
   const device = getDeviceById(c.req.valid("param").id);
   if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) return c.json({ error: "This device is not yours to change. Choose your own device or ask an admin." }, 404);
-  setDeviceOfflineScope(device.id, c.req.valid("json").offline_scope);
+  // A child's or teen's keep permission is a guardian's to give: they cannot grant it to themselves.
+  if (actor.role !== "owner" && actor.role !== "admin" && mediaBandOf(actor) !== "adult") return c.json({ error: "A grown-up sets this. Ask a grown-up to allow keeping media on this device." }, 403);
+  const requested = c.req.valid("json").offline_scope;
+  if (requested.includes("media.offline") && !mayHoldMediaOffline(device)) return c.json({ error: "A shared device such as a robot, TV or pod cannot keep media. Use a phone, computer or browser." }, 400);
+  setDeviceOfflineScope(device.id, requested);
   return c.json({ success: true as const }, 200);
 });
