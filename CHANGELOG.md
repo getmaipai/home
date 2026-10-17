@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-17
+
+Weather is an app, pictures reach the AI, the voice is Chatterbox, and sign-in uses one box per digit.
+
 ### Apps
 - Packages can now be apps. An app opens at `/apps/<package id>`, shows in search and favorites, and draws its pages from data, with no rebuild. A package app can declare a settings area, which opens from a Settings gear in the app's toolbar.
 - Weather is the first app: a big animated weather card, a place picker (Current location, your home, your saved places), an hourly strip, and a temperature unit setting (Fahrenheit or Celsius) that also applies to chat answers. Removing a saved place now deletes it.
@@ -31,6 +35,20 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ### Chat start
 - Send waits and reads "Getting ready, one moment" while the AI warms up.
+
+### Chat and memory (more)
+- The thinking words change more slowly, and the conversation button shows once speech in and out are installed.
+- A memory merge keeps both facts when they say different things, and a correction keeps the person's own words.
+- "My dog's name is Rover" no longer makes Home ask who Rover is, and a queued question waits for its own chat.
+- An edited first message gives the chat a new title from the messages that remain.
+- The picture editor has its routes: edit through the AI engine with progress and cancel, preview, then apply as a new version.
+
+### Voice (engine)
+- The Studio voice is Chatterbox Turbo, and the engine keeps chat, search and the quick answer model warm.
+
+### Fixes
+- The database version now counts the 6-digit passcode change from 0.2.5 (version 60), so a rollback cannot open data the older build cannot read.
+- Test fixes: a test left a broken browser storage behind that failed about a hundred other tests, thinking-word timing tests no longer race a random delay, and three lint errors are gone.
 
 ### Under the hood
 - The installer builds the Stack from the pin `STACK_TAG`, now at the commit with the projector fix for Muse pictures and the ddgs search service.
