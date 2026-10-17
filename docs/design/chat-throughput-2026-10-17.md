@@ -141,6 +141,29 @@ search bench is the weak instrument here: 8 rows cannot see a few points, and th
 is lossless in distribution, and nothing here contradicts that. The reasoning set is at its ceiling (20/20) so it can only catch a
 collapse, which did not occur. Not run: the 120-row KS-BENCH-01 set (hours at 26 tok/s) and ARCH-MEASURE-01's 50-repeat budget pass.
 
+### Combined with the Muse projector: no gain (2026-10-17)
+
+The Stack launches Muse with its projector (VISION-03a), so the draft was tested together with it: the Stack's exact generated flags
+(`--mmproj <file> --spec-type draft-dflash -md <file> -ngld 99 --image-max-tokens 2560 -ctk q8_0 -ctv q8_0`, `--cache-reuse` omitted
+as the Stack does with a projector), scratch port, Q4_K_XL, 131072 context, three runs per cell.
+
+| Launch | Text prompt tok/s | Picture + text tok/s | Acceptance | Resident |
+|---|---:|---:|---:|---:|
+| Projector, no draft | 26.0, 26.1, 25.8 | 25.7, 25.9, 25.9 | n/a | 21.6 GB |
+| Projector + draft | 23.7, 17.7, 22.7 | 23.2, 23.1, 21.3 | 46% and 49% | 23.8 GB |
+| Draft, no projector (control, same hour) | 34.6, 30.3, 35.2 | not applicable | about 42% | about 22.2 GB |
+
+The combination starts, answers a picture request, and speculation engages (acceptance matches the no-projector run), but it is
+**slower than no draft** (about 22 against 26 tok/s) while the same draft without the projector runs at 30 to 35. The cause inside
+llama.cpp is not identified (the projector turns off chunk reuse and changes the slot path; I did not bisect it). The memory fits
+the p128 budget either way (23.8 GB resident).
+
+**Consequence: the draft cannot ship while Muse loads the projector on b10797.** The Stack change (stack branch `dflash-draft`,
+commit `f0fe28d`: pin, install plan, launch flags, memory counting, tests) is complete but is not pushed. Choices for Jesse:
+(a) keep pictures, no draft (today); (b) run the draft and leave the projector out of chat (about 1.3x to 1.8x faster, no picture
+reading); (c) retest the combination on a newer llama.cpp build (the Metal few-row kernels, b11404 and later) before choosing.
+Recommended: (a) now and (c) at the next engine pin bump; (b) only if Jesse prefers speed over pictures.
+
 ### How to ship it (CHAT-TPS-02 plan)
 
 1. **Pin the draft in the model record**, the same way the projector is pinned (VISION-03b): `draft: { url, revision, sha256,

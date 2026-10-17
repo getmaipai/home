@@ -41,8 +41,13 @@ STACK_REPO="getmaipai/stack"
 # stack commit that release is meant to carry (docs/dev.md's own "What
 # Home's release carries" paragraph). Today's value binds Muse Glimmer 30B
 # as the chat model above 24 GB (STACK-MUSE-01, owner's rule 2026-10-16)
-# on top of vision URL binding and the embed role on the processor.
-STACK_TAG="51bd657e2576b005d84e93eb3892d6af7fb25096"
+# on top of vision URL binding and the embed role on the processor, and
+# carries the Muse projector pin (VISION-03a), keep-warm (STACK-WARM-01),
+# the Instant judge role (INSTANT-02), the Pocket TTS requirements fix and
+# the Chatterbox Turbo voice engine (VOICE-STUDIO-01). A bump to this line
+# must be checked against every one of those: an old value silently rebuilds
+# the Stack without them.
+STACK_TAG="89a6b01f40ff6d3e90f8ad1c0ed2f3668ec759df"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
