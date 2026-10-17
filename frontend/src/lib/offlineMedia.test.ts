@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { keepOnDevice, listKept, removeFromDevice, removeAllOfflineMedia, reconcileKept, setMediaOwner, MEDIA_CACHE, USE_GO } from "./offlineMedia";
+import { keepOnDevice, listKept, removeFromDevice, removeAllOfflineMedia, reconcileKept, setMediaOwner, nextMediaOwner, MEDIA_CACHE, USE_GO } from "./offlineMedia";
 
 const locationDescriptor = Object.getOwnPropertyDescriptor(globalThis, "location");
 const originalFetch = globalThis.fetch;
@@ -115,4 +115,13 @@ test("reconcile removes copies the hub reports gone or changed and keeps the ok 
   globalThis.fetch = (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch;
   expect(await reconcileKept()).toBe(0);
   expect((await listKept()).length).toBe(1); // offline: nothing is removed
+});
+
+test("the media owner is cleared only by a 401 from /me, never by a network error or a server error", () => {
+  const unreachable = new TypeError("Failed to fetch");
+  expect(nextMediaOwner("person-atlas", { person: { id: "person-pippa" } })).toBe("person-pippa");
+  expect(nextMediaOwner("person-atlas", { error: unreachable })).toBe("person-atlas"); // hub unreachable: copies keep playing
+  expect(nextMediaOwner("person-atlas", { error: Object.assign(new Error("down"), { status: 503 }) })).toBe("person-atlas");
+  expect(nextMediaOwner("person-atlas", { error: Object.assign(new Error("Unauthorized"), { status: 401 }) })).toBeNull();
+  expect(nextMediaOwner(null, { error: unreachable })).toBeNull();
 });

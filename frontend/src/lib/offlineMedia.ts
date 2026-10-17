@@ -8,6 +8,14 @@ export const OWNER_MESSAGE = "maipai-media-owner";
 let owner: string | null = null;
 const bucket = (): string | null => (owner ? `${MEDIA_CACHE}:${owner}` : null);
 
+/** Who owns the kept copies after a `/me` attempt. A signed-in answer names the owner; only a 401 (signed out or session expired
+ * on the hub) clears it. A network or server error keeps the last announced owner, so copies play exactly when the hub is
+ * unreachable. Explicit sign-out wipes the copies themselves (`removeAllOfflineMedia`). */
+export function nextMediaOwner(previous: string | null, result: { person: { id: string } } | { error: unknown }): string | null {
+  if ("person" in result) return result.person.id;
+  return (result.error as { status?: number } | null)?.status === 401 ? null : previous;
+}
+
 /** Tell this module and the service worker who is signed in (null: nobody, so no copy is served or listed). */
 export async function setMediaOwner(personId: string | null): Promise<void> {
   owner = personId;

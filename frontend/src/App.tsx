@@ -13,7 +13,7 @@ import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { api, type SignedInPerson } from "@/lib/api";
-import { reconcileKept, setMediaOwner } from "@/lib/offlineMedia";
+import { nextMediaOwner, reconcileKept, setMediaOwner } from "@/lib/offlineMedia";
 import { SessionLockGate } from "@/shell/sessionLockContext";
 import { PreviewRuntime } from "@/apps/setup/preview/PreviewRuntime";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
@@ -52,6 +52,7 @@ const queryClient = createQueryClient();
 // must remain addressable before a household profile exists.
 export function App() {
   const [person, setPerson] = useState<SignedInPerson | null | undefined>(undefined);
+  const [mediaOwnerId, setMediaOwnerId] = useState<string | null>(null);
 
   // Fail-closed: used only where "we don't yet know who's signed in" is
   // the real question (first load, right after sign-in) - api.me()
@@ -59,8 +60,8 @@ export function App() {
   function loadPerson() {
     return api
       .me()
-      .then(setPerson)
-      .catch(() => setPerson(null));
+      .then((me) => { setPerson(me); setMediaOwnerId((previous) => nextMediaOwner(previous, { person: me })); })
+      .catch((error) => { setPerson(null); setMediaOwnerId((previous) => nextMediaOwner(previous, { error })); });
   }
 
   // A code review (2026-09-04) found ChangeSecretSection's onChanged
@@ -83,7 +84,8 @@ export function App() {
 
   // Kept media copies belong to the signed-in person: tell the worker who that is (null while signed out or expired, so
   // nothing is served), then drop any copy the hub says is gone or changed, now and whenever the browser is back online.
-  const personId = person?.id ?? null;
+  // The owner is not `person`: an unreachable hub turns `person` null, but must not lock the kept copies (see nextMediaOwner).
+  const personId = mediaOwnerId;
   useEffect(() => {
     if (__SETUP_PREVIEW__) return;
     void setMediaOwner(personId).then(() => { if (personId) void reconcileKept(); });
