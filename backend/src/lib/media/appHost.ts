@@ -140,6 +140,23 @@ function outroSecondsOf(item: MediaItem): number {
   return db.select({ outro: mediaSources.skipOutroS }).from(mediaSources).where(eq(mediaSources.id, item.source_id)).get()?.outro ?? 0;
 }
 
+/** The line under a title in a list: the channel for a video, "Today · The show" for a podcast episode (how Apple Podcasts says it). */
+function eyebrowOf(item: MediaItem): string | null {
+  if (item.kind !== "podcast_episode") return item.subtitle;
+  return [whenLabel(item.external?.published_at ?? item.added_at), item.subtitle].filter(Boolean).join(" · ");
+}
+
+/** "Today", "Yesterday", "Tue", "Oct 10": how long ago, as Apple Podcasts says it. */
+export function whenLabel(iso: string, now = new Date()): string {
+  const day = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
+  const then = new Date(iso);
+  const days = Math.round((day(now) - day(then)) / 86_400_000);
+  if (days <= 0) return "Today";
+  if (days === 1) return "Yesterday";
+  if (days < 7) return then.toLocaleDateString("en-US", { weekday: "short" });
+  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
 export function copyLabelOf(item: MediaItem): string {
   return (item.location as { url?: string }).url ? "Not saved" : "Saved";
 }
@@ -161,7 +178,7 @@ export function rowOf(item: MediaItem, context: RowContext): MediaRow {
   const seen = context.progressById.get(item.id);
   const art = artworkUrl(item);
   const row: MediaRow = {
-    id: item.id, title: item.title, channel: item.subtitle, summary: oneLine(item.description, 140) || item.subtitle || "", kind: item.kind, thumbnail: art, backdrop: art,
+    id: item.id, title: item.title, channel: eyebrowOf(item), summary: oneLine(item.description, 140) || item.subtitle || "", kind: item.kind, thumbnail: art, backdrop: art,
     duration_s: item.duration_s, copy_label: copyLabelOf(item),
   };
   if (seen?.completed) row.completed = true;
@@ -329,7 +346,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   const direct = (item.location as { url?: string }).url;
   const view: MediaItemView = {
     // A stream-only item (a podcast episode not saved yet) plays from its own address on the person's device; the hub never relays it.
-    ...base, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),
+    ...base, channel: item.subtitle, src: direct ?? `/api/media/items/${encodeURIComponent(item.id)}/content`, subtitle: item.subtitle, description: item.description, poster: artworkUrl(item),
     chapters: item.chapters.map((chapter) => ({ start_s: chapter.start_s, title: chapter.title })), captions: [],
     ...(seconds !== undefined && !progress?.completed ? { position_s: seconds } : {}),
     liked: collectionIds(person, "liked").includes(item.id), watch_later: collectionIds(person, "watch_later").includes(item.id),

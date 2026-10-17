@@ -23,7 +23,7 @@
           "actions": [
             {
               "label": "Add to queue",
-              "icon": "list",
+              "icon": "list-video",
               "field": "queued",
               "on_label": "In your queue",
               "action": {

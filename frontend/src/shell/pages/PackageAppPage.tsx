@@ -13,7 +13,7 @@ import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
-import { isMediaApp, playPageOf } from "@/shell/mediaApps";
+import { homeLabelOf, isMediaApp, playPageOf } from "@/shell/mediaApps";
 import { useMediaDock } from "@/shell/mediaHost";
 
 /** APP-KIND-04: one route, `apps/*`, for every installed package app. `/apps/<package>` opens its `index` page and
@@ -68,7 +68,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="package-app" data-package={packageId}>
       {media ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar person={person} to={app.to} label={app.label} homeLabel={media ? "Home" : "Overview"} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} media={media} /> : null}
+      {app ? <AppToolbar person={person} to={app.to} label={app.label} homeLabel={media ? homeLabelOf(packageId) : "Overview"} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} media={media} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}

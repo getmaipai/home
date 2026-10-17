@@ -14,6 +14,7 @@ import { __resetProgressForTests, flushProgress } from "@/lib/media/progress";
 import { removeItem } from "@/lib/media/items";
 import { __setPodcastFetchDepsForTests, applyAutoRules, chaptersFromNotes, parsePodcastFeed, plainNotes } from "@/lib/media/podcasts";
 import { getFeed, updateFeed } from "@/lib/shelf/feedStore";
+import { privacyConnections } from "@/lib/privacy";
 import { pollFeed, type PollDeps } from "@/lib/shelf/shelfPoller";
 import { __resetShelfCountersForTests } from "@/lib/shelf/shelfCounters";
 
@@ -134,10 +135,12 @@ describe("the one poller reads a podcast feed", () => {
     const episodes = await data(adult.client, "episodes");
     expect(episodes.map((row) => row.title)).toEqual(["Question 3", "Question 2", "Question 1"]);
     expect(episodes.every((row) => row.copy_label === "Not saved")).toBe(true);
+    expect(episodes[0]!.channel).toMatch(/ · Sprout Science$/); // "Today · The show", as Apple Podcasts says it
     const item = await data<{ src: string; saved: boolean; duration_s: number }>(adult.client, "item", { id: episodes[0]!.id });
     expect(item.src).toBe(`${HOST}/sprout-ep3.mp3`); // the person's own device plays it; the hub relays nothing
     expect(item.saved).toBe(false);
     expect(item.duration_s).toBe(12);
+    expect((item as unknown as { channel: string }).channel).toBe("Sprout Science"); // the player's artist line is the show alone
     const row = db.select().from(mediaItems).where(eq(mediaItems.id, episodes[1]!.id)).get()!;
     expect(row).toMatchObject({ kind: "podcast_episode", bandOk: "adult", advisoryExplicit: true, subtitle: "Sprout Science" });
     expect(JSON.parse(row.external!)).toMatchObject({ extractor: "rss", id: "urn:sprout:ep2" });
@@ -305,6 +308,20 @@ async function subscribeAgainHidden(owner: TestClient): Promise<string> {
   const res = await owner.post("/api/plugins/podcasts/subscribe", { url: `${HOST}/second.xml`, visible_to: [] });
   return ((await res.json()) as { source_id: string }).source_id;
 }
+
+describe("the privacy page", () => {
+  test("lists each podcast feed host with a conditional request and no identity, and only while a show is followed", async () => {
+    const { owner, subscribe } = await setup();
+    expect(privacyConnections().some((row) => row.id === "platform:podcast-feeds")).toBe(false);
+    const { sourceId } = await subscribe();
+    const row = privacyConnections().find((candidate) => candidate.id === "platform:podcast-feeds")!;
+    expect(row.destination).toBe("pod.example.com");
+    expect(row.what).toMatch(/conditional request/);
+    expect(row.what).toMatch(/No name, device ID or cookie/);
+    await owner.post("/api/plugins/podcasts/unsubscribe", { source_id: sourceId });
+    expect(privacyConnections().some((candidate) => candidate.id === "platform:podcast-feeds")).toBe(false);
+  });
+});
 
 describe("OPML", () => {
   test("export then import round-trips the show list; bad and repeated addresses are reported, not fatal", async () => {

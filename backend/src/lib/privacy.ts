@@ -27,6 +27,7 @@ import { webSourcesPicked } from "@/lib/retrieval/webSources";
 import { DDGS_DESTINATION_HOST } from "@/lib/retrieval/ddgsSource";
 import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
 import { shelfAdminHosts } from "@/lib/shelf/shelfFeeds";
+import { podcastFeedHosts } from "@/lib/media/podcasts";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
 import type { PrivacyConnection } from "@/wire";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -157,6 +158,13 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:news-shelf-feeds", shelfAdminHosts().join(", ") || null, {
       when: "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only for the news feed addresses an adult added under Settings, News shelf. Turn the shelf off there to stop it.",
       what: "a request for each feed file, plus your home's internet address. No name, device ID or cookie goes with it. Home reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+    }),
+    // MEDIA-PODCASTS-01 (media design section 14): the shows an admin follows in Podcasts. Each feed host gets a conditional request from
+    // the same poller; a copy saved on the hub is fetched from the show's own server. Listening to an unsaved episode is the person's own
+    // device talking to the show's server, not Home, so it is not a Home connection and says so in the Podcasts help.
+    row("platform:podcast-feeds", podcastFeedHosts().join(", ") || null, {
+      when: "automatically, about every hour at most (a show's own pace can be slower), only while nobody is using MaiPai, for each show an admin follows in Podcasts. Remove the show to stop it. When someone presses Save on the hub, Home also downloads that one episode and the show's picture from the show's server.",
+      what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request), plus your home's internet address. No name, device ID or cookie goes with it. Nothing anyone in the house said, asked, listened to, or saved.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",

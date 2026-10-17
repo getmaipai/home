@@ -44,22 +44,7 @@ function episodesOf(person: PersonRow, params: DataParams, limit: number, savedO
   return items.filter((item) => !savedOnly || !(item.location as { url?: string }).url).sort((a, b) => publishedOf(b).localeCompare(publishedOf(a))).slice(0, limit);
 }
 
-/** "Today", "Yesterday", "Tue", "Oct 10": how long ago, the way Apple Podcasts says it. */
-export function whenLabel(iso: string, now = new Date()): string {
-  const day = (date: Date) => Date.UTC(date.getFullYear(), date.getMonth(), date.getDate());
-  const then = new Date(iso);
-  const days = Math.round((day(now) - day(then)) / 86_400_000);
-  if (days <= 0) return "Today";
-  if (days === 1) return "Yesterday";
-  if (days < 7) return then.toLocaleDateString("en-US", { weekday: "short" });
-  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-/** An episode row for the lists: the eyebrow line is the date and the show, the summary the show notes' first line. */
-function episodeRows(person: PersonRow, items: readonly MediaItem[]): MediaRow[] {
-  const base = rowsOf(person, items);
-  return base.map((row, index) => ({ ...row, channel: `${whenLabel(publishedOf(items[index]!))} · ${items[index]!.subtitle ?? ""}`.replace(/ · $/, "") }));
-}
+const episodeRows = (person: PersonRow, items: readonly MediaItem[]): MediaRow[] => rowsOf(person, items);
 
 function bookmarkRows(person: PersonRow, limit: number): MediaRow[] {
   const rows: MediaRow[] = [];

@@ -36,7 +36,7 @@
     "pages": [
       {
         "id": "index",
-        "label": "Listen now",
+        "label": "Podcasts",
         "icon": "mic",
         "nav": true,
         "kind": "schema",

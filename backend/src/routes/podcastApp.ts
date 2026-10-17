@@ -4,7 +4,7 @@ import type { Context } from "hono";
 import { readableIn } from "@/lib/media/appHost";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
 import { coerceNumber, mediaAppAllowed } from "@/lib/media/appHost";
-import { exportOpml, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
+import { applyAutoRules, exportOpml, importOpml, pollPodcastNow, saveEpisode, subscribePodcast, unsaveEpisode, unsubscribePodcast, updatePodcastSource } from "@/lib/media/podcasts";
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 
@@ -75,7 +75,10 @@ export function podcastRoutes() {
       ...(body.visible_to === "household" || Array.isArray(body.visible_to) ? { visible_to: body.visible_to as "household" | string[] } : {}),
       ...(auto ? { auto: { ...(auto.save === "none" || auto.save === "audio" ? { save: auto.save } : {}), ...(auto.keep_latest !== undefined ? { keep_latest: auto.keep_latest === null ? null : coerceNumber(auto.keep_latest) ?? NaN } : {}), ...(typeof auto.remove_watched === "boolean" ? { remove_watched: auto.remove_watched } : {}) } } : {}),
     });
-    return result.ok ? c.json({ ok: true as const }, 200) : fail(c, result);
+    if (!result.ok) return fail(c, result);
+    // A changed keep rule takes effect now, not at the next poll.
+    if (auto) void applyAutoRules(result.value.id);
+    return c.json({ ok: true as const }, 200);
   });
 
   routes.post("/opml/import", requireAuth, async (c, next) => {

@@ -72,6 +72,14 @@ function open(path: string, extra: ReactNode = null) {
   );
 }
 
+describe("a media app's first tab", () => {
+  test("is Home for the video apps, Listen now for the audio apps and Reading now for Books", async () => {
+    const { homeLabelOf, playRoute } = await import("@/shell/mediaApps");
+    expect(["videos", "shows", "podcasts", "music", "books"].map(homeLabelOf)).toEqual(["Home", "Home", "Listen now", "Listen now", "Reading now"]);
+    expect(playRoute("podcast_episode", "media-aaaaaa")).toBe("/apps/podcasts/play?id=media-aaaaaa");
+  });
+});
+
 describe("a media app in the shell", () => {
   test("the first tab is Home and a tile's play action opens the watch page with the id in the address", async () => {
     const view = open("/apps/videos");

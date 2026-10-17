@@ -39,3 +39,10 @@ export function mediaAppOfPath(pathname: string): string | null {
 export function playPageOf(app: string): string | null {
   return Object.values(MEDIA_APP_FOR_KIND).find((target) => target.app === app)?.page ?? null;
 }
+
+/** The first tab of a media app: "Home" for Videos and Shows, "Listen now" for the audio apps (Apple's and Spotify's word), "Reading now" for Books. */
+export function homeLabelOf(app: string): string {
+  if (app === "podcasts" || app === "music") return "Listen now";
+  if (app === "books") return "Reading now";
+  return "Home";
+}

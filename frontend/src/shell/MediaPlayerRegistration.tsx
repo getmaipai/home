@@ -50,7 +50,7 @@ export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: st
       ...(played?.poster ? { artworkUrl: played.poster } : {}),
       ...(played ? { chapters: chaptersWithEnds(played.chapters ?? [], played.duration_s) } : {}),
     }),
-    [played],
+    [played, appId],
   );
   useAudioRegistration(played ? element : null, { kind: audioKindOfApp(appId), item: audioItem });
   return null;
