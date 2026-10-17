@@ -67,11 +67,12 @@ for (const key of EASE_KEYS) OLD_CHILD.add(key);
 const OLD_TEEN = new Set([...OLD_CHILD, "chat.photo_uploads"]);
 
 describe("which sections each role sees", () => {
-  const ACCOUNT_BASE = ["profile", "appearance", "notifications", "voice", "data"];
+  // LIKENESS-01: Pictures and videos (the person's two consent switches) is for adults only, between Voice and Data.
   test.each(ROLES)("Account, %s", (role) => {
     const adultOrUp = ["owner", "admin", "adult"].includes(role);
-    expect(sectionIds("account", viewerFor(role, EMPTY_HOME))).toEqual(ACCOUNT_BASE);
-    expect(sectionIds("account", viewerFor(role, FULL_HOME))).toEqual([...ACCOUNT_BASE, ...(adultOrUp ? ["device", "robot"] : [])]);
+    const base = adultOrUp ? ["profile", "appearance", "notifications", "voice", "pictures", "data"] : ["profile", "appearance", "notifications", "voice", "data"];
+    expect(sectionIds("account", viewerFor(role, EMPTY_HOME))).toEqual(base);
+    expect(sectionIds("account", viewerFor(role, FULL_HOME))).toEqual([...base, ...(adultOrUp ? ["device", "robot"] : [])]);
   });
 
   test.each(ROLES)("Chat settings, %s", (role) => {
