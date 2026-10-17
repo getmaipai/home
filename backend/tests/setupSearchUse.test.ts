@@ -105,6 +105,29 @@ describe("setup web search address", () => {
     expect(getHouseholdSettingValue("search.searxng_url")).toBe("http://192.168.1.20:8888");
   });
 
+  test("an old SearXNG version and no /stats/errors are advice only: Test passes with a warning and Save is allowed", async () => {
+    __setSearchInstanceFetchForTests(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/healthz") return new Response("OK", { status: 200 });
+      if (url.pathname === "/config") return Response.json({ version: "2023.1.1", safe_search: 2, limiter: { enabled: false }, engines: ENGINES });
+      if (url.pathname === "/search") return Response.json({ results: [] });
+      return new Response("missing", { status: 404 });
+    });
+    const { result } = (await (await use({ url: "http://192.168.1.20:8888", dry_run: true })).json()) as { result: { level: string; canUse: boolean; details: { id: string; state: string }[] } };
+    expect(result.details.find((check) => check.id === "version")?.state).toBe("warn");
+    expect(result.level).toBe("warn");
+    expect(result.canUse).toBe(true);
+    expect((await use({ url: "http://192.168.1.20:8888" })).status).toBe(200);
+    expect(getHouseholdSettingValue("search.searxng_url")).toBe("http://192.168.1.20:8888");
+  });
+
+  test("an empty checks list is never usable", async () => {
+    const { summarizeSearchStatus } = await import("@/lib/searchTestSummary");
+    const result = summarizeSearchStatus({ checks: [], groups: [], engineErrors: [] } as never, "http://192.168.1.20:8888");
+    expect(result.canUse).toBe(false);
+    expect(result.level).toBe("fail");
+  });
+
   test("a failing check blocks: no web engines gives a fail with the one next step", async () => {
     __setSearchInstanceFetchForTests(async (input) => {
       const url = new URL(String(input));
