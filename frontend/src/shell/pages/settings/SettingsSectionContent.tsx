@@ -74,7 +74,7 @@ function EaseCardRenderer({ viewingSelf, ...rest }: { viewingSelf: boolean } & O
 function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps, returnPath: string) {
   const group = card.group!;
   const scope = card.scope!;
-  const title = props.section.id === "voice" && group === "person.voice" ? "Speaking voice" : card.label;
+  const title = card.label;
   const allowed = minorVisibleSettingKeys(viewer.band);
   const rendererProps = {
     scope,
@@ -124,6 +124,9 @@ export function SettingsSectionContent(props: SectionContentProps) {
         // face card inside `account.profile` already draws this group's one
         // key (the enrollment sounds switch); a second card would repeat it.
         if (section.id === "profile" && card.group === "person.profile") return null;
+        // Same for the voice page: its lead view (account.voice) is the one dropdown bound to tts.voice_id, so the
+        // registry row for that key is not drawn here (the key stays in the registry for other surfaces).
+        if (section.id === "voice" && card.group === "person.voice") return null;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
         return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props, returnPath)}</div>;
       })}

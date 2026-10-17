@@ -29,66 +29,82 @@ function renderPage(voices: StackVoice[], options = ["alba", "mira"], settings: 
   return renderWithQueryClient(<VoiceBrowserSection person={actor} />);
 }
 
+const trigger = (view: ReturnType<typeof renderPage>) => view.findByRole("combobox", { name: "Voice for you" });
+const three = () => [voice("x-voice-alba", { name: "Alba" }), voice("x-voice-javert", { name: "Javert", onDisk: false }), voice("x-voice-mira", { name: "Mira", onDisk: false })];
+
 describe("VoiceBrowserSection", () => {
-  test("lists plain names with no engine words, clone controls, filters or table", async () => {
-    const view = renderPage([voice("pocket-tts-voice-alba", { name: "Alba", description: "Warm, friendly" }), voice("chatterbox-turbo-voice-default", { name: "Chatterbox default" })], ["alba"]);
-    await view.findByText("Alba"); await view.findByText("Default"); await view.findByText("Warm, friendly");
-    expect(view.getByText("Choose a voice for you")).toBeTruthy();
+  test("exactly one voice control: one dropdown, no radios, no engine words", async () => {
+    const view = renderPage([voice("pocket-tts-voice-alba", { name: "Alba" }), voice("pocket-tts-voice-mira", { name: "Mira" })], ["alba", "mira"]);
+    await trigger(view);
+    expect(view.getAllByRole("combobox")).toHaveLength(1);
+    expect(view.queryAllByRole("radio")).toHaveLength(0);
     expect(document.body.textContent).not.toMatch(/chatterbox|pocket|orpheus|mlx|clone|upload|unknown|catalog/i);
-    expect(view.queryAllByRole("combobox")).toHaveLength(0);
   });
-  test("only installed presets are listed", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" }), voice("x-voice-mira", { name: "Mira", onDisk: false }), voice("c", { name: "Community", source: "community" }), voice("k", { name: "Cloned", source: "cloned" })]);
-    await view.findByText("Alba");
-    for (const name of ["Mira", "Community", "Cloned"]) expect(view.queryByText(name)).toBeNull();
+  test("lists every preset, installed or not, and no community or cloned rows", async () => {
+    const view = renderPage([...three(), voice("c", { name: "Community", source: "community" }), voice("k", { name: "Cloned", source: "cloned" })], ["alba", "javert", "mira"]);
+    fireEvent.click(await trigger(view));
+    const names = (await view.findAllByRole("option")).map((option) => option.textContent);
+    expect(names).toEqual(["Alba", "Javert", "Mira"]);
   });
-  test("the current voice is the checked radio; choosing another saves at once and confirms quietly", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" }), voice("x-voice-mira", { name: "Mira" })], ["alba", "mira"], { voice: "alba" });
-    await view.findByText("Mira");
-    const radios = view.getAllByRole("radio");
-    expect(radios[0]!.getAttribute("aria-checked")).toBe("true");
+  test("the dropdown shows the stored voice", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "javert" });
+    expect((await trigger(view)).textContent).toBe("Javert");
+  });
+  test("a stored voice that is not on the list shows with its name and a note, never blank", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "vera" });
+    expect((await trigger(view)).textContent).toBe("Vera (not on this home's list)");
+    expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true);
+    view.getByText("This voice is not on the list, so it cannot be tested.");
+  });
+  test("choosing another voice saves at once and confirms quietly", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "alba" });
     const setter = spyOn(api, "setSetting").mockResolvedValue({ key: "tts.voice_id", value: "mira", source: "user", label: "Speaking voice", level: "basic", secret: false });
-    fireEvent.click(radios[1]!);
+    fireEvent.click(await trigger(view));
+    fireEvent.click(await view.findByRole("option", { name: "Mira" }));
     await waitFor(() => expect(setter).toHaveBeenCalledWith("person:person-1", "tts.voice_id", "mira"));
     await view.findByText("Saved.");
+    await waitFor(async () => expect((await trigger(view)).textContent).toBe("Mira"));
   });
   test("a failed save says what happened and what to do", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" }), voice("x-voice-mira", { name: "Mira" })], ["alba", "mira"]);
-    await view.findByText("Mira");
+    const view = renderPage(three(), ["alba", "javert", "mira"]);
     spyOn(api, "setSetting").mockRejectedValue(new Error("boom"));
-    fireEvent.click(view.getAllByRole("radio")[1]!);
+    fireEvent.click(await trigger(view));
+    fireEvent.click(await view.findByRole("option", { name: "Mira" }));
     await view.findByText("Home could not save that voice. Try again.");
   });
-  test("preview plays, shows Stop, and stops", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" })]);
+  test("Test plays the selected voice, shows Stop, and stops", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "javert" });
     const start = spyOn(voicePreviewPlayer, "start").mockImplementation(async (id: string) => { (voicePreviewPlayer as unknown as { update(s: unknown): void }).update({ voiceId: id, busy: false, error: null }); });
     const stop = spyOn(voicePreviewPlayer, "stop");
-    fireEvent.click(await view.findByRole("button", { name: "Play Alba" }));
-    expect(start).toHaveBeenCalledWith("x-voice-alba");
-    const stopButton = await view.findByRole("button", { name: "Stop Alba" });
+    await trigger(view);
+    fireEvent.click(view.getByRole("button", { name: "Test" }));
+    expect(start).toHaveBeenCalledWith("x-voice-javert");
+    const stopButton = await view.findByRole("button", { name: "Stop" });
     stop.mockClear(); fireEvent.click(stopButton);
     expect(stop).toHaveBeenCalled();
   });
-  test("no voices yet shows the warming line", async () => {
-    const view = renderPage([voice("x-voice-alba", { onDisk: false })]);
+  test("no voices yet shows the warming line and a disabled Test", async () => {
+    const view = renderPage([]);
     await view.findByText("Voices are still getting ready. This takes a minute after setup.");
+    expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true);
   });
-  test("a down voice service says what to do and offers a retry", async () => {
+  test("a down voice service says what to do, offers a retry, and Test is off", async () => {
     const loader = spyOn(api, "stackVoices").mockRejectedValueOnce(new Error("Stack is offline")).mockResolvedValue({ voices: [] });
     const view = renderWithQueryClient(<VoiceBrowserSection person={person()} />);
     await view.findByText(/Home can't reach its voice service\. Check Repairs, then come back\./);
+    expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(await view.findByRole("button", { name: "Try again" }));
     await waitFor(() => expect(loader).toHaveBeenCalledTimes(2));
   });
   test("a locked setting has no choice and shows its own reason", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" })], ["alba"], { locked: true, reason: "Set by a guardian." }); await view.findByText("Set by a guardian.");
-    expect(view.getAllByRole("radio").every((radio) => radio.hasAttribute("disabled") || radio.getAttribute("aria-disabled") === "true" || (radio as HTMLButtonElement).disabled)).toBe(true);
+    const view = renderPage(three(), ["alba", "javert", "mira"], { locked: true, reason: "Set by a guardian." }); await view.findByText("Set by a guardian.");
+    expect((await trigger(view)).hasAttribute("disabled") || (await trigger(view)).getAttribute("data-disabled") !== null).toBe(true);
   });
-  test("a child gets the line asking a parent and cannot choose, but can preview", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" })], ["alba"], { role: "child" }); await view.findByText("Alba");
+  test("a child gets the line asking a parent and cannot choose, but can test", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { role: "child" }); const box = await trigger(view);
     expect(view.getByText("Ask a parent to choose your voice.")).toBeTruthy();
-    expect(view.getAllByRole("radio").every((radio) => (radio as HTMLButtonElement).disabled || radio.getAttribute("aria-disabled") === "true")).toBe(true);
-    expect(view.getByRole("button", { name: "Play Alba" })).toBeTruthy();
+    expect(box.hasAttribute("disabled") || box.getAttribute("data-disabled") !== null).toBe(true);
+    expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(false);
   });
   test("an admin chooses for a child from the Choose a voice for control and writes to the child's scope", async () => {
     spyOn(api, "stackVoices").mockResolvedValue({ voices: [voice("x-voice-alba", { name: "Alba" }), voice("x-voice-mira", { name: "Mira" })] });
@@ -98,16 +114,16 @@ describe("VoiceBrowserSection", () => {
     const settings = spyOn(api, "settingsValues").mockImplementation(async () => [{ key: "tts.voice_id", value: "alba", source: "user", label: "Speaking voice", level: "basic", secret: false } as never]);
     spyOn(api, "settingsRegistry").mockResolvedValue([{ key: "tts.voice_id", label: "Speaking voice", scope: "person", selector: "select", range: { options: ["alba", "mira"] }, default: "alba" }] as never);
     const view = renderWithQueryClient(<VoiceBrowserSection person={{ ...person("owner"), id: "person-1" }} />);
-    await view.findByText("Alba");
     fireEvent.click(await view.findByRole("combobox", { name: "Choose a voice for" }));
     fireEvent.click(await view.findByRole("option", { name: "Bramble" }));
     await waitFor(() => expect(settings).toHaveBeenCalledWith("person:person-child"));
     await view.findByText("Choose a voice for Bramble");
-    fireEvent.click(view.getAllByRole("radio")[1]!);
+    fireEvent.click(await view.findByRole("combobox", { name: "Voice for Bramble" }));
+    fireEvent.click(await view.findByRole("option", { name: "Mira" }));
     await waitFor(() => expect(setter).toHaveBeenCalledWith("person:person-child", "tts.voice_id", "mira"));
   });
   test("an adult who is not an owner or admin sees no person control", async () => {
-    const view = renderPage([voice("x-voice-alba", { name: "Alba" })]); await view.findByText("Alba");
-    expect(view.queryAllByRole("combobox")).toHaveLength(0);
+    const view = renderPage(three()); await trigger(view);
+    expect(view.getAllByRole("combobox")).toHaveLength(1);
   });
 });

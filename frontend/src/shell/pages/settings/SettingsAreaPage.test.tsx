@@ -187,7 +187,7 @@ describe("the settings route", () => {
   test("an admin opens the household voice catalog in Home settings", async () => {
     const view = open(makePerson("admin"), "/settings/home/voices");
     await waitFor(() => expect(where(view)).toBe("/settings/home/voices"));
-    await waitFor(() => expect(view.getByText(/Browse the household voice catalog/)).toBeTruthy());
+    await waitFor(() => expect(view.getByText("Choose a voice for you")).toBeTruthy());
   });
 
   test("a section the viewer may not see replaces to the first visible one, naming nothing", async () => {
