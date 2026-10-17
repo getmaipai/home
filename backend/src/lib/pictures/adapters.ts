@@ -66,7 +66,8 @@ export function matchAdapter(adapters: readonly Adapter[], named: string): Adapt
   if (!wanted) return null;
   const exact = adapters.filter((a) => a.id === named.trim() || norm(a.name) === wanted);
   if (exact.length === 1) return exact[0]!;
-  const loose = adapters.filter((a) => norm(a.name).includes(wanted) || wanted.includes(norm(a.name)) || a.trigger_words.some((t) => norm(t) === wanted));
+  // A name too short to mean anything ("A", "!!!") only matches exactly, never by being found inside other words.
+  const loose = wanted.length < 3 ? [] : adapters.filter((a) => { const name = norm(a.name); return (name.length >= 3 && (name.includes(wanted) || wanted.includes(name))) || a.trigger_words.some((t) => norm(t) === wanted); });
   return loose.length === 1 ? loose[0]! : null;
 }
 

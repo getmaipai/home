@@ -11,6 +11,8 @@ export interface FakeJob { id: string; body: Record<string, unknown>; polls: num
 export interface FakeImageStack {
   jobs: FakeJob[];
   submitted: Array<Record<string, unknown>>;
+  /** The fields of each POST /v1/images/edits (files as "file:<bytes>"). */
+  edits: Array<Record<string, unknown>>;
   /** Polls before a job is done. */
   pollsToFinish: number;
   /** When set, a job fails with this code and sentence instead of finishing. */
@@ -18,6 +20,10 @@ export interface FakeImageStack {
   /** When set, the submit itself is refused with this status, code and sentence. */
   refuseSubmit: { status: number; code: string; error: string } | null;
   loras: StackLora[];
+  /** The fields of each LoRA add (files as "file:<bytes>"). */
+  loraAdds: Array<Record<string, unknown>>;
+  /** When set, a LoRA file add is refused with this code and sentence. */
+  loraRefusal: { code: string; error: string } | null;
   restore(): void;
 }
 
@@ -36,7 +42,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeImageStack(options: { pollsToFinish?: number } = {}): FakeImageStack {
   const fake: FakeImageStack = {
-    jobs: [], submitted: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, loras: [...TEST_LORAS],
+    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, loras: [...TEST_LORAS], loraAdds: [], loraRefusal: null,
     restore() { __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
   };
   __setPictureStatusForTests(readyStatusForTests());
@@ -51,6 +57,16 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       fake.submitted.push(body);
       if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
       const job: FakeJob = { id: `job-${fake.jobs.length + 1}`, body, polls: 0, state: "queued", deleted: false };
+      fake.jobs.push(job);
+      return json({ created: 1, job: job.id, data: [] }, 202);
+    }
+    if (method === "POST" && path === "/v1/images/edits") {
+      const form = init?.body as FormData;
+      const body: Record<string, unknown> = { edit: true };
+      for (const [key, value] of form.entries()) body[key] = typeof value === "string" ? value : `file:${(value as File).size}`;
+      fake.edits.push(body);
+      if (fake.refuseSubmit) return json({ error: fake.refuseSubmit.error, code: fake.refuseSubmit.code }, fake.refuseSubmit.status);
+      const job: FakeJob = { id: `job-${fake.jobs.length + 1}`, body: { ...body, n: 1 }, polls: 0, state: "queued", deleted: false };
       fake.jobs.push(job);
       return json({ created: 1, job: job.id, data: [] }, 202);
     }
@@ -73,7 +89,39 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "queued" : "rendering", progress: job.polls * 30, phase_progress: null, position: job.state === "queued" ? 1 : null, error: null, code: null, data: [] });
     }
     if (method === "GET" && path === "/stack/v1/image") return json({ image: readyStatusForTests() });
-    if (method === "GET" && path === "/stack/v1/image/loras") return json({ loras: fake.loras });
+    if (method === "GET" && path === "/stack/v1/image/loras") return json({ loras: fake.loras, base_models: ["flux2-klein-4b", "z-image-turbo"], max_per_picture: 3 });
+    if (method === "POST" && path === "/stack/v1/image/loras") {
+      const form = init?.body as FormData;
+      fake.loraAdds.push(Object.fromEntries([...form.entries()].map(([k, v]) => [k, typeof v === "string" ? v : `file:${(v as File).size}`])));
+      if (fake.loraRefusal) return json({ error: fake.loraRefusal.error, code: fake.loraRefusal.code }, 422);
+      const record: StackLora = { id: "lora-dddddddddddddddd", name: String(form.get("name")), sha256: "d".repeat(64), bytes: 1234, base_model: "flux2-klein-4b", licence: String(form.get("licence")), source_url: null, classification: String(form.get("classification")) as StackLora["classification"], trigger_words: JSON.parse(String(form.get("trigger_words") ?? "[]")), strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
+      fake.loras.push(record);
+      return json(record);
+    }
+    if (method === "POST" && path === "/stack/v1/image/loras/install") {
+      const body = JSON.parse(String(init?.body)) as Record<string, unknown>;
+      fake.loraAdds.push(body);
+      return json({ job: "lora-job-1" }, 202);
+    }
+    if (method === "GET" && path === "/stack/v1/jobs/lora-job-1") {
+      const record: StackLora = { id: "lora-eeeeeeeeeeeeeeee", name: "From Link", sha256: "e".repeat(64), bytes: 99, base_model: "z-image-turbo", licence: "unknown", source_url: "https://huggingface.co/x/y/resolve/main/a.safetensors", classification: "adult-only", trigger_words: [], strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
+      fake.loras.push(record);
+      return json({ job: { id: "lora-job-1", state: "done", percent: 100, result: { lora: record } } });
+    }
+    const patchMatch = path.match(/^\/stack\/v1\/image\/loras\/([^/]+)$/);
+    if (patchMatch && method === "PATCH") {
+      const lora = fake.loras.find((l) => l.id === patchMatch[1]);
+      if (!lora) return json({ error: "No such LoRA in the library.", code: "unknown_lora" }, 404);
+      Object.assign(lora, JSON.parse(String(init?.body)));
+      return json(lora);
+    }
+    if (patchMatch && method === "DELETE") {
+      const at = fake.loras.findIndex((l) => l.id === patchMatch[1]);
+      if (at < 0) return json({ error: "No such LoRA in the library.", code: "unknown_lora" }, 404);
+      fake.loras.splice(at, 1);
+      return json({ ok: true });
+    }
+    if (method === "POST" && path === "/stack/v1/image/install") return json({ job: "install-job-1", family: "flux2-klein-4b", joined: false }, 202);
     return json({ error: `The fake picture engine has no route ${method} ${path}.`, code: "not_found" }, 404);
   }) as typeof fetch);
   return fake;

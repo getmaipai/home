@@ -121,6 +121,11 @@ describe("the two absolute lines", () => {
     expect(PROMPT_REFUSAL_LINE.minor_sexual).toContain("never made here");
   });
 
+  test("ages written in digits count as a minor beside a sexual word", () => {
+    for (const prompt of ["sexy 14yo", "nude 16-year-old", "a 12 years old girl, lingerie", "topless 15 y o", "erotic teenaged model"]) expect(refusePrompt(prompt)).toBe("minor_sexual");
+    for (const prompt of ["a 25 year old woman in lingerie, studio photo", "a 40yo man, portrait", "an 18th century ship"]) expect(refusePrompt(prompt)).toBeNull();
+  });
+
   test("ordinary requests with a child, or with an adult body, pass", () => {
     for (const prompt of ["a red fox in the snow", "a girl flying a kite on a hill", "children building a snowman, watercolor", "a woman in a bikini on a beach at sunset", "a nude figure study in charcoal, classical sculpture style", "a baby sleeping, soft light", "a high school graduation poster"]) {
       expect(refusePrompt(prompt)).toBeNull();
@@ -206,6 +211,17 @@ describe("the chat tool, even when a model calls it without being offered it", (
       const tools = JSON.stringify(seen.find((r) => (r.tools?.length ?? 0) > 0)?.tools ?? []);
       expect(tools).not.toContain("Boudoir");
       expect(tools).not.toContain("lora-");
+    });
+  });
+
+  test("a style whose trigger words cross the line is refused after Home adds them, with no job", async () => {
+    fake.loras = [...fake.loras, { ...fake.loras[0]!, id: "lora-cccccccccccccccc", name: "Soft Light", trigger_words: ["nude", "softlight"], classification: "all-ages" }];
+    await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a girl in a field", style: "soft light" })]), reply: () => "ignored" }, async (seen) => {
+      const value = await turn(people.owner, "a girl in a field in soft light");
+      expect(value.picture).toBeUndefined();
+      expect(fake.submitted).toHaveLength(0);
+      // The tool tells the model nothing was made and gives it the line to relay.
+      expect(seen.find(isPhrasing)!.messages.find((m) => m.role === "tool")!.content!.toString()).toContain(PROMPT_REFUSAL_LINE.minor_sexual);
     });
   });
 

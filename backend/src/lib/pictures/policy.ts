@@ -100,7 +100,7 @@ export const PROMPT_REFUSAL_LINE: Record<PromptRefusal, string> = {
 const MINOR_LOOKING = [
   "child", "children", "kid", "kids", "kiddo", "minor", "underage", "under age", "preteen", "pre teen", "tween", "teen", "teens", "teenager", "teenage",
   "toddler", "baby", "infant", "boy", "boys", "girl", "girls", "little girl", "little boy", "young girl", "young boy", "schoolgirl", "schoolboy", "school girl", "school boy",
-  "loli", "lolita", "shota", "juvenile", "youth", "youthful", "childlike", "child like", "childish", "babyface", "baby face", "flat chest", "flat chested", "petite", "tiny", "innocent", "prepubescent",
+  "loli", "lolita", "lolicon", "shota", "shotacon", "juvenile", "underaged", "teenaged", "teen aged", "young looking", "youthful looking", "youth", "youthful", "childlike", "child like", "childish", "babyface", "baby face", "flat chest", "flat chested", "petite", "tiny", "innocent", "prepubescent",
   "barely legal", "just turned 18", "freshman", "high school", "middle school", "elementary", "kindergarten", "grade school",
   "13 year", "14 year", "15 year", "16 year", "17 year", "12 year", "11 year", "10 year", "9 year", "8 year", "7 year", "6 year", "5 year", "4 year", "3 year", "2 year",
 ];
@@ -110,6 +110,9 @@ const SEXUAL = [
   "sex", "sexy", "sexual", "sexualized", "sexualised", "erotic", "erotica", "porn", "porno", "pornographic", "nsfw", "explicit", "lewd", "hentai", "ecchi", "fetish", "seductive", "provocative", "suggestive",
   "orgasm", "masturbat", "fellatio", "blowjob", "cumshot", "intercourse", "molest", "rape", "bondage", "kinky", "xxx", "r18", "uncensored", "spread legs", "legs spread",
 ];
+
+// "14yo", "15 y o", "16-year-old", "12 years old": any age below 18 written with digits.
+const MINOR_AGE_DIGITS = /\b(?:[1-9]|1[0-7])\s?(?:yo|y o|yr|yrs|year|years|yr old|yrs old)\b/;
 
 function normalise(text: string): string {
   return ` ${text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim()} `;
@@ -127,7 +130,7 @@ export function promptViolatesMinorLine(prompt: string): boolean {
   const text = normalise(prompt);
   const sexual = SEXUAL.some((term) => hasWord(text, term));
   if (!sexual) return false;
-  return MINOR_LOOKING.some((term) => hasWord(text, term));
+  return MINOR_LOOKING.some((term) => hasWord(text, term)) || MINOR_AGE_DIGITS.test(text);
 }
 
 /** The prompt-level refusal, or null when the request may proceed. `depictsRealPerson` is the model's own statement in the tool call that the person asked for the likeness of a real, named or identifiable person; there is no word list of names, and the Stack refuses likeness adapters at import. */
@@ -135,4 +138,10 @@ export function refusePrompt(prompt: string, flags: { depictsRealPerson?: boolea
   if (promptViolatesMinorLine(prompt)) return "minor_sexual";
   if (flags.depictsRealPerson === true) return "real_person";
   return null;
+}
+
+/** Whether the words ask for sexual content at all (used where the picture may show a real person: an uploaded photo is never changed into that). */
+export function mentionsSexualContent(text: string): boolean {
+  const normalised = normalise(text);
+  return SEXUAL.some((term) => hasWord(normalised, term));
 }

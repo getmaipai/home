@@ -92,6 +92,11 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const available = await adaptersFor(adapterAudiencesFor(audience));
   const named = typeof args.style === "string" ? args.style.trim() : "";
   const adapter = named ? matchAdapter(available, named) : null;
+  // The absolute line is checked again on what is actually sent: the style's trigger words are added by Home, so they
+  // are part of the request too.
+  const sentPrompt = withTriggerWords(prompt, adapter);
+  const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`);
+  if (second) return refused(callId, args, { kind: "prompt", why: second, line: PROMPT_REFUSAL_LINE[second] });
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
 
   try {
@@ -104,7 +109,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       kind: "generate",
       prompt,
       body: {
-        prompt: withTriggerWords(prompt, adapter),
+        prompt: sentPrompt,
         size,
         n: count,
         audience: adultAdaptersAllowed() ? "adult" : "all-ages",

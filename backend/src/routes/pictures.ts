@@ -5,12 +5,11 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { adapterAudiencesFor, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
+import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
-import { adaptersFor } from "@/lib/pictures/adapters";
+import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady } from "@/lib/pictures/ready";
 import { StackPicturesError } from "@/lib/pictures/stack";
-import { adultAdaptersAllowed } from "@/lib/pictures/policy";
 import type { PersonRow } from "@/types";
 
 export const picturesRoutes = apiRouter();
@@ -126,21 +125,23 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // One at a time: a card with a picture still being made takes no second one.
   const group = source.turnId ? pictureJobsForTurn(actor, source.turnId) : [source];
   if (group.some((j) => j.state === "queued" || j.state === "running")) return c.json({ error: "A picture is still being made. Wait for it or stop it first.", code: "busy" }, 409) as never;
-  const refused = refusePrompt(source.prompt);
+  const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
+  // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
+  const used = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [a] : []; });
+  const prompt = used.reduce((text, a) => withTriggerWords(text, a), source.prompt);
+  const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`);
   if (refused) return c.json({ error: PROMPT_REFUSAL_LINE[refused], code: refused }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: "No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.", code: "not_installed" }, 503) as never;
-  const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
-  // Only styles this person may still use ride along; a style turned off since is dropped.
-  const loras = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [{ id: a.id, scale: a.strength_default }] : []; });
+  const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
-      body: { prompt: source.prompt, size: source.request.size, n: 1, audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt, size: source.request.size, n: 1, audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
     });
     void job;
     return c.json(cardView(actor, source, true), 200);
   } catch (error) {
-    const status = error instanceof StackPicturesError && error.status === 422 ? 422 : 503;
+    const status = error instanceof StackPicturesError && (error.status === 422 || error.status === 409) ? error.status : 503;
     return c.json({ error: plainFailure(error), code: error instanceof StackPicturesError ? error.code : "failed" }, status) as never;
   }
 });

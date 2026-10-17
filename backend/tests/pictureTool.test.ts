@@ -17,7 +17,10 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { db } from "@/db";
 import { attachments, people as peopleTable } from "@/db/schema";
-import { getPictureJob } from "@/lib/pictures/jobs";
+import { cancelPictureJob, getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
+import { deleteAttachmentsForTurns } from "@/lib/attachments";
+import { pictureJobs } from "@/db/schema";
+import { saveJob, type PictureJob } from "@/lib/pictures/jobStore";
 import { cardView } from "@/routes/pictures";
 import { __setPictureStatusForTests } from "@/lib/pictures/ready";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
@@ -205,5 +208,53 @@ describe("IMGGEN-HOME-01: the call, the job and the stored picture", () => {
       expect(db.select().from(attachments).all()).toHaveLength(0);
       expect(getPictureJob(people.owner, value.picture!.id)!.files).toHaveLength(1);
     });
+  });
+});
+
+describe("IMGGEN-HOME-01: jobs that are stopped, forgotten or broken", () => {
+  test("Stop is not overwritten by a poll or the finish that was already in flight", async () => {
+    fake.pollsToFinish = 3;
+    const conv = (await import("@/lib/conversationHistory")).resolveOrCreateConversation(people.owner, "chat", undefined, {});
+    if (!conv.ok) throw new Error("no conversation");
+    const job = await startPictureJob({ actor: people.owner, conversationId: conv.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", n: 1, audience: "adult" } });
+    const stopped = await cancelPictureJob(people.owner, job.id);
+    expect(stopped?.state).toBe("cancelled");
+    await new Promise((r) => setTimeout(r, 250));
+    expect(getPictureJob(people.owner, job.id)?.state).toBe("cancelled");
+    expect(fake.jobs[0]!.deleted).toBe(true);
+  });
+
+  test("forgetting a turn removes its picture job and the prompt with it", async () => {
+    await withStub(script(FOX), async () => {
+      const { value } = await streamValue(people.owner, "make me a picture of a red fox");
+      await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "done");
+      const row = db.select().from(pictureJobs).where(eq(pictureJobs.id, value.picture!.id)).get()!;
+      expect(row.prompt).toContain("red fox");
+      deleteAttachmentsForTurns([row.turnId!]);
+      expect(db.select().from(pictureJobs).where(eq(pictureJobs.id, value.picture!.id)).get()).toBeUndefined();
+      expect(getPictureJob(people.owner, value.picture!.id)).toBeNull();
+    });
+  });
+
+  test("a second picture on a card that is still being made is refused, not started", async () => {
+    fake.pollsToFinish = 50;
+    await withStub(script(FOX), async () => {
+      const { value } = await streamValue(people.owner, "make me a picture of a red fox");
+      const first = getPictureJob(people.owner, value.picture!.id)!;
+      await expect(startPictureJob({ actor: people.owner, conversationId: first.conversationId, turnId: first.turnId, temporary: false, kind: "variation", prompt: "a red fox", body: { prompt: "a red fox", n: 1, audience: "adult" } })).rejects.toMatchObject({ code: "busy" });
+      expect(fake.submitted).toHaveLength(1);
+      await cancelPictureJob(people.owner, first.id);
+    });
+  });
+
+  test("only changes are written: a save of the same state writes no row and bumps no hlc", () => {
+    const job: PictureJob = { id: "pic-unit000001", personId: people.owner.id, conversationId: null, turnId: null, kind: "generate", state: "running", stackJob: "job-x", percent: 10, phase: "rendering", position: null, prompt: "a red fox", request: { size: "1024x1024", n: 1, seed: null, loras: [], source_file_id: null, audience: "adult" }, error: null, files: [], temporary: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    saveJob(job);
+    const first = db.select().from(pictureJobs).where(eq(pictureJobs.id, job.id)).get()!;
+    saveJob(job);
+    expect(db.select().from(pictureJobs).where(eq(pictureJobs.id, job.id)).get()!.hlc).toBe(first.hlc);
+    job.percent = 40;
+    saveJob(job);
+    expect(db.select().from(pictureJobs).where(eq(pictureJobs.id, job.id)).get()!.hlc).not.toBe(first.hlc);
   });
 });

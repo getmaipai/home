@@ -1,6 +1,7 @@
 // ATT-01a: local attachment storage. The database row is spec-shaped and
 // immutable; the file is a household-local implementation detail addressed
 // only by its validated relative storage_path.
+import { deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
 import { isAbsolute, normalize, relative, resolve } from "node:path";
@@ -291,6 +292,7 @@ export function readAttachmentForConversation(actor: PersonRow, conversationId: 
 /** Delete records and their files before the owning turn is deleted. */
 export function deleteAttachmentsForTurns(turnIds: string[]): number {
   if (turnIds.length === 0) return 0;
+  deletePictureJobsForTurns(turnIds); // IMGGEN-HOME-01: the picture jobs (and their prompts) of these turns go with them
   const rows = db.select().from(attachments).where(inArray(attachments.turnId, turnIds)).all();
   for (const row of rows) removeFile(row.storagePath);
   sqlite.query(`DELETE FROM attachments WHERE turn_id IN (${turnIds.map(() => "?").join(",")})`).run(...turnIds);
@@ -326,6 +328,7 @@ export function removeFileBlobs(storagePaths: readonly string[]): void {
  * different rule with a household outcome for shared files; that one is
  * lib/storage/personFiles.ts's releaseFilesOfDeletedPerson(). */
 export function deleteAttachmentsForPerson(personId: string): number {
+  deletePictureJobsForPerson(personId);
   const rows = db.select().from(attachments).where(eq(attachments.ownerPersonId, personId)).all();
   const blobs: string[] = [];
   for (const row of rows) {
@@ -378,6 +381,7 @@ export function listTemporaryChatImageVersions(actor: PersonRow, conversationId:
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 export function removeTemporaryChatImages(conversationId: string): void {
+  dropTemporaryPictureJobs(conversationId);
   for (const [id, image] of temporaryChatImages) if (image.conversationId === conversationId) temporaryChatImages.delete(id);
 }
 
@@ -385,6 +389,7 @@ export function removeTemporaryChatImages(conversationId: string): void {
  * pictures are process memory only, but they are still the person's and
  * go with them rather than waiting out the two-hour expiry. */
 export function removeTemporaryChatImagesForPerson(personId: string): void {
+  dropTemporaryPictureJobsForPerson(personId);
   for (const [id, image] of temporaryChatImages) if (image.ownerPersonId === personId) temporaryChatImages.delete(id);
 }
 

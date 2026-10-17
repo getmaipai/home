@@ -23,6 +23,7 @@
 //
 // Memorialization never calls this: a memorialized profile keeps every
 // file exactly as it was (decision 5).
+import { deletePictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { and, eq, inArray, isNotNull, isNull, or, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, shares } from "@/db/schema";
@@ -107,6 +108,7 @@ export function releaseFilesOfDeletedPerson(personId: string): ReleasedFiles {
   for (const file of othersFiles) pruneUnreachableShares(file.id, file.ownerPersonId, personId);
 
   removeTemporaryChatImagesForPerson(personId);
+  deletePictureJobsForPerson(personId); // IMGGEN-HOME-01: a deleted person leaves no picture jobs (their prompts) behind
   const released: ReleasedFiles = { purged: 0, keptForHousehold: 0, blobsToRemove: [] };
   const purge = (row: typeof attachments.$inferSelect) => {
     const blob = purgeFileRecord(row);
