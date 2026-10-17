@@ -78,12 +78,12 @@ describe("the Weather app is a package app", () => {
     expect(page).toEqual(file);
   });
 
-  test("the declared settings area is the person's own weather places and default", () => {
+  test("the declared settings area is the person's own weather places, default and unit", () => {
     const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, "weather", "manifest.json"), "utf-8")) as { contributes: { settings_area: { id: string; app: string; sections: Array<{ cards: Array<{ group: string; scope: string }> }> } }; config: Array<{ key: string; lives_in: string; scope: string }> };
     const area = manifest.contributes.settings_area;
     expect(area).toMatchObject({ id: "weather", app: "/apps/weather" });
     const card = area.sections[0]!.cards[0]!;
-    expect(manifest.config.filter((k) => k.lives_in === card.group && k.scope === card.scope).map((k) => k.key).sort()).toEqual(["weather.default_place", "weather.places"]);
+    expect(manifest.config.filter((k) => k.lives_in === card.group && k.scope === card.scope).map((k) => k.key).sort()).toEqual(["weather.default_place", "weather.places", "weather.unit"]);
   });
 });
 
@@ -195,5 +195,20 @@ describe("the forecast data call", () => {
     const result = await getAppData(row, "weather", "forecast", { place: play.id });
     expect(result.ok).toBe(true);
     expect(urls.find((url) => url.includes("/v1/forecast"))).toContain("latitude=45.5&longitude=-122.7");
+  });
+
+  test("a person's Celsius choice reaches the forecast call and the card, and Fahrenheit stays the default", async () => {
+    const { client, row } = await owner();
+    const cabin = await addPlace(client, "Cabin");
+    const first = await getAppData(row, "weather", "forecast", { place: cabin.id });
+    expect(urls.find((url) => url.includes("/v1/forecast"))).toContain("temperature_unit=fahrenheit");
+    expect((first as { value: { blocks: Array<Record<string, any>> } }).value.blocks[0]!.props.unit).toBe("F");
+
+    expect((await client.put("/api/settings", { scope: `person:${row.id}`, key: "weather.unit", value: "celsius" })).status).toBe(200);
+    __resetPackageCacheForTests();
+    urls = [];
+    const second = await getAppData(row, "weather", "forecast", { place: cabin.id });
+    expect(urls.find((url) => url.includes("/v1/forecast"))).toContain("temperature_unit=celsius");
+    expect((second as { value: { blocks: Array<Record<string, any>> } }).value.blocks[0]!.props.unit).toBe("C");
   });
 });

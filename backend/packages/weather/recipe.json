@@ -15,6 +15,11 @@
       "name": "longitude",
       "selector": "number",
       "required": false
+    },
+    {
+      "name": "unit",
+      "selector": "select",
+      "required": false
     }
   ],
   "steps": [
@@ -53,9 +58,17 @@
       "unless_set": "place_name"
     },
     {
+      "op": "lookup",
+      "as": "unit",
+      "from": "latitude",
+      "table": {},
+      "default": "fahrenheit",
+      "unless_set": "unit"
+    },
+    {
       "op": "fetch",
       "as": "wx",
-      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit=fahrenheit",
+      "url": "https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,weather_code,is_day&hourly=temperature_2m,precipitation_probability&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=8&forecast_hours=24&timezone=auto&temperature_unit={unit}",
       "method": "GET"
     },
     {
@@ -207,7 +220,7 @@
         "high": "{high}",
         "low": "{low}",
         "precipitation_chance": "{rain_chance}",
-        "unit": "fahrenheit",
+        "unit": "{unit}",
         "forecast_dates": "{day_dates}",
         "forecast_highs": "{day_highs}",
         "forecast_lows": "{day_lows}",

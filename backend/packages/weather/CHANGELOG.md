@@ -22,6 +22,10 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ### Added
 
+- A person setting `weather.unit` (Fahrenheit by default, or Celsius). The recipe takes an optional `unit` input that Home injects
+  for the signed-in person (never a model argument); chat answers and the Weather app both follow it. The hourly background refresh
+  has no person and stays Fahrenheit.
+
 - The package is now the Weather app (`contributes.pages`, `contributes.data`, `settings_area`): it opens at `/apps/weather` with the
   animated `weather_card` for the chosen place (hourly strip and 8-day outlook included) and a place picker that lists Current
   location first (asked of the browser only on that choice), then the household home, then the person's own saved places. The chat

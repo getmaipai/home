@@ -179,7 +179,7 @@ export async function resolveWeatherPlace(input: {
   named?: unknown;
   current?: CurrentCoordinates | null;
   preferCurrent?: boolean;
-}): Promise<{ place: string; hostInputs: { latitude?: number; longitude?: number }; uncached: boolean } | null> {
+}): Promise<{ place: string; hostInputs: { latitude?: number; longitude?: number; unit?: "celsius" }; uncached: boolean } | null> {
   const named = typeof input.named === "string" && input.named.trim() ? input.named.trim() : null;
   const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false, preferCurrent: input.preferCurrent });
   // The spoken name wins. A saved or household place is labelled by its own name (never its
@@ -188,10 +188,13 @@ export async function resolveWeatherPlace(input: {
   const label = resolved.from === "current" ? (currentArea && currentArea !== "Approximate area" ? currentArea : "your current location") : resolved.label;
   const place = named ?? label;
   if (!place) return null;
-  if (resolved.lat === null || resolved.lon === null) return { place, hostInputs: {}, uncached: false };
+  // The person's own unit rides as a host input too (never a model argument). Fahrenheit is the recipe's default, so
+  // only Celsius is sent.
+  const unit = input.person && getPersonSettingValue(input.person, "weather.unit") === "celsius" ? { unit: "celsius" as const } : {};
+  if (resolved.lat === null || resolved.lon === null) return { place, hostInputs: { ...unit }, uncached: false };
   const decimals = input.person?.role === "child" ? 1 : 2;
   const round = (value: number) => Number(value.toFixed(decimals));
-  return { place, hostInputs: { latitude: round(resolved.lat), longitude: round(resolved.lon) }, uncached: resolved.from === "current" };
+  return { place, hostInputs: { latitude: round(resolved.lat), longitude: round(resolved.lon), ...unit }, uncached: resolved.from === "current" };
 }
 
 /** Validates the `current_location` a turn request may carry. Anything off

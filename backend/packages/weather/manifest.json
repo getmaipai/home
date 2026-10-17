@@ -54,6 +54,25 @@
       "honoured_by": ["home"]
     },
     {
+      "key": "weather.unit",
+      "scope": "person",
+      "selector": "select",
+      "range": { "options": ["fahrenheit", "celsius"] },
+      "default": "fahrenheit",
+      "label": "Temperature unit",
+      "help": "Whether weather shows degrees Fahrenheit or Celsius.",
+      "level": "basic",
+      "copy": {
+        "does": "Chooses degrees Fahrenheit or Celsius for weather answers and the Weather app.",
+        "options": {
+          "fahrenheit": "Degrees Fahrenheit, like 72 F.",
+          "celsius": "Degrees Celsius, like 22 C."
+        }
+      },
+      "lives_in": "weather",
+      "honoured_by": ["home"]
+    },
+    {
       "key": "weather.default_place",
       "scope": "person",
       "selector": "location",
