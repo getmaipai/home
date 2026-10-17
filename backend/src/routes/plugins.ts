@@ -189,7 +189,8 @@ pluginsRoutes.post("/:id/data/:dataId", requireAuth, async (c) => {
   const body = await c.req.json().catch(() => ({}));
   const result = await getAppData(c.get("person"), c.req.param("id"), c.req.param("dataId"), body);
   if (result.ok) return c.json(result.value, 200);
-  return c.json(result.kind ? { error: result.error, kind: result.kind } : { error: result.error }, result.status as 400);
+  // `code` mirrors `kind` so the kit page (ApiError.code) can say the reason in the page's own words (WEATHER-FIX-01).
+  return c.json(result.kind ? { error: result.error, kind: result.kind, code: result.kind } : { error: result.error }, result.status as 400);
 });
 
 // Owner/admin only: forces a re-check outside the daily job, e.g. right

@@ -7,6 +7,12 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+Weather says why it has nothing to show, place search reads on one line, and every app is on one searchable page.
+
+- The Weather app no longer shows "Check your connection" when the real problem is that no place is chosen. It says "Choose a place" with **Add a place** and **Use my location** (and, in Safari, the exact steps to allow location), says when the weather source cannot be reached or is slow, and offers **Try again**. A saved place now answers when the default is Current location and the browser shares nothing.
+- **Add a place** results are one line each (town, then the state or region in grey), in a wider list with a clear highlight, a Searching state and "No places match". The Weather default place row stacks so nothing runs behind the list.
+- **All apps** (the grid button on the left rail) is now a full page with a search box, Favorites first, apps grouped by topic, and a star on each app. Pins: spec-v0.1.161, ui-v0.5.254. Weather 0.3.1.
+
 ## [0.2.13] - 2026-10-17
 
 Chat answers while the faster engine downloads, and Home can pause chat and show what is installing.

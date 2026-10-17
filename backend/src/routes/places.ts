@@ -1,7 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { resolvePlace, searchPlaces } from "@/lib/places";
+import { PlaceSearchUnavailable, resolvePlace, searchPlaces } from "@/lib/places";
 import { nearestLocalPlace, searchLocalPlaces } from "@/lib/gazetteer";
 
 export const placesRoutes = apiRouter();
@@ -27,9 +27,16 @@ const searchRoute = createRoute({
   method: "get", path: "/search", tags: ["Places"], summary: "Search for map places",
   middleware: [requireAuth] as const,
   request: { query: z.object({ q: z.string().max(200) }) },
-  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number() })) } }, description: "Geocoding candidates, coarsened for a child." }, ...errorResponses({ 401: "Not signed in" }) },
+  responses: { 200: { content: { "application/json": { schema: z.array(z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number() })) } }, description: "Geocoding candidates, coarsened for a child." }, ...errorResponses({ 401: "Not signed in", 502: "The place search service could not be reached; an empty list means it answered with no match" }) },
 });
-placesRoutes.openapi(searchRoute, async (c) => c.json(await searchPlaces(c.req.valid("query").q, c.get("person")), 200));
+placesRoutes.openapi(searchRoute, async (c) => {
+  try {
+    return c.json(await searchPlaces(c.req.valid("query").q, c.get("person")), 200);
+  } catch (error) {
+    if (!(error instanceof PlaceSearchUnavailable)) throw error;
+    return c.json({ error: "Place search is not available right now. Check that this computer is online, then try again.", code: "down" }, 502);
+  }
+});
 
 const localShape = z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number() });
 const localSearchRoute = createRoute({

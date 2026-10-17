@@ -177,4 +177,26 @@ describe("resolvePlace order", () => {
     const response = await client.get("/api/places/search?q=Seattle");
     expect(await response.json()).toEqual([{ name: "Seattle", area: "Washington, United States", lat: 47.6, lon: -122.3 }]);
   });
+
+  // WEATHER-FIX-01: "no match" and "the search service is down" are different answers.
+  test("search: an answer with no results is an empty list; an unreachable service is a 502 the search box can name", async () => {
+    const { client } = await ownerClient();
+    const originalFetch = globalThis.fetch;
+    try {
+      globalThis.fetch = (async () => Response.json({})) as unknown as typeof fetch;
+      const none = await client.get("/api/places/search?q=Zzzzzz");
+      expect(none.status).toBe(200);
+      expect(await none.json()).toEqual([]);
+      globalThis.fetch = (async () => { throw new TypeError("fetch failed: ECONNREFUSED 192.0.2.7:443"); }) as unknown as typeof fetch;
+      const down = await client.get("/api/places/search?q=Seattle");
+      expect(down.status).toBe(502);
+      const body = await down.json() as { error: string; code: string };
+      expect(body.code).toBe("down");
+      expect(body.error).not.toContain("ECONNREFUSED");
+      globalThis.fetch = (async () => new Response("nope", { status: 503 })) as unknown as typeof fetch;
+      expect((await client.get("/api/places/search?q=Seattle")).status).toBe(502);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

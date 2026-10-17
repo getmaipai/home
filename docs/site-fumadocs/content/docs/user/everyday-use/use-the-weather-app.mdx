@@ -19,13 +19,19 @@ Above the card is a place picker. The choices, in order:
 2. **Your home**, shown as the place name and "(home)". This is the household's home place.
 3. **Your own saved places.**
 
-If the forecast cannot load, the page says so in plain words and tells you what to try. It does not show an empty card.
+Weather never shows an empty page. It says why, and gives you the next step:
+
+- **No place chosen.** The page says "Choose a place" and offers **Add a place** and **Use my location**. **Add a place** opens the Weather settings. **Use my location** asks your browser for where you are. If the browser says no, the page tells you how to allow it. In Safari, choose **Safari**, **Settings**, **Websites**, **Location**, set this site to **Allow**, then press the button again.
+- **Weather is not reachable.** Home could not reach Open-Meteo. Check that this computer is online, then press **Try again**.
+- **Weather is slow to answer.** The weather service did not reply in time. Press **Try again** in a moment.
+
+If you have saved places but no home and no location, Home shows your first saved place. You do not need to share your location to see the weather.
 
 ## Choose your places and units
 
 Press the **Settings** gear on the Weather page. It opens the Weather settings.
 
-- **Weather places.** Add the cities you care about. Remove one to unlist it.
+- **Weather places.** Add the cities you care about. Press **Add a place**, type a town, and pick it from the list. Each result shows the town and its state or region on one line. Use the arrow keys and Enter, or tap a result. Remove one to unlist it.
 - **Weather default place.** The place Home uses when you do not name one. **Current location** is the first choice.
 - **Temperature unit.** Degrees Fahrenheit or Celsius. It applies to chat answers and the app. The default is Fahrenheit.
 
@@ -46,8 +52,9 @@ Weather asks one outside service, Open-Meteo, a free public weather service. It 
 | What you see | Why | What to do |
 |---|---|---|
 | "Ask a grown-up to set the home location" | The household has no home place yet | An owner or admin sets it on the Home page |
-| **Use my location** does nothing | The browser blocked location, or the address is not `localhost` or `https` | Allow location for this site, or type a city |
-| The forecast will not load | Home cannot reach Open-Meteo, or the internet is down | Check the internet, then try again. Home says what is missing |
+| **Use my location** says location is blocked | The browser blocked location, or the address is not `localhost` or `https` | In Safari, choose **Safari**, **Settings**, **Websites**, **Location**, set this site to **Allow**. Or add a place instead |
+| "Choose a place" | You have no places and no home | Press **Add a place**, search for your town, and pick it |
+| "Weather is not reachable" | Home cannot reach Open-Meteo, or the internet is down | Check the internet, then press **Try again** |
 | Chat says it has no place | You named none and have no default | Name a place, or set a default place in the Weather settings |
 | Wrong unit | The unit is per person | Change **Temperature unit** in the Weather settings |
 | A city is not found | Home looks up cities in a built-in list. ZIP codes do not work yet | Type the city and state |

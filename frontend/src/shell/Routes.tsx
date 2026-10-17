@@ -13,6 +13,7 @@ import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
 import { PackageAppPage } from "@/shell/pages/PackageAppPage";
+import { ALL_APPS_PATH, AllAppsPage } from "@/shell/pages/AllAppsPage";
 import { ProjectsPage } from "@/shell/pages/ProjectsPage";
 import { FamilyPage } from "@/shell/pages/FamilyPage";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
@@ -234,7 +235,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} onRailAppPinChange={(url) => togglePin(url)} headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} onRailAppPinChange={(url) => togglePin(url)} railAllAppsHref={ALL_APPS_PATH} headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />
@@ -269,6 +270,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="files" element={<FilesPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />
             {/* APP-KIND-04: every installed package app, with no rebuild. Static routes above win over this splat. */}
+            <Route path="all-apps" element={<AllAppsPage person={person} />} />
             <Route path="apps/*" element={<PackageAppPage person={person} />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />

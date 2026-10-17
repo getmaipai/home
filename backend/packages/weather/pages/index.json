@@ -22,7 +22,30 @@
       "empty_state": {
         "type": "empty_state",
         "icon": "cloud-off",
-        "text": "The weather is not available right now. Check your connection and try again, or choose another place."
+        "text": "The weather is not available right now. Try again, or choose another place."
+      },
+      "states": {
+        "needs_place": {
+          "icon": "map-pin",
+          "title": "Choose a place",
+          "text": "Weather needs a place to look up. Add one to your places, or let this browser share where you are.",
+          "actions": [
+            { "label": "Add a place", "icon": "plus", "navigate": { "to": "/settings/weather" } },
+            { "label": "Use my location", "icon": "locate-fixed", "locate": { "state": "place" } }
+          ]
+        },
+        "down": {
+          "icon": "cloud-off",
+          "title": "Weather is not reachable",
+          "text": "Home could not reach its weather source, Open-Meteo. Check that this computer is online, then try again.",
+          "actions": [{ "label": "Try again", "icon": "refresh-cw", "retry": true }]
+        },
+        "timed_out": {
+          "icon": "clock",
+          "title": "Weather is slow to answer",
+          "text": "The weather source did not reply in time. Try again in a moment.",
+          "actions": [{ "label": "Try again", "icon": "refresh-cw", "retry": true }]
+        }
       }
     }
   ]

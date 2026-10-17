@@ -1,6 +1,6 @@
 {
   "id": "weather",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "kind": "plugin",
   "category": "Utilities",
   "display": "Weather",

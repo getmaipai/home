@@ -293,6 +293,11 @@
         "chat"
       ]
     },
+    "user/everyday-use/find-and-favorite-your-apps": {
+      "areas": [
+        "settings"
+      ]
+    },
     "user/everyday-use/talk-instead-of-type": {
       "areas": [
         "voice"

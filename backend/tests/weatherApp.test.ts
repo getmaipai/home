@@ -178,6 +178,30 @@ describe("the forecast data call", () => {
     expect(urls).toEqual([]);
   });
 
+  // WEATHER-FIX-01: Current location is the default, and a browser that blocks location sends no coordinates.
+  test("a saved place answers when the default is Current location and the browser shared nothing", async () => {
+    const { client, row } = await owner();
+    const cabin = await addPlace(client, "Cabin");
+    expect((await client.put("/api/settings", { scope: `person:${row.id}`, key: "weather.places", value: [cabin.id] })).status).toBe(200);
+    const result = await getAppData(row, "weather", "forecast", {});
+    const blocks = (result as { value: { blocks: Array<Record<string, any>>; needs?: string } }).value;
+    expect(blocks.needs).toBeUndefined();
+    expect(blocks.blocks[0]!.props.place).toBe("Cabin");
+  });
+
+  test("the route says why: a failed lookup and a Current location with no coordinates carry a code the page reads", async () => {
+    const { client, row } = await owner();
+    const cabin = await addPlace(client, "Cabin");
+    const noCoordinates = await client.post("/api/plugins/weather/data/forecast", { place: "current" });
+    expect(noCoordinates.status).toBe(400);
+    expect(await noCoordinates.json()).toMatchObject({ code: "needs_place", kind: "needs_place" });
+    globalThis.fetch = (async () => { throw new TypeError("fetch failed"); }) as unknown as typeof fetch;
+    const down = await client.post("/api/plugins/weather/data/forecast", { place: cabin.id });
+    expect(down.status).toBe(502);
+    expect(await down.json()).toMatchObject({ code: expect.stringMatching(/down|timed_out/) });
+    expect(row.id).toBeTruthy();
+  });
+
   test("offline: a failed lookup is 502 with only its kind, never the raw error", async () => {
     const { client, row } = await owner();
     const cabin = await addPlace(client, "Cabin");

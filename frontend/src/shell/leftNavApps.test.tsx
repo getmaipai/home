@@ -1,5 +1,5 @@
 // LEFTNAV-APPS-01: package apps in the left rail. The hub's list (role, age band, surface and Incognito already
-// applied) feeds a pinned section and an "All apps" launcher; Weather's manifest pins it by default; a person's own
+// applied) feeds a pinned section and an "All apps" page; Weather's manifest pins it by default; a person's own
 // saved pins always win.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
@@ -55,16 +55,16 @@ afterEach(() => {
 });
 
 describe("the rail's apps", () => {
-  test("Weather is in the rail on first load with no pins saved, and Notes is only in the launcher", async () => {
+  test("Weather is in the rail on first load with no pins saved, and Notes is only on the All apps page", async () => {
     start();
     const view = open();
     const link = await rail(view).findByRole("link", { name: "Weather" });
     expect(link.getAttribute("href")).toBe("/apps/weather");
     expect(rail(view).queryByRole("link", { name: "Notes" })).toBeNull();
-    fireEvent.click(rail(view).getByRole("button", { name: "All apps" }));
-    expect(await view.findByRole("link", { name: "Notes" })).toBeTruthy();
-    expect(view.getByRole("button", { name: "Unpin Weather from the rail" })).toBeTruthy();
-    expect(view.getByRole("button", { name: "Pin Notes to the rail" })).toBeTruthy();
+    fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
+    expect(await view.findByRole("link", { name: /^Notes/ })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Remove Weather from favorites" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Add Notes to favorites" })).toBeTruthy();
     expect(home.puts.some((put) => put.key === "ui.pinned_apps")).toBe(false);
   });
 
@@ -83,46 +83,46 @@ describe("the rail's apps", () => {
     cleanup(); home.restore(); globalThis.fetch = baseFetch;
     start([]);
     const empty = open();
-    await rail(empty).findByRole("button", { name: "All apps" });
+    await rail(empty).findByRole("link", { name: "All apps" });
     expect(rail(empty).queryByRole("link", { name: "Weather" })).toBeNull();
   });
 
-  test("pinning from the launcher saves the whole list after the defaults; unpinning saves it without that app", async () => {
+  test("a star on the All apps page saves the whole list after the defaults; unpinning saves it without that app", async () => {
     start();
     const view = open();
     await rail(view).findByRole("link", { name: "Weather" });
-    fireEvent.click(rail(view).getByRole("button", { name: "All apps" }));
-    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Pin Notes to the rail" })); });
+    fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
+    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Add Notes to favorites" })); });
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ key: "ui.pinned_apps", value: JSON.stringify(["/apps/weather", "/apps/notes"]) }));
     await rail(view).findByRole("link", { name: "Notes" });
-    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Unpin Weather from the rail" })); });
+    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Remove Weather from favorites" })); });
     await waitFor(() => expect(home.puts.at(-1)).toMatchObject({ value: JSON.stringify(["/apps/notes"]) }));
     await waitFor(() => expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull());
   });
 
-  test("an app the hub does not list (role, age band or Incognito) is nowhere in the rail or the launcher", async () => {
+  test("an app the hub does not list (role, age band or Incognito) is nowhere in the rail or on the All apps page", async () => {
     rows = [notes];
     start();
     const view = open();
-    await rail(view).findByRole("button", { name: "All apps" });
+    await rail(view).findByRole("link", { name: "All apps" });
     expect(rail(view).queryByRole("link", { name: "Weather" })).toBeNull();
-    fireEvent.click(rail(view).getByRole("button", { name: "All apps" }));
-    await view.findByRole("link", { name: "Notes" });
-    expect(view.queryByRole("link", { name: "Weather" })).toBeNull();
+    fireEvent.click(rail(view).getByRole("link", { name: "All apps" }));
+    await view.findByRole("link", { name: /^Notes/ });
+    expect(view.queryByRole("link", { name: /^Weather/ })).toBeNull();
   });
 
-  test("no package apps means no launcher at all", async () => {
+  test("no package apps means no All apps entry at all", async () => {
     rows = [];
     start();
     const view = open();
     await waitFor(() => expect(rail(view).getByRole("link", { name: "Chat" })).toBeTruthy());
-    expect(rail(view).queryByRole("button", { name: "All apps" })).toBeNull();
+    expect(rail(view).queryByRole("link", { name: "All apps" })).toBeNull();
   });
 
-  test("at 390 the rail still shows the pinned app and the launcher", async () => {
+  test("at 390 the rail still shows the pinned app and the All apps link", async () => {
     start();
     const view = open("/", 390);
     await rail(view).findByRole("link", { name: "Weather" });
-    expect(rail(view).getByRole("button", { name: "All apps" })).toBeTruthy();
+    expect(rail(view).getByRole("link", { name: "All apps" })).toBeTruthy();
   });
 });

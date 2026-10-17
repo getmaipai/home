@@ -40,7 +40,7 @@ export interface AppData {
   needs?: "place";
 }
 
-export type AppResult<T> = { ok: true; status: 200; value: T } | { ok: false; status: 404 | 400 | 502; error: string; kind?: "down" | "timed_out" | "found_nothing" };
+export type AppResult<T> = { ok: true; status: 200; value: T } | { ok: false; status: 404 | 400 | 502; error: string; kind?: "down" | "timed_out" | "found_nothing" | "needs_place" };
 
 const NOT_FOUND = { ok: false, status: 404, error: "no such app" } as const;
 
@@ -268,13 +268,20 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
     if (!found.ok || found.value?.kind !== "place") return { ok: false, status: 400, error: "That place is not one of yours. Choose another." };
     named = found.value!.name;
   }
-  if (chosen === "current" && !current) return { ok: false, status: 400, error: "Location was not shared. Choose a saved place instead." };
+  if (chosen === "current" && !current) return { ok: false, status: 400, error: "Location was not shared. Choose a saved place instead.", kind: "needs_place" };
 
   const inputs: Record<string, unknown> = { ...((entry.inputs ?? {}) as Record<string, unknown>) };
   let hostInputs: Record<string, unknown> | undefined;
   let uncached = false;
   if (entry.surface === "weather") {
-    const place = await resolveWeatherPlace({ person, named, current, preferCurrent: current !== null });
+    let place = await resolveWeatherPlace({ person, named, current, preferCurrent: current !== null });
+    // WEATHER-FIX-01: the app page was asked for the person's default, the default is Current location, the browser
+    // shared nothing and there is no household home. A saved place still answers: the first one the person saved.
+    if (!place && !chosen) {
+      const first = savedPlaceRows(person, "weather").find((row) => !row.label.endsWith("(home)"));
+      const saved = first ? getEntity(person, first.id) : null;
+      if (saved?.ok && saved.value?.kind === "place") place = await resolveWeatherPlace({ person, named: saved.value.name });
+    }
     if (!place) return { ok: true, status: 200, value: { as_of: asOf, blocks: [], needs: "place" } };
     inputs.place = place.place;
     hostInputs = place.hostInputs;

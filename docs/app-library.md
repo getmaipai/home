@@ -37,12 +37,15 @@ is on, an app whose manifest says `incognito: "blocked"` is left out. An app tha
 
 Package apps the hub lists for the person (`GET /api/apps`: role, age band, surface and Incognito already applied) reach the
 rail two ways. A pinned app is a named icon link below Home, Chat, Library and People, at most six, the open one highlighted. A
-grid button at the foot of the rail opens "All apps": every listed app with a Pin or Unpin button (disabled with a reason while
-six are pinned). The phone keeps the same 56px rail, so the launcher is the same.
+grid button at the foot of the rail ("All apps", a link) opens the All apps page at `/all-apps` (`AllAppsPage`, built on the kit's
+`AppDirectory`, APPS-DIRECTORY-01). It scales to dozens of apps: a search box focused on open that filters as you type across name,
+description, category and keywords; Favorites first (the person's pins, in order), then one section per category, then "Built in"
+(the core apps, which open but have no star); a star on each tile that saves `ui.pinned_apps`, the same list the rail draws and the
+app page's own star edits (held with a reason while six are pinned); arrow keys, Home and End between tiles; an empty state with
+Clear search. The phone keeps the same 56px rail, so the grid button is the same.
 
 Defaults come from the app's manifest, never from Home: the index page's `pinned_by_default` and `pin_order` (`@maipai/spec`
 0.1.157) pin Weather for everyone who may open it. A person who has never pinned or unpinned anything (`ui.pinned_apps` still has
 its default) starts with those; the first change saves the whole list and from then on their list wins, even when empty. A person
-whose list was saved before this existed keeps it and finds Weather in "All apps". `AppRail` in `@maipai/ui` draws the rail and
-launcher (`railApps`, `onRailAppPinChange`); Home passes `railApps()` from `appCatalog.ts`. No drag to reorder: the kit has no
+whose list was saved before this existed keeps it and finds Weather in "All apps". `AppRail` in `@maipai/ui` draws the rail (`railApps`, `onRailAppPinChange`, `allAppsHref`; without `allAppsHref` the grid button opens the older popover list); Home passes `railApps()` from `appCatalog.ts` and `railAllAppsHref`. No drag to reorder: the kit has no
 sortable list.

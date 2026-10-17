@@ -30126,6 +30126,16 @@
                 }
               }
             }
+          },
+          "502": {
+            "description": "The place search service could not be reached; an empty list means it answered with no match",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           }
         }
       }

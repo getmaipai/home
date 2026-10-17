@@ -143,8 +143,14 @@ export async function resolvePlace(input: {
   return emptyPlace();
 }
 
+/** Thrown when the geocoder cannot be reached or does not answer: the caller says so instead of reporting "no match". */
+export class PlaceSearchUnavailable extends Error {
+  constructor() { super("Place search is not available."); }
+}
+
 /** Calls the existing Open-Meteo geocoder used by the bundled weather
- * package. Failure is an empty candidate list and never logs the query. */
+ * package. An unreachable geocoder throws PlaceSearchUnavailable (the search box then says search is down, not that
+ * nothing matched); an answer with no results is an empty list. The query is never logged. */
 export async function searchPlaces(query: string, person: PersonRow): Promise<Array<{ name: string; area: string | null; lat: number; lon: number }>> {
   const trimmed = query.trim();
   if (!trimmed) return [];
@@ -160,12 +166,12 @@ async function geocodeMany(name: string): Promise<Array<{ name: string; area: st
     url.searchParams.set("count", "5");
     url.searchParams.set("name", name);
     const response = await fetch(url, { signal: AbortSignal.timeout(4000), headers: { "user-agent": HOME_USER_AGENT } });
-    if (!response.ok) return [];
+    if (!response.ok) throw new PlaceSearchUnavailable();
     const body = await response.json() as { results?: Array<{ latitude?: number; longitude?: number; name?: string; admin1?: string; country?: string }> };
     return (body.results ?? []).filter((row) => typeof row.latitude === "number" && typeof row.longitude === "number" && typeof row.name === "string")
       .map((row) => ({ name: row.name!, area: [row.admin1, row.country].filter(Boolean).join(", ").slice(0, 200) || null, lat: row.latitude!, lon: row.longitude! }));
   } catch {
-    return [];
+    throw new PlaceSearchUnavailable();
   }
 }
 

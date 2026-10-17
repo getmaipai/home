@@ -2,6 +2,10 @@
 
 All notable changes to the Weather package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.1] - 2026-10-17
+
+- The Weather app says why it has nothing to show. With no place chosen it asks you to add a place or use your location (and explains how to allow location in Safari). If the weather source cannot be reached it says so and offers Try again, instead of one generic error. A saved place is used when Current location is the default and the browser shares no position.
+
 ## [0.1.2] - 2026-10-14
 
 - Restores the weather answer blocks and records hourly background fetches in the privacy details.
