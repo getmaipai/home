@@ -337,6 +337,8 @@ browser; it transcodes once into the store.
   another signed-in device of the same person shows "Continue here" (FT's card) in the app's index. "Play on another screen"
   sends a `device_command` (`play {media_id, position}`) to a chosen device of the household, the kit cast slot's first target;
   Chromecast and AirPlay are the Player's own buttons when the browser offers them (nothing of ours in the path).
+  > **Superseded in part 2026-10-17** by [media-handoff-2026-10-17.md](media-handoff-2026-10-17.md): the presence shape, the
+  > `play_media` kind and the target set (the sender's own screens) are decided there.
 - One audio session per client: the shell's audio session (section 12) ensures one thing plays at a time across apps, chat voice
   included, and owns speed, sleep timer and Media Session metadata. It draws nothing outside a media app's area (section 6).
 
