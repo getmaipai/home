@@ -85,15 +85,6 @@
       "reason": "Kit artifact-card lacked an actions slot (added in ui-v0.5.116); ADOPT-02."
     }
   },
-  "apps/chat/composerAddMenu.tsx": {
-    "ComposerMenuItem": {
-      "tokens": [
-        "min-h-13"
-      ],
-      "ed": "ED-029",
-      "reason": "Kit composer lacked a compact density; ELT-COMPOSER-KIT-01."
-    }
-  },
   "apps/chat/composerVoiceControls.tsx": {
     "TooltipIconButton": {
       "tokens": [

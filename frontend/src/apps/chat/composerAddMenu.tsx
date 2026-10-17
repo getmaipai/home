@@ -25,11 +25,10 @@ import { ComposerPrimitive, useAuiEvent } from "@assistant-ui/react";
 import { toast } from "sonner";
 import { useComposerAddAttachment } from "@assistant-ui/core/react";
 import { useQuery } from "@tanstack/react-query";
-import { ComposerAttachButton, ComposerMenu, ComposerMenuItem } from "@maipai/ui/src/elements/composer";
+import { ComposerAttachButton, ComposerMenu, ComposerMenuItem, ComposerMenuLabel } from "@maipai/ui/src/elements/composer";
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { getIcon } from "@maipai/ui/src/icons";
-import { cn } from "@maipai/ui/src/utils";
 import { kindStyle } from "@/apps/library/appPresentation";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { readyRole } from "@/apps/chat/engineRoles";
@@ -88,13 +87,13 @@ const SparklesIcon = getIcon("sparkles");
 // of inventing a second stacked layout.
 function ComposerAddMenuItem({ icon, name, description, className, ...props }: { icon: ComponentType<{ className?: string }>; name: string; description: string } & Omit<ComponentProps<typeof ComposerMenuItem>, "children">) {
   const Icon = icon;
+  // ChatGPT-style row (Jesse, 2026-10-17): icon and one short label, no
+  // description line (it was truncated). The explanation rides on the native
+  // `title` tooltip, which the Element passes through.
   return (
-    <ComposerMenuItem className={cn("min-h-13", className)} {...props}>
+    <ComposerMenuItem title={description} {...props} className={className}>
       <Icon className="text-foreground/35 size-4 shrink-0" />
-      <span className="font-medium shrink-0">{name}</span>
-      {/* Deliberate type-floor exception: text-xs, same compact size
-          variant the shipped ComposerCommandItem's own description uses. */}
-      <span className="text-foreground/45 min-w-0 flex-1 truncate text-start text-xs">{description}</span>
+      <span className="font-medium whitespace-nowrap">{name}</span>
     </ComposerMenuItem>
   );
 }
@@ -110,11 +109,16 @@ function GroupLabel({ children }: { children: string }) {
  * menu row via `asChild` instead of its own bare button. */
 function AddPhotosAndFilesItem({ onSelect, photos, reason }: { onSelect: () => void; photos: boolean; reason: string }) {
   return (
+    <>
     <ComposerPrimitive.AddAttachment asChild>
       {photos
         ? <ComposerAddMenuItem icon={FileTextIcon} name="Add photos and files" description="Images, text, PDF, Office" onClick={onSelect} />
         : <ComposerAddMenuItem icon={FileTextIcon} name="Add files" description={reason} onClick={onSelect} />}
     </ComposerPrimitive.AddAttachment>
+    {/* Pictures are off on purpose (profile setting or no vision model): the
+        picker then omits images, so say why in one plain line, not silently. */}
+    {!photos && <ComposerMenuLabel>{reason}</ComposerMenuLabel>}
+    </>
   );
 }
 
@@ -242,10 +246,9 @@ function AppsGroup({ onSelect }: { onSelect: (pkg: InstalledPackage) => void }) 
         // Deliberate type-floor exception: same compact-row shape as
         // ComposerAddMenuItem above, `text-xs` on the description only.
         return (
-          <ComposerMenuItem key={pkg.id} onClick={() => onSelect(pkg)}>
+          <ComposerMenuItem key={pkg.id} title={pkg.description} onClick={() => onSelect(pkg)}>
             <IconTile icon={style.icon} hue={style.hue} size="sm" glow={false} />
-            <span className="font-medium shrink-0">{pkg.display}</span>
-            <span className="text-foreground/45 min-w-0 flex-1 truncate text-start text-xs">{pkg.description}</span>
+            <span className="font-medium whitespace-nowrap">{pkg.display}</span>
           </ComposerMenuItem>
         );
       })}
@@ -286,10 +289,11 @@ export function ComposerAddMenu() {
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
       />
-      {/* UPLOAD-IMG-02: "end", not "start" - Home's compact composer puts
-          this "+" near the right end of the row (tokens.css), so a
-          start-aligned menu opened past the phone's right edge. */}
-      <ComposerMenu open={open} inert={!open} align="end">
+      {/* Opens directly above the "+": it sits at the composer's start edge
+          (the compact grid's lead cell), and the menu anchors to the
+          composer root, so "start" lines the two up. "end" put it over
+          the right corner (Jesse, live, 2026-10-17). */}
+      <ComposerMenu open={open} inert={!open} align="start">
         <GroupLabel>Add</GroupLabel>
         <AddPhotosAndFilesItem onSelect={close} photos={photosAllowed} reason={photoDisabledReason} />
         {photosAllowed && <TakeAPhotoItem onSelect={close} />}
