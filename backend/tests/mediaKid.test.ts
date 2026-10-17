@@ -123,43 +123,40 @@ test("discovery follows the allowlist, and both new settings pass the copy lint"
   expect(Object.values(MEDIA_KID_COPY)).toEqual(["Screen time is done for today.", "Ask a grown-up for more.", "Not for you yet. Tap to ask a grown-up."]);
 });
 
-test("playing time accumulates; seeks, rewind, paused gaps and replayed samples do not", async () => {
+test("playing time accumulates from the server clock; seeks count only wall-clock time, rewinds and replays nothing", async () => {
   const { child, video } = await setup(); const start = clock();
   tick(child, video, start, 0);
-  tick(child, video, at(start, 10), 10);
-  tick(child, video, at(start, 20), 900); // seek
-  tick(child, video, at(start, 30), 910);
+  tick(child, video, at(start, 10), 10); // +10
+  tick(child, video, at(start, 20), 900); // forward seek: only the 10 s of wall clock
+  tick(child, video, at(start, 30), 910); // +10
   tick(child, video, at(start, 30), 910); // replay
   tick(child, video, at(start, 25), 905); // old
-  tick(child, video, at(start, 40), 100); // rewind
-  tick(child, video, at(start, 50), 110, { playing: false }); // final playing interval
-  tick(child, video, at(start, 600), 110, { playing: false });
-  tick(child, video, at(start, 610), 110, { events: { play: true } });
-  tick(child, video, at(start, 620), 120);
-  tick(child, video, at(start, 630), 125, { seeking: true });
-  tick(child, video, at(start, 640), 135);
-  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(50 / 60);
-  tick(child, video, at(start, 650), 149); // slack never counts more than the elapsed 10 seconds
-  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(50 / 60); // delta > elapsed + 2 is a seek
+  tick(child, video, at(start, 40), 100); // rewind: nothing
+  tick(child, video, at(start, 50), 110); // +10
+  tick(child, video, at(start, 600), 110); // no forward movement: nothing
+  tick(child, video, at(start, 610), 120); // +10
+  tick(child, video, at(start, 620), 125); // +5, position advanced less than the clock
+  tick(child, video, at(start, 630), 135); // +10
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(65 / 60);
+  tick(child, video, at(start, 640), 149); // a 14 s jump in 10 s is a seek: 10 s
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(75 / 60);
 });
 
-test("sessions and devices are separate baselines; a foreign device adds no usage or place", async () => {
+test("cursors are per server key and item; a foreign device adds no usage or place", async () => {
   const { child, adult, video } = await setup(); const start = clock();
   const a = createDevice("browser", "Tablet", child.id);
   const b = createDevice("browser", "Phone", child.id);
   const foreign = createDevice("browser", "TV", adult.id);
   tick(child, video, start, 0, { device_id: a.id });
   tick(child, video, at(start, 10), 10, { device_id: a.id });
-  tick(child, video, at(start, 11), 500, { device_id: b.id });
-  tick(child, video, at(start, 21), 510, { device_id: b.id });
-  tick(child, video, at(start, 22), 900, { device_id: a.id, meterKey: "new-run" });
-  tick(child, video, at(start, 32), 910, { device_id: a.id, meterKey: "new-run" });
+  tick(child, video, at(start, 11), 500, { device_id: b.id, meterKey: "other" });
+  tick(child, video, at(start, 21), 510, { device_id: b.id, meterKey: "other" });
   expect(tick(child, video, at(start, 42), 920, { device_id: foreign.id })).toEqual({ ok: false, refusal: "other_persons_device" });
-  expect(mediaBudget(child.id, start).used_min).toBe(0.5);
-  expect(getProgress(child.id, video)?.position).toEqual({ seconds: 910 });
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(20 / 60);
+  expect(getProgress(child.id, video)?.position).toEqual({ seconds: 510 });
   __resetProgressForTests(); // cursor is persisted, no in-memory reset can forget usage or baseline
-  tick(child, video, at(start, 42), 920, { device_id: a.id, meterKey: "new-run" });
-  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(40 / 60);
+  tick(child, video, at(start, 30), 20, { device_id: a.id });
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(30 / 60);
 });
 
 test("coalescing never drops metered ticks, and switching items starts a baseline", async () => {
@@ -169,6 +166,20 @@ test("coalescing never drops metered ticks, and switching items starts a baselin
   expect(mediaBudget(child.id, start).used_min).toBeCloseTo(10 / 60);
   expect(getProgress(child.id, video)?.position).toEqual({ seconds: 10 });
   tick(child, other, at(start, 20), 1000, { meterKey: "-" });
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(10 / 60);
+});
+
+test("a child sending seeking:true and playing:false on every write while the position advances still reaches the budget", async () => {
+  const { child, video, set } = await setup(); const start = clock();
+  await set(`person:${child.id}`, "allowance.media.daily_minutes", 1);
+  for (let n = 0; n <= 6; n++) tick(child, video, at(start, n * 10), n * 10, { seeking: true, playing: false, events: { skip: true } });
+  expect(mediaBudget(child.id, start)).toEqual({ limit_min: 1, used_min: 1, left_min: 0, exhausted: true });
+});
+
+test("the client stamp is not trusted: back-dated or future stamps meter by the server clock", async () => {
+  const { child, video } = await setup(); const start = clock();
+  tick(child, video, start, 0, { stamp: new Date(start.getTime() - 3_600_000).toISOString() });
+  tick(child, video, at(start, 10), 10, { stamp: new Date(start.getTime() + 3_600_000).toISOString() });
   expect(mediaBudget(child.id, start).used_min).toBeCloseTo(10 / 60);
 });
 

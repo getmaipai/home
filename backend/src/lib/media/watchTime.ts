@@ -71,28 +71,30 @@ function addSeconds(personId: string, day: string, seconds: number, audio: boole
 /** Called only after the progress device/shape guards, before coalescing can discard a tick.
  * `meterKey` is derived by the server from the authenticated session or device token, never from a request field, so a client
  * cannot start a fresh baseline by rotating anything it sends. The cursor is per (key, media item).
- * A new play, item/device change, pause, seek, replayed or older stamp establishes a baseline, never extra time.
- * Position jumps beyond the actual write interval plus slack are seeks; only elapsed playing time is counted.
+ * Metered from the server clock between two writes of one cursor: min(wall-clock elapsed, forward position advance, interval plus
+ * slack). Client flags (`playing`, `seeking`, events) and the client stamp are never trusted. A jump larger than elapsed plus
+ * slack is a seek and only the wall-clock part counts; no forward movement counts nothing.
  */
 export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "kind">, write: ProgressWrite, now: Date, meterKey = "-"): MediaBudget {
   db.transaction(() => {
     const sessionKey = JSON.stringify([meterKey, item.id]);
     const previous = db.select().from(mediaWatchSessions).where(and(eq(mediaWatchSessions.personId, person.id), eq(mediaWatchSessions.sessionKey, sessionKey))).get();
-    const sampled = Math.min(Date.parse(write.stamp), now.getTime());
-    if (!Number.isFinite(sampled)) return;
+    // Server wall-clock only: neither the client stamp nor the `playing`, `seeking` or `events` flags are trusted.
+    const sampled = now.getTime();
     const last = previous ? Date.parse(previous.sampledAt) : null;
-    // Duplicate/offline replay cannot reset the baseline or add time twice.
     if (last !== null && sampled <= last) return;
     const position = "seconds" in write.position ? write.position.seconds : null;
     const elapsed = last === null ? 0 : (sampled - last) / 1000;
     const cap = Math.min(elapsed, WRITE_INTERVAL_S + WRITE_SLACK_S);
     let seconds = 0;
-    if (previous?.mediaId === item.id && previous.playing && !write.events?.play && !write.events?.skip && !write.seeking) {
+    if (previous) {
       if (position !== null && previous.positionS !== null) {
         const delta = position - previous.positionS;
-        if (delta > 0 && delta <= cap + WRITE_SLACK_S) seconds = Math.min(delta, cap);
+        // Forward movement counts the least of wall-clock time, position advance and the cap. A jump larger than the
+        // wall-clock time plus slack is a seek: only the wall-clock part counts. No forward movement counts nothing.
+        if (delta > 0) seconds = delta > elapsed + WRITE_SLACK_S ? cap : Math.min(delta, cap);
       } else if (position === null && previous.positionS === null) {
-        // Reader playing ticks: no seconds locator, but the same bounded elapsed interval.
+        // Reader ticks have no seconds locator: the bounded wall-clock interval.
         seconds = cap;
       }
     }
@@ -109,7 +111,7 @@ export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "k
       }
     }
     if (!previous) pruneCursors(person.id, now);
-    const values = { mediaId: item.id, deviceId: write.device_id ?? null, positionS: position, sampledAt: new Date(sampled).toISOString(), playing: write.playing !== false };
+    const values = { mediaId: item.id, deviceId: write.device_id ?? null, positionS: position, sampledAt: new Date(sampled).toISOString(), playing: true };
     db.insert(mediaWatchSessions).values({ personId: person.id, sessionKey, ...values }).onConflictDoUpdate({ target: [mediaWatchSessions.personId, mediaWatchSessions.sessionKey], set: values }).run();
   });
   const budget = mediaBudget(person.id, now);

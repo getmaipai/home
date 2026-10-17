@@ -177,12 +177,10 @@ only confirms the change; it reveals no usage. `GET /api/media/budget` returns t
 `watchTime.ts` meters accepted progress writes before coalescing, across all kinds and screens. Migration 0108 (schema version 65)
 adds private `media_watch_days` totals (seconds, audio seconds, today's extension and notification latch) and
 `media_watch_sessions` sample cursors. Both are erased when the person leaves. Session cursors survive a restart; duplicate or
-older samples never count twice. Players send `playing: false` on pause and `seeking: true` on a seek. The cursor key is server-derived: the hashed auth session
+older samples never count twice. Metering ignores the `playing`, `seeking` and event flags and the client stamp: between two writes of one cursor it counts the least of
+server wall-clock elapsed, forward position advance and the 10-second cadence plus 2 seconds of slack. A jump bigger than elapsed plus slack is a seek and only the wall-clock part counts; no forward movement counts nothing. The cursor key is server-derived: the hashed auth session
 cookie plus the media item, never a request field, so rotating anything in the body cannot start a fresh baseline. Cursor rows older
-than two days are dropped and each person keeps at most 200. A new play, changed item or changed session establishes a baseline. A positive seconds delta counts only
-up to the elapsed sample interval, bounded to the 10-second write cadence plus 2 seconds of slack; larger jumps and rewinds count
-nothing. Reader locator ticks use that same bounded elapsed time. Pause/resume writes must identify their playing state so idle
-reading or listening is not counted. Progress uses the existing skew-corrected sample stamp, capped to server time.
+than two days are dropped and each person keeps at most 200. The first write of a cursor is a baseline. Reader locator ticks use the bounded wall-clock time. The saved place still uses the skew-corrected sample stamp.
 
 Days follow the household host's local calendar midnight, as other daily hub limits do. A crossing interval is split at midnight;
 calendar dates handle daylight saving changes. Extensions and the notification latch expire with that day. Usage is derived
