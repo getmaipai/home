@@ -999,7 +999,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // retries even with thinking already off (ENVELOPE-NONE-01): the
   // first attempt produced no usable text at all, so the retry is the
   // one recourse left before this round ships an empty reply.
-  if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded)) {
+  // SEARCH-DOWN-EMPTY-01: a round that follows a missed lookup (the retry round, the phrasing round)
+  // with no visible text gets the same one regeneration even when thinking was already off, so the
+  // person hears the model's own words before any fixed line stands in for them.
+  const afterMissedLookup = isPhrasingRound || input.retry === true;
+  if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded || afterMissedLookup)) {
     attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal);
     if (!attempt.ok) {
       settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));

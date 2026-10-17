@@ -360,3 +360,49 @@ describe("a project call that cannot run is never offered for a yes (live 2026-1
     }
   });
 });
+
+// SEARCH-DOWN-EMPTY-01 (live, 2026-10-17): the only web source was down, the retry round and the
+// phrasing round came back with no visible text, and the person saw an empty reply. A failed
+// lookup never fails the answer (rule 6): a reply is never empty.
+describe("SEARCH-DOWN-EMPTY-01: a missed lookup never ends in an empty reply", () => {
+  test("every round empty after a failed lookup: the reply still says what is missing and what to do", async () => {
+    const { spy } = failWeather();
+    try {
+      await withStub({ calls: script(), reply: () => "" }, async () => {
+        const result = await runTurnNext(people.owner, "chat", "what is the weather in oslo today");
+        expect(result.ok).toBe(true);
+        if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+        expect(result.value.reply.text.trim().length).toBeGreaterThan(0);
+        expect(result.value.reply.text).not.toContain(MARKER);
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  test("the only web source is down and every round is empty: the reply names web search and what to do", async () => {
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:1");
+    await withStub({ calls: (request) => (request.tool_choice === "none" || request.messages.some((m) => m.role === "tool") ? undefined : [{ id: "call-g", name: "websearch", args: JSON.stringify({ expression: "gold price today" }) }]), reply: () => "" }, async () => {
+      const result = await runTurnNext(people.owner, "chat", "search the web for today's gold price");
+      expect(result.ok).toBe(true);
+      if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+      expect(result.value.reply.text).toContain("Web search isn't answering right now");
+      expect(result.value.reply.text).toContain("Try again");
+    });
+  });
+
+  test("the model's own words win: an empty first phrasing attempt is retried before any fixed line", async () => {
+    const { spy } = failWeather();
+    try {
+      let phrasingCalls = 0;
+      await withStub({ calls: script(), reply: (request) => (request.messages.some((m) => m.role === "tool") || request.tool_choice === "none" ? (++phrasingCalls < 2 ? "" : NOTE) : "") }, async () => {
+        const result = await runTurnNext(people.owner, "chat", "what is the weather in oslo today");
+        expect(result.ok).toBe(true);
+        if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+        expect(result.value.reply.text.trim().length).toBeGreaterThan(0);
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});

@@ -90,6 +90,15 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   return "I don't actually have that in this conversation, so I won't guess.";
 }
 
+/** The last-resort line when a lookup was missed and the model wrote no words at all. Says what is
+ * missing and what to do (STYLE.md); never the raw error, never a made-up fact. */
+export function missedLookupLine(outcomes: readonly ToolExecutionOutcome[]): string {
+  const web = outcomes.some((o) => o.packageId === "websearch");
+  return web
+    ? "Web search isn't answering right now, so I can't check that. Try again in a little while, or ask me something I can answer without it."
+    : "I couldn't look that up just now. Try again in a little while, or ask me something else.";
+}
+
 export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) => {
   switch (input.kind) {
     case "policy_refused":
@@ -122,6 +131,10 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // to the model (model.ts filters it out of the phrasing round and tells
       // it the failure kind only); the model's own note is part of its text,
       // so nothing is appended here.
+      // SEARCH-DOWN-EMPTY-01 (rule 6): a lookup ran and the model still wrote nothing visible (its
+      // regeneration came back empty too). The person never gets silence: a short plain line says
+      // what is missing and what to do. It stands in only when no model words exist.
+      if (input.text.trim().length === 0 && state.outcomes.length > 0) return { outcome: { ok: true }, output: { text: missedLookupLine(state.outcomes), sources } };
       return { outcome: { ok: true }, output: { text: input.text, sources } };
     }
     case "from_outcomes": {
