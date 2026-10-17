@@ -788,7 +788,9 @@ describe("every bundled package's description is one sentence a person would say
   // mark or exclamation inside, so a two-sentence description cannot
   // pass as one (a code review on this item).
   const RULE = /^[A-Z][^().?!]{10,118}\.$/;
-  for (const id of listPackageIds()) {
+  // Bundled directories only: listPackageIds() also lists installs recorded in the shared store by other test files in the same process.
+  const bundledIds = readdirSync(PACKAGES_DIR, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name);
+  for (const id of bundledIds) {
     test(`${id}: one imperative sentence, at most 120 characters, no parentheses, no year`, () => {
       const loaded = loadManifestOnly(id);
       expect(loaded.ok).toBe(true);
