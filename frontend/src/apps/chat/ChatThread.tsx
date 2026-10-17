@@ -153,7 +153,7 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
         if (target instanceof Element && target.closest("input, button, a, textarea, select, [contenteditable='true']")) return;
         rootRef.current?.focus();
       }}
-      className="relative flex min-h-0 flex-1 flex-col"
+      className="relative flex min-h-0 flex-1 flex-col outline-none"
     >
       {TOOL_BINDINGS.map((binding) => <ElementBinding key={binding.toolName} binding={binding} />)}
       {DATA_BINDINGS.map((binding) => <DataElementBinding key={binding.name} binding={binding} />)}
