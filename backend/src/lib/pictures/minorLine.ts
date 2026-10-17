@@ -16,9 +16,9 @@ export const MINOR_MARKERS: readonly string[] = [
   "pubescent", "prepubescent", "pre pubescent",
   // gendered young phrases (the bare words girl and boy are NOT markers)
   "little girl", "little girls", "little boy", "little boys", "young girl", "young girls", "young boy", "young boys",
-  "small girl", "small boy", "baby girl", "baby boy",
+  "small girl", "small girls", "small boy", "small boys", "baby girl", "baby girls", "baby boy", "baby boys", "youngster", "youngsters",
   // school
-  "schoolgirl", "schoolgirls", "schoolboy", "schoolboys", "school girl", "school girls", "school boy", "school boys", "schoolkid", "schoolkids",
+  "schoolgirl", "schoolgirls", "schoolboy", "schoolboys", "school girl", "school girls", "school boy", "school boys", "schoolkid", "schoolkids", "schoolchild", "schoolchildren", "preschooler", "preschoolers", "under 18", "under eighteen", "below 18", "younger than 18",
   "school uniform", "high school", "middle school", "elementary", "kindergarten", "grade school", "preschool",
   // looks young
   "childlike", "child like", "childish", "babyface", "baby face", "young looking", "youthful looking", "flat chest", "flat chested",
@@ -31,6 +31,7 @@ export const SEXUAL_WORDS: readonly string[] = [
   "nude", "naked", "nudity", "topless", "bottomless", "undress", "undressed", "undressing", "lingerie", "underwear", "panties", "bra", "thong", "cleavage", "breasts", "boobs", "nipples",
   "genital", "genitals", "vagina", "penis", "cock", "pussy", "buttocks", "crotch", "groin",
   "sex", "sexy", "sexual", "sexualized", "sexualised", "erotic", "erotica", "porn", "porno", "pornographic", "nsfw", "explicit", "lewd", "hentai", "ecchi", "fetish", "seductive", "provocative", "suggestive",
+  "nipple", "breast", "bare breast", "bare breasts", "nudes", "nakedness", "butt", "tits", "sensual", "horny", "anal", "orgy", "cum", "cumming", "dick",
   "orgasm", "masturbat", "fellatio", "blowjob", "cumshot", "intercourse", "molest", "rape", "bondage", "kinky", "xxx", "r18", "uncensored", "spread legs", "legs spread",
 ];
 
@@ -48,6 +49,7 @@ export const MINOR_AGE = new RegExp(
     `\\b${AGE_NUMBER}\\s?(?:yo|y o|yr|yrs)\\b`,
     `\\b${AGE_NUMBER}\\s?(?:year|years|yr|yrs)\\s(?:old|olds|of age)\\b`,
     `\\bage[sd]?\\s${AGE_NUMBER}\\b`,
+    `\\bage[sd]?\\s(?:${AGE_WORDS})\\b`,
     `\\b(?:${AGE_WORDS})\\s(?:year|years|yr|yrs)\\s(?:old|of age)\\b`,
     `\\b(?:${AGE_WORDS})\\s?(?:yo|y o)\\b`,
   ].join("|"),
@@ -64,15 +66,28 @@ export function hasWord(haystack: string, term: string): boolean {
   return term.length >= 6 && haystack.includes(` ${term}`);
 }
 
+/** Phrases that carry a sexual word without being sexual ("sex reveal party"); removed before the check. */
+const NEUTRAL_PHRASES = [" sex reveal ", " gender reveal "];
+function cleaned(text: string): string {
+  let n = normalise(text);
+  for (const phrase of NEUTRAL_PHRASES) n = n.split(phrase).join(" ");
+  return n;
+}
+
+/** Markers are whole words only ("infant" must not match "infantry"); the prefix reading in hasWord is for sexual stems. */
+function hasMarker(haystack: string, term: string): boolean {
+  return haystack.includes(` ${term} `);
+}
+
 export function mentionsSexualWord(text: string): boolean {
-  const n = normalise(text);
+  const n = cleaned(text);
   return SEXUAL_WORDS.some((term) => hasWord(n, term));
 }
 
 /** True when the text puts a minor marker (or an age under 18) beside a sexual or nudity word, however far apart. */
 export function minorSexualMatch(text: string): boolean {
-  const n = normalise(text);
+  const n = cleaned(text);
   const sexual = SEXUAL_WORDS.some((term) => hasWord(n, term)) || UNCLOTHED_PHRASES.some((term) => hasWord(n, term));
   if (!sexual) return false;
-  return MINOR_MARKERS.some((term) => hasWord(n, term)) || MINOR_AGE.test(n);
+  return MINOR_MARKERS.some((term) => hasMarker(n, term)) || MINOR_AGE.test(n);
 }

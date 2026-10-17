@@ -633,7 +633,7 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
   // Home's own fixed refusal of a picture or video request that crosses the minor line names children and sexual
   // situations on purpose (the person must be told why). Exactly these lines pass the whole-reply floor; any other
   // text, including a model quoting them, is checked as usual.
-  if (FIXED_MINOR_REFUSAL_LINES.has(input.reply.text)) {
+  if (band !== "child" && FIXED_MINOR_REFUSAL_LINES.has(input.reply.text) && (input.reply.speech === undefined || input.reply.speech === input.reply.text)) {
     return { outcome: { ok: true }, output: { refused: false, text: input.reply.text, speech: input.reply.speech, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningEmit ? "gate" : input.reasoningWithheldFor } } };
   }
   const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
