@@ -16,7 +16,7 @@ const INFOBOX_VALUE_MAX = 200;
 const DISAMBIGUATION_OPTIONS_MAX = 8;
 const FULL_ARTICLE_DROP = "references, .references, .reflist, .navbox, .mw-editsection, script, style, iframe, form, noscript, svg, .catlinks, .metadata, .sistersitebox, .portal, .mw-jump-link, .mw-references-wrap";
 
-export type ArticleInline = { type: "text" | "emphasis" | "strong"; text: string } | { type: "link"; text: string; target?: { book: string; path: string } };
+export type ArticleInline = { type: "text" | "emphasis" | "strong"; text: string } | { type: "link"; text: string; target?: { book: string; path: string }; href?: string };
 export type ArticleBlock =
   | { type: "heading"; level: 2 | 3 | 4; id: string; text: string }
   | { type: "paragraph"; inlines: ArticleInline[] }
@@ -24,23 +24,48 @@ export type ArticleBlock =
   | { type: "rows"; rows: Array<{ label: string; value: string }> }
   | { type: "table"; headers: string[]; rows: string[][] }
   | { type: "figure"; src: string; alt: string; caption: string }
-  | { type: "note"; text: string };
+  | { type: "note"; text: string }
+  | { type: "quote"; inlines: ArticleInline[]; cite?: string };
 export interface FullArticle { title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; redirectTo?: string }
 
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
 
 /** Extract a closed, renderable block model. This walk deliberately ignores unknown markup. */
-export function extractFullArticle(html: string, opts: { book: string; allowedBooks: ReadonlySet<string>; allowLinks: boolean; allowImages: boolean }): FullArticle {
+export interface FullArticleOptions {
+  book: string; allowedBooks: ReadonlySet<string>; allowLinks: boolean; allowImages: boolean;
+  /** `reference` (default) is the encyclopedia reader. `news` (NEWS-02b) keeps a publisher article's outbound links as plain `href`s
+   * when `allowLinks` is true, drops them to text when false, finds the article body without the wiki wrappers, and reads `<blockquote>`
+   * as a `quote` block. */
+  mode?: "reference" | "news";
+  /** News mode only: resolves relative links; without it a relative link is plain text. */
+  baseUrl?: string;
+}
+
+/** An outbound link the news reader may keep: absolute http(s) only, no credentials, no script or data schemes. */
+export function safeOutboundHref(raw: string, baseUrl?: string): string | null {
+  try {
+    const url = baseUrl ? new URL(raw, baseUrl) : new URL(raw);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (url.username || url.password) return null;
+    return url.toString();
+  } catch { return null; }
+}
+
+const NEWS_DROP = "nav, aside, footer, button, [role=navigation], [role=complementary], [aria-hidden=true]";
+
+export function extractFullArticle(html: string, opts: FullArticleOptions): FullArticle {
+  const news = opts.mode === "news";
   const { document } = parseHTML(html);
   const detectedBeforeClean = document.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*=\"disambig\"]") !== null || /\bmay (?:also )?refer to\b/i.test(document.body?.textContent ?? "");
   const redirectTo = document.querySelector(".redirectMsg a, .redirectText a, #redirectedfrom a")?.getAttribute("href") ?? null;
   document.querySelectorAll(FULL_ARTICLE_DROP).forEach((n: Node) => n.remove());
+  if (news) document.querySelectorAll(NEWS_DROP).forEach((n: Node) => n.remove());
   document.querySelectorAll(".redirectMsg, .redirectText, #redirectedfrom").forEach((n: Node) => n.remove());
   document.querySelectorAll("[style*='display:none'],[style*='display: none'],[hidden]").forEach((n: Node) => n.remove());
   const title = cleanText((document.querySelector("h1") ?? document.querySelector("title"))?.textContent ?? "");
   const blocks: ArticleBlock[] = [];
   const toc: FullArticle["toc"] = [];
-  const content = document.querySelector(".mw-parser-output") ?? document.querySelector("main") ?? document.body ?? document.documentElement;
+  const content = (news ? document.querySelector("article") : null) ?? document.querySelector(".mw-parser-output") ?? document.querySelector("main") ?? document.body ?? document.documentElement;
   const titleNode = content.querySelector("h1");
   if (titleNode) titleNode.remove();
   const inline = (root: Element): ArticleInline[] => {
@@ -53,6 +78,11 @@ export function extractFullArticle(html: string, opts: { book: string; allowedBo
       if (tag === "a") {
         const text = cleanText(el.textContent ?? ""); const href = el.getAttribute("href") ?? "";
         const match = /^\/(?:content\/)?([^/?#]+)\/([^?#]+)$/.exec(href) ?? /^\.\/([^/?#]+)$/.exec(href);
+        if (news) {
+          const outbound = opts.allowLinks ? safeOutboundHref(href, opts.baseUrl) : null;
+          if (text) out.push(outbound ? { type: "link", text, href: outbound } : { type: "text", text });
+          return;
+        }
         let target: { book: string; path: string } | undefined;
         if (opts.allowLinks && match) {
           const book = match.length === 3 ? decodeURIComponent(match[1]!) : opts.book;
@@ -75,7 +105,7 @@ export function extractFullArticle(html: string, opts: { book: string; allowedBo
     const options = (Array.from(root.querySelectorAll("li")) as Element[]).slice(0, 8).map((li) => cleanText(li.textContent ?? "")).filter(Boolean);
     if (options.length) blocks.push({ type: "list", ordered: false, items: options.map((text) => [{ type: "text", text }]) });
   }
-  const elements = Array.from(root.querySelectorAll("h2,h3,h4,p,ul,ol,table.infobox,table.infobox_v2,table.infobox_v3,table:not(.infobox):not(.infobox_v2):not(.infobox_v3),figure")) as Element[];
+  const elements = Array.from(root.querySelectorAll(`h2,h3,h4,p,ul,ol${news ? ",blockquote" : ""},table.infobox,table.infobox_v2,table.infobox_v3,table:not(.infobox):not(.infobox_v2):not(.infobox_v3),figure`)) as Element[];
   const dropped = new Set(["references", "see also", "external links", "notes", "further reading", "citations", "bibliography", "footnotes", "sources"]);
   let skip = false;
   for (const el of elements) {
@@ -88,7 +118,13 @@ export function extractFullArticle(html: string, opts: { book: string; allowedBo
       blocks.push({ type: "heading", level, id, text }); toc.push({ id, title: text, level }); continue;
     }
     if (skip || el.closest("table") && !/^table/.test(tag)) continue;
-    if (tag === "p") { const inlines = inline(el); if (inlines.length) blocks.push({ type: "paragraph", inlines }); }
+    if (news && tag !== "blockquote" && el.closest("blockquote")) continue;
+    if (tag === "blockquote") {
+      const citeEl = el.querySelector("cite, footer"); const cite = citeEl ? plain(citeEl) : ""; citeEl?.remove();
+      const paras = Array.from(el.querySelectorAll("p")) as Element[];
+      const inlines = paras.length > 1 ? paras.flatMap((p, i) => [...(i ? [{ type: "text" as const, text: " " }] : []), ...inline(p)]) : inline(el);
+      if (inlines.length) blocks.push({ type: "quote", inlines, ...(cite ? { cite } : {}) });
+    } else if (tag === "p") { const inlines = inline(el); if (inlines.length) blocks.push({ type: "paragraph", inlines }); }
     else if (tag === "ul" || tag === "ol") { if (el.parentElement?.closest("ul,ol")) continue; const items = Array.from(el.querySelectorAll(":scope > li")).map((li) => inline(li)).filter((x) => x.length); if (items.length) blocks.push({ type: "list", ordered: tag === "ol", items }); }
     else if (tag === "table") {
       const trs = Array.from(el.querySelectorAll("tr")) as Element[];

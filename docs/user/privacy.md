@@ -24,6 +24,8 @@ When a robot is paired, MaiPai downloads its pinned robot models directly from t
 
 When a written answer includes pictures, Home gets a few picture files from the sites that host them. The picture requests do not send your name or what you asked. Home does not send cookies or the page you came from. Wikipedia and Wikidata get the name of the person or thing when Home checks their picture sources. The sites receive your home's internet address. Nothing else anyone in the house said or saved is sent.
 
+The News app gets a story's picture from the site that hosts it, once, the first time someone's screen shows that story and only while the News pictures setting is on. Home never gets pictures in the background. The site sees a plain request for that one picture file and your home's internet address. It does not see your name or what you read. When someone opens a story, Home also asks the publisher for that one page, and, if you turn on full-text prefetch, for the pages of stories you follow, a few at a time. A teen or an adult whose story page is gone is shown the Internet Archive's saved copy, and the Internet Archive sees the address of the missing page. Follows, saves, reads and My Mix never leave this computer.
+
 An adult can also generate an API token for another app or device. This page shows that too, under its own heading. It is the one thing that goes the other way: an app or device you gave the token to can send text or audio to your hub over your home network and receive a reply. Revoking the token ends that access.
 
 ## Pictures and videos of a person
