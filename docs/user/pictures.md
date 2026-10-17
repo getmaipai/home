@@ -40,6 +40,10 @@ The original is never changed. The new picture is the next version of it: press 
 - **Make a variation.** Open the **More** menu under the reply and choose **Make a variation**. You get another picture from the same words.
 - **Try again.** If a picture did not work, the card says why and has a **Try again** button.
 
+## Fewer questions and warnings about people
+
+By default Home makes what you ask for without extra questions or warnings about the people in it. If you want them back, an admin can turn on **Ask me before making pictures and videos of people** in Settings, Pictures and videos. The safety rules never turn off: children, nothing sexual involving a minor, and a real person who has not agreed. When Home needs to know who is in a photo, it asks once and remembers your answer for that photo.
+
 ## Who can make pictures
 
 Adults can, on their own screen, in a written chat. Children and teens cannot. Spoken answers, the TV and other shared screens never make pictures. A guest cannot.

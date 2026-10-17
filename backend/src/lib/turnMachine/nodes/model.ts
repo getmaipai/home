@@ -13,7 +13,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun } from "@/lib/text";
 import { asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION } from "@/lib/mediaClaims";
-import { PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
+import { peopleGuidanceSuffix, PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
@@ -158,7 +158,9 @@ export function toolSpecFor(id: string): ToolSpec | null {
   if (!loaded.ok) return null;
   // CAP-GATE-01: a tool whose package needs a capability that is off is not offered.
   if (missingRequired(loaded.value).length > 0) return null;
-  return { id, description: loaded.value.description, args: loaded.value.args };
+  // PEOPLE-PROMPTS-01: while the household has the extra questions about people off, the picture and video tools say so to the model.
+  const media = id === "generate_image" || id === "generate_video";
+  return { id, description: media ? `${loaded.value.description}${peopleGuidanceSuffix()}` : loaded.value.description, args: loaded.value.args };
 }
 
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-

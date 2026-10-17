@@ -46,7 +46,20 @@ export function messageAttests(utterance: unknown, requester: PersonRow, declare
 export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you) and make sure they have agreed. I only use a photo of someone who lives here and said yes.";
 
 /** The adult a tool call may treat as the person in a photo: the model's proposal (`photo_subject`) resolved against the household, kept only when the person's own message names or claims that adult. The one rule for every tool that takes a photo and a subject (pictures and videos). */
-export function attestedAdult(proposal: unknown, utterance: unknown, requester: PersonRow): { proposed: PersonRow | null; attested: PersonRow | null } {
+export function attestedAdult(proposal: unknown, utterance: unknown, requester: PersonRow, remember?: { photoKeys: readonly string[]; on: boolean }): { proposed: PersonRow | null; attested: PersonRow | null } {
   const proposed = resolveDeclaredAdult(proposal, requester);
-  return { proposed, attested: proposed && messageAttests(utterance, requester, proposed) ? proposed : null };
+  if (!proposed) return { proposed, attested: null };
+  const keys = (remember?.photoKeys ?? []).map((key) => `${requester.id}:${key}`);
+  if (messageAttests(utterance, requester, proposed)) {
+    // Ask at most once: what the person said about this photo is remembered (while the household has the extra questions off).
+    if (remember?.on) for (const key of keys) attestations.set(key, proposed.id);
+    return { proposed, attested: proposed };
+  }
+  // A photo the person already said who is in is not asked about again. The model never writes to this memory: only the person's own message does.
+  if (remember?.on && keys.some((key) => attestations.get(key) === proposed.id)) return { proposed, attested: proposed };
+  return { proposed, attested: null };
 }
+
+/** Who a person said is in a photo, by person and photo (its hash and its chain's first picture). Process memory only: a restart asks again once. */
+const attestations = new Map<string, string>();
+export function __resetAttestationsForTests(): void { attestations.clear(); }

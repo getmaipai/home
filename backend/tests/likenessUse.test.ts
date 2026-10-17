@@ -22,6 +22,7 @@ import { runGenerateImage } from "@/lib/pictures/tool";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { getVideoJobFor } from "@/lib/videos/jobs";
+import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
 import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { __setStackTrustForTests, mintProof, proofPublicKey, photoBind } from "@/lib/likeness/proof";
 import { checkStyleSubject } from "@/lib/likeness/importStyle";
@@ -49,6 +50,7 @@ const switchOff = (person: PersonRow, key = "likeness.adults") => expect(setValu
 
 beforeEach(() => {
   resetDb();
+  __resetAttestationsForTests();
   bench = createBenchPeople();
   marlow = addPerson("Marlow", "adult");
   nadia = addPerson("Nadia", "adult");

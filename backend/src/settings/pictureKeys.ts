@@ -57,4 +57,19 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.pictures",
     honoured_by: ["home"],
   }),
+  // PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the extra questions and warnings about people in pictures and videos
+  // are one household switch, off by default. It never reaches a safety rule: nothing sexual involving a minor, a real person's
+  // likeness without their recorded consent, the finished-picture check and the fail-closed freeze have no key at all.
+  SettingsKey.parse({
+    key: "generation.people_prompts",
+    scope: "household",
+    selector: "boolean",
+    default: false,
+    label: "Ask me before making pictures and videos of people",
+    help: "When off, Home makes what you ask for without extra questions or warnings. Safety rules for children and for real people never turn off.",
+    level: "basic",
+    copy: { does: "Turns the extra questions and warnings about people in pictures and videos on or off." },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
 ];

@@ -17,6 +17,8 @@ import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
+import { createHash } from "node:crypto";
+import { peopleGuidanceSuffix, peoplePromptsOn } from "@/lib/pictures/policy";
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
@@ -123,7 +125,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     const photo = loadUploadedPhoto(actor, state.conversationId, attached[0]!.id, temporary);
     if (!photo.ok) return refuseWith("reference", photo.line);
     // The model's `photo_subject` is a proposal: only the person's own message (a name, or a claim that it is them) attests who is in the photo.
-    const { proposed, attested: declared } = attestedAdult(args.photo_subject, state.utterance, actor);
+    const { proposed, attested: declared } = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [createHash("sha256").update(photo.bytes).digest("hex"), photo.id], on: !peoplePromptsOn() });
     if (!declared) return refuseWith("likeness", proposed ? WHO_IS_IN_PHOTO_LINE : PHOTO_SUBJECT_LINE);
     // The photo must show exactly the one declared adult, nobody who could be a child: counted by the household's own model, fail closed.
     const verdict = await singleAdultPhoto(photo.bytes);
@@ -190,7 +192,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `A ${seconds} second video is being made from this description: ${prompt}. It takes about two minutes and appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}` },
+        reply: { text: `A ${seconds} second video is being made from this description: ${prompt}. It takes about two minutes and appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${peopleGuidanceSuffix()}` },
         data: { videoJobId: job.id },
         actions: [],
       },

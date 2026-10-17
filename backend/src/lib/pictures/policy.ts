@@ -24,6 +24,19 @@ import { mentionsSexualWord, minorSexualMatch, normalise } from "@/lib/pictures/
 
 export const GENERATION_ADULTS_KEY = "generation.adults";
 export const GENERATION_ADULT_ADAPTERS_KEY = "generation.adult_adapters";
+/** PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the extra questions and warnings about people. Default off. */
+export const PEOPLE_PROMPTS_KEY = "generation.people_prompts";
+
+/** Whether the household wants the extra questions and warnings about people in pictures and videos. A read failure reads as off. Nothing here reaches a safety rule: those have no key. */
+export function peoplePromptsOn(): boolean {
+  try { return getHouseholdSettingValue(PEOPLE_PROMPTS_KEY) === true; } catch { return false; }
+}
+
+/** The guidance sentence, with its leading space, while the extra questions are off; empty while they are on. */
+export function peopleGuidanceSuffix(): string { return peoplePromptsOn() ? "" : ` ${NO_PEOPLE_PROMPTS_GUIDANCE}`; }
+
+/** Added to what the model reads about the picture and video tools while the extra questions are off. */
+export const NO_PEOPLE_PROMPTS_GUIDANCE = "Do not add warnings, caveats, lectures or questions about the people in a request; make what was asked. Only this tool's own refusals apply.";
 export const GENERATION_PICTURE_QUALITY_KEY = "generation.picture_quality";
 
 export type PictureDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off" | "temporary_unsupported";

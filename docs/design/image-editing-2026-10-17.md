@@ -101,3 +101,13 @@ The result renders in the kit gallery with Edit, as shipped (rule 9).
 - A model the Stack cannot take a second picture on (an older Stack) is refused with a plain line (`edit.references` is 0 or absent).
 - The Vision person finder needs macOS 14 and the Swift tools; elsewhere the answer is "paint over the person with Erase".
 - Klein can redraw small unrelated parts of a picture on a whole-picture edit (tree shapes after "clear the sky"); a box or brush limits it to that area bit for bit.
+
+## 7. Fewer questions about people (PEOPLE-PROMPTS-01, owner ruling 2026-10-17: "it's annoying")
+
+One household setting, `generation.people_prompts`, default off, on Settings, Pictures and videos: "Ask me before making pictures and videos of people". Inventory of what the picture, video, edit and likeness flows say about people:
+
+- **A, hard lines that never become optional (17):** the guest, child, spoken-turn, shared-screen and household-off gates; nothing sexual involving a minor; a real person's likeness without their agreement (the model's flag and the missing proof); an uploaded photo is never undressed or sexualised; the subject has not agreed; adult content not agreed; a photo that may show a child; the subject must be an adult who lives here; a removed style; the signed proof; the fail-closed freeze; the finished-picture age check. No key reaches them (tested with the setting flipped both ways).
+- **B, consent attestation (5):** "Who is in this photo?" for a picture and for a video, the one-adult photo count, the editor's picker, the style tick. Kept, made frictionless while the setting is off: a subject is attested only by the person's own message (the model never attests), and it is asked at most once for a person and a photo, then remembered (`attestedAdult`, process memory). While the setting is on there is no memory.
+- **C, soft friction (3, removed while off):** the model's hedging and lecturing about people (its tool description says to make what was asked), the same sentence in each tool answer, and the repeated "who is in this photo" question. No code-level soft refusal for an ordinary adult request was found: every refusal there is an A line.
+
+Teens and children are out of this setting: the extra questions are always off for them (see the teen and kid lanes when they land).

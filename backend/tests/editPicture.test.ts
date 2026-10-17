@@ -15,6 +15,7 @@ import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attach
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { listVersions } from "@/lib/imageEdit";
+import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
 import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { __setStackTrustForTests } from "@/lib/likeness/proof";
 import { likenessUseLog } from "@/lib/likeness/uses";
@@ -41,6 +42,7 @@ const switchOn = (person: PersonRow, key = "likeness.adults") => expect(setValue
 
 beforeEach(() => {
   resetDb();
+  __resetAttestationsForTests();
   bench = createBenchPeople();
   marlow = addPerson("Marlow", "adult");
   nadia = addPerson("Nadia", "adult");

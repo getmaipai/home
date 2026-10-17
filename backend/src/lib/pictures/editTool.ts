@@ -26,7 +26,7 @@ import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
 import sharp from "sharp";
 import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, inverseMask, maskCoverage, peopleMask, peopleMaskWithCount, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
-import { asksToUndress, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
+import { asksToUndress, peopleGuidanceSuffix, peoplePromptsOn, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit, type StackPic } from "./stack";
@@ -173,7 +173,8 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
 
   // The person named is the one in the reference when there is one (the person to add), else the one in the picture being changed.
   // The model's `photo_subject` is a proposal, never the attestation: it counts only when the person's own message names or claims that adult.
-  const declared = attestedAdult(args.photo_subject, state.utterance, actor).attested;
+  const photoWithPerson = ref ?? base;
+  const declared = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [photoWithPerson.sha256, photoWithPerson.rootId], on: !peoplePromptsOn() }).attested;
   const named = typeof args.photo_subject === "string" && args.photo_subject.trim() !== "";
 
   const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
@@ -319,7 +320,7 @@ function started(callId: string, args: Record<string, unknown>, jobId: string, w
   return outcomeOf({
     callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: `${what} The changed picture appears below your reply when it is ready, and the original stays as it was (Edit on the picture shows both, with Undo). You have not seen the result: do not describe how it looks. Tell the person in one short sentence that it is on its way.` },
+      reply: { text: `${what} The changed picture appears below your reply when it is ready, and the original stays as it was (Edit on the picture shows both, with Undo). You have not seen the result: do not describe how it looks. Tell the person in one short sentence that it is on its way.${peopleGuidanceSuffix()}` },
       data: { pictureJobId: jobId },
       actions: [],
     },

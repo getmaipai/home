@@ -9,7 +9,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
 import { startPictureJob, plainFailure } from "./jobs";
-import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
+import { adapterAudiencesFor, adultAdaptersAllowed, peopleGuidanceSuffix, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
 import { StackPicturesError } from "./stack";
@@ -139,7 +139,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}${qualityNote}` },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}${qualityNote}${peopleGuidanceSuffix()}` },
         data: { pictureJobId: job.id },
         actions: [],
       },

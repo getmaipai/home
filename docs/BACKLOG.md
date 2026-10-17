@@ -375,6 +375,7 @@ From [image-tools-2026-10-17.md](design/image-tools-2026-10-17.md): Apple Vision
 - [ ] **IMGEDIT-04: brush and reference controls in the kit editor Comment** (M, `commons` ui first, then a pin). The API is ready (IMGEDIT-02).
 - [x] **IMGEDIT-05: sky, colour, background and object edits of photos that show several people** (S). Owner ruled yes 2026-10-17 (through the coordinator): the people are frozen, restored from the original after the edit and proved unchanged by a pixel check. Built in `people.ts` `freezePeople` and the `affects_people` argument; tested with an outline test and a full chat call.
 - [x] **IMGEDIT-06: Klein masked fill for removed people** (S). Built: on a picture made here the chosen person's outline (Stack `people_mask`) is filled by the picture model, 2.6 s and cleaner than LaMa; uploads and failures use LaMa.
+- [x] **PEOPLE-PROMPTS-01: one household setting for the extra questions and warnings about people** (S, `generation.people_prompts`, default off; `policy.ts`, `likeness/resolve.ts`, `model.ts` toolSpecFor). Built 2026-10-17: hard lines untouched and tested both ways; ask at most once per person and photo, never the model attesting; the model told not to hedge while off. Inventory in [the design note](design/image-editing-2026-10-17.md) section 7.
 
 ## Music generation (owner, 2026-10-17)
 
