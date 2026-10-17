@@ -44,7 +44,8 @@ export function viewerOf(person: PersonRow, now = new Date()): Viewer {
 /** The blocks a viewer may be shown: the manifest allowlist, the block schema, the band and the output floor. */
 function finishBlocks(person: Pick<PersonRow, "displayName">, band: AgeBand, raw: unknown[]): unknown[] {
   const loaded = loadManifestOnly("news");
-  return filterAnswerBlocks(raw, "news", loaded.ok ? loaded.value.returns_blocks ?? [] : [], band, person);
+  // No actor: publisher text is not the person's activity, so the filter never tells a parent about it.
+  return filterAnswerBlocks(raw, "news", loaded.ok ? loaded.value.returns_blocks ?? [] : [], band, null);
 }
 
 const blockBase = (kind: string, alt: string, provenance: string) => ({
@@ -196,7 +197,8 @@ export function channelData(person: PersonRow, body: Record<string, unknown>, no
 
 /** The band a shared screen is shown at, or null when a child lives here (then it shows nothing). */
 export function householdBand(now = new Date()): AgeBand | null {
-  const rows = db.select().from(people).where(isNull(people.deletedAt)).all().filter((row) => row.enabled && row.role !== "guest");
+  // A disabled profile still counts: it is a child (or teen) who lives here and may be turned back on. Only a deleted one does not.
+  const rows = db.select().from(people).where(isNull(people.deletedAt)).all().filter((row) => row.role !== "guest");
   const bands = rows.map((row) => speakerAgeBand(row, now));
   if (bands.includes("child")) return null;
   return bands.includes("teen") ? "teen" : "adult";

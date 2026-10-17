@@ -53,7 +53,7 @@ export function filterAnswerBlocks(
   packageId: string,
   allowedKinds: readonly string[],
   band: AgeBand,
-  actor: Pick<PersonRow, "displayName">,
+  actor: Pick<PersonRow, "displayName"> | null,
   seenIds: ReadonlySet<string> = new Set(),
   onCrisisSignal?: (safety: SafetyResult) => void,
 ): AnswerBlockValue[] {
@@ -91,7 +91,7 @@ export function filterAnswerBlocks(
       }
       if (safety.action === "refuse") refused = true;
     }
-    if (flagged.notify_parent) notifyIfFlagged(actor, { ...flagged, categories: [...new Set(flagged.categories)] }, "[answer-block]");
+    if (actor && flagged.notify_parent) notifyIfFlagged(actor, { ...flagged, categories: [...new Set(flagged.categories)] }, "[answer-block]");
     if (refused) {
       console.warn("[answer-block] dropped block at output floor");
       continue;

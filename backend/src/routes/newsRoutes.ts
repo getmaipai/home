@@ -67,8 +67,10 @@ newsRoutes.post("/actions/:action", requireAuth, async (c) => {
 newsRoutes.get("/images/:item", requireAuth, async (c) => {
   const person = c.get("person");
   if (!appImageAllowed(person, "news")) { bumpNewsCounter("route_refused"); return c.json({ error: "no such picture" }, 404); }
-  const width = Number(c.req.query("w"));
-  if (!(NEWS_PICTURE_WIDTHS as readonly number[]).includes(width)) return c.json({ error: "Ask for a picture 480 or 1280 pixels wide." }, 400);
+  // The raw text, not a number: "0x1E0", "480.0" and " 480" are not 480.
+  const rawWidth = c.req.query("w") ?? "";
+  if (!/^(480|1280)$/.test(rawWidth)) return c.json({ error: "Ask for a picture 480 or 1280 pixels wide." }, 400);
+  const width = Number(rawWidth);
   // The item must be one this person's band is released: a guessed id is a 404, never a fetch.
   const item = releasedItem(viewerOf(person), c.req.param("item"));
   if (!item) return c.json({ error: "no such picture" }, 404);

@@ -32,11 +32,13 @@ function variantOf(band: "child" | "teen" | "adult"): ContentVariant {
 function textOfBlocks(blocks: readonly ArticleBlock[]): string {
   return blocks.map((block) => {
     switch (block.type) {
-      case "paragraph":
-      case "quote": return inlineText(block.inlines);
+      case "paragraph": return inlineText(block.inlines);
+      case "quote": return [inlineText(block.inlines), block.cite ?? ""].filter(Boolean).join(" ");
       case "list": return block.items.map(inlineText).join(" ");
       case "heading":
-      case "note": return block.type === "heading" ? "" : block.text;
+      case "note": return block.text;
+      case "rows": return block.rows.map((row) => `${row.label}: ${row.value}`).join("\n");
+      case "table": return [block.headers.join(" "), ...block.rows.map((row) => row.join(" "))].join("\n");
       default: return "";
     }
   }).filter(Boolean).join("\n");
@@ -122,7 +124,7 @@ export async function articleBlock(item: ShelfItem, env: CardEnv, options: { ret
   if (!title || (band === "child" && !gate.passes(publisher))) return null;
   const loaded = await loadContent(item, band, { retry: options.retry, store: env.store });
   const blocks = band === "child" ? gateBlocks(loaded.blocks, gate) : loaded.blocks;
-  if (blocks.length === 0) return null;
+  if (blocks.length === 0 || gate.sawCrisis()) return null;
   const topic = topicsShown(item, band).map((id) => topicById(id)?.label).find((label): label is string => !!label);
   const image = imageOf(item, title, publisher, env);
   const speech = speechFor(title, blocks);

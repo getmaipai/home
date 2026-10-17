@@ -7,7 +7,7 @@
 // Only a child's text goes through this (a teen's and an adult's strings meet the same floor whole, in filterAnswerBlocks).
 import { splitReadyChunks } from "@maipai/spec/safety/ts/sentenceChunker.js";
 import type { AgeBand } from "@/lib/ageBand";
-import { evaluateSafety, forOutput } from "@/lib/safety";
+import { carriesCrisisSignal, evaluateSafety, forOutput } from "@/lib/safety";
 import type { ArticleBlock, ArticleInline } from "@/lib/retrieval/extractArticle";
 import { bumpNewsCounter } from "./newsCounters";
 
@@ -16,6 +16,8 @@ export interface Gate {
   text(value: string): string;
   /** Whether a short string (a headline, a source line) passes whole. */
   passes(value: string): boolean;
+  /** True once a sentence about self-harm or a crisis was seen. News is not a conversation, so no resources are offered: the caller drops the whole article. */
+  sawCrisis(): boolean;
 }
 
 /** The sentences of a text, in order (the same chunker the spoken gate cuts with); a tail with no terminator is a sentence. */
@@ -27,11 +29,17 @@ export function sentencesOf(value: string): string[] {
 
 /** A gate for this person. A band that is not child gets a pass-through (its strings meet the floor whole at release). */
 export function gateFor(band: AgeBand): Gate {
-  if (band !== "child") return { text: (value) => value, passes: () => true };
+  if (band !== "child") return { text: (value) => value, passes: () => true, sawCrisis: () => false };
   // No parent notification here: the child asked for nothing the publisher wrote, so a dropped sentence is not the child's
   // activity to report (the classifier still logs the category, never the text).
-  const refuses = (sentence: string): boolean => forOutput(evaluateSafety(sentence, band)).action === "refuse";
+  let crisis = false;
+  const refuses = (sentence: string): boolean => {
+    const safety = forOutput(evaluateSafety(sentence, band));
+    if (carriesCrisisSignal(safety)) { crisis = true; return true; }
+    return safety.action === "refuse";
+  };
   return {
+    sawCrisis: () => crisis,
     text(value) {
       const kept: string[] = [];
       for (const sentence of sentencesOf(value)) {
@@ -54,6 +62,11 @@ export function inlineText(inlines: readonly ArticleInline[]): string {
   return inlines.map((inline) => inline.text).join(" ").replace(/\s+([,.;:!?])/g, "$1").replace(/\s+/g, " ").trim();
 }
 
+function slugOf(text: string, fallback: string): string {
+  const slug = text.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return slug || fallback.replace(/[^a-z0-9-]+/gi, "").slice(0, 8) || "section";
+}
+
 const plainInline = (text: string): ArticleInline[] => [{ type: "text", text }];
 
 /** A block with a child's gate applied: kept whole when every sentence passes, rebuilt from the sentences that did when some
@@ -68,12 +81,19 @@ export function gateBlock(block: ArticleBlock, gate: Gate): ArticleBlock | null 
   switch (block.type) {
     case "heading": {
       const text = gate.text(block.text);
-      return text ? { ...block, text } : null;
+      // The id is built from the text that stays: a dropped sentence must not live on in the anchor.
+      return text ? { ...block, text, id: text === block.text ? block.id : slugOf(text, block.id) } : null;
     }
-    case "paragraph":
-    case "quote": {
+    case "paragraph": {
       const inlines = rebuild(block.inlines);
       return inlines ? { ...block, inlines } : null;
+    }
+    case "quote": {
+      const inlines = rebuild(block.inlines);
+      if (!inlines) return null;
+      const cite = block.cite === undefined ? undefined : gate.text(block.cite);
+      const { cite: _old, ...rest } = block;
+      return { ...rest, inlines, ...(cite ? { cite } : {}) };
     }
     case "list": {
       const items = block.items.map(rebuild).filter((item): item is ArticleInline[] => item !== null);
