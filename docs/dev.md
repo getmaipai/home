@@ -347,8 +347,10 @@ SEARCH-DDGS-01 (below). Images, videos, hosted search and page reads are outside
 maintained `ddgs` library runs in a local sidecar (`scripts/ddgs-sidecar/server.py`, pinned in its
 `requirements.txt`, binds 127.0.0.1) that owns the one fixed browser identity: no proxy, no rotation. Home
 reaches it only when `MAIPAI_DDGS_URL` names a loopback address; unset, ddgs stays unbuilt and nothing changes.
-It is adults only: `ModeSource "ddgs"` is closed for a child and teen, a guest is filtered in `packageHost.ts`,
-and `ddgsSearch` refuses a non-adult band itself. Traffic goes through the shared limiter (key `ddgs`, burst 2,
+It is adults only unless an owner or admin sets `search.ddgs_for_minors` (default `off`, SEARCH-DDGS-TEEN-01):
+`ModeSource "ddgs"` is closed for a child and teen unless `minorDdgsAllowed(band)`, and then only beside a picked
+SearXNG, never on a spoken turn; a guest is filtered in `packageHost.ts`, and `ddgsSearch` refuses a minor the
+household did not allow itself (and sends `safesearch=on` for one). Traffic goes through the shared limiter (key `ddgs`, burst 2,
 one token per 10 s). The first 429 from the sidecar opens quiet mode: no request for 1 h, then 3 h, 12 h, 24 h
 on repeat blocks, reset by one normal answer; a refused connection or timeout is "not answering", not a block.
 Rows join the blend before `attachSearchPages`, so the adult always-block list and the page budget apply as for

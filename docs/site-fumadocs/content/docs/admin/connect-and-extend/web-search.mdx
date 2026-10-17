@@ -39,7 +39,7 @@ Home checks SearXNG every hour while it is healthy and every 15 minutes while it
 | **DuckDuckGo** | Adults only | Start the ddgs helper on the same computer, set `MAIPAI_DDGS_URL` to its loopback address, then pick it in **Web search sources**. |
 | **Brave Search** | Adults only | Paste a key in **Brave Search key (optional)**. The words an adult searches go to Brave. The key is stored encrypted. |
 
-Without the helper, Home says "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source." A child's or teen's search never goes to either.
+Without the helper, Home says "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source." A child's or teen's search never goes to Brave. It goes to DuckDuckGo only if an admin sets **DuckDuckGo for teens and children** (Settings, Search, Web search) to **Teens** or **Teens and children**. That setting is off by default: DuckDuckGo's own filter is not guaranteed, and the ddgs text search does not honor the strict safe-search request Home sends, so adult results may reach that age group. DuckDuckGo then runs beside SearXNG, never alone, never on a spoken turn, and never for a guest. The setting appears only while the ddgs helper is set up.
 
 ## 🛡️ Safe search
 

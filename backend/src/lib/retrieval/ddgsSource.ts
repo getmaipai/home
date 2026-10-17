@@ -5,10 +5,13 @@
 // is its single choke point: a person's pace through the shared limiter, and quiet mode on the
 // first block (no request at all for a growing window), so a block is never retried through.
 //
-// Adults only. webSources.ts gates the band (ModeSource "ddgs" is closed for a child and teen) and
-// packageHost.ts keeps a guest off it; this file also refuses a non-adult band as a second lock.
+// Adults by default. webSources.ts gates the band (ModeSource "ddgs" is closed for a child and teen unless an owner or
+// admin turned on `search.ddgs_for_minors` for that band, SEARCH-DDGS-TEEN-01) and packageHost.ts keeps a guest off it;
+// this file refuses a minor the household did not allow, and a minor on a spoken turn, as a second lock. For a minor
+// it sends `safesearch=on` (strict); the ddgs text path may ignore it, which the settings page says plainly.
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { tryConsume } from "@/lib/rateLimiter";
+import { minorDdgsAllowed } from "@/lib/retrieval/sourceMode";
 import type { WebRows, WebRow, WebSearchContext } from "@/lib/retrieval/webSources";
 
 export const DDGS_URL_ENV = "MAIPAI_DDGS_URL";
@@ -75,7 +78,10 @@ function cleanUrl(value: unknown): string | null {
 const UNAVAILABLE = "DuckDuckGo search isn't answering right now. Home will try again later; searches use the other picked source meanwhile.";
 
 export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
-  if (ctx.band !== "adult" || ctx.role === "guest") throw new HostError("permission_denied", "DuckDuckGo search is for adults only.");
+  const minor = ctx.band !== "adult";
+  const spokenArg = (ctx.args as { spoken?: unknown } | undefined)?.spoken;
+  const spoken = spokenArg === true || spokenArg === "true";
+  if (ctx.role === "guest" || (minor && (spoken || !minorDdgsAllowed(ctx.band)))) throw new HostError("permission_denied", "DuckDuckGo search is not allowed for this profile.");
   const base = ddgsBaseUrl();
   if (!base) throw new HostError("search_unavailable", "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source.");
   const query = (ctx.args as { query?: unknown } | undefined)?.query;
@@ -87,6 +93,7 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
   const url = new URL("search", base.href.endsWith("/") ? base.href : `${base.href}/`);
   url.searchParams.set("q", query);
   url.searchParams.set("max", String(ROW_CAP));
+  if (minor) url.searchParams.set("safesearch", "on");
   const isProbe = blockCount > 0;
   if (isProbe) probing = true;
   const controller = new AbortController();

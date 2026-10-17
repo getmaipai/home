@@ -13,7 +13,7 @@
 // picked source fails does the first one's error stand (rule 6).
 import type { AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { effectiveMode, type ModeSource } from "@/lib/retrieval/sourceMode";
+import { effectiveMode, minorDdgsAllowed, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
 import { ddgsConfigured, ddgsSearch } from "@/lib/retrieval/ddgsSource";
 
@@ -106,13 +106,20 @@ function modeSourceOf(id: WebSourceId): ModeSource {
 
 /** The sources that may answer this band's web search: the stored list, minus unbuilt sources,
  * minus any whose mode is closed or offline for the band. A child or teen reaches SearXNG only,
- * and only when the household picked it. */
-export function webSourcesFor(band: AgeBand, temporary = false): WebSourceId[] {
-  return storedSources().filter((id) => {
+ * and only when the household picked it, unless an admin allowed ddgs for that band (`search.ddgs_for_minors`):
+ * then ddgs joins as a second source behind SearXNG, never alone and never on a spoken turn. */
+export function webSourcesFor(band: AgeBand, temporary = false, spoken = false): WebSourceId[] {
+  const stored = storedSources();
+  const picked = stored.filter((id) => {
     if (!isBuilt(id)) return false;
+    // SEARCH-DDGS-TEEN-01: for a child or teen ddgs is only ever a second source beside a picked SearXNG, never the
+    // sole pick, and never on a spoken turn (a voice or robot surface stays as restricted as it is today).
+    if (id === "ddgs" && band !== "adult" && (spoken || !stored.includes("searxng"))) return false;
     const mode = effectiveMode(modeSourceOf(id), band, temporary);
     return mode !== "closed" && mode !== "offline";
   });
+  // A minor's SearXNG answer always leads the blend, whatever order the household stored.
+  return band === "adult" ? picked : [...picked].sort((a, b) => Number(b === "searxng") - Number(a === "searxng"));
 }
 
 /** The write refusals that need this file's knowledge. Everything else about the value (an array of

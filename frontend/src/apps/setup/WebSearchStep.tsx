@@ -115,7 +115,7 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" size="lg" disabled={empty || busy !== null} onClick={() => void runTest()}>{result && !changedAfterTest ? (result.canUse ? "Test again" : "Try again") : "Test"}</Button>
       </div>
-      <p className="text-base text-muted-foreground md:text-lg">To skip SearXNG, leave the address empty and press Continue. That turns on DuckDuckGo search for adults. You can change this in Settings.</p>
+      <p className="text-base text-muted-foreground md:text-lg">To skip SearXNG, leave the address empty and press Continue. That turns on DuckDuckGo search for adults. Until SearXNG is set up, teens and children use the Library only. You can allow DuckDuckGo for them in Settings, Web search.</p>
     </div>
   );
 }

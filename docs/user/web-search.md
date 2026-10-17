@@ -35,13 +35,21 @@ When you search, MaiPai sends your search words to your SearXNG. It does not nee
 
 ## Add DuckDuckGo as a second source (optional)
 
-SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, then **Search**. It only works once its small search service is running, and only adults use it. Children, teens and guests always use SearXNG alone.
+SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, then **Search**. It only works once its small search service is running, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
 
 1. Start the small search service that comes with MaiPai. In the `scripts/ddgs-sidecar` folder, create its environment with `python3 -m venv .venv`, install with `.venv/bin/pip install -r requirements.txt`, then run `.venv/bin/python server.py`.
 2. Tell MaiPai where it is by setting `MAIPAI_DDGS_URL` to `http://127.0.0.1:8793` and restarting MaiPai.
 3. Open **Settings**, then **Search**, and pick DuckDuckGo under **Web search sources**.
 
 What it sends: the words searched and your home's internet address go to DuckDuckGo, from the service on your computer. Nothing else anyone in the house said or saved. It asks at a person's pace. If DuckDuckGo pushes back, MaiPai stops asking for an hour or more and answers from your other source meanwhile.
+
+### Allow DuckDuckGo for teens and children (off by default)
+
+Teens and children use SearXNG alone. An admin can change that. Once DuckDuckGo is running, open **Settings**, then **Search**, then **Web search**, and set **DuckDuckGo for teens and children** to **Teens** or **Teens and children**. Only an admin can change it.
+
+Read this first. DuckDuckGo's own filter is not guaranteed, and the tool MaiPai uses to reach it often ignores the strict setting MaiPai asks for. Adult results may reach this age group. Leave this off unless you accept that.
+
+When it is on, DuckDuckGo is a second source beside SearXNG, never the only one. MaiPai still asks for the strictest SafeSearch, blocks adult sites, checks the pages it reads and checks every answer. Searches spoken to a voice or robot still use SearXNG alone, and so do guests. Until SearXNG is set up, teens and children use the Library only unless you turn this on.
 
 ## Using search when you are away from home
 
@@ -78,7 +86,7 @@ If you turned off **Ask Wikipedia when web search fails or finds nothing** in an
 
 Open **Settings**, then **Search**, then **Web search sources** (an advanced option). SearXNG is picked by default. When you pick more than one source, MaiPai asks them all at once and merges the answers into one list. A page that two sources both find moves to the top, and the same page never appears twice. If one source fails, the others still answer.
 
-You must keep at least one source picked. To turn web search off, set **Web searches** to **Library only** instead. DuckDuckGo is listed but does not answer yet, so keep SearXNG picked until a later update adds it. Children and teens only ever use SearXNG.
+You must keep at least one source picked. To turn web search off, set **Web searches** to **Library only** instead. DuckDuckGo only answers once its small search service is running (see Add DuckDuckGo as a second source). Children and teens use SearXNG alone unless an admin allows DuckDuckGo for them (see Add DuckDuckGo as a second source).
 
 ## Looking up a word online
 

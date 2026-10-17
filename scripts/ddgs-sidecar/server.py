@@ -6,9 +6,12 @@ ONE client for the life of the process and reuses it, and never rotates or picks
 Requests that carry an Origin header (a web page) or a Host other than loopback are refused, so only
 a local program such as Home can use it.
 
-    GET /search?q=<words>&max=<n>  ->  200 {"rows":[{"title","url","snippet"}]}
+    GET /search?q=<words>&max=<n>[&safesearch=on|moderate|off]  ->  200 {"rows":[{"title","url","snippet"}]}
                                        429 {"error":"blocked"}   the engine pushed back; Home goes quiet
                                        502 {"error":"failed"}    anything else
+
+safesearch is passed to the library when given (Home sends "on" for a teen or child). The library's text search may
+ignore it (DuckDuckGo's own filter is not guaranteed); it is asked for anyway.
 
 Binds 127.0.0.1 only. Logs nothing about the words searched.
 Run: python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
@@ -27,9 +30,15 @@ CLIENT = DDGS()  # one client for the process: one identity, no per-request rota
 BLOCK_WORDS = ("ratelimit", "rate limit", "429", "403", "202", "captcha", "blocked", "bot")
 
 
-def search(query: str, limit: int) -> list[dict]:
+SAFESEARCH = ("on", "moderate", "off")
+
+
+def search(query: str, limit: int, safesearch: str | None = None) -> list[dict]:
     try:
-        hits = CLIENT.text(query, max_results=limit)
+        if safesearch:
+            hits = CLIENT.text(query, safesearch=safesearch, max_results=limit)
+        else:
+            hits = CLIENT.text(query, max_results=limit)
     except RatelimitException:
         raise
     except DDGSException as err:
@@ -69,8 +78,11 @@ class Handler(BaseHTTPRequestHandler):
             limit = max(1, min(MAX_ROWS, int((params.get("max") or ["8"])[0])))
         except ValueError:
             limit = 8
+        safesearch = (params.get("safesearch") or [""])[0].strip().lower()
+        if safesearch and safesearch not in SAFESEARCH:
+            return self._send(400, {"error": "safesearch must be on, moderate or off"})
         try:
-            self._send(200, {"rows": search(query, limit)})
+            self._send(200, {"rows": search(query, limit, safesearch or None)})
         except RatelimitException:
             self._send(429, {"error": "blocked"})
         except Exception:

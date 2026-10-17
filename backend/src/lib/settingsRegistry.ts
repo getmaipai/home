@@ -11,6 +11,8 @@ import { join } from "node:path";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
 import { HOSTED_SEARCH_SETTINGS_KEYS } from "@/settings/hostedSearchKeys";
+import { MINOR_DDGS_SETTINGS_KEYS } from "@/settings/minorDdgsKeys";
+import { ddgsConfigured } from "@/lib/retrieval/ddgsSource";
 import { SPEC_DIR } from "./specDir.js";
 import { PACKAGES_DIR } from "./paths";
 import { areWakewordAssetsInstalled } from "@/lib/wakewordAssets";
@@ -58,7 +60,7 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map(withPersonGuardFacts);
 }
 
@@ -102,7 +104,10 @@ export function getRegistry(): SettingsKey[] {
   // inference assets are actually on disk. The catalog package system does
   // not yet own wakeword installation; keep this gate tied to the real
   // downloadable asset state.
-  return areWakewordAssetsInstalled() ? cached : cached.filter((key) => key.key !== WAKEWORD_SETTING_KEY);
+  const visible = areWakewordAssetsInstalled() ? cached : cached.filter((key) => key.key !== WAKEWORD_SETTING_KEY);
+  // SEARCH-DDGS-TEEN-01: the DuckDuckGo-for-minors control exists only while DuckDuckGo search itself is set up on this
+  // computer. Hidden, it reads as off (sourceMode.ts fails closed on an unreadable value).
+  return ddgsConfigured() ? visible : visible.filter((key) => key.key !== "search.ddgs_for_minors");
 }
 
 export function getRegistryKey(key: string): SettingsKey | undefined {

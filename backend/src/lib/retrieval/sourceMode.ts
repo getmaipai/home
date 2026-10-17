@@ -30,7 +30,8 @@ import { bumpReferenceCounter } from "@/lib/retrieval/referenceCounters";
 export const SOURCE_MODES = ["live", "offline", "mix"] as const;
 export type SourceMode = (typeof SOURCE_MODES)[number];
 /** SEARCH-SOURCES-01: `ddgs` is a web backend the household may pick (webSources.ts). It is closed for a
- * child or teen like every non-`web` source, and follows the web override for an adult. */
+ * child or teen like every non-`web` source unless an admin allowed it for that band (`minorDdgsAllowed`), and
+ * follows the web override for an adult. */
 export type ModeSource = "wikimedia" | "web" | "hosted" | "ddgs";
 /** `closed`: the source is never reachable for this band, whatever the setting. */
 export type EffectiveMode = SourceMode | "closed";
@@ -77,6 +78,21 @@ function overrideMode(source: "wikimedia" | "web"): SourceMode | null {
   }
 }
 
+/** SEARCH-DDGS-TEEN-01 (owner's request, 2026-10-17): DuckDuckGo (ddgs) is closed for a child and teen unless an owner or
+ * admin switched it on for that band. `off` (default) | `teens` | `teens_and_children`. Children are never on without
+ * `teens_and_children`. A value that cannot be read, or an unknown one, is off (fail closed). This is only the band's
+ * permission; webSources.ts still needs ddgs built, picked and beside SearXNG, and the band's web switch still decides first. */
+export const MINOR_DDGS_KEY = "search.ddgs_for_minors";
+export function minorDdgsAllowed(band: AgeBand): boolean {
+  if (band === "adult") return false;
+  try {
+    const value = getHouseholdSettingValue(MINOR_DDGS_KEY);
+    return band === "teen" ? value === "teens" || value === "teens_and_children" : value === "teens_and_children";
+  } catch {
+    return false;
+  }
+}
+
 export const BAND_WEB_KEYS = { child: "search.web.child_mode", teen: "search.web.teen_mode" } as const;
 
 /** MINOR-SEARCH-01c: why a minor's web side is off, if it is. A child's temporary chat has no
@@ -111,7 +127,7 @@ function listsLoading(band: AgeBand, source: ModeSource): boolean {
 
 /** The mode in force for one source and one age band. `temporary` is true in a temporary chat. */
 export function effectiveMode(source: ModeSource, band: AgeBand, temporary = false): EffectiveMode {
-  if (source !== "web" && band !== "adult") return "closed";
+  if (source !== "web" && band !== "adult" && !(source === "ddgs" && minorDdgsAllowed(band))) return "closed";
   if (source === "wikimedia") return overrideMode("wikimedia") ?? householdMode();
   if (bandWebOffCause(band, temporary)) return "offline";
   if (listsLoading(band, source)) return "offline";

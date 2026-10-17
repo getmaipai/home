@@ -128,3 +128,38 @@ Options, if Jesse wants teens later (all need his approval and an architect verd
    toggle per household (off by default), and a 15-query leak bench with zero unsafe hits. Risk: medium, unofficial scraper.
 3. Never for minors, written as a rule in RULES.md (Jesse only).
 Tracked as SEARCH-DDGS-TEEN-01 (open, no build).
+
+## Built: owner-controlled opt-in (SEARCH-DDGS-TEEN-01, 2026-10-17)
+
+Jesse asked in chat: "add a way Home settings can enable it for teens and kids and leave that off by default, and in the
+setup wizard mention how they can enable it for them in Home settings." Built as an informed owner choice, not as a safe
+feature: the findings above still hold and the setting says so.
+
+- **One setting, not two:** `search.ddgs_for_minors`, household select `off` (default) | `teens` | `teens_and_children`.
+  One definition, and the ladder cannot express the odd state "children yes, teens no". Owner and admin write only (the
+  generic household write rule in `settings.ts`); a teen or child is refused. It is declared in
+  `backend/src/settings/minorDdgsKeys.ts` and merged like `search.brave_api_key` until a commons spec tag carries it. It
+  is hidden while the ddgs helper is not set up, so it reads as off. Its help text: "DuckDuckGo's own filter is not
+  guaranteed. Adult results may reach this age group. Leave this off unless you accept that."
+- **Enforcement** (`sourceMode.ts` `minorDdgsAllowed`, `webSources.ts` `webSourcesFor`, `ddgsSource.ts`): ddgs opens for a
+  band only through `effectiveMode`, so the band's web switch, the child temporary-chat rule and the blocklist-loading
+  hold all still apply. For a minor ddgs also needs SearXNG picked in `search.web_sources` (never the sole pick), SearXNG
+  leads the blend whatever the stored order, and a spoken turn (voice, robot) keeps SearXNG alone. A guest is still
+  refused. `ddgsSearch` repeats those locks. It sends `safesearch=on` for a minor; the sidecar passes it to the library,
+  which may ignore it. Result handling is the minor path already used for blends: `floorSearchResult`, the adult-site
+  host list, page cleaning, the output gate. Hosted search stays adult only.
+- **Wizard:** the Web search screen (shown only when SearXNG is not ready) says: "Until SearXNG is set up, teens and
+  children use the Library only. You can allow DuckDuckGo for them in Settings, Web search." When SearXNG is ready the
+  screen is skipped, so no line shows there.
+
+### Self-review against RULES.md (no `architect` agent exists in this repo or the shared plugin)
+
+- Rule 0: the sources a kid or teen gets are an owner-ruled user default that an admin may change; this adds a household
+  switch only an admin sets, default off, and adds no path for the person. The adult-site list and output gate are
+  untouched. Default behavior is byte-for-byte as before. PASS.
+- Rule 1: no word rule decides anything; a typed setting does. PASS. Rule 6: ddgs failing leaves SearXNG's answer; both
+  failing is the existing failed-tool path. PASS. Rule 6a: no log line added; the sidecar logs nothing. PASS.
+- Rule 7: page text for a minor still passes that person's cleaning and safesearch level; ddgs adds rows, not a bypass. PASS.
+- Rule 10: untouched. Rule 11: ddgs is a supporting service, not a model runner. PASS.
+- Risks named, not removed: DuckDuckGo may return adult results to a minor (the reason for the warning and the default);
+  the leak bench has not run. No rule needed changing.

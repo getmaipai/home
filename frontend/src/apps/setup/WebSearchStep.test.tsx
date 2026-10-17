@@ -36,6 +36,8 @@ describe("WebSearchStep", () => {
     expect(save).not.toHaveBeenCalled();
     expect(done).toHaveBeenCalledTimes(1);
     expect(rendered.container.textContent).toContain("leave the address empty and press Continue");
+    // SEARCH-DDGS-TEEN-01: one honest sentence on what teens and children get and where an admin can change it.
+    expect(rendered.container.textContent).toContain("Until SearXNG is set up, teens and children use the Library only. You can allow DuckDuckGo for them in Settings, Web search.");
     expect(rendered.queryByRole("button", { name: /Skip|Save/ })).toBeNull();
   });
 

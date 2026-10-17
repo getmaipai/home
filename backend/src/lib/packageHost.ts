@@ -2368,7 +2368,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             if (hosted) return hosted;
             const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
             // SEARCH-SOURCES-01: several picked sources run at once and blend by rank; one source (the default) is the old path unchanged.
-            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary).filter((id) => !(id === "ddgs" && actor.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
+            const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary, wantsSpoken(args as { spoken?: unknown } | undefined)).filter((id) => !(id === "ddgs" && actor.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
             if (sources.length === 0) return { text: NO_SOURCE_FOR_BAND_TEXT, rows: [] };
             if (sources.length === 1 && sources[0] === "searxng") return searxngSearch(args, searxOpts);
             const rowsOnly = { ...(args as object), read_page: false };
