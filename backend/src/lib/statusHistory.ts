@@ -136,6 +136,41 @@ async function liveComponentStatesFrom(health: HealthSnapshot, maintenanceParts:
   return result;
 }
 
+/** CHAT-PAUSE-01: why chat is not answering right now, in the words the
+ * Status page counts by. Stored in the event's `detail` (a cause word, no
+ * person or text). */
+async function chatPauseCauseNow(): Promise<string> {
+  const chat = await roleHealth("chat");
+  if (chat.cause) return chat.cause;
+  return chat.availability === "starting" ? "warming" : "offline";
+}
+
+const PAUSE_CAUSE_WORDS: Record<string, string> = { restarting: "restarting", warming: "starting up", memory: "low memory", not_installed: "not installed", offline: "not answering" };
+
+/** CHAT-PAUSE-01: how often chat stopped answering since local midnight,
+ * and why: "Chat was paused 3 times today: restarting (2), low memory (1)".
+ * Counts only; it names no person and no message. */
+export function chatPauseSummary(now: Date = new Date()): { count: number; causes: Record<string, number>; line: string } {
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+  const rows = db.select({ state: statusEvents.state, at: statusEvents.at, detail: statusEvents.detail }).from(statusEvents)
+    .where(eq(statusEvents.component, "chat")).orderBy(statusEvents.at).all().filter((row) => row.at >= dayStart && row.at <= now.toISOString());
+  const causes: Record<string, number> = {};
+  let count = 0;
+  let paused = false;
+  for (const row of rows) {
+    const down = row.state === "degraded" || row.state === "outage";
+    if (down && !paused) {
+      count += 1;
+      const cause = row.detail ?? "offline";
+      causes[cause] = (causes[cause] ?? 0) + 1;
+    }
+    if (row.state !== "maintenance") paused = down;
+  }
+  if (count === 0) return { count, causes, line: "Chat has not been paused today." };
+  const parts = Object.entries(causes).sort((a, b) => b[1] - a[1]).map(([cause, n]) => `${PAUSE_CAUSE_WORDS[cause] ?? cause} (${n})`);
+  return { count, causes, line: `Chat was paused ${count === 1 ? "once" : `${count} times`} today: ${parts.join(", ")}.` };
+}
+
 let healthForTests: HealthSnapshot | undefined;
 export function __setStatusHistoryHealthForTests(health: HealthSnapshot | undefined): void {
   healthForTests = health;
@@ -146,14 +181,14 @@ function upsertHeartbeat(now: Date): void {
     .onConflictDoUpdate({ target: statusHeartbeat.id, set: { lastSeenAt: now.toISOString() } }).run();
 }
 
-function writeEvent(component: StatusComponent, state: StatusState, at: Date, source: StatusEventRecord["source"]): void {
+function writeEvent(component: StatusComponent, state: StatusState, at: Date, source: StatusEventRecord["source"], detail: string | null = null): void {
   const event = StatusEvent.parse({
     id: `sev-${randomSuffix(10)}`,
     component,
     state,
     at: at.toISOString(),
     source,
-    detail: null,
+    detail,
     hlc: nextHlc(),
   });
   db.insert(statusEvents).values(event).run();
@@ -176,7 +211,7 @@ export async function recordStatusSample(now: Date = new Date(), internet?: Inte
       const service = component.startsWith("service:") ? serviceState(component, now.getTime()) : null;
       const state: StatusState | undefined = service ? service === "unknown" ? undefined : service === "outage" ? "outage" : service : states[component];
       if (!state || state === lastState(component)) continue;
-      writeEvent(component, state, now, state === "maintenance" ? "maintenance" : "sample");
+      writeEvent(component, state, now, state === "maintenance" ? "maintenance" : "sample", component === "chat" && (state === "degraded" || state === "outage") ? await chatPauseCauseNow() : null);
     }
     if (internet) {
       const state: StatusState = maintenance.has("internet") ? "maintenance" : internet === "down" ? "outage" : internet;

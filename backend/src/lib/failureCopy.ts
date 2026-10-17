@@ -5,8 +5,8 @@ export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable"
 export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup" | "microphone_missing" | "microphone_busy";
 export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adultNoRepairs: string; minor: string }> = {
   listening_lost: {
-    adult: "Voice listening stopped because the connection to your hub dropped. Check that the hub is on, then tap the waveform to start again.",
-    adultNoRepairs: "Voice listening stopped because the connection to your hub dropped. Check that the hub is on, then tap the waveform to start again.",
+    adult: "Home is restarting or updating, so voice listening stopped. It will be back in a minute; then tap the waveform to start again.",
+    adultNoRepairs: "Home is restarting or updating, so voice listening stopped. It will be back in a minute; then tap the waveform to start again.",
     minor: "I can't hear you right now. Please tell a grown-up.",
   },
   listening_engine: {
@@ -126,10 +126,58 @@ const COMPOSER_NOTICE: Record<"paused" | "starting", ComposerNotice> = {
   },
 };
 
-export function composerNotice(availability: "ready" | "starting" | "unavailable"): ComposerNotice | null {
+/** CHAT-PAUSE-01: the same composer line, worded for the cause when Home
+ * knows it. Every cause reuses the one notice shape (and so the one
+ * composer line, Welcome state and Send hold); only the words differ. */
+const CAUSE_NOTICE: Record<"restarting" | "memory" | "not_installed" | "paused_by_admin" | "offline", ComposerNotice> = {
+  restarting: {
+    adult: "The AI is restarting. Chat will start again by itself in a minute.",
+    teen: "The AI is restarting. Chat will start again by itself in a minute.",
+    child: "I'm waking up. Try again in a minute.",
+    repairs_link: null,
+  },
+  memory: {
+    adult: "The computer is low on memory. Chat is paused until it recovers.",
+    teen: "The computer is low on memory. Chat is paused until it recovers.",
+    child: "I need a rest. Try again soon.",
+    repairs_link: "Open Repairs",
+  },
+  not_installed: {
+    adult: "The AI isn't installed yet. An owner can finish setup.",
+    teen: "The AI isn't installed yet. An owner can finish setup.",
+    child: "I'm not ready yet. Ask a grown-up.",
+    repairs_link: "Open Repairs",
+  },
+  paused_by_admin: {
+    adult: "Chat is paused by an admin until it is turned back on.",
+    teen: "Chat is paused by an admin until it is turned back on.",
+    child: "Chat is resting. Ask a grown-up.",
+    repairs_link: null,
+  },
+  offline: {
+    adult: "The AI isn't answering.",
+    teen: "The AI isn't answering. Ask a grown-up to check Repairs.",
+    child: "I'm taking a break. Ask a grown-up.",
+    repairs_link: "Check Repairs",
+  },
+};
+
+export type ChatPauseCause = keyof typeof CAUSE_NOTICE;
+
+export function composerNotice(availability: "ready" | "starting" | "unavailable", cause?: ChatPauseCause | null, adminMessage?: string | null): ComposerNotice | null {
+  if (cause && availability !== "ready") {
+    const base = CAUSE_NOTICE[cause];
+    const extra = cause === "paused_by_admin" && adminMessage?.trim() ? ` ${adminMessage.trim()}` : "";
+    return extra ? { ...base, adult: base.adult + extra, teen: base.teen + extra } : base;
+  }
   if (availability === "unavailable") return COMPOSER_NOTICE.paused;
   if (availability === "starting") return COMPOSER_NOTICE.starting;
   return null;
+}
+
+/** The pause line the turn routes answer with while an admin has chat paused. */
+export function adminPauseLine(adminMessage?: string | null): string {
+  return composerNotice("unavailable", "paused_by_admin", adminMessage)!.adult;
 }
 
 /** CHAT-CALM-ERRORS-01b (design section 8): the kind of a Stack refusal,

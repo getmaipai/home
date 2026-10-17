@@ -207,12 +207,20 @@ describe("ChatMessageError", () => {
   });
 
   // ENGINE-DOWN-UI-01: a failed reply's Retry needs the engine like any other control.
-  test("Retry is disabled, with the reason in its name, while chat is paused, and enabled again when it is back", async () => {
+  test("Retry is disabled, with the reason in its name, while chat is paused, and the reply retries itself once when it is back", async () => {
+    let attempts = 0;
+    const adapter: ChatModelAdapter = {
+      async *run() {
+        attempts++;
+        if (attempts === 1) throw new ChatTurnError("Try again.", "unavailable");
+        yield { content: [{ type: "text", text: "Recovered." }] };
+      },
+    };
     let setAvailability!: (value: "ready" | "unavailable") => void;
     function AvailabilityHarness() {
       const [availability, set] = useState<"ready" | "unavailable">("ready");
       setAvailability = set;
-      return <ChatAvailabilityContext.Provider value={availability}><Harness adapter={failingAdapter(new ChatTurnError("Try again.", "unavailable"))} /></ChatAvailabilityContext.Provider>;
+      return <ChatAvailabilityContext.Provider value={availability}><Harness adapter={adapter} /></ChatAvailabilityContext.Provider>;
     }
     const view = renderWithQueryClient(<AvailabilityHarness />);
     await sendFailingMessage(view);
@@ -222,7 +230,8 @@ describe("ChatMessageError", () => {
     await waitFor(() => expect(retry().disabled).toBe(true));
     expect(retry().textContent).toContain("Chat is paused");
     act(() => setAvailability("ready"));
-    await waitFor(() => expect(retry().disabled).toBe(false));
+    await waitFor(() => expect(view.container.textContent).toContain("Recovered."));
+    expect(attempts).toBe(2);
   });
 
   test("Retry reruns the failed reply", async () => {

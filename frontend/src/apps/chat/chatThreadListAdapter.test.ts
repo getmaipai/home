@@ -43,6 +43,29 @@ describe("saved conversations", () => {
     await expect(resumeClosedConversation("conv-19fp5aqgmr")).rejects.toThrow("Could not reopen this chat. Try again.");
   });
 
+  test("a hub that is restarting holds the first message; the chat starts once when it answers", async () => {
+    let up = false;
+    let created = 0;
+    const realSetTimeout = globalThis.setTimeout;
+    globalThis.setTimeout = ((fn: () => void) => realSetTimeout(fn, 0)) as unknown as typeof setTimeout;
+    globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const path = String(input);
+      if (path.includes("/api/health")) { if (!up) throw new TypeError("Failed to fetch"); return Response.json({}, { status: 401 }); }
+      if (path === "/api/conversations" && (init?.method ?? "GET") === "POST") {
+        if (!up) throw new TypeError("Failed to fetch");
+        created += 1;
+        return Response.json({ id: "conv-restart1", title: null, surface: "chat", created_at: "2026-09-07T00:00:00Z", pinned: false }, { status: 201 });
+      }
+      return Response.json([]);
+    }) as unknown as typeof fetch;
+    try {
+      const started = createChatThreadListAdapter("Nova").initialize("local-r");
+      realSetTimeout(() => { up = true; }, 30);
+      expect((await started).remoteId).toBe("conv-restart1");
+      expect(created).toBe(1);
+    } finally { globalThis.setTimeout = realSetTimeout; }
+  });
+
   test("new chats have distinct persistent ids, titles survive remount, and deletion survives reload", async () => {
     const saved = new Map<string, { id: string; title: string | null; surface: string; created_at: string; pinned: boolean }>();
     let sequence = 0;

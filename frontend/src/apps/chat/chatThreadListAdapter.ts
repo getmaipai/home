@@ -1,3 +1,4 @@
+import { isHubUnreachable, waitForHub } from "@/lib/hubReachability";
 import { useMemo } from "react";
 import { openedChat, takeCarry } from "./chatCarry";
 import { useAui, type RemoteThreadListAdapter } from "@assistant-ui/react";
@@ -210,9 +211,16 @@ export function createChatThreadListAdapter(selfName: string, options: ChatThrea
       // A chat always starts: a carry or a project the hub refuses (gone,
       // not this person's) falls back to a plain new chat.
       const plain = () => api.createConversation(mode);
-      const row = carryFrom || folderId
-        ? await api.createConversation(mode, carryFrom ?? undefined, folderId).catch(() => (carryFrom && folderId ? api.createConversation(mode, undefined, folderId).catch(plain) : plain()))
-        : await plain();
+      const start = () => carryFrom || folderId
+        ? api.createConversation(mode, carryFrom ?? undefined, folderId).catch(() => (carryFrom && folderId ? api.createConversation(mode, undefined, folderId).catch(plain) : plain()))
+        : plain();
+      // CHAT-PAUSE-01: a hub that is restarting or updating does not answer.
+      // The first message waits for it (asking every few seconds, up to five
+      // minutes) and the chat then starts once, so nothing typed is lost.
+      const row = await start().catch(async (error: unknown) => {
+        if (!isHubUnreachable(error) || !(await waitForHub(AbortSignal.timeout(300_000)))) throw error;
+        return start();
+      });
       if (row.folder_id) {
         createdInFolder.set(row.id, row.folder_id);
         rememberCustom(row.id, { pinned: false, folder_id: row.folder_id });

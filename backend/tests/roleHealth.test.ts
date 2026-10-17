@@ -39,7 +39,7 @@ describe("roleHealth", () => {
   test("Stack fetch failure makes owned roles unavailable with stack unreachable reason", async () => {
     setHouseholdSettingValue("engines.stack.url", "http://127.0.0.1:8770");
     client([], true);
-    expect(await roleHealth("chat")).toEqual({ availability: "unavailable", reason: "stack_unreachable" });
+    expect(await roleHealth("chat")).toEqual({ availability: "unavailable", reason: "stack_unreachable", cause: "restarting" });
   });
 
   test("Stack ready is operational for chat and embeddings", async () => {

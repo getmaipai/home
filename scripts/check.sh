@@ -453,7 +453,7 @@ const generated = JSON.parse(fs.readFileSync(outputPath, "utf8"));
 const byKey = new Map(spec.map((entry) => [entry.key, entry]));
 // Keys Home declares ahead of the pinned spec tag (spec first is still owed in commons). An entry may be absent from
 // the tag, never different from it; delete the key here when a spec tag carries it.
-const aheadOfSpec = new Set(["ui.reasoning_open", "voice.hesitations"]);
+const aheadOfSpec = new Set(["ui.reasoning_open", "voice.hesitations", "chat.paused", "chat.paused_message"]);
 const missing = generated.filter((entry) => !entry.key.startsWith("engines.stack.") && !(aheadOfSpec.has(entry.key) && !byKey.has(entry.key)) && JSON.stringify(byKey.get(entry.key)) !== JSON.stringify(entry));
 const required = ["engines.stack.where", "engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"];
 const localPort = byKey.get("engines.stack.remote.local_port");

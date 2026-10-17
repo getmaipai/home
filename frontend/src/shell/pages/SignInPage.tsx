@@ -10,7 +10,8 @@ import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import FullLogo from "@maipai/ui/src/dashboard/layouts/full/shared/logo/FullLogo";
 import { useProfileSignIn } from "@/kit/hooks/useProfileSignIn";
-import { api, ApiError, type Roster } from "@/lib/api";
+import { api, type Roster } from "@/lib/api";
+import { hubErrorMessage, isHubUnreachable, useWhenHubBack } from "@/lib/hubReachability";
 import { useTabItem } from "@/shell/tabIdentity";
 
 /** /sign-in: SHELL-08's own row (docs/plans/shell-on-shadcndashboard-
@@ -53,6 +54,8 @@ import { useTabItem } from "@/shell/tabIdentity";
 export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   useTabItem("Sign in");
   const profilesQuery = useQuery<Roster[]>({ queryKey: ["auth-profiles"], queryFn: () => api.profiles() });
+  // The hub restarting or updating: ask again by itself as soon as it answers.
+  useWhenHubBack(profilesQuery.isError && isHubUnreachable(profilesQuery.error), () => { void profilesQuery.refetch(); });
   const [wantsPassword, setUsePassword] = useState(false);
   const { selected, secret, setSecret, secretError, locked, attempt, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
     useProfileSignIn(onSignedIn);
@@ -76,7 +79,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
             error={profilesQuery.isError}
             isFetching={profilesQuery.isFetching}
             onRetry={() => profilesQuery.refetch()}
-            errorMessage={profilesQuery.error instanceof ApiError ? profilesQuery.error.message : "Could not reach the hub."}
+            errorMessage={hubErrorMessage(profilesQuery.error)}
             loadingLabel="Loading household"
           >
             {(profiles: Roster[]) =>

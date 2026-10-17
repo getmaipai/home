@@ -78,6 +78,31 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.chat",
     honoured_by: ["home"],
   }),
+  // CHAT-PAUSE-01: the household's own off switch for chat. Server-side: the
+  // turn routes answer 503 while it is on. Settings stays open, so an admin
+  // can always turn it back off.
+  SettingsKey.parse({
+    key: "chat.paused",
+    scope: "household",
+    selector: "boolean",
+    default: false,
+    label: "Pause chat for everyone",
+    help: "Turns chat off for the whole household until you turn it back on. Messages are not sent while it is paused. Timers, alarms and the emergency lines keep working.",
+    level: "basic",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "chat.paused_message",
+    scope: "household",
+    selector: "text",
+    default: "",
+    label: "Message shown while chat is paused",
+    help: "Optional. One short line everyone sees next to the pause notice, for example when chat comes back.",
+    level: "basic",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "chat.teen_gate_grain",
     scope: "household",

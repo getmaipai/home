@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>MaiPai Home - offline</title>
+    <title>MaiPai Home - restarting</title>
     <style>
       body {
         margin: 0;
@@ -24,13 +24,13 @@
   </head>
   <body>
     <main>
-      <h1>Can't reach MaiPai right now</h1>
-      <p>
-        This device isn't connected to your home network, so MaiPai Home
-        isn't reachable. Nothing here works without a connection to the
-        hub yet: reconnect to your home Wi-Fi, or try again once you're
-        back in range.
+      <h1 id="offline-title">Home is restarting or updating</h1>
+      <p id="offline-body" role="status" aria-live="polite">
+        It will be back in a minute. This page checks every few seconds and
+        opens Home by itself when it answers. If this device is away from your
+        home network, reconnect to your home Wi-Fi.
       </p>
     </main>
+    <script src="/offline.js"></script>
   </body>
 </html>

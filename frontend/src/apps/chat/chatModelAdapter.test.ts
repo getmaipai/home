@@ -1491,13 +1491,23 @@ describe("createChatModelAdapter errors", () => {
     } finally { env.restore(); }
   });
 
-  test("an unreachable hub becomes a ChatTurnError with code client_unreachable", async () => {
-    const env = stubEnvironment(() => Promise.reject(new Error("network error")));
+  test("an unreachable hub becomes a ChatTurnError with code hub_unreachable and the restarting line", async () => {
+    const env = stubEnvironment(() => Promise.reject(new TypeError("Failed to fetch")));
     try {
       const { error } = await collect([fakeUserMessage("hi")]);
       expect(error).toBeInstanceOf(ChatTurnError);
-      expect((error as Error).message).toMatch(/Could not reach the hub/);
-      expect(error).toMatchObject({ code: "client_unreachable", turnId: undefined });
+      expect((error as Error).message).toBe("Home is restarting or updating. It will be back in a minute.");
+      expect(error).toMatchObject({ code: "hub_unreachable", turnId: undefined });
+    } finally {
+      env.restore();
+    }
+  });
+
+  test("a failure that is not the hub being down stays client_unreachable with a plain line", async () => {
+    const env = stubEnvironment(() => Promise.reject(new Error("something odd")));
+    try {
+      const { error } = await collect([fakeUserMessage("hi")]);
+      expect(error).toMatchObject({ code: "client_unreachable", message: "That did not send. Try again." });
     } finally {
       env.restore();
     }

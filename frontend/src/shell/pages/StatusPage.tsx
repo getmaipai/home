@@ -81,6 +81,7 @@ export function StatusPage({ person }: { person: Roster }) {
         <CardContent><div className="flex flex-col divide-y divide-border"><StatusPartsBody person={person} health={healthQuery.data} maintenance={maintenance} history={historyQuery.data} engineComputer={engineComputerQuery.data} /></div></CardContent>
       </Card> : undefined} /> : null}
       </div>
+      {canSeeParts && historyQuery.data?.chat_pauses ? <p data-testid="chat-pauses" className="mt-4 text-sm text-muted-foreground">{historyQuery.data.chat_pauses.line}</p> : null}
       {canSeeParts && incidentEvents.length ? <><h3 className="mt-4 mb-2 text-sm font-semibold">Recent problems</h3><Timeline events={incidentEvents} visibleCount={incidentEvents.length} animate={false} /></> : null}
       {(boardData?.maintenance.length ?? 0) > 0 || admin ? <div className="mt-4"><Card>
         <CardHeader><CardTitle>Scheduled maintenance</CardTitle></CardHeader>

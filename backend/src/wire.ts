@@ -769,6 +769,10 @@ export interface EngineHealthEntry {
    * cannot answer (failureCopy.ts's composerNotice); absent or null when
    * the engine is ready. Additive: clients that ignore it lose nothing. */
   notice?: ComposerNotice | null;
+  /** CHAT-PAUSE-01: why chat cannot answer, when Home knows (additive):
+   * the Stack is restarting, low on memory, not installed, or an admin
+   * paused chat. Absent when ready or when the cause is unknown. */
+  cause?: "restarting" | "memory" | "not_installed" | "paused_by_admin" | null;
 }
 
 /** Mirrors lib/failureCopy.ts's ComposerNotice (that file stays import-free). */

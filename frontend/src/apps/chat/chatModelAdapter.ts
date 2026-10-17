@@ -16,6 +16,7 @@ import type { TurnWithMedia } from "@/apps/chat/chatCitations";
 import type { CrisisSupport } from "@maipai/home-backend/src/wire";
 import type { PendingContinuation } from "@/apps/chat/chatContinue";
 import { ChatTurnError } from "@/apps/chat/chatTurnError";
+import { HUB_DOWN_LINE, isHubUnreachable } from "@/lib/hubReachability";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { randomUuid } from "@/lib/randomUuid";
 
@@ -832,15 +833,18 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         // properly (filed as a follow-up), this at least tells the
         // person what to do instead of surfacing the backend's raw,
         // id-bearing error string.
+        const hubDown = isHubUnreachable(e);
         const message =
-          e instanceof ApiError && e.code === "unavailable"
+          hubDown
+            ? HUB_DOWN_LINE
+          : e instanceof ApiError && e.code === "unavailable"
             ? failureLine("unreachable", false)
             : e instanceof ApiError && e.code === "temporary_mismatch"
               ? "Incognito can't turn on partway through a chat. Start a new chat to go incognito."
             : e instanceof ApiError
               ? e.message
-              : "Could not reach the hub. Try again.";
-        const code = e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
+              : "That did not send. Try again.";
+        const code = hubDown ? "hub_unreachable" : e instanceof ApiError ? e.code ?? "unavailable" : "client_unreachable";
         throw new ChatTurnError(message, code, resumeTurnId, code === "safety_refused" ? crisisSupport : undefined);
       }
     },

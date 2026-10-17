@@ -122,4 +122,20 @@ describe("StatusPage app-first view", () => {
       expect(paths.filter((path) => path === "/api/status/history")).toHaveLength(1);
     } finally { restore(); }
   });
+
+  test("an admin reads how often chat paused today and why; a member does not", async () => {
+    const history = { generated_at: "2026-09-30T12:00:00.000Z", days: 90, components: [], incidents: [], chat_pauses: { count: 3, causes: { restarting: 2, memory: 1 }, line: "Chat was paused 3 times today: restarting (2), low memory (1)." } } satisfies StatusHistory;
+    const admin = mockStatus(true, history);
+    try {
+      const view = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      expect((await view.findByTestId("chat-pauses")).textContent).toBe("Chat was paused 3 times today: restarting (2), low memory (1).");
+      view.unmount();
+    } finally { admin.restore(); }
+    const member = mockStatus(true, history);
+    try {
+      const view = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      expect(view.queryByTestId("chat-pauses")).toBeNull();
+    } finally { member.restore(); }
+  });
 });

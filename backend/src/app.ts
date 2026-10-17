@@ -47,6 +47,7 @@ import { setupRoutes } from "@/routes/setup";
 import { installRoutes } from "@/routes/install";
 import { componentsRoutes } from "@/routes/components";
 import { installGate } from "@/middleware/installGate";
+import { chatPauseGate } from "@/middleware/chatPauseGate";
 import { setupChecklistRoutes } from "@/routes/setupChecklist";
 import { tailscaleRoutes } from "@/routes/tailscale";
 import { devicesRoutes } from "@/routes/devices";
@@ -188,6 +189,9 @@ app.route("/api/notifications", notificationsRoutes);
 app.route("/api/jobs", jobsRoutes);
 app.route("/api/scheduler", schedulerRoutes);
 // Needs-the-AI routes wait for the install (setup page B, install strip).
+app.use("/api/llm/chat", chatPauseGate);
+app.use("/api/turn/*", chatPauseGate);
+app.use("/v1/chat/completions", chatPauseGate);
 app.use("/api/llm/*", installGate("chat"));
 app.use("/api/turn/*", installGate("chat"));
 app.use("/api/tts/*", installGate("all", undefined, ["tts"]));

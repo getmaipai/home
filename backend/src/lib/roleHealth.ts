@@ -9,7 +9,7 @@ export type HealthRole = "chat" | "embed" | "background" | "voice";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
 export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; }
 
@@ -35,7 +35,7 @@ export async function localRoleHealthEntry(role: HealthRole): Promise<EngineHeal
  * default and sees the refusal. */
 export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}): Promise<RoleHealth> {
   if (roleHealthForTests[role]) return roleHealthForTests[role]!;
-  if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable" };
+  if (!isStackConfigured()) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   // THIN-1C: the Stack's own recent refusal of this role outranks what
   // its role list says - during #203's incident the list still showed
   // chat as installed (ready on demand) while every request was being
@@ -44,12 +44,12 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
   // STACK_REFUSAL_TTL_MS (stackEngine.ts), so this never pins a role
   // offline after the machine has recovered.
   const refusal = opts.live ? null : stackRefusal(STACK_REFUSAL_KEY[role]);
-  if (refusal) return { availability: "unavailable", reason: "stack_refused", detail: refusal.household };
+  if (refusal) return { availability: "unavailable", reason: "stack_refused", detail: refusal.household, ...(/memory/i.test(refusal.household) ? { cause: "memory" as const } : {}) };
   try {
     const id = STACK_ROLE_ID[role] ?? role;
     const { roles } = await getStackClient().roles();
     const row = roles.find((item) => item.id === id);
-    if (!row) return { availability: "unavailable", reason: "stack_unreachable" };
+    if (!row) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
     const state = row.state.state;
     const status = role === "chat" ? { ...chatContextStatus(row), ...(row.model?.id ? { modelId: row.model.id } : {}) } : {};
     // The Stack says a warm-up is still running: the role reads `installed`
@@ -58,9 +58,9 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     if (role === "chat" && state === "installed" && warmupInFlight()) return { availability: "starting", reason: null, ...status };
     if (state === "ready" || state === "installed") return { availability: "ready", reason: null, ...status };
     if (state === "loaded") return { availability: row.state.reason === STACK_IDLE_REASON ? "ready" : "starting", reason: null, ...status };
-    return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
+    return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start", ...(state === "notInstalled" ? { cause: "not_installed" as const } : /memory/i.test(row.state.reason ?? "") ? { cause: "memory" as const } : {}) };
   } catch {
-    return { availability: "unavailable", reason: "stack_unreachable" };
+    return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
   }
 }
 
@@ -97,7 +97,7 @@ export function roleHealthEntry(role: HealthRole, local: EngineHealthEntry, stat
   // role-list reason ("model crashed") never reaches the wire here, the
   // same as before.
   const context = role === "chat" ? { context_length: state.contextLength ?? null, context_slots: state.slots ?? null, context_per_slot: state.contextPerSlot ?? null, context_scope: state.contextScope ?? null } : {};
-  if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}) };
+  if (state.reason === "stack_unreachable" || state.availability === "unavailable") return { ...local, ...context, kind: "failed", alive: false, availability: "unavailable", reason: "failed_start", ...(state.detail !== undefined ? { detail: state.detail } : {}), ...(state.cause ? { cause: state.cause } : {}) };
   if (state.availability === "starting") return { ...local, ...context, kind: "starting", alive: true, availability: "starting", reason: null };
   return { ...local, ...context, alive: true, availability: "ready", reason: null };
 }
