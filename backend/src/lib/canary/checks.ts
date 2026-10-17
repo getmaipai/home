@@ -52,10 +52,10 @@ export const CHECKS: CanaryCheck[] = [
     },
   },
   {
-    id: "chat_tool_weather", name: "Chat uses tools (weather)", group: "tools", timeoutMs: 180_000, title: "Chat did not use the weather tool",
+    id: "chat_tool_weather", name: "Chat uses tools (weather)", group: "tools", timeoutMs: 75_000, title: "Chat did not use the weather tool",
     async run(deps, ctx) {
       if (ctx.chatDown) return { kind: "skip", reason: "Chat is not running." };
-      const probe = await deps.chat({ text: WEATHER_PHRASE, timeoutMs: 180_000 });
+      const probe = await deps.chat({ text: WEATHER_PHRASE, timeoutMs: 75_000 });
       const bad = transport(probe, "Chat");
       if (bad) return bad;
       if (!probe.toolCalls.includes("weather")) return fail("Chat is up but did not look up the weather when asked: it answered without using the weather tool.", CHECK_AGAIN);
@@ -65,10 +65,10 @@ export const CHECKS: CanaryCheck[] = [
     },
   },
   {
-    id: "spoken_turn", name: "Spoken replies", group: "voice", timeoutMs: 120_000, title: "Spoken replies come back empty",
+    id: "spoken_turn", name: "Spoken replies", group: "voice", timeoutMs: 75_000, title: "Spoken replies come back empty",
     async run(deps, ctx) {
       if (ctx.chatDown) return { kind: "skip", reason: "Chat is not running." };
-      const probe = await deps.chat({ text: "hello there", spoken: true, timeoutMs: 120_000 });
+      const probe = await deps.chat({ text: "hello there", spoken: true, timeoutMs: 75_000 });
       const bad = transport(probe, "A spoken turn");
       if (bad) return bad;
       if (!probe.text.trim()) return fail(probe.cue ? "A spoken turn only played a waiting phrase and never gave an answer." : "A spoken turn gave no answer.", CHECK_AGAIN);
@@ -97,10 +97,10 @@ export const CHECKS: CanaryCheck[] = [
     },
   },
   {
-    id: "chat_search_trigger", name: "Chat searches the web", group: "search", timeoutMs: 180_000, title: "Chat did not search the web when asked",
+    id: "chat_search_trigger", name: "Chat searches the web", group: "search", timeoutMs: 120_000, title: "Chat did not search the web when asked",
     async run(deps, ctx) {
       if (ctx.chatDown) return { kind: "skip", reason: "Chat is not running." };
-      const probe = await deps.chat({ text: ctx.searchPhrase, timeoutMs: 180_000 });
+      const probe = await deps.chat({ text: ctx.searchPhrase, timeoutMs: 120_000 });
       const bad = transport(probe, "Chat");
       if (bad) return bad;
       if (!probe.toolCalls.includes("websearch")) return fail("Chat is up but did not search the web when asked: it answered from memory.", "Check Settings, Web search, then run the checks again.");

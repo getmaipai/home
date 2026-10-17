@@ -65,7 +65,14 @@ export async function chatProbe(request: ChatProbeRequest): Promise<ChatProbe> {
         probe.firstTokenMs ??= Math.round(performance.now() - started);
       } else if (event.type === "spoken_cue") probe.cue = true;
       else if (event.type === "error") { probe.error ??= event.code ?? "error"; }
-      else if (event.type === "done") probe.ok = probe.error === null;
+      else if (event.type === "done") {
+        // A package's own reply (a weather card, a command) arrives whole in the done value with no delta before it.
+        if (!probe.text.trim() && event.value.reply.text.trim()) {
+          probe.text = event.value.reply.text;
+          probe.firstTokenMs ??= Math.round(performance.now() - started);
+        }
+        probe.ok = probe.error === null;
+      }
     }
     for (const e of result.toolEvents ?? []) {
       if (e.t === "tool_call") probe.toolCalls.push(e.package_id);
@@ -130,11 +137,29 @@ export async function stackBlocker(): Promise<string | null> {
   return null;
 }
 
+/** The name of the engine that runs the chat role: the Stack setting when it names one, else the engine the chat model is built for. */
+export async function chatEngineName(): Promise<string | null> {
+  const client = getStackClient();
+  const { settings } = await client.settings();
+  const row = settings.find((s) => s.key === "stack.engines.chat.engine") as ({ value?: unknown; default?: unknown }) | undefined;
+  const chosen = String(row?.value ?? row?.default ?? "auto");
+  if (chosen === "omlx" || chosen === "llama-server") return chosen;
+  const { roles } = await client.roles();
+  const model = roles.find((r) => r.id === "chat")?.model?.id ?? "";
+  return /mlx/i.test(model) ? "omlx" : model ? "llama-server" : null;
+}
+
+/** One restart of the chat engine through the Stack's own engine route (POST /stack/v1/engines/{name}/restart). */
 export async function stackRestart(reason: string): Promise<boolean> {
-  void reason;
-  // The Stack's requestEngineRestart() (ROBUST-01) is internal; until it has a route, a canary never uses the engine
-  // action, which resets the circuit breaker. Returns false so the canary only raises its Repairs item.
-  return false;
+  void reason; // the Stack logs the restart; the reason stays here so it can be recorded later without a signature change
+  try {
+    const name = await chatEngineName();
+    if (!name) return false;
+    await getStackClient().engineAction(name, "restart");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export function searchTroubleNow(): boolean {

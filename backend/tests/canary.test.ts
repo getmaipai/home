@@ -72,6 +72,12 @@ describe("checks assert behaviour", () => {
     expect(blocked[0]!.note).toContain("the search failed");
   });
 
+  test("a package reply that arrives whole in the done value counts as the answer (the weather card)", async () => {
+    // chatProbe fills text from the done value; the checks only see ChatProbe, so this proves the check side of it.
+    const out = await runSuite(deps({ chat: async () => ({ ...OK_PROBE, toolCalls: ["weather"], text: "It is 4 degrees in Oslo." }) }), { reason: "manual", only: ["chat_tool_weather"] });
+    expect(out[0]!.status).toBe("pass");
+  });
+
   test("a spoken turn that only played a cue fails (the one-sec regression)", async () => {
     const out = await runSuite(deps({ chat: async () => ({ ...OK_PROBE, text: "", cue: true }) }), { reason: "manual", only: ["spoken_turn"] });
     expect(out[0]!.status).toBe("fail");
@@ -250,6 +256,29 @@ describe("when checks must not run", () => {
     for (let i = 0; i < 7; i++) { await runSuite(d, { reason: "manual", only: ["chat_hello"] }); clock += 31_000; }
     expect(schedule.slowUntil).toBeGreaterThan(clock);
     expect(dueChecks(clock, schedule, { keepWarm: true })).toEqual([]);
+  });
+});
+
+describe("the one restart", () => {
+  test("a restart goes to the Stack's engine route for the chat engine named by its setting, or by the model when the setting is automatic", async () => {
+    const { stackRestart } = await import("@/lib/canary/probes");
+    const { __setStackClientForTests } = await import("@/lib/stackEngine");
+    const restarted: string[] = [];
+    const client = (setting: string, modelId: string) => ({
+      settings: async () => ({ sections: [], settings: [{ key: "stack.engines.chat.engine", value: setting, default: "auto" }] }),
+      roles: async () => ({ roles: [{ id: "chat", model: { id: modelId } }] }),
+      engineAction: async (name: string, action: string) => { restarted.push(`${name}:${action}`); return { ok: true }; },
+    }) as never;
+    __setStackClientForTests(client("llama-server", "x"));
+    expect(await stackRestart("test")).toBe(true);
+    __setStackClientForTests(client("auto", "muse-glimmer-30b-mlx-4bit"));
+    expect(await stackRestart("test")).toBe(true);
+    __setStackClientForTests(client("auto", "some-gguf"));
+    expect(await stackRestart("test")).toBe(true);
+    expect(restarted).toEqual(["llama-server:restart", "omlx:restart", "llama-server:restart"]);
+    __setStackClientForTests({ settings: async () => { throw new Error("down"); } } as never);
+    expect(await stackRestart("test")).toBe(false);
+    __setStackClientForTests(null);
   });
 });
 
