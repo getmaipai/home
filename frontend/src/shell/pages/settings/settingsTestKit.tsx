@@ -45,12 +45,14 @@ export interface HomeFixture {
   restore: () => void;
 }
 
-export function mockHome({ robots = false, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps = [], apps, extraKeys = [], places = [] }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
+export function mockHome({ robots = false, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps, apps, extraKeys = [], places = [] }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
   const original = globalThis.fetch;
   const requests: string[] = [];
   const scopes: string[] = [];
   const puts: HomeFixture["puts"] = [];
-  let pinnedAppsSerialized = JSON.stringify(pinnedApps);
+  // LEFTNAV-APPS-01: no `pinnedApps` option means the person never chose pins (the setting reads as its default).
+  let pinnedAppsExplicit = pinnedApps !== undefined;
+  let pinnedAppsSerialized = JSON.stringify(pinnedApps ?? []);
   const registry = [...REGISTRY.filter((key) => wakeword || key.key !== "voice.wakeword.enabled"), ...extraKeys];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
@@ -58,7 +60,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
     if (url.endsWith("/api/settings") && init?.method === "PUT") {
       const body = JSON.parse(String(init.body)) as { scope: string; key: string; value: unknown };
       puts.push(body);
-      if (body.key === "ui.pinned_apps") pinnedAppsSerialized = String(body.value);
+      if (body.key === "ui.pinned_apps") { pinnedAppsSerialized = String(body.value); pinnedAppsExplicit = true; }
       const def = registry.find((k) => k.key === body.key)!;
       return Promise.resolve(Response.json({ key: def.key, value: body.value, source: "user", label: def.label, help: def.help, level: def.level, secret: def.secret ?? false }));
     }
@@ -82,7 +84,7 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
       const scope = decodeURIComponent(url.split("scope=")[1] ?? "");
       scopes.push(scope);
       const kind = scope.split(":")[0];
-      return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.key === "ui.pinned_apps" ? pinnedAppsSerialized : k.default ?? null, source: "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
+      return Promise.resolve(Response.json(registry.filter((k) => k.scope === kind).map((k) => ({ key: k.key, value: k.key === "ui.pinned_apps" ? pinnedAppsSerialized : k.default ?? null, source: k.key === "ui.pinned_apps" && pinnedAppsExplicit ? "user" : "default", label: k.label, help: k.help, level: k.level, secret: k.secret ?? false }))));
     }
     if (url.includes("/api/voice/wakewords")) return Promise.resolve(Response.json({ detectors: [], installed: wakeword }));
     if (url.endsWith("/api/commands")) return Promise.resolve(Response.json([]));

@@ -18,6 +18,8 @@ const AppRow = z.object({
   sections: z.array(z.object({ page: z.string(), label: z.string(), icon: z.string().nullable() })),
   to: z.string().describe("The app's route in the web shell: /apps/<package id>."),
   settings_area: z.record(z.string(), z.unknown()).optional().describe("The package's own settings area as its manifest declares it (present only when it declares one and the asking person's role may open it); the shell draws it at /settings/<id>."),
+  pinned_by_default: z.boolean().optional().describe("The app's manifest asks to be pinned in the left rail for a person who has never chosen their own pins."),
+  pin_order: z.number().int().optional().describe("Where this app sits among the default pins, lowest first."),
   incognito: z.enum(["blocked", "ephemeral", "unaffected"]).describe("The package's Incognito behaviour; the shell hides a blocked app while Incognito is on."),
 });
 

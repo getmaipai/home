@@ -32,3 +32,17 @@ package app pins by its route (`/apps/<id>`) in `ui.pinned_apps`; an app that is
 absent from the catalog, `favoriteApps` skips its pin, and the stored pin stays so a reinstall brings it back. While Incognito
 is on, an app whose manifest says `incognito: "blocked"` is left out. An app that declares `contributes.settings_area` gets a Settings gear in its toolbar that opens `/settings/<area id>` (the area rides on the app's row in `GET /api/apps`; `shell/pages/settings/packageAreas.ts` merges it with the spec areas). How to write one: "Writing an app package" in the org
 `docs/PACKAGES.md`. The design is [plans/app-kind-2026-10-16.md](plans/app-kind-2026-10-16.md).
+
+## Package apps in the left rail (LEFTNAV-APPS-01)
+
+Package apps the hub lists for the person (`GET /api/apps`: role, age band, surface and Incognito already applied) reach the
+rail two ways. A pinned app is a named icon link below Home, Chat, Library and People, at most six, the open one highlighted. A
+grid button at the foot of the rail opens "All apps": every listed app with a Pin or Unpin button (disabled with a reason while
+six are pinned). The phone keeps the same 56px rail, so the launcher is the same.
+
+Defaults come from the app's manifest, never from Home: the index page's `pinned_by_default` and `pin_order` (`@maipai/spec`
+0.1.157) pin Weather for everyone who may open it. A person who has never pinned or unpinned anything (`ui.pinned_apps` still has
+its default) starts with those; the first change saves the whole list and from then on their list wins, even when empty. A person
+whose list was saved before this existed keeps it and finds Weather in "All apps". `AppRail` in `@maipai/ui` draws the rail and
+launcher (`railApps`, `onRailAppPinChange`); Home passes `railApps()` from `appCatalog.ts`. No drag to reorder: the kit has no
+sortable list.

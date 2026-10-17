@@ -23,6 +23,9 @@ function appHrefForRoute(path: string): string {
   const pathname = path.split(/[?#]/, 1)[0] ?? path;
   if (pathname === "/chat" || pathname.startsWith("/chat/")) return "/chat";
   if (pathname === "/files" || pathname.startsWith("/files/")) return "/files";
+  // LEFTNAV-APPS-01: a package app (and its sections) selects its own rail icon, not Home.
+  const packageApp = /^\/apps\/[a-z][a-z0-9-]*(?=\/|$)/.exec(pathname)?.[0];
+  if (packageApp) return packageApp;
   if (pathname === "/people" || pathname.startsWith("/people/")) return "/people";
   return "/";
 }

@@ -22,3 +22,10 @@ describe("settings Back to app route", () => {
     expect(activeAppHref("/settings/home/general")).toBe("/people");
   });
 });
+
+import { activeAppHref as activeAppHrefForApps } from "./settingsBackLink";
+test("LEFTNAV-APPS-01: a package app and its sections select their own rail icon, not Home", () => {
+  expect(activeAppHrefForApps("/apps/weather")).toBe("/apps/weather");
+  expect(activeAppHrefForApps("/apps/weather/forecast")).toBe("/apps/weather");
+  expect(activeAppHrefForApps("/applications")).toBe("/");
+});

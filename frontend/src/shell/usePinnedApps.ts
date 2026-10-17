@@ -1,5 +1,8 @@
+import { useMemo } from "react";
 import { useIsMutating, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/api";
+import { defaultPinnedRoutes } from "@/shell/appCatalog";
+import { useAppRows } from "@/shell/useAppCatalog";
 
 // `ui.pinned_apps` (person scope, backend/src/settings/uiKeys.ts): a JSON
 // array of `NavEntry.to` values, in pin order. Read/write through
@@ -10,6 +13,9 @@ import { api } from "@/lib/api";
 // sync without either one knowing the other exists.
 const queryKey = (personId: string) => ["settings", "person", personId, "ui.pinned_apps"] as const;
 
+// LEFTNAV-APPS-01: a person who has never pinned or unpinned anything (the setting still has its default) starts with the
+// apps whose manifests say `pinned_by_default`; the first pin or unpin saves the whole list, and from then on theirs
+// wins, even when it is empty. The query holds `null` for "never chosen".
 function parsePinned(raw: unknown): string[] {
   if (typeof raw !== "string") return [];
   try {
@@ -34,7 +40,8 @@ export function usePinnedApps(personId: string): {
     queryKey: queryKey(personId),
     queryFn: async () => {
       const values = await api.settingsValues(`person:${personId}`);
-      return parsePinned(values.find((v) => v.key === "ui.pinned_apps")?.value);
+      const row = values.find((v) => v.key === "ui.pinned_apps");
+      return row?.source === "user" ? parsePinned(row.value) : null;
     },
   });
 
@@ -50,17 +57,18 @@ export function usePinnedApps(personId: string): {
     // clicks, and corrected if the write itself fails.
     onMutate: async (next) => {
       await queryClient.cancelQueries({ queryKey: queryKey(personId) });
-      const previous = queryClient.getQueryData<string[]>(queryKey(personId));
+      const previous = queryClient.getQueryData<string[] | null>(queryKey(personId));
       queryClient.setQueryData(queryKey(personId), next);
       return { previous };
     },
     onError: (_err, _next, context) => {
-      if (context) queryClient.setQueryData(queryKey(personId), context.previous ?? []);
+      if (context) queryClient.setQueryData(queryKey(personId), context.previous ?? null);
     },
     onSettled: () => queryClient.invalidateQueries({ queryKey: queryKey(personId) }),
   });
 
-  const pinned = query.data ?? [];
+  const rows = useAppRows();
+  const pinned = useMemo(() => query.data ?? defaultPinnedRoutes(rows), [query.data, rows]);
 
   function isPinned(navTo: string): boolean {
     return pinned.includes(navTo);

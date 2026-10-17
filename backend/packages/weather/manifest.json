@@ -121,7 +121,7 @@
   "background": false,
   "contributes": {
     "pages": [
-      { "id": "index", "label": "Weather", "icon": "cloud-sun", "nav": true, "kind": "schema", "module": "index", "keywords": ["forecast", "rain", "snow", "temperature", "outside", "hourly"] }
+      { "id": "index", "label": "Weather", "icon": "cloud-sun", "nav": true, "kind": "schema", "module": "index", "pinned_by_default": true, "pin_order": 10, "keywords": ["forecast", "rain", "snow", "temperature", "outside", "hourly"] }
     ],
     "data": [
       { "id": "places", "surface": "weather", "rows": "places" },

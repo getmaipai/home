@@ -54,3 +54,24 @@ export function mergeAppCatalog(rows: readonly AppRow[] | undefined, incognito: 
   const known = new Set(APP_CATALOG.map((app) => app.to));
   return [...APP_CATALOG, ...packageApps.filter((app) => !known.has(app.to))];
 }
+
+/** LEFTNAV-APPS-01: the routes a person who has never chosen their own pins starts with: every app whose manifest
+ * says `pinned_by_default`, lowest `pin_order` first, then by name. The hub already left out the apps this person may
+ * not open; the Incognito filter is `mergeAppCatalog`'s. */
+export function defaultPinnedRoutes(rows: readonly AppRow[] | undefined): string[] {
+  return (rows ?? [])
+    .filter((row) => row.pinned_by_default)
+    .sort((a, b) => (a.pin_order ?? 100) - (b.pin_order ?? 100) || a.label.localeCompare(b.label))
+    .map((row) => row.to);
+}
+
+/** The package apps for the left rail and its launcher: pinned ones first in pin order, then the rest by name. The core
+ * destinations (Home, Chat, Library, People) are the rail's own, so a pinned core route is not repeated here. */
+export function railApps(apps: readonly AppEntry[], pinned: readonly string[]): Array<{ name: string; url: string; icon: string; description: string; pinned: boolean }> {
+  const packageApps = apps.filter((app) => app.to.startsWith("/apps/"));
+  const order = [...new Set(pinned)];
+  const pinnedApps = order.flatMap((to) => packageApps.filter((app) => app.to === to));
+  const rest = packageApps.filter((app) => !order.includes(app.to)).sort((a, b) => a.label.localeCompare(b.label));
+  return [...pinnedApps.map((app) => ({ app, pinned: true })), ...rest.map((app) => ({ app, pinned: false }))]
+    .map(({ app, pinned: isPinned }) => ({ name: app.label, url: app.to, icon: app.icon, description: app.description, pinned: isPinned }));
+}

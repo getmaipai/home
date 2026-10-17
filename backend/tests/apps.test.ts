@@ -31,7 +31,7 @@ const indexPage = {
 };
 const morePage = { type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "shopping" } }] };
 
-interface FixtureOptions { minRole?: string; platforms?: string[]; pages?: unknown; extraPage?: boolean; data?: unknown; requires?: string[] }
+interface FixtureOptions { minRole?: string; platforms?: string[]; pages?: unknown; extraPage?: boolean; data?: unknown; requires?: string[]; pin?: { pinned_by_default?: boolean; pin_order?: number } }
 
 function installFixtureApp(options: FixtureOptions = {}): string {
   const dir = installedPackageVersionDir(ID, VERSION);
@@ -45,7 +45,7 @@ function installFixtureApp(options: FixtureOptions = {}): string {
   if (options.requires) manifest.requires = options.requires;
   manifest.contributes = {
     pages: [
-      { id: "index", label: "Lists", icon: "list", nav: true, kind: "schema", module: "lists", keywords: ["shopping", "groceries"] },
+      { id: "index", label: "Lists", icon: "list", nav: true, kind: "schema", module: "lists", keywords: ["shopping", "groceries"], ...(options.pin ?? {}) },
       ...(options.extraPage === false ? [] : [{ id: "more", label: "More", icon: "calendar", nav: true, kind: "schema", module: "more" }]),
     ],
     data: options.data ?? [
@@ -112,6 +112,35 @@ describe("GET /api/apps", () => {
     });
     expect(typeof rows[0]!.description).toBe("string");
     expect(typeof rows[0]!.category).toBe("string");
+  });
+
+  // LEFTNAV-APPS-01: the manifest's default pin reaches the shell for everyone the app is visible to.
+  test("the bundled Weather app is pinned by default for an owner, a teen and a child", async () => {
+    const { client: ownerClient } = await owner();
+    const teenClient = await teen(ownerClient);
+    const { client: childClient } = await child(ownerClient);
+    for (const client of [ownerClient, teenClient, childClient]) {
+      const rows = (await (await client.get("/api/apps")).json()) as Array<{ package: string; pinned_by_default?: boolean; pin_order?: number }>;
+      expect(rows.find((row) => row.package === "weather")).toMatchObject({ pinned_by_default: true, pin_order: 10 });
+    }
+  });
+
+  test("an app that declares no default pin carries neither field; one that does carries both", async () => {
+    installFixtureApp();
+    const { client } = await owner();
+    const plain = (await fixtureApps(client))[0]!;
+    expect("pinned_by_default" in plain).toBe(false);
+    expect("pin_order" in plain).toBe(false);
+    installFixtureApp({ pin: { pinned_by_default: true, pin_order: 3 } });
+    expect((await fixtureApps(client))[0]).toMatchObject({ pinned_by_default: true, pin_order: 3 });
+  });
+
+  test("a default-pinned app a person's role cannot open is not listed to them", async () => {
+    installFixtureApp({ minRole: "admin", pin: { pinned_by_default: true } });
+    const { client: ownerClient } = await owner();
+    const teenClient = await teen(ownerClient);
+    expect(await fixtureApps(ownerClient)).toHaveLength(1);
+    expect(await fixtureApps(teenClient)).toHaveLength(0);
   });
 
   test("uninstalling hides it again", async () => {

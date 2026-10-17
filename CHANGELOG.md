@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+Apps now appear in the left column. Weather is pinned there for everyone who can open it, other apps sit under an All apps button at the bottom of the column, and each person can pin or unpin any of them (up to six show). The open app is highlighted.
+
 ## [0.2.10] - 2026-10-17
 
 Home copes with low memory and restarts of the AI engine.

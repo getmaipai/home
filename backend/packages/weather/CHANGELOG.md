@@ -22,6 +22,8 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ### Added
 
+- The app asks to be pinned in Home's left rail for everyone who has not chosen their own pins (`pinned_by_default`, `pin_order` 10 in the
+  index page entry). A person can unpin it from the All apps launcher.
 - A person setting `weather.unit` (Fahrenheit by default, or Celsius). The recipe takes an optional `unit` input that Home injects
   for the signed-in person (never a model argument); chat answers and the Weather app both follow it. The hourly background refresh
   has no person and stays Fahrenheit.

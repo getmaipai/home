@@ -1217,6 +1217,10 @@ export interface AppRow {
   /** The package's Incognito behaviour. The hub cannot see the browser's Incognito state, so the shell
    * hides an app whose value is "blocked" while Incognito is on. */
   incognito: "blocked" | "ephemeral" | "unaffected";
+  /** LEFTNAV-APPS-01: the app's index page asks to be pinned in the left rail for anyone who has never chosen their own
+   * pins (`contributes.pages[].pinned_by_default`); `pin_order` sorts the default pins, lowest first. */
+  pinned_by_default?: boolean;
+  pin_order?: number;
   /** The package's own settings area (its manifest's `contributes.settings_area`, as declared), present only when the
    * package declares one and the asking person's role clears `audience.min_role`. The shell draws it at
    * `/settings/<id>` and opens it from the app's gear. */

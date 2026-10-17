@@ -7,7 +7,8 @@ import { useIncognitoContext } from "@/shell/incognitoContext";
  * app page. Install, uninstall, update and role changes invalidate `["apps"]`; it also refetches on window focus. A
  * failed or pending read is an empty list, never an error: the core apps are always there. */
 export function useAppRows(): AppRow[] | undefined {
-  return useAppsQuery().data;
+  const data = useAppsQuery().data;
+  return Array.isArray(data) ? data : undefined;
 }
 
 /** The same shared `["apps"]` query with its state, for a page that must tell "still loading" from "not an app". */

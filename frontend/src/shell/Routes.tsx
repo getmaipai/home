@@ -45,6 +45,9 @@ import { InstallStrip } from "@/shell/InstallStrip";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useStatusApps } from "@/shell/useStatusApps";
+import { railApps } from "@/shell/appCatalog";
+import { useAppCatalog } from "@/shell/useAppCatalog";
+import { usePinnedApps } from "@/shell/usePinnedApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
 import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
@@ -157,6 +160,10 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
   const location = useLocation();
   const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
+  // LEFTNAV-APPS-01: the installed package apps this person may open (the hub's list, minus an Incognito-blocked app
+  // while Incognito is on), pinned ones in the rail and all of them in the launcher at its foot.
+  const appCatalog = useAppCatalog();
+  const { pinned: pinnedRoutes, togglePin } = usePinnedApps(person.id);
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();
   const tourRunner = useTourRunner(person);
@@ -237,7 +244,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             Notifications, System status, Incognito, Settings, Help and Log
             out. Pages draw their own slim title bar; chat draws its own
             beside the history column. */}
-        <Route element={<FullLayout rail activeAppHref={selectedAppHref} headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
+        <Route element={<FullLayout rail activeAppHref={selectedAppHref} railApps={railApps(appCatalog, pinnedRoutes)} onRailAppPinChange={(url) => togglePin(url)} headerSearchRemote={api.search} railTourId="shell.rail" railItemTourId={(item) => item.name === "Chat" ? "rail.chat" : undefined} incognitoTourId="shell.incognito" railProfile={<RailProfile person={person} incognito={incognito} onIncognitoChange={onIncognitoChange} onSignedOut={onSignedOut} helpEntries={helpEntries} />} sidebarItemStatus={(item) => sidebarItemStatus(statusAppsQuery.data ?? [], item)} />}>
           <Route path="chat" element={<ChatPage person={person} />} />
           <Route path="chat/projects" element={<ProjectsPage person={person} />} />
           <Route path="chat/projects/:id" element={<ChatPage person={person} />} />

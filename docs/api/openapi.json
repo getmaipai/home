@@ -5475,6 +5475,14 @@
                         },
                         "description": "The package's own settings area as its manifest declares it (present only when it declares one and the asking person's role may open it); the shell draws it at /settings/<id>."
                       },
+                      "pinned_by_default": {
+                        "type": "boolean",
+                        "description": "The app's manifest asks to be pinned in the left rail for a person who has never chosen their own pins."
+                      },
+                      "pin_order": {
+                        "type": "integer",
+                        "description": "Where this app sits among the default pins, lowest first."
+                      },
                       "incognito": {
                         "type": "string",
                         "enum": [

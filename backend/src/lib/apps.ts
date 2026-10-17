@@ -201,6 +201,8 @@ export function listApps(person: PersonRow): AppRow[] {
       sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
       to: `/apps/${id}`,
       incognito: manifest.incognito,
+      ...(index.pinned_by_default ? { pinned_by_default: true } : {}),
+      ...(typeof index.pin_order === "number" ? { pin_order: index.pin_order } : {}),
       // The package's own settings area, as declared, for the person's role only (the shell draws it at /settings/<id>).
       ...(settingsAreaFor(person, manifest) ? { settings_area: settingsAreaFor(person, manifest)! } : {}),
     });
