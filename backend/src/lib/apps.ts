@@ -17,6 +17,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
 import { getEntity } from "@/lib/entities";
+import { ROLE_LADDER } from "@/middleware/auth";
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { resolvePackageDir } from "@/lib/packageResolve";
 import { parseCurrentLocation, resolveWeatherPlace } from "@/lib/places";
@@ -171,7 +172,8 @@ export function appVisibleTo(
 export function pageMinRole(manifest: PackageManifest, entry: AppPageEntry): string {
   const own = entry.min_role;
   if (own === undefined) return manifest.min_role;
-  if (!meetsMinRole(own, manifest.min_role)) return manifest.min_role;
+  if (!(ROLE_LADDER as readonly string[]).includes(own)) return "owner"; // fail closed: a role the ladder does not know opens to no one but the owner
+  if (!meetsMinRole(own, manifest.min_role)) return manifest.min_role; // never below the package (the install lint refuses it too)
   return own;
 }
 
@@ -194,7 +196,8 @@ function pageReferences(doc: unknown, packageId: string): { data: Set<string>; a
     const call = obj.call;
     if (typeof call === "object" && call !== null && typeof (call as Record<string, unknown>).target === "string") {
       const target = (call as { target: string }).target;
-      if (target.startsWith(actionPrefix)) actions.add(target.slice(actionPrefix.length));
+      // The action id is the first path segment after the prefix; a trailing segment or query string never makes a new id.
+      if (target.startsWith(actionPrefix)) actions.add(target.slice(actionPrefix.length).split(/[/?#{]/)[0]!);
     }
     Object.values(obj).forEach(walkNode);
   };
@@ -202,25 +205,35 @@ function pageReferences(doc: unknown, packageId: string): { data: Set<string>; a
   return { data, actions };
 }
 
-/** The pages (entries) a data id or an action is reached from, by the bindings and call targets in the page documents. */
+const referenceCache = new WeakMap<object, Map<string, { data: Set<string>; actions: Set<string> }>>();
+
+/** The pages (entries) a data id or an action is reached from, by the bindings and call targets in the page documents.
+ * The reference sets are computed once per loaded document (the document objects are cached by `loadApp`). */
 function owningPages(app: LoadedApp, kind: "data" | "actions", id: string): AppPageEntry[] {
   return (app.contributes.pages ?? []).filter((entry) => {
     const doc = app.pages.get(entry.module);
-    return doc !== undefined && pageReferences(doc, app.manifest.id)[kind].has(id);
+    if (doc === undefined || typeof doc !== "object" || doc === null) return false;
+    let perDoc = referenceCache.get(doc);
+    if (!perDoc) { perDoc = new Map(); referenceCache.set(doc, perDoc); }
+    let refs = perDoc.get(app.manifest.id);
+    if (!refs) { refs = pageReferences(doc, app.manifest.id); perDoc.set(app.manifest.id, refs); }
+    return refs[kind].has(id);
   });
 }
 
 /** NEWS-00: may this person reach a data id (`data`) or an action (`actions`)? It names its page through the page
  * documents; the person needs the floor of at least one page that uses it, so a call cannot reach data its page
  * hides. An id no page uses keeps only the package's floor (a widget's data id, say). */
-export function appRouteAllowed(person: PersonRow, packageId: string, kind: "data" | "actions", id: string): boolean {
-  const app = visibleApp(person, packageId);
+export function appRouteAllowed(person: PersonRow, packageId: string, kind: "data" | "actions", id: string, loaded: LoadedApp | null = visibleApp(person, packageId)): boolean {
+  const app = loaded;
   if (!app) return false;
   const owners = owningPages(app, kind, id);
   return owners.length === 0 || owners.some((entry) => pageVisibleTo(person, app.manifest, entry));
 }
 
-/** NEWS-00: the picture route of an app. A picture belongs to the whole app, so the person needs the floor of at
+/** NEWS-00: the action and image forms have no caller until NEWS-02 adds `/actions/:action` and `/images/:item`; each of
+ * those routes must call `appRouteAllowed(..., "actions", id)` and `appImageAllowed` first (the data form is wired in `getAppData`).
+ * The picture route of an app. A picture belongs to the whole app, so the person needs the floor of at
  * least one of its pages. */
 export function appImageAllowed(person: PersonRow, packageId: string): boolean {
   const app = visibleApp(person, packageId);
@@ -230,7 +243,11 @@ export function appImageAllowed(person: PersonRow, packageId: string): boolean {
 function visibleApp(person: PersonRow, id: string): LoadedApp | null {
   const app = loadApp(id);
   if (!app || app.problems.length > 0) return null;
-  return appVisibleTo(person, app.manifest) ? app : null;
+  if (!appVisibleTo(person, app.manifest)) return null;
+  // An app whose index page is above the person is hidden as a whole (the list and search drop it), so its other pages are 404 too.
+  const index = app.contributes.pages!.find((page) => page.id === "index");
+  if (index && !pageVisibleTo(person, app.manifest, index)) return null;
+  return app;
 }
 
 function settingsAreaFor(person: Pick<PersonRow, "role">, manifest: PackageManifest): SettingsArea | undefined {
@@ -315,7 +332,7 @@ export async function getAppData(person: PersonRow, packageId: string, dataId: s
   const app = visibleApp(person, packageId);
   if (!app) return NOT_FOUND;
   const entry: AppDataEntry | undefined = app.contributes.data?.find((d) => d.id === dataId);
-  if (!entry || !appRouteAllowed(person, packageId, "data", dataId)) return { ok: false, status: 404, error: "no such data" };
+  if (!entry || !appRouteAllowed(person, packageId, "data", dataId, app)) return { ok: false, status: 404, error: "no such data" };
   const asOf = new Date().toISOString();
   if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
 

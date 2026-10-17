@@ -259,9 +259,34 @@ describe("a page's own min_role (NEWS-00)", () => {
   });
 
   test("a data id and an action used by one open page and one raised page stay open to the lower role", () => {
-    installFixtureApp({ minRole: "child", pageRoles: { more: "teen" } });
+    const callTo = (action: string) => ({ type: "empty_state", icon: "inbox", text: "None.", action: { call: { target: `/api/plugins/${ID}/actions/${action}` } } });
+    const openPage = { type: "page", id: "lists", title: "Lists", body: [{ type: "answer_blocks", bind: { source: "package", path: "shopping" }, empty_state: callTo("follow") }] };
+    const dir = installFixtureApp({ minRole: "child", pageRoles: { more: "teen" }, pages: openPage });
+    const raised = { type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "shopping" }, empty_state: callTo("follow") }] };
+    writeFileSync(join(dir, "pages", "more.json"), JSON.stringify(raised));
+    __resetAppCachesForTests();
     const childPerson = { role: "child" } as PersonRow;
     expect(appRouteAllowed(childPerson, ID, "data", "shopping")).toBe(true);
+    expect(appRouteAllowed(childPerson, ID, "actions", "follow")).toBe(true);
+  });
+
+  test("regression: an action target with a trailing segment or a query still names its action, so a raised page's action stays closed", () => {
+    const callTo = (target: string) => ({ type: "page", id: "more", title: "More", body: [{ type: "empty_state", icon: "inbox", text: "None.", action: { call: { target } } }] });
+    const dir = installFixtureApp({ minRole: "child", pageRoles: { more: "teen" }, pages: placesOnlyIndex });
+    for (const suffix of ["/{id}", "?x=1", "/123"]) {
+      writeFileSync(join(dir, "pages", "more.json"), JSON.stringify(callTo(`/api/plugins/${ID}/actions/follow${suffix}`)));
+      __resetAppCachesForTests();
+      expect(appRouteAllowed({ role: "child" } as PersonRow, ID, "actions", "follow")).toBe(false);
+      expect(appRouteAllowed({ role: "teen" } as PersonRow, ID, "actions", "follow")).toBe(true);
+    }
+  });
+
+  test("regression: with the index page above a child, the app's other pages are 404 too, not only the list", async () => {
+    installFixtureApp({ minRole: "child", pageRoles: { index: "teen" } });
+    const { client: ownerClient } = await owner();
+    const { client: childClient } = await child(ownerClient);
+    expect((await childClient.get(`/api/plugins/${ID}/pages/more`)).status).toBe(404);
+    expect((await childClient.post(`/api/plugins/${ID}/data/shopping`, {})).status).toBe(404);
   });
 
   test("an action named only by a raised page is refused below it; an unused action keeps the package floor; images need one open page", () => {
