@@ -660,7 +660,7 @@ export type StatusHistoryMinutes = { operational: number; degraded: number; outa
 export type StatusHistoryDay = { date: string; worst: StatusHistoryState; minutes: StatusHistoryMinutes };
 export type StatusHistoryIncident = { component: "chat" | "embed" | "background" | "voice" | "library" | "hub" | "engine_computer"; started_at: string; ended_at: string | null; minutes: number; ongoing: boolean };
 export type StatusHistoryComponent = { component: StatusHistoryIncident["component"]; uptime_percent: number | null; days: StatusHistoryDay[]; current: { state: StatusHistoryState; since: string | null } };
-export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[]; /** CHAT-PAUSE-01: how often chat stopped answering today, and why (counts only). */ chat_pauses?: { count: number; causes: Record<string, number>; line: string } };
+export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[]; /** CHAT-PAUSE-01: how often chat stopped answering today, and why (counts only). */ chat_pauses?: { count: number; causes: Record<string, number>; line: string }; /** ROBUST-01: engines that stopped on their own today, and how many the Stack restarted. */ engine_crashes?: { count: number; healed: number; gave_up: number; line: string; days: Array<{ day: string; crashes: number; healed: number; gave_up: number }> } };
 
 export type StatusAppsResponse = StatusAppsWire;
 export type AppRow = AppRowWire;

@@ -8,7 +8,7 @@ import { StackJob as StackJobSchema } from "@maipai/spec/stack/ts/stack-job.js";
 import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
 import { defaultStackBaseUrl } from "../ports";
-import { StackVoiceSchema } from "./types";
+import { StackVoiceSchema, type StackSelfHeal } from "./types";
 import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
 import type {
@@ -132,6 +132,8 @@ export interface StackClient {
   modelAction(id: string, action: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
   health(opts?: { signal?: AbortSignal }): Promise<{ health: HealthItem[] }>;
   healthFix(code: string, opts?: { signal?: AbortSignal }): Promise<Record<string, unknown>>;
+  /** ROBUST-01: crashes per day and the Stack's own restarts; absent on a Stack older than the route. */
+  selfHeal?(opts?: { signal?: AbortSignal }): Promise<StackSelfHeal>;
   settings(opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   applySettings(values: Record<string, unknown>, opts?: { signal?: AbortSignal }): Promise<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>;
   /** SEARXNG-SET-03: Stack-owned SearXNG settings preview and revert. */
@@ -434,6 +436,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),
+    selfHeal: (opts) => call("/stack/v1/engines/self-heal", { method: "GET" }, json<StackSelfHeal>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),
     applySettings: (values, opts) => call("/stack/v1/settings/apply", jsonInit(values), json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),

@@ -79,6 +79,9 @@ export function getHomeOwnedRoles(): StackRole[] {
   return [];
 }
 
+/** ROBUST-01: Home's one safe act on an unreachable Stack: forget the cached connection so a dead one is never reused. */
+export function dropStackClientCache(): void { cachedClient = null; cachedUrl = null; }
+
 let cachedClient: StackClient | null = null;
 let cachedUrl: string | null = null;
 let testClient: StackClient | null = null;

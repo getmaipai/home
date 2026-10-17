@@ -13221,6 +13221,56 @@
                         "causes",
                         "line"
                       ]
+                    },
+                    "engine_crashes": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "healed": {
+                          "type": "number"
+                        },
+                        "gave_up": {
+                          "type": "number"
+                        },
+                        "line": {
+                          "type": "string"
+                        },
+                        "days": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "day": {
+                                "type": "string"
+                              },
+                              "crashes": {
+                                "type": "number"
+                              },
+                              "healed": {
+                                "type": "number"
+                              },
+                              "gave_up": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "day",
+                              "crashes",
+                              "healed",
+                              "gave_up"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "healed",
+                        "gave_up",
+                        "line",
+                        "days"
+                      ]
                     }
                   },
                   "required": [
@@ -13228,7 +13278,8 @@
                     "days",
                     "components",
                     "incidents",
-                    "chat_pauses"
+                    "chat_pauses",
+                    "engine_crashes"
                   ]
                 }
               }

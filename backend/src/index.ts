@@ -51,6 +51,7 @@ import { ensureSetupState } from "@/lib/setupState";
 import { restoreWasApplied } from "@/db";
 import { syncTailscaleRenewalSetting } from "@/lib/tailscale";
 import { startDdgsStackSync } from "@/lib/retrieval/ddgsStackSync";
+import { startStackSelfHealWatch } from "@/lib/stackSelfHeal";
 
 const configuredPort = configuredHubPort();
 purgeLegacyHubLogs();
@@ -287,6 +288,8 @@ setInterval(() => {
 // "how busy the machine has been" (Jesse, 2026-09-04) doesn't need finer
 // granularity than that to show a real trend.
 setInterval(() => void sampleEngineStats(), 60_000);
+// ROBUST-01: the Stack restarts engines that stop; this tells the admins once and counts it for the Status page.
+startStackSelfHealWatch();
 const statusSampleInterval = setInterval(() => void recordStatusSample(), 30_000);
 statusSampleInterval.unref();
 const internetProbeSample = async () => {

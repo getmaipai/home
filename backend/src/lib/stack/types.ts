@@ -304,3 +304,7 @@ export interface FailureBody {
   role?: string;
   state?: string;
 }
+
+/** GET /stack/v1/engines/self-heal (ROBUST-01): the Stack's own restarts of engines that stopped. */
+export interface StackSelfHealEvent { id: string; kind: "crashed" | "healed" | "gave_up"; at: string; role: string; cause: string; causeKind: string; seconds?: number; crashedAt?: string; attempts?: number }
+export interface StackSelfHeal { enabled: boolean; crashesByDay: Array<{ day: string; crashes: number; healed: number; gaveUp: number }>; events: StackSelfHealEvent[]; stopped: string[]; healing: string[]; blocker?: string | null }

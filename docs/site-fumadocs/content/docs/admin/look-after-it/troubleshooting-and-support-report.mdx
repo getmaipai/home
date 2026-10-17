@@ -16,6 +16,17 @@ Only an owner or admin can fix or dismiss. If a button fails, Home says "Could n
 
 Tick **Telegram me about new Repairs items** to hear about them when you are out.
 
+## 🔁 When the AI stops by itself
+
+An engine can stop on its own, for example when the computer runs low on memory. The Stack restarts it for you, after 2 seconds, then 10, 30 and 120 seconds. It checks that the engine answers before it calls it ready, and it waits while an install, an update or a picture or video job runs, or while memory is low.
+
+- You get one notification: "Chat engine crashed and was restarted at 14:48; it was back in 12 seconds."
+- **Status** shows how many times an engine crashed today and how many the Stack restarted.
+- If Home cannot reach the Stack for 2 minutes, Home says "The AI stopped and is restarting itself". After 6 minutes it says "The AI could not restart itself: open Repairs".
+- After 5 stops in 30 minutes the Stack stops trying. Repairs then shows "The chat engine keeps stopping" with the cause, the last 20 log lines and a **Restart engine** button. Fix the cause first (close big programs, or choose a smaller model), then press the button.
+
+The switch is **Restart engines that crash** in the Stack settings (on by default).
+
 ## 🩺 Other places to look
 
 | Page | Use it for |

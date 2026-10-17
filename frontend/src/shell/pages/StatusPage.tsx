@@ -82,6 +82,7 @@ export function StatusPage({ person }: { person: Roster }) {
       </Card> : undefined} /> : null}
       </div>
       {canSeeParts && historyQuery.data?.chat_pauses ? <p data-testid="chat-pauses" className="mt-4 text-sm text-muted-foreground">{historyQuery.data.chat_pauses.line}</p> : null}
+      {canSeeParts && historyQuery.data?.engine_crashes ? <p data-testid="engine-crashes" className="mt-1 text-sm text-muted-foreground">{historyQuery.data.engine_crashes.line}</p> : null}
       {canSeeParts && incidentEvents.length ? <><h3 className="mt-4 mb-2 text-sm font-semibold">Recent problems</h3><Timeline events={incidentEvents} visibleCount={incidentEvents.length} animate={false} /></> : null}
       {(boardData?.maintenance.length ?? 0) > 0 || admin ? <div className="mt-4"><Card>
         <CardHeader><CardTitle>Scheduled maintenance</CardTitle></CardHeader>

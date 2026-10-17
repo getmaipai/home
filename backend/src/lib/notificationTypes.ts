@@ -155,6 +155,27 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app"],
     toast: true,
   },
+  // ROBUST-01: the Stack restarted an engine that stopped, or itself stopped.
+  // One line each, in plain words, for the admins; the Repairs item and the
+  // Status page carry the rest.
+  {
+    id: "stack.engine_healed",
+    level: "passive",
+    audience: "admins",
+    template: "{text}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
+  {
+    id: "stack.restarting",
+    level: "time_sensitive",
+    audience: "admins",
+    template: "{text}",
+    configurable: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   // Session F (platform and trust), step 1: the Health/Repairs surface.
   // Only `error`-severity issues fire this (lib/issues.ts's raiseIssue());
   // `info` and `warning` sit on GET /api/repairs for a person to notice on
