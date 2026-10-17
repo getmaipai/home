@@ -150,6 +150,8 @@ export interface StackClient {
   runCheck(opts?: { signal?: AbortSignal }): Promise<StackCheckRun>;
   /** POST /stack/v1/warmup (STACK-WARM-01): load and prime the roles a first chat needs; the Stack also does this on its own at start and after each model install. */
   warmup(opts?: { signal?: AbortSignal }): Promise<{ state: "idle" | "warming" | "ready"; trigger: string | null }>;
+  /** GET /stack/v1/warmup: the warm-up state, read only. Polling uses this; a POST starts a new warm-up whenever none is running, so polling it looped a chat prime every 2 s. */
+  warmupState(opts?: { signal?: AbortSignal }): Promise<{ state: "idle" | "warming" | "ready"; trigger: string | null }>;
   /** GET /stack/v1/search (STACK-DDGS-01): where the Stack's DuckDuckGo search service listens and whether it is healthy. */
   searchService(opts?: { signal?: AbortSignal }): Promise<{ ddgs: StackSearchServiceStatus }>;
   /** GET /healthz. `version` is the Stack's own release ("0.1.0"); `contract` is the wire contract number Home compares to STACK_CONTRACT_MIN/MAX. */
@@ -442,6 +444,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     rollbackEngine: (name, tag, opts) => call(`/stack/v1/updates/engines/${encodeURIComponent(name)}/rollback`, jsonInit({ tag }), json<StackEngineRollbackResult>, opts),
     sweepStorage: (opts) => call("/stack/v1/storage/sweep", { method: "POST" }, json<StackStorageSweepResult>, opts),
     warmup: (opts) => call("/stack/v1/warmup", { method: "POST" }, json<{ state: "idle" | "warming" | "ready"; trigger: string | null }>, opts),
+    warmupState: (opts) => call("/stack/v1/warmup", { method: "GET" }, json<{ state: "idle" | "warming" | "ready"; trigger: string | null }>, opts),
     runCheck: (opts) => call("/stack/v1/check", { method: "POST" }, json<StackCheckRun>, opts),
     searchService: (opts) => call("/stack/v1/search", { method: "GET" }, json<{ ddgs: StackSearchServiceStatus }>, opts),
     healthz: (opts) => call("/healthz", { method: "GET" }, json<{ ok: boolean; version: string; contract?: number; uptimeSeconds: number }>, opts),

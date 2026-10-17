@@ -10,8 +10,9 @@ import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
  * Between the request and the role list flipping to `loaded` the role still
  * reads `installed` (ready on demand), so the composer used to enable and a
  * message sent then waited out the whole load. While the Stack says it is
- * warming, this module re-asks every WARM_POLL_MS (joining the running
- * warm-up, cheap) and `warmupInFlight()` is true, which roleHealth reads as
+ * warming, this module reads the state (GET, never another POST: a POST
+ * starts a new warm-up whenever none is running, and re-posting every
+ * 2 s kept a chat prime looping on the Stack, 2026-10-17) every WARM_POLL_MS and `warmupInFlight()` is true, which roleHealth reads as
  * "starting". It gives up after WARM_MAX_MS so a stuck warm-up never holds
  * Send for good. */
 export const WARM_POLL_MS = 2_000;
@@ -26,12 +27,25 @@ export function __resetWarmupForTests(): void { warmingSince = null; clearTimeou
 
 function schedule(): void {
   clearTimeout(pollTimer);
-  pollTimer = setTimeout(() => { void warmStack(); }, WARM_POLL_MS);
+  pollTimer = setTimeout(() => { void readWarmup(); }, WARM_POLL_MS);
   (pollTimer as { unref?: () => void }).unref?.();
 }
 
+/** The poll: read the Stack's warm-up state without starting one. */
+async function readWarmup(): Promise<void> {
+  if (!isStackConfigured()) { warmingSince = null; return; }
+  try {
+    const { state } = await getStackClient().warmupState();
+    if (state === "warming" && warmupInFlight()) schedule(); else warmingSince = null;
+  } catch {
+    warmingSince = null;
+  }
+}
+
+/** Asks for one warm-up, once per need: a request while one is already being watched does nothing. */
 export async function warmStack(): Promise<boolean> {
   if (!isStackConfigured()) return false;
+  if (warmupInFlight()) return true;
   try {
     const { state } = await getStackClient().warmup();
     if (state === "warming") {
