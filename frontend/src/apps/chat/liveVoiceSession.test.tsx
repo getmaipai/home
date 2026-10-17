@@ -238,6 +238,21 @@ describe("live voice session", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
+  test("a stalled event loop that delivers speech and the quiet-window timer together does not close the session", async () => {
+    // Found in the full `bun test src` run (2026-10-17): a long pause (GC, load) expires the speech message's timer and the
+    // idle timer in one pass, so the idle callback ran before React re-rendered and cleared it, and closed a call whose
+    // person had already started talking. The callback must read the speech flag itself.
+    const onOpenChange = mock();
+    const fixture: SttFixtureStep[] = [
+      { delayMs: 0, message: { t: "ready" } },
+      { delayMs: 80, message: { t: "vad", speaking: true, rms: 0.1 } },
+    ];
+    render(<Harness open onOpenChange={onOpenChange} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={[]} idleCloseMs={150} />);
+    setTimeout(() => { const end = Date.now() + 200; while (Date.now() < end) { /* stall the loop */ } }, 40);
+    await new Promise((resolve) => setTimeout(resolve, 450));
+    expect(onOpenChange).not.toHaveBeenCalledWith(false);
+  });
+
   test("the quiet window restarts after a spoken reply so a follow-up still works", async () => {
     const onOpenChange = mock();
     const sentTexts: string[] = [];
