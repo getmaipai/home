@@ -68,7 +68,7 @@ test("a stream cut after a word was shown is not repeated", async () => {
 
 test("what counts as a restart: refused, 503 stack_restarting, a closed socket; not a bad request", () => {
   expect(isStackRestart(new StackError("unreachable", "x"))).toBe(true);
-  expect(isStackRestart(Object.assign(new StackError("unavailable", "The Stack is restarting. Try again in a few seconds."), { status: 503 }))).toBe(true);
+  expect(isStackRestart(Object.assign(new StackError("unexpected", "The Stack is restarting. Try again in a few seconds."), { status: 503 }))).toBe(true);
   expect(isStackRestart(new TypeError("terminated"))).toBe(true);
   expect(isStackRestart(new StackError("unexpected", "bad request"))).toBe(false);
 });
