@@ -17,6 +17,10 @@ Media Session, search providers, Save to Home, one household trash, handoff, the
 [the media apps blend note, section 12](media-apps-blend-2026-10-17.md#12-cross-app-platform-features-from-filetube); a
 design that queues work, resumes something or keeps a collection cites that section rather than defining its own.
 
+**Live video (RULES.md V1, owner's rule 2026-10-17):** no code, test, script, bench, agent or session sends any request to
+YouTube or any other live video service until Jesse has approved that request in the moment, after the Loki Doki history review
+and a proposed design; otherwise the household IP gets blocked.
+
 ## Current designs in `docs/design/`
 
 | Record | Status | Owner row(s) in `docs/BACKLOG.md` |
@@ -36,6 +40,7 @@ design that queues work, resumes something or keeps a collection cites that sect
 | [devices-and-robot-link-2026-10-17.md](devices-and-robot-link-2026-10-17.md) | new 2026-10-17, no code | ROBOTLINK-01, -02, ROBOTLINK-BENCH-01, DEVICES-01 to -03 (to be cut; today the Portability "Sync engine decision" and "A Device record and spec/link" rows) |
 | [stories-2026-10-17.md](stories-2026-10-17.md) | new 2026-10-17, no code | STORIES-01 to -04 (to be cut; today PROJECT-PACK-01, -02 in Projects) |
 | [media-apps-blend-2026-10-17.md](media-apps-blend-2026-10-17.md) (and its [sources](media-apps-blend-2026-10-17-sources.md)) | current; section 12 is the cross-app platform record | Media apps: MEDIA-SPEC-01 to MEDIA-GO-01, AUDIO-SESSION-01, KEEP-OFFLINE-01, SAVE-TO-HOME-01, TRASH-01, HANDOFF-01 |
+| [live-video-2026-10-17.md](live-video-2026-10-17.md) (and its [Loki Doki lessons](live-video-lessons-2026-10-17.md)) | new 2026-10-17, proposal awaiting Jesse; no code, no request made; the record for RULES.md V1 | LIVE-VIDEO-01 to -06 (to be cut from the note's section 10 once Jesse approves it; today MEDIA-SEARCH-01 and YOUTUBE-API-01) |
 | [modes-and-child-protections-2026-10-17.md](modes-and-child-protections-2026-10-17.md) | new 2026-10-17, no code; MODE-BIRTHDATE-01 held behind Jesse's rule edit | MODE-NAMING-01, MODE-BIRTHDATE-01, MODE-GUEST-01, ROLE-RENAME-01 (the rung names), AGE-01, AGE-02, DOCS-GAP-02, CHILD-PROFANITY-01, TEEN-RESEARCH-01 |
 | [people-roles-and-account-2026-10-17.md](people-roles-and-account-2026-10-17.md) | new 2026-10-17, no code; RAIL-SWITCH-PROFILE-01 held behind S1 | NO-OWNER-ROLE-01, GRANTS-01, RELATION-INFER-01, PARENT-CONTROLS-UI-01, DOCS-GAP-03b, ACCOUNT-PIN-CHANGE-01, DEVICE-PHONE-01, BRANCH-SEC1-01, NO-CROSS-USER-VISIBILITY-01, LOG-PRIVACY-01 |
 | [security-and-data-lifecycle-2026-10-17.md](security-and-data-lifecycle-2026-10-17.md) | new 2026-10-17, no code | SEC-PRIVACY-01, CAP-06, CAP-08, SETTINGS-AUDIT-01, DIAG-REPORT-01, PERF-ALERT-01, ERASE-HUB-01, EXPORT-01, MEM-EXPORT-01, HUB-MIGRATE-01, SELF-UPDATE-TESTS-01, HOME-IMAGE-01 |

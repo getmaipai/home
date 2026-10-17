@@ -103,6 +103,8 @@ Verdicts: **keep** (build as designed in the target), **port** (carry the logic,
 | Roku channel | no | yes | Go | drop |
 | Eras and skins | no | yes | theme packages | later, catalog only |
 
+> **Superseded in part 2026-10-17** by [live-video-2026-10-17.md](live-video-2026-10-17.md) (Jesse's decision: everyone browses live web video): the rows "Browse and search YouTube live" and "Linked Google account by TV device code" now follow that note (the official API with the household key, the official player on the person's device, a child within an approved list, an optional family account); InnerTube, Invidious and Piped are dropped. Any request to a live video service waits on RULES.md V1.
+
 ### Shows and Films
 
 | Feature | LD | FT | Target | Verdict |
@@ -468,6 +470,7 @@ For Jesse (each goes through the question wizard when he is back; nothing above 
   Home's offline routes for now. This note assumes Go.
 - **B.** Whether live web video browsing (trending, related, open search) is wanted for adults at all, or only "save this link"
   and subscriptions. This note ships the latter and holds browsing as opt-in later.
+  > **Superseded in part 2026-10-17** by [live-video-2026-10-17.md](live-video-2026-10-17.md): answered, live browsing is wanted, for everyone.
 - **C.** Default quality ceiling for saved video (this note: 1080p household default, 4K only when an admin raises it, since the
   Studio's disk and the Apple TV's decoder both argue for it).
 

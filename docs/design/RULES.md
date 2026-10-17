@@ -414,3 +414,25 @@ S6. **System status reaches the person through the existing mechanisms.**
     the verdict is DUPLICATE when an existing mechanism covers the kind of
     status. Rejected in review: a new status UI that duplicates an existing
     one.
+
+## Live video services
+
+Record: [live web video for everyone](live-video-2026-10-17.md), with its
+history in [the Loki Doki lessons](live-video-lessons-2026-10-17.md).
+Owner-approved 2026-10-17: V1, authored by Jesse in chat; his reason is the
+record: otherwise the household IP gets blocked (YouTube walled the home
+address on 2026-08-28).
+
+Governs: backend/**, frontend/**, scripts/**, docs/design/live-video*.md
+
+V1. **No request to a live video service without Jesse's approval in the
+    moment.** No code, test, script, bench, agent or session sends a
+    request of any kind (a page, an API call, a loaded embed or player, a
+    thumbnail, a caption, a yt-dlp run, a search-engine pass-through, a
+    probe) to YouTube or any other live video service (its hosts and
+    CDNs, and any Invidious, Piped or other front end for one) until the
+    Loki Doki history has been reviewed, the research done, a design
+    proposed to Jesse, and Jesse has approved it in the moment. An
+    approval covers only the requests it names; approving a design is not
+    approving a request. Tests use hand-written fixtures, never a capture
+    from the live service. Reason: the household's one IP gets blocked.
