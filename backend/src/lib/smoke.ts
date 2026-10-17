@@ -182,8 +182,27 @@ const DENO_TEST_TIMEOUT_MS = 60_000;
 // - the exact same "never a real bundled package under PACKAGES_DIR"
 // posture lib/denoHost.ts's own real-spawn permission tests already take,
 // denoHost.test.ts's own header explains why).
+/** Deno is optional: without it the Deno-backed data packages stay off. Overridable for tests. */
+let denoLookup: () => string | null = () => Bun.which("deno");
+export function setDenoLookupForTest(fn: (() => string | null) | null): void {
+  denoLookup = fn ?? (() => Bun.which("deno"));
+}
+let denoMissingLogged = false;
+
+async function recordSkipped(id: string, message: string): Promise<SmokeResult> {
+  // Off, but not broken: no Repairs item, just a disabled status with the reason.
+  const now = new Date().toISOString();
+  db.insert(packageStatus)
+    .values({ packageId: id, status: "disabled", lastSmokeAt: now, smokeOk: null, smokeMessage: message })
+    .onConflictDoUpdate({ target: packageStatus.packageId, set: { status: "disabled", lastSmokeAt: now, smokeOk: null, smokeMessage: message } })
+    .run();
+  return { ok: true, message };
+}
+
 export async function runDenoTestSmoke(dir: string, timeoutMs: number = DENO_TEST_TIMEOUT_MS): Promise<SmokeResult> {
-  const proc = Bun.spawn(["deno", "test", "--no-check", `--allow-read=${dir}`, "--cached-only", dir], {
+  let proc: Bun.Subprocess<"ignore", "pipe", "pipe">;
+  try {
+    proc = Bun.spawn(["deno", "test", "--no-check", `--allow-read=${dir}`, "--cached-only", dir], {
     stdout: "pipe",
     stderr: "pipe",
     // Use the same Deno package-resolution mode as the live sandbox:
@@ -191,7 +210,10 @@ export async function runDenoTestSmoke(dir: string, timeoutMs: number = DENO_TES
     // not a Deno-managed node_modules tree beside Bun's package.json.
     env: { ...process.env, DENO_NO_PACKAGE_JSON: "1" },
     timeout: timeoutMs,
-  });
+    });
+  } catch (err) {
+    return { ok: false, message: `deno could not be started: ${(err as Error).message}` };
+  }
   const [stdout, stderr, exitCode] = await Promise.all([
     new Response(proc.stdout).text(),
     new Response(proc.stderr).text(),
@@ -262,6 +284,13 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
   }
 
   if (smoke.kind === "deno_test") {
+    if (!denoLookup()) {
+      if (!denoMissingLogged) {
+        denoMissingLogged = true;
+        console.warn("[smoke] Deno is not installed, so the built-in data packages (music, news, sports, almanac) stay off. Install Deno, then restart the hub to turn them on.");
+      }
+      return recordSkipped(id, "Deno is not installed; this package stays off until it is. Install Deno and restart.");
+    }
     return recordResult(id, await runDenoTestSmoke(resolvePackageDir(id)));
   }
 
@@ -275,7 +304,13 @@ export async function runAllSmokeTests(): Promise<{ ran: number; failed: number 
   let ran = 0;
   let failed = 0;
   for (const id of listPackageIds()) {
-    const result = await runSmoke(id);
+    let result: SmokeResult;
+    try {
+      result = await runSmoke(id);
+    } catch (err) {
+      console.error(`[smoke] ${id} smoke threw: ${(err as Error).message}`);
+      result = { ok: false, message: (err as Error).message };
+    }
     ran++;
     if (!result.ok) failed++;
   }

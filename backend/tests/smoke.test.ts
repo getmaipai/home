@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { resetDb } from "./reset-db";
-import { runSmoke, runDenoTestSmoke, getPackageStatus, allPackageStatuses, runAllSmokeTests } from "@/lib/smoke";
+import { runSmoke, runDenoTestSmoke, getPackageStatus, allPackageStatuses, runAllSmokeTests, setDenoLookupForTest } from "@/lib/smoke";
 import { listIssues } from "@/lib/issues";
 
 beforeEach(() => {
@@ -161,4 +161,17 @@ describe("runDenoTestSmoke timeout (COR-2)", () => {
     const result = await runDenoTestSmoke(tempDir, 30_000);
     expect(result.ok).toBe(true);
   }, 15_000);
+});
+
+describe("Deno is optional", () => {
+  afterEach(() => setDenoLookupForTest(null));
+  test("deno missing: a deno_test package is skipped (off, no issue, no throw)", async () => {
+    setDenoLookupForTest(() => null);
+    const r = await runSmoke("music");
+    expect(r.ok).toBe(true);
+    expect(r.message).toContain("Deno is not installed");
+    expect(getPackageStatus("music").status).toBe("disabled");
+    expect(listIssues().some((i) => i.key === "music")).toBe(false);
+    await expect(runAllSmokeTests()).resolves.toBeDefined();
+  });
 });
