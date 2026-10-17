@@ -126,10 +126,26 @@ describe("planFor", () => {
       const signal = base("question");
       const line = planLine(planFor(input(signal, { surfaceClass: "written" })), signal, "written");
       expect(line).not.toContain("as complete as you would answer");
-      const [head = "", tail = ""] = line.split(". ");
+      const sentences = line.split(". ");
+      const [head = ""] = sentences;
+      const tail = sentences[sentences.length - 1] ?? "";
       expect(head).not.toContain("persona");
       expect(tail).toContain("persona at all");
       expect(tail.startsWith("Length: ")).toBe(true);
+    });
+    test("PERSONA-LEAK-02: the written bans are an instruction sentence, never the 'no question, no tasks' fragment", () => {
+      // Live 2026-10-17: three written replies in one session opened or closed with
+      // "No question, no tasks." because the bans sat as a bare fragment at the end of
+      // the plan list, the same leak PERSONA-LEAK-01 fixed for the length clause.
+      const signal = base("question");
+      const written = planLine(planFor(input(signal, { surfaceClass: "written" })), signal, "written");
+      expect(written).not.toMatch(/no question/i);
+      expect(written).not.toMatch(/no tasks/i);
+      expect(written).not.toMatch(/no playfulness/i);
+      expect(written).toMatch(/\. (Do not add [^.]+|Add no unnecessary follow-up)\. Length: /);
+      // The spoken class keeps its frozen fragment wording (rule 0: a spoken turn's shape never changes here).
+      const spoken = planLine(planFor(input(signal)), signal);
+      expect(spoken).toMatch(/no question|no tasks|no unnecessary follow-up/);
     });
   });
 

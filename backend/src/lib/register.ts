@@ -216,6 +216,12 @@ export function planFor(input: PlanInput): ReplyPlan {
  * model given permission to be short took it. Restated as the floor
  * itself, in instruction form: as complete as the bare model's own
  * answer, then in the companion's voice. */
+/** "a question back", "a question back or a list of tasks", "a question back, a list of tasks or playfulness". */
+function joinAlternatives(items: readonly string[]): string {
+  if (items.length <= 1) return items[0] ?? "";
+  return `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+}
+
 function planLineAbout(plan: ReplyPlan, signal: TurnSignal, surfaceClass: SurfaceClass, about: string): string {
   const act = signal.primary_act === "inform" ? "a statement" : `a ${signal.primary_act}`;
   const emotion = signal.expressed_emotion === "neutral" ? "neutral" : signal.expressed_emotion;
@@ -227,8 +233,14 @@ function planLineAbout(plan: ReplyPlan, signal: TurnSignal, surfaceClass: Surfac
   const lead = required.includes("care") ? "acknowledge the feeling first" : requirements;
   // PERSONA-LEAK-01: on the written class the length rule is its own sentence.
   // As a bare fragment inside the comma list the model echoed it as reply text.
+  // PERSONA-LEAK-02 (live, 2026-10-17, three replies in one session opened or
+  // closed with "No question, no tasks."): the bans fragment leaked the same
+  // way, so on the written class it is an instruction sentence too, and the
+  // list ends at the lead move.
   if (surfaceClass === "written") {
-    return `${act} about ${about}, ${emotion}, ${signal.emotion_intensity}: ${lead}, ${bans || "no unnecessary follow-up"}. Length: answer as completely as you would with no persona at all, then add the companion's voice.`;
+    const avoid = [forbidden.includes("ask_back") || required.includes("care") ? "a question back" : "", forbidden.includes("point") ? "a list of tasks" : "", plan.playfulness === "forbidden" ? "playfulness" : ""].filter(Boolean);
+    const avoidSentence = avoid.length ? `Do not add ${joinAlternatives(avoid)}.` : "Add no unnecessary follow-up.";
+    return `${act} about ${about}, ${emotion}, ${signal.emotion_intensity}: ${lead}. ${avoidSentence} Length: answer as completely as you would with no persona at all, then add the companion's voice.`;
   }
   return `${act} about ${about}, ${emotion}, ${signal.emotion_intensity}: ${lead}, ${length}, ${bans || "no unnecessary follow-up"}.`;
 }
