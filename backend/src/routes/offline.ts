@@ -6,7 +6,9 @@ import { offlineProvider } from "@/lib/offline/registry";
 import "@/lib/offline/providers";
 
 export const offlineRoutes = apiRouter();
-const gate = requireDeviceScope("offline.records");
+// A device a guardian granted media.offline before KEEP-OFFLINE-01 keeps media through these routes too. Its grant is not widened to
+// other kinds (no migration adds offline.records): every other kind needs offline.records.
+const gate = requireDeviceScope((c) => (c.req.query("kind") ?? c.req.param("kind")) === "media" ? ["offline.records", "media.offline"] : ["offline.records"]);
 const missing = "This copy is not available to you on Home. Open the item in its app, then try again.";
 const errors = errorResponses({ 401: "Sign in to Home and try again", 403: "Check this device's offline permission, or screen time is done (media_time_up, budget_keep_refused)", 404: "Open the item in its app and try again" });
 const manifest = createRoute({
@@ -18,7 +20,7 @@ const manifest = createRoute({
 offlineRoutes.openapi(manifest, async (c) => {
   const { kind, id } = c.req.valid("query");
   const provider = offlineProvider(kind);
-  const refused = provider?.refuse?.(c.get("person"));
+  const refused = provider?.refuse(c.get("person"));
   if (refused) return c.json(refused, 403);
   const result = await provider?.manifest(c.get("person"), id);
   if (!result) return c.json({ error: missing }, 404);
@@ -35,7 +37,7 @@ offlineRoutes.openapi(file, (c) => {
   const { kind, entry } = c.req.valid("param");
   const provider = offlineProvider(kind);
   if (!provider) return c.json({ error: missing }, 404);
-  const refused = provider.refuse?.(c.get("person"));
+  const refused = provider.refuse(c.get("person"));
   if (refused) return c.json(refused, 403);
   return provider.file(c.get("person"), entry, c.req.raw);
 });

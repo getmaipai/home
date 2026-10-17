@@ -65,7 +65,7 @@ test("quota refusal and quota exceptions map to storageFull", async () => {
   expect(await listKept()).toEqual([]);
 });
 test("HTTP failures map to plain codes", async () => {
-  for (const [status, code] of [[403, "revoked"], [401, "revoked"], [404, "notOnServer"], [409, "notPlayable"], [503, "notReady"], [500, "network"]] as const) {
+  for (const [status, code] of [[401, "revoked"], [404, "notOnServer"], [409, "notPlayable"], [503, "notReady"], [500, "network"]] as const) {
     globalThis.fetch = (async () => new Response("", { status })) as unknown as typeof fetch;
     expect(await keepOnDevice({ kind: "media", id: "media-nova00" })).toMatchObject({ ok: false, code });
   }
@@ -120,6 +120,25 @@ test("reconcile removes copies the hub reports gone or changed and keeps the ok 
   globalThis.fetch = (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch;
   expect(await reconcileKept()).toBe(0);
   expect((await listKept()).length).toBe(1); // offline: nothing is removed
+});
+
+test("a 403 is revoked only for device_revoked; a missing grant and screen time say so", async () => {
+  for (const [body, code] of [[{ code: "offline_scope_missing" }, "needsGrant"], [{ code: "guardian_grant_required" }, "needsGrant"], [{ code: "media_time_up" }, "screenTime"], [{ code: "budget_keep_refused" }, "screenTime"], [{}, "needsGrant"], [{ code: "device_revoked" }, "revoked"]] as const) {
+    globalThis.fetch = (async () => Response.json(body, { status: 403 })) as unknown as typeof fetch;
+    expect(await keepOnDevice({ kind: "media", id: "media-nova00" })).toMatchObject({ ok: false, code });
+  }
+});
+
+test("reconcile wipes every copy when the hub says the device was revoked, and nothing on another 403", async () => {
+  const original = globalThis.fetch;
+  await keepOnDevice({ kind: "media", id: "media-nova00" });
+  globalThis.fetch = (async () => Response.json({ code: "offline_scope_missing" }, { status: 403 })) as unknown as typeof fetch;
+  await reconcileKept();
+  expect((await listKept()).length).toBe(1);
+  globalThis.fetch = (async () => Response.json({ code: "device_revoked" }, { status: 403 })) as unknown as typeof fetch;
+  await reconcileKept();
+  expect(await listKept()).toEqual([]);
+  globalThis.fetch = original;
 });
 
 test("the media owner is cleared only by a 401 from /me, never by a network error or a server error", () => {

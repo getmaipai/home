@@ -360,9 +360,13 @@ export const requireApiToken = createMiddleware<AppEnv>(async (c, next) => {
   await next();
 });
 
-/** Bearer admission is opt-in at each route. Never use this in the general session authenticator. */
-export function requireDeviceScope(scope: "media.offline" | "offline.records") {
+export type OfflineScope = "media.offline" | "offline.records";
+/** Bearer admission is opt-in at each route. Never use this in the general session authenticator. `scope` is one scope, or a function
+ * naming the scopes that admit this request (any one is enough): the generic offline routes accept a media-only grant for media. */
+export function requireDeviceScope(scope: OfflineScope | ((c: Context<AppEnv>) => readonly OfflineScope[])) {
   return createMiddleware<AppEnv>(async (c, next) => {
+    const allowed = typeof scope === "function" ? scope(c) : [scope];
+    const granted = (list: readonly string[]) => allowed.some((s) => list.includes(s));
     const authorization = c.req.header("authorization");
     if (authorization !== undefined) {
       const match = /^Bearer ([^ ]+)$/i.exec(authorization);
@@ -370,7 +374,7 @@ export function requireDeviceScope(scope: "media.offline" | "offline.records") {
       const device = identity ? getDeviceById(identity.deviceId) : null;
       // `device_revoked` is the one code the browser treats as "wipe kept copies"; a missing scope is not a revocation.
       if (!identity || !device) return c.json({ error: "This device is no longer paired with Home. Pair it again to keep files.", code: "device_revoked" }, 403);
-      if (!device.offlineScope.includes(scope) || !mayHoldMediaOffline(device)) {
+      if (!granted(device.offlineScope) || !mayHoldMediaOffline(device)) {
         return c.json({ error: "This device cannot keep these files. Sign in to Home and check its offline permission, or pair it again.", code: "offline_scope_missing" }, 403);
       }
       c.set("person", identity.person);
@@ -386,7 +390,7 @@ export function requireDeviceScope(scope: "media.offline" | "offline.records") {
       const deviceId = resolveSessionDeviceId(token);
       // Redeeming a device bearer for a cookie must not bypass the offline scope.
       const sessionDevice = deviceId ? getDeviceById(deviceId) : null;
-      if (deviceId && (!sessionDevice?.offlineScope.includes(scope) || !mayHoldMediaOffline(sessionDevice))) {
+      if (deviceId && (!sessionDevice || !granted(sessionDevice.offlineScope) || !mayHoldMediaOffline(sessionDevice))) {
         return c.json({ error: "This device has no offline permission. Sign in on your own browser to change it.", code: "offline_scope_missing" }, 403);
       }
       // A child or teen keeps media only on a device a grown-up granted: a plain browser session has no device to grant.

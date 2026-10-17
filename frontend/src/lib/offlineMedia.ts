@@ -32,11 +32,13 @@ function generation(): string {
 }
 const INDEX_PATH = "/api/media/offline/kept/";
 export const USE_GO = "Use the MaiPai Go app to keep this on your phone.";
-export type OfflineCode = "storageFull" | "revoked" | "notOnServer" | "notReady" | "notPlayable" | "network" | "useGo";
+export type OfflineCode = "storageFull" | "revoked" | "needsGrant" | "screenTime" | "notOnServer" | "notReady" | "notPlayable" | "network" | "useGo";
 export type OfflineResult = { ok: true } | { ok: false; code: OfflineCode; message: string };
 export const offlineMessages: Record<OfflineCode, string> = {
   storageFull: "There is not enough room on this device. Remove some copies, then try again.",
   revoked: "This device cannot get this copy. Sign in to Home and check its permission.",
+  needsGrant: "This device needs permission to keep copies. Ask a grown-up or an admin to allow it in Settings, Devices.",
+  screenTime: "Keeping a title for later is off right now because of screen time. Ask a grown-up.",
   notOnServer: "This file is not saved on Home. Save it to the hub first, then try again.",
   notReady: "This copy is not ready. Try again later.",
   notPlayable: "This file cannot play on this device. Choose another item.",
@@ -48,7 +50,16 @@ export const isDeviceRevoked = (status: number, body: unknown): boolean => statu
 const failure = (code: OfflineCode): OfflineResult => ({ ok: false, code, message: offlineMessages[code] });
 export const isWebKit = (ua: string): boolean => /AppleWebKit\//.test(ua) && (!/\b(?:Chrome|Chromium|Edg)\//.test(ua) || /iPhone|iPad|iPod/.test(ua));
 export const isChromium = (ua: string): boolean => /\b(?:Chrome|Chromium|Edg)\//.test(ua) && !isWebKit(ua);
-const codeFor = (status: number): OfflineCode => status === 401 || status === 403 ? "revoked" : status === 404 ? "notOnServer" : status === 409 ? "notPlayable" : status === 503 ? "notReady" : "network";
+/** A 403 is "revoked" only for `device_revoked`; a missing or never-given grant and a screen-time refusal say so instead. */
+const codeFor = (status: number, body?: unknown): OfflineCode => {
+  if (status === 403) {
+    const code = (body as { code?: unknown } | null | undefined)?.code;
+    if (code === "device_revoked") return "revoked";
+    if (code === "media_time_up" || code === "budget_keep_refused") return "screenTime";
+    return "needsGrant";
+  }
+  return status === 401 ? "revoked" : status === 404 ? "notOnServer" : status === 409 ? "notPlayable" : status === 503 ? "notReady" : "network";
+};
 const hubFile = (path: string): boolean => (path.startsWith("/api/media/offline/file/") || path.startsWith("/api/offline/file/")) && !path.includes("\\") && new URL(path, location.origin).origin === location.origin;
 export interface OfflineRecordRef { kind: string; id: string }
 // Keep media's existing index key, so upgrades list and remove the same copies without a second bucket.
@@ -68,8 +79,9 @@ export async function keepOnDevice(item: OfflineRecordRef): Promise<OfflineResul
     const response = await fetch(`/api/offline/manifest?kind=${encodeURIComponent(item.kind)}&id=${encodeURIComponent(item.id)}`, { credentials: "same-origin", cache: "no-store", redirect: "error" });
     checkCurrent();
     if (!response.ok) {
-      if (isDeviceRevoked(response.status, await response.clone().json().catch(() => null))) await removeAllOfflineMedia();
-      return failure(codeFor(response.status));
+      const body = await response.clone().json().catch(() => null);
+      if (isDeviceRevoked(response.status, body)) await removeAllOfflineMedia();
+      return failure(codeFor(response.status, body));
     }
     const manifest = OfflineManifest.parse(await response.json());
     checkCurrent();
@@ -95,9 +107,10 @@ export async function keepOnDevice(item: OfflineRecordRef): Promise<OfflineResul
       const bytes = await fetch(networkUrl, { credentials: "same-origin", cache: "no-store", redirect: "error" });
       checkCurrent();
       if (!bytes.ok || bytes.status !== 200) {
-        if (isDeviceRevoked(bytes.status, await bytes.clone().json().catch(() => null))) await removeAllOfflineMedia();
+        const body = await bytes.clone().json().catch(() => null);
+        if (isDeviceRevoked(bytes.status, body)) await removeAllOfflineMedia();
         for (const path of written) await cache.delete(path);
-        return failure(codeFor(bytes.status));
+        return failure(codeFor(bytes.status, body));
       }
       const entry = manifest.entries.find((e) => e.url === url);
       if (entry && (bytes.headers.get("etag") !== JSON.stringify(entry.fingerprint) || Number(bytes.headers.get("content-length")) !== entry.bytes)) {
@@ -164,13 +177,20 @@ export async function reconcileKept(): Promise<number> {
     const legacy = kept.filter((m) => m.kind === "media" && m.entries.some((e) => e.url.startsWith("/api/media/offline/file/")));
     const items = legacy.flatMap((m) => m.entries.slice(0, 1).map((e) => ({ kind: "media" as const, id: m.id, fingerprint: e.fingerprint })));
     const response = items.length ? await fetch("/api/media/offline/status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) }) : null;
-    if (response && !response.ok) return 0;
+    if (response && !response.ok) {
+      if (isDeviceRevoked(response.status, await response.clone().json().catch(() => null))) { await removeAllOfflineMedia(); return kept.length; }
+      return 0;
+    }
     const { items: results } = (response ? await response.json() : { items: [] }) as { items: Array<{ id: string; status: "ok" | "changed" | "gone" }> };
     for (const result of results) if (result.status !== "ok") { await removeFromDevice({ kind: "media", id: result.id }); removed++; }
     for (const manifest of kept.filter((m) => !legacy.includes(m))) {
       const response = await fetch(`/api/offline/manifest?kind=${encodeURIComponent(manifest.kind)}&id=${encodeURIComponent(manifest.id)}`, { credentials: "same-origin", cache: "no-store", redirect: "error" });
       if (response.status === 404) { await removeFromDevice(manifest); removed++; continue; }
-      if (!response.ok) continue;
+      if (!response.ok) {
+        // A revoked device wipes every copy, as on a keep; any other failure changes nothing.
+        if (isDeviceRevoked(response.status, await response.clone().json().catch(() => null))) { await removeAllOfflineMedia(); return removed + kept.length; }
+        continue;
+      }
       const current = OfflineManifest.safeParse(await response.json());
       if (current.success && current.data.kind === manifest.kind && current.data.id === manifest.id &&
         JSON.stringify(current.data.entries.map((e) => [e.id, e.fingerprint, e.ready])) !== JSON.stringify(manifest.entries.map((e) => [e.id, e.fingerprint, e.ready]))) {

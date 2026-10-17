@@ -8,6 +8,7 @@ test("offline providers dispatch by kind and pass the actor, entry and request u
   const calls: unknown[][] = [];
   const provider: OfflineProvider = {
     kind: "fixture",
+    refuse: () => null,
     manifest(person, id) { calls.push([person, id]); return null; },
     file(person, entry, req) { calls.push([person, entry, req]); return new Response("nova"); },
   };
@@ -19,4 +20,5 @@ test("offline providers dispatch by kind and pass the actor, entry and request u
   expect(offlineProvider("unregistered")).toBeUndefined();
   expect(() => registerOfflineProvider(provider)).toThrow("already registered");
   expect(() => registerOfflineProvider({ ...provider, kind: "../fixture" })).toThrow("invalid");
+  expect(() => registerOfflineProvider({ ...provider, kind: "norefuse", refuse: undefined } as unknown as OfflineProvider)).toThrow("refuse check");
 });

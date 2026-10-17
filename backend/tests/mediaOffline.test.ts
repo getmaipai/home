@@ -340,6 +340,17 @@ describe("MEDIA-KID-01 on the offline routes", () => {
 });
 
 describe("generic offline routes", () => {
+  test("a device granted only media.offline (before KEEP-OFFLINE-01) keeps media through the generic routes, and nothing else", async () => {
+    const s = await setup();
+    setDeviceOfflineScope(s.issued.deviceId, ["media.offline"]);
+    expect((await s.client.get(`/api/offline/manifest?kind=media&id=${s.id}`, auth(s.issued.token))).status).toBe(200);
+    expect((await s.client.get(`/api/offline/file/media/${s.id}`, auth(s.issued.token))).status).toBe(200);
+    for (const path of [`/api/offline/manifest?kind=news_story&id=${s.id}`, `/api/offline/file/news_story/${s.id}`]) {
+      const res = await s.client.get(path, auth(s.issued.token));
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { code?: string }).code).toBe("offline_scope_missing");
+    }
+  });
   test("generic media equals the legacy manifest and byte server, with URLs for its own scope", async () => {
     const s = await setup();
     setDeviceOfflineScope(s.issued.deviceId, ["media.offline", "offline.records"]);
@@ -360,8 +371,9 @@ describe("generic offline routes", () => {
     expect(range.status).toBe(206); expect(await range.text()).toBe("234");
     expect(await (await s.client.get(entry.artwork_url!, auth(s.issued.token))).text()).toBe("picture");
   });
-  test("missing offline.records refuses both generic routes; unknown kinds are 404 after admission", async () => {
+  test("a device with no offline grant is refused on both generic routes; unknown kinds are 404 after admission", async () => {
     const s = await setup(); s.allow();
+    setDeviceOfflineScope(s.issued.deviceId, []);
     const paths = [`/api/offline/manifest?kind=media&id=${s.id}`, `/api/offline/file/media/${s.id}`];
     for (const path of paths) expect((await s.client.get(path, auth(s.issued.token))).status).toBe(403);
     setDeviceOfflineScope(s.issued.deviceId, ["offline.records"]);

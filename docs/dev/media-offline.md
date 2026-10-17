@@ -70,4 +70,10 @@ Transcode-on-save (needs the Stack's `media.transcode`), News, reference and con
 KEEP-OFFLINE-01 adds `/api/offline/manifest?kind=&id=` and `/api/offline/file/:kind/:entry` with the separate `offline.records`
 scope, backed by the same media provider and browser bucket. The media URLs and `media.offline` scope still work for Go.
 Settings, Devices grants both scopes with "Can keep copies on this device". The guardian and shared-device rules above apply
-to both scopes. See [the provider contract and open kinds](media-library.md#keep-a-record-on-this-device-keep-offline-01).
+to both scopes. A device granted only `media.offline` (every grant made before KEEP-OFFLINE-01) is admitted to the generic routes
+for `kind=media` and refused for every other kind: no migration widens an old grant to records a guardian never chose. Every
+provider must have a `refuse(person)` check (registration fails without one); media's is MEDIA-KID-01's keep refusal, so the
+generic routes answer `media_time_up` and `budget_keep_refused` like the media routes. The browser maps a 403 to "revoked" only
+for `device_revoked`; `offline_scope_missing` and `guardian_grant_required` read "needs permission" and the screen-time codes
+read as screen time, and the start-up reconcile wipes every copy when the hub answers `device_revoked`.
+See [the provider contract and open kinds](media-library.md#keep-a-record-on-this-device-keep-offline-01).

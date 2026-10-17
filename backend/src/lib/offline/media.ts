@@ -42,7 +42,7 @@ export function mediaManifest(actor: PersonRow, id: string): OfflineManifest | n
   return OfflineManifest.parse({
     kind: "media", id, title: item.title, subtitle: item.subtitle, total_bytes: bytes, generated_at: new Date().toISOString(),
     entries: [{
-      id, title: item.title, url: `/api/media/offline/file/media/${id}`, bytes, mime: item.media_type,
+      id, title: item.title, url: `/api/media/offline/file/media/${encodeURIComponent(id)}`, bytes, mime: item.media_type,
       fingerprint: item.fingerprint ?? "unavailable", ready, playable: item.playable, reason, duration_s: item.duration_s,
       artwork_url: item.artwork ? `/api/media/offline/file/artwork/${id}` : null,
       chapters: item.chapters.map(({ start_s, title }) => ({ start_s, title })),
@@ -63,7 +63,8 @@ export async function mediaFile(actor: PersonRow, id: string, kind: string, requ
     return response;
   }
   if (kind === "subtitle") {
-    const track = item.subtitles[Number(new URL(request.url).searchParams.get("track") ?? 0)];
+    const raw = new URL(request.url).searchParams.get("track") ?? "0";
+    const track = /^\d{1,3}$/.test(raw) ? item.subtitles[Number(raw)] : undefined;
     const read = track ? readAttachment(actor, track.file_id) : null;
     if (!read?.ok) return Response.json({ error: "This subtitle is not available. Try keeping the item again later." }, { status: 404 });
     // Only caption types are served, always as text/vtt, sandboxed: a stored file can never run as a page or script.
