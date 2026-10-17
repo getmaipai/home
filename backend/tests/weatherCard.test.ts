@@ -75,6 +75,18 @@ describe("WEATHER-CARD-01: weather_card from the recipe's one forecast response"
     expect(props.attribution).toBe(manifest.data_sources![0]!.attribution!);
   });
 
+  // WEATHER-FOLLOWUP-01: the daily arrays used to sit only under block_* keys, which the turn strips
+  // before the model sees the result, so "and tomorrow?" was answered "I only have today".
+  test("the daily forecast is also under model-visible names", async () => {
+    const { result } = await runWeather("clear-day");
+    const data = result.data as Record<string, unknown>;
+    for (const key of ["forecast_dates", "forecast_highs", "forecast_lows", "forecast_rain_chance"]) {
+      expect(Array.isArray(data[key])).toBe(true);
+      expect((data[key] as unknown[]).length).toBeGreaterThan(1);
+    }
+    expect((data.forecast_dates as string[])[1]).toBe("2026-10-17");
+  });
+
   test("rain at night: is_day false, rain codes and chances carried through", async () => {
     const { card } = await runWeather("rain-night");
     const props = CardProps.parse(card!.props);

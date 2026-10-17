@@ -9,7 +9,7 @@
       "id": "c-001",
       "band": "child",
       "category": "animals",
-      "question": "What is the largest animal on Earth?",
+      "question": "What is the largest living animal on Earth?",
       "answer": "Blue whale",
       "source": "https://www.nationalgeographic.com/animals/mammals/facts/blue-whale"
     },
@@ -17,9 +17,9 @@
       "id": "c-002",
       "band": "child",
       "category": "animals",
-      "question": "What do bees collect from flowers?",
+      "question": "What sweet liquid do bees collect from flowers?",
       "answer": "Nectar",
-      "source": "https://www.si.edu/spotlight/buginfo/bees"
+      "source": "https://gardens.si.edu/gardens/pollinator-garden/why-what-when-where-who-how-pollination/"
     },
     {
       "id": "c-003",
@@ -35,7 +35,7 @@
       "category": "animals",
       "question": "What is a baby frog called?",
       "answer": "Tadpole",
-      "source": "https://www.nationalgeographic.com/animals/amphibians/facts/frogs"
+      "source": "https://www.amnh.org/exhibitions/frogs-a-chorus-of-colors/reproduction/tadpoles"
     },
     {
       "id": "c-005",
@@ -43,7 +43,7 @@
       "category": "animals",
       "question": "Which bird can hover and fly backward?",
       "answer": "Hummingbird",
-      "source": "https://www.si.edu/spotlight/buginfo/hummingbirds"
+      "source": "https://nationalzoo.si.edu/migratory-birds/hummingbirds"
     },
     {
       "id": "c-006",
@@ -73,7 +73,7 @@
       "id": "c-009",
       "band": "child",
       "category": "animals",
-      "question": "Which mammal lays eggs and has a bill?",
+      "question": "Which egg-laying mammal has a broad, duck-like bill?",
       "answer": "Platypus",
       "source": "https://www.nationalgeographic.com/animals/mammals/facts/platypus"
     },
@@ -83,13 +83,13 @@
       "category": "animals",
       "question": "What do caterpillars turn into?",
       "answer": "Butterflies or moths",
-      "source": "https://www.si.edu/spotlight/buginfo/butterflies"
+      "source": "https://naturalhistory.si.edu/education/teaching-resources/life-science/butterflies-and-beyond"
     },
     {
       "id": "c-011",
       "band": "child",
       "category": "animals",
-      "question": "Which animal has black and white stripes?",
+      "question": "Which African hoofed animal is known for black-and-white stripes?",
       "answer": "Zebra",
       "source": "https://www.nationalgeographic.com/animals/mammals/facts/zebra"
     },
@@ -195,13 +195,13 @@
       "category": "earth and nature",
       "question": "What gas do plants take in from air?",
       "answer": "Carbon dioxide",
-      "source": "https://www.nasa.gov/learning-resources/for-kids-and-students/"
+      "source": "https://science.nasa.gov/earth/earth-observatory/the-carbon-cycle/"
     },
     {
       "id": "c-025",
       "band": "child",
       "category": "earth and nature",
-      "question": "What do we call water falling from clouds?",
+      "question": "What do we call liquid water falling from clouds?",
       "answer": "Rain",
       "source": "https://www.weather.gov/jetstream/precip"
     },
@@ -265,7 +265,7 @@
       "id": "c-033",
       "band": "child",
       "category": "plants",
-      "question": "What do oak trees grow from?",
+      "question": "What is the name of an oak tree’s nut-like seed?",
       "answer": "Acorns",
       "source": "https://www.fs.usda.gov/learn/trees/oak"
     },
@@ -313,7 +313,7 @@
       "id": "c-039",
       "band": "child",
       "category": "shapes and colours",
-      "question": "What shape has four equal sides and four corners?",
+      "question": "What shape has four equal sides and four right-angle corners?",
       "answer": "Square",
       "source": "https://www.britannica.com/science/square-geometry"
     },
@@ -321,7 +321,7 @@
       "id": "c-040",
       "band": "child",
       "category": "words and spelling",
-      "question": "What is the opposite of the word “hot”?",
+      "question": "What is the opposite of “hot” on a hot/cold scale?",
       "answer": "Cold",
       "source": "https://www.merriam-webster.com/thesaurus/hot"
     },
@@ -337,7 +337,7 @@
       "id": "t-001",
       "band": "teen",
       "category": "space",
-      "question": "Which planet has the shortest year?",
+      "question": "Which planet in our solar system has the shortest year?",
       "answer": "Mercury",
       "source": "https://science.nasa.gov/mercury/facts/"
     },
@@ -345,7 +345,7 @@
       "id": "t-002",
       "band": "teen",
       "category": "space",
-      "question": "What is the name of the first artificial satellite?",
+      "question": "What was the first artificial satellite to orbit Earth?",
       "answer": "Sputnik 1",
       "source": "https://history.nasa.gov/sputnik/"
     },
@@ -361,7 +361,7 @@
       "id": "t-004",
       "band": "teen",
       "category": "earth and nature",
-      "question": "What is the process by which liquid water becomes vapor?",
+      "question": "What is the change of liquid water at its surface into vapor called?",
       "answer": "Evaporation",
       "source": "https://www.usgs.gov/special-topics/water-science-school/science/evaporation-and-water-cycle"
     },
@@ -369,7 +369,7 @@
       "id": "t-005",
       "band": "teen",
       "category": "animals",
-      "question": "What is the largest living bird?",
+      "question": "What is the largest living bird by mass?",
       "answer": "Ostrich",
       "source": "https://www.nationalgeographic.com/animals/birds/facts/ostrich"
     },
@@ -385,7 +385,7 @@
       "id": "t-007",
       "band": "teen",
       "category": "numbers and math",
-      "question": "What is the square root of 144?",
+      "question": "What is the principal square root of 144?",
       "answer": "12",
       "source": "https://www.britannica.com/science/square-root"
     },
@@ -401,9 +401,9 @@
       "id": "t-009",
       "band": "teen",
       "category": "earth and nature",
-      "question": "What is the most abundant gas in Earth’s atmosphere?",
+      "question": "What is the most abundant gas in Earth’s atmosphere by volume?",
       "answer": "Nitrogen",
-      "source": "https://climate.nasa.gov/faq/19/what-is-the-atmosphere/"
+      "source": "https://www.noaa.gov/jetstream/atmosphere"
     },
     {
       "id": "t-010",
@@ -427,7 +427,7 @@
       "category": "the human body",
       "question": "What blood cells carry oxygen?",
       "answer": "Red blood cells",
-      "source": "https://www.nhlbi.nih.gov/health/blood"
+      "source": "https://www.nhlbi.nih.gov/health/blood-tests"
     },
     {
       "id": "t-013",
@@ -451,7 +451,7 @@
       "category": "animals",
       "question": "What is the only mammal capable of true flight?",
       "answer": "Bat",
-      "source": "https://www.si.edu/spotlight/bats"
+      "source": "https://www.si.edu/spotlight/bats/batfacts"
     },
     {
       "id": "t-016",
@@ -489,7 +489,7 @@
       "id": "t-020",
       "band": "teen",
       "category": "animals",
-      "question": "Which animal group includes frogs and salamanders?",
+      "question": "Which class of vertebrate includes frogs and salamanders?",
       "answer": "Amphibians",
       "source": "https://www.amnh.org/explore/ology/zoology/all-about-amphibians"
     },
@@ -513,7 +513,7 @@
       "id": "t-023",
       "band": "teen",
       "category": "earth and nature",
-      "question": "What is the hardest naturally occurring mineral?",
+      "question": "Which mineral ranks highest on the Mohs hardness scale?",
       "answer": "Diamond",
       "source": "https://www.usgs.gov/faqs/what-mohs-hardness-scale"
     },
@@ -521,7 +521,7 @@
       "id": "t-024",
       "band": "teen",
       "category": "space",
-      "question": "What is the name of the largest planet?",
+      "question": "Which planet in our solar system is largest?",
       "answer": "Jupiter",
       "source": "https://science.nasa.gov/jupiter/facts/"
     },
@@ -531,7 +531,7 @@
       "category": "the human body",
       "question": "Which organ filters waste from blood to make urine?",
       "answer": "Kidneys",
-      "source": "https://medlineplus.gov/kidneys.html"
+      "source": "https://medlineplus.gov/urineandurination.html"
     },
     {
       "id": "t-026",
@@ -561,7 +561,7 @@
       "id": "t-029",
       "band": "teen",
       "category": "earth and nature",
-      "question": "Which ocean is the deepest?",
+      "question": "Which ocean contains the deepest known part of the ocean?",
       "answer": "Pacific Ocean",
       "source": "https://oceanservice.noaa.gov/facts/oceandepth.html"
     },
@@ -673,7 +673,7 @@
       "id": "a-013",
       "band": "adult",
       "category": "space",
-      "question": "What is the nearest major galaxy to the Milky Way?",
+      "question": "What is the nearest large spiral galaxy to the Milky Way?",
       "answer": "Andromeda Galaxy",
       "source": "https://science.nasa.gov/universe/galaxies/andromeda-galaxy/"
     },
@@ -689,7 +689,7 @@
       "id": "a-015",
       "band": "adult",
       "category": "animals",
-      "question": "Which animal has the highest blood pressure?",
+      "question": "Which animal is known for exceptionally high blood pressure needed to pump blood up its long neck?",
       "answer": "Giraffe",
       "source": "https://www.nationalgeographic.com/animals/mammals/facts/giraffe"
     },
@@ -713,7 +713,7 @@
       "id": "a-018",
       "band": "adult",
       "category": "earth and nature",
-      "question": "Which mineral is the primary source of aluminum?",
+      "question": "Which rock is the chief ore of aluminum?",
       "answer": "Bauxite",
       "source": "https://www.britannica.com/science/bauxite"
     },
@@ -729,7 +729,7 @@
       "id": "a-020",
       "band": "adult",
       "category": "space",
-      "question": "What is the name of the first exoplanet found orbiting a Sun-like star?",
+      "question": "What was the first confirmed exoplanet found orbiting a Sun-like star?",
       "answer": "51 Pegasi b",
       "source": "https://science.nasa.gov/exoplanet-catalog/51-pegasi-b/"
     },

@@ -1,6 +1,6 @@
 {
   "id": "trivia",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "kind": "plugin",
   "category": "Fun",
   "display": "Trivia",

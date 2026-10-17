@@ -2,7 +2,16 @@
 
 All notable changes to the Weather package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.1.2] - 2026-10-14
+
+- Restores the weather answer blocks and records hourly background fetches in the privacy details.
+
 ## [Unreleased]
+
+### Fixed
+
+- A follow-up such as "will it rain tomorrow?" no longer fails when the place was named in the last reply (the place argument is grounded on the conversation).
+- The daily forecast (dates, highs, lows, chance of rain) reaches the model, so "and tomorrow?" and "this weekend" are answered from data.
 
 ### Changed
 
@@ -40,6 +49,11 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
   Open-Meteo endpoint, so the privacy row is unchanged.
 
 ### Changed
+
+- Weather uses the host's coordinates when it has them and looks up a place
+  only when someone names one. This restores the optional place and coordinate
+  inputs, saved weather places, current-place default and routing example that
+  catalog sync `22830bd` had dropped.
 
 - The one-line description now says what the package does for the
   household, in one imperative sentence: it is the store-card line, the

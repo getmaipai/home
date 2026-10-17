@@ -304,3 +304,38 @@ describe("policyNode: show_images' subject grounds on the last assistant turns",
     expect(await decide(state, "show_images", { subject: "it", kind: "film" })).toEqual({ allow: false, reason: "ungrounded_args" });
   });
 });
+
+// WEATHER-FOLLOWUP-01 (live, 2026-10-17): "what's the weather?" answered for the household's
+// home city, then "will it rain tomorrow?" had the model call weather with that city, which the
+// person never typed (the hub's own reply named it). The call was refused as `ungrounded_args`
+// and the fixed honesty line replaced the answer. The weather manifest now marks `place`
+// `grounded: "conversation"`, the same seam show_images' subject uses, so a place the last two
+// replies named grounds a follow-up; a place nobody said is still refused.
+describe("policyNode: weather's place grounds on the last assistant turns", () => {
+  beforeEach(() => resetDb());
+
+  const item = (id: string, text: string, source = "window") => ({ id, text, source, subjects: [], disclosure: "child_ok" });
+  function stateWith(utterance: string, context: unknown[]): TurnState {
+    return { actor: { role: "adult" }, context, crisis: false, temporary: false, utterance } as unknown as TurnState;
+  }
+  async function decide(state: TurnState, args: Record<string, unknown>) {
+    const result = await policyNode(state, { calls: [{ tool: "weather", args, id: "c1" }] }, new AbortController().signal);
+    return result.output.entries[0]?.decision;
+  }
+
+  test("the home city the last reply named grounds a follow-up's place", async () => {
+    const state = stateWith("will it rain tomorrow?", [item("window-user-1", "what's the weather?"), item("window-assistant-2", "It's 39°F and clear right now in Chicago.")]);
+    expect(await decide(state, { place: "Chicago" })).toEqual({ allow: true });
+  });
+
+  test("a place nobody said is still refused", async () => {
+    const state = stateWith("will it rain tomorrow?", [item("window-user-1", "what's the weather?"), item("window-assistant-2", "It's 39°F and clear right now.")]);
+    expect(await decide(state, { place: "Chicago" })).toEqual({ allow: false, reason: "ungrounded_args" });
+  });
+
+  test("the manifest declares the seam, so the check is data, not a weather special case", () => {
+    const manifest = loadManifestOnly("weather");
+    if (!manifest.ok) throw new Error("the bundled weather manifest did not load");
+    expect((manifest.value.args as { properties: Record<string, { grounded?: string }> }).properties.place?.grounded).toBe("conversation");
+  });
+});

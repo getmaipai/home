@@ -27,9 +27,11 @@ Nothing to set up. Works as soon as it's installed.
 
 ## What it uses
 
-Weather looks up the place, then its forecast (now, the next 24 hours and the next 7 days), through
-Open-Meteo, a free weather service. A recent answer for the same place is remembered for a
-little while so asking again right away doesn't need a new lookup. See
+Weather looks up a place only when someone names one. Otherwise, only rounded
+coordinates go to Open-Meteo, a free weather service. The forecast covers now,
+the next 24 hours and the next 7 days. A recent answer for the same place is
+remembered for a little while, so asking again right away doesn't need a new
+lookup. See
 the household's Privacy page for the full "what leaves the house" row.
 
 For the hourly background refresh, Home substitutes the household's home place for the

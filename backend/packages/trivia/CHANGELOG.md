@@ -8,7 +8,11 @@ All notable changes to the Trivia package, in [Keep a Changelog](https://keepach
   an internet question is used. Adults and teens get a saved question if
   Open Trivia Database is unavailable.
 - Open Trivia Database answers show the CC BY-SA 4.0 credit.
-- Package version is 0.2.0.
+- Package version is 0.2.1.
+
+### Fixed
+
+- Updated broken trivia sources and clarified questions with multiple plausible readings.
 
 ### Changed
 
