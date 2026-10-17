@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, expect, test } from "bun:test";
 import { chromium, type Browser, type Page } from "playwright";
 import { spawn, type ChildProcess } from "node:child_process";
+import { existsSync } from "node:fs";
 import { join } from "node:path";
 
 const ROOT = join(import.meta.dir, "../../..");
@@ -9,8 +10,11 @@ let browser: Browser;
 let page: Page;
 let url: string;
 let serverOutput = "";
+// TEST-RED-01: a real-browser test; a machine without the Playwright Chromium (npx playwright install) skips it.
+const HAS_CHROMIUM = existsSync(chromium.executablePath());
 
 beforeAll(async () => {
+  if (!HAS_CHROMIUM) return;
   server = spawn("bun", ["run", "dev", "--host", "127.0.0.1", "--port", "0"], { cwd: join(ROOT, "frontend"), stdio: ["ignore", "pipe", "pipe"] });
   server.stdout?.on("data", (chunk: Buffer) => { serverOutput += chunk.toString(); });
   server.stderr?.on("data", (chunk: Buffer) => { serverOutput += chunk.toString(); });
@@ -26,11 +30,12 @@ beforeAll(async () => {
 }, 30000);
 
 afterAll(async () => {
+  if (!HAS_CHROMIUM) return;
   await browser?.close();
   server?.kill("SIGTERM");
 });
 
-test.each(["light", "dark"] as const)("Incognito body paints its page token in %s theme", async (theme) => {
+test.skipIf(!HAS_CHROMIUM).each(["light", "dark"] as const)("Incognito body paints its page token in %s theme", async (theme) => {
   await page.evaluate((selectedTheme) => {
     document.documentElement.classList.remove("light", "dark", "incognito");
     document.documentElement.classList.add(selectedTheme, "incognito");
