@@ -49,7 +49,7 @@ export interface StackVideoStatus {
   loras_supported: boolean;
   lora_count: number;
   audio: boolean;
-  reference_images?: { generated: boolean; uploaded: boolean; reason: string };
+  reference_images?: { generated: boolean; uploaded: boolean; household_photo?: boolean; reason: string };
 }
 
 export interface StackVideoLora {
@@ -69,16 +69,21 @@ export interface StackVideoLora {
   trigger_words: string[];
   added_by?: string | null;
   added_at: string;
+  /** LIKENESS-01: the household adult this style looks like (an opaque id Home gave with a signed proof), or null. */
+  likeness_subject?: string | null;
 }
 
 export interface VideoBody {
   prompt: string;
+  negative_prompt?: string;
   size?: string;
   seconds?: number;
   seed?: number;
   image?: string;
-  image_source?: "generated";
-  loras?: Array<{ id: string; strength: number }>;
+  image_source?: "generated" | "household_photo";
+  /** LIKENESS-01: with `image_source: household_photo`, Home's signed proof bound to this exact picture. */
+  consent_proof?: string;
+  loras?: Array<{ id: string; strength: number; likeness_proof?: string }>;
   audience: "all-ages" | "adult";
   timeout_ms: number;
 }

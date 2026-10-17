@@ -13,6 +13,7 @@ import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
 import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "@/lib/pictures/ageCheck";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
+import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
 export type VideoJobKind = "generate" | "animate";
@@ -41,6 +42,8 @@ export interface VideoRequest {
   /** The generated picture a clip starts from (an attachment id in this conversation), or null. */
   source_file_id: string | null;
   audience: "all-ages" | "adult";
+  /** LIKENESS-01: set when the clip looks like a household adult. Checked again on every poll while the job waits. */
+  likeness?: JobLikeness | null;
 }
 
 export interface VideoJob {
@@ -151,7 +154,7 @@ export function videoJobIdsByTurn(actor: PersonRow, turnIds: readonly string[]):
 
 // ---------------------------------------------------------------- temporary clips (memory only)
 
-interface TemporaryClip { id: string; conversationId: string; ownerPersonId: string; mediaType: string; bytes: Uint8Array; createdAt: number }
+interface TemporaryClip { id: string; conversationId: string; ownerPersonId: string; mediaType: string; bytes: Uint8Array; createdAt: number; /** LIKENESS-01: the poster of a clip that looks like a person is not a free starting picture. */ noReference?: true }
 const TEMP_MS = 2 * 60 * 60 * 1000;
 const temporaryClips = new Map<string, TemporaryClip>();
 function storeTemporaryClip(clip: Omit<TemporaryClip, "createdAt">): void {
@@ -192,7 +195,7 @@ export function __resetVideoJobsForTests(): void {
 export const GENERATED_PICTURE_NOTE = "picture-gen:";
 export const CLIP_POSTER_NOTE = "video-poster:";
 
-export type ReferenceResult = { ok: true; id: string; base64: string; width: number | null; height: number | null } | { ok: false; line: string };
+export type ReferenceResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null; /** LIKENESS-01: the person this picture looks like (it was made with a style of them, or from a photo of them). Starting a clip from it asks their agreement again. */ likenessSubject: string | null } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
 /** The newest picture of this temporary chat the Stack made: a generated picture or the poster of a clip, whichever is newer. */
@@ -208,11 +211,11 @@ export function latestTemporaryPosterId(actor: PersonRow, conversationId: string
 export function loadGeneratedReference(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): ReferenceResult {
   if (temporary) {
     const clip = temporaryClips.get(fileId);
-    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg") return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), width: null, height: null };
+    if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && clip.noReference !== true) return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), bytes: clip.bytes, width: null, height: null, likenessSubject: null };
     // A temporary picture counts only when Home marked it `generated` when the picture engine made it (a field no upload
     // can set; a file name proves nothing). The Stack still checks the bytes' hash.
     const image = getTemporaryChatImage(actor, conversationId, fileId);
-    if (image && image.generated === true) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), width: image.width, height: image.height };
+    if (image && image.generated === true) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height, likenessSubject: null };
     return { ok: false, line: NOT_GENERATED_LINE };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
@@ -223,12 +226,32 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
   if (!read.ok) return { ok: false, line: NOT_GENERATED_LINE };
   let width: number | null = null;
   let height: number | null = null;
+  let likenessSubject: string | null = null;
   try {
-    const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number };
+    const meta = JSON.parse(note.slice(note.indexOf(":") + 1)) as { width?: number; height?: number; likeness?: string | null };
     width = typeof meta.width === "number" ? meta.width : null;
     height = typeof meta.height === "number" ? meta.height : null;
+    likenessSubject = typeof meta.likeness === "string" && meta.likeness ? meta.likeness : null;
   } catch { /* the size is only a hint for the clip's shape */ }
-  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), width, height };
+  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width, height, likenessSubject };
+}
+
+export type PhotoResult = { ok: true; id: string; base64: string; bytes: Uint8Array; width: number | null; height: number | null } | { ok: false; line: string };
+const NOT_A_PHOTO_LINE = "I can't find that photo any more. Attach it again and ask once more.";
+
+/** A photo a person attached in this conversation (not one this home made), as its stored bytes, unchanged. LIKENESS-01: it starts a clip only for a declared household adult who agreed, and only after the photo is checked to show exactly that one person. */
+export function loadUploadedPhoto(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): PhotoResult {
+  const typeOk = (type: string) => type === "image/png" || type === "image/jpeg" || type === "image/webp";
+  if (temporary) {
+    const image = getTemporaryChatImage(actor, conversationId, fileId);
+    if (!image || image.generated === true || !typeOk(image.mediaType)) return { ok: false, line: NOT_A_PHOTO_LINE };
+    return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), bytes: image.bytes, width: image.width, height: image.height };
+  }
+  const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
+  if (!row || row.conversationId !== conversationId || row.ownerPersonId !== actor.id || !typeOk(row.mediaType)) return { ok: false, line: NOT_A_PHOTO_LINE };
+  const read = readAttachmentForConversation(actor, conversationId, fileId);
+  if (!read.ok) return { ok: false, line: NOT_A_PHOTO_LINE };
+  return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), bytes: read.value.bytes, width: null, height: null };
 }
 
 /** How many of this person's clips are waiting or being made. */
@@ -251,6 +274,8 @@ export interface StartVideoInput {
   prompt: string;
   body: Omit<VideoBody, "timeout_ms">;
   sourceFileId?: string | null;
+  /** LIKENESS-01: the clip looks like this household adult (already decided by lib/likeness/decide.ts). */
+  likeness?: JobLikeness | null;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
@@ -264,7 +289,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: submitted.job,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: { size: input.body.size ?? "832x480", seconds: input.body.seconds ?? 5, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience },
+    request: { size: input.body.size ?? "832x480", seconds: input.body.seconds ?? 5, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.likeness ? { likeness: input.likeness } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   save(job);
@@ -288,14 +313,51 @@ function sleep(ms: number, signal: AbortSignal): Promise<void> {
   });
 }
 
+/** LIKENESS-01: ends the job (and the Stack's copy) when its subject no longer agrees. True when it did. */
+function stopForLikeness(job: VideoJob): boolean {
+  const likeness = job.request.likeness;
+  if (!likeness) return false;
+  const now = likenessStillAllowed(likeness);
+  if (now.ok) return false;
+  job.state = "failed";
+  job.error = now.line;
+  job.files = [];
+  save(job);
+  watching.get(job.id)?.abort();
+  watching.delete(job.id);
+  if (job.stackJob) void cancelOrDeleteVideo(job.stackJob);
+  return true;
+}
+
+/** The person took their agreement back (or only the adult-content part): every clip of them still waiting or being made stops now. Returns how many. */
+export function stopLikenessVideoJobs(subjectPersonId: string, onlyAdultContent: boolean): number {
+  let count = 0;
+  const jobs = new Map<string, VideoJob>();
+  for (const job of [...memory.values(), ...liveJobs.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
+  for (const row of db.select().from(videoJobs).where(inArray(videoJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
+  for (const job of jobs.values()) {
+    const likeness = job.request.likeness;
+    if (!likeness || likeness.subject !== subjectPersonId || likeness.subject === likeness.requester) continue;
+    if (onlyAdultContent && !likeness.adult_content) continue;
+    if (stopForLikeness(job)) count += 1;
+  }
+  return count;
+}
+
 async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null = null): Promise<void> {
   if (!job.stackJob || watching.has(job.id)) return;
   const controller = new AbortController();
   watching.set(job.id, controller);
   const deadline = Date.now() + MAX_WATCH_MS;
   try {
-    if (early) { await finish(job, actor, early, controller.signal); return; }
+    if (early) {
+      if (stopForLikeness(job)) return;
+      await finish(job, actor, early, controller.signal);
+      return;
+    }
     while (!controller.signal.aborted && Date.now() < deadline) {
+      // The person it looks like can take their agreement back at any moment: checked on every poll, so a clip waiting in the line is stopped.
+      if (stopForLikeness(job)) return;
       let status;
       try {
         status = await getVideoJob(job.stackJob);
@@ -306,7 +368,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
         continue;
       }
       if (controller.signal.aborted) return;
-      if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
+      if (status.state === "done") { if (stopForLikeness(job)) return; await finish(job, actor, status.data, controller.signal); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); save(job); return; }
       if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(503, "no_memory", status.error ?? "")); save(job); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; save(job); return; }
@@ -383,14 +445,14 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
       const id = newFileId();
       const posterId = newFileId();
       storeTemporaryClip({ id, conversationId, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
-      storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster });
+      storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster, ...(job.request.likeness ? { noReference: true as const } : {}) });
       file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
     } else {
       if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
       if (signal.aborted) return;
       const made = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "video/mp4", bytes: video, provenance: `video-gen:${JSON.stringify({ v: 1, job: job.id, ...meta })}`, deduplicate: false });
       if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); save(job); return; }
-      const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, job: job.id, width, height })}`, deduplicate: false });
+      const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, job: job.id, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false });
       if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); save(job); return; }
       file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
     }

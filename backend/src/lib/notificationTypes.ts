@@ -63,6 +63,18 @@ function isDeliveredChannel(channel: string): channel is NotificationChannel {
 export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   // INITIATIVE-01: a robot offer nobody answered in time lands here once, so the item is not lost.
   // The body never carries the prepared text, only the plain line the robot would have said.
+  // LIKENESS-01: told each time another adult makes a picture or video that looks like you. Not configurable: it is the
+  // person's own protection and the thing they agreed to is only agreed to while they can see it.
+  {
+    id: "likeness.used",
+    level: "time_sensitive",
+    audience: "person",
+    template: "{who} made {kind}. Read the list or turn this off in Settings, Pictures and videos.",
+    configurable: false,
+    privacy: true,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   {
     id: "robot.offer_missed",
     level: "passive",

@@ -67,6 +67,8 @@ export interface StackLora {
   strength_default: number;
   added_by?: string | null;
   added_at: string;
+  /** LIKENESS-01: the household adult this style looks like (an opaque id Home gave with a signed proof), or null. */
+  likeness_subject?: string | null;
 }
 
 export interface GenerationBody {
@@ -77,9 +79,12 @@ export interface GenerationBody {
   n?: number;
   seed?: number;
   steps?: number;
-  loras?: Array<{ id: string; scale: number }>;
+  loras?: Array<{ id: string; scale: number; likeness_proof?: string }>;
   audience: "all-ages" | "adult";
   init_image?: string;
+  /** LIKENESS-01: where the starting picture came from (required with `init_image`) and, for a household photo, Home's signed proof. */
+  image_source?: "generated" | "uploaded" | "household_photo";
+  consent_proof?: string;
   strength?: number;
   timeout_ms: number;
 }
@@ -235,4 +240,22 @@ export async function getStackJob(id: string): Promise<StackBackgroundJob> {
   if (!res.ok) return failure(res);
   const body = await res.json() as { job?: StackBackgroundJob };
   return body.job ?? { id, state: "failed", reason: "The job could not be read." };
+}
+
+// ---------------------------------------------------------------- LIKENESS-01
+
+/** The Stack's likeness trust state, or null when it is too old to know about proofs (404). */
+export async function likenessTrustStatus(): Promise<{ trusted: boolean; fingerprint: string | null } | null> {
+  const res = await request("/stack/v1/likeness", { method: "GET", timeoutMs: 5_000 });
+  if (res.status === 404) return null;
+  if (!res.ok) return failure(res);
+  const body = await res.json() as { likeness?: { trusted?: boolean; fingerprint?: string | null } };
+  return { trusted: body.likeness?.trusted === true, fingerprint: body.likeness?.fingerprint ?? null };
+}
+
+/** Registers Home's proof-signing public key with the Stack (the first key a Stack sees is trusted). */
+export async function registerLikenessTrust(publicKey: string): Promise<{ result: string; fingerprint: string }> {
+  const res = await request("/stack/v1/likeness/trust", { method: "PUT", headers: { "content-type": "application/json" }, body: JSON.stringify({ public_key: publicKey }), timeoutMs: 8_000 });
+  if (!res.ok) return failure(res);
+  return await res.json() as { result: string; fingerprint: string };
 }

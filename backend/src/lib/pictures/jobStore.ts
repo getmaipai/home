@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { pictureJobs } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
+import type { JobLikeness } from "@/lib/likeness/guard";
 import { StackPicturesError } from "./stack";
 
 export type PictureJobKind = "generate" | "variation" | "edit";
@@ -31,6 +32,8 @@ export interface PictureRequest {
   /** A variation or an edit starts from this file in the same conversation. */
   source_file_id: string | null;
   audience: "all-ages" | "adult";
+  /** LIKENESS-01: set when the picture looks like a household adult. Checked again on every poll while the job waits. */
+  likeness?: JobLikeness | null;
 }
 
 export interface PictureJob {
@@ -153,6 +156,14 @@ export function pictureJobIdsByTurn(actor: PersonRow, turnIds: readonly string[]
   const rows = db.select({ id: pictureJobs.id, turnId: pictureJobs.turnId, createdAt: pictureJobs.createdAt }).from(pictureJobs).where(and(eq(pictureJobs.personId, actor.id), inArray(pictureJobs.turnId, [...turnIds]))).all();
   for (const row of rows) if (row.turnId) note(row.turnId, row.id, row.createdAt);
   return out;
+}
+
+/** Every picture job being made right now, wherever it lives (memory only for a temporary chat, the live object, or a stored row), for the sweeps that stop jobs. */
+export function unfinishedJobs(): PictureJob[] {
+  const jobs = new Map<string, PictureJob>();
+  for (const job of [...memory.values(), ...live.values()]) if (job.state === "queued" || job.state === "running") jobs.set(job.id, job);
+  for (const row of db.select().from(pictureJobs).where(inArray(pictureJobs.state, ["queued", "running"])).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
+  return [...jobs.values()];
 }
 
 /** Unfinished stored jobs, for the boot-time resume. */

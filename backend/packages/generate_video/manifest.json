@@ -1,6 +1,6 @@
 {
   "id": "generate_video",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
@@ -42,8 +42,14 @@
         "type": "string",
         "maxLength": 80,
         "grounded": false,
-        "description": "Optional. Set to \"latest\" only when the person asks to animate or bring to life a picture that was made earlier in this chat. Leave it out for a video from words alone. Pictures the person uploaded cannot be animated."
+        "description": "Optional. Set to \"latest\" only when the person asks to animate or bring to life a picture that was made earlier in this chat. Set to \"attached\" only when the person attached one photo of an adult in this household to this message and asks to animate it, and also set photo_subject. Leave it out for a video from words alone. A photo of anyone else cannot be animated."
       },
+    "photo_subject": {
+      "type": "string",
+      "maxLength": 80,
+      "grounded": false,
+      "description": "Only with from_picture \"attached\": the name of the adult in this household who is in the attached photo, exactly as the person said it, or \"me\" when they say it is themselves. Never guess a name; if they did not say, ask them who it is."
+    },
       "orientation": {
         "type": "string",
         "enum": [
@@ -69,7 +75,7 @@
       "depicts_real_person": {
         "type": "boolean",
         "grounded": false,
-        "description": "Set true when the person asks for a video that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home does not make those. Otherwise leave it out."
+        "description": "Set true when the person asks for a video that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home makes one only of an adult in this household who agreed, through their saved style or an attached photo. Otherwise leave it out."
       }
     }
   },

@@ -4,6 +4,7 @@
 import { instanceLock } from "@/lib/bootGuard";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
+import { drainStyleRemovals } from "@/lib/likeness/adapters";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
@@ -203,6 +204,9 @@ registerAllPackageProjectTypes();
 resumePictureJobs();
 // VIDEO-GEN-05: and a clip a restart interrupted.
 resumeVideoJobs();
+// LIKENESS-01: a style of a person who took their agreement back, still waiting to be removed from the library, is removed now and then retried every few minutes until the engine has answered.
+void drainStyleRemovals();
+const styleRemovalInterval = setInterval(() => void drainStyleRemovals(), 5 * 60_000);
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();
@@ -298,6 +302,7 @@ const internetProbeInterval = setInterval(() => void internetProbeSample(), 60_0
 internetProbeInterval.unref();
 const statusPruneInterval = setInterval(() => pruneStatusEvents(), 6 * 60 * 60_000);
 statusPruneInterval.unref();
+styleRemovalInterval.unref();
 // lib/householdCa.ts's own "rotation as a Repairs item" - once a day is
 // plenty for a 30-day warning window; the job itself is idempotent and
 // cheap (a single file read and a date comparison) when nothing's close

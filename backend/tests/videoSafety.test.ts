@@ -360,6 +360,7 @@ describe("the routes", () => {
     form.set("file", new File([new Uint8Array(16)], "ink.safetensors"));
     form.set("name", "Ink");
     form.set("licence", "apache-2.0");
+    form.set("looks_like", "nobody");
     const res = await owner.client.postForm("/api/videos/adapters", form);
     expect(res.status).toBe(200);
     const added = await res.json() as { id: string; classification: string; enabled: boolean; needs_confirmation: boolean };

@@ -11,7 +11,10 @@ import { addLoraFile, addLoraUrl, getStackJob, imageStatus, installPictureModel,
 import { adultAdaptersAllowed, householdAllowsAdults } from "@/lib/pictures/policy";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { db } from "@/db";
-import { pictureAdapterPrefs } from "@/db/schema";
+import { pictureAdapterPrefs, people } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { declareStyleSubject, forgetStyleSubject, getStyleSubject } from "@/lib/likeness/adapters";
+import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
 
 export const picturesAdminRoutes = apiRouter();
 
@@ -19,6 +22,7 @@ const AdapterSchema = z.object({
   id: z.string(), name: z.string(), base_model: z.string(), classification: z.enum(["all-ages", "adult-only"]), classification_note: z.string().nullable(),
   licence: z.string(), licence_known: z.boolean(), source_url: z.string().nullable(), bytes: z.number(), sha256: z.string(), trigger_words: z.array(z.string()), added_at: z.string(),
   enabled: z.boolean(), needs_confirmation: z.boolean(),
+  looks_like: z.object({ id: z.string(), name: z.string() }).nullable().describe("LIKENESS-01: the household adult this style looks like, or null for nobody."),
 });
 const OverviewSchema = z.object({
   stack: z.enum(["ok", "unreachable"]),
@@ -47,8 +51,17 @@ function present(a: Awaited<ReturnType<typeof allAdapters>>[number], pendingIds:
   return {
     id: a.id, name: a.name, base_model: a.base_model, classification: a.classification, classification_note: a.classification_note ?? null,
     licence: licence || "No licence stated", licence_known: licence !== "" && licence.toLowerCase() !== "unknown", source_url: a.source_url ?? null, bytes: a.bytes, sha256: a.sha256,
-    trigger_words: a.trigger_words, added_at: a.added_at, enabled: a.enabled, needs_confirmation: pendingIds.has(a.id),
+    trigger_words: a.trigger_words, added_at: a.added_at, enabled: a.enabled, needs_confirmation: pendingIds.has(a.id), looks_like: lookedLikeView("picture", a.id, a.likeness_subject ?? null),
   };
+}
+
+/** Whom a style looks like, by name, for the admin's list (a household fact, shown to the admins who manage the library). */
+export function lookedLikeView(medium: "picture" | "video", adapterId: string, stackSubject: string | null): { id: string; name: string } | null {
+  const record = getStyleSubject(medium, adapterId);
+  const id = record ? record.subjectPersonId : stackSubject;
+  if (!id) return null;
+  const person = db.select().from(people).where(eq(people.id, id)).get();
+  return { id, name: person ? (person.nickname?.trim() || person.displayName) : "Someone who left" };
 }
 
 function pendingIds(): Set<string> {
@@ -57,7 +70,7 @@ function pendingIds(): Set<string> {
 
 function stackFailure(c: { json: (body: unknown, status: never) => Response }, error: unknown): Response {
   if (error instanceof StackPicturesError) {
-    const status = error.status === 409 ? 409 : error.status === 413 ? 413 : error.status === 422 ? 422 : error.status === 404 ? 404 : error.status === 503 ? 503 : 502;
+    const status = error.status === 403 ? 403 : error.status === 409 ? 409 : error.status === 413 ? 413 : error.status === 422 ? 422 : error.status === 404 ? 404 : error.status === 503 ? 503 : 502;
     return c.json({ error: error.message, code: error.code }, status as never);
   }
   return c.json({ error: "The picture engine could not do that. Try again.", code: "failed" }, 502 as never);
@@ -120,6 +133,9 @@ picturesAdminRoutes.openapi(jobRoute, async (c) => {
       const lora = job.result?.lora;
       let adapter = null;
       if (lora) {
+        const declaredBy = pendingNobody.get(c.req.valid("param").id);
+        if (declaredBy && !getStyleSubject("picture", lora.id)) declareStyleSubject({ adapterId: lora.id, medium: "picture", subjectPersonId: null, classification: lora.classification, declaredBy });
+        pendingNobody.delete(c.req.valid("param").id);
         if (!db.select().from(pictureAdapterPrefs).all().some((p) => p.adapterId === lora.id)) setAdapterEnabled(lora.id, false, `added:${adminId}`);
         dropAdapterCache();
         const found = (await allAdapters()).find((a) => a.id === lora.id);
@@ -141,7 +157,9 @@ const addRoute = createRoute({
   request: { body: { content: { "multipart/form-data": { schema: z.object({
     name: z.string().min(1).max(80), url: z.string().max(600).optional(), file: z.any().optional(),
     licence: z.string().max(200).optional(), licence_acknowledged: z.enum(["true", "false"]).optional(),
-    all_ages: z.enum(["yes", "no", "unsure"]).optional(), trigger_words: z.string().max(400).optional(), not_real_person: z.enum(["true", "false"]),
+    all_ages: z.enum(["yes", "no", "unsure"]).optional(), trigger_words: z.string().max(400).optional(),
+    looks_like: z.string().max(80).optional().describe("LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."),
+    not_real_person: z.enum(["true", "false"]).optional().describe("Older clients: the same as looks_like 'nobody'."),
   }) } } } },
   responses: { 200: { content: { "application/json": { schema: z.union([z.object({ job: z.string() }), z.object({ adapter: AdapterSchema })]) } }, description: "A file is added at once (switched off until confirmed); a link starts a job to poll at GET /jobs/{id}." }, ...refusals },
 });
@@ -150,12 +168,15 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
   const form = await c.req.parseBody();
   const name = String(form.name ?? "").trim();
   if (!name) return c.json({ error: "Give the style a name.", code: "bad_name" }, 422) as never;
-  if (String(form.not_real_person ?? "") !== "true") return c.json({ error: "Tick the box to say this style is not a likeness of a real person. Styles of real people's faces are never added.", code: "likeness_unconfirmed" }, 422) as never;
+  const lookedLike = String(form.looks_like ?? "").trim() || (String(form.not_real_person ?? "") === "true" ? "nobody" : "");
+  const subjectCheck = checkStyleSubject(lookedLike, c.get("person"));
+  if (!subjectCheck.ok) return c.json({ error: subjectCheck.line || LOOKS_LIKE_REQUIRED_LINE, code: subjectCheck.code }, subjectCheck.status) as never;
   const licenceText = String(form.licence ?? "").trim();
   const ack = String(form.licence_acknowledged ?? "") === "true";
   if (!WELL_KNOWN_FREE.test(licenceText) && !ack) return c.json({ error: "Read the licence and tick the box to say you have. A style with no licence stated or an unusual one needs that before it is added.", code: "licence_acknowledgement_required" }, 422) as never;
   // Uncertain means adult-only: only a plain "yes, all ages" makes it all-ages.
-  const classification = String(form.all_ages ?? "") === "yes" ? "all-ages" as const : "adult-only" as const;
+  // A style of a person is always adult-only.
+  const classification = subjectCheck.kind === "person" ? "adult-only" as const : String(form.all_ages ?? "") === "yes" ? "all-ages" as const : "adult-only" as const;
   const trigger = String(form.trigger_words ?? "").split(",").map((w) => w.trim()).filter(Boolean).slice(0, 12);
   try {
     const file = form.file;
@@ -168,7 +189,15 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       stack.append("classification", classification);
       stack.append("trigger_words", JSON.stringify(trigger));
       stack.append("added_by", adminId);
+      if (subjectCheck.kind === "person") {
+        const fields = await stackLikenessFields(subjectCheck, c.get("person"), new Uint8Array(await file.arrayBuffer()));
+        if ("error" in fields) return c.json({ error: fields.error, code: "likeness_engine" }, 503) as never;
+        stack.append("likeness_subject", fields.likeness_subject);
+        stack.append("likeness_proof", fields.likeness_proof);
+      }
       const lora = await addLoraFile(stack);
+      declareStyleSubject({ adapterId: lora.id, medium: "picture", subjectPersonId: subjectCheck.kind === "person" ? subjectCheck.subject.id : null, classification: lora.classification, declaredBy: adminId });
+      if (subjectCheck.kind === "person") await notifyStyleAdded(subjectCheck.subject.id, c.get("person"), "picture");
       setAdapterEnabled(lora.id, false, `added:${adminId}`);
       dropAdapterCache();
       const found = (await allAdapters()).find((a) => a.id === lora.id);
@@ -176,10 +205,16 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
     }
     const url = String(form.url ?? "").trim();
     if (!url) return c.json({ error: "Paste a Hugging Face link to the .safetensors file, or choose the file.", code: "source_required" }, 422) as never;
+    // A style of a person is added from the file itself: its proof is bound to the file's hash, and a link's bytes can change.
+    if (subjectCheck.kind === "person") return c.json({ error: "A style that looks like a person has to be added as a file, not from a link. Download it, then choose the file.", code: "likeness_file_required" }, 422) as never;
     const started = await addLoraUrl({ url, name, ...(licenceText ? { licence: licenceText } : {}), licence_acknowledged: ack, classification, trigger_words: trigger, added_by: adminId });
+    pendingNobody.set(started.job, adminId);
     return c.json({ job: started.job }, 200) as never;
   } catch (error) { return stackFailure(c, error) as never; }
 });
+
+/** A link install in flight: the answer was "Nobody", recorded when the job finishes and the style exists. */
+const pendingNobody = new Map<string, string>();
 
 const adapterParams = z.object({ id: z.string().min(1).max(60).openapi({ param: { name: "id", in: "path" } }) });
 const patchRoute = createRoute({
@@ -212,6 +247,7 @@ picturesAdminRoutes.openapi(removeRoute, async (c) => {
   const { id } = c.req.valid("param");
   try {
     await removeLora(id);
+    forgetStyleSubject("picture", id);
     forgetAdapterPref(id);
     dropAdapterCache();
     return c.json({ ok: true as const }, 200);

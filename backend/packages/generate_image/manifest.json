@@ -1,6 +1,6 @@
 {
   "id": "generate_image",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Picture",
@@ -66,7 +66,7 @@
       "depicts_real_person": {
         "type": "boolean",
         "grounded": false,
-        "description": "Set true when the person asks for a picture that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home does not make those. Otherwise leave it out."
+        "description": "Set true when the person asks for a picture that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home makes one only of an adult in this household who agreed, through their saved style or an attached photo. Otherwise leave it out."
       }
     }
   },

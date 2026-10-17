@@ -10,6 +10,8 @@ import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFail
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { StackPicturesError } from "@/lib/pictures/stack";
+import { prepareStyleUse } from "@/lib/likeness/apply";
+import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { PersonRow } from "@/types";
 
 export const picturesRoutes = apiRouter();
@@ -134,12 +136,18 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`);
   if (refused) return c.json({ error: PROMPT_REFUSAL_LINE[refused], code: refused }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
-  const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
+  // LIKENESS-01: another picture in a style of a household adult is decided again, now: their agreement may have been taken back since.
+  const likenessStyle = used[0] ?? null;
+  const prep = await prepareStyleUse({ medium: "picture", audience: routeAudience(actor), style: likenessStyle, text: `${prompt} ${used.map((a) => a.name).join(" ")}`, depictsRealPerson: false, source: "chat" });
+  if (prep.kind === "refused") return c.json({ error: prep.line || PROMPT_REFUSAL_LINE.real_person, code: "likeness" }, 403) as never;
+  const loras = used.map((a) => ({ id: a.id, scale: a.strength_default, ...(prep.kind === "likeness" && a.id === likenessStyle?.id ? { likeness_proof: prep.proof } : {}) }));
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
-      body: { prompt, size: source.request.size, n: 1, audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt, size: source.request.size, n: 1, audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
+    if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     void job;
     return c.json(cardView(actor, source, true), 200);
   } catch (error) {

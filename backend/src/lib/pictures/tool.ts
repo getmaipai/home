@@ -12,6 +12,8 @@ import { startPictureJob, plainFailure } from "./jobs";
 import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { StackPicturesError } from "./stack";
+import { prepareStyleUse } from "@/lib/likeness/apply";
+import { recordLikenessUse } from "@/lib/likeness/uses";
 
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
 
@@ -35,7 +37,7 @@ export function audienceOf(state: Pick<TurnState, "actor" | "surface" | "speaker
   };
 }
 
-export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string };
+export type PictureCallRefusal = { kind: "denied"; why: PictureDenial; line: string } | { kind: "prompt"; why: PromptRefusal; line: string } | { kind: "likeness"; why: "likeness"; line: string };
 
 /** The refusal for this call, or null: the surface and age gate first, then the two absolute lines on the prompt. */
 export function refusalFor(audience: PictureAudience, args: Record<string, unknown>): PictureCallRefusal | null {
@@ -43,7 +45,9 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   if (denial) return { kind: "denied", why: denial, line: PICTURE_DENIAL_LINE[denial] };
   const prompt = typeof args.prompt === "string" ? args.prompt : "";
   const style = typeof args.style === "string" ? args.style : "";
-  const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true });
+  // A request that names a style may be a style of a household adult who agreed (LIKENESS-01): the tool decides that once it
+  // has matched the style, so the model's "real person" flag alone does not end the call here when a style was named.
+  const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" });
   if (refused) return { kind: "prompt", why: refused, line: PROMPT_REFUSAL_LINE[refused] };
   return null;
 }
@@ -68,7 +72,7 @@ function failed(callId: string, args: Record<string, unknown>, code: string, kin
 function refused(callId: string, args: Record<string, unknown>, refusal: PictureCallRefusal): ToolExecutionOutcome {
   return outcomeOf({
     callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
-    result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${refusal.line}` }, data: { refused: refusal.kind === "prompt" ? refusal.why : refusal.why }, actions: [] },
+    result: { reply: { text: `No picture was made. Say this to the person in your own words and keep its meaning: ${refusal.line}` }, data: { refused: refusal.why }, actions: [] },
   });
 }
 
@@ -98,6 +102,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`);
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: PROMPT_REFUSAL_LINE[second] });
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
+  // LIKENESS-01: a style of a household adult is made only if they agreed; a real person with no such style is refused.
+  const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
+  if (prep.kind === "refused") return refused(callId, args, prep.why === "real_person" ? { kind: "prompt", why: "real_person", line: PROMPT_REFUSAL_LINE.real_person } : { kind: "likeness", why: "likeness", line: prep.line });
 
   try {
     const temporary = state.temporary === true || state.ephemeral === true;
@@ -113,9 +120,12 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         size,
         n: count,
         audience: adultAdaptersAllowed() ? "adult" : "all-ages",
-        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default }] } : {}),
+        ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" ? { likeness_proof: prep.proof } : {}) }] } : {}),
+        ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
       },
+      ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
+    if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: state.actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
