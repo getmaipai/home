@@ -287,6 +287,19 @@ describe("run: the gate's pass/fail meaning", () => {
     finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  test("a listed failure nested in a describe is rerun by bun's space-joined name (#216)", async () => {
+    const dir = fixture({ "a.test.ts": "" });
+    const marker = join(dir, "first-run");
+    writeFileSync(join(dir, "tests/a.test.ts"), `import {describe,test,expect} from "bun:test"; import {existsSync,writeFileSync} from "node:fs"; describe("group: a suite", () => { test("flaky nested",()=>{if(!existsSync(${JSON.stringify(marker)})){writeFileSync(${JSON.stringify(marker)},"seen"); expect(1).toBe(2)} expect(1).toBe(1)}); });`);
+    const messages: string[] = [];
+    const originalLog = console.log;
+    console.log = (...args: unknown[]) => messages.push(args.join(" "));
+    try {
+      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "group: a suite > flaky nested"), changedFiles: [] })).toBe(0);
+      expect(messages.join("\n")).toContain("FLAKY");
+    } finally { console.log = originalLog; rmSync(dir, { recursive: true, force: true }); }
+  });
+
   test("a listed failure that fails again on its one rerun stays red", async () => {
     const dir = fixture({ "a.test.ts": `import {test,expect} from "bun:test"; test("still red",()=>expect(1).toBe(2));` });
     try { expect(await quietRun({ dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "still red"), changedFiles: [] })).not.toBe(0); }

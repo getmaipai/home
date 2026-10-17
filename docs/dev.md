@@ -37133,3 +37133,10 @@ not "run it again": it moves to `bench` with a reason, or it is rewritten offlin
 
 The 04:00 launchd run itself (the job is loaded and `launchctl print` shows the calendar trigger); a bench run on a machine without
 multicast.
+
+**Follow-up, same day (#216).** The flake ledger's isolated rerun never worked for a test inside a `describe`: it passed bun the
+failure line's `describe > test` name, bun matches `describe test` joined by single spaces, the rerun matched 0 tests and exited
+1, so a listed flake still turned the gate red. Fixed in `scripts/gate/shardTests.ts` with a describe-nested regression test. The
+two `turnNext.test.ts` tests that failed 38 gates since 2026-10-12 at the 5 second timeout, and pass alone in under 2 seconds,
+are listed in the ledger until 2026-10-23 while the shared-state cause is found. `check.sh --pre` also failed from a bare
+checkout because the commons path was exported relative before it was made absolute; fixed in the same landing.

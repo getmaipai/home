@@ -622,7 +622,10 @@ export async function run(opts: RunOptions): Promise<number> {
   // fail fast as ordinary failures.
   if (!firstFail) for (const { entry, line } of flakyCandidates.values()) {
     const slot = await reserveForSingleWorker();
-    const exactName = `^${entry.test.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
+    // bun's -t matches "describe test" joined by single spaces, never the
+    // " > " the failure line prints; the " > " form matched 0 tests and the
+    // rerun exited 1, so a listed flake still went red (#216, 2026-10-16).
+    const exactName = `^${entry.test.split(" > ").join(" ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
     const proc = Bun.spawn(["bun", "test", entry.file, "-t", exactName], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
     setSlotOwner(slot, proc.pid);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
