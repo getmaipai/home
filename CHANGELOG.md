@@ -7,8 +7,41 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-### Changed
-- Installer: installs Deno 2.9.7 itself (checksum-verified, into the install folder's `.deno/bin`), so the built-in data packages work without installing Deno by hand. A failed Deno download no longer matters to the rest of the install; run the installer again to retry.
+## [0.2.4] - 2026-10-17
+
+Setup is clearer, Home searches the web more safely, the voice sounds better, and chat feels calmer.
+
+### Setup
+- Home installs Deno 2.9.7 itself (checksum-verified), so the built-in data packages work without installing it by hand. The installer opens the setup address in your browser when it finishes.
+- Web search setup has one Test result in plain words, and Continue turns on only after a passed Test. There are no Save or Skip buttons.
+- The Tune this computer step is redone, the plan names voice, and the Checks screen no longer moves on by itself.
+- Setup errors show as a clear red alert. Passcode boxes turn green when they match and red when they do not.
+- Setup installs the chat engine before it pulls models. A new art set covers search and warming up.
+
+### Search
+- A grown-up can let teens, or teens and children, use DuckDuckGo-style search beside SearXNG. It is off by default.
+- If you skip the web search step, DuckDuckGo stays on for adults.
+
+### Voice
+- The new default voice is Chatterbox Turbo, picked by ear. It can add small cues such as a laugh, only the ones it really supports.
+- Voice settings are one plain list with a preview and a one-tap choose.
+- Conversation mode checks your microphone first and shows help for your browser. A mic problem no longer reopens the overlay in a loop.
+
+### Chat
+- Reasoning stays folded by default, with calm rotating words while the model thinks and "Thought for Ns" when it is done. Your choice is remembered.
+- A model that always thinks shows a short Thinking badge instead of a mode picker.
+- Chat titles come from the first message right away, then a model title replaces it.
+- The chat menu matches the history menu: Rename, Pin, Archive, Delete. The plus menu opens above the plus. You can drop files anywhere on the chat page.
+- The message box takes focus when you open Chat.
+- Muse Glimmer models can take pictures on bigger computers.
+
+### Home page
+- A new Home page has an ask box, starter ideas, Today cards from your packages, and Getting started.
+- Home asks for your city once, with Use my location or a typed city, so weather works.
+
+### Fixes
+- An empty dark box under the chat is gone.
+- Weather with no place set gives a plain answer instead of an error.
 
 ## [0.2.3] - 2026-10-17
 
