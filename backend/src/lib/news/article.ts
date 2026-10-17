@@ -60,7 +60,7 @@ export interface LoadedContent { blocks: ArticleBlock[]; source: ContentSource; 
 const opening = new Map<string, Promise<LoadedContent>>();
 
 /** The item's article for this band: the stored copy when it is fresh (or a saved story pinned it), else one fetch. */
-export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null } = {}): Promise<LoadedContent> {
+export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null; background?: boolean } = {}): Promise<LoadedContent> {
   const key = `${item.id}:${band}`;
   const running = opening.get(key);
   if (running && !options.retry) return running;
@@ -69,7 +69,7 @@ export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", o
   return next;
 }
 
-async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null }): Promise<LoadedContent> {
+async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null; background?: boolean }): Promise<LoadedContent> {
   const store = options.store === undefined ? sharedShelfStore() : options.store;
   const variant = variantOf(band);
   const stored = store?.getContent(item.id, variant) ?? null;
@@ -91,7 +91,7 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
   if (options.retry) failures.forget(item.url);
   else if (failures.has(item.url)) return fallback();
   try {
-    const page = await pageHtml(item.url, undefined, band === "adult" ? undefined : band);
+    const page = await pageHtml(item.url, undefined, band === "adult" ? undefined : band, { background: options.background });
     const article = extractFullArticle(page.html, { book: "news", allowedBooks: new Set(), allowLinks: band !== "child", allowImages: false, mode: "news", baseUrl: item.url });
     const blocks = article.blocks.filter((block) => block.type !== "figure");
     const text = textOfBlocks(blocks);

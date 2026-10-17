@@ -6,6 +6,7 @@
 // feeds that carried it are kept in a link table, so a story two feeds
 // both link is one row with two links (canonical-URL dedupe).
 import { Database } from "bun:sqlite";
+import { prefetchBudget, PREFETCH_SCHEMA } from "@/lib/news/prefetchBudget";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { cacheDir } from "@/lib/paths";
@@ -38,6 +39,7 @@ CREATE TABLE IF NOT EXISTS shelf_item_feed (
 );
 CREATE INDEX IF NOT EXISTS shelf_item_feed_feed ON shelf_item_feed (feed_id);
 CREATE INDEX IF NOT EXISTS shelf_item_id ON shelf_item (id);
+${PREFETCH_SCHEMA}
 -- NEWS-02: the cleaned article of an item a person opened (spec NewsItem.content_ref is the item id). One row per item
 -- and band: each band keeps its own copy (a child's holds no links, a teen's and an adult's keep them). A pinned row belongs
 -- to a saved story and is never pruned while the save exists.
@@ -82,6 +84,9 @@ export interface ShelfStore {
   pinContent(itemId: string, pinned: boolean): void;
   /** Drops a feed's links, and every item no feed carries any more. */
   forgetFeed(feedId: string): number;
+  /** Atomically reserve one background attempt, including failed fetches. Rolling 24 hour site cap, global pace. */
+  claimPrefetch(url: string, site: string, nowMs: number): boolean;
+  prefetchOutcome(ok: boolean, nowMs: number): void;
   count(): number;
   close(): void;
 }
@@ -227,6 +232,7 @@ export function openShelfStore(path: string): ShelfStore {
       reattribute.run(feedId);
       return dropOrphans.run().changes;
     },
+    ...prefetchBudget(sqlite),
     count() {
       return total.get()?.n ?? 0;
     },

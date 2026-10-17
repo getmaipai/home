@@ -292,3 +292,23 @@ export function savedRows(person: PersonRow, now = new Date()): RowsData {
   return rows;
 }
 
+/** NEWS-07: only explicit follows and the Today lead set, through the same card and source gates as Today. */
+export function fullTextCandidates(person: PersonRow, now = new Date()): ShelfItem[] {
+  if (person.role === "guest" || !person.enabled || person.deletedAt || person.memorializedAt || !shelfEnabled()) return [];
+  const env = cardEnv(viewerOf(person, now));
+  if (!env) return [];
+  const followed = followedChannels(person.id);
+  const items = releaseShelfItems(env.viewer.band, CANDIDATES, env.store)
+    .filter((item) => ageMs(item, now) <= TODAY_WINDOW_H * HOUR_MS);
+  const inputs = items.flatMap((item) => {
+    const card = cardOf(item, env);
+    return card ? [rankInputOf(item, card)] : [];
+  });
+  const ranked = rankStories({ stories: inputs, now, followed, mode: "today" });
+  const chosen = new Set([ranked.hero?.item_id, ...ranked.featured.map((story) => story.item_id)]);
+  const byId = new Map(items.map((item) => [item.id, item]));
+  for (const story of inputs) {
+    if (story.topics.some((topic) => followed.topics.has(topic)) || env.store.feedIdsOf(byId.get(story.item_id)!.canonical_url).some((id) => followed.sources.has(id))) chosen.add(story.item_id);
+  }
+  return items.filter((item) => chosen.has(item.id));
+}

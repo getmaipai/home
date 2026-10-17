@@ -1721,7 +1721,7 @@ function robotsAllows(robots: string, target: URL): boolean {
   return allowed;
 }
 
-async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSignal, minorBand?: MinorBand): Promise<AttemptResult> {
+async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSignal, minorBand?: MinorBand, background = false): Promise<AttemptResult> {
   // The pace counts pages, not the robots.txt check that goes with each
   // one (THIN-4A: with both counted, a three-page search spent six
   // tokens of a three-token burst and read one page).
@@ -1730,7 +1730,10 @@ async function pageFetch(url: string, countsAgainstPace = true, signal?: AbortSi
   try {
     const fetchOptions = { method: "GET", headers: { accept: "text/html,application/xhtml+xml" }, signal: signal ?? AbortSignal.timeout(SEARXNG_PAGE_TIMEOUT_MS) };
     let response: Response;
-    if (!minorBand && !siteBlocksActive("adult")) {
+    if (background) {
+      // A redirect needs its own robots and budget checks. Leave it for an explicit open.
+      response = await guardedFetch(url, { ...fetchOptions, redirect: "manual" });
+    } else if (!minorBand && !siteBlocksActive("adult")) {
       response = await guardedFetch(url, { ...fetchOptions, redirect: "follow", maxRedirects: MAX_FETCH_REDIRECTS });
     } else {
       const hopBand = minorBand ?? "adult";
@@ -1822,6 +1825,8 @@ export function parseReadablePage(html: string, url: string): PageReadResult {
  * helper was rejected because it would leave article extraction as a
  * second parser surface. */
 export interface PageReadOptions {
+  /** Background News reads never expand a missing page into Archive requests. */
+  background?: boolean;
   /** A temporary chat: the fetch cache is neither read nor written (KS-07). */
   temporary?: boolean;
 }
@@ -1857,7 +1862,7 @@ export async function pageHtml(url: string, signal?: AbortSignal, minorBand?: Mi
   // KS-07: the band's blocked-site check runs before the cache is consulted, so a cached body is never served
   // for an address the asker's band may not open.
   if (!urlAllowedFor(band, url)) throw new HostError("network_unreachable", "That page isn't available.");
-  const fetchOne = pageFetchForTests ?? ((target: string) => pageFetch(target, true, signal, minorBand));
+  const fetchOne = pageFetchForTests ?? ((target: string) => pageFetch(target, true, signal, minorBand, opts.background));
   const cache = fetchCacheForRead(temporary);
   if (cache) {
     let hit: ReturnType<typeof cache.get> = null;
@@ -1866,14 +1871,14 @@ export async function pageHtml(url: string, signal?: AbortSignal, minorBand?: Mi
     } catch {
       hit = null; // the cache is disposable: a locked or full file means a fresh fetch
     }
-    if (hit) {
+    if (hit?.robotsOk) {
       bumpReferenceCounter("fetch_hit", band);
       return { html: hit.body };
     }
     bumpReferenceCounter("fetch_miss", band);
   }
   const origin = parsedUrl.origin;
-  const robotsResult = await (pageFetchForTests ? pageFetchForTests(`${origin}/robots.txt`) : pageFetch(`${origin}/robots.txt`, false, signal));
+  const robotsResult = await (pageFetchForTests ? pageFetchForTests(`${origin}/robots.txt`) : pageFetch(`${origin}/robots.txt`, false, signal, undefined, opts.background));
   if (!robotsResult.ok && robotsResult.status !== 404) pageFailure(robotsResult, `${origin}/robots.txt`);
   if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
     throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);
@@ -1882,7 +1887,7 @@ export async function pageHtml(url: string, signal?: AbortSignal, minorBand?: Mi
   if (!result.ok) {
     // KS-07: a cited page that is gone (404) may be answered from the Internet Archive's copy, for a teen or an
     // adult only, with the household's switch on; the caller's floor runs on whatever comes back.
-    if (result.status === 404) {
+    if (result.status === 404 && !opts.background) {
       const copy = await waybackCopy(url, band, temporary, {
         cache,
         fetchText: async (target) => {

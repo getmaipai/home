@@ -71,3 +71,11 @@ Their news still comes only from the Kids' lists.
 stories stay. Stories you opened may look unread again. My Mix starts again from your follows and new reading.
 
 The News app pages and these controls ship with the News app package. The shelf settings above work without that package.
+
+## Keep full stories ready
+
+An admin can turn on **Load News stories ahead of time** in the News settings, under advanced options. It is off by default. With it off, Home loads a story page only when someone opens or saves it.
+
+When it is on, Home loads text from followed channels and the top stories in Today while nobody is using MaiPai. It tries each item only once. It loads at most one page every 30 seconds and 150 pages per site in 24 hours. It follows each site's rules for automated readers. If a site blocks a request, Home pauses these background reads for at least an hour. More failures make the wait longer, up to a day. You can still open a story yourself.
+
+This switch never loads pictures in the background. Children still get only the Kids' sources. Each sentence is checked again before a child sees or hears it. No reading history or follow list is sent to the publisher.

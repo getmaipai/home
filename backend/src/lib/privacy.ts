@@ -26,6 +26,8 @@ import { HOSTED_SEARCH_HOST, hostedSearchKey } from "@/lib/hostedSearch";
 import { webSourcesPicked } from "@/lib/retrieval/webSources";
 import { DDGS_DESTINATION_HOST } from "@/lib/retrieval/ddgsSource";
 import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
+import { NEWS_FULL_TEXT_PREFETCH_KEY } from "@/settings/newsKeys";
+import { shelfEnabled } from "@/lib/shelf/shelfPolicy";
 import { shelfAdminHosts } from "@/lib/shelf/shelfFeeds";
 import { podcastFeedHosts } from "@/lib/media/podcasts";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
@@ -165,6 +167,10 @@ export function platformConnections(): PrivacyConnection[] {
     row("platform:podcast-feeds", podcastFeedHosts().join(", ") || null, {
       when: "automatically, about every hour at most (a show's own pace can be slower), only while nobody is using MaiPai, for each show an admin follows in Podcasts. Remove the show to stop it. Home fetches the show's picture when it reads a new show. Pressing Save downloads an episode. Keep rules also download episodes automatically after each poll or a rule change.",
       what: "a request for the show's feed file that asks only for what changed since last time (a plain conditional request). Feed, episode and picture hosts, including CDNs and redirect hosts, receive the requested address and your home's internet address. No name, device ID or cookie goes with it. No chat or listening history is sent.",
+    }),
+    row("platform:news-full-text-prefetch", shelfEnabled() && getHouseholdSettingValue(NEWS_FULL_TEXT_PREFETCH_KEY) === true ? "the publishers of followed channels and the top stories in Today" : null, {
+      when: "only when Load News stories ahead of time is on and nobody is using MaiPai. Each item is tried once, at most one every 30 seconds and 150 pages per site in 24 hours. Home follows robots rules and pauses on the first block.",
+      what: "a request for that story page and the site's robots rules, plus your home's internet address. No name, question, follow list, cookie or reading history is sent. Background requests never ask the Internet Archive.",
     }),
     row("platform:hosted-search", hostedSearchKey() ? HOSTED_SEARCH_HOST : null, {
       when: "when an adult asks something that needs a web search, and only while a Brave Search key is saved under Household, Integrations. Never for a child or teen.",
