@@ -7,6 +7,15 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-16
+
+A fresh install of 0.2.0 stopped at the dependency step. This release fixes that.
+
+### Fixed
+- Installer: Commons packages that point at a sibling package (Core needs Spec) now get that sibling linked in the staged folder, so `bun install` finishes on a clean machine.
+- Gate script: `scripts/check.sh` runs when started by hand with no Commons path set, instead of stopping with an unbound variable.
+- Tests: the port-ownership test finds the shared worktree script from the main checkout as well as from a worktree.
+
 ## [0.2.0] - 2026-10-16
 
 Weather answers get a card and a place of their own, and the setup wizard can tune a Mac that runs the AI.
