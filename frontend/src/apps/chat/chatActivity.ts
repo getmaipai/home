@@ -5,7 +5,6 @@ import { useAuiState } from "@assistant-ui/react";
 import { toast } from "sonner";
 import type { BackgroundRun } from "@maipai/ui/src/elements/background-inbox";
 import { api, type HomeJobView } from "@/lib/api";
-import { isVisibleModelDownload } from "@/lib/modelDownloadProgress";
 import { WakeWordPersonContext } from "@/apps/chat/chatThreadContexts";
 import { NOTIFICATIONS_QUERY_KEY } from "@/shell/NotificationBell";
 import {
@@ -67,7 +66,6 @@ export function useChatActivity() {
   });
   const viewer = useMemo(() => (person ? { id: person.id, band: bandOf(person.role), admin: person.role === "owner" || person.role === "admin" } : null), [person]);
   const rows = Array.isArray(jobs.data) ? jobs.data : [];
-  const modelDownloads = viewer?.admin ? rows.filter((row) => isVisibleModelDownload(row) && row.state !== "done" && row.state !== "failed" && row.state !== "cancelled") : [];
   const now = Date.now();
   const view = viewer ? runningNowView({ jobs: rows.filter((row) => row.kind !== "model_download"), viewer, now }) : null;
 
@@ -108,5 +106,5 @@ export function useChatActivity() {
     if (pick) setDismissed((current) => new Set(current).add(pick.row.id));
   };
 
-  return { pick, backgroundRuns, modelDownloads, busy, act, dismiss };
+  return { pick, backgroundRuns, busy, act, dismiss };
 }

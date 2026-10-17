@@ -42,7 +42,7 @@ import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
-import { InstallStrip } from "@/shell/InstallStrip";
+import { InstallDock } from "@/shell/InstallDock";
 import { RailProfile } from "@/shell/RailProfile";
 import { BrowserAlerts } from "@/shell/BrowserAlerts";
 import { useStatusApps } from "@/shell/useStatusApps";
@@ -120,23 +120,12 @@ function PageHeaderLayout() {
   );
 }
 
-/** The install/download line, pinned to the bottom of every page for the people who can act on it
- * (admins and the owner). Fixed, so the page never shifts; it renders nothing once the install is
- * done, and the Home settings AI page already shows its own copy. */
+/** The one install line, pinned to the bottom of every page for everyone signed in. Admins and the owner can
+ * open it for details; the Home settings AI page already shows its own copy. */
 function ShellInstallStrip({ person }: { person: Roster }) {
   const { pathname } = useLocation();
-  if (!meetsMinRole(person.role, "admin") || pathname.startsWith("/settings/home/ai")) return null;
-  return (
-    <InstallStrip
-      compact
-      detailsHref={null}
-      frame={(line) => (
-        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-2">
-          <div className="pointer-events-auto w-full max-w-md rounded-md border bg-background/95 px-3 py-2 shadow-sm">{line}</div>
-        </div>
-      )}
-    />
-  );
+  if (pathname.startsWith("/settings/home/ai")) return null;
+  return <InstallDock admin={meetsMinRole(person.role, "admin")} />;
 }
 
 // HOME-UI-04d: `useAppearance` calls the vendored `useTheme()`, so

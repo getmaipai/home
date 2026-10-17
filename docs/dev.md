@@ -37425,3 +37425,17 @@ then the clip with poster, loop, Download, Share, Make another, Try again). Anim
 fallback and rollback (23 percent faster generation, 36 to 42 percent faster prompt processing, 2 GB smaller resident). It has **not
 landed**: ENGINE-MLX-01 and ENGINE-MLX-02 are open, v0.2.9 still runs the chat role on llama-server b10797, and no user doc says
 otherwise. Update this section, the user docs and the README when ENGINE-MLX-01 ships.
+
+### The install strip (INSTALL-DOCK-01)
+
+One line at the bottom of every page shows what is installing: `frontend/src/shell/InstallDock.tsx`, mounted by `ShellInstallStrip` in
+`Routes.tsx` for everyone signed in (hidden on Settings, AI, which has its own copy). Words come from one module,
+`shell/installWords.ts`: a model or component id maps to a verb, a plain name, an optional product name and one benefit sentence, with a role
+fallback (the label never shows a file or model id). The list is the install status (`GET /api/install`, one entry per Stack `model.install`
+job) joined, for admins, to `GET /api/jobs` rows (`stack:<job id>`) for speed, file details and Cancel; one download is one entry. The line
+shows the primary install, "+N more", the percent weighted over all running installs, and time left and speed when known. It centres on the
+chat column (`data-slot="chat-pane"`), else the content beside the rail, and on the screen below 768 px. Owners and admins open it like an
+accordion (kit `Collapsible`) to see each install as the kit `JobProgress` with a benefit line, failures with Try again and a Repairs link;
+everyone else sees the same line with no control. A hidden `role="status"` line announces the start and the finish once. The chat page no
+longer draws a download card of its own (`ChatMessageQueue`); Settings, Models and storage keeps its `JobProgress` rows. When the Stack's
+component list carries plain labels in the install plan, replace the rules in `installWords.ts` with that list (same ids).

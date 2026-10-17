@@ -220,6 +220,30 @@ describe("ChatPage (SHELL-02's first slice)", () => {
     }
   });
 
+  test("a running model download is not drawn on the chat page: the shell install strip owns it (no second card)", async () => {
+    const original = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/jobs")) return Promise.resolve(Response.json([{ id: "stack:j1", kind: "model_download", state: "running", title: "muse-glimmer-30b-mlx-4bit", actions: ["stop"], updatedAt: new Date().toISOString(), progress: { completedBytes: 972_700_000, totalBytes: 19_443_246_692, bytesPerSecond: 44_800_000 } }]));
+      if (url.includes("/api/conversations")) return Promise.resolve(new Response(JSON.stringify([]), { status: 200 }));
+      return Promise.resolve(new Response("{}", { status: 200 }));
+    }) as unknown as typeof fetch;
+    try {
+      const view = renderPage(
+        <MemoryRouter initialEntries={["/chat"]}>
+          <ChatPage person={makePerson({ role: "owner" })} />
+        </MemoryRouter>,
+      );
+      await view.findByLabelText("Message input");
+      await new Promise((r) => setTimeout(r, 60));
+      expect(view.container.textContent).not.toContain("muse-glimmer-30b-mlx-4bit");
+      expect(view.container.textContent).not.toContain("File details");
+      expect(view.container.querySelector("[data-slot=\"job-progress\"]")).toBeNull();
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
+
   test("ordinary new chat shows the greeting and generic starter chips, with no where-it-runs or can-make-mistakes line", async () => {
     const restore = stubFetch();
     try {
