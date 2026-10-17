@@ -16,6 +16,7 @@ import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
 import type { StackFixture } from "./stackFixture";
+import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 
 let defaultScriptedStack: StackFixture;
 
@@ -116,7 +117,17 @@ installTestIsolationGuard();
   // adult-content refusal) leaves nothing behind. tests/ageCheckStateReset.test.ts proves it.
   afterEach(restoreAgeCheckDefaults);
 }
+// FLAKE-LOAD-01 (cause a, real I/O): a search test whose rows point at https://example.com/... made searxngSearch read those
+// pages from the real internet (6 s alone for SEARCH-ROWS-01, over bun's 5 s default, and a fetch to a third party from a
+// unit test). A page read now fails as "unreachable" unless a test installs its own fetch (__setPageFetchForTests or
+// __setPageReaderForTests); re-applied around every test so a test that cleared the seam cannot re-open the network.
+const offlinePageFetch = async (url: string) => ({ ok: false, networkFailure: true, error: new HostError("network_unreachable", `could not reach ${url} (tests are offline)`) }) as const;
+const keepPagesOffline = async (): Promise<void> => {
+  (await import("@/lib/packageHost")).__setPageFetchForTests(offlinePageFetch as never);
+};
+afterEach(keepPagesOffline);
 beforeEach(async () => {
+  await keepPagesOffline();
   // MINOR-SEARCH-01e-5: tests that are not about the blocked-site lists run as if every enabled list had loaded.
   // Imported here, not at the top, so paths.ts reads MAIPAI_DATA_DIR after this file has set it.
   (await import("@/lib/blocklists/listStore")).__setListsReadyForTests(true);
