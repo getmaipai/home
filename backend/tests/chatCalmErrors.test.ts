@@ -352,7 +352,9 @@ describe("the engine dies mid-reply", () => {
     expect(error.code).toBe("engine_unavailable");
     const generation = error.detail!.generations[0];
     // The socket closed with no [DONE] and no finish reason: a cut-off reply, never a finished one.
-    expect(generation.error).toContain("ended before the engine finished");
+    // Bun reports an errored server stream as a reset socket, and a clean close with no finish reason as the second
+    // message; both are the same cut-off reply and neither is a finished one.
+    expect(generation.error).toMatch(/ended before the engine finished|socket connection was closed|ECONNRESET/);
     expect(events.some((e) => e.type === "done")).toBe(false);
     expect(generation).toMatchObject({ engine_id: IDENTITY_HEADERS["x-maipai-engine"], model_id: IDENTITY_HEADERS["x-maipai-model"] });
     expect(typeof generation.failed_ms).toBe("number");

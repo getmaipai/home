@@ -65,8 +65,9 @@ describe("POST /api/voice/voices/:id/preview", () => {
     expect(ownerResult.status).toBe(503);
     expect(((await ownerResult.json()) as { error: string }).error).toContain("Open Settings, then Engines");
     expect(adultResult.status).toBe(503);
-    expect(((await adultResult.json()) as { error: string }).error).toContain("Ask the person who manages Home");
-    expect(await adultResult.clone().text()).not.toContain("raw token");
+    const adultBody = (await adultResult.json()) as { error: string };
+    expect(adultBody.error).toContain("Ask the person who manages Home");
+    expect(JSON.stringify(adultBody)).not.toContain("raw token");
   });
 
   test("a Stack cloning refusal gets Home's safe Settings copy", async () => {

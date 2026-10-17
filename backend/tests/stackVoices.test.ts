@@ -20,8 +20,9 @@ async function ownerClient(): Promise<TestClient> {
   return client;
 }
 
-async function fixtureFor(rows: unknown[] | Response): Promise<void> {
-  fixture = startStackFixture({ "GET /stack/v1/voices": () => rows instanceof Response ? rows : Response.json({ voices: rows }) });
+// A Response body can be read once, so a scripted failure is a function that builds a fresh one per request.
+async function fixtureFor(rows: unknown[] | (() => Response)): Promise<void> {
+  fixture = startStackFixture({ "GET /stack/v1/voices": () => typeof rows === "function" ? rows() : Response.json({ voices: rows }) });
 }
 
 async function requestWithFixture(client: TestClient): Promise<Response> {
@@ -66,7 +67,7 @@ describe("GET /api/voice/voices", () => {
   });
 
   test("with the Stack down the route answers with a plain-words error and the picker data call does not throw", async () => {
-    await fixtureFor(offlineResponse("tts", "the test Stack is unavailable"));
+    await fixtureFor(() => offlineResponse("tts", "the test Stack is unavailable"));
     const owner = await ownerClient();
     const ownerRes = await requestWithFixture(owner);
     expect(ownerRes.status).toBe(503);

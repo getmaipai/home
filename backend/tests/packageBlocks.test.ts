@@ -279,7 +279,8 @@ describe("GENUI-04: weather returns a spec_sheet, a chart and a data_table", () 
       expect(block.producer).toBe("weather");
     }
     const data = (value as { data?: Record<string, unknown> }).data ?? {};
-    expect(Object.keys(data).sort()).toEqual(["conditions", "high", "low", "place", "precipitation_chance", "temperature", "unit"]);
+    // WEATHER-FOLLOWUP-01: the forecast arrays reach the model so "and tomorrow?" can be answered; the block-only data does not.
+    expect(Object.keys(data).sort()).toEqual(["conditions", "forecast_dates", "forecast_highs", "forecast_lows", "forecast_rain_chance", "high", "low", "place", "precipitation_chance", "temperature", "unit"]);
   });
 
   test("spec_sheet: the current reading, in the rows the old card showed", async () => {

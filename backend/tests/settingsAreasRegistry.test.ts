@@ -2,7 +2,7 @@
 // keys.json is generated from Home's declarations, so a `lives_in` here that
 // the pinned spec does not carry would be reverted by the next gen:settings.
 import { describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { getSettingsAreas } from "@/lib/settingsAreas";
@@ -29,7 +29,15 @@ describe("settings registry and the spec's areas", () => {
     const { areas, not_placed } = getSettingsAreas();
     const notPlaced = new Set(not_placed.map((n) => `${n.scope}:${n.group}`));
     const cards = new Map<string, number>();
-    for (const area of areas) for (const s of area.sections as { cards?: { group?: string; scope?: string; levels?: string[] }[] }[]) {
+    // WEATHER-APP-01: a bundled package declares its own settings area (contributes.settings_area); its cards place keys too.
+    type Card = { group?: string; scope?: string; levels?: string[] };
+    const packageAreas = readdirSync(join(import.meta.dir, "../packages"), { withFileTypes: true })
+      .filter((d) => d.isDirectory() && existsSync(join(import.meta.dir, "../packages", d.name, "manifest.json")))
+      .flatMap((d) => {
+        const manifest = JSON.parse(readFileSync(join(import.meta.dir, "../packages", d.name, "manifest.json"), "utf-8")) as { contributes?: { settings_area?: { sections?: { cards?: Card[] }[] } } };
+        return manifest.contributes?.settings_area ? [manifest.contributes.settings_area] : [];
+      });
+    for (const area of [...areas, ...packageAreas]) for (const s of area.sections as { cards?: Card[] }[]) {
       for (const c of s.cards ?? []) if (c.group) {
         const levels = c.levels ?? ["*"];
         for (const level of levels) {

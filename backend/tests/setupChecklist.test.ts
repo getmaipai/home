@@ -5,6 +5,7 @@ import { SOURCE_MODE_KEY, SOURCE_MODE_OVERRIDE_KEYS } from "@/lib/retrieval/sour
 import { db } from "@/db";
 import { packageInstalls } from "@/db/schema";
 import { setSmbTarget } from "@/lib/backupTargets";
+import { setHouseholdSettingValue } from "@/lib/settings";
 import { issueDeviceToken, redeemDeviceToken } from "@/lib/deviceTokens";
 import { SFACE_DIM, SFACE_MODEL_ID } from "@/lib/faceModelPins";
 import { owner, teen } from "./support/testAuth";
@@ -99,8 +100,10 @@ describe("GET /api/setup-checklist", () => {
     }).run();
     expect((await checklist(client)).find((item) => item.id === "apps")?.done).toBe(true);
 
-    const away = await client.put("/api/settings", { scope: "household", key: "network.tailnet_access", value: true });
-    expect(away.status).toBe(200);
+    // The route refuses this key until Tailscale is signed in on the machine running the test, so the
+    // household fact the checklist reads is written directly: the test follows the fact, not the machine.
+    const away = setHouseholdSettingValue("network.tailnet_access", true);
+    expect(away.ok).toBe(true);
     expect((await checklist(client)).find((item) => item.id === "away-access")?.done).toBe(true);
 
     const remote = await client.put("/api/settings", { scope: "household", key: "engines.stack.where", value: "another_computer" });

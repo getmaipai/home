@@ -72,6 +72,8 @@ async function buildInstallableFixture(
   const manifest = JSON.parse(readFileSync(join(stagingSrc, "manifest.json"), "utf-8"));
   manifest.id = opts.id;
   manifest.version = version;
+  // The copied package's app pages and settings area name its own id (WEATHER-APP-01); a renamed copy is not an app.
+  if (manifest.contributes) { delete manifest.contributes.pages; delete manifest.contributes.settings_area; }
   if (opts.requires) manifest.requires = opts.requires;
   opts.mutateManifest?.(manifest);
   writeFileSync(join(stagingSrc, "manifest.json"), JSON.stringify(manifest));

@@ -99,7 +99,8 @@ describe("place privacy and persistence", () => {
     const childSettings = await (await owner.get(`/api/settings?scope=person:${child.id}`)).json() as Array<{ key: string; value: unknown }>;
     expect(childSettings.some((row) => row.key === "weather.places" || row.key === "weather.default_place" || row.key.startsWith("maps."))).toBe(false);
     const adminChildSettings = await (await adminClient.get(`/api/settings?scope=person:${child.id}`)).json() as Array<{ key: string; value: unknown }>;
-    expect(adminChildSettings.some((row) => row.key.startsWith("weather.") || row.key.startsWith("maps."))).toBe(false);
+    // weather.unit (Fahrenheit or Celsius) is a display choice, not a place; every other weather and maps key is location data.
+    expect(adminChildSettings.filter((row) => (row.key.startsWith("weather.") && row.key !== "weather.unit") || row.key.startsWith("maps.")).map((r) => r.key)).toEqual([]);
     expect((await adultClient.get(`/api/settings?scope=person:${child.id}`)).status).toBe(403);
     for (const target of [teen, adult]) {
       expect((await owner.get(`/api/settings?scope=person:${target.id}`)).status).toBe(403);
