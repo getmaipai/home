@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T23:25:44.079Z",
+  "generatedAt": "2026-10-17T07:01:12.458Z",
   "kitTag": "ui-v0.5.236",
   "items": [
     {
@@ -754,7 +754,7 @@
       "group": "other",
       "verdict": "wire-now",
       "verdictReason": "ELT-T1-01 is owner-approved to replace the plain numeric StatCard value with the shipped NumberTicker.",
-      "implemented": true
+      "implemented": false
     },
     {
       "file": "onboarding.tsx",

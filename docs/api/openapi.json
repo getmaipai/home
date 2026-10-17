@@ -21510,7 +21510,7 @@
         "summary": "Run setup checks and persist their health items",
         "responses": {
           "200": {
-            "description": "The ordered check rows and updated setup state.",
+            "description": "The ordered check rows and updated setup state. searchNeeded: setup should offer the Web search screen.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21863,12 +21863,16 @@
                     "searchCandidate": {
                       "type": "string",
                       "nullable": true
+                    },
+                    "searchNeeded": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
                     "rows",
                     "state",
-                    "searchCandidate"
+                    "searchCandidate",
+                    "searchNeeded"
                   ]
                 }
               }
@@ -22223,7 +22227,7 @@
         "tags": [
           "Setup"
         ],
-        "summary": "Choose a discovered local SearXNG",
+        "summary": "Test or save the SearXNG address, or skip it and keep DuckDuckGo for adults",
         "requestBody": {
           "content": {
             "application/json": {
@@ -22231,29 +22235,122 @@
                 "type": "object",
                 "properties": {
                   "url": {
-                    "type": "string",
-                    "format": "uri"
+                    "type": "string"
+                  },
+                  "dry_run": {
+                    "type": "boolean"
+                  },
+                  "ddgs_default": {
+                    "type": "boolean"
                   }
                 },
-                "required": [
-                  "url"
-                ]
+                "additionalProperties": false
               }
             }
           }
         },
         "responses": {
           "200": {
-            "description": "The chosen SearXNG address was saved.",
+            "description": "A Test answers 200 with result (pass, warn or fail in plain words) and saved false; a Save answers 200 with saved true once it, or the skip choice, was saved.",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
                     "saved": {
-                      "type": "boolean",
-                      "enum": [
-                        true
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string",
+                          "enum": [
+                            "pass",
+                            "warn",
+                            "fail"
+                          ]
+                        },
+                        "address": {
+                          "type": "string"
+                        },
+                        "headline": {
+                          "type": "string"
+                        },
+                        "verdict": {
+                          "type": "string"
+                        },
+                        "recommendation": {
+                          "type": "string"
+                        },
+                        "canUse": {
+                          "type": "boolean"
+                        },
+                        "trouble": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "important": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "important"
+                            ]
+                          }
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "warn",
+                                  "fail",
+                                  "unknown"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "fix": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "state",
+                              "detail",
+                              "fix"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "address",
+                        "headline",
+                        "verdict",
+                        "recommendation",
+                        "canUse",
+                        "trouble",
+                        "details"
                       ]
                     }
                   },
@@ -22265,7 +22362,7 @@
             }
           },
           "400": {
-            "description": "The address is not a passing loopback SearXNG.",
+            "description": "The address is not allowed, or a Save found the service not usable.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29285,6 +29382,147 @@
         }
       }
     },
+    "/api/places/local-search": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Find a city by name in the offline gazetteer",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "q",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Up to five cities, coordinates rounded to 2 decimals. Nothing leaves the home.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lat": {
+                        "type": "number"
+                      },
+                      "lon": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "area",
+                      "lat",
+                      "lon"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/places/nearest": {
+      "get": {
+        "tags": [
+          "Places"
+        ],
+        "summary": "Name the city nearest a point, offline",
+        "parameters": [
+          {
+            "schema": {
+              "type": "number",
+              "nullable": true,
+              "minimum": -90,
+              "maximum": 90
+            },
+            "required": false,
+            "name": "lat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "nullable": true,
+              "minimum": -180,
+              "maximum": 180
+            },
+            "required": false,
+            "name": "lon",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The nearest city within 150 km, or null. The point is not stored or logged.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "nullable": true,
+                  "properties": {
+                    "name": {
+                      "type": "string"
+                    },
+                    "area": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lat": {
+                      "type": "number"
+                    },
+                    "lon": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "area",
+                    "lat",
+                    "lon"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/lists": {
       "get": {
         "tags": [
@@ -35727,6 +35965,99 @@
                           "percentage"
                         ]
                       }
+                    },
+                    "summary": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string",
+                          "enum": [
+                            "pass",
+                            "warn",
+                            "fail"
+                          ]
+                        },
+                        "address": {
+                          "type": "string"
+                        },
+                        "headline": {
+                          "type": "string"
+                        },
+                        "verdict": {
+                          "type": "string"
+                        },
+                        "recommendation": {
+                          "type": "string"
+                        },
+                        "canUse": {
+                          "type": "boolean"
+                        },
+                        "trouble": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "important": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "important"
+                            ]
+                          }
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "warn",
+                                  "fail",
+                                  "unknown"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "fix": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "state",
+                              "detail",
+                              "fix"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "address",
+                        "headline",
+                        "verdict",
+                        "recommendation",
+                        "canUse",
+                        "trouble",
+                        "details"
+                      ]
                     }
                   },
                   "required": [
