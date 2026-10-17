@@ -18,7 +18,7 @@ launchd services and `/usr/local/maipai-home` were not touched. Weights came fro
 
 ## 1. The decision
 
-**Superseded for a 128 GB computer by section 16 (owner ruling, 2026-10-17): Z-Image-Turbo is the default there; Klein stays for quick pictures, edits and every smaller tier. The rest of this section is the original pick.**
+**Section 16 (owner ruling, 2026-10-17) keeps Klein as the default on every tier and makes Z-Image-Turbo the advanced choice named Detailed. This section stands as the original pick.**
 
 | Slot | Pick | Runtime | Licence | Why in one line |
 |---|---|---|---|---|
@@ -442,43 +442,42 @@ percent are over the 120 MB a form upload can carry, the largest is 1.45 GB, non
 
 ### 16.2 Decision
 
-| Tier | Default for a request with no model and no LoRA | Also installed by the wizard | Optional in Models and storage |
+**Owner ruling, final (Jesse, 2026-10-17): plain picture requests stay fast, so FLUX.2 Klein 4B (about 4 s) is the default on every tier.
+Z-Image-Turbo (13 to 30 s, 8,913 CivitAI LoRAs, the best look) is an advanced choice.** The same day's first ruling made Z-Image-Turbo the
+p128 default; that was reversed within hours when the 13 to 30 s wait was weighed against a 4 s one. What the evidence above still decides:
+Z-Image-Turbo is the model that carries the large LoRA library and the best skin and fur texture, so it is what a person gets when they ask for
+that, and what a LoRA made for it selects.
+
+| Tier | Default for a request with no model and no LoRA | Also available | Optional in Models and storage |
 |---|---|---|---|
-| p128 | **Z-Image-Turbo** (8-bit, 9 steps, 34 GB admission, about 13 s measured) | FLUX.2 Klein 4B (quick pictures, every edit and Comment, 15 GB) | Video; later the anime model (IMGGEN-SDXL-01) |
-| p64 | FLUX.2 Klein 4B (unchanged) | none | Z-Image-Turbo only after IMGGEN-ZIT-P64 measures it |
+| p128 | **FLUX.2 Klein 4B** (about 4 s) | Z-Image-Turbo as "Detailed" (8-bit, 9 steps, 34 GB admission, 13 to 30 s) | Z-Image-Turbo (unchecked in the wizard, about 33 GB); video; later the anime model (IMGGEN-SDXL-01) |
+| p64 | FLUX.2 Klein 4B | none | Z-Image-Turbo only after IMGGEN-ZIT-P64 measures it |
 | p32 | FLUX.2 Klein 4B at 4-bit | none | none |
 | p16 | off | | |
 
-- **Why Z-Image-Turbo wins the default.** It is the only candidate that clears all four of the owner's tests at once: a CivitAI library of
-  8,913 (the largest of any model our runtime can run), Apache-2.0 and not gated (a household admin can download it, and the Stack already pins
-  and installs it), no filter stated on its card, and 12.9 s a picture on MLX with the best skin and fur texture of the benched set.
-  What it gives up: it is about three times slower than Klein, it cannot edit, and its folded-hands anatomy was worse in the bench.
-- **What Klein stays for.** Fast photoreal (4.0 s), text in pictures that reads correctly, all edits and Comment, and the only model on
-  p32 and p64. It is installed beside Z-Image on p128 (15 GB) because an edit is always a Klein job.
-- **The licence caveat that remains.** Z-Image-Turbo's licence is Apache-2.0 with no use restriction on the card, so no licence reason stops adult
-  output; the two absolute lines are enforced in our code and unchanged (sections 6 and 15), and the marketing rule (never pitch generation as
-  "uncensored") is unchanged.
-- **p64 stays on Klein for now.** The only Z-Image memory numbers are 8-bit: 30.1 GB MLX peak (bf16 33.7 GB), so most of the peak is probably the
-  load, not the steady state. With the chat model at 18 to 20 GB resident and the other roles, a 34 GB admission does not fit a 64 GB computer, and I could not
-  measure 4-bit today: the Stack's weights on the Studio were uninstalled by another session and the earlier bench copy is gone, so a run
-  needs a 24 GB download under the bench lock. Row IMGGEN-ZIT-P64 holds the measurement; nothing about p64 is guessed.
-- **The second model, anime and illustration.** Illustrious XL (or its NoobAI derivative; Pony V6 is older) is the right second model for the Civitai
-  anime and illustration LoRA library, installable in Models and storage, never the default. It needs the sd.cpp worker built (IMGGEN-SDXL-01, Large)
-  and the owner's acceptance of its licence (section 9 question b, now a Fair AI Public License share-alike term on derivative models, not only OpenRAIL).
+- **Why Klein is the default.** 4.0 s warm against 12.9 s measured (30 s under load through the live Stack), text in pictures that reads
+  correctly, the only model that edits, and the only one on p32 and p64. One model on every tier means one behaviour.
+- **Why Z-Image-Turbo is still the advanced choice.** It is the only candidate that clears the owner's four tests at once (section 16.1): a
+  CivitAI library of 8,913, Apache-2.0 and not gated, no filter stated on its card, and the best texture of the benched set. It gives up speed (about
+  three times slower than Klein), edits, and its folded-hands anatomy was worse in the bench.
+- **Licence.** Z-Image-Turbo is Apache-2.0 with no use restriction on the card, so no licence reason stops adult output; the two absolute lines are
+  enforced in our code and unchanged (sections 6 and 15), and the marketing rule (never pitch generation as "uncensored") is unchanged.
+- **p64 stays Quick only for now.** The only Z-Image memory numbers are 8-bit: 30.1 GB MLX peak (bf16 33.7 GB), so most of the peak is probably the
+  load. With the chat model at 18 to 20 GB resident and the other roles, a 34 GB admission does not fit a 64 GB computer. Row IMGGEN-ZIT-P64 holds the measurement.
+- **The second model, anime and illustration.** Illustrious XL (or its NoobAI derivative) is the right model for the Civitai anime and illustration LoRA
+  library, installable in Models and storage, never the default; it needs the sd.cpp worker (IMGGEN-SDXL-01) and the owner's acceptance of its licence.
   Until then the Stack refuses these files with a sentence naming the family.
 
 ### 16.3 What changed in the code (2026-10-17)
 
-- **Stack** (IMGGEN-DEFAULT-01): `defaultFamilyFor(tier)` picks Z-Image-Turbo on p128 when installed, else Klein; `GET /stack/v1/image` reports it as `default_model`;
-  the disk plan marks `pictures-zimage` `recommended` on p128 (label "Make pictures (Z-Image Turbo)") and renames the Klein row there "Quick pictures
-  and edits"; a LoRA still selects the base it was made for. LoRA detection reads Civitai-style files: a kohya-named Z-Image file
+- **Stack** (IMGGEN-DEFAULT-01): the first pass added `defaultFamilyFor(tier)` and a recommended Z-Image row on p128; both are reverted (Stack `dee922c`), the default
+  is Klein on every tier and the disk plan row is optional again. Kept: LoRA detection reads Civitai-style files: a kohya-named Z-Image file
   (`lora_unet_layers_N_attention`) is no longer mistaken for SDXL because of its `lora_unet_` prefix, a header that declares its base wins, and Pony, Illustrious,
-  NoobAI, FLUX.1 and Chroma files are refused with their family named. Not verified against real Civitai files (none was downloaded: the add flow takes a file the admin
-  saved, and fetching one was not part of this research); the detection is tested on synthetic headers.
-- **Home**: the Stack's plan drives the wizard and Models and storage, so the new default and sizes flow through with no Home change. The one Home gap found
+  NoobAI, FLUX.1 and Chroma files are refused with their family named. Not verified against real Civitai files (the detection is tested on synthetic headers).
+- **Home**: the Stack's plan drives the wizard and Models and storage. The one Home gap found
   is the add flow: Civitai is never fetched (no accounts, no phone-home), so an admin downloads the file, and 69 percent of popular Z-Image LoRAs exceed the 120 MB the form
   and Bun's request cap allow. Settings, Pictures and videos now has "A file already on this computer": the admin types the path and the Stack reads it with the same
   checks (audience unclear means adult-only, likeness and minor refusals, hash, base from the tensors).
-- **Unverified**: Z-Image-Turbo end to end through the Stack at the new default (the live Studio had its weights uninstalled during this session); a 4-bit/8-bit p64
+- **Unverified**: Z-Image-Turbo end to end through the Stack (the live Studio had its weights uninstalled during this session); a 4-bit/8-bit p64
   run; any Chroma or SDXL speed on this Mac beyond section 3.3; real Civitai LoRA headers; the uncensored behaviour (by design nothing explicit was generated).
 
