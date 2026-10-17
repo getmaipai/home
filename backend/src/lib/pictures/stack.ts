@@ -38,7 +38,10 @@ export interface StackImageStatus {
   available: boolean;
   reason: string | null;
   default_model: string | null;
-  models: Array<{ id: string; family?: string; installed: boolean; licence?: string; loras?: boolean; edit?: boolean; steps_default?: number; peak_gb?: number }>;
+  models: Array<{ id: string; family?: string; label?: string; installed: boolean; default?: boolean; available?: boolean; licence?: string; loras?: boolean; edit?: boolean; steps_default?: number; peak_gb?: number; install?: { remaining_bytes: number } }>;
+  lora_count?: number;
+  code?: string | null;
+  install?: { remaining_bytes: number };
   loras_supported: boolean;
   edit: { generative: boolean; masked: boolean };
   limits: { min_side?: number; max_side?: number; size_step?: number; max_n?: number; max_prompt_chars?: number; max_loras?: number; max_edit_megapixels?: number; queue_max?: number };
@@ -49,14 +52,20 @@ export interface StackImageStatus {
 export interface StackLora {
   id: string;
   name: string;
+  file?: string;
   sha256: string;
   bytes: number;
+  rank?: number;
+  modules?: number;
   base_model: string;
   licence: string | null;
+  licence_class?: "free" | "acknowledged";
   source_url: string | null;
   classification: "all-ages" | "adult-only";
+  classification_note?: string | null;
   trigger_words: string[];
   strength_default: number;
+  added_by?: string | null;
   added_at: string;
 }
 
@@ -187,14 +196,43 @@ export async function listLoras(): Promise<StackLora[]> {
   return Array.isArray(body) ? body : Array.isArray(body.loras) ? body.loras : [];
 }
 
-export async function addLora(form: FormData): Promise<StackLora> {
+/** Adds a LoRA from a file the admin uploaded. The Stack reads the tensors, hashes the file and refuses one that cannot work or must not be added (a minor in a sexual context, a real person's likeness). */
+export async function addLoraFile(form: FormData): Promise<StackLora> {
   const res = await request("/stack/v1/image/loras", { method: "POST", body: form, timeoutMs: 600_000 });
   if (!res.ok) return failure(res);
-  const body = await res.json() as { lora?: StackLora } & Partial<StackLora>;
-  return (body.lora ?? body) as StackLora;
+  return await res.json() as StackLora;
+}
+
+/** Adds a LoRA from a Hugging Face file link: an install job; poll it with `getStackJob`. */
+export async function addLoraUrl(body: { url: string; name: string; licence?: string; licence_acknowledged?: boolean; classification?: "all-ages" | "adult-only"; trigger_words?: string[]; added_by?: string }): Promise<{ job: string }> {
+  const res = await request("/stack/v1/image/loras/install", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body), timeoutMs: 20_000 });
+  if (!res.ok) return failure(res);
+  return await res.json() as { job: string };
+}
+
+export async function patchLora(id: string, body: { name?: string; classification?: "all-ages" | "adult-only"; trigger_words?: string[]; strength_default?: number }): Promise<StackLora> {
+  const res = await request(`/stack/v1/image/loras/${encodeURIComponent(id)}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+  if (!res.ok) return failure(res);
+  return await res.json() as StackLora;
 }
 
 export async function removeLora(id: string): Promise<void> {
   const res = await request(`/stack/v1/image/loras/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (!res.ok) return failure(res);
+}
+
+/** Starts the install of a picture model family (the pinned files, then the engine environment, one job). */
+export async function installPictureModel(family?: string): Promise<{ job: string; family: string; joined: boolean }> {
+  const res = await request("/stack/v1/image/install", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(family ? { family } : {}), timeoutMs: 20_000 });
+  if (!res.ok) return failure(res);
+  return await res.json() as { job: string; family: string; joined: boolean };
+}
+
+export interface StackBackgroundJob { id: string; state: string; percent?: number; status?: string; reason?: string | null; result?: { lora?: StackLora } | null }
+/** A Stack job (model install, a LoRA fetch). */
+export async function getStackJob(id: string): Promise<StackBackgroundJob> {
+  const res = await request(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET", timeoutMs: 8_000 });
+  if (!res.ok) return failure(res);
+  const body = await res.json() as { job?: StackBackgroundJob };
+  return body.job ?? { id, state: "failed", reason: "The job could not be read." };
 }

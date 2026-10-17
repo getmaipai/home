@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T10:02:56.410Z",
+  "generatedAt": "2026-10-17T10:57:57.294Z",
   "kitTag": "ui-v0.5.243",
   "items": [
     {
@@ -588,7 +588,7 @@
       "group": "image",
       "verdict": "wire-after",
       "verdictReason": "Deferred until Q16 ANSWER-IMG-04 adopts the kit Element for answer image parts.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "image-generation.tsx",

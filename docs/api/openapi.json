@@ -40922,7 +40922,7 @@
         "tags": [
           "Image editor"
         ],
-        "summary": "Ask for a change in words (needs the picture-making model)",
+        "summary": "Ask for a change in words; the picture engine changes the pointed-at area and returns a preview to apply",
         "parameters": [
           {
             "schema": {
@@ -40986,32 +40986,123 @@
         },
         "responses": {
           "200": {
-            "description": "Plain words: picture creation is not set up yet. Nothing was changed.",
+            "description": "Running with a job to poll at GET /jobs/{job}, then done with a preview to apply (POST /previews/{token}/apply). Nothing changes until it is applied.",
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "done": {
-                      "type": "boolean",
-                      "enum": [
-                        false
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "done"
+                          ]
+                        },
+                        "preview": {
+                          "type": "object",
+                          "properties": {
+                            "token": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            },
+                            "width": {
+                              "type": "number"
+                            },
+                            "height": {
+                              "type": "number"
+                            },
+                            "operation": {
+                              "type": "string"
+                            },
+                            "engine": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "model": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "ms": {
+                              "type": "number",
+                              "nullable": true
+                            },
+                            "transparent": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "token",
+                            "url",
+                            "width",
+                            "height",
+                            "operation",
+                            "engine",
+                            "model",
+                            "ms",
+                            "transparent"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "preview"
                       ]
                     },
-                    "code": {
-                      "type": "string",
-                      "enum": [
-                        "not_set_up"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "running"
+                          ]
+                        },
+                        "job": {
+                          "type": "string"
+                        },
+                        "percent": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "job",
+                        "percent",
+                        "label"
                       ]
                     },
-                    "message": {
-                      "type": "string"
+                    {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "failed",
+                            "cancelled"
+                          ]
+                        },
+                        "error": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "error",
+                        "code"
+                      ]
                     }
-                  },
-                  "required": [
-                    "done",
-                    "code",
-                    "message"
                   ]
                 }
               }
@@ -41099,6 +41190,1305 @@
           },
           "503": {
             "description": "The editing tools are not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/admin": {
+      "get": {
+        "tags": [
+          "Pictures admin"
+        ],
+        "summary": "The picture models, the style library and the household's picture switches",
+        "responses": {
+          "200": {
+            "description": "Additive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unreachable"
+                      ]
+                    },
+                    "engine": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string"
+                        },
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "default_model": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "edit_ready": {
+                          "type": "boolean"
+                        },
+                        "models": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "label": {
+                                "type": "string"
+                              },
+                              "installed": {
+                                "type": "boolean"
+                              },
+                              "available": {
+                                "type": "boolean"
+                              },
+                              "licence": {
+                                "type": "string"
+                              },
+                              "edit": {
+                                "type": "boolean"
+                              },
+                              "peak_gb": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "remaining_bytes": {
+                                "type": "number"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "label",
+                              "installed",
+                              "available",
+                              "licence",
+                              "edit",
+                              "peak_gb",
+                              "remaining_bytes"
+                            ]
+                          }
+                        },
+                        "remaining_bytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "available",
+                        "reason",
+                        "default_model",
+                        "edit_ready",
+                        "models",
+                        "remaining_bytes"
+                      ]
+                    },
+                    "adapters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "base_model": {
+                            "type": "string"
+                          },
+                          "classification": {
+                            "type": "string",
+                            "enum": [
+                              "all-ages",
+                              "adult-only"
+                            ]
+                          },
+                          "classification_note": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "licence": {
+                            "type": "string"
+                          },
+                          "licence_known": {
+                            "type": "boolean"
+                          },
+                          "source_url": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "bytes": {
+                            "type": "number"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "trigger_words": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "added_at": {
+                            "type": "string"
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "needs_confirmation": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "base_model",
+                          "classification",
+                          "classification_note",
+                          "licence",
+                          "licence_known",
+                          "source_url",
+                          "bytes",
+                          "sha256",
+                          "trigger_words",
+                          "added_at",
+                          "enabled",
+                          "needs_confirmation"
+                        ]
+                      }
+                    },
+                    "bands": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "band": {
+                            "type": "string",
+                            "enum": [
+                              "children",
+                              "teens",
+                              "adults"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "on": {
+                            "type": "boolean"
+                          },
+                          "locked": {
+                            "type": "boolean"
+                          },
+                          "note": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "band",
+                          "label",
+                          "on",
+                          "locked",
+                          "note"
+                        ]
+                      }
+                    },
+                    "adult_adapters": {
+                      "type": "string",
+                      "enum": [
+                        "allowed",
+                        "restricted"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "stack",
+                    "engine",
+                    "adapters",
+                    "bands",
+                    "adult_adapters"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style or job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too big",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That cannot be added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/admin/models/install": {
+      "post": {
+        "tags": [
+          "Pictures admin"
+        ],
+        "summary": "Install a picture model",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "family": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "The install job; poll GET /jobs/{id}.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "family": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "family"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style or job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too big",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That cannot be added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/admin/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Pictures admin"
+        ],
+        "summary": "Progress of a model install or a style fetch",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 120
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A finished style fetch carries the new style, switched off until confirmed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "running",
+                        "done",
+                        "failed"
+                      ]
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "code": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "adapter": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "base_model": {
+                          "type": "string"
+                        },
+                        "classification": {
+                          "type": "string",
+                          "enum": [
+                            "all-ages",
+                            "adult-only"
+                          ]
+                        },
+                        "classification_note": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "licence": {
+                          "type": "string"
+                        },
+                        "licence_known": {
+                          "type": "boolean"
+                        },
+                        "source_url": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "bytes": {
+                          "type": "number"
+                        },
+                        "sha256": {
+                          "type": "string"
+                        },
+                        "trigger_words": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "added_at": {
+                          "type": "string"
+                        },
+                        "enabled": {
+                          "type": "boolean"
+                        },
+                        "needs_confirmation": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "base_model",
+                        "classification",
+                        "classification_note",
+                        "licence",
+                        "licence_known",
+                        "source_url",
+                        "bytes",
+                        "sha256",
+                        "trigger_words",
+                        "added_at",
+                        "enabled",
+                        "needs_confirmation"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "percent",
+                    "label",
+                    "error",
+                    "code",
+                    "adapter"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style or job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too big",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That cannot be added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/admin/adapters": {
+      "post": {
+        "tags": [
+          "Pictures admin"
+        ],
+        "summary": "Add a style (LoRA) by Hugging Face link or file",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "url": {
+                    "type": "string",
+                    "maxLength": 600
+                  },
+                  "file": {
+                    "nullable": true
+                  },
+                  "licence": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "licence_acknowledged": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  },
+                  "all_ages": {
+                    "type": "string",
+                    "enum": [
+                      "yes",
+                      "no",
+                      "unsure"
+                    ]
+                  },
+                  "trigger_words": {
+                    "type": "string",
+                    "maxLength": 400
+                  },
+                  "not_real_person": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "not_real_person"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A file is added at once (switched off until confirmed); a link starts a job to poll at GET /jobs/{id}.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "job": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "job"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "adapter": {
+                          "type": "object",
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "base_model": {
+                              "type": "string"
+                            },
+                            "classification": {
+                              "type": "string",
+                              "enum": [
+                                "all-ages",
+                                "adult-only"
+                              ]
+                            },
+                            "classification_note": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "licence": {
+                              "type": "string"
+                            },
+                            "licence_known": {
+                              "type": "boolean"
+                            },
+                            "source_url": {
+                              "type": "string",
+                              "nullable": true
+                            },
+                            "bytes": {
+                              "type": "number"
+                            },
+                            "sha256": {
+                              "type": "string"
+                            },
+                            "trigger_words": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            },
+                            "added_at": {
+                              "type": "string"
+                            },
+                            "enabled": {
+                              "type": "boolean"
+                            },
+                            "needs_confirmation": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "base_model",
+                            "classification",
+                            "classification_note",
+                            "licence",
+                            "licence_known",
+                            "source_url",
+                            "bytes",
+                            "sha256",
+                            "trigger_words",
+                            "added_at",
+                            "enabled",
+                            "needs_confirmation"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "adapter"
+                      ]
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style or job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too big",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That cannot be added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/admin/adapters/{id}": {
+      "patch": {
+        "tags": [
+          "Pictures admin"
+        ],
+        "summary": "Turn a style on or off for the household, or change its age setting",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "classification": {
+                    "type": "string",
+                    "enum": [
+                      "all-ages",
+                      "adult-only"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "trigger_words": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "maxLength": 60
+                    },
+                    "maxItems": 12
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The style as it stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
+                    "classification": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "classification_note": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "licence": {
+                      "type": "string"
+                    },
+                    "licence_known": {
+                      "type": "boolean"
+                    },
+                    "source_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "bytes": {
+                      "type": "number"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "added_at": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "base_model",
+                    "classification",
+                    "classification_note",
+                    "licence",
+                    "licence_known",
+                    "source_url",
+                    "bytes",
+                    "sha256",
+                    "trigger_words",
+                    "added_at",
+                    "enabled",
+                    "needs_confirmation"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style or job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too big",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That cannot be added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Pictures admin"
+        ],
+        "summary": "Remove a style and its file",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such style or job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too big",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That cannot be added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
             "content": {
               "application/json": {
                 "schema": {

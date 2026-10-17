@@ -79,50 +79,6 @@
   "min_role": "adult",
   "consequential": false,
   "offline": "full",
-  "config": [
-    {
-      "key": "generation.adults",
-      "scope": "household",
-      "selector": "boolean",
-      "default": true,
-      "label": "Adults can make pictures",
-      "help": "Adults can ask chat for pictures. Children and teens cannot, whatever this says.",
-      "level": "basic",
-      "copy": {
-        "does": "Lets adults ask chat to make pictures on this computer. Children and teens never can."
-      },
-      "lives_in": "household.ai",
-      "honoured_by": [
-        "home"
-      ]
-    },
-    {
-      "key": "generation.adult_adapters",
-      "scope": "household",
-      "selector": "select",
-      "range": {
-        "options": [
-          "allowed",
-          "restricted"
-        ]
-      },
-      "default": "allowed",
-      "label": "Adult-only styles",
-      "help": "Whether adults can use styles marked adult-only. Children and teens never can.",
-      "level": "basic",
-      "copy": {
-        "does": "Chooses whether adults can use styles marked adult-only.",
-        "options": {
-          "allowed": "Adults can use every style in the library.",
-          "restricted": "Adults can use only styles marked for all ages."
-        }
-      },
-      "lives_in": "household.ai",
-      "honoured_by": [
-        "home"
-      ]
-    }
-  ],
   "data_sources": [],
   "permissions": [],
   "notifications": [],
@@ -135,5 +91,6 @@
   "smoke": {
     "kind": "recipe_fixture",
     "fixture": "tests/smoke.json"
-  }
+  },
+  "config": []
 }

@@ -22,6 +22,7 @@ import { UI_SETTINGS_KEYS } from "../src/settings/uiKeys.js";
 import { ALLOWANCE_SETTINGS_KEYS } from "../src/settings/allowanceKeys.js";
 import { STORAGE_SETTINGS_KEYS } from "../src/settings/storageKeys.js";
 import { REFERENCE_SETTINGS_KEYS } from "../src/settings/referenceKeys.js";
+import { PICTURE_SETTINGS_KEYS } from "../src/settings/pictureKeys.js";
 import { SECURITY_SETTINGS_KEYS } from "../src/settings/securityKeys.js";
 import { WAKEWORD_SETTINGS_KEYS } from "../src/settings/wakewordKeys.js";
 import { ROBOT_SETTINGS_KEYS } from "../src/settings/robotSettingsKeys.js";
@@ -42,6 +43,7 @@ const sorted = [
   ...ALLOWANCE_SETTINGS_KEYS,
   ...STORAGE_SETTINGS_KEYS,
   ...REFERENCE_SETTINGS_KEYS,
+  ...PICTURE_SETTINGS_KEYS,
   ...SECURITY_SETTINGS_KEYS,
   ...WAKEWORD_SETTINGS_KEYS,
   ...ROBOT_SETTINGS_KEYS,

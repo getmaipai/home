@@ -71,7 +71,7 @@ describe("who may open Home settings", () => {
 describe("the sections that had no entry draw inside Home settings", () => {
   test("the spec's Home area carries a trail view for each of them", () => {
     const trail = Object.fromEntries(homeArea().sections.filter((section) => section.trail_view).map((section) => [section.id, section.trail_view]));
-    expect(trail).toEqual({ ai: "home.engine_admin", robot: "home.devices_admin", developer: "home.routing_stats" });
+    expect(trail).toEqual({ ai: "home.engine_admin", pictures: "home.pictures_library", robot: "home.devices_admin", developer: "home.routing_stats" });
   });
 
 
