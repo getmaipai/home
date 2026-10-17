@@ -7,8 +7,24 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.16] - 2026-10-17
+
+Stronger protection for children and teens in pictures and videos, a Videos app, a Trash for deleted media, and health checks that restart a stuck engine.
+
+### Safety
+- Words that try to hide a request about a child (letter-spacing, dots, look-alike characters, other languages) are read the same as plain words. A picture this home did not make is checked before it is edited, animated or used as a reference, and a teen or child is never shown anything nude or sexual. A teen or child who trips a word rule with a harmless request reads one friendly line, and admins are told.
+- Teens can make pictures and videos and edit pictures in their lane. Children can make cartoon pictures and videos of safe subjects, 20 pictures and 5 videos a day by default, counted in a stored daily record. A child or teen never sees a half-drawn frame, only gets the Quick video model, and cannot claim a stranger's photo as their own. Every edit is in the admins' activity list.
+
+### Videos
+- A new **Videos** app plays the videos saved on your hub, in a dark look like YouTube. Tabs: Home (a big picture, Continue watching, Recently added, more from what you watch most, Watch again), Library by channel, Watch later and History. A video resumes where you stopped, shows Up next, and a finished video leaves Watch later. A child sees only the videos cleared for children and no lists of new videos.
+- The Pick up shelf's media links open the video in its app. One video plays at a time, and its speed and the sleep timer follow the audio settings.
+
 ### Storage
 - Storage now has one Trash for deleted media, playlists and watchlists. Restore an item within 30 days, or confirm Delete forever. Home clears expired items at startup and every six hours; deleted paths stay out of new scans. Children see only their own safe items. Lists and memories will join later.
+
+### Reliability
+- Home runs plain health checks in the background (hello, weather, search, a picture, embeddings, voice, a spoken turn). When the AI engine is dead or hung, never just slow, Home asks the Stack to restart it, at most once every 30 minutes.
+- The Stack is updated to the build that accepts those restart requests.
 
 ## [0.2.15] - 2026-10-17
 
@@ -57,9 +73,7 @@ Conversation mode speaks a real answer again. Pictures and videos can look like 
 
 ### Pictures
 - Two kinds of picture, in plain words. **Quick** (a few seconds) stays the default; **Detailed** (15 to 30 seconds, finer detail, many more styles) is the choice for people who want it. Chat uses Detailed when you ask for the best quality, photoreal or a custom look and says so; a style made for Detailed uses it on its own; a **Make it Detailed** or **Make it Quick** button on each picture makes it again the other way. Settings, Pictures and videos has a **Picture quality** row, a **What is the difference?** comparison and **Get Detailed pictures** when it is not installed. Model names appear only under **Details**.
-### Videos
-- A new **Videos** app plays the videos saved on your hub, in a dark look like YouTube. Tabs: Home (a big picture, Continue watching, Recently added, more from what you watch most, Watch again), Library by channel, Watch later and History. A video resumes where you stopped, shows Up next, and a finished video leaves Watch later. A child sees only the videos cleared for children and no lists of new videos.
-- The Pick up shelf's media links open the video in its app. One video plays at a time, and its speed and the sleep timer follow the audio settings.
+
 
 ### Audio
 - One thing plays at a time. A spoken reply pauses a podcast or video, and starting one pauses MaiPai's voice.
