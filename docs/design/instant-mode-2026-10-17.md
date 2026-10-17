@@ -90,3 +90,27 @@ Self-review against RULES.md; no `architect` agent exists in this checkout (`.cl
 verdict, not the agent's. INSTANT-01: APPROVED (removes a dead selector, touches no turn behavior, no minor path, no rule).
 INSTANT-02 to 04: APPROVED in design provided the minor gate and the rule 3 bench stay as written. INSTANT-05: NEEDS the
 owner's decision (rule 0, spoken turn shape).
+
+## 7. INSTANT-05 decided: spoken turns stay on Glimmer (owner delegated the decision, 2026-10-17)
+
+**Why conversation mode said only "One sec."** (VOICE-REPLY-01, `e89c7388`). The Stack serves Glimmer as the oMLX build
+`muse-glimmer-30b-mlx-4bit`; Home had no record for that id, so it read as a model that can switch thinking off. A spoken turn's
+ceiling was 128 tokens, Glimmer spent all 128 on reasoning the client drops, the engine stopped on `length` with no text, and the
+one empty-reply retry used the same ceiling. Live timeline before the fix: cue at 0.9 s, first generation 128 of 128 tokens,
+retry 128 of 128, `done` with empty text at 21 s. After: ceiling 640, 217 tokens used, the answer arrives. The build now reads
+Glimmer's record, the budget is the running model's, a model that stops on `length` with no text is learned, and its retry gets
+1024 more tokens. The bridge cue for a spoken turn moves from 0.9 s to 2.5 s and is never the same phrase twice in a row.
+
+**The 4B as the spoken answerer: measured, not adopted.** Built and run through the real spoken route (judge role, thinking off,
+Home's own prompt and tools block), 20 prompts (10 needing a lookup, 10 plain). Qwen3 4B first text 0.6 to 1.1 s, against 6 to 27 s
+for Glimmer on a busy Studio (idle Glimmer is 1 to 2.5 s, section 2). Quality fails rule 6:
+- Called the right tool on 2 of 10 lookups with Home's prompt, 6 of 10 with an added "never guess" instruction (rule 3's bar is
+  far higher, and a miss is a spoken invented fact).
+- Spoke an invented forecast ("sunny, high of 72"), an invented traffic report and an invented score, with the weather tool offered.
+- Plain turns: repeated the question back, and said "I can't tell jokes".
+So the 4B cannot be the router that decides a turn needs a tool, and nothing else decides that without Glimmer's reasoning
+(rule 1 bars a word rule). Spoken turns stay on Glimmer; the 4B lane code was removed, not left behind a setting.
+Not measured: 4B repetition over a long conversation (the plain-turn failures made it moot).
+
+**What would reopen it:** a tool-decision record for a small model (rule 3) with recall near Glimmer's, or an engine option that
+shortens Glimmer's reasoning to a few tokens for a spoken turn.
