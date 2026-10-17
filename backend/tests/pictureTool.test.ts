@@ -258,3 +258,11 @@ describe("IMGGEN-HOME-01: jobs that are stopped, forgotten or broken", () => {
     expect(db.select().from(pictureJobs).where(eq(pictureJobs.id, job.id)).get()!.hlc).not.toBe(first.hlc);
   });
 });
+
+describe("what the tool says it is for", () => {
+  test("the prompt argument's description keeps edits of an existing picture out and points to the Edit button (a model once called it for 'remove the background' and claimed the edit)", async () => {
+    const manifest = JSON.parse(await Bun.file(new URL("../packages/generate_image/manifest.json", import.meta.url)).text()) as { args: { properties: { prompt: { description: string } } } };
+    expect(manifest.args.properties.prompt.description).toContain("remove its background");
+    expect(manifest.args.properties.prompt.description).toContain("Edit button");
+  });
+});

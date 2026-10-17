@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for."
+        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. Never call this tool to change a picture that already exists (remove its background, erase something, resize, upscale or crop it): it cannot, so do not call it; tell the person to tap the Edit button on the picture instead."
       },
       "size": {
         "type": "string",
