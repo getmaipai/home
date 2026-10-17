@@ -91,7 +91,9 @@ describe("wt.sh worktree lifecycle", () => {
     run(["done"], { MAIPAI_WT_SESSION: name });
   });
 
-  test("tmux creates only a session on its private socket and done kills it", () => {
+  // Skipped, with this reason, on a machine without tmux; runs wherever tmux is installed.
+  const hasTmux = spawnSync("tmux", ["-V"], { stdio: "ignore" }).status === 0;
+  (hasTmux ? test : test.skip)("tmux creates only a session on its private socket and done kills it (needs tmux installed)", () => {
     const started = run(["start", "tmux"]);
     expect(started.status).toBe(0);
     const path = started.stdout.trim();

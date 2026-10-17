@@ -3635,6 +3635,59 @@
       "replacesHandBuilt": [],
       "realTurnToday": true,
       "verdictReason": "The generated-clip card (progress with Stop, then the clip with poster, controls, loop, Download, Share, Make another); VIDEO-GEN-06 binds it as the chat's `video` tool part."
+    },
+    {
+      "file": "image-editor.tsx",
+      "name": "image-editor",
+      "group": "image",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "image-edit"
+      ],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "The picture editor in the chat canvas (Remove BG, Erase, Upscale, Markup, versions); IMGTOOLS-05 opens it and /api/image-edit serves it."
+    },
+    {
+      "file": "image-editor-state.ts",
+      "name": "image-editor-state",
+      "group": "image",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "Pure undo, zoom and resize math the image editor reads; used only through that Element."
+    },
+    {
+      "file": "image-editor-surface.tsx",
+      "name": "image-editor-surface",
+      "group": "image",
+      "verdict": "support",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": null,
+      "verdictReason": "The image editor's one canvas layer for strokes and masks; used only through that Element."
     }
   ]
 }

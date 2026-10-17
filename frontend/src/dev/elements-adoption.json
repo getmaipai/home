@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T15:34:01.778Z",
+  "generatedAt": "2026-10-17T16:18:07.505Z",
   "kitTag": "ui-v0.5.250",
   "items": [
     {
@@ -570,24 +570,24 @@
       "file": "image-editor-state.ts",
       "name": "image-editor-state",
       "group": "image",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "support",
+      "verdictReason": "Pure undo, zoom and resize math the image editor reads; used only through that Element.",
       "implemented": false
     },
     {
       "file": "image-editor-surface.tsx",
       "name": "image-editor-surface",
       "group": "image",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "support",
+      "verdictReason": "The image editor's one canvas layer for strokes and masks; used only through that Element.",
       "implemented": false
     },
     {
       "file": "image-editor.tsx",
       "name": "image-editor",
       "group": "image",
-      "verdict": "unassessed",
-      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "verdict": "wire-now",
+      "verdictReason": "The picture editor in the chat canvas (Remove BG, Erase, Upscale, Markup, versions); IMGTOOLS-05 opens it and /api/image-edit serves it.",
       "implemented": true
     },
     {
