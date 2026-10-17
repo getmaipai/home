@@ -626,7 +626,7 @@ async function seedHousehold(): Promise<string> {
   const sessionValue = setCookie?.split(";")[0]?.split("=")[1];
   if (!sessionValue) throw new Error("setup response carried no session cookie");
 
-  if (plainRun || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg)) {
+  if (plainRun || a11yOnly || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg)) {
     for (const [key, value] of [["engines.stack.url", STACK_URL]] as const) {
       const response = await fetch(`${BASE_URL}/api/settings`, {
         method: "PUT",
@@ -10121,7 +10121,7 @@ async function main() {
     // once the gate itself is fixed).
     return "Start with a sunny spot and a few easy plants.\n\n- Grow lettuce in a shallow container.\n- Give tomatoes a larger pot and a support.\n- Water when the top layer of soil feels dry.\nHow much space do you have?";
   } });
-  const screenshotStack = plainRun || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
+  const screenshotStack = plainRun || a11yOnly || docsReview || chatArtifactCapture || nextChatToolsReview || chatPageScreenshotFixture || chatIncognitoAudit || chatShellReview || chatColumnReview || mobileSmoke || Boolean(elementsWave2Arg) || regenerateMenuReview ? startScreenshotStack(chatModel.url, regenerateMenuReview) : undefined;
   if (screenshotStack) STACK_URL = `http://127.0.0.1:${screenshotStack.port}`;
   // Keep the HTTP listener independent; intentionally exercise the
   // Repairs surface's real Wyoming bind-failure path via its fixture flag.
