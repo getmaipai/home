@@ -7,6 +7,7 @@ import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Switch } from "@maipai/ui/src/ui/switch";
+import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { listKept, removeAllOfflineMedia } from "@/lib/offlineMedia";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -98,10 +99,10 @@ export function DevicesSection() {
               <div className="flex flex-col gap-4">
               {robots.map((r) => (
                 <Card key={r.id} data-testid="robot-card">
-                <label>
-                  <Switch checked={r.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(r, checked)} />
+                <Label htmlFor={`offline-${r.id}`}>
+                  <Switch id={`offline-${r.id}`} checked={r.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(r, checked)} />
                   Can keep media on this device
-                </label>
+                </Label>
                 <RobotBody
                   device={r}
                   busy={busy}
@@ -140,10 +141,10 @@ export function DevicesSection() {
                         {d.area ? `${d.area} · ` : ""}
                         {d.lastSeenAt ? `last seen ${whenText(d.lastSeenAt)}` : "never connected"}
                       </span>
-                      <label>
-                        <Switch checked={d.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
+                      <Label htmlFor={`offline-${d.id}`}>
+                        <Switch id={`offline-${d.id}`} checked={d.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
                         Can keep media on this device
-                      </label>
+                      </Label>
                     </div>
                   );
                 }}
