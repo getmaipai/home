@@ -74,7 +74,6 @@ const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), 
 // of the first bundle, as it was before 6bed798c dropped the route.
 // MEDIA-POLISH-01: package app pages load on demand. They carry the schema interpreter, the kit Player and Media Chrome, which pushed
 // the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
-const PackageAppPage = lazy(() => import("@/shell/pages/PackageAppPage").then((m) => ({ default: m.PackageAppPage })));
 const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
