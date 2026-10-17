@@ -118,6 +118,20 @@ describe("SetupWizard", () => {
     } finally { globalThis.fetch = original; }
   });
 
+  test("Continue anyway sits in the footer beside Continue, not in the page body, and defers checks", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state, [{ id: "engine", title: "Engine service", state: "amber", text: "The engine is slow." }]);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("The engine is slow."));
+      const button = rendered.getByRole("button", { name: "Continue anyway" });
+      expect(button.parentElement).toBe(rendered.getByRole("button", { name: "Continue" }).parentElement);
+      await advanceTo(rendered, "Continue anyway", "Your setup plan");
+      expect(h.bodies["checks"]).toMatchObject({ status: "deferred" });
+    } finally { h.restore(); }
+  });
+
   test("resumes at the first pending step from server state and ignores browser storage", async () => {
     const state = freshState();
     for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";
