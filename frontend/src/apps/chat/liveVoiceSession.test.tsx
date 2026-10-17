@@ -566,17 +566,20 @@ describe("live voice session", () => {
 
   test("no_speech re-listens instead of sending an empty turn", async () => {
     const sentTexts: string[] = [];
+    const socketConnections: number[] = [];
     const fixture: SttFixtureStep[] = [
       { delayMs: 0, message: { t: "ready" } },
       { delayMs: 150, message: { t: "no_speech" } },
     ];
-    const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} />);
+    const view = render(<Harness open={true} onOpenChange={() => {}} isSpeaking={false} speakingEndedAt={0} fixture={fixture} sentTexts={sentTexts} socketConnections={socketConnections} />);
     await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
-    // The fixture replays (a fresh socket per generation) - still
-    // listening, never a send.
-    await new Promise((resolve) => setTimeout(resolve, 30));
+    // The fixture replays on a fresh socket per generation: wait for the
+    // second socket, then for it to be listening again, never a send. A
+    // fixed 30 ms sleep here read "Connecting" when the first "Listening"
+    // arrived late under full-gate load (2026-10-16).
+    await waitFor(() => expect(socketConnections.length).toBeGreaterThanOrEqual(2));
+    await waitFor(() => expect(view.getByText("Listening")).toBeTruthy());
     expect(sentTexts).toEqual([]);
-    expect(view.getByText("Listening")).toBeTruthy();
   });
 
   test("onEnd requests that the voice call dialog close", async () => {
