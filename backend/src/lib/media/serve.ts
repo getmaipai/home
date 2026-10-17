@@ -7,7 +7,7 @@ import { resolve, sep } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaSources } from "@/db/schema";
-import { readAttachment } from "@/lib/attachments";
+import { attachmentFilePath, getAttachment, readAttachment } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 import type { MediaItem } from "./model";
 import { IMAGE_TYPES } from "./kinds";
@@ -107,4 +107,19 @@ export async function serveItemArtwork(actor: PersonRow, item: MediaItem): Promi
     if (embedded) return new Response(embedded.data as never, { status: 200, headers: { ...headers, "content-type": embedded.mediaType } });
   }
   return { error: "No picture for this item.", status: 404 };
+}
+
+/** Availability and HTTP date from the same guarded locations as serveItemBytes, without loading the stream. */
+export function itemByteMetadata(actor: PersonRow, item: MediaItem): { modified: Date; size: number } | null {
+  const location = item.location as { file_id?: string; root_id?: string; path?: string };
+  let path: string | null = null;
+  if (location.file_id) {
+    const found = getAttachment(actor, location.file_id);
+    if (found.ok) path = attachmentFilePath(found.value.storage_path);
+  } else if (location.root_id && location.path !== undefined) path = resolveUnderRoot(item.source_id, location.path);
+  if (!path) return null;
+  try {
+    const info = statSync(path);
+    return info.isFile() ? { modified: info.mtime, size: info.size } : null;
+  } catch { return null; }
 }

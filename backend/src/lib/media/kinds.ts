@@ -27,7 +27,7 @@ export function mediaTypeOfExtension(ext: string): string {
 /** What a browser plays straight from the file, by container and codecs. The Stack's probe supplies the codecs; a tag reader
  * supplies an audio file's. Anything else needs a transcode (`transcode`), a file with no stream at all is `none`. */
 const DIRECT_CONTAINERS = new Set(["mp4", "m4v", "mov", "webm", "ogv"]);
-const DIRECT_VIDEO = new Set(["h264", "avc1", "vp8", "vp9", "av1", "av01"]);
+const DIRECT_VIDEO = new Set(["h264", "avc1", "hvc1", "vp8", "vp9", "av1", "av01"]);
 const DIRECT_AUDIO = new Set(["aac", "mp3", "mp4a", "opus", "vorbis", "flac", "alac", "pcm_s16le"]);
 
 export function decidePlayable(input: { ext: string; hasVideo: boolean; hasAudio: boolean; videoCodec: string | null; audioCodec: string | null }): "original" | "transcode" | "none" {

@@ -25480,232 +25480,14 @@
                           "type": "string"
                         }
                       },
-                      "state": {
-                        "type": "object",
-                        "nullable": true,
-                        "properties": {
-                          "activity": {
-                            "type": "string",
-                            "enum": [
-                              "starting",
-                              "idle",
-                              "listening",
-                              "thinking",
-                              "speaking",
-                              "reconnecting",
-                              "sleeping"
-                            ],
-                            "description": "The robot's current interaction phase, so the hub can show an accurate Devices-page card, including the distinct startup state. reconnecting means the robot lost the hub link and is trying to restore it. sleeping means the robot is deliberately idle, not unreachable. A consumer that meets an activity value it does not know treats it as unknown, not as an error."
-                          },
-                          "muted": {
-                            "type": "boolean"
-                          },
-                          "tracking": {
-                            "type": "boolean"
-                          },
-                          "on_battery": {
-                            "type": "boolean",
-                            "nullable": true
-                          },
-                          "battery_level": {
-                            "type": "number",
-                            "nullable": true
-                          },
-                          "daemon_version": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "app_version": {
-                            "type": "string",
-                            "nullable": true
-                          },
-                          "motion": {
-                            "anyOf": [
-                              {
-                                "type": "string",
-                                "enum": [
-                                  "resting"
-                                ]
-                              },
-                              {
-                                "type": "string",
-                                "enum": [
-                                  "held"
-                                ]
-                              },
-                              {
-                                "type": "object",
-                                "nullable": true,
-                                "enum": [
-                                  null
-                                ]
-                              },
-                              {
-                                "nullable": true
-                              }
-                            ],
-                            "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
-                          },
-                          "put_down_count": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
-                          },
-                          "motors_latched": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "description": "Names of the motors the robot's motor gate has latched off after a failed recovery, so the hub can show which parts are down. An empty list means none are latched. Omission means the producer does not yet report this field."
-                          },
-                          "motors_stuck": {
-                            "type": "boolean",
-                            "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
-                          },
-                          "motors_reboot_offer": {
-                            "type": "array",
-                            "items": {
-                              "type": "string",
-                              "minLength": 1
-                            },
-                            "description": "Names of the latched motors for which the robot asks the hub to offer a reboot to an adult (a latched servo error that cycling the motor mode did not clear). Always a subset of motors_latched. An empty list means no offer is pending; omission means the producer does not yet report this field. The hub shows one card offer and, on an adult's yes, sends a motor_reboot command naming these motors; the robot never reboots a motor on its own while a person may be touching the head."
-                          },
-                          "thermal": {
-                            "type": "object",
-                            "properties": {
-                              "level": {
-                                "type": "string",
-                                "enum": [
-                                  "nominal",
-                                  "vision_slowed",
-                                  "gestures_suspended",
-                                  "idle_still"
-                                ],
-                                "description": "The thermal governor's current step: nominal, vision slowed, gestures suspended, then idle and still. A consumer that meets a level it does not know treats it as unknown, not as an error."
-                              },
-                              "temp_c": {
-                                "anyOf": [
-                                  {
-                                    "type": "number",
-                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
-                                  },
-                                  {
-                                    "nullable": true,
-                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
-                                  },
-                                  {
-                                    "nullable": true
-                                  }
-                                ],
-                                "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
-                              },
-                              "vision_hz": {
-                                "type": "number",
-                                "minimum": 0,
-                                "description": "The camera processing rate the governor currently allows, in frames per second."
-                              },
-                              "fault": {
-                                "type": "boolean",
-                                "description": "Whether the temperature sensor could not be read, so the level is a best guess."
-                              }
-                            },
-                            "required": [
-                              "level",
-                              "temp_c",
-                              "vision_hz",
-                              "fault"
-                            ],
-                            "additionalProperties": false,
-                            "description": "The robot's thermal governor state, so the hub can say why the robot has slowed down. Omission means the producer does not report thermal state (no monitor wired)."
-                          },
-                          "reachable": {
-                            "type": "boolean"
-                          },
-                          "unreachableSince": {
-                            "type": "string",
-                            "nullable": true
-                          }
-                        },
-                        "required": [
-                          "activity",
-                          "muted",
-                          "tracking",
-                          "on_battery",
-                          "battery_level",
-                          "daemon_version",
-                          "app_version",
-                          "reachable",
-                          "unreachableSince"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "kind",
-                      "name",
-                      "area",
-                      "lastSeenAt",
-                      "createdAt",
-                      "capabilities",
-                      "state"
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/devices/robots": {
-      "get": {
-        "tags": [
-          "Devices"
-        ],
-        "summary": "Every paired robot, household-wide",
-        "responses": {
-          "200": {
-            "description": "Every device of kind \"robot\", regardless of who paired it.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "kind": {
-                        "type": "string",
-                        "enum": [
-                          "robot",
-                          "pod",
-                          "tv",
-                          "phone",
-                          "desktop",
-                          "browser"
-                        ]
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "area": {
-                        "type": "string",
-                        "nullable": true
-                      },
-                      "lastSeenAt": {
-                        "type": "string",
-                        "nullable": true
-                      },
-                      "createdAt": {
-                        "type": "string"
-                      },
-                      "capabilities": {
+                      "offlineScope": {
                         "type": "array",
                         "items": {
-                          "type": "string"
+                          "type": "string",
+                          "enum": [
+                            "media.offline",
+                            "offline.records"
+                          ]
                         }
                       },
                       "state": {
@@ -25876,6 +25658,246 @@
                       "lastSeenAt",
                       "createdAt",
                       "capabilities",
+                      "offlineScope",
+                      "state"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/robots": {
+      "get": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Every paired robot, household-wide",
+        "responses": {
+          "200": {
+            "description": "Every device of kind \"robot\", regardless of who paired it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "robot",
+                          "pod",
+                          "tv",
+                          "phone",
+                          "desktop",
+                          "browser"
+                        ]
+                      },
+                      "name": {
+                        "type": "string"
+                      },
+                      "area": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "lastSeenAt": {
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "createdAt": {
+                        "type": "string"
+                      },
+                      "capabilities": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "offlineScope": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "media.offline",
+                            "offline.records"
+                          ]
+                        }
+                      },
+                      "state": {
+                        "type": "object",
+                        "nullable": true,
+                        "properties": {
+                          "activity": {
+                            "type": "string",
+                            "enum": [
+                              "starting",
+                              "idle",
+                              "listening",
+                              "thinking",
+                              "speaking",
+                              "reconnecting",
+                              "sleeping"
+                            ],
+                            "description": "The robot's current interaction phase, so the hub can show an accurate Devices-page card, including the distinct startup state. reconnecting means the robot lost the hub link and is trying to restore it. sleeping means the robot is deliberately idle, not unreachable. A consumer that meets an activity value it does not know treats it as unknown, not as an error."
+                          },
+                          "muted": {
+                            "type": "boolean"
+                          },
+                          "tracking": {
+                            "type": "boolean"
+                          },
+                          "on_battery": {
+                            "type": "boolean",
+                            "nullable": true
+                          },
+                          "battery_level": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "daemon_version": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "app_version": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "motion": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "resting"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "held"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "description": "Whether the body is resting on a surface or being held, so the hub can show when someone is carrying the robot. Null means the body cannot tell; omission means the producer does not yet report this field. A consumer that meets a value it does not know treats it as unknown, not as an error."
+                          },
+                          "put_down_count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "How many times the robot has been put down since it started, a non-negative running count the hub can compare between frames. Omission means the producer does not yet report this field."
+                          },
+                          "motors_latched": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Names of the motors the robot's motor gate has latched off after a failed recovery, so the hub can show which parts are down. An empty list means none are latched. Omission means the producer does not yet report this field."
+                          },
+                          "motors_stuck": {
+                            "type": "boolean",
+                            "description": "Whether the robot's stuck-servo recovery ladder is currently running (any stage other than healthy), so the card can say the body is working on a motor problem. Omission means the producer does not yet report this field."
+                          },
+                          "motors_reboot_offer": {
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "description": "Names of the latched motors for which the robot asks the hub to offer a reboot to an adult (a latched servo error that cycling the motor mode did not clear). Always a subset of motors_latched. An empty list means no offer is pending; omission means the producer does not yet report this field. The hub shows one card offer and, on an adult's yes, sends a motor_reboot command naming these motors; the robot never reboots a motor on its own while a person may be touching the head."
+                          },
+                          "thermal": {
+                            "type": "object",
+                            "properties": {
+                              "level": {
+                                "type": "string",
+                                "enum": [
+                                  "nominal",
+                                  "vision_slowed",
+                                  "gestures_suspended",
+                                  "idle_still"
+                                ],
+                                "description": "The thermal governor's current step: nominal, vision slowed, gestures suspended, then idle and still. A consumer that meets a level it does not know treats it as unknown, not as an error."
+                              },
+                              "temp_c": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "description": "The last measured body temperature in degrees Celsius. Null means no reading is available."
+                              },
+                              "vision_hz": {
+                                "type": "number",
+                                "minimum": 0,
+                                "description": "The camera processing rate the governor currently allows, in frames per second."
+                              },
+                              "fault": {
+                                "type": "boolean",
+                                "description": "Whether the temperature sensor could not be read, so the level is a best guess."
+                              }
+                            },
+                            "required": [
+                              "level",
+                              "temp_c",
+                              "vision_hz",
+                              "fault"
+                            ],
+                            "additionalProperties": false,
+                            "description": "The robot's thermal governor state, so the hub can say why the robot has slowed down. Omission means the producer does not report thermal state (no monitor wired)."
+                          },
+                          "reachable": {
+                            "type": "boolean"
+                          },
+                          "unreachableSince": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "activity",
+                          "muted",
+                          "tracking",
+                          "on_battery",
+                          "battery_level",
+                          "daemon_version",
+                          "app_version",
+                          "reachable",
+                          "unreachableSince"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "kind",
+                      "name",
+                      "area",
+                      "lastSeenAt",
+                      "createdAt",
+                      "capabilities",
+                      "offlineScope",
                       "state"
                     ]
                   }
@@ -27186,6 +27208,103 @@
           },
           "404": {
             "description": "No such device",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/devices/{id}/offline-scope": {
+      "patch": {
+        "tags": [
+          "Devices"
+        ],
+        "summary": "Set a device's default-deny offline permissions (owner or admin)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "offline_scope": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "media.offline",
+                        "offline.records"
+                      ]
+                    },
+                    "maxItems": 2
+                  }
+                },
+                "required": [
+                  "offline_scope"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Permission saved. New byte requests use it immediately.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Use your own browser to manage permissions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Device missing or owned by someone else",
             "content": {
               "application/json": {
                 "schema": {
@@ -47145,6 +47264,787 @@
           },
           "503": {
             "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/offline/manifest": {
+      "get": {
+        "tags": [
+          "Media offline"
+        ],
+        "summary": "A hub-only manifest for keeping one media item",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "media",
+                "video",
+                "episode",
+                "film",
+                "track",
+                "podcast_episode",
+                "book",
+                "audiobook",
+                "chapter"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One byte stream with readiness and my progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The provider's record kind: media, news_story, reference_page, conversation."
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "subtitle": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "url": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^\\/",
+                            "description": "A hub path, never an outside address."
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "mime": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fingerprint": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "ready": {
+                            "type": "boolean",
+                            "description": "False while a transcode is queued; the file route answers 503 with Retry-After until it is."
+                          },
+                          "playable": {
+                            "type": "string",
+                            "enum": [
+                              "original",
+                              "transcode",
+                              "none",
+                              "unknown"
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "notReady"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "notPlayable"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "notOnServer"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "duration_s": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "artwork_url": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\/"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "chapters": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "start_s": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "title": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "start_s",
+                                "title"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
+                          },
+                          "subtitles": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "lang": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ],
+                                  "default": null
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "pattern": "^\\/"
+                                }
+                              },
+                              "required": [
+                                "lang",
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
+                          },
+                          "progress": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "position_s": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "completed": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "position_s",
+                                  "completed"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "bytes",
+                          "mime",
+                          "fingerprint",
+                          "ready",
+                          "playable"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_bytes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    },
+                    "generated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "id",
+                    "title",
+                    "entries",
+                    "generated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 for KEEP-OFFLINE-01 (media design sections 9 and 12). What a device needs to keep a record on the device: one entry per byte stream with its address on the hub, size, type, fingerprint and readiness, plus the person's progress when the record has one. Served by the hub's offline routes for any record kind that registers a provider (media first). FileTube's offline manifest, generalized."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to Home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pair this device again or check its offline permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Check the library for this item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/offline/file/{kind}/{id}": {
+      "get": {
+        "tags": [
+          "Media offline"
+        ],
+        "summary": "Offline media bytes, artwork or a subtitle from the hub",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "media",
+                "video",
+                "episode",
+                "film",
+                "track",
+                "podcast_episode",
+                "book",
+                "audiobook",
+                "chapter",
+                "artwork",
+                "subtitle"
+              ]
+            },
+            "required": true,
+            "name": "kind",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "nullable": true,
+              "minimum": 0
+            },
+            "required": false,
+            "name": "track",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete bytes, fingerprint ETag, Last-Modified, private no-store."
+          },
+          "206": {
+            "description": "Requested range. If-Range accepts the strong ETag or Last-Modified date."
+          },
+          "401": {
+            "description": "Sign in to Home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pair this device again or check its offline permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Check the library for this item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This file cannot play; choose another item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Request a range inside the file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Play the parts of this folder",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Copy not ready; Retry-After: 60",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/offline/status": {
+      "post": {
+        "tags": [
+          "Media offline"
+        ],
+        "summary": "Check up to 500 kept fingerprints without disclosing unreadable items",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "items": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "media",
+                            "video",
+                            "episode",
+                            "film",
+                            "track",
+                            "podcast_episode",
+                            "book",
+                            "audiobook",
+                            "chapter"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "fingerprint": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "fingerprint"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 500
+                  }
+                },
+                "required": [
+                  "items"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Results in request order. Gone includes items this person cannot read.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "media",
+                              "video",
+                              "episode",
+                              "film",
+                              "track",
+                              "podcast_episode",
+                              "book",
+                              "audiobook",
+                              "chapter"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "ok",
+                              "changed",
+                              "gone"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "status"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "items"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to Home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pair this device again or check its offline permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Check the library for this item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/offline/progress": {
+      "post": {
+        "tags": [
+          "Media offline"
+        ],
+        "summary": "Merge up to 200 offline progress events after clock correction",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "sent_at": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "events": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "media",
+                            "video",
+                            "episode",
+                            "film",
+                            "track",
+                            "podcast_episode",
+                            "book",
+                            "audiobook",
+                            "chapter"
+                          ]
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "position_s": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "duration_s": {
+                          "type": "number",
+                          "nullable": true,
+                          "minimum": 0
+                        },
+                        "at": {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        "finished": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id",
+                        "position_s",
+                        "duration_s",
+                        "at",
+                        "finished"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "maxItems": 200
+                  }
+                },
+                "required": [
+                  "sent_at",
+                  "events"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Each event uses writeProgress, including minor device protection.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "media",
+                              "video",
+                              "episode",
+                              "film",
+                              "track",
+                              "podcast_episode",
+                              "book",
+                              "audiobook",
+                              "chapter"
+                            ]
+                          },
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "applied",
+                              "older",
+                              "gone",
+                              "refused"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "kind",
+                          "id",
+                          "status",
+                          "reason"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "restamp: reset sent_at and event timestamps before retrying",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to Home",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pair this device again or check its offline permission",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Check the library for this item",
             "content": {
               "application/json": {
                 "schema": {
