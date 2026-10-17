@@ -77,6 +77,10 @@ function qualityFields(job: PictureJob, detailedReadyNow: boolean, can: boolean)
 /** The card for a job: the first picture and every variation made from it are one card. While any of them is
  * being made the card shows that one's progress; the pictures finished so far stay in view. `job` is the id to
  * stop (the one being made), or the card's own id when nothing is. */
+/** A teen or child never gets a half-drawn frame: the finished-item check has not seen it (lane safety review, 2026-10-17). */
+function withheldFromYoung<T extends { preview_url: string | null; preview_step: number | null }>(actor: PersonRow, fields: T): T {
+  return laneOfPerson(actor) === "adult" ? fields : { ...fields, preview_url: null, preview_step: null };
+}
 export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, detailedReadyNow = false) {
   // A child never sees a maker's name or a Detailed or Quick choice (KIDS-CREATE-01): Quick is all they get.
   const kid = laneOfPerson(actor) === "child";
@@ -91,7 +95,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
   const state = active ? active.state : files.length > 0 ? "done" as const : last.state;
   return {
     id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? getLive(active.id)?.stageLabel : null) ?? phaseLabel(active) : "", position: active ? active.position : null,
-    ...(active && active.state === "running" ? liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
+    ...(active && active.state === "running" ? withheldFromYoung(actor, liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`)) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
     can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
@@ -142,7 +146,7 @@ const previewRoute = createRoute({
 picturesRoutes.openapi(previewRoute, (c) => {
   const actor = c.get("person");
   const job = getPictureJob(actor, c.req.valid("param").id);
-  const preview = job ? getLive(job.id)?.preview : null;
+  const preview = job && laneOfPerson(actor) === "adult" ? getLive(job.id)?.preview : null;
   if (!job || !preview) return c.json({ error: "There is no preview for that picture." }, 404) as never;
   return new Response(preview, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });

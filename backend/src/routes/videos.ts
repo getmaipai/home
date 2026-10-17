@@ -12,6 +12,7 @@ import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, 
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
 import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, noteKidVideo, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
 import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
@@ -68,13 +69,13 @@ function phaseLabel(job: VideoJob): string {
   return "Making your video";
 }
 
-function itemView(job: VideoJob) {
+function itemView(job: VideoJob, actor: PersonRow) {
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
     label: job.state === "queued" ? phaseLabel(job) : job.state === "running" ? getLive(job.id)?.stageLabel ?? phaseLabel(job) : "",
     position: job.position,
-    ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
+    ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
     clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id } : null,
   };
@@ -86,7 +87,7 @@ export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
   return {
-    id: root.id, conversation_id: root.conversationId, items: jobs.map(itemView),
+    id: root.id, conversation_id: root.conversationId, items: jobs.map((j) => itemView(j, actor)),
     can_make_another: canMake && !active && jobs.length < MAX_CLIPS_PER_CARD, limits: VIDEO_LIMITS_LINE,
   };
 }
@@ -135,7 +136,7 @@ const previewRoute = createRoute({
 videosRoutes.openapi(previewRoute, (c) => {
   const actor = c.get("person");
   const job = getVideoJobFor(actor, c.req.valid("param").id);
-  const preview = job ? getLive(job.id)?.preview : null;
+  const preview = job && laneOfPerson(actor) === "adult" ? getLive(job.id)?.preview : null;
   if (!job || !preview) return c.json({ error: "There is no preview for that video." }, 404) as never;
   return new Response(preview, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
