@@ -167,10 +167,10 @@ describe("T5 / THIN-2G: one retry round after every call in a round failed", () 
   });
 
   test("a malformed call (bad_arguments) counts as a failure and the retry names that kind", async () => {
-    // weather with no `place` fails the manifest's own schema in runPlugin.
+    // weather with a non-string `place` fails the manifest's own schema in runPlugin.
     await withStub(
       {
-        calls: (request) => (request.tool_choice === "none" || isRetryRound(request) ? undefined : [{ id: "call-w", name: "weather", args: "{}" }]),
+        calls: (request) => (request.tool_choice === "none" || isRetryRound(request) ? undefined : [{ id: "call-w", name: "weather", args: JSON.stringify({ place: 5 }) }]),
         reply: replies,
       },
       async (seen) => {
@@ -183,6 +183,26 @@ describe("T5 / THIN-2G: one retry round after every call in a round failed", () 
         const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
         const outcomes = JSON.parse(row!.outcomes as unknown as string) as { packageId: string; failureKind?: string }[];
         expect(outcomes.find((o) => o.packageId === "weather")?.failureKind).toBe("bad_arguments");
+      },
+    );
+  });
+
+  test("weather with no place anywhere is not a failure: the model is told plainly, no retry round", async () => {
+    await withStub(
+      {
+        calls: (request) => (request.tool_choice === "none" || isRetryRound(request) ? undefined : [{ id: "call-w0", name: "weather", args: "{}" }]),
+        reply: replies,
+      },
+      async (seen) => {
+        const result = await runTurnNext(people.owner, "chat", "what's the weather like today");
+        expect(result.ok).toBe(true);
+        if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+        expect(seen.filter(isRetryRound)).toHaveLength(0);
+        const row = db.select().from(conversationTurns).where(eq(conversationTurns.id, result.value.turn_id)).get();
+        const outcomes = JSON.parse(row!.outcomes as unknown as string) as { packageId: string; status: string; result?: { reply?: { text?: string } } }[];
+        const weather = outcomes.find((o) => o.packageId === "weather");
+        expect(weather?.status).toBe("succeeded");
+        expect(weather?.result?.reply?.text).toContain("Home location in Settings");
       },
     );
   });

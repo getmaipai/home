@@ -6,6 +6,7 @@ All notable changes to the Weather package, in [Keep a Changelog](https://keepac
 
 ### Changed
 
+- Asking for the weather with no place named, no default and no household home no longer fails. The answer says it does not know where you are and how to fix that.
 - The hourly warm uses only the household home place, and its privacy row
   describes the background refresh.
 - The manifest placeholder is replaced by Home before the hourly warm runs.

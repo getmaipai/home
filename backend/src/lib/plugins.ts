@@ -523,6 +523,9 @@ export function safeFailureMessage(result: Extract<PluginOpResult<PluginResult>,
   return catalogued?.spoken_fallback ?? "Sorry, I couldn't do that.";
 }
 
+/** Weather with no place to look up. Mirrors the almanac's set-the-home-place note. */
+export const WEATHER_NO_PLACE_NOTE = "I don't know where you are yet, so I can't look up the weather. Tell me a city, or an owner or admin can set the Home location in Settings.";
+
 /** Runs a bundled package - Tier 0's own recipe, or (session-d-packages-
  * and-store.md step 5) Tier 1's Deno sandbox - for `actor`, checking
  * min_role first (4.9: the floor role a person needs to invoke this
@@ -570,7 +573,9 @@ export async function runPlugin(
   const argsError = validateArgs(id, manifest, inputs);
   if (argsError) return { ok: false, status: 400, error: `${id}'s inputs failed validation: ${argsError}`, code: "bad_arguments" };
   if (id === "weather" && typeof inputs.place !== "string" && options.hostInputs?.latitude === undefined) {
-    return { ok: false, status: 400, error: "Weather needs a place. Name one, or set a default place or a household home place in Settings.", code: "bad_arguments" };
+    // No place named and none resolved (no home, no default, no Current location): not a malformed call and not a
+    // failure. The model gets the plain fact and words the ask itself (a city, or the Home location setting).
+    return { ok: true, value: { reply: { text: WEATHER_NO_PLACE_NOTE }, actions: [], data: { needs: "place" } } };
   }
 
   if (manifest.tier === 1) {
