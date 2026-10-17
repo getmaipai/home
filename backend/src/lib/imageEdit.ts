@@ -34,7 +34,7 @@ import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
-import { viewerOf, checkImages, decideAgeCheck, promptHash, recordWithheld } from "@/lib/pictures/ageCheck";
+import { promptRefusalLineFor, viewerOf, checkImages, decideAgeCheck, promptHash, recordWithheld } from "@/lib/pictures/ageCheck";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
@@ -434,7 +434,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const prompt = input.prompt.trim();
   if (!prompt) throw new ImageEditError(422, "Say what to change, then send it.", "prompt_required");
   const refused = refusePrompt(prompt);
-  if (refused) throw new ImageEditError(422, PROMPT_REFUSAL_LINE[refused], `refused_${refused}`);
+  if (refused) throw new ImageEditError(422, promptRefusalLineFor(refused, "picture", actor, editorAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), `refused_${refused}`);
   // A picture the person did not generate here (an upload) may show a real person: it is never changed into something sexual.
   const generated = await isGeneratedPicture(actor, source);
   if (!generated && asksToUndress(prompt)) throw new ImageEditError(422, PROMPT_REFUSAL_LINE.real_person, "refused_real_person");

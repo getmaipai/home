@@ -9,6 +9,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
 import { startPictureJob, plainFailure } from "./jobs";
+import { promptRefusalLineFor } from "./ageCheck";
 import { adapterAudiencesFor, adultAdaptersAllowed, peopleGuidanceSuffix, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
 import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
@@ -50,7 +51,7 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   // A request that names a style may be a style of a household adult who agreed (LIKENESS-01): the tool decides that once it
   // has matched the style, so the model's "real person" flag alone does not end the call here when a style was named.
   const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" });
-  if (refused) return { kind: "prompt", why: refused, line: PROMPT_REFUSAL_LINE[refused] };
+  if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]) };
   return null;
 }
 
@@ -105,7 +106,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   // are part of the request too.
   const sentPrompt = withTriggerWords(prompt, adapter);
   const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`);
-  if (second) return refused(callId, args, { kind: "prompt", why: second, line: PROMPT_REFUSAL_LINE[second] });
+  if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
   const choice = chooseQuality({ requested: isPictureQuality(args.quality) ? args.quality : undefined, style: adapter, engine });
   const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";

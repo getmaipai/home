@@ -401,15 +401,38 @@ export async function recordWithheld(event: WithheldEvent): Promise<void> {
     label: verdict ? effectiveLabel(verdict) : null, age: verdict?.apparent_min_age_estimate ?? null, people: verdict?.people_count ?? null,
     sexual: verdict?.is_nude_or_sexual ?? null, confidence: verdict?.confidence ?? null,
   })}`);
+  await notifyAdmins(event.kind, event.personId);
+}
+
+/** The admin notification with no image and no words, at most once every ten minutes for one person. Only a notification that went out starts the quiet period. */
+async function notifyAdmins(kind: CheckedKind, personId: string): Promise<void> {
   const now = Date.now();
-  const last = lastNotified.get(event.personId);
+  const last = lastNotified.get(personId);
   if (last !== undefined && now - last < NOTIFY_EVERY_MS) return;
+  // The quiet period starts now, so two refusals in the same instant send one notification; a failed send gives it back.
+  lastNotified.set(personId, now);
   try {
-    const row = db.select({ name: people.displayName }).from(people).where(eq(people.id, event.personId)).get();
-    await trigger("safety.picture_withheld", { kind: event.kind, personName: row?.name ?? "Someone" });
-    // Only a notification that went out starts the quiet period: a failed one is tried again on the next withheld item.
-    lastNotified.set(event.personId, now);
+    const row = db.select({ name: people.displayName }).from(people).where(eq(people.id, personId)).get();
+    await trigger("safety.picture_withheld", { kind, personName: row?.name ?? "Someone" });
   } catch (error) {
+    lastNotified.delete(personId);
     console.error(`[age-check] the admin notification failed: ${(error as Error).message}`);
   }
+}
+
+/** The kind of refusal a prompt got, for the one line a teen or a child reads. */
+export type PromptRefusalKind = "minor_sexual" | "real_person";
+
+/**
+ * KID-SAFE-REFUSAL: the line for a prompt the word floor refused. The floor is strict on purpose and a few harmless words trip it
+ * ("a kid in a bikini", "rooster", "chicken breast"). An adult reads the fixed absolute-line text (`adultLine`). A teen or a child
+ * reads ONE friendly sentence that names no term, no list and no category, and the admins are told (rate limited, no words, no image,
+ * the same notification as a withheld picture) so a parent can see what was tried. A real-person refusal keeps its own line for everyone.
+ */
+export function promptRefusalLineFor(refused: PromptRefusalKind, kind: CheckedKind, actor: PersonRow, band: Viewer, prompt: string, adultLine: string): string {
+  const viewer = viewerOf(actor, band);
+  if (viewer === "adult" || refused !== "minor_sexual") return adultLine;
+  console.warn(`[age-check] prompt refused for a ${viewer} ${JSON.stringify({ kind, person: actor.id, prompt_hash: promptHash(prompt) })}`);
+  void notifyAdmins(kind, actor.id);
+  return MINOR_VIEWER_LINE;
 }

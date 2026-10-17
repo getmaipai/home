@@ -15,7 +15,7 @@ import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, load
 import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
-import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
+import { promptRefusalLineFor, screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import { createHash } from "node:crypto";
@@ -56,7 +56,7 @@ export function videoRefusalFor(audience: VideoAudience, args: Record<string, un
   // A request that names a style, or animates an attached photo, may be of a household adult who agreed (LIKENESS-01): the tool
   // decides that once it has matched the style or read the photo, so the model's "real person" flag alone does not end the call here.
   const refused = refuseVideoPrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" && !isAttached(args.from_picture) });
-  if (refused) return { kind: "prompt", why: refused, line: VIDEO_REFUSAL_LINE[refused] };
+  if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "video", audience.actor, audience.band, `${prompt} ${style}`, VIDEO_REFUSAL_LINE[refused]) };
   return null;
 }
 
