@@ -16,7 +16,7 @@ import { __resetVideoJobsForTests, startVideoJob } from "@/lib/videos/jobs";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { saveJob } from "@/lib/pictures/jobStore";
 import { __setAgeCheckRunnerForTests, MINOR_VIEWER_LINE } from "@/lib/pictures/ageCheck";
-import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_PROMPT_PREFIX, CHILD_VIDEO_LIMIT_LINE, childPromptUnsafe, laneOf, picturesMadeToday, videoModelForLane, videosMadeToday, WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
+import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_PROMPT_PREFIX, CHILD_VIDEO_LIMIT_LINE, childPromptUnsafe, laneOf, picturesMadeToday, teenPromptUnsafe, videoModelForLane, videosMadeToday, WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
 import { __setChildSafetyRunnerForTests, type ChildSafetyCheck } from "@/lib/pictures/laneGate";
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { editToolsStatus, loadSource, startComment } from "@/lib/imageEdit";
@@ -359,5 +359,33 @@ describe("a child and a teen are only ever on the Quick video model", () => {
     expect(videoModelForLane("adult")).toBeUndefined();
     await start(bench.owner, "ltx-2-sound");
     expect((video.submitted.at(-1) as { model?: string }).model).toBe("ltx-2-sound");
+  });
+});
+
+describe("the child topic gate (lane review, 2026-10-17)", () => {
+  const blocked = [
+    "a knight with a sword", "a pirate with a cannon and a grenade", "a man with a chainsaw", "burning a village", "slaying the dragon", "a girl in a bikini", "a cartoon bong", "someone rolling a joint",
+    "Pikachu at the beach", "Elsa building a snowman", "Mario jumping over a pipe", "Spider-Man on a roof", "a machine gun", "a vape pen", "a shotgun", "a robot in underwear", "dynamite blowing up a hill",
+  ];
+  const fine = ["a friendly dragon with a balloon", "a cat in a hat eating pizza", "a campfire with marshmallows", "a swordfish swimming", "a happy robot gardener", "a bunny who loves carrots", "a rocket ship to the moon", "a sunny day at the park"];
+  test("each is one friendly line and nothing is sent", async () => {
+    for (const prompt of blocked) {
+      expect([prompt, childPromptUnsafe(prompt)]).toEqual([prompt, true]);
+      expect([prompt, text(await pic(kid, { prompt })).includes(CHILD_CONTENT_LINE)]).toEqual([prompt, true]);
+      expect([prompt, text(await vid(kid, { prompt })).includes(CHILD_CONTENT_LINE)]).toEqual([prompt, true]);
+    }
+    expect(image.submitted).toHaveLength(0);
+    expect(video.submitted).toHaveLength(0);
+  });
+  test("ordinary safe ideas still pass", () => {
+    for (const prompt of fine) expect([prompt, childPromptUnsafe(prompt)]).toEqual([prompt, false]);
+  });
+  test("a teen is not held to the character list, the weapons list or the child list, only to the adult and sexual gates", async () => {
+    for (const prompt of ["Mario jumping over a pipe", "a knight with a sword", "Pikachu at the beach"]) {
+      expect([prompt, teenPromptUnsafe(prompt)]).toEqual([prompt, false]);
+    }
+    expect((await pic(teen, { prompt: "Mario jumping over a pipe" })).status).toBe("succeeded");
+    expect(teenPromptUnsafe("a girl in a bikini")).toBe(false);
+    expect(teenPromptUnsafe("a naked woman")).toBe(true);
   });
 });
