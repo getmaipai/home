@@ -1,7 +1,7 @@
 // COMPONENTS-01: Settings, Models and storage. Data only; nothing here draws. The routes are owner and admin only.
 import { ApiError } from "@/lib/api";
 
-export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "tools" | "loras";
+export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "tools" | "loras";
 export interface ComponentRow {
   id: string; label: string; summary: string; group: ComponentGroup; kind: "model" | "lora";
   state: "installed" | "installing" | "notInstalled" | "failed";

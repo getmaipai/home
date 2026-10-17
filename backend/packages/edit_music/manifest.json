@@ -1,0 +1,171 @@
+{
+  "id": "edit_music",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Edit a Song",
+  "description": "Change a song made here in this chat, keeping every version.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicEditAllowed",
+    "bench_row": "music-edit-tool",
+    "reason": "adult on their own written screen with music enabled and an available Stack music model; this conversation also holds a song made here"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make it slower",
+      "change the chorus to be about waffles",
+      "make it instrumental",
+      "extend it by twenty seconds",
+      "trim the first five seconds",
+      "give me another take"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "track",
+      "change"
+    ],
+    "properties": {
+      "description": {
+        "type": "string",
+        "grounded": false,
+        "description": "Genre, mood, instruments and original voice, based on the request. Never claim a song exists without calling this tool.",
+        "minLength": 3,
+        "maxLength": 1200
+      },
+      "lyrics": {
+        "type": "string",
+        "grounded": false,
+        "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the person will see them. Omit for an instrumental.",
+        "maxLength": 4000
+      },
+      "bpm": {
+        "type": "number",
+        "grounded": false,
+        "description": "Optional tempo in beats per minute.",
+        "minimum": 20,
+        "maximum": 300
+      },
+      "key": {
+        "type": "string",
+        "grounded": false,
+        "description": "Optional musical key.",
+        "maxLength": 40
+      },
+      "imitates_real_voice": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set true when the person asks to sound like a named real singer or another real identifiable person. Home refuses copying real voices. Use an original voice for a similar style instead."
+      },
+      "track": {
+        "type": "string",
+        "grounded": false,
+        "description": "Use latest for the selected song in this chat, or an exact file id of a version made here. Uploaded audio is never accepted.",
+        "minLength": 1,
+        "maxLength": 80
+      },
+      "change": {
+        "type": "string",
+        "grounded": false,
+        "description": "The change the person asked for.",
+        "enum": [
+          "remake",
+          "restyle",
+          "instrumental",
+          "rewrite_section",
+          "extend",
+          "variation",
+          "trim",
+          "fade",
+          "loudness"
+        ]
+      },
+      "section": {
+        "type": "string",
+        "grounded": false,
+        "description": "A section tag in the stored lyrics, such as chorus or verse 2. For a rewrite, give this or explicit from_s and to_s.",
+        "maxLength": 80
+      },
+      "from_s": {
+        "type": "number",
+        "grounded": false,
+        "description": "Start of the section or trim in seconds.",
+        "minimum": 0
+      },
+      "to_s": {
+        "type": "number",
+        "grounded": false,
+        "description": "End of the section or trim in seconds.",
+        "exclusiveMinimum": 0
+      },
+      "seconds": {
+        "type": "number",
+        "grounded": false,
+        "description": "For extend: seconds to add. For fade: fade length. For remake or variation: total length.",
+        "exclusiveMinimum": 0
+      },
+      "at": {
+        "type": "string",
+        "grounded": false,
+        "description": "Where to extend.",
+        "enum": [
+          "start",
+          "end"
+        ]
+      },
+      "where": {
+        "type": "string",
+        "grounded": false,
+        "description": "Which end to fade.",
+        "enum": [
+          "in",
+          "out",
+          "both"
+        ]
+      },
+      "strength": {
+        "type": "number",
+        "grounded": false,
+        "description": "How much a cover changes the style. Default 0.6.",
+        "minimum": 0.3,
+        "maximum": 1
+      },
+      "lufs": {
+        "type": "number",
+        "grounded": false,
+        "description": "Loudness target in LUFS, default -14.",
+        "minimum": -70,
+        "maximum": -5
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

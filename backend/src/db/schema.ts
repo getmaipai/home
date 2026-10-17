@@ -2160,3 +2160,13 @@ export const mediaWatchSessions = sqliteTable("media_watch_sessions", {
   sampledAt: text("sampled_at").notNull(),
   playing: integer("playing", { mode: "boolean" }).notNull().default(true),
 }, (table) => [primaryKey({ columns: [table.personId, table.sessionKey] })]);
+// MUSIC-GEN-03: private requests, progress and version lineage. Files are separate attachments.
+export const musicJobs = sqliteTable("music_jobs", {
+  id: text("id").primaryKey(), personId: text("person_id").notNull().references(() => people.id),
+  conversationId: text("conversation_id"), turnId: text("turn_id"), task: text("task").notNull(), request: text("request").notNull(),
+  stackJob: text("stack_job"), state: text("state").notNull(), stage: text("stage"), progress: real("progress").notNull().default(0),
+  etaSeconds: real("eta_seconds"), position: integer("position"), errorCode: text("error_code"), errorLine: text("error_line"),
+  fileId: text("file_id"), parentFileId: text("parent_file_id"), seed: integer("seed"), durationS: real("duration_s"), lrc: text("lrc"),
+  chosenAt: text("chosen_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), hlc: text("hlc").notNull(),
+}, (table) => [index("music_jobs_person_id_idx").on(table.personId), index("music_jobs_turn_id_idx").on(table.turnId),
+  index("music_jobs_person_conversation_idx").on(table.personId, table.conversationId), index("music_jobs_file_id_idx").on(table.fileId)]);

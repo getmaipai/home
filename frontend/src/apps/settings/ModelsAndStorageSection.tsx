@@ -18,7 +18,7 @@ import { componentsApi, type ComponentGroup, type ComponentRow } from "@/lib/com
 const KEY = ["components"] as const;
 const GROUPS: Array<{ id: ComponentGroup; title: string }> = [
   { id: "chat", title: "Chat and thinking" }, { id: "voice", title: "Voice" }, { id: "pictures", title: "Pictures" },
-  { id: "video", title: "Video" }, { id: "tools", title: "Picture tools" }, { id: "loras", title: "Styles you added" },
+  { id: "video", title: "Video" }, { id: "music", title: "Music" }, { id: "tools", title: "Picture tools" }, { id: "loras", title: "Styles you added" },
 ];
 
 export const sizeWords = (n: number): string => (n >= 1e12 ? `${(n / 1e12).toFixed(1)} TB` : n >= 1e9 ? `${n >= 1e10 ? Math.round(n / 1e9) : (n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);

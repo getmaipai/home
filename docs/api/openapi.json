@@ -24802,6 +24802,7 @@
                               "voice",
                               "pictures",
                               "video",
+                              "music",
                               "tools",
                               "loras"
                             ]
@@ -57416,6 +57417,800 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/status": {
+      "get": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Whether this person can make songs now",
+        "responses": {
+          "200": {
+            "description": "Music capability.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "can_make": {
+                      "type": "boolean"
+                    },
+                    "engine_ready": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "min_seconds": {
+                          "type": "number"
+                        },
+                        "max_seconds": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "min_seconds",
+                        "max_seconds"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "can_make",
+                    "engine_ready",
+                    "limits"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "The owner's song card",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Progress and versions.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string"
+                    },
+                    "progress": {
+                      "type": "number"
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "url"
+                        ]
+                      }
+                    },
+                    "current_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lyrics": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "duration_s": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "started_at": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "stage_label",
+                    "progress",
+                    "eta_seconds",
+                    "position",
+                    "error_line",
+                    "versions",
+                    "current_id",
+                    "title",
+                    "description",
+                    "lyrics",
+                    "duration_s",
+                    "started_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Stop a song being made",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The stopped card.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string"
+                    },
+                    "progress": {
+                      "type": "number"
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "url"
+                        ]
+                      }
+                    },
+                    "current_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lyrics": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "duration_s": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "started_at": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "stage_label",
+                    "progress",
+                    "eta_seconds",
+                    "position",
+                    "error_line",
+                    "versions",
+                    "current_id",
+                    "title",
+                    "description",
+                    "lyrics",
+                    "duration_s",
+                    "started_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/jobs/{id}/use": {
+      "post": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Use a version for the next edit",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                },
+                "required": [
+                  "file_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The selected version.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "stage": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string"
+                    },
+                    "progress": {
+                      "type": "number"
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "error_line": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "versions": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "url"
+                        ]
+                      }
+                    },
+                    "current_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "title": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "description": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "lyrics": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "duration_s": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "started_at": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "stage",
+                    "stage_label",
+                    "progress",
+                    "eta_seconds",
+                    "position",
+                    "error_line",
+                    "versions",
+                    "current_id",
+                    "title",
+                    "description",
+                    "lyrics",
+                    "duration_s",
+                    "started_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/music/jobs/{id}/files/{fileId}": {
+      "get": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "The owner's audio with Range support",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audio bytes.",
+            "content": {
+              "audio/mp4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "A Range slice."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Range outside the file."
+          }
+        }
+      }
+    },
+    "/api/music/files/{fileId}": {
+      "get": {
+        "tags": [
+          "Music"
+        ],
+        "summary": "Download a song, checking its chain for commercial export",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "commercial",
+                "personal"
+              ]
+            },
+            "required": false,
+            "name": "purpose",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audio bytes.",
+            "content": {
+              "audio/mp4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "A Range slice."
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Music is off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such song",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Commercial export not allowed",
             "content": {
               "application/json": {
                 "schema": {

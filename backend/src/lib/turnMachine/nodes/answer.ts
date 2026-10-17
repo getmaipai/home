@@ -1,3 +1,4 @@
+import { MUSIC_NOT_HERE_LINE, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 // U2c, the `answer` node (turn-machine-state-record-2026-09-22.md's
 // state table): "the model's final text or the package reply, the
 // outcomes' sources, the surface's projection (reply.speech), the
@@ -8,7 +9,7 @@
 import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { engineComputerAwayFromHome, failureLine, type FailureKind } from "@/lib/generationFailure";
-import { COMPOSE_FAILURE_LINE, pictureForOutcomes, videoForOutcomes } from "@/lib/composer";
+import { COMPOSE_FAILURE_LINE, pictureForOutcomes, videoForOutcomes, musicForOutcomes } from "@/lib/composer";
 import { PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { VIDEO_NOT_HERE_LINE, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 
@@ -87,6 +88,9 @@ function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "picture_not_here") return PICTURE_NOT_HERE_LINE;
   if (reason === "picture_refused_minor") return PROMPT_REFUSAL_LINE.minor_sexual;
   if (reason === "picture_refused_person") return PROMPT_REFUSAL_LINE.real_person;
+  if (reason === "music_not_here") return MUSIC_NOT_HERE_LINE;
+  if (reason === "music_refused_minor") return MUSIC_REFUSAL_LINE.minor_sexual;
+  if (reason === "music_refused_voice") return MUSIC_REFUSAL_LINE.real_voice;
   if (reason === "video_not_here") return VIDEO_NOT_HERE_LINE;
   if (reason === "video_refused_minor") return VIDEO_REFUSAL_LINE.minor_sexual;
   if (reason === "video_refused_person") return VIDEO_REFUSAL_LINE.real_person;
@@ -174,6 +178,7 @@ export const answerNode: Node<AnswerInput, AnswerOutput> = async (state, input) 
       // stream ended while the job began). "Something went wrong while writing that" would be false and would make
       // the person ask again, so a second job; the job is real and its card is coming, so say that.
       if (pictureForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: PICTURE_STARTED_LINE, sources: [] } };
+      if (musicForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: "Your song is being made. It will show up right below when it is ready.", sources: [] } };
       if (videoForOutcomes(state.outcomes)) return { outcome: { ok: true }, output: { text: VIDEO_STARTED_LINE, sources: [] } };
       // THIN-DL-02: the line follows the failure kind (generationFailure.ts),
       // never the generic apology.

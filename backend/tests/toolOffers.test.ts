@@ -122,3 +122,26 @@ describe("TOOL-OFFER-01 manifest-derived tool offers", () => {
     for (const id of ids) expect(source).not.toContain(`"${id}"`);
   });
 });
+
+describe("MUSIC-GEN-03: music earns two conditional slots within the sixteen-tool cap", () => {
+  test("generation requires musicAllowed; editing also requires the conversation's made-here state gate", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    expect(withTurnToolGates(base, false, false, false, false, true).tools_offered).not.toContain("edit_music");
+    const make = withTurnToolGates(base, false, false, false, true, false).tools_offered;
+    expect(make).toContain("generate_music"); expect(make).not.toContain("edit_music");
+    const both = withTurnToolGates(base, true, true, true, true, true).tools_offered;
+    expect(both).toContain("generate_music"); expect(both).toContain("edit_music");
+    expect(both).toHaveLength(15);
+  });
+  test("the real worst case plus the planned link reader is exactly sixteen, and a seventeenth still throws", () => {
+    const base = resolveTurnBudget("qwen3-8b-instruct-q4-k-m", "adult");
+    const link = { ...VIRTUAL_TOOL_REGISTRY[0]!, id: "read_link" };
+    VIRTUAL_TOOL_REGISTRY.push(link);
+    try {
+      const full = withTurnToolGates(base, true, true, true, true, true);
+      expect(full.tools_offered).toHaveLength(16);
+      expect(full.tools_offered).toEqual(expect.arrayContaining([...BASE_TOOL_IDS, "show_images", "generate_image", "generate_video", "generate_music", "edit_music", "read_link"]));
+      expect(() => withTurnToolGates({ ...base, max_tools: 15 }, true, true, true, true, true)).toThrow(/exceeds the model cap/);
+    } finally { VIRTUAL_TOOL_REGISTRY.pop(); }
+  });
+});

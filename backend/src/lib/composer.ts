@@ -761,6 +761,15 @@ export function projectForOutcomes(outcomes: readonly ToolExecutionOutcome[]): {
 }
 
 /** VIDEO-GEN-06: `TurnValue.video`, the id of the video job this turn's `generate_video` call started. */
+export function musicForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
+  for (const outcome of outcomes) {
+    if (outcome.status !== "succeeded" || (outcome.packageId !== "generate_music" && outcome.packageId !== "edit_music")) continue;
+    const id = recordData(outcome.result?.data)?.musicJobId;
+    if (typeof id === "string" && id) return { id };
+  }
+  return null;
+}
+
 export function videoForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
   for (const outcome of outcomes) {
     if (outcome.status !== "succeeded" || outcome.packageId !== "generate_video") continue;

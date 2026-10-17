@@ -184,7 +184,7 @@ export function rowsToBranchableMessages(
       // read-side gate, gated on the READING actor, never even stored for
       // one going forward either) - `row.reasoning` is simply absent then.
       content:
-        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.picture || row.video || row.sources?.length || row.blocks?.length
+        row.reasoning || row.structured_part || row.artifact || row.confirm || row.project || row.picture || row.video || row.music || row.sources?.length || row.blocks?.length
           ? [
               ...(row.reasoning ? [{ type: "reasoning" as const, text: row.reasoning }] : []),
               ...(row.structured_part ? [toolCallPart(`${row.id}-structured`, row.structured_part.tool_id, row.structured_part)] : []),
@@ -228,6 +228,8 @@ export function rowsToBranchableMessages(
               ...(row.picture ? [toolCallPart(`${row.id}-picture-progress`, "picture_progress", row.picture), toolCallPart(`${row.id}-picture`, "picture", row.picture)] : []),
               // VIDEO-GEN-06: and the video card, the same part as live.
               ...(row.video ? [toolCallPart(`${row.id}-video`, "video", row.video)] : []),
+              // MUSIC-GEN-04: and the song card, the same part as live.
+              ...(row.music ? [toolCallPart(`${row.id}-song`, "song", row.music)] : []),
               ...(row.artifact && row.pluginId === PROJECT_START_PLUGIN_ID ? [toolCallPart(`${row.id}-artifact`, "write_document", row.artifact)] : []),
               ...sourceMessageParts(row.sources),
             ]

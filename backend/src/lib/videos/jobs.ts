@@ -79,7 +79,7 @@ export const VIDEO_FAILED_PREFIX = "I couldn't make that video.";
 
 /** The line a queued job shows while the Stack is busy with another picture or video. */
 export function busyLine(position: number | null): string {
-  const base = "Home is busy making another picture or video. It will start in a minute.";
+  const base = "Home is busy making another picture, video or song. It will start in a minute.";
   return position && position > 1 ? `${base} You are number ${position} in line.` : base;
 }
 
@@ -89,7 +89,7 @@ export function plainVideoFailure(error: unknown): string {
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a few minutes.`;
-      case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.`;
+      case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.`;
       case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Videos need a Mac with 128 GB of memory.`;
       case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} The video engine isn't answering. Check that the engine is running, then try again.`;
       case "lora_not_allowed": case "unknown_lora": case "wrong_base_model": case "lora_changed": case "lora_missing": return `${VIDEO_FAILED_PREFIX} That style isn't available for this request. Choose another style or leave it out.`;

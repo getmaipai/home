@@ -1,3 +1,6 @@
+import { musicsAllowed } from "@/lib/music/policy";
+import { musicEngineReady } from "@/lib/music/ready";
+import { conversationHasMusic } from "@/lib/music/jobs";
 // U2b/c (docs/plans/turn-machine-state-record-2026-09-22.md, "Files"):
 // the entry `routes/turn.ts` calls, with the same TurnStreamResult shape
 // runTurnStream() already returns (the old engine file, imported here, never
@@ -41,7 +44,7 @@ import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "./messages";
 import { topicBlockForTurn } from "@/lib/topicPrompt";
 import type { ContextSegmentKey } from "@/wire";
-import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes, videoForOutcomes } from "@/lib/composer";
+import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes, videoForOutcomes, musicForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
@@ -207,6 +210,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     project: projectForOutcomes(state.outcomes) ?? undefined,
     picture: pictureForOutcomes(state.outcomes) ?? undefined,
     video: videoForOutcomes(state.outcomes) ?? undefined,
+    music: musicForOutcomes(state.outcomes) ?? undefined,
     ...(state.bare ? { bare: true } : {}),
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
@@ -556,11 +560,14 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // for the household and a picture engine installed on the Stack. A child, a teen, a guest, a spoken or shared surface
   // never sees it.
   // The video status read starts here so it runs beside the picture engine's, not after it (each can wait on the Stack).
+  const musicReadyNow = !bare && musicsAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) ? musicEngineReady() : Promise.resolve(false);
   const videoReadyNow = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) ? videoEngineReady() : Promise.resolve(false);
   const picturesOk = !bare && picturesAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await pictureEngineReady());
   // VIDEO-GEN-05 (rule 0): `generate_video` follows the same gate, with the household's video switch and a video model.
   const videosOk = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await videoReadyNow);
-  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk, videosOk);
+  const musicOk = await musicReadyNow;
+  const musicEditOk = musicOk && conversationHasMusic(actor, conversation.id, temporary || opts.ephemeral === true);
+  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk);
 
   const state: TurnState = {
     turnId,
@@ -576,6 +583,8 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
     ...(picturesOk ? { picturesAllowed: true } : {}),
     ...(videosOk ? { videosAllowed: true } : {}),
+    ...(musicOk ? { musicAllowed: true } : {}),
+    ...(musicEditOk ? { musicEditAllowed: true } : {}),
     modelId: opts.model,
     ...(engineModelId ? { engineModelId } : {}),
     signal,

@@ -153,7 +153,7 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
       const { value } = await streamValue(people.owner, "make a short video of a paper boat in the rain");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.phase === "waiting for memory");
       const card = videoCardView(people.owner, getVideoJobFor(people.owner, value.video!.id)!, true);
-      expect(card.items[0]!.label).toContain("Home is busy making another picture or video. It will start in a minute.");
+      expect(card.items[0]!.label).toContain("Home is busy making another picture, video or song. It will start in a minute.");
       expect(card.items[0]!.label).toContain("number 2 in line");
       await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "done");
     });

@@ -1,12 +1,12 @@
-// Picture and video honesty at the turn: a reply may say a picture or video is being made, ready or on its way only
+// Picture, video and song honesty at the turn: a reply may say a picture or video is being made, ready or on its way only
 // when the tool ran and a job exists. The model sometimes writes that line without calling the tool (live QA,
 // 2026-10-17: about 1 turn in 8, and once an invented clip in a fresh chat). The model node holds the first round's
 // text on a turn that plainly asks for one, runs ONE guarded re-ask when the held text claims a result with no tool
 // call, and never lets a claim stand without a job. Both checks here are deliberately loose word tests used only as
 // that safety net on such a turn; the decision to call the tool stays the model's.
 
-const MEDIA_NOUN = "(?:pictures?|images?|photos?|photographs?|illustrations?|drawings?|paintings?|artworks?|posters?|logos?|wallpapers?|banners?|videos?|clips?|animations?|gifs?|renders?)";
-const MAKE_VERB = "(?:make|makes|create|generate|draw|paint|render|produce|animate|sketch|illustrate|design|film|show me|give me|get me)";
+const MEDIA_NOUN = "(?:pictures?|images?|photos?|photographs?|illustrations?|drawings?|paintings?|artworks?|posters?|logos?|wallpapers?|banners?|videos?|clips?|animations?|gifs?|renders?|songs?|music|tracks?|tunes?|jingles?)";
+const MAKE_VERB = "(?:make|makes|create|generate|draw|paint|render|produce|animate|sketch|illustrate|design|film|compose|write|show me|give me|get me)";
 const DRAW_ONLY = /\b(?:draw|paint|sketch|animate|illustrate|doodle)\b/;
 const ASK_VERB_NOUN = new RegExp(`\\b${MAKE_VERB}\\b[^.!?\\n]{0,60}\\b${MEDIA_NOUN}\\b`);
 // IMGEDIT-01: asking for a picture they already have to be changed ("remove the man from this photo", "make the sky clear in the picture").
@@ -37,7 +37,7 @@ export function claimsMedia(reply: string): boolean {
 }
 
 /** The reply that stands in for a claim when no tool ran, even after the re-ask. Says what happened and what to do. */
-export const MEDIA_NOT_STARTED_LINE = "I didn't start that picture or video, so nothing is being made. Send the request once more and I'll try again.";
+export const MEDIA_NOT_STARTED_LINE = "I didn't start that picture, video or song, so nothing is being made. Send the request once more and I'll try again.";
 
 /** The one re-ask: the held reply claimed a result and no tool ran. */
-export const MEDIA_REASK_INSTRUCTION = "You wrote that a picture or video is made or on its way, but you did not call the Make a Picture or Make a Video tool, so nothing was made. If the person asked for one, call the tool now with their request. If you cannot make it, say so plainly in one sentence. Do not say anything is being made unless you call the tool in this reply.";
+export const MEDIA_REASK_INSTRUCTION = "You wrote that a picture, video or song is made or on its way, but you did not call the Make a Picture, Make a Video or Make a Song tool, so nothing was made. If the person asked for one, call the tool now with their request. If you cannot make it, say so plainly in one sentence. Do not say anything is being made unless you call the tool in this reply.";

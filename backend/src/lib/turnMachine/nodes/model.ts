@@ -964,7 +964,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
   // A turn that plainly asks for a picture or video holds its first round's text until it is known whether the tool
   // was called: a reply that says a picture is on its way with no job is never shown (mediaClaims.ts).
-  const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video");
+  const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video" || t.id === "generate_music" || t.id === "edit_music");
   const holdMedia = !isPhrasingRound && !input.retry && !noToolsTurn(state) && asksForMedia(input.utterance);
   let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && searchAssistMayHold(state, tools));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
@@ -1087,7 +1087,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     if (claimsMedia(attempt.text)) {
       let second: GenerationResult | undefined;
       if (mediaOffered && !signal.aborted) {
-        console.error("[model] the reply claimed a picture or video with no tool call; asking once more");
+        console.error("[model] the reply claimed a picture, video or song with no tool call; asking once more");
         second = await runOneGeneration(state, [...messages, { role: "assistant", content: attempt.text }, { role: "user", content: MEDIA_REASK_INSTRUCTION }], tools, "auto", false, replyMaxTokensFor(state, false), "media_reask", signal, "media");
       }
       if (second?.ok && (second.toolCalls?.length ?? 0) > 0) attempt = second;

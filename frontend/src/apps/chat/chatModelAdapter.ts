@@ -633,6 +633,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             const picture = event.value.picture;
             // VIDEO-GEN-06: and the video job this turn started, drawn as the kit player card.
             const video = event.value.video;
+            // MUSIC-GEN-04: and the song job (generate_music or edit_music), drawn as the kit song card.
+            const music = event.value.music;
             // TOOL-EVENTS-01: `toolTimelinePart` (above) is the one
             // definition, used here and by `buildContent()` mid-stream -
             // computed once so both the array-spread check and the part
@@ -714,6 +716,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture)] : []),
                 ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video)] : []),
+                ...(music ? [toolCallPart(`${event.value.turn_id}-song`, "song", music)] : []),
                 ...sourceParts,
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),

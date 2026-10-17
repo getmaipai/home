@@ -1,0 +1,28 @@
+package: generate_music
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: backend/tests/musicTool.test.ts and musicSafety.test.ts cover native jobs and gates
+  routing_examples:
+    met: true
+    note: six examples in manifest.json
+  privacy_row_per_data_source:
+    met: true
+    note: no data sources; music stays on this computer
+  offline_behavior_stated:
+    met: true
+  smoke_test:
+    met: true
+    note: tests/smoke.json
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+gold:
+  real_service_verified:
+    met: false
+    note: live verification belongs to MUSIC-GEN-06

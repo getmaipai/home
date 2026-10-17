@@ -1,3 +1,4 @@
+import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, runGenerateMusic, runEditMusic } from "@/lib/music/tool";
 // U2c, the `tool` node (turn-machine-state-record-2026-09-22.md's state
 // table): "runPlugin under the tool deadline; the outcome recorded in
 // model order." The node's signal reaches runPlugin() so search requests
@@ -187,7 +188,17 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
       continue;
     }
 
-    // VIDEO-GEN-05: the video tool starts a Stack job and answers at once; the card on the thread follows the job.
+    // MUSIC-GEN-03: both music tools start a Stack job and return its card id at once.
+    if (tool === GENERATE_MUSIC_TOOL_ID || tool === EDIT_MUSIC_TOOL_ID) {
+      const outcome = await (tool === EDIT_MUSIC_TOOL_ID ? runEditMusic : runGenerateMusic)({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
+      outcomes.push(outcome);
+      const data = outcome.result?.data as { musicJobId?: string } | undefined;
+      if (outcome.status === "succeeded") toolEvents.push({ t: "tool_result", call_id: callId, package_id: tool, outcome: { text: outcome.result?.reply?.text, ...(data?.musicJobId ? { musicJobId: data.musicJobId } : {}) } });
+      else toolEvents.push({ t: "tool_error", call_id: callId, package_id: tool, error: lookupFailureKind(outcome) });
+      continue;
+    }
+
+    // VIDEO-GEN-05: the card follows the job after this call returns.
     if (tool === GENERATE_VIDEO_TOOL_ID) {
       const outcome = await runGenerateVideo({ state, args: args as Record<string, unknown>, callId, spoken: (state.planBasis?.surfaceClass ?? "spoken") !== "written" });
       outcomes.push(outcome);

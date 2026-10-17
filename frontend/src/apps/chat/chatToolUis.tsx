@@ -18,6 +18,8 @@ import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
+import { MusicTrack, type MusicTrackStatus } from "@maipai/ui/src/elements/music-track";
+import { musicApi, type MusicCard } from "@/lib/musicApi";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
@@ -596,3 +598,91 @@ function videoHint(item: { quality?: "quick" | "detailed"; clip: { has_sound?: b
   if (item.quality === "detailed") return "Detailed: with sound and speech.";
   return "Quick: about 2 minutes, no sound. Ask for Detailed to add sound and speech.";
 }
+// MUSIC-GEN-04: a song the person asked for (`generate_music`, `edit_music`; the turn names the job as `TurnValue.music`; the part is named "song" because "music" is the music-lookup spec sheet).
+// One tool-call part, one shipped Element (the kit's MusicTrack): the stage line, clock, time left and Stop while it is
+// made, then the kit Player in its audio layout with the lyrics, the version stepper (Previous and Next switch what is
+// shown; Use this version makes an older one the one the next edit starts from), Download and Share. Polling stops once
+// nothing is being made. Save to Music waits for MUSIC-GEN-09 and Make another has no route yet, so neither is passed.
+const MUSIC_POLL_MS = 1_000;
+const MUSIC_SETTLED = new Set(["done", "failed", "cancelled"]);
+
+function useMusicCard(id: string | undefined) {
+  return useQuery({
+    queryKey: ["music", id],
+    queryFn: ({ signal }) => musicApi.card(id!, signal),
+    enabled: id !== undefined,
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && MUSIC_SETTLED.has(q.state.data.state)) ? false : MUSIC_POLL_MS),
+  });
+}
+
+function musicStatusOf(card: MusicCard): MusicTrackStatus {
+  if (card.state === "done" && card.versions.length > 0) return "ready";
+  if (card.state === "queued") return "queued";
+  if (card.state === "running") return "generating";
+  if (card.state === "cancelled") return "cancelled";
+  return "failed";
+}
+
+/** The file name a song is saved under: its title, with only characters every system accepts. */
+export function musicFileName(title: string | null | undefined): string {
+  const base = (title ?? "").replace(/[^\p{L}\p{N} _-]+/gu, " ").replace(/\s+/g, " ").trim().slice(0, 80).trim();
+  return `${base || "song"}.m4a`;
+}
+
+function musicDescriptionOf(card: MusicCard): string | undefined {
+  const caption = (card.description ?? "").replace(/\s+/g, " ").trim();
+  const style = caption.length > 70 ? `${caption.slice(0, 67).trimEnd()}...` : caption;
+  const seconds = card.duration_s;
+  const length = typeof seconds === "number" && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}` : "";
+  return [style, length].filter(Boolean).join(", ") || undefined;
+}
+
+export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = useMusicCard(result?.id);
+  const navigate = useNavigate();
+  const card = query.data;
+  // The version on show is local state; a new server-side choice (Use this version, a new edit) resets it.
+  const [picked, setPicked] = useState<{ base: string | null; id: string } | null>(null);
+  const status = card ? musicStatusOf(card) : "queued";
+  const shownId = card ? (picked && picked.base === card.current_id && card.versions.some((v) => v.id === picked.id) ? picked.id : card.current_id) : null;
+  const shown = card?.versions.find((v) => v.id === shownId) ?? card?.versions[card.versions.length - 1];
+  const downloadName = musicFileName(card?.title);
+  // The file is fetched when the song is ready, so Share can call the system share sheet inside the click
+  // (a share call after an await loses the user gesture and Safari refuses it).
+  const prepared = useQuery({
+    queryKey: ["music-share", shown?.url],
+    queryFn: ({ signal }) => prepareClip(shown!.url, signal, { type: "audio/mp4", name: downloadName }),
+    enabled: status === "ready" && shown !== undefined,
+    staleTime: Infinity,
+    gcTime: 10 * 60_000,
+    retry: false,
+  });
+  if (!result) return null;
+  if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : null;
+  const refresh = () => { void query.refetch(); };
+  const title = card.title ?? "Your song";
+  const description = musicDescriptionOf(card);
+  const lyrics = card.lyrics && card.lyrics.trim() !== "[Instrumental]" ? card.lyrics : undefined;
+  const ready = status === "ready" && shown !== undefined;
+  return (
+    <MusicTrack
+      status={status}
+      title={title}
+      {...(description ? { description } : {})}
+      {...(ready ? { src: shown.url } : {})}
+      progress={Math.round(card.progress * 100)}
+      {...(card.stage_label && card.state !== "queued" ? { phaseLabel: card.stage_label } : {})}
+      {...(etaLabel(card.eta_seconds) ? { etaLabel: etaLabel(card.eta_seconds)! } : {})}
+      queuePosition={card.position}
+      startedAt={card.started_at}
+      {...(card.error_line ? { error: card.error_line } : {})}
+      downloadName={downloadName}
+      {...(ready && lyrics ? { lyrics } : {})}
+      {...(ready ? { versions: card.versions.map((v) => ({ id: v.id, label: v.label })), ...(shownId ? { currentId: shownId } : {}) } : {})}
+      onSelectVersion={(id) => setPicked({ base: card.current_id, id })}
+      onUseVersion={(id) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); }}
+      onStop={() => { void musicApi.stop(card.id).then(refresh).catch(refresh); }}
+      {...(ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {})}
+    />
+  );
+};

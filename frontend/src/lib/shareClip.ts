@@ -18,19 +18,20 @@ export function fileNameFrom(disposition: string | null, fallback: string): stri
   try { return decodeURIComponent(match[1]); } catch { return match[1]; }
 }
 
-/** Fetches the messaging copy ahead of the click. */
-export async function prepareClip(url: string, signal?: AbortSignal): Promise<PreparedClip> {
+/** Fetches the file ahead of the click (a clip's messaging copy, or a song with `type: "audio/mp4"`). */
+export async function prepareClip(url: string, signal?: AbortSignal, options: { type?: string; name?: string } = {}): Promise<PreparedClip> {
+  const type = options.type ?? "video/mp4";
   const res = await fetch(url, { credentials: "include", ...(signal ? { signal } : {}) });
   if (!res.ok) throw new Error(`clip ${res.status}`);
   const blob = await res.blob();
-  return { blob: blob.type === "video/mp4" ? blob : new Blob([blob], { type: "video/mp4" }), name: fileNameFrom(res.headers.get("content-disposition"), "video.mp4") };
+  return { blob: blob.type === type ? blob : new Blob([blob], { type }), name: fileNameFrom(res.headers.get("content-disposition"), options.name ?? "video.mp4") };
 }
 
 /** Call from the click handler. Synchronous up to `navigator.share`; the fallback runs when sharing a file is not possible or fails for a reason other than the person closing the sheet. */
 export function shareClip(input: { prepared: PreparedClip | undefined; title: string; nav: ShareNavigator; fallback: () => void }): Promise<ShareOutcome> {
   const { prepared, title, nav, fallback } = input;
   if (prepared && typeof nav.share === "function" && typeof nav.canShare === "function") {
-    const files = [new File([prepared.blob], prepared.name, { type: "video/mp4" })];
+    const files = [new File([prepared.blob], prepared.name, { type: prepared.blob.type || "video/mp4" })];
     if (nav.canShare({ files })) {
       return nav.share({ files, title }).then(
         (): ShareOutcome => "shared",

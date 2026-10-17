@@ -23,10 +23,10 @@ export type VideoDenial = "guest" | "minor" | "spoken" | "shared_screen" | "hous
 
 export const VIDEO_DENIAL_LINE: Record<VideoDenial, string> = {
   guest: "Guests can't make videos. Ask someone in the household to sign you in.",
-  minor: "Making videos is off for this profile. A parent can turn it on in Settings, Pictures and videos.",
+  minor: "Making videos is off for this profile. A parent can turn it on in Settings, Pictures, videos and music.",
   spoken: "Videos can only be made in a written chat on your own screen.",
   shared_screen: "Videos can only be made on your own screen, not a shared one.",
-  household_off: "Making videos is switched off for adults in this home. An admin can switch it on in Settings, Pictures and videos.",
+  household_off: "Making videos is switched off for adults in this home. An admin can switch it on in Settings, Pictures, videos and music.",
 };
 
 /** The reply when a model proposes a video on a turn that was never offered the tool (no video model, a turn that cannot make one). */

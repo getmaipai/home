@@ -1,0 +1,16 @@
+{
+  "id": "generate_music",
+  "inputs": [
+    {
+      "name": "description",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Songs can only be made through chat on your own screen. Ask chat to make a song."
+    }
+  ]
+}

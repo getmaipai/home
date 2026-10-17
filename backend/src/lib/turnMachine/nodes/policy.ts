@@ -1,3 +1,4 @@
+import { GENERATE_MUSIC_TOOL_ID, EDIT_MUSIC_TOOL_ID, musicAudienceOf, musicRefusalFor } from "@/lib/music/tool";
 // U2c, the `policy` node (turn-machine-state-record-2026-09-22.md's
 // state table): each ActionProposal against the manifest's min_role,
 // consequential, permissions; the grounding of the arguments against
@@ -359,8 +360,20 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
     }
 
-    // VIDEO-GEN-04 / VIDEO-GEN-05: the video tool's gates run first, as the picture tool's do. A person who may not make a
-    // video here, or a prompt over one of the two absolute lines, is refused with a fixed reply before any job exists.
+    // MUSIC-GEN-03: the music offer and both absolute lines bind forged calls too.
+    if (call.tool === GENERATE_MUSIC_TOOL_ID || call.tool === EDIT_MUSIC_TOOL_ID) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const musicProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const offered = call.tool === EDIT_MUSIC_TOOL_ID ? state.musicEditAllowed : state.musicAllowed;
+      const refusal = !offered ? { kind: "denied" as const } : musicRefusalFor(musicAudienceOf(state, false), callArgs);
+      if (refusal) {
+        const reason = refusal.kind === "denied" ? "music_not_here" as const : refusal.why === "minor_sexual" ? "music_refused_minor" as const : "music_refused_voice" as const;
+        noteRefusal(reason);
+        entries.push({ proposal: musicProposal, decision: { allow: false, reason } });
+        continue;
+      }
+    }
+
     if (call.tool === GENERATE_VIDEO_TOOL_ID) {
       const callArgs = (call.args ?? {}) as Record<string, unknown>;
       const videoProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };

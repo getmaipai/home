@@ -4,7 +4,7 @@
 // with `__setComponentsFetchForTests`.
 import { getStackUrl } from "@/lib/stackEngine";
 
-export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "tools" | "loras";
+export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "tools" | "loras";
 export interface StackComponent {
   id: string; label: string; summary: string; group: ComponentGroup; kind: "model" | "lora";
   state: "installed" | "installing" | "notInstalled" | "failed";

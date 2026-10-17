@@ -93,7 +93,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "picture_refused_person" | "video_not_here" | "video_refused_minor" | "video_refused_person";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "picture_refused_person" | "video_not_here" | "video_refused_minor" | "video_refused_person" | "music_not_here" | "music_refused_minor" | "music_refused_voice";
       ask?: PendingAskInfo;
     };
 
@@ -187,6 +187,9 @@ export interface TurnState {
   picturesAllowed?: boolean;
   /** VIDEO-GEN-05: whether this turn may make videos (videos/policy.ts, rule 0's gates, plus the Stack having a video engine), decided once in beginTurn; `generate_video` is offered only then. */
   videosAllowed?: boolean;
+  /** MUSIC-GEN-03: age, surface, household switch and Stack readiness; edits also need a made-here song in this chat. */
+  musicAllowed?: boolean;
+  musicEditAllowed?: boolean;
   modelId?: string;
   /** MINOR-CEILING-01: the chat model the Stack runs this turn (the person's pick when they made
    * one), so a node can read the running model's record; never sent to a client. */

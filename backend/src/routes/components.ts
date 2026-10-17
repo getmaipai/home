@@ -12,11 +12,12 @@ import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropAdapterCache, forgetAdapterPref } from "@/lib/pictures/adapters";
 import { dropVideoAdapterCache, forgetVideoAdapterPref } from "@/lib/videos/adapters";
 import { dropVideoStatusCache } from "@/lib/videos/ready";
+import { dropMusicStatusCache } from "@/lib/music/ready";
 
 export const componentsRoutes = apiRouter();
 
 const ComponentSchema = z.object({
-  id: z.string(), label: z.string(), summary: z.string(), group: z.enum(["chat", "voice", "pictures", "video", "tools", "loras"]), kind: z.enum(["model", "lora"]),
+  id: z.string(), label: z.string(), summary: z.string(), group: z.enum(["chat", "voice", "pictures", "video", "music", "tools", "loras"]), kind: z.enum(["model", "lora"]),
   state: z.enum(["installed", "installing", "notInstalled", "failed"]),
   size_bytes: z.number().nullable(), download_bytes: z.number(), full_bytes: z.number(), required_free_bytes: z.number(),
   plan_need: z.enum(["required", "recommended", "optional"]).nullable(), requirement: z.enum(["required", "optional", "unsupported"]), requirement_reason: z.string().nullable(),
@@ -86,6 +87,7 @@ componentsRoutes.openapi(removeRoute, async (c) => {
     // Picture and video readiness are read from the Stack; the next read sees the part gone.
     dropPictureStatusCache();
     dropVideoStatusCache();
+    dropMusicStatusCache();
     resetInstallStatusCache();
     return c.json(removed, 200);
   } catch (error) { return failure(c, error) as never; }

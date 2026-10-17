@@ -1,3 +1,5 @@
+import { generationOf } from "@/lib/music/types";
+import { deleteMusicJobsForPerson, deleteMusicJobsForTurns } from "@/lib/music/store";
 // ATT-01a: local attachment storage. The database row is spec-shaped and
 // immutable; the file is a household-local implementation detail addressed
 // only by its validated relative storage_path.
@@ -25,6 +27,7 @@ export type AttachmentOpResult<T> =
   | { ok: false; status: 400 | 403 | 404 | 500; error: string };
 
 export interface CreateAttachmentInput {
+  retention?: "conversation" | "kept";
   conversationId: string;
   turnId: string;
   mediaType: string;
@@ -91,12 +94,13 @@ function storagePathFor(ownerPersonId: string, id: string): string {
 // a second copy of this mapping would drift from this one the moment
 // STORE-SPEC-01's shape changes again.
 export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
+  const generation = generationOf(row.provenance);
   const parsed = FileRecordSchema.safeParse({
     id: row.id,
     owner_person_id: row.ownerPersonId,
-    // A chat upload is "sent"; MEDIA-PODCASTS-01 adds "fetched" (a copy the
-    // hub fetched for a media source, lib/media/fetchedFiles.ts).
-    origin: row.origin === "fetched" ? "fetched" : "sent",
+    // A chat upload is "sent"; MEDIA-PODCASTS-01 adds "fetched" (a copy the hub fetched for a media source,
+    // lib/media/fetchedFiles.ts); MUSIC-GEN-03: a generated song is "made".
+    origin: generation ? "made" : row.origin === "fetched" ? "fetched" : "sent",
     kind: kindForMediaType(row.mediaType),
     media_type: row.mediaType,
     size: row.size,
@@ -104,14 +108,13 @@ export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
     storage_path: row.storagePath,
     retention: row.retention,
     // STORE-SPEC-01: conversation_id/turn_id moved off the top level into
-    // provenance, which also gained package_id/job_id/requested_by_person_id
-    // (never set here - none of those origins apply to a sent upload) and
+    // provenance, which also gained package_id/job_id/requested_by_person_id and
     // note (the old free-text provenance column, unchanged in meaning).
     provenance: {
       conversation_id: row.conversationId,
       turn_id: row.turnId,
-      package_id: null,
-      job_id: null,
+      package_id: generation ? "generate_music" : null,
+      job_id: generation?.job_id ?? null,
       requested_by_person_id: null,
       media_source_id: row.origin === "fetched" ? (row.mediaSourceId ?? null) : null,
       note: row.provenance,
@@ -227,7 +230,7 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
     size: bytes.byteLength,
     sha256,
     storagePath,
-    retention: "conversation" as const,
+    retention: input.retention ?? "conversation" as const,
     provenance,
     origin: "sent",
     mediaSourceId: null,
@@ -296,6 +299,7 @@ export function readAttachmentForConversation(actor: PersonRow, conversationId: 
 /** Delete records and their files before the owning turn is deleted. */
 export function deleteAttachmentsForTurns(turnIds: string[]): number {
   if (turnIds.length === 0) return 0;
+  deleteMusicJobsForTurns(turnIds);
   deletePictureJobsForTurns(turnIds); // IMGGEN-HOME-01: the picture jobs (and their prompts) of these turns go with them
   const rows = db.select().from(attachments).where(inArray(attachments.turnId, turnIds)).all();
   for (const row of rows) removeFile(row.storagePath);
@@ -332,6 +336,7 @@ export function removeFileBlobs(storagePaths: readonly string[]): void {
  * different rule with a household outcome for shared files; that one is
  * lib/storage/personFiles.ts's releaseFilesOfDeletedPerson(). */
 export function deleteAttachmentsForPerson(personId: string): number {
+  deleteMusicJobsForPerson(personId);
   deletePictureJobsForPerson(personId);
   const rows = db.select().from(attachments).where(eq(attachments.ownerPersonId, personId)).all();
   const blobs: string[] = [];

@@ -1,3 +1,4 @@
+import { musicJobIdsByTurn, deleteMusicJobsForConversation } from "@/lib/music/store";
 // Conversation history (platform plan 4.14, split): "conversations are
 // per person and per surface... retention defaults: conversations ninety
 // days then summarised... each is a household setting with a floor for
@@ -1994,6 +1995,7 @@ export function listConversationTurns(
   const pictureByTurn = pictureJobIdsByTurn(actor, rows.map((r) => r.id));
   // VIDEO-GEN-06: and for a video job the turn started.
   const videoByTurn = videoJobIdsByTurn(actor, rows.map((r) => r.id));
+  const musicByTurn = musicJobIdsByTurn(actor, rows.map((r) => r.id));
 
   // MINOR-SEARCH-01m: a child reads no link in a reply and no page address in a source, old rows included (the stored row is untouched).
   const bandOut = speakerAgeBand(actor, new Date());
@@ -2022,7 +2024,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: { id: videoByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(musicByTurn.has(r.id) && !hideForRefusedChildTurn ? { music: { id: musicByTurn.get(r.id)! } } : {}), ...(videoByTurn.has(r.id) && !hideForRefusedChildTurn ? { video: { id: videoByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 
@@ -2171,6 +2173,7 @@ export function updateConversationSettings(actor: PersonRow, id: string, patch: 
 export function deleteConversationById(actor: PersonRow, id: string): ConversationOpResult<true> {
   const found = getConversation(actor, id);
   if (!found.ok) return found;
+  deleteMusicJobsForConversation(id);
   const turns = db.select({ id: conversationTurns.id }).from(conversationTurns).where(eq(conversationTurns.conversationId, id)).all();
   deleteAttachmentsForTurns(turns.map((t) => t.id));
   deleteEpisodesForTurns(turns.map((t) => t.id));
@@ -2283,6 +2286,7 @@ function withPicturesNote(text: string, images: readonly ChatImagePart[]): strin
  * turn knows that saying a picture is coming goes with calling the tool. */
 function mediaToolNote(pluginId: string | null): string | null {
   if (pluginId === "generate_image") return "[The Make a Picture tool was called for this message and started the picture the reply speaks of.]";
+  if (pluginId === "generate_music" || pluginId === "edit_music") return "[The music tool was called for this message and started the song the reply speaks of.]";
   if (pluginId === "generate_video") return "[The Make a Video tool was called for this message and started the video the reply speaks of.]";
   return null;
 }

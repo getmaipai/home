@@ -1,3 +1,4 @@
+import { deleteMusicJobsForPerson } from "@/lib/music/store";
 // STORE-DELETE-01 (docs/plans/household-storage-2026-09-23.md, "When a
 // person is deleted", and decision 5): what happens to a person's files
 // when the person is deleted. One step, called from one place
@@ -108,6 +109,7 @@ export function releaseFilesOfDeletedPerson(personId: string): ReleasedFiles {
   for (const file of othersFiles) pruneUnreachableShares(file.id, file.ownerPersonId, personId);
 
   removeTemporaryChatImagesForPerson(personId);
+  deleteMusicJobsForPerson(personId);
   deletePictureJobsForPerson(personId); // IMGGEN-HOME-01: a deleted person leaves no picture jobs (their prompts) behind
   const released: ReleasedFiles = { purged: 0, keptForHousehold: 0, blobsToRemove: [] };
   const purge = (row: typeof attachments.$inferSelect) => {

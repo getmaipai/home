@@ -156,11 +156,11 @@ function modelHasRecord(id: string): boolean {
   return CATALOG.some((m) => m.role === "chat" && m.id === id);
 }
 
-function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false): boolean {
+function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean, picturesOk: boolean, videosOk = false, musicOk = false, musicEditOk = false): boolean {
   if (offer.mode === "base") return true;
   if (offer.mode !== "conditional" || !offer.bench_row) return false;
   // IMGGEN-HOME-01: `picturesAllowed` is decided once per turn (pictures/policy.ts and the Stack's picture engine being up).
-  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "videosAllowed" && videosOk);
+  return (offer.gate === "answerImagesAllowed" && answerImagesOk) || (offer.gate === "picturesAllowed" && picturesOk) || (offer.gate === "videosAllowed" && videosOk) || (offer.gate === "musicAllowed" && musicOk) || (offer.gate === "musicEditAllowed" && musicOk && musicEditOk);
 }
 
 export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?: { mode: string; reason?: string; gate?: string } }, status: "enabled" | "disabled", usedInChat = false): string | null {
@@ -177,7 +177,7 @@ export function toolOfferLabel(manifest: { kind?: string; args?: unknown; offer?
  * are the only sources; disabled or smoke-failed packages are excluded,
  * off and unmeasured tools stay out, and exceeding the model cap is a
  * configuration error rather than a silently shortened offer. */
-export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false): TurnBudget {
+export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, picturesOk = false, videosOk = false, musicOk = false, musicEditOk = false): TurnBudget {
   const cap = budget.max_tools ?? 0;
   if (budget === NO_RECORD_BUDGET) return budget;
   if (cap === 0) return budget.tools_offered.length === 0 ? budget : { ...budget, tools_offered: [] };
@@ -187,13 +187,13 @@ export function withTurnToolGates(budget: TurnBudget, answerImagesOk: boolean, p
   for (const manifest of listInstalledManifests()) {
     const offer = manifest.offer;
     const forcedForMeasurement = offerOverridesForTests.has(manifest.id);
-    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk))) continue;
+    if (!forcedForMeasurement && (!offer || !offerPassesGate(offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk))) continue;
     const status = statuses.get(manifest.id);
     if (status && (status.status !== "enabled" || status.smokeOk === false)) continue;
     candidates.set(manifest.id, { id: manifest.id, priority: offer?.priority ?? 1000 });
   }
   for (const tool of VIRTUAL_TOOL_REGISTRY) {
-    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
+    if (offerOverridesForTests.has(tool.id) || offerPassesGate(tool.offer, answerImagesOk, picturesOk, videosOk, musicOk, musicEditOk)) candidates.set(tool.id, { id: tool.id, priority: tool.offer.priority ?? 1000 });
   }
 
   const ordered = [...candidates.values()].sort((a, b) => a.priority - b.priority || a.id.localeCompare(b.id));

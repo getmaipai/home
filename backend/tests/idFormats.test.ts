@@ -46,6 +46,7 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newMediaSourceId", "msrc-", 10],
   ["newMediaProgressId", "mprg-", 10],
   ["newMediaCollectionId", "mcol-", 10],
+  ["newMusicJobId", "mus-", 10],
 ];
 
 describe("id generators", () => {

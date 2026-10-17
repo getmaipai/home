@@ -1,3 +1,4 @@
+import { resumeMusicJobs } from "@/lib/music/jobs";
 // SINGLE-INSTANCE-01 (#194): must stay the FIRST import. It refuses a stray
 // data directory and takes the data directory's one-hub lock before any
 // later import (app, db, keystore) can open the database.
@@ -209,6 +210,7 @@ registerAllPackageProjectTypes();
 resumePictureJobs();
 // VIDEO-GEN-05: and a clip a restart interrupted.
 resumeVideoJobs();
+resumeMusicJobs();
 // LIKENESS-01: a style of a person who took their agreement back, still waiting to be removed from the library, is removed now and then retried every few minutes until the engine has answered.
 void drainStyleRemovals();
 const styleRemovalInterval = setInterval(() => void drainStyleRemovals(), 5 * 60_000);

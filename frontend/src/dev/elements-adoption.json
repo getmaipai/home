@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T22:57:35.721Z",
+  "generatedAt": "2026-10-17T23:18:33.144Z",
   "kitTag": "ui-v0.5.265",
   "items": [
     {
@@ -786,7 +786,7 @@
       "group": "music",
       "verdict": "wire-after",
       "verdictReason": "MUSIC-GEN-04's generation card Element (ui-v0.5.260); the music generation slices wire it to the generate_music job card when they land; nothing in Home uses it yet.",
-      "implemented": false,
+      "implemented": true,
       "reading": "CHAR-01 uses AgentStatus through the commons companion-presence block; the block composes shipped Elements."
     },
     {

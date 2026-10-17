@@ -1,3 +1,4 @@
+import { musicRoutes } from "@/routes/music";
 import { serveStatic } from "hono/bun";
 import { apiReference } from "@scalar/hono-api-reference";
 import { existsSync } from "node:fs";
@@ -275,6 +276,7 @@ app.route("/api/offline", offlineRoutes);
 app.route("/api/media", mediaRoutes);
 app.route("/api/trash", trashRoutes);
 app.route("/api/continue", continueRoutes);
+app.route("/api/music", musicRoutes);
 app.route("/api/shares", sharesRoutes);
 app.route("/api/updates", updatesRoutes);
 // Root-mounted, not under /api: OpenAI's own wire contract names this

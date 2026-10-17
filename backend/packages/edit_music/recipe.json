@@ -1,0 +1,16 @@
+{
+  "id": "edit_music",
+  "inputs": [
+    {
+      "name": "track",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "Songs can only be made through chat on your own screen. Ask chat to edit a song made here."
+    }
+  ]
+}

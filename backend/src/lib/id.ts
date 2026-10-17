@@ -220,6 +220,9 @@ export function newPictureJobId(): string {
   return `pic-${randomSuffix(10)}`;
 }
 
+// MUSIC-GEN-03: music jobs are hub-internal, like picture and video jobs.
+export function newMusicJobId(): string { return `mus-${randomSuffix(10)}`; }
+
 // VIDEO-GEN-05: a video job (hub-internal, like picture jobs and approvals).
 export function newVideoJobId(): string {
   return `vid-${randomSuffix(10)}`;

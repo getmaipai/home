@@ -55,7 +55,7 @@ export function readyVideoStatusForTests(overrides: Partial<StackVideoStatus> & 
   return { ...base, state: quickMissing ? "not-installed" : base.state, qualities: { quick: quality("fastwan2-2-ti2v-5b-mlx-bf16", !quickMissing, false, 5, "832x480"), detailed: quality("ltx-2-3-distilled-mlx", detailed === "installed", true, 10, "768x448") } };
 }
 
-const NO_VIDEO_MODEL = "No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.";
+const NO_VIDEO_MODEL = "No video model is installed on this computer yet. An admin can add one in Settings, Pictures, videos and music.";
 const VIDEO_ENGINE_UNREACHABLE = "I can't reach the video engine on this computer right now. Check that the MaiPai Stack is running, then try again.";
 
 /** Why a video cannot be made now, in the person's terms (see pictureNotReadyReason). */

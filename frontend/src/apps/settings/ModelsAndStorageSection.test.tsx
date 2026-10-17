@@ -39,6 +39,19 @@ describe("words", () => {
 });
 
 describe("Models and storage", () => {
+  test("the music maker is listed under its own Music heading", async () => {
+    const v = mount(overview([
+      row({ id: "music", label: "Music: ACE-Step 1.5", summary: "Writes and sings songs on this computer.", group: "music", download_bytes: 11_460_000_000 }),
+      row({}),
+    ]));
+    await waitFor(() => expect(v.getByRole("heading", { name: "Music" })).toBeTruthy());
+    const heading = v.getByRole("heading", { name: "Music" });
+    expect(heading.parentElement?.textContent ?? "").toContain("Music: ACE-Step 1.5");
+    expect(v.getByTestId("component-music").textContent).toContain("Download about 11 GB");
+    expect(v.getByRole("heading", { name: "Pictures" })).toBeTruthy();
+    v.restore();
+  });
+
   test("lists the parts by group with size, state, last use and the room left", async () => {
     const v = mount(overview([
       row({}),

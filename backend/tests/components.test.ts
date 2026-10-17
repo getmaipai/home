@@ -42,6 +42,13 @@ async function owner() {
 }
 
 describe("the list", () => {
+  test("a music component in group music passes through the list route", async () => {
+    const { client } = await owner();
+    answers["GET /stack/v1/components"] = () => Response.json({ tier: "p128", free_disk_bytes: 1_500_000_000_000, disk_margin_bytes: 5e9, installed_bytes: 0, components: [row({ id: "music", label: "Music: ACE-Step 1.5", group: "music" })] });
+    const res = await client.get("/api/components");
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { components: Array<{ id: string; group: string }> }).components[0]).toMatchObject({ id: "music", group: "music" });
+  });
   test("is the Stack's list with a stack flag", async () => {
     const { client } = await owner();
     answers["GET /stack/v1/components"] = () => Response.json({ tier: "p128", free_disk_bytes: 1_500_000_000_000, disk_margin_bytes: 5e9, installed_bytes: 0, components: [row({})] });

@@ -1,3 +1,5 @@
+import { __resetMusicJobsForTests } from "@/lib/music/store";
+import { musicJobs } from "@/db/schema";
 import { tmpdir } from "node:os";
 import { db } from "@/db";
 import { dataDir } from "@/lib/paths";
@@ -187,6 +189,8 @@ export function resetDb(): void {
   db.delete(kidUsage).run(); // KIDS-CREATE-01: references people
   db.delete(pictureJobs).run(); // IMGGEN-HOME-01: references people
   db.delete(pictureAdapterPrefs).run();
+  __resetMusicJobsForTests();
+  db.delete(musicJobs).run();
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people
   db.delete(videoAdapterPrefs).run();
   db.delete(likenessUses).run(); // LIKENESS-01: references people

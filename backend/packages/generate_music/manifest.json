@@ -1,0 +1,114 @@
+{
+  "id": "generate_music",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make a Song",
+  "description": "Make a song or an instrumental here, with lyrics you write.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "musicAllowed",
+    "bench_row": "music-tool",
+    "reason": "adult on their own written screen with music enabled and an available Stack music model"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make a folk song about Saturday pancakes",
+      "write and sing a chorus about rain",
+      "make a minute of piano music",
+      "create an instrumental for reading",
+      "make a song with these lyrics",
+      "write a jazz tune with an original voice"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "description"
+    ],
+    "properties": {
+      "description": {
+        "type": "string",
+        "grounded": false,
+        "description": "Genre, mood, instruments and original voice, based on the request. Never claim a song exists without calling this tool.",
+        "minLength": 3,
+        "maxLength": 1200
+      },
+      "lyrics": {
+        "type": "string",
+        "grounded": false,
+        "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the person will see them. Omit for an instrumental.",
+        "maxLength": 4000
+      },
+      "bpm": {
+        "type": "number",
+        "grounded": false,
+        "description": "Optional tempo in beats per minute.",
+        "minimum": 20,
+        "maximum": 300
+      },
+      "key": {
+        "type": "string",
+        "grounded": false,
+        "description": "Optional musical key.",
+        "maxLength": 40
+      },
+      "imitates_real_voice": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set true when the person asks to sound like a named real singer or another real identifiable person. Home refuses copying real voices. Use an original voice for a similar style instead."
+      },
+      "instrumental": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "True for music with no singing."
+      },
+      "seconds": {
+        "type": "number",
+        "grounded": false,
+        "description": "Length in seconds, from 10 to the installed music model limit. Default 60.",
+        "minimum": 10,
+        "default": 60
+      },
+      "language": {
+        "type": "string",
+        "grounded": false,
+        "description": "Language of the lyrics.",
+        "maxLength": 80
+      },
+      "title": {
+        "type": "string",
+        "grounded": false,
+        "description": "Short title for the person to see.",
+        "maxLength": 200
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

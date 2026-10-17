@@ -3637,6 +3637,25 @@
       "verdictReason": "The generated-clip card (progress with Stop, then the clip with poster, controls, loop, Download, Share, Make another); VIDEO-GEN-06 binds it as the chat's `video` tool part."
     },
     {
+      "file": "music-track.tsx",
+      "name": "music-track",
+      "group": "music",
+      "verdict": "wire-now",
+      "backendNeeded": null,
+      "effort": null,
+      "specTagNeeded": false,
+      "newDependency": false,
+      "bindings": [
+        "song"
+      ],
+      "size": "S",
+      "showcaseScenario": null,
+      "batch": null,
+      "replacesHandBuilt": [],
+      "realTurnToday": true,
+      "verdictReason": "The generated-song card (progress with Stop, then the kit Player in its audio layout with lyrics, versions, Download and Share); MUSIC-GEN-04 binds it as the chat's `generate_music` and `edit_music` tool parts."
+    },
+    {
       "file": "image-editor.tsx",
       "name": "image-editor",
       "group": "image",

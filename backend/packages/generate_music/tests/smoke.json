@@ -1,0 +1,17 @@
+{
+  "description": "Recipe fallback; native chat jobs and gates are covered in backend/tests/musicTool.test.ts.",
+  "inputs": {
+    "description": "a folk song"
+  },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "Songs can only be made through chat on your own screen. Ask chat to make a song.",
+      "speech": "Songs can only be made through chat on your own screen. Ask chat to make a song."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}
