@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make a short video on this computer when someone asks for a clip or an animation.",
+  "description": "Make a short video on this computer when someone asks for a clip, a video or an animation. Call it first, in every chat; never say a clip is coming without calling it.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",
@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What the video shows, written as a full description in plain English: the subject, what moves, the setting and the light or mood, built from what the person asked for. For a picture that moves, describe the motion. Keep their own words for names. Do not add people, objects or themes they did not ask for."
+        "description": "What the video shows, written as a full description in plain English: the subject, what moves, the setting and the light or mood, built from what the person asked for. For a picture that moves, describe the motion. Keep their own words for names. Do not add people, objects or themes they did not ask for. A video exists only if you called this tool in this reply: never say one is being made, ready or on its way without calling it, and never describe a clip you did not make."
       },
       "from_picture": {
         "type": "string",

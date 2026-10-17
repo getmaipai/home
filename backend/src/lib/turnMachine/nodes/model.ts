@@ -12,6 +12,8 @@ import { missingRequired } from "@/lib/capabilities";
 import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun } from "@/lib/text";
+import { asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION } from "@/lib/mediaClaims";
+import { PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
@@ -222,6 +224,8 @@ interface GenerationAttempt {
   hold?: "rescue" | "tool_call" | "text_kept";
   /** The rescue came from the budget running out, not from the round ending. */
   holdAtBudget?: boolean;
+  /** The round's text was held back, not released (mediaClaims.ts); the model node releases what stands. */
+  heldBack?: boolean;
 }
 // GENFAIL-01: `message` is the engine's own diagnostic text (llm.ts's
 // caught error, or startCompleteStream()'s own `started.error`) -
@@ -271,7 +275,7 @@ export function __setSearchAssistHoldClockForTests(fn: (() => number) | null): v
  * it through the streaming client (COR-7's own signal support), and
  * drains it manually so the generator's return value (the tool calls)
  * survives - `for await...of` would discard it. */
-async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, nodeAbort: AbortSignal, arm = false): Promise<GenerationResult> {
+async function runOneGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, nodeAbort: AbortSignal, arm: boolean | "media" = false): Promise<GenerationResult> {
   // DEADLINE-02: first-token and stall timers on the whole generation,
   // from the request on (a pre-stream wait is the first-token wait).
   // THIN-DL-02: a transient failure before anything reached the person is
@@ -318,7 +322,10 @@ function generationFailureKind(facts: StackFailureFacts | null, message: string 
   return facts?.state ? stackRefusalKind(facts.state, facts.offline_reason) : classifyGenerationFailure(message).kind;
 }
 
-async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal, beat: () => void, arm = false): Promise<GenerationResult> {
+async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], tools: ToolSpec[], tool_choice: "auto" | "none" | undefined, thinking: boolean, maxTokens: number, reason: string, signal: AbortSignal, beat: () => void, armMode: boolean | "media" = false): Promise<GenerationResult> {
+  // "media": the whole round is held back (mediaClaims.ts) so a claim of a picture or video can be checked before anyone reads it.
+  const holdAll = armMode === "media";
+  const arm = armMode === true;
   // STREAM-NEXT-01 (b): `state.streamGate` is undefined for every caller
   // but turnNext.ts's own runTurnNextStream(), so this is a no-op
   // everywhere else. reset() clears whatever a PRIOR, now-abandoned
@@ -410,6 +417,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
         continue;
       }
       raw += step.value.text;
+      if (holdAll) continue;
       if (hold && hold.phase === "text") {
         // Plain text is being held; the model still has until the budget to call a tool.
         hold.held += step.value.text;
@@ -467,7 +475,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     const failedAtMs = Date.now();
     const facts = err instanceof StackStreamError ? err.facts : null;
     state.generations.push({ reason, thinking, maxTokens, requestSentMs: requestSentMs - state.startedAt, firstDeltaMs, stats: started.stats, error: message, offlineReason: facts?.offline_reason ?? null, facts, failureKind: generationFailureKind(facts, message), failedMs: failedAtMs - state.startedAt, failedAt: new Date(failedAtMs).toISOString() });
-    return { ok: false, code: "generation_failed", message, released: raw.length - (hold?.held.length ?? 0) > 0 || (state.reasoning.emit && nativeReasoning.length > 0) };
+    return { ok: false, code: "generation_failed", message, released: (!holdAll && raw.length - (hold?.held.length ?? 0) > 0) || (state.reasoning.emit && nativeReasoning.length > 0) };
   }
 
   if (!rescued && gate && thinkSplit) {
@@ -526,7 +534,7 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     else if (hold.phase === "text" || (hold.phase === "envelope" && visible.trim().length > 0)) heldEnd = "rescue";
     else heldEnd = "text_kept";
   }
-  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking, ...(heldEnd ? { hold: heldEnd } : {}) };
+  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking, ...(heldEnd ? { hold: heldEnd } : {}), ...(holdAll ? { heldBack: true } : {}) };
 }
 
 /** ENGINE-CONTRACT-02's builder row, shared by every path that reaches
@@ -915,7 +923,11 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // record and the empty-reply retry all see the effective flag.
   const thinkingOn = state.budget.thinking_budget_tokens > 0 && !minorThinkingOff && state.reasoning.emit;
   const maxTokens = replyMaxTokensFor(state, thinkingOn);
-  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, !isPhrasingRound && !input.retry && toolsAllowed && searchAssistMayHold(state, tools));
+  // A turn that plainly asks for a picture or video holds its first round's text until it is known whether the tool
+  // was called: a reply that says a picture is on its way with no job is never shown (mediaClaims.ts).
+  const mediaOffered = tools.some((t) => t.id === "generate_image" || t.id === "generate_video");
+  const holdMedia = !isPhrasingRound && !input.retry && !noToolsTurn(state) && asksForMedia(input.utterance);
+  let attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : input.retry ? "tool_retry" : "model", signal, holdMedia ? "media" : !isPhrasingRound && !input.retry && toolsAllowed && searchAssistMayHold(state, tools));
   // THIN-GROUND-01: llama-server reports the rendered prompt size in its
   // 400 body. Use that measurement to choose the first evidence cut, then
   // keep cutting until the request fits or the prompt carries no search
@@ -1003,8 +1015,9 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // with no visible text gets the same one regeneration even when thinking was already off, so the
   // person hears the model's own words before any fixed line stands in for them.
   const afterMissedLookup = isPhrasingRound || input.retry === true;
-  if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0 && (thinkingOn || phrasingToolCallDiscarded || afterMissedLookup)) {
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal);
+  if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0) {
+    // Rule 6: an empty reply (seen live on a plain written turn with thinking already off) is retried once, never shown as-is.
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal, holdMedia ? "media" : false);
     if (!attempt.ok) {
       settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));
       const failureMessage = attempt.message ?? "";
@@ -1015,6 +1028,21 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       return { outcome: { ok: false, code: attempt.code, message: attempt.message }, output: failedOutput(attempt) };
     }
     if (isPhrasingRound && attempt.toolCalls && attempt.toolCalls.length > 0) attempt = { ...attempt, toolCalls: undefined };
+  }
+
+  // A held first round (holdMedia): a claim of a picture or video with no tool call gets ONE guarded re-ask; a claim
+  // that still stands without a job is replaced by an honest line. Text that makes no claim is released as written.
+  if (attempt.heldBack && (!attempt.toolCalls || attempt.toolCalls.length === 0)) {
+    if (claimsMedia(attempt.text)) {
+      let second: GenerationResult | undefined;
+      if (mediaOffered && !signal.aborted) {
+        console.error("[model] the reply claimed a picture or video with no tool call; asking once more");
+        second = await runOneGeneration(state, [...messages, { role: "assistant", content: attempt.text }, { role: "user", content: MEDIA_REASK_INSTRUCTION }], tools, "auto", false, replyMaxTokensFor(state, false), "media_reask", signal, "media");
+      }
+      if (second?.ok && (second.toolCalls?.length ?? 0) > 0) attempt = second;
+      else if (second?.ok && !claimsMedia(second.text) && second.text.trim().length > 0) attempt = second;
+      else attempt = { ...attempt, text: mediaOffered ? MEDIA_NOT_STARTED_LINE : PICTURE_NOT_HERE_LINE };
+    }
   }
 
   // "Reasoning is a second output" (the owner's ruling): `context`
@@ -1093,6 +1121,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       ? askAppendFor({ actor: state.actor, conversationId: state.conversationId, turnId: state.turnId, replyText: attempt.text, utterance: input.utterance, subjects: state.subjects, unknownAsk: state.unknownAsk ?? null, recentUserTexts: state.context.filter((c) => c.source === "window" && c.id.startsWith("window-user")).map((c) => c.text), temporary: state.temporary })
       : NO_ASK_APPEND;
   state.askCommit = ask.commit;
+  if (attempt.heldBack && attempt.text) gate?.push(attempt.text);
   if (ask.append) gate?.push(ask.append);
   gate?.finish();
   return { outcome: { ok: true }, output: { kind: "text", text: attempt.text + ask.append, thinking: attempt.thinking, reasoning } };

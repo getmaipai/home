@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Picture",
-  "description": "Make a new picture when someone asks you to draw, paint, illustrate or design one; never for real photos or charts.",
+  "description": "Make a new picture when someone asks you to draw, paint, illustrate or design one; never for real photos. Call it first, in every chat; never say a picture is coming without calling it.",
   "offer": {
     "mode": "conditional",
     "gate": "picturesAllowed",
@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming without calling it. Never call this tool to change a picture that already exists (remove its background, erase something, resize, upscale or crop it): it cannot, so do not call it; tell the person to tap the Edit button on the picture instead."
+        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. Never call this tool to change a picture that already exists (remove its background, erase something, resize, upscale or crop it): it cannot, so do not call it; tell the person to tap the Edit button on the picture instead."
       },
       "size": {
         "type": "string",
