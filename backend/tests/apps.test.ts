@@ -356,6 +356,24 @@ describe("install-time page validation (appPackageProblems)", () => {
     expect(problemsFor((_m, dir) => writeFileSync(join(dir, "pages", "more.json"), JSON.stringify({ type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "elsewhere" } }] }))).join("\n")).toContain('"elsewhere" is not a contributes.data id');
   });
 
+  test("a settings area that takes a built-in id, another app, or settings that are not the package's own is refused in plain words", () => {
+    const area = (m: Record<string, unknown>) => (m.contributes as { settings_area?: Record<string, unknown> }).settings_area!;
+    const withArea = (patch: (a: Record<string, unknown>) => void) => problemsFor((m) => {
+      (m.contributes as Record<string, unknown>).settings_area = {
+        id: "fixture-settings", title: "Fixture", app: `/apps/${ID}`, audience: { min_role: "child" },
+        groups: [{ label: "Fixture", sections: ["main"] }],
+        sections: [{ id: "main", label: "Main", icon: "map-pin", kind: "keys", cards: [{ label: "Main", group: "fixture", scope: "person" }] }],
+      };
+      m.config = [{ key: "fixture.thing", scope: "person", selector: "text", default: "", label: "Thing", help: "A thing.", level: "basic", lives_in: "fixture", honoured_by: ["home"] }];
+      patch(area(m));
+    }).join("\n");
+    expect(withArea(() => {})).toBe("");
+    expect(withArea((a) => { a.id = "account"; })).toContain('taken by a built-in settings page');
+    expect(withArea((a) => { a.id = "users"; })).toContain('taken by a built-in settings page');
+    expect(withArea((a) => { a.app = "/apps/other"; })).toContain(`must name its own app, "/apps/${ID}"`);
+    expect(withArea((a) => { (a.sections as Array<{ cards: Array<Record<string, unknown>> }>)[0]!.cards[0]!.group = "household"; })).toContain("not one of this package's own settings");
+  });
+
   test("a page that is not valid against the UI schema is reported", () => {
     const out = problemsFor((_m, dir) => writeFileSync(join(dir, "pages", "more.json"), JSON.stringify({ type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "/api/people" } }] })));
     expect(out.join("\n")).toContain("does not match the UI schema");

@@ -5,6 +5,7 @@ import type { ModelCapabilities } from "@maipai/spec/gen/ts/model-capabilities.j
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
+import type { SettingsArea } from "@maipai/spec/settings/areas-check.js";
 import type { conversationTurns, conversations } from "./db/schema";
 // hardware.ts has zero "@/"-aliased imports of its own, unlike backup.ts
 // and modelCatalog.ts below, so its types are re-exported directly
@@ -1210,4 +1211,8 @@ export interface AppRow {
   /** The package's Incognito behaviour. The hub cannot see the browser's Incognito state, so the shell
    * hides an app whose value is "blocked" while Incognito is on. */
   incognito: "blocked" | "ephemeral" | "unaffected";
+  /** The package's own settings area (its manifest's `contributes.settings_area`, as declared), present only when the
+   * package declares one and the asking person's role clears `audience.min_role`. The shell draws it at
+   * `/settings/<id>` and opens it from the app's gear. */
+  settings_area?: SettingsArea;
 }

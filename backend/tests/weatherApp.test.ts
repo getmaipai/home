@@ -87,6 +87,18 @@ describe("the Weather app is a package app", () => {
   });
 });
 
+describe("the app list carries the package's settings area", () => {
+  test("every role that clears the area's min_role gets the declared object as is", async () => {
+    const { client } = await owner();
+    const teenClient = await teen(client);
+    const manifest = JSON.parse(readFileSync(join(PACKAGES_DIR, "weather", "manifest.json"), "utf-8")) as { contributes: { settings_area: unknown } };
+    for (const c of [client, teenClient]) {
+      const rows = (await (await c.get("/api/apps")).json()) as Array<{ package: string; settings_area?: unknown }>;
+      expect(rows.find((r) => r.package === "weather")?.settings_area).toMatchObject(manifest.contributes.settings_area as object);
+    }
+  });
+});
+
 describe("the places the picker lists", () => {
   test("the household home first, then the asker's own, never another person's", async () => {
     const { client, row } = await owner();

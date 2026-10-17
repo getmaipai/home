@@ -5468,6 +5468,13 @@
                         "type": "string",
                         "description": "The app's route in the web shell: /apps/<package id>."
                       },
+                      "settings_area": {
+                        "type": "object",
+                        "additionalProperties": {
+                          "nullable": true
+                        },
+                        "description": "The package's own settings area as its manifest declares it (present only when it declares one and the asking person's role may open it); the shell draws it at /settings/<id>."
+                      },
                       "incognito": {
                         "type": "string",
                         "enum": [
@@ -36552,6 +36559,245 @@
           },
           "504": {
             "description": "The Stack stopped answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/web": {
+      "get": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "What web search uses right now",
+        "responses": {
+          "200": {
+            "description": "The saved address, whether it works, the picked sources and whether DuckDuckGo is set up.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "address": {
+                      "type": "string"
+                    },
+                    "works": {
+                      "type": "boolean",
+                      "nullable": true
+                    },
+                    "stackOwned": {
+                      "type": "boolean"
+                    },
+                    "sources": {
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "enum": [
+                          "searxng",
+                          "ddgs"
+                        ]
+                      }
+                    },
+                    "ddgsReady": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "address",
+                    "works",
+                    "stackOwned",
+                    "sources",
+                    "ddgsReady"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may see web search settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/search/address": {
+      "post": {
+        "tags": [
+          "Search"
+        ],
+        "summary": "Test, save or remove the SearXNG address",
+        "description": "Owner/admin only. dry_run tests without saving. An empty url removes SearXNG. Same host rules and checks as the setup screen.",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string"
+                  },
+                  "dry_run": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "A Test answers with result and saved false; a Save answers saved true; an empty url removes SearXNG (cleared true).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "saved": {
+                      "type": "boolean"
+                    },
+                    "cleared": {
+                      "type": "boolean"
+                    },
+                    "result": {
+                      "type": "object",
+                      "properties": {
+                        "level": {
+                          "type": "string",
+                          "enum": [
+                            "pass",
+                            "warn",
+                            "fail"
+                          ]
+                        },
+                        "address": {
+                          "type": "string"
+                        },
+                        "headline": {
+                          "type": "string"
+                        },
+                        "verdict": {
+                          "type": "string"
+                        },
+                        "recommendation": {
+                          "type": "string"
+                        },
+                        "canUse": {
+                          "type": "boolean"
+                        },
+                        "trouble": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "label": {
+                                "type": "string"
+                              },
+                              "important": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "label",
+                              "important"
+                            ]
+                          }
+                        },
+                        "details": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string",
+                                "enum": [
+                                  "pass",
+                                  "warn",
+                                  "fail",
+                                  "unknown"
+                                ]
+                              },
+                              "detail": {
+                                "type": "string"
+                              },
+                              "fix": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "title",
+                              "state",
+                              "detail",
+                              "fix"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "level",
+                        "address",
+                        "headline",
+                        "verdict",
+                        "recommendation",
+                        "canUse",
+                        "trouble",
+                        "details"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "saved"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The address is not allowed, or a Save found the service not usable.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "next": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner or an admin may change web search",
             "content": {
               "application/json": {
                 "schema": {

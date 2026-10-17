@@ -12,6 +12,7 @@ import Ajv2020 from "ajv/dist/2020.js";
 import UI_SCHEMA from "@maipai/spec/ui/schema.json" with { type: "json" };
 import { checkAppPackage, type AppContributes, type AppDataEntry, type AppPageEntry } from "@maipai/spec/ui/app-check.js";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { CENTRAL_AREA_IDS, RESERVED_AREA_IDS, type SettingsArea } from "@maipai/spec/settings/areas-check.js";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
@@ -65,6 +66,26 @@ function readPage(dir: string, module: string): unknown {
   }
 }
 
+/** The plain-language problems with a package's own settings area (SPEC-SETAREA-01), or an empty list. The area
+ * is the manifest's declared object as is; the hub only refuses one that would collide with a central page or
+ * draw something that is not the package's own: a reserved or central id, an `app` that is not `/apps/<id>`,
+ * or a card whose group is not one of the package's own `config[]` groups at that scope. */
+export function settingsAreaProblems(manifest: PackageManifest): string[] {
+  const area = (manifest.contributes as { settings_area?: SettingsArea } | undefined)?.settings_area;
+  if (!area) return [];
+  const problems: string[] = [];
+  if (RESERVED_AREA_IDS.includes(area.id) || CENTRAL_AREA_IDS.includes(area.id)) problems.push(`the settings area id "${area.id}" is taken by a built-in settings page; choose another id`);
+  if (area.app !== `/apps/${manifest.id}`) problems.push(`the settings area must name its own app, "/apps/${manifest.id}", not "${area.app ?? ""}"`);
+  const own = new Set((manifest.config ?? []).map((entry) => `${entry.scope}:${entry.lives_in}`));
+  for (const section of area.sections ?? []) {
+    for (const card of section.cards ?? []) {
+      if (card.links) problems.push(`settings area card "${card.label}" may not hold links; a package area draws only its own settings`);
+      else if (!card.group || !card.scope || !own.has(`${card.scope}:${card.group}`)) problems.push(`settings area card "${card.label}" draws "${card.group ?? ""}" at ${card.scope ?? "no scope"}, which is not one of this package's own settings (config[])`);
+    }
+  }
+  return problems;
+}
+
 /** Reads and validates one package's pages. Cached on the manifest and every page file's size and mtime. */
 function loadApp(id: string): LoadedApp | null {
   const loaded = loadManifestOnly(id);
@@ -97,6 +118,7 @@ function loadApp(id: string): LoadedApp | null {
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
+  problems.push(...settingsAreaProblems(manifest));
   if (problems.length > 0 && !warned.has(`${id}|${stamp}`)) {
     warned.add(`${id}|${stamp}`);
     console.warn(`[apps] ${id}: app refused: ${problems.join("; ")}`);
@@ -121,6 +143,7 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
+  problems.push(...settingsAreaProblems(manifest));
   return problems;
 }
 
@@ -149,6 +172,11 @@ function visibleApp(person: PersonRow, id: string): LoadedApp | null {
   return appVisibleTo(person, app.manifest) ? app : null;
 }
 
+function settingsAreaFor(person: Pick<PersonRow, "role">, manifest: PackageManifest): SettingsArea | undefined {
+  const area = (manifest.contributes as { settings_area?: SettingsArea } | undefined)?.settings_area;
+  return area && meetsMinRole(person.role, area.audience.min_role) ? area : undefined;
+}
+
 /** Every app the asking person may open, built from the manifests on disk (no network). */
 export function listApps(person: PersonRow): AppRow[] {
   const statuses = allPackageStatuses();
@@ -173,6 +201,8 @@ export function listApps(person: PersonRow): AppRow[] {
       sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
       to: `/apps/${id}`,
       incognito: manifest.incognito,
+      // The package's own settings area, as declared, for the person's role only (the shell draws it at /settings/<id>).
+      ...(settingsAreaFor(person, manifest) ? { settings_area: settingsAreaFor(person, manifest)! } : {}),
     });
   }
   return rows.sort((a, b) => a.label.localeCompare(b.label));
