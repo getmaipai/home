@@ -417,6 +417,41 @@ describe("the judge's open question: a candidate is never knowledge", () => {
     });
   });
 
+  test("WHO-ASK-02: a question that is not in play is asked in the chat it came from, never in an unrelated new chat", async () => {
+    const { actor } = await owner();
+    const rivet = candidate(actor, "Rivet", "pet");
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const home = createConversation(actor, { surface: "chat" });
+    if (!home.ok) throw new Error(home.error);
+    const question = queueOpenQuestion({ person: actor.id, conversationId: home.value.id, kind: "who", text: "Who's Rivet?", subjectId: rivet.id, source: "turn-judge" });
+    await withChat("I don't have your shoe size.", async () => {
+      const elsewhere = createConversation(actor, { surface: "chat" });
+      if (!elsewhere.ok) throw new Error(elsewhere.error);
+      expect(elsewhere.value.id).not.toBe(home.value.id);
+      const reply = await runTurn(actor, "chat", "what's my shoe size?", { conversationId: elsewhere.value.id });
+      if (!reply.ok) throw new Error(reply.error);
+      expect(reply.value.reply.text).toBe("I don't have your shoe size.");
+      expect(listOpenQuestions(actor.id).find((q) => q.id === question.id)?.status).toBe("pending");
+    });
+  });
+
+  test("WHO-ASK-02: in the chat it came from, a question is asked once and not again", async () => {
+    const { actor } = await owner();
+    const { createConversation } = await import("@/lib/conversationHistory");
+    const home = createConversation(actor, { surface: "chat" });
+    if (!home.ok) throw new Error(home.error);
+    const rivet = candidate(actor, "Rivet", "pet");
+    queueOpenQuestion({ person: actor.id, conversationId: home.value.id, kind: "who", text: "Who's Rivet?", subjectId: rivet.id, source: "turn-judge" });
+    await withChat("I don't have your shoe size.", async () => {
+      const back = await runTurn(actor, "chat", "what's my shoe size?", { conversationId: home.value.id });
+      if (!back.ok) throw new Error(back.error);
+      expect(back.value.reply.text).toBe("I don't have your shoe size. Who's Rivet?");
+      const again = await runTurn(actor, "chat", "what's my shoe size?", { conversationId: home.value.id });
+      if (!again.ok) throw new Error(again.error);
+      expect(again.value.reply.text).toBe("I don't have your shoe size.");
+    });
+  });
+
   test("the set's read: a queued question whose name is on the turn goes first; a relationship question about a name not in play holds", async () => {
     const { actor } = await owner();
     const { writeRelation } = await import("@/lib/subjects");
@@ -503,7 +538,8 @@ describe("the judge's open question: a candidate is never knowledge", () => {
       expect(other.value.source).toBe("model");
       expect(seen.requests).toHaveLength(1);
       expect(entityNamed("juniper")).toMatchObject({ source: "inferred" });
-      expect(other.value.reply.text).toBe("Nice. Who's Juniper?");
+      // WHO-ASK-02: a question raised in another chat is not put here; it waits for its own chat or the name.
+      expect(other.value.reply.text).toBe("Nice.");
     });
   });
 

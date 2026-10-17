@@ -69,3 +69,22 @@ describe("who-answer questions", () => {
     expect(replyAsksAbout("Serena, someone you know or a public figure?", "Serena")).toBe(true);
   });
 });
+
+describe("WHO-ASK-02: a sentence that states the kind answers its own who-question", () => {
+  test("'my dog's name is Rivet' and its variants frame the name with the kind, so nothing asks who it is", () => {
+    for (const [text, kind] of [
+      ["actually my dog's name is Rivet, not Rover", "pet"],
+      ["our cat is named Pip", "pet"],
+      ["my wife is called Serena", "person"],
+      ["my wife's name is Serena", "person"],
+    ] as const) {
+      const r = resolveNames(text, undefined, known, "t");
+      const subject = r.subjects.find((s) => s.type === "unresolved" && ["Rivet", "Pip", "Serena"].includes(s.surface_form));
+      expect(subject && subject.type === "unresolved" ? subject.candidate_kinds : null).toEqual([kind]);
+      expect(r.unknown.every((u) => !u.ask)).toBe(true);
+    }
+  });
+  test("a bare name with no kind still asks", () => {
+    expect(resolveNames("our Rivet is sick", undefined, known, "t").unknown.some((u) => u.ask)).toBe(true);
+  });
+});

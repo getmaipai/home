@@ -182,14 +182,19 @@ let relationNounRes: RegExp[] | null = null;
 function relationNounPatterns(): RegExp[] {
   if (relationNounRes) return relationNounRes;
   const alternatives = [...relationNouns().keys()].sort((a, b) => b.length - a.length).map(escapeRe).join("|");
-  const name = "(?<name>\\p{Lu}[\\p{L}-]*(?:\\s+\\p{Lu}[\\p{L}-]*)*)(?![\\p{L}])";
+  // The patterns carry the i flag (so "My cousin" opens a sentence), and under i + u \\p{Lu} also matches
+  // lowercase letters, so a name is a (?-i:) group: "my phone is broken" is not a phone named "is broken".
+  const name = "(?<name>(?-i:\\p{Lu}[\\p{L}-]*(?:\\s+\\p{Lu}[\\p{L}-]*)*))(?![\\p{L}])";
   const nouns = `(?<noun>${alternatives})(?:'s\\s+(?<inner>${alternatives}))?`;
   relationNounRes = [
     new RegExp(`(?<![\\p{L}])(?<head>my|our|the|a|an)\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
-    new RegExp(`(?<![\\p{L}])(?<head>\\p{Lu}[\\p{L}]+'s)\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
+    new RegExp(`(?<![\\p{L}])(?<head>(?-i:\\p{Lu}[\\p{L}]+'s))\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
     // The connector is required: "Tell Nadia my phone is broken" is a
     // verb and its object, not Nadia's phone (a review).
     new RegExp(`${name}(?:,|\\s+(?:is|who is|who's))\\s+(?<head>my|our)\\s+(?:[a-z-]+\\s+)?${nouns}(?![\\p{L}])`, "giu"),
+    // WHO-ASK-02: "my dog's name is Rivet", "our cat is named Pip", "my wife is called Serena" state
+    // the kind in the sentence, so the name needs no who-question.
+    new RegExp(`(?<![\\p{L}])(?<head>my|our)\\s+(?:[a-z-]+\\s+)?(?<noun>${alternatives})(?:'s\\s+name\\s+is|'s\\s+called|\\s+is\\s+(?:named|called)|\\s+named|\\s+called),?\\s+${name}`, "giu"),
   ];
   return relationNounRes;
 }
@@ -580,7 +585,7 @@ const DECLINE_RE =
 const YES_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm)[,\s]+)*(?:yes|yeah|yep|yup|correct|right|exactly|that'?s right|she is|he is|they are|it is|sure(?: is)?|mhm|uh[- ]?huh)\s*[.!]?$/i;
 const NO_RE = /^(?:(?:oh|well|hmm)[,\s]+)*(?:no|nope|nah|not really|wrong|that'?s wrong|not quite)\b/i;
 const ANSWER_LEAD_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|no|nope|nah|yes|yeah|actually)[,\s]+)*(?:(?:he|she|they|it|that|this)(?:'s|’s| is| was|'re|’re| are)\s+|(?:he's|she's|they're|it's)\s+)?/i;
-const ANSWER_LEAD_FULL_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|no|nope|nah|yes|yeah|actually|not really|wrong)[,\s]+)*(?:(?:he|she|they|it|that|this|that one|this one|\p{Lu}[\p{L}-]*)(?:'s|’s| is| was|'re|’re| are|'d be| would be)\s+(?:just\s+|only\s+|actually\s+)?)?$/iu;
+const ANSWER_LEAD_FULL_RE = /^(?:(?:oh|well|ok(?:ay)?|hmm|no|nope|nah|yes|yeah|actually|not really|wrong)[,\s]+)*(?:(?:he|she|they|it|that|this|that one|this one|(?-i:\p{Lu}[\p{L}-]*))(?:'s|’s| is| was|'re|’re| are|'d be| would be)\s+(?:just\s+|only\s+|actually\s+)?)?$/iu;
 
 export interface WhoAnswer {
   kind: EntityKind | undefined;

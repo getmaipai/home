@@ -159,7 +159,7 @@ function openQuestionName(question: OpenQuestionRow): string | null {
  * play (named in the utterance or the last two user turns, or a subject on the
  * turn), else the oldest pending entity question; a relationship question about a
  * name not in play waits. */
-function nextOpenQuestionInPlay(personId: string, utterance: string, ctx: { history: readonly string[]; subjects: readonly SubjectRef[] }): OpenQuestionRow | null {
+function nextOpenQuestionInPlay(personId: string, utterance: string, ctx: { history: readonly string[]; subjects: readonly SubjectRef[]; conversationId?: string }): OpenQuestionRow | null {
   const pending = pendingOpenQuestionsFor(personId).filter((q) => {
     if (!q.subjectId || openQuestionName(q) !== null) return true;
     expireOpenQuestion(q.id);
@@ -174,7 +174,10 @@ function nextOpenQuestionInPlay(personId: string, utterance: string, ctx: { hist
     const name = openQuestionName(q);
     return name !== null && new RegExp(`(?<![\\p{L}\\p{N}])${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "iu").test(recent);
   };
-  return pending.find(inPlay) ?? pending.find((q) => !(q.subjectId ?? "").startsWith("rel-")) ?? null;
+  // WHO-ASK-02: a question that is not in play is asked only in the chat it came from (live, 2026-10-17:
+  // "Who's Rivet?" followed the person into a shoe-size chat). Named again in another chat, it is in play.
+  const sameChat = (q: OpenQuestionRow) => !q.conversationId || !ctx.conversationId || q.conversationId === ctx.conversationId;
+  return pending.find(inPlay) ?? pending.find((q) => !(q.subjectId ?? "").startsWith("rel-") && sameChat(q)) ?? null;
 }
 
 // ---------------------------------------------------------------------------
@@ -317,7 +320,7 @@ export function askAppendFor(input: { actor: PersonRow; conversationId: string; 
       },
     };
   }
-  const question = nextOpenQuestionInPlay(actor.id, utterance, { history: recentUserTexts, subjects });
+  const question = nextOpenQuestionInPlay(actor.id, utterance, { history: recentUserTexts, subjects, conversationId });
   if (!question) return NO_ASK_APPEND;
   const name = openQuestionName(question);
   if (question.subjectId && name === null) {
