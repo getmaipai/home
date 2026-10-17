@@ -173,6 +173,7 @@ const EXEMPT: Record<string, string> = {
   "lib/followUpSuggestions.ts": "suggestions are generated for an adult's own chat only (canGenerateFollowUpSuggestions)",
   "lib/conversationTitle.ts": "a two to five word label, run through the output gate for the owner's band; gives no advice",
   "lib/conversationHistory.ts": "retention summaries kept as records; never sent to the person as a reply",
+  "lib/pictures/people.ts": "picks which numbered, boxed person a description means, as numbers in JSON; no text reaches the person, a doubt removes no one",
   "lib/likeness/inspector.ts": "counts the people and faces in an uploaded photo as JSON; no text reaches the person, and a doubt refuses",
   "lib/memoryJudge.ts": "classifies memory candidates into a JSON verdict; no text reaches the person",
   "lib/personaJudge.ts": "admin evaluation judge; no person-facing text",
