@@ -14,6 +14,7 @@ import { ActionBarMorePrimitive, ComposerPrimitive, useAui, useAuiState, type Th
 import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 // APPROVE-CARD-02: confirmation is rendered by the named approval-card
 // binding; the lifted context below lets it send an answer as a new turn.
+import { useReasoningOpen } from "@/apps/chat/useReasoningOpen";
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
 import { Sources as SourcesCard } from "@maipai/ui/src/elements/sources";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
@@ -511,11 +512,36 @@ export function ChatWelcome() {
 // through the documented `components.ReasoningGroup` slot (never a
 // fork of the vendored file): the shipped Root/Trigger/Content/Text
 // primitives, unstyled beyond the variant choice.
+//
+// 2026-10-17 (Jesse): collapsed by default like ChatGPT. While the model
+// reasons the group stays closed with the Element's own shimmer on its
+// label (one calm status line, no stream); when it ends the label gains the
+// measured seconds through the trigger's own `duration` prop. Open/closed is
+// the Element's controlled `open` prop, remembered per person in
+// `ui.reasoning_open` (default collapsed). Missing in the kit: a "Thought
+// for Ns" label (the trigger renders "Reasoning (Ns)").
 export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
   const running = group.status.type === "running";
+  const person = useContext(WakeWordPersonContext);
+  const [preferOpen, setPreferOpen] = useReasoningOpen(person);
+  const [startedAt, setStartedAt] = useState<number | null>(null);
+  const [seconds, setSeconds] = useState<number | undefined>(undefined);
+  useEffect(() => {
+    if (running) {
+      setStartedAt((t) => t ?? Date.now());
+    } else if (startedAt !== null) {
+      setSeconds(Math.max(1, Math.round((Date.now() - startedAt) / 1000)));
+      setStartedAt(null);
+    }
+  }, [running, startedAt]);
   return (
-    <ReasoningRoot streaming={running} defaultOpen={false} variant="ghost">
-      <ReasoningTrigger active={running} />
+    <ReasoningRoot
+      streaming={running}
+      open={running ? false : preferOpen}
+      onOpenChange={(next) => { if (!running) setPreferOpen(next); }}
+      variant="ghost"
+    >
+      <ReasoningTrigger active={running} duration={running ? undefined : seconds} />
       <ReasoningContent aria-busy={running}>
         {/* Live finding, 2026-09-22 (Jesse, in Firefox): the shipped
             ReasoningText carries `ps-6` (room under the trigger's own

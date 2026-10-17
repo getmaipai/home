@@ -16,6 +16,19 @@ export const UI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "person.chat",
     honoured_by: ["home"],
   }),
+  // 2026-10-17: reasoning in chat is collapsed behind one line unless the
+  // person opens it; the choice is theirs and carries across replies.
+  SettingsKey.parse({
+    key: "ui.reasoning_open",
+    scope: "person",
+    selector: "boolean",
+    default: false,
+    label: "Show reasoning expanded",
+    help: "Open the model's reasoning under each chat reply instead of keeping it collapsed.",
+    level: "advanced",
+    lives_in: "person.chat",
+    honoured_by: ["home"],
+  }),
   // FACE-02N: the on/off switch for FACE-02M's face-capture sounds. The
   // person at the screen is the one who hears them, so it is theirs
   // (person scope), and it is a plain boolean the generic settings
