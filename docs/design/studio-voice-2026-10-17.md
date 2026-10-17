@@ -1,6 +1,6 @@
 # Studio voice: what was decided, what was not (2026-10-17)
 
-Status: slice 1 built and live on the Studio (Chatterbox Turbo default on p64 and p128, Pocket TTS fallback); Jesse picks by ear. Questions at the bottom.
+Status: decided 2026-10-17. Chatterbox Turbo (MLX) is the Studio's voice, chosen by ear by Jesse; slice 1 built and live (default on p64 and p128, Pocket TTS fallback).
 
 ## Decision trail
 
@@ -128,13 +128,17 @@ setting, `stack.voice.engine` (`auto`, `chatterbox-turbo`, `pocket`; applies at 
   gains the option when its pins land.
 - **Home side (other agent):** nothing in Home changes for speech to work (same wire); composer tags and REG-02 read `tts.tags`.
 
-## Next, once Jesse answers
+## Decision (2026-10-17, owner)
 
-1. Jesse listens to the Chatterbox sample and, if wanted, Orpheus (`orpheus_mlx_4bit.wav`); Orpheus is built as slice 2 only if he
-   prefers it or Chatterbox's cough or sigh sounds weak.
-2. REG-02: tag vocabulary per engine (read `tts.tags`), tag passthrough test from `reply.speech` to the engine.
-3. Slice 3: reference-clip voices for Chatterbox (pin S3TokenizerV2).
+After listening to the benchmark samples and the live Stack sample (`chatterbox_turbo_via_stack_laugh_cough_sigh.wav`), Jesse (owner)
+chose Chatterbox Turbo (MLX) as the Studio's voice. He picked the Chatterbox sample by ear.
 
-## The one question
+- Slice 1 is done and stands as built. The tags are live: the composer (REG-02) writes only the tags listed in `tts.tags`.
+- Orpheus stays an optional later slice (slice 2), built only if wanted.
+- Pocket TTS stays the small-machine fallback.
+- Reference-clip cloning for Chatterbox stays later (slice 3, pins S3TokenizerV2).
 
-Is the voice you remember choosing Chatterbox Turbo, Orpheus, or something else (a name or where you heard it)?
+## Next
+
+1. REG-02: tag vocabulary per engine (read `tts.tags`), tag passthrough test from `reply.speech` to the engine.
+2. Optional later: Orpheus (slice 2), reference-clip voices (slice 3).
