@@ -10,7 +10,7 @@ bronze:
     note: an app package has no chat tool, so it has no routing examples
   privacy_row_per_data_source:
     met: true
-    note: data_sources is empty: the shows are an admin's own feed addresses, listed on the privacy page as platform:podcast-feeds with their hosts
+    note: "data_sources is empty. The shows are an admin's own feed addresses, listed on the privacy page as platform:podcast-feeds with their hosts"
   offline_behavior_stated:
     met: true
     note: "offline: degraded - episodes saved on the hub play with the internet off; an episode that is not saved plays from the show's website and needs the internet."
