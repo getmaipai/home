@@ -39048,9 +39048,10 @@
                             "enum": [
                               "sent",
                               "made",
-                              "exported"
+                              "exported",
+                              "fetched"
                             ],
-                            "description": "\"sent\": a file the person gave in chat (today's attachment). \"made\": a package or a job produced it on the person's behalf (a generated picture, video, audio clip or story). \"exported\": a copy the person asked for (a data export). Shapes which fields of provenance apply below."
+                            "description": "\"sent\": a file the person gave in chat (today's attachment). \"made\": a package or a job produced it on the person's behalf (a generated picture, video, audio clip or story). \"exported\": a copy the person asked for (a data export). \"fetched\" (MEDIA-SPEC-01): a copy the hub fetched for a person from a source they chose (a saved video, a podcast episode, a subtitle, a storyboard); owned by the person who asked, or by the adult who created a household source. Shapes which fields of provenance apply below."
                           },
                           "kind": {
                             "type": "string",
@@ -39185,6 +39186,24 @@
                                 "default": null,
                                 "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
                               },
+                              "media_source_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^msrc-[a-z0-9]{6,}$",
+                                    "description": "Set when origin is \"fetched\": the media-source (a feed, a channel or a pasted link) the copy came from. job_id names the Stack media.fetch job."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "Set when origin is \"fetched\": the media-source (a feed, a channel or a pasted link) the copy came from. job_id names the Stack media.fetch job."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "Set when origin is \"fetched\": the media-source (a feed, a channel or a pasted link) the copy came from. job_id names the Stack media.fetch job."
+                              },
                               "note": {
                                 "anyOf": [
                                   {
@@ -39313,9 +39332,10 @@
                       "enum": [
                         "sent",
                         "made",
-                        "exported"
+                        "exported",
+                        "fetched"
                       ],
-                      "description": "\"sent\": a file the person gave in chat (today's attachment). \"made\": a package or a job produced it on the person's behalf (a generated picture, video, audio clip or story). \"exported\": a copy the person asked for (a data export). Shapes which fields of provenance apply below."
+                      "description": "\"sent\": a file the person gave in chat (today's attachment). \"made\": a package or a job produced it on the person's behalf (a generated picture, video, audio clip or story). \"exported\": a copy the person asked for (a data export). \"fetched\" (MEDIA-SPEC-01): a copy the hub fetched for a person from a source they chose (a saved video, a podcast episode, a subtitle, a storyboard); owned by the person who asked, or by the adult who created a household source. Shapes which fields of provenance apply below."
                     },
                     "kind": {
                       "type": "string",
@@ -39449,6 +39469,24 @@
                           ],
                           "default": null,
                           "description": "Set when origin is \"exported\" and the requester differs from owner_person_id (an admin exporting a child's files on the child's behalf)."
+                        },
+                        "media_source_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^msrc-[a-z0-9]{6,}$",
+                              "description": "Set when origin is \"fetched\": the media-source (a feed, a channel or a pasted link) the copy came from. job_id names the Stack media.fetch job."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "Set when origin is \"fetched\": the media-source (a feed, a channel or a pasted link) the copy came from. job_id names the Stack media.fetch job."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "Set when origin is \"fetched\": the media-source (a feed, a channel or a pasted link) the copy came from. job_id names the Stack media.fetch job."
                         },
                         "note": {
                           "anyOf": [
