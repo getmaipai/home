@@ -29,6 +29,7 @@ import { ComposerAttachButton, ComposerMenu, ComposerMenuItem, ComposerMenuLabel
 import { useBreakpoint } from "@maipai/ui/src/hooks/useBreakpoint";
 import { IconTile } from "@maipai/ui/src/primitives/IconTile";
 import { getIcon } from "@maipai/ui/src/icons";
+import { useChatFileDrop } from "@/apps/chat/composerFileDrop";
 import { kindStyle } from "@/apps/library/appPresentation";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { readyRole } from "@/apps/chat/engineRoles";
@@ -265,6 +266,7 @@ export function ComposerAddMenu() {
     ? "Photo uploads are turned off for this profile."
     : "Pictures need a ready vision model.";
   useAttachmentAddErrorToast(photoAccess.settingAllowed, photoAccess.modelCanReadPictures);
+  useChatFileDrop();
   const breakpoint = useBreakpoint();
   const directAttachment = breakpoint.atLeast(640) && photosAllowed;
   // GET /api/engines is owner/admin only (a 403 console error for anyone else).
