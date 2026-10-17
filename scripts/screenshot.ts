@@ -9874,7 +9874,7 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.locator('[id="settings-household.blocked_sites"]').scrollIntoViewIfNeeded().catch(() => {});
   });
   await shot("settings-network", desktop, "light", async (page) => {
-    await ready(page, "/settings/home/network", /Reach Home from anywhere/);
+    await ready(page, "/settings/home/network", /Network and access/);
   });
   await shot("settings-notifications", desktop, "light", async (page) => {
     await ready(page, "/settings/account/notifications", /Telegram/);

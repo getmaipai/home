@@ -7,6 +7,26 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-16
+
+Weather answers get a card and a place of their own, and the setup wizard can tune a Mac that runs the AI.
+
+### Added
+- Weather: asking about the weather now shows a weather card built from a single forecast lookup, instead of a paragraph of numbers.
+- Weather place: the answer uses your current location when your browser shares it, otherwise a saved place, otherwise the household home. The card says which place it used by label, never by street address, and the model cannot change the coordinates it was given.
+- Settings: the household home has a location field with a place lookup, so weather and other local answers know where home is.
+- Setup wizard: an optional "This computer" step for a Mac that runs the AI. It applies the recommended power, GPU memory and indexing changes only with your consent, one at a time, and each change can be reverted. A checklist covers the advice that cannot be applied for you.
+- Install guide page on the docs site, and `scripts/publish-docs.sh` to build the site and publish it with a dead-link check.
+
+### Changed
+- Installer: it checks the downloaded Commons archives against pinned digests and stages Home's own Commons pins before `bun install`, so a fresh install no longer fails on a missing pin.
+- Removed setting alias: `household.home_place` is gone. Use the location field on `household.home`. Anything that still writes the old key must switch to the new one.
+- The main-branch gate now survives the reduced PATH that launchd gives it, and names the line that crashed when a run fails.
+- README: the install section is back and matches the current install line.
+
+### Fixed
+- Docs drift map: the install guide page is covered, so the docs check no longer fails on it.
+
 ## [0.1.0] - 2026-10-16
 
 First release.
