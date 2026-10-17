@@ -28,7 +28,7 @@ Your chats, people and memories stay in your house. Home goes online only to do 
 
 ## Status
 
-Early release (0.1.0). Not deployed to a real household yet.
+Early release (0.2.x). The first full install runs on a Mac Studio. Expect rough edges, and read the [changelog](CHANGELOG.md) before you upgrade.
 
 ## Install
 

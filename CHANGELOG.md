@@ -7,6 +7,34 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Apps
+- Packages can now be apps. An app opens at `/apps/<package id>`, shows in search and favorites, and draws its pages from data, with no rebuild. A package app can declare a settings area, which opens from a Settings gear in the app's toolbar.
+- Weather is the first app: a big animated weather card, a place picker (Current location, your home, your saved places), an hourly strip, and a temperature unit setting (Fahrenheit or Celsius) that also applies to chat answers. Removing a saved place now deletes it.
+- The Today row on the Home page shows a compact weather card.
+
+### Chat
+- Pictures you send are shrunk to 2000 pixels on the long side before the model looks at them, and iPhone HEIC photos work.
+- A lookup that finds nothing never ends in an empty reply: Home tries once more, then says what is missing and what to do.
+- A picture request with nothing to show is dropped instead of answered with an empty gallery.
+- Teen and child replies get longer deadlines and keep room for the reasoning a thinking model writes anyway.
+
+### Sign-in
+- Each digit of a PIN has its own box. A wrong code shakes the boxes red and clears them, and the lockout countdown turns the boxes off. The lock screen has a password option.
+
+### Voice
+- Voice capture works in Safari and Firefox, and each capture failure says what is wrong instead of a vague "blocked".
+- Voice settings are one **Voice for you** list with a **Test** button, and every preset voice is listed.
+
+### Search
+- Settings, Home settings, Search has a Web search block: your SearXNG address with Test and Save, the source switches, and the teen and child DuckDuckGo choice (owner and admin only).
+- Home asks the AI engine for DuckDuckGo search. The engine builds and supervises that small service itself, and Home says "still being set up" while it does.
+
+### Chat start
+- Send waits and reads "Getting ready, one moment" while the AI warms up.
+
+### Under the hood
+- The installer builds the Stack from the pin `STACK_TAG`, now at the commit with the projector fix for Muse pictures and the ddgs search service.
+
 ## [0.2.5] - 2026-10-17
 
 Sign-in works for 6-digit passcodes.
