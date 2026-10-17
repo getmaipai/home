@@ -1,4 +1,4 @@
-# Media library (MEDIA-LIB-01, MEDIA-PROGRESS-01, MEDIA-VIDEOS-01)
+# Media library (MEDIA-LIB-01, MEDIA-PROGRESS-01, MEDIA-VIDEOS-01, MEDIA-PODCASTS-01)
 
 Design: [media-apps-blend-2026-10-17.md](../design/media-apps-blend-2026-10-17.md) sections 7, 8, 10, 11 and 12. The
 app packages (Videos, Shows, Music, Podcasts, Books) build on the routes below. Storage includes the shared Trash page.
@@ -220,3 +220,56 @@ extension refresh; the ask-a-grown-up action must use the one Ask record. No sec
 "Add minutes" action on the time-up notice. The notification registry has no `actions[]` support yet (NOTIFICATIONS.md declares
 it), so the notice says an admin can add minutes and the extend route is `POST /api/media/budget/{personId}/extend`; the button
 belongs with the Ask record work.
+
+## Podcasts (MEDIA-PODCASTS-01)
+
+Podcasts are `feed` records with `purpose: "podcast"` read by the ONE shelf poller (`lib/shelf/shelfPoller.ts`: conditional GET, one request
+per host, backoff, the SSRF guard). Migration 0108 (schema version 65) adds `feeds.purpose` (default `news`), `attachments.origin` (default
+`sent`) and `attachments.media_source_id`. `listFeeds(purpose?)`: the news shelf (`shelfRead`, `syncShelfFeeds`) asks for `news`, so a
+podcast feed is never read as news and never deleted by the settings sync. `pollDueFeeds` polls both purposes; a podcast feed is polled while
+it has a live, unpaused source (the news-shelf switch and tick-boxes do not apply), at the source's `poll_minutes`. The size cap is 8 MB for a
+podcast feed (2 MB for news).
+
+**One outbound path.** `guardedGet` (exported from the poller) is the shared GET: every hop through the guard, redirects by hand, per-host
+pacing, honest user agent, no cookies or referrer. Feeds use bucket `feed` (one a minute per host), enclosure downloads `enclosure` (5, one
+more every 10 s), the show's picture `art`. Tests inject `deps.fetch` (the fixture host mapped onto Bun.serve on 127.0.0.1) and a stub DNS;
+the guard is unchanged. A route-triggered poll or Save uses `__setPodcastFetchDepsForTests` in tests.
+
+**Ingest** (`lib/media/podcasts.ts`, `ingestPodcastFeed`): the poller hands the body over; feedsmith parses RSS, Atom or JSON feeds; each episode
+with an enclosure becomes a `media-item` (kind `podcast_episode`, `subtitle` the show, location `{url}` stream-only, `external {extractor:
+"rss", id: guid, published_at}`, `duration_s` from `itunes:duration`, season and episode, `advisory.explicit` from `itunes:explicit` (the show's
+flag applies when an episode says nothing), `band_ok` through `bandOkAtIngest`, chapters from inline Podlove chapters or from `0:00 Title`
+lines of the show notes (source `description`, three or more climbing lines from the start)). Identity is (source, guid); a re-poll updates,
+never duplicates, and keeps a saved copy. The show's picture is fetched once (2 MB, image types) into the file store and every item points
+at it. The source's label becomes the show title. A guid in `media_sources.archive`, or a trashed row, is skipped ("deleted stays gone":
+`removeItem` and the trash purge archive the guid when there is no path).
+
+**Files.** `lib/media/fetchedFiles.ts` writes `origin: fetched` copies (retention `kept`, `provenance.media_source_id`) into the same blob store
+as chat uploads (same caps, dedupe by sha256, same reconcile job) and shares each to the household so every reader of the episode can read
+the bytes. `provenance` text is `podcast:manual`, `podcast:auto` or `podcast:art`; identical bytes are one file and a manual save outranks an
+auto one. `media_items` keeps `loc_url` beside `loc_file_id`: Save sets the file id, Unsave clears it and the item streams again.
+
+**Save** (`saveEpisode`): adults only (`mayManageSaves`); the enclosure through `guardedGet` (https only, 400 MB, 15 minutes), content type
+from the response, `fingerprint` the sha256. **Keep rules** (`applyAutoRules`, after each poll and when a rule changes): `auto.save: "audio"`
+with `keep_latest` N saves the newest N and releases auto copies that fell outside N; `remove_watched` releases an auto copy when everyone who
+has progress finished it. A copy a person saved by hand is never released by the rules.
+
+**Host extension.** `appHost.ts` exports its helpers and gains `registerMediaAppData(appId, hook)` and `registerItemView(appId, hook)`;
+`laterKindOf(appId)` names the standing list (Watch later, or the queue for Podcasts); `rowOf` draws a podcast row's second line as
+"Today · The show"; an item view's `src` is the enclosure URL for a stream-only item (the person's own device plays it; the hub relays
+nothing). `lib/media/podcastApp.ts` registers `shows`, `episodes` (newest first, `channel` filters by show), `saved`, `bookmarks` and the
+item fields `saved`, `queued`, `speed`, `skip_intro_s`, `skip_outro_s` (a first listen starts at `skip_intro_s`; `saveProgress` treats
+`position >= duration - skip_outro_s` as finished and sends `completed`). `routes/podcastApp.ts` adds under `/api/plugins/podcasts`:
+`queue` (toggle), `save` (`on: false` removes the copy), `bookmark` (`media-progress.marks`), and for an adult admin `subscribe`,
+`unsubscribe`, `source` (speed, skip seconds, `auto`, `paused`, `visible_to`), `opml/import` (`{ opml }`) and `GET opml/export`.
+OPML uses feedsmith's reader and writer; the export holds feed addresses only.
+
+**Package** `backend/packages/podcasts` (pages index, shows, episodes, queue, saved, play; the first tab reads "Listen now", `homeLabelOf` in
+`shell/mediaApps.ts`). The privacy row is `platform:podcast-feeds` (hosts of followed shows).
+
+**Not built, and why.** Adding a show and importing OPML have no form on a package page (no text input node), so they are API only, as media
+sources are. Per-show speed is stored and listed but the audio session applies the person's own podcast speed (a session override needs the
+shell to stop writing the show's speed back as the person's). Transcripts, persons and `podcast:chapters` JSON files have no field on
+`media-item` and would need another request per episode. The list tiles are the kit's 160 px vertical rows (the mockup's compact rows with
+a Play and a Save button each need a kit size and a row actions slot). Directory search is later by the design.
+

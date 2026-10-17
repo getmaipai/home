@@ -34,6 +34,8 @@ Stronger protection for children and teens in pictures and videos, a Videos app,
 ### Videos
 - A new **Videos** app plays the videos saved on your hub, in a dark look like YouTube. Tabs: Home (a big picture, Continue watching, Recently added, more from what you watch most, Watch again), Library by channel, Watch later and History. A video resumes where you stopped, shows Up next, and a finished video leaves Watch later. A child sees only the videos cleared for children and no lists of new videos.
 - The Pick up shelf's media links open the video in its app. One video plays at a time, and its speed and the sleep timer follow the audio settings.
+### Podcasts
+- New Podcasts app: Listen now, Shows, Episodes, Queue and Saved. New episodes play right away from the show's website; Save on the hub keeps a copy that plays with the internet off. Admins follow shows and can bring their list from another app with an OPML file; Home checks each show about once an hour and asks only for what changed. A child sees only episodes cleared for children, and never an explicit one.
 
 ### Storage
 - Storage now has one Trash for deleted media, playlists and watchlists. Restore an item within 30 days, or confirm Delete forever. Home clears expired items at startup and every six hours; deleted paths stay out of new scans. Children see only their own safe items. Lists and memories will join later.
