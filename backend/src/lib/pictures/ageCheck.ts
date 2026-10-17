@@ -14,6 +14,8 @@ import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
+import { speakerAgeBand } from "@/lib/ageBand";
+import type { PersonRow } from "@/types";
 import { toWireMessage, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
 import { getStackClient } from "@/lib/stackEngine";
@@ -142,15 +144,39 @@ export type AgeDecision =
   | { action: "withhold"; reason: "minor_sexual"; line: string }
   | { action: "withhold"; reason: "unchecked"; line: string };
 
+/** Who is looking: the stricter of the turn's band and the person's own band. Adults are unchanged; a teen or a child gets the stricter rules in `decideAgeCheck`. */
+export type Viewer = "adult" | "teen" | "child";
+
+/** The viewer band for a person on their own: the person's age band (role and birthdate, the stricter). A caller that also knows the turn's band passes the stricter of the two. */
+export function viewerOf(actor: PersonRow, turnBand?: Viewer): Viewer {
+  const own: Viewer = speakerAgeBand(actor, new Date());
+  const rank: Record<Viewer, number> = { child: 0, teen: 1, adult: 2 };
+  return turnBand && rank[turnBand] < rank[own] ? turnBand : own;
+}
+
+/** The line a teen or a child reads when a finished picture or clip is withheld for them: one friendly sentence, no reason, no wording that names what was found. */
+export const MINOR_VIEWER_LINE = "I can't show that one. Want to try something different?";
+
 /**
  * The one decision, for a picture (one check) or a clip (three keyframe checks).
+ * ADULT viewer (the default, unchanged):
  *  - any depicted person possibly a minor or a child AND (the image is nude or sexual OR the job is adult-only): WITHHOLD;
  *  - a check that could not run on an adult-only job: WITHHOLD (fails closed);
  *  - a check that could not run on an ordinary job: ALLOW (fails open, so an ordinary picture is never blocked by a busy model);
  *  - everything else: ALLOW (an adult, nobody, or a possible minor in an ordinary, not sexual picture such as a cartoon child with a balloon).
+ * TEEN or CHILD viewer (the stricter rules; no setting reaches them):
+ *  - anything nude or sexual is WITHHELD whoever is in it (an adult in it does not matter);
+ *  - an adult-only job is never shown to them: WITHHELD;
+ *  - a check that could not run, for any job, is WITHHELD (fails closed);
+ *  - everything else: ALLOW (the child lane's own extra question is the lane's, laneGate.ts).
  * A minor finding outranks a failed check on another frame.
  */
-export function decideAgeCheck(checks: readonly ImageCheck[], adultOnly: boolean, kind: CheckedKind): AgeDecision {
+export function decideAgeCheck(checks: readonly ImageCheck[], adultOnly: boolean, kind: CheckedKind, viewer: Viewer = "adult"): AgeDecision {
+  if (viewer !== "adult") {
+    if (adultOnly || checks.some((check) => check.ok && check.verdict.is_nude_or_sexual)) return { action: "withhold", reason: "minor_sexual", line: MINOR_VIEWER_LINE };
+    if (checks.length === 0 || checks.some((check) => !check.ok)) return { action: "withhold", reason: "unchecked", line: uncheckedRefusalLine(kind) };
+    return { action: "allow" };
+  }
   for (const check of checks) {
     if (check.ok && showsPossibleMinor(check.verdict) && (check.verdict.is_nude_or_sexual || adultOnly)) {
       return { action: "withhold", reason: "minor_sexual", line: minorRefusalLine(kind) };

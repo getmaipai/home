@@ -11,7 +11,7 @@ import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
-import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "@/lib/pictures/ageCheck";
+import { viewerOf, checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "@/lib/pictures/ageCheck";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
@@ -432,7 +432,7 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     // The poster is frame 0 only. For an adult-only clip that is not enough to answer for the rest of it, so it counts as "could not check".
     if (!keyframes) checks.push({ ok: false, why: "unavailable" });
     if (signal.aborted) return;
-    const decision = decideAgeCheck(checks, adult, "video");
+    const decision = decideAgeCheck(checks, adult, "video", viewerOf(actor));
     if (decision.action === "withhold") {
       job.state = "failed"; job.error = decision.line; job.files = []; save(job);
       if (decision.reason === "minor_sexual") await recordWithheld({ kind: "video", personId: actor.id, jobId: job.id, prompt: job.prompt, adultOnly: adult, checks });

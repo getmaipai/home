@@ -12,7 +12,7 @@ import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
-import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "./ageCheck";
+import { viewerOf, checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "./ageCheck";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
@@ -248,7 +248,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
     const adult = await adultOnly(job);
     const checks = await checkImages(made.map((m) => m.raw), "picture");
     if (stopped(job)) return;
-    const decision = decideAgeCheck(checks, adult, "picture");
+    const decision = decideAgeCheck(checks, adult, "picture", viewerOf(actor));
     if (decision.action === "withhold") {
       fail(decision.line);
       if (decision.reason === "minor_sexual") await recordWithheld({ kind: "picture", personId: actor.id, jobId: job.id, prompt: job.prompt, adultOnly: adult, checks });

@@ -34,7 +34,7 @@ import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
-import { checkImages, decideAgeCheck, promptHash, recordWithheld } from "@/lib/pictures/ageCheck";
+import { viewerOf, checkImages, decideAgeCheck, promptHash, recordWithheld } from "@/lib/pictures/ageCheck";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
@@ -562,7 +562,7 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     const made = status.data[0];
     // IMGGEN-SAFE-01: a described change is a new picture, so it passes the same finished-output check before it is kept as a preview.
     const checks = await checkImages([png], "picture");
-    const decision = decideAgeCheck(checks, job.adultOnly === true, "picture");
+    const decision = decideAgeCheck(checks, job.adultOnly === true, "picture", viewerOf(actor));
     if (decision.action === "withhold") {
       if (decision.reason === "minor_sexual") await recordWithheld({ kind: "picture", personId: actor.id, jobId, promptHash: job.promptHash, adultOnly: job.adultOnly === true, checks });
       throw new ImageEditError(422, decision.line, `withheld_${decision.reason}`);
