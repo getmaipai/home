@@ -20,7 +20,7 @@ Every number below was measured on the Studio (Apple M5 Max, 128 GB, macOS 27) u
 | Model | **ACE-Step 1.5**: the 2B turbo DiT (`acestep-v15-turbo`, 8 steps), the 5 Hz planning LM (`acestep-5Hz-lm-1.7B` on p128, `-0.6B` on p64), the Qwen3-Embedding-0.6B text encoder and the music VAE, all from `ACE-Step/Ace-Step1.5` | MIT (code: the repository's LICENSE; weights: the `license: mit` field of every card used). The card states the training set is licensed music, royalty-free or public-domain music, and synthetic MIDI-rendered audio, and that output may be used commercially | Full songs with sung lyrics, structure tags (`[Verse]`, `[Chorus]`), 50+ languages, 10 s to 10 min, and the edit tasks the owner asked for (repaint a section, extend, cover in another style, remake) **in the same model**; an official, in-repository Apple silicon path (MLX DiT, MLX VAE, MLX LM), no fork |
 | Runtime | ACE-Step's own Python package (commit `ca1e85f`) driven in-process by a Stack worker (no `acestep-api` server, no port), torch 2.10 on MPS for the text encoder, MLX 0.30.6 for the DiT, VAE and LM | MIT | The video engine's pattern: one managed Python 3.12 environment, one JSON-lines worker, offline at generate time |
 | Beds, effects, stings | **Not a second model in v1.** ACE-Step makes instrumentals (`[Instrumental]`) from 10 s; a sting shorter than 10 s is a trim of one (section 4) | | Stable Audio 3.0 needs Stability's Community licence ($1M revenue ceiling), the same revenue bar the video note used to reject LTX; it is a later row (MUSIC-GEN-11) behind that licence gate, never a default |
-| Tiers | p128 and p64 (section 4); p16 and p32 off | | Peak memory measured in section 4 |
+| Tiers | p128 (quick and detailed, up to 240 s) and p64 (quick only, up to 120 s); p16 and p32 off | | Peak memory measured in section 4.2: 32 GB worst, admitted at 33 GB |
 
 ## 2. Candidates and why each lost (licence texts read 2026-10-17)
 
@@ -52,8 +52,8 @@ Every number below was measured on the Studio (Apple M5 Max, 128 GB, macOS 27) u
   Every hash was checked against the Hub's LFS record after download. Full hashes are in the Stack's model catalog.
 - **Two things the Stack must not trust from the weights repository.** The checkpoint folder ships `modeling_acestep_v15_turbo.py`; ACE-Step
   overwrites it from its own pinned package (`_sync_model_code_if_needed`), so the code that runs is the pinned package's, never the model
-  repository's. `silence_latent.pt` is a pickle: the worker loads it with `torch.load(weights_only=True)` or the Stack converts it once to
-  safetensors at install (MUSIC-GEN-01 decides by test).
+  repository's. `silence_latent.pt` is a pickle; ACE-Step's loader opens it with `torch.load(..., weights_only=True)` (read in
+  `init_service_loader.py`), which refuses code objects, and its sha256 is pinned.
 - **Memory controls.** On a 128 GB Mac ACE-Step picks an untiled VAE decode and MLX keeps a large buffer cache, which is what drove the peaks in
   section 4's first run. The worker sets `ACESTEP_MLX_VAE_CHUNK=256` (tiled decode) and `mx.set_cache_limit(2 GB)`; section 4 measures both.
 
@@ -80,19 +80,54 @@ The planning LM is two thirds of a new song; an edit skips it and takes 3.5 to 7
 50 s, **71 GB** at 60 s. On a 128 GB Mac with chat resident that is unsafe, and it is not the weights (10 GB): ACE-Step picks an untiled
 decode when it sees a large unified memory, and MLX keeps freed buffers in its cache. Section 4.2 measures the fix.
 
-### 4.2 The production settings (tiled decode, MLX cache capped at 2 GB), through the worker
+### 4.2 The production settings (tiled decode, MLX cache capped at 2 GB), through the Stack's worker
 
-Pending: the run through the Stack's worker (`music/music_worker.py`) with `ACESTEP_MLX_VAE_CHUNK=256` and the 2 GB cache cap, both planning
-models (0.6B for quick, 1.7B for detailed), songs of 30, 60, 120 and 240 s and every edit, waits on the shared GPU lock. Until it lands here
-the governor admission and the p64 decision are provisional: if the tiled peak does not fit beside the resident chat set on a 64 GB Mac,
-p64 goes off, the same call video made.
+`scripts/drive.py` drives `music_worker.py` exactly as the Stack does (JSON lines, one process, jobs in order), with `ACESTEP_MLX_VAE_CHUNK=256`
+and the 2 GB cache cap; output is the AAC file the person gets. Wall is the job from request to reply, LRC timings and the AAC encode included;
+footprint is the worker's `phys_footprint` after the job and its `phys_footprint_peak` so far (the peak only ever rises in one process).
+
+| Job (planning model) | Wall | Stages (s from the request) | Footprint after / peak so far | MLX peak |
+|---|---:|---|---:|---:|
+| 30 s song, cold start (0.6B) | 84.4 | load 21, plan 37, music 6, mix 12, save 8 | 22 / 27 GB | 14.0 GB |
+| 30 s instrumental (0.6B) | 9.9 | plan 4.6, music 2.0, mix 2.5, save 0.8 | 21 / 28 GB | 14.0 GB |
+| 60 s song (0.6B) | 15.0 | plan 6.9, music 1.8, mix 5.3, save 1.0 | 22 / 28 GB | 14.0 GB |
+| rewrite the chorus, 20 to 40 s of that song | 11.3 | music 4.7, mix 5.4, save 1.1 | 22 / 29 GB | 15.0 GB |
+| extend the 30 s song by 20 s | 8.6 | music 2.9, mix 4.8, save 0.8 | 22 / 29 GB | 14.6 GB |
+| restyle as jazz piano, instrumental | 5.7 | music 2.3, mix 2.6, save 0.7 | 21 / 29 GB | 14.5 GB |
+| trim, fade out, louder (no model) | 0.7 to 0.8 | save | 21 / 29 GB | none |
+| a 5 s song (refused, `bad_request`) | 0.3 | none | | |
+| 120 s song (0.6B) | 26.3 | plan 11.6, music 2.7, mix 10.3, save 1.7 | 24 / 29 GB | 14.1 GB |
+| 60 s song (1.7B, model switch included) | 32.0 | load 11.8, plan 11.8, music 1.9, mix 5.5, save 1.0 | 25 / 30 GB | 16.4 GB |
+| 240 s song (1.7B) | 66.6 | plan 39.6, music 6.1, mix 18.5, save 2.4 | 31 / 32 GB | 16.6 GB |
+
+**What this settles.** The tiled decode and the cache cap take the worst peak from 71 GB (4.1) to **32 GB** for a four-minute detailed song,
+29 GB for anything quick up to two minutes. The Stack admits a song against **33 GB** (Stack `d216374`). **p64 stays on, quick only, up to
+120 s:** 29 GB beside the roughly 28 GB resident chat set leaves about 7 GB on a 64 GB Mac (video, at 44 GB, could not fit and is off there);
+the governor still refuses a song when the machine cannot grant the admission at that moment, with the plain `no_memory` line. A warm song is
+10 to 30 s for one to two minutes of music; the cold start (load and first compile) adds about a minute once per worker. The "mix" stage
+includes the lyric timings (LRC) for a sung song, a few seconds. Every result is AAC-LC 48 kHz stereo, about 264 kbps, faststart (`M4A`
+brand), about 1 MB for 30 s and 8 MB for four minutes.
 
 ## 5. Quality, judged
 
-Pending with section 4.2: every clip of 4.1 is 48 kHz stereo, peak normalised to -1 dBFS, RMS -16.6 to -18.8 dB, and under 15 percent
-of 100 ms windows below -50 dBFS (`scripts/stats.py`). The sung words are checked against the lyrics by a local transcription
-(`mlx-whisper` large-v3-turbo, MIT, run under the GPU lock) and the clips are played in the built-in browser on the throwaway Home
-(MUSIC-GEN-06); both are recorded here.
+Every clip is 48 kHz stereo, peak normalised to -1 dBFS, RMS -16.6 to -18.8 dB (`scripts/stats.py`). The sung words were checked by a local
+transcription of each AAC file (`mlx-whisper` with `whisper-large-v3-turbo`, MIT, under the GPU lock, `asr.log`):
+
+- **The words are sung, and clearly.** The 60 s and 120 s songs and the 240 s detailed song carry every line of the verse and chorus in order
+  ("Morning light on the kitchen floor, coffee steam and an open door ..."); the four-minute song sings the bridge ("Windows open, summer air")
+  where the lyrics put it. Mishearings are the transcriber's or small slurs ("our heart's about" for "our home's about").
+- **Rewrite the chorus works:** the repainted 20 to 40 s sings the new words ("Turn it up, turn it round ... kitchen ground") and keeps the
+  verse before it unchanged.
+- **Instrumentals have no voice:** the transcriber hears nothing but its own silence hallucination, as expected for music without vocals.
+- **Extend, trim, fade and louder** keep the song and do what they say (the 50 s extension continues the chorus; the trim starts mid-verse).
+- **Finding that sets the tool's guidance: when the lyrics are shorter than the song, ACE-Step fills the rest with invented, half-sung
+  words** (a 60 s song with 30 s of lyrics ended in nonsense syllables). Two consequences. (1) The `generate_music` tool tells the model to
+  write enough lines for the length (about one line per four seconds) and to end with an `[Outro]` or `[Instrumental]` section, and Home sets
+  the length from the lyrics when the person gave none. (2) Words the model invents are not words Home checked: the minor line runs on the
+  description, lyrics and title, not on the audio. A check of the sung words through the household's own speech-to-text against the same
+  minor line is row **MUSIC-GEN-15**; until it exists the gap is stated here.
+- Not judged by a person yet: musical quality, mix and voice character. MUSIC-GEN-06 plays them in the built-in browser on the throwaway
+  Home and records the verdict here.
 
 ## 6. Samples (author's scratchpad, `scratchpad/music`)
 
@@ -266,6 +301,7 @@ A failed job is the kit `ErrorState` with Try again; the model says in its own w
 | MUSIC-GEN-12 | Later: stems (ACE-Step base `extract`, or Demucs with its licence read) |
 | MUSIC-GEN-13 | Later: a parent's per-child music switch with a lyric ceiling (design first) |
 | MUSIC-GEN-14 | Decision for Jesse: uploaded audio as a source (a person's own recording, a consenting household adult's voice) |
+| MUSIC-GEN-15 | The sung-words check: the household's speech-to-text on a finished sung song, against the minor line |
 | MUSIC-STUDIO-01 | Later: the music studio app (design stub in section 10) |
 
 ## Supersedes
