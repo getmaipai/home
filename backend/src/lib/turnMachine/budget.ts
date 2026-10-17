@@ -116,6 +116,14 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
 }
 
 export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBand): Promise<TurnBudget> {
+  return (await resolveTurnBudgetAndEngineModel(modelId, band)).budget;
+}
+
+/** The budget plus the chat model the Stack actually runs (the person's pick
+ * when they made one). MINOR-CEILING-01: the model node reads the running
+ * model's record to know whether the engine reasons on every turn, so the
+ * one Stack read here serves both; no second health call per turn. */
+export async function resolveTurnBudgetAndEngineModel(modelId?: string, band?: AgeBand): Promise<{ budget: TurnBudget; engineModelId?: string }> {
   const base = resolveTurnBudget(modelId, band);
   const context = await chatWindowContext();
   // VISION-02d (rule 8, a review): the model the Stack actually runs also
@@ -123,7 +131,7 @@ export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBan
   // think, whatever the household setting or the person's toggle says.
   const runs = modelId ?? context.modelId;
   const thinking = runs !== undefined && thinkingModeFor(runs) === "none" ? { thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : {};
-  return { ...base, ...thinking, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null };
+  return { budget: { ...base, ...thinking, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null }, ...(runs !== undefined ? { engineModelId: runs } : {}) };
 }
 
 function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean): boolean {

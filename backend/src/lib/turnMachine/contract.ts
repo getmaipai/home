@@ -183,6 +183,9 @@ export interface TurnState {
    * gates, decided once in beginTurn); `show_images` is offered only then. */
   answerImagesAllowed?: boolean;
   modelId?: string;
+  /** MINOR-CEILING-01: the chat model the Stack runs this turn (the person's pick when they made
+   * one), so a node can read the running model's record; never sent to a client. */
+  engineModelId?: string;
   signal: TurnSignal;
   budget: TurnBudget;
   /** U4b: resolved once in `turnNext.ts` (the same call already feeding

@@ -25,6 +25,7 @@ import { askAppendFor, NO_ASK_APPEND } from "@/lib/askNames";
 import { pickStatusPhrase } from "@/lib/statusPhrases";
 import { contextToMessages, bareMessages, continuationMessages } from "../messages";
 import { promptLimitLine } from "@/lib/failureCopy";
+import { thinkingModeFor } from "@/lib/modelCatalog";
 import { lookupMissed, lookupFailureKind, lookupMissedClause, lookupMissedInstruction, markRetryMessage, recoveredRetry, retryInstruction, retryTools, isRepeatOfFailed } from "./lookupFallback";
 import type { Node, TurnState, NodeOutcome } from "../contract";
 import type { StreamGate } from "./outputGate";
@@ -186,10 +187,19 @@ export function toolSpecFor(id: string): ToolSpec | null {
  * ceiling is the only cap, every round; a minor's typed turn and every
  * spoken or glance turn still fall through to the formula unchanged
  * (rule 0). */
-export function replyMaxTokensFor(state: Pick<TurnState, "planBasis" | "plan" | "budget">, thinking: boolean): number {
+export function replyMaxTokensFor(state: Pick<TurnState, "planBasis" | "plan" | "budget" | "modelId" | "engineModelId">, thinking: boolean): number {
   const isWrittenAdult = isWrittenAdultTurn(state.planBasis.surfaceClass, state.plan.age_band) && !state.planBasis.brevity;
   if (isWrittenAdult) return state.budget.reply_ceiling_tokens + (thinking ? state.budget.thinking_budget_tokens_toggled : 0);
-  return visibleReplyMaxTokens(state.plan.max_words, thinking);
+  // MINOR-CEILING-01 (live, 2026-10-17): a child's and a teen's turn sends
+  // thinking off, but a model whose record says it reasons on every turn
+  // (thinking_mode "always": Muse's template has no off switch) spends the
+  // reply ceiling on reasoning the client then drops, and the person got an
+  // empty reply (96 tokens, all reasoning, no text) on "what's the weather?".
+  // The engine's reasoning span is reserved on top of the visible ceiling;
+  // the reply the person sees keeps the band's own cap (rule 0: the words
+  // allowed never grow, only the room for reasoning nobody sees).
+  const reasonsAnyway = thinkingModeFor(state.modelId ?? state.engineModelId) === "always";
+  return visibleReplyMaxTokens(state.plan.max_words, thinking || reasonsAnyway);
 }
 
 interface GenerationAttempt {

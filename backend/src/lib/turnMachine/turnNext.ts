@@ -52,7 +52,7 @@ import { StatusChannel } from "@/lib/statusChannel";
 import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
-import { resolveTurnBudgetWithStack, withTurnToolGates } from "./budget";
+import { resolveTurnBudgetAndEngineModel, withTurnToolGates } from "./budget";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
@@ -540,7 +540,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // already trusts) - the minor gate is still enforced independently,
   // belt and braces, by model.ts's own minorThinkingOff regardless of
   // what this resolves to.
-  const resolvedBudget = await resolveTurnBudgetWithStack(opts.model, band);
+  const { budget: resolvedBudget, engineModelId } = await resolveTurnBudgetAndEngineModel(opts.model, band);
   const thinkingBudget: TurnBudget = opts.thinking === true || bare ? { ...resolvedBudget, thinking_budget_tokens: resolvedBudget.thinking_budget_tokens_toggled } : resolvedBudget;
   // ANSWER-IMG-02 (rules 0 and 8): `show_images` is offered only when the
   // model's own record offers it AND this turn may show pictures; the
@@ -561,6 +561,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),
     ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
     modelId: opts.model,
+    ...(engineModelId ? { engineModelId } : {}),
     signal,
     budget,
     persona,
