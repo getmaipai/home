@@ -16,6 +16,8 @@
 import { foldLateSystemMessages } from "@/lib/systemFold";
 import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
+import { isStackRestart, waitForStackBack } from "@/lib/stackRestart";
+import { StackError } from "@/lib/stack/errors";
 import { LlmClientError, type ChatCompletionStreamStats } from "@maipai/spec/llm/ts/client.js";
 import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefinition, ToolCallWire } from "@maipai/spec/llm/ts/types.js";
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
@@ -674,11 +676,19 @@ async function openStackPieces(
   const stats: ChatCompletionStreamStats = { usage: null, timings: null, stopReason: null };
   let stream: ReadableStream<Uint8Array>;
   let headers: Headers;
+  const openStream = async () => {
+    const result = await getStackClient().chat({ ...body, model: opts.model ?? role, stream: true }, { signal });
+    if (!("stream" in result)) throw new StackError("unexpected", "chat model unavailable: the Stack answered a streaming request without a stream");
+    return result;
+  };
   try {
-    const client = getStackClient();
-    const result = await client.chat({ ...body, model: opts.model ?? role, stream: true }, { signal });
-    if (!("stream" in result)) {
-      return { ok: false, status: 503, code: "unavailable", error: "chat model unavailable: the Stack answered a streaming request without a stream" };
+    let result;
+    try {
+      result = await openStream();
+    } catch (err) {
+      // The Stack is restarting: wait for it and ask once more, so a message sent during an update still gets its answer.
+      if (!isStackRestart(err) || signal?.aborted || !(await waitForStackBack(signal))) throw err;
+      result = await openStream();
     }
     ({ stream, headers } = result);
   } catch (err) {
@@ -694,7 +704,28 @@ async function openStackPieces(
   resolveStackOffline(role);
   async function* pieces(): AsyncGenerator<LlmStreamPiece, ToolCall[] | undefined, void> {
     try {
-      const wireToolCalls = yield* stackChatPieces(stream, stats, opts.dropReasoning === true);
+      // A stream that breaks before the first word because the Stack went down is opened once more after it is back; after a word was
+      // shown it is not (the person would read the start twice).
+      let yielded = false;
+      let retried = false;
+      let wireToolCalls: ToolCallWire[] | undefined;
+      for (;;) {
+        try {
+          const source = stackChatPieces(stream, stats, opts.dropReasoning === true);
+          for (;;) {
+            const step = await source.next();
+            if (step.done) { wireToolCalls = step.value; break; }
+            yielded = true;
+            yield step.value;
+          }
+          break;
+        } catch (inner) {
+          if (yielded || retried || signal?.aborted || !isStackRestart(inner)) throw inner;
+          retried = true;
+          if (!(await waitForStackBack(signal))) throw inner;
+          stream = (await openStream()).stream;
+        }
+      }
       return offering && wireToolCalls && wireToolCalls.length > 0 ? wireToolCalls.map(toolCallFromWire) : undefined;
     } catch (err) {
       const facts = stackFailureFacts(err);
