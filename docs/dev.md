@@ -37360,3 +37360,68 @@ rounded before they are stored and an owner or admin gate is enforced in `create
 Chat with `?ask=` so the text arrives unsent), `GettingStarted` (up to three open checklist items, owners and admins only), `HomePlaceAsk`
 and `TodaySection` (cards from package widgets, filtered by the server on role and age). The stat cards and the activity log were
 removed. HOME-PAGE-01 to 04 (widget placement fields, per-person ordering, three breakpoints, hide a card) are open.
+
+## 2026-10-17 reference, pass 2: pictures, videos, the editor, releases and pins
+
+Releases cut on 2026-10-17 and what each one pins (read from the tag, not from memory):
+
+| Release | `STACK_TAG` | Schema | What it added |
+|---|---|---|---|
+| v0.2.5 | `51bd657` | 59 | PIN-length sign-in fix |
+| v0.2.6 | `6c380bd` | 60 | Weather app, app kind, passcode boxes, projector fix |
+| v0.2.7 | `1ed4e61` | 60 | Picture tools and video in the engine; picture reader fetched on upgrade |
+| v0.2.8 | `d3c4fab` | 62 | Chat makes pictures and videos; Pictures and videos settings; Comment tool |
+| v0.2.9 | `d3c4fab` | 62 | Safer, more honest picture and video chat |
+
+`d3c4fab` is the final Stack pin of the day (the Stack at that commit carries FLUX.2 Klein picture generation, masked edits, LoRA, the
+image tools service and the Wan 2.2 video engine). Remember the lesson from pass 1: the installer builds the Stack from `STACK_TAG`,
+so a Stack fix reaches installs only with a Home release that moves it. Commons pins at v0.2.9: `spec-v0.1.155`, `ui-v0.5.246`.
+`CURRENT_SCHEMA_VERSION` is 62 (`backend/src/db/schema-version.ts`): picture jobs and video jobs. The installer copies `data/` first, so
+a rollback restores a database the older release can read.
+
+### Pictures (IMGGEN-HOME-01, IMGGEN-SAFE-01, IMGGEN-UI-01, IMGGEN-SET-01)
+
+- **Tool.** `backend/packages/generate_image` (display "Make a Picture", `min_role: adult`). Arguments: `prompt`, `size` (square, portrait,
+  landscape, wide, tall), `count` (1 to 4), `style` (a saved style's name), `depicts_real_person`. It is offered only to an owner, admin or
+  adult on their own written chat screen when `generation.adults` is on and the Stack reports a picture model (`picturesAllowed`).
+  `lib/pictures/policy.ts` refuses a call that arrives anyway, with a fixed line, before a job exists. `promptViolatesMinorLine` pairs
+  a sexual word with a minor-looking word or an age under 18 (digit ages too, and plain no-clothes wording beside a minor term) and refuses.
+- **Jobs.** `picture_jobs` (`lib/pictures/jobStore.ts`, `jobs.ts`), polled from the Stack, stored as the person's own file with the
+  Stack's bytes unchanged and provenance `picture-gen:`. Memory only in a temporary or Incognito chat. A forgotten turn, chat or
+  person takes its jobs. If the phrasing round fails after a job started, the reply says it is coming (0.2.9). Earlier picture and
+  video turns replay with a note that the tool was called, so the model stops claiming pictures it did not make. "Another one" calls the
+  tool again. The tool's prompt argument says it cannot change an existing picture and points to Edit.
+- **Card and menus.** Kit `JobProgress` (Stop), kit `ImageGallery` (size large since ui-v0.5.246) with Edit, kit `ErrorState` with Try again.
+  Make a variation is in the reply's More menu (`MakeVariationMenuItem`, `picturesApi.again`).
+- **Settings.** Home settings, Pictures and videos (`PicturesLibrary.tsx`, `VideoLibrary.tsx`; keys in `settings/pictureKeys.ts` and
+  `videoKeys.ts`: `generation.adults`, `generation.adult_adapters`, `generation.video.enabled`, `generation.video.adult_adapters`,
+  `engines.image.choice`, `engines.video.choice`). Styles (LoRAs) are added by link or file (picture styles up to 120 MB, refused before the
+  upload starts; Home takes request bodies up to 128 MiB), each with a licence tick, an all-ages answer (default adult-only) and a
+  not-a-likeness tick, then a confirm step that shows the SHA-256.
+- **Limits stated on purpose** (design note section 14): the prompt line is a word list plus the model's own `depicts_real_person` flag;
+  there is no check on the finished picture yet (IMGGEN-SAFE-01 follow-up), so children and teens stay locked off with no key that turns them on; a household member's own likeness stays refused until the owner rules; adult-only styles are the open risk.
+
+### The editor (IMGTOOLS-03 to 05, IMGGEN-EDITOR-01)
+
+The chat canvas opens a picture in the kit `ImageEditor` from the Edit button (`useImageEditor.ts`). Remove background (Apple Vision on a Mac,
+IS-Net ONNX elsewhere), Erase (Big-LaMa), Upscale (Real-ESRGAN x4v3) and Resize run in the Stack's image-tools worker (`GET
+/stack/v1/image-tools`, `POST /v1/images/edits`; three pinned ONNX models, 389 MB, in the install plan). Markup, zoom, download and share are
+client side. Comment sends `edit_masked` (or `edit`) to the picture engine and returns a preview to apply as a new attachment version
+with provenance; it is gated like picture creation, and a Comment on an uploaded photo refuses undressing phrasings (`asksToUndress`).
+Generated pictures are marked by Home when the engine makes them, never by a file name. Numbers: `docs/design/image-tools-2026-10-17.md`.
+
+### Videos (VIDEO-GEN-04 to 08)
+
+`generate_video` (`min_role: adult`; `prompt`, `from_picture`, `orientation`, `seconds` 1 to 5, `style`, `depicts_real_person`), offered only when
+`GET /stack/v1/video` answers available, which is the 128 GB tier only (Wan 2.2 TI2V-5B, FastWan 3-step, MLX, 832 x 480, 121 frames, about
+127 to 141 s warm). The Stack governor admits one generator job at a time (a video holds 44 GB), so a clip can sit in "waiting for memory"
+or behind a picture; the card shows the place in line. One clip at a time per person. The card is the kit `VideoPlayer` (progress with Stop,
+then the clip with poster, loop, Download, Share, Make another, Try again). Animate this picture sends the stored bytes unchanged with
+`image_source: generated`, only for pictures the Stack made. Files are served with Range support at `/api/videos/jobs/:id/files/:fileId`.
+
+### Chat engine decision (not shipped)
+
+`docs/design/chat-engine-comparison-2026-10-17.md` decides to cut the chat role to oMLX 0.7.0 on p64 and p128 with llama-server as
+fallback and rollback (23 percent faster generation, 36 to 42 percent faster prompt processing, 2 GB smaller resident). It has **not
+landed**: ENGINE-MLX-01 and ENGINE-MLX-02 are open, v0.2.9 still runs the chat role on llama-server b10797, and no user doc says
+otherwise. Update this section, the user docs and the README when ENGINE-MLX-01 ships.
