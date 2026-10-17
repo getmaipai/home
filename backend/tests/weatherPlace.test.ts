@@ -88,11 +88,11 @@ describe("weather place plumbing", () => {
     expect(forecastUrl()).toContain("latitude=45.5234");
   });
 
-  test("no named place, no current coordinates and no home: no place, and the runner refuses cleanly", async () => {
+  test("no named place, no current coordinates and no home: no place, and the runner answers with a plain needs-place result (WEATHER-HOME-ASK-01)", async () => {
     const { adult } = await household();
     expect(await resolveWeatherPlace({ person: adult })).toBeNull();
     const result = await runPlugin("weather", adult, {});
-    expect(result.ok).toBe(false);
+    expect(result).toMatchObject({ ok: true, value: { data: { needs: "place" } } });
     expect(urls).toEqual([]);
   });
 
