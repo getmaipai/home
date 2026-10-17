@@ -11,9 +11,9 @@
 const LOW = 20_000;
 const SPAN = 25_000;
 
-function bindable(port: number, hostname?: string): boolean {
+function bindable(port: number, hostname: "127.0.0.1" | "0.0.0.0"): boolean {
   try {
-    Bun.serve({ ...(hostname ? { hostname } : {}), port, fetch: () => new Response() }).stop(true);
+    Bun.serve({ hostname, port, fetch: () => new Response() }).stop(true);
     return true;
   } catch {
     return false;
@@ -23,7 +23,7 @@ function bindable(port: number, hostname?: string): boolean {
 export function reserveFreePort(): number {
   for (let attempt = 0; attempt < 200; attempt++) {
     const port = LOW + Math.floor(Math.random() * SPAN);
-    if (bindable(port, "127.0.0.1") && bindable(port)) return port;
+    if (bindable(port, "127.0.0.1") && bindable(port, "0.0.0.0")) return port;
   }
   throw new Error("no free test port found in 200 tries; close other test runs and retry");
 }
