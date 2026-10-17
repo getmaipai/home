@@ -30,7 +30,9 @@ const PHASES: WizardStep[] = [
   { id: "computers", title: "Your Home" },
   { id: "meet", title: "Your AI" },
 ];
-const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "owner", "face", "hello", "backup", "done"] as const;
+// Steps older installs recorded that no screen shows any more.
+const RETIRED_STEPS = new Set<string>(["away", "face", "profile", "hello"]);
+const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "owner", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
@@ -41,8 +43,6 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   checks: "Checking your computers",
   plan: "Your setup plan",
   owner: "Create your owner account",
-  face: "Let Home greet you",
-  hello: "Hello",
   backup: "Save your backup key",
   done: "You're all set",
 };
@@ -55,8 +55,6 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   checks: "Home is checking that everything is ready.",
   plan: "Review the steps Home will complete.",
   owner: "Create the account that manages this Home.",
-  face: "You can choose a face greeting now or later.",
-  hello: "You can talk with Home after setup.",
   backup: "Save this key somewhere other than this computer.",
   done: "Your Home is ready to use.",
 };
@@ -66,9 +64,7 @@ const SCREEN_ART: Partial<Record<ScreenId, string>> = {
   engine_location: "/setup-art/where.webp",
   storage: "/setup-art/storage.webp",
   plan: "/setup-art/plan.webp",
-  hello: "/setup-art/hello.webp",
   owner: "/setup-art/owner.webp",
-  face: "/setup-art/face-intro.webp",
   backup: "/setup-art/backup.webp",
   checks: "/setup-art/checking.webp",
   done: "/setup-art/done.webp",
@@ -121,6 +117,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [backupKey, setBackupKey] = useState<{ hubName: string; hubInstanceId: string; backupKeyHex: string; generatedAt: string } | null>(null);
   const [backupKeyError, setBackupKeyError] = useState(false);
   const [backupSavedError, setBackupSavedError] = useState(false);
+  const [backupDownloaded, setBackupDownloaded] = useState(false);
   const [checkRows, setCheckRows] = useState<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }> | null>(null);
   const [checkError, setCheckError] = useState(false);
   const [checksFetching, setChecksFetching] = useState(false);
@@ -159,12 +156,12 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     setState(result);
     // `away` remains in the persisted setup contract for older records, but
     // is now completed from the post-setup checklist rather than first run.
-    const firstPending = result.steps.find((step) => step.id !== "away" && (step.status === "pending" || step.status === "running" || step.status === "failed"))?.id;
+    const firstPending = result.steps.find((step) => !RETIRED_STEPS.has(step.id) && (step.status === "pending" || step.status === "running" || step.status === "failed"))?.id;
     // The common new-person profile flow is not built. The plan explicitly
     // removes screen 9 until it exists, so its server record is not a UI step.
     const ownerDone = stepIsDone(result, "owner");
     const disclosureSeen = sessionStorage.getItem("maipai:setup-before-start-read") === "true";
-    const next = !ownerDone && !disclosureSeen && firstPending !== "welcome" ? "before_start" : firstPending === "profile" ? "hello" : firstPending === "backup_key" ? "backup" : firstPending;
+    const next = !ownerDone && !disclosureSeen && firstPending !== "welcome" ? "before_start" : firstPending === "backup_key" ? "backup" : firstPending;
     if (next && (SCREEN_IDS as readonly string[]).includes(next)) setScreen(next as ScreenId);
     setEngine(result.engine.where);
     return result;
@@ -224,25 +221,9 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     link.download = "maipai-home-emergency-backup-key.txt";
     link.click();
     URL.revokeObjectURL(url);
-  }
-
-  async function printEmergencyKit() {
-    const popup = window.open("", "maipai-emergency-kit");
-    if (!popup) { setBackupKeyError(true); return; }
-    const kit = backupKey ?? await loadEmergencyKit();
-    if (!kit) { popup.close(); return; }
-    const title = popup.document.createElement("h1");
-    title.textContent = "MaiPai Home emergency kit";
-    const details = popup.document.createElement("p");
-    details.textContent = `Home: ${kit.hubName} · Home id: ${kit.hubInstanceId}`;
-    const key = popup.document.createElement("pre");
-    key.textContent = kit.backupKeyHex;
-    const storage = popup.document.createElement("p");
-    storage.textContent = "Keep this key somewhere other than this computer.";
-    popup.document.body.replaceChildren(title, details, key, storage);
-    popup.document.title = "MaiPai Home emergency kit";
-    popup.focus();
-    popup.print();
+    // The app cannot confirm the file was saved, so the click that starts the download unlocks Continue.
+    setBackupDownloaded(true);
+    void confirmBackupKeySaved();
   }
 
   async function confirmBackupKeySaved() {
@@ -258,7 +239,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
   }
 
-  const phase = screen === "owner" || screen === "face" || screen === "hello" || screen === "backup" || screen === "done" ? "meet" : "computers";
+  const phase = screen === "owner" || screen === "backup" || screen === "done" ? "meet" : "computers";
   const completedCount = phase === "meet" ? 1 : 0;
   const thingsLeftLine = openThings === null ? null : setupChecklistCountLine(openThings);
 
@@ -288,7 +269,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
     const stepId = screen === "before_start" ? "welcome" : screen;
     if (screen === "host_tune") { arrivedByBack.current = false; setScreen(neighbour(screen, 1) ?? "checks"); return; }
-    const deferred = (["checks", "plan", "hello"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
+    const deferred = (["checks", "plan"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
     const folders = screen === "storage" ? { ...(engine === "this_computer" && storageChoice.models ? { models: storageChoice.models } : {}), ...(storageChoice.records ? { records: storageChoice.records } : {}) } : {};
     // Saying where the AI runs is what decides whether Home installs the
@@ -298,25 +279,16 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     if (!updated) return;
     if (screen === "before_start") {
       sessionStorage.setItem("maipai:setup-before-start-read", "true");
-      const firstPending = updated.steps.find((step) => step.id !== "away" && (step.status === "pending" || step.status === "running" || step.status === "failed"))?.id;
-      const target = firstPending === "profile" ? "hello" : firstPending === "backup_key" ? "backup" : firstPending;
+      const firstPending = updated.steps.find((step) => !RETIRED_STEPS.has(step.id) && (step.status === "pending" || step.status === "running" || step.status === "failed"))?.id;
+      const target = firstPending === "backup_key" ? "backup" : firstPending;
       if (target && (SCREEN_IDS as readonly string[]).includes(target)) setScreen(target as ScreenId);
       return;
     }
-    if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
     arrivedByBack.current = false;
     const following = neighbour(screen, 1);
     // Once the owner exists, Back and Continue step over the create form.
-    if (following === "owner" && !("done" in updated) && stepIsDone(updated, "owner")) setScreen("face");
+    if (following === "owner" && !("done" in updated) && stepIsDone(updated, "owner")) setScreen("backup");
     else if (following) setScreen(following);
-  }
-
-  async function defer() {
-    const updated = await record(screen, "deferred");
-    if (!updated) return;
-    if (screen === "face") await api.setupStep("profile", { status: "skipped", phase: "meet" });
-    arrivedByBack.current = false;
-    setScreen(neighbour(screen, 1) ?? "done");
   }
 
   async function submitOwner(name = ownerName, secret = ownerSecret) {
@@ -327,7 +299,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       await api.setup(name.trim(), secret);
       const updated = await api.setupStep("owner", { status: "done", phase: "meet" });
       setState(updated);
-      setScreen("face");
+      setScreen("backup");
     } catch (reason) {
       const already = reason instanceof ApiError && reason.status === 409;
       const message = already ? "Home is already set up. Sign in instead." : reason instanceof Error && reason.message === SECRET_SERVER_TEXT ? SECRET_LENGTH_COPY : reason instanceof Error ? reason.message : "Home couldn't save your account. Check the name and PIN, then press Create owner account again.";
@@ -403,25 +375,23 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     }
     case "plan": body = <><PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} onReady={setPlanBlocksContinue} />{searchCandidate ? <Card><CardContent><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void chooseSearchCandidate()}>Use it</Button></CardContent></Card> : null}{searchError ? <p role="alert">{searchError}</p> : null}</>; break;
     case "owner": body = <Card><CardContent><p>{OWNER_COPY}</p><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} checkSecret hideSubmit /></CardContent></Card>; break;
-    case "face": body = <Card><CardContent><p>Face data stays on this computer. You can turn on face greetings now or later in your profile.</p></CardContent></Card>; break;
-    case "hello": body = <Card><CardContent><p>You can talk with Home as soon as setup is finished.</p></CardContent></Card>; break;
-    case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void printEmergencyKit()}>Print</Button><Button type="button" variant="secondary" size="lg" disabled={!backupKey || busy} onClick={() => void confirmBackupKeySaved()}>I saved my backup key</Button>{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}{backupSavedError ? <p role="alert">Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</CardContent></Card>; break;
-    case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
+    case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button>{backupDownloaded ? null : <p className="text-base text-muted-foreground md:text-lg">Download your backup key to continue.</p>}{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}{backupSavedError ? <p role="alert">Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</CardContent></Card>; break;
+    case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>You can talk with Home as soon as you open it. Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes. To have Home greet you by face, turn it on in your profile; face data stays on this computer.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
   if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("engine_location")) body = <>{body}<InstallStrip compact detailsHref={null} read={api.setupInstallStatus} retry={state && stepIsDone(state, "owner") ? api.installRetry : () => api.setupEngineInstall().then(() => api.setupInstall().catch(() => undefined))} /></>;
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const currentPhaseIndex = phase === "meet" ? 1 : 0;
   const screenIndex = SCREEN_IDS.indexOf(screen);
-  const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : screen === "face" ? defer : next;
+  const submit = screen === "owner" ? submitOwner : screen === "done" ? finish : next;
   const previewBanner = window.__setupPreview ? <SetupPreviewBar currentScreen={screenIndex + 1} onJump={(index) => setScreen(SCREEN_IDS[Math.max(0, Math.min(SCREEN_IDS.length - 1, index))]!)} /> : undefined;
   const art = SCREEN_ART[screen];
   const continueAnyway = screen === "checks" && initialScreen !== "checks" && (checkRows?.some((row) => row.state === "amber") ?? false) && !(checkRows?.some((row) => row.state === "red") ?? false);
-  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} skipLabel={continueAnyway ? "Continue anyway" : undefined} onSkip={continueAnyway ? () => { void record("checks", "deferred").then((updated) => { if (updated) setScreen("plan"); }); } : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "face" ? "Do this later" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "plan" ? planBlocksContinue && !planInstalled.current && !stepIsDone(state, "plan") : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={false} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
+  return <Wizard steps={PHASES} currentStepId={phaseStep} completedCount={completedCount} onJumpTo={screen === "owner" ? () => ownerFormRef.current?.requestSubmit() : moveToPhase} onBack={screenIndex > 0 ? back : undefined} skipLabel={continueAnyway ? "Continue anyway" : undefined} onSkip={continueAnyway ? () => { void record("checks", "deferred").then((updated) => { if (updated) setScreen("plan"); }); } : undefined} onNext={() => screen === "owner" ? ownerFormRef.current?.requestSubmit() : screen === "checks" && checkRows?.some((row) => row.state === "red") ? retryChecks() : void submit()} nextLabel={screen === "owner" ? "Create owner account" : screen === "welcome" ? "Set up my Home" : screen === "before_start" ? "I understand" : screen === "done" ? "Open my Home" : screen === "checks" && checkRows?.some((row) => row.state === "red") ? "Try again" : "Continue"} nextDisabled={screen === "owner" ? busy : screen === "storage" ? storageBlocked : screen === "plan" ? planBlocksContinue && !planInstalled.current && !stepIsDone(state, "plan") : screen === "checks" && checksFetching} busy={busy || (screen === "done" && certificate === "loading")} layout="centered" stepKind="intro" stickyFooter={false} progress={{ current: currentPhaseIndex + 1, total: PHASES.length }} eyebrow={PHASES[currentPhaseIndex]!.title} heading={SCREEN_TITLE[screen]} description={SCREEN_DESCRIPTION[screen]} header={<img src={dark ? "/brand/maipai-home-logo-dark.png" : "/brand/maipai-home-logo-light.png"} alt="MaiPai Home" width={104} height={39} />} aside={art ? <img src={art} alt="" /> : undefined} banner={previewBanner}>{body}{error && screen !== "owner" ? <p role="alert">{error}</p> : null}</Wizard>;
 }
 
 function phaseFor(id: string): SetupState["phase"] {
   if (id === "done") return "done";
-  if (["owner", "face", "profile", "hello", "backup_key"].includes(id)) return "meet";
+  if (["owner", "backup_key"].includes(id)) return "meet";
   return "computers";
 }

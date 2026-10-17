@@ -201,11 +201,24 @@ describe("SetupWizard", () => {
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
       fireEvent.change(rendered.getByLabelText("Confirm passcode"), { target: { value: "2468" } });
-      await advanceTo(rendered, "Create owner account", "Let Home greet you");
-      await advanceTo(rendered, "Do this later", "Hello");
-      await advanceTo(rendered, "Continue", "Save your backup key");
+      await advanceTo(rendered, "Create owner account", "Save your backup key");
+      const createUrl = URL.createObjectURL; const revoke = URL.revokeObjectURL;
+      URL.createObjectURL = () => "blob:test"; URL.revokeObjectURL = () => {};
+      const click = HTMLAnchorElement.prototype.click;
+      HTMLAnchorElement.prototype.click = () => {};
+      try {
+        await waitFor(() => expect(rendered.getByRole("button", { name: "Download" }).hasAttribute("disabled")).toBe(false));
+        await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Download" })); });
+      } finally { URL.createObjectURL = createUrl; URL.revokeObjectURL = revoke; HTMLAnchorElement.prototype.click = click; }
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false));
+      const createUrl = URL.createObjectURL; const click = HTMLAnchorElement.prototype.click;
+      URL.createObjectURL = () => "blob:test"; HTMLAnchorElement.prototype.click = () => {};
+      try {
+        await waitFor(() => expect(rendered.getByRole("button", { name: "Download" }).hasAttribute("disabled")).toBe(false));
+        await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Download" })); });
+      } finally { URL.createObjectURL = createUrl; HTMLAnchorElement.prototype.click = click; }
       await advanceTo(rendered, "Continue", "You're all set");
-      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "face", "profile", "hello"]);
+      expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "backup_key"]);
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
       expect(h.posts.at(-1)).toBe("done");
       await waitFor(() => expect(rendered.container.textContent).toContain("Sign in"));
@@ -244,10 +257,22 @@ describe("SetupWizard", () => {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       expect(rendered.container.textContent).toContain("Your AI");
-      // The button stays disabled until the emergency kit request resolves, a fetch separate from the
-      // screen text; clicking before then is a no-op, which failed this test when the machine was loaded.
-      await waitFor(() => expect(rendered.getByRole("button", { name: "I saved my backup key" }).hasAttribute("disabled")).toBe(false));
-      await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "I saved my backup key" })); });
+      expect(rendered.container.textContent).toContain("Download your backup key to continue.");
+      expect(rendered.queryByRole("button", { name: "Print" })).toBeNull();
+      expect(rendered.queryByRole("button", { name: "I saved my backup key" })).toBeNull();
+      expect(rendered.container.textContent).not.toContain("aabb");
+      expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(true);
+      const createUrl = URL.createObjectURL; const revoke = URL.revokeObjectURL;
+      URL.createObjectURL = () => "blob:test"; URL.revokeObjectURL = () => {};
+      const click = HTMLAnchorElement.prototype.click; let saved = "";
+      HTMLAnchorElement.prototype.click = function (this: HTMLAnchorElement) { saved = this.download; };
+      try {
+        await waitFor(() => expect(rendered.getByRole("button", { name: "Download" }).hasAttribute("disabled")).toBe(false));
+        await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Download" })); });
+      } finally { URL.createObjectURL = createUrl; URL.revokeObjectURL = revoke; HTMLAnchorElement.prototype.click = click; }
+      expect(saved).toBe("maipai-home-emergency-backup-key.txt");
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false));
+      expect(rendered.container.textContent).not.toContain("aabb");
       await waitFor(() => expect(h.posts).toContain("backup_key"));
     } finally { h.restore(); }
   });
@@ -267,12 +292,11 @@ describe("SetupWizard", () => {
 
   test("backup key has its own screen before the final step", async () => {
     const state = freshState();
-    for (const step of state.steps) if (step.id !== "hello" && step.id !== "done") step.status = "done";
+    for (const step of state.steps) if (step.id !== "backup_key" && step.id !== "done") step.status = "done";
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Hello"));
-      await advanceTo(rendered, "Continue", "Save your backup key");
+      await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       expect(rendered.container.textContent).toContain("If this computer breaks, this key restores your Home on a new one.");
     } finally { h.restore(); }
   });
@@ -378,9 +402,9 @@ describe("SetupWizard", () => {
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Let Home greet you"));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       await advanceTo(rendered, "Back", "Your setup plan");
-      await advanceTo(rendered, "Continue", "Let Home greet you");
+      await advanceTo(rendered, "Continue", "Save your backup key");
     } finally { h.restore(); }
   });
 
@@ -390,7 +414,7 @@ describe("SetupWizard", () => {
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Hello"));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       expect(rendered.container.textContent).not.toMatch(/not built|not available|isn't available|not supported/i);
     } finally { h.restore(); }
   });
@@ -468,7 +492,7 @@ describe("SetupWizard", () => {
     const h = harness(state);
     try {
       const rendered = view();
-      await waitFor(() => expect(rendered.container.textContent).toContain("Let Home greet you"));
+      await waitFor(() => expect(rendered.container.textContent).toContain("Save your backup key"));
       await waitFor(() => expect(rendered.queryByTestId("install-strip")).not.toBeNull());
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(rendered.container.textContent).not.toContain("chat-27b");
