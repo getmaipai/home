@@ -101,6 +101,9 @@ describe("Pictures and videos settings view", () => {
     fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
     fireEvent.click(v.getByRole("radio", { name: "A file already on this computer (for big files)" }));
     fireEvent.change(v.getByLabelText("Where the .safetensors file is saved on this computer"), { target: { value: " /Users/you/Downloads/ink.safetensors " } });
+    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
+    fireEvent.click(await v.findByRole("option", { name: "Nobody (not a real person)" }));
+    await waitFor(() => expect(v.getByRole("button", { name: "Add style" })).not.toBeDisabled());
     fireEvent.click(v.getByRole("button", { name: "Add style" }));
     await waitFor(() => expect(picturesAdminApi.addAdapter).toHaveBeenCalled());
     const sent = (picturesAdminApi.addAdapter as unknown as { mock: { calls: Array<[FormData]> } }).mock.calls[0]![0];

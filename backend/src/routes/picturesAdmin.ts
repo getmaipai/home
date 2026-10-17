@@ -196,7 +196,7 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       stack.append("classification", classification);
       stack.append("trigger_words", JSON.stringify(trigger));
       stack.append("added_by", adminId);
-      if (subjectCheck.kind === "person") {
+      if (subjectCheck.kind === "person" && file instanceof File) {
         const fields = await stackLikenessFields(subjectCheck, c.get("person"), new Uint8Array(await file.arrayBuffer()));
         if ("error" in fields) return c.json({ error: fields.error, code: "likeness_engine" }, 503) as never;
         stack.append("likeness_subject", fields.likeness_subject);
