@@ -137,7 +137,7 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     default: "light",
     label: "Natural speech sounds",
     copy: {
-      does: "Lets spoken replies include a light \"hmm,\" or a laugh now and then, never in the written chat and never for children or teens.",
+      does: "Lets spoken replies include a light \"hmm,\" or laugh now and then.",
       options: {
         off: "Spoken replies are read exactly as written.",
         light: "A rare \"hmm,\" or laugh, at most once per reply.",

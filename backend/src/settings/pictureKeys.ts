@@ -50,8 +50,8 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     copy: {
       does: "Decides how chat makes a picture when nobody asks for a kind.",
       options: {
-        quick: "A few seconds a picture. Best for most requests.",
-        detailed: "About 15 to 30 seconds a picture, with finer detail and many more styles.",
+        quick: "A few seconds a picture, best for most requests.",
+        detailed: "About 15 to 30 seconds a picture, with finer detail and more styles.",
       },
     },
     lives_in: "household.pictures",
