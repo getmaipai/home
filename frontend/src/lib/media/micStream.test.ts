@@ -8,6 +8,7 @@ const open = async () => {
   return { getTracks: () => [{ readyState: "live", stop() { stopped++; } }] } as unknown as MediaStream;
 };
 const realSetTimeout = globalThis.setTimeout;
+const realClearTimeout = globalThis.clearTimeout;
 let timers: { fn: () => void; ms: number }[] = [];
 
 beforeEach(() => {
@@ -16,7 +17,8 @@ beforeEach(() => {
   (globalThis as unknown as { setTimeout: unknown }).setTimeout = ((fn: () => void, ms: number) => { timers.push({ fn, ms }); return timers.length; }) as unknown;
   (globalThis as unknown as { clearTimeout: unknown }).clearTimeout = ((id: number) => { if (timers[id - 1]) timers[id - 1] = { fn: () => {}, ms: 0 }; }) as unknown;
 });
-afterEach(() => { globalThis.setTimeout = realSetTimeout; });
+// Restore both: a stubbed clearTimeout left behind breaks every later timer test in the same process (the audio sleep timer, useIdleTimer).
+afterEach(() => { globalThis.setTimeout = realSetTimeout; globalThis.clearTimeout = realClearTimeout; });
 
 describe("shared mic stream", () => {
   test("grace is 10 seconds", () => expect(MIC_GRACE_MS).toBe(10_000));
