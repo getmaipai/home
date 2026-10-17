@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Timeline } from "@maipai/ui/src/elements/timeline";
 import { StatusLegend, StatusPartsBody } from "@/shell/pages/status/StatusComponents";
 import { StatusBanner } from "@/shell/pages/status/StatusBanner";
@@ -10,6 +10,8 @@ import { getIcon } from "@maipai/ui/src/icons";
 import { MaintenanceDialog, StatusBoardNotes, StatusMaintenanceBody, STATUS_BOARD_QUERY_KEY } from "@/shell/pages/status/StatusBoard";
 import { activeMaintenanceParts } from "@/shell/pages/status/statusBoardFormat";
 import { StatusApps } from "@/shell/pages/status/StatusApps";
+import { agoText, GROUP_WORD } from "@/shell/pages/status/statusChecksFormat";
+import { Button } from "@maipai/ui/src/ui/button";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { statusAppsSummary } from "@/shell/statusApps";
 import { statusTimelineEvents } from "@/shell/pages/status/statusTimelineEvents";
@@ -38,6 +40,10 @@ export function StatusPage({ person }: { person: Roster }) {
   const historyQuery = useQuery<StatusHistory>({ queryKey: ["status-history", 90], queryFn: () => api.statusHistory(90), refetchInterval: 60_000, retry: false, enabled: canSeeParts });
   const engineComputerQuery = useQuery({ queryKey: ["status", "engine-computer", canSeeParts ? "admin" : "member"], queryFn: api.engineComputerStatus, refetchInterval: 10_000 });
   const missingToursQuery = useQuery({ queryKey: ["status", "tour-missing-targets"], queryFn: api.missingTourTargets, enabled: canSeeParts, retry: false });
+  const queryClient = useQueryClient();
+  const checksQuery = useQuery({ queryKey: ["health-checks"], queryFn: () => api.healthChecks(), refetchInterval: 30_000, retry: false, enabled: canSeeParts });
+  const runChecks = useMutation({ mutationFn: () => api.runHealthChecks(), onSuccess: (next) => queryClient.setQueryData(["health-checks"], next) });
+  const checks = checksQuery.data && Array.isArray(checksQuery.data.groups) && Array.isArray(checksQuery.data.checks) ? checksQuery.data : undefined;
   const boardData = boardQuery.data && Array.isArray(boardQuery.data.maintenance) ? boardQuery.data : undefined;
   const maintenance = activeMaintenanceParts(boardData?.maintenance);
   const apps = appsQuery.data ?? [];
@@ -66,6 +72,20 @@ export function StatusPage({ person }: { person: Roster }) {
             <div><dt className="inline font-medium">Last probe: </dt><dd className="inline">{engineComputerQuery.data.details.lastProbeAt ? new Date(engineComputerQuery.data.details.lastProbeAt).toLocaleString() : "No successful probe yet"}</dd></div>
             <div><dt className="inline font-medium">Stack contract: </dt><dd className="inline">{engineComputerQuery.data.details.contract ?? "Not reported"}</dd></div>
           </dl> : null}
+        </CardContent>
+      </Card> : null}
+      {canSeeParts && checks ? <Card data-testid="health-checks">
+        <CardHeader><CardTitle>Health checks</CardTitle></CardHeader>
+        <CardContent>
+          <p className="text-sm">{agoText(checks.last_checked_at)}: {checks.groups.map((g) => g.label).join(", ")}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {checks.groups.map((g) => <Status key={g.group} status={g.state === "fail" ? "offline" : g.state === "pass" ? "online" : "maintenance"}>{g.label}: {GROUP_WORD[g.state]}</Status>)}
+          </div>
+          <ul className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground">
+            {checks.checks.filter((c) => c.state === "fail" || c.state === "skipped").map((c) => <li key={c.id}>{c.name}: {c.note}</li>)}
+          </ul>
+          {runChecks.error instanceof Error ? <p role="alert" className="mt-2 text-sm text-destructive">{runChecks.error.message}</p> : null}
+          <div className="mt-3"><Button variant="outline" disabled={runChecks.isPending || checks.running} onClick={() => runChecks.mutate()}>{runChecks.isPending || checks.running ? "Checking..." : "Run checks now"}</Button></div>
         </CardContent>
       </Card> : null}
       {incident ? <Card>

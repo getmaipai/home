@@ -93,6 +93,19 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai",
     honoured_by: ["home"],
   }),
+  // CANARY-01: the health checks and the warm-up pings. Off stops the timers and the search check; the post-start suite,
+  // Run checks now and the daily picture check stay.
+  SettingsKey.parse({
+    key: "health.keep_warm",
+    scope: "household",
+    selector: "boolean",
+    default: true,
+    label: "Keep the AI warm",
+    help: "Home sends a tiny made-up message to the AI every few minutes so the first real reply is quick, and checks that chat, tools, search and voice still work. It uses about 1,000 words of AI output an hour, stores nothing, and never runs while someone is talking to the AI. Turn it off to stop these checks.",
+    level: "basic",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
   SettingsKey.parse({
     key: "chat.paused_message",
     scope: "household",

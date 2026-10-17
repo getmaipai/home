@@ -13947,6 +13947,323 @@
         }
       }
     },
+    "/api/health-checks": {
+      "get": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Read the latest health check results",
+        "responses": {
+          "200": {
+            "description": "Pass or fail per group, and per check.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "running": {
+                      "type": "boolean"
+                    },
+                    "last_checked_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "tools",
+                              "search",
+                              "voice",
+                              "pictures"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "fail",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "group",
+                          "label",
+                          "state"
+                        ]
+                      }
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "tools",
+                              "search",
+                              "voice",
+                              "pictures"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "fail",
+                              "skipped",
+                              "unknown"
+                            ]
+                          },
+                          "at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "duration_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "first_token_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "group",
+                          "state",
+                          "at",
+                          "duration_ms",
+                          "first_token_ms",
+                          "note"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "running",
+                    "last_checked_at",
+                    "groups",
+                    "checks"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/health-checks/run": {
+      "post": {
+        "tags": [
+          "Status"
+        ],
+        "summary": "Run the health checks now",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "include_search": {
+                    "type": "boolean"
+                  },
+                  "include_picture": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The results after the run.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "running": {
+                      "type": "boolean"
+                    },
+                    "last_checked_at": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "groups": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "tools",
+                              "search",
+                              "voice",
+                              "pictures"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "fail",
+                              "unknown"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "group",
+                          "label",
+                          "state"
+                        ]
+                      }
+                    },
+                    "checks": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "tools",
+                              "search",
+                              "voice",
+                              "pictures"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "pass",
+                              "fail",
+                              "skipped",
+                              "unknown"
+                            ]
+                          },
+                          "at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "duration_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "first_token_ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "note": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "group",
+                          "state",
+                          "at",
+                          "duration_ms",
+                          "first_token_ms",
+                          "note"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "running",
+                    "last_checked_at",
+                    "groups",
+                    "checks"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Owner or admin only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A run is already going, or one just finished."
+          }
+        }
+      }
+    },
     "/api/status/engine-computer": {
       "get": {
         "tags": [

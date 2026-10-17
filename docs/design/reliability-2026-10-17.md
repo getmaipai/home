@@ -158,7 +158,7 @@ One scheduler tick (60 s) in Home decides all synthetic work, so checks, prewarm
 
 - **The canary is the load.** Hard caps in code (tokens per call, 3 searches a day, single flight). If `chat_hello` takes more
   than 3 times its trailing median, or the engine reports a queue, the tick backs off to 15 minutes until a person's turn has
-  come and gone. A person's turn always wins: a canary request in flight is aborted when a real turn starts.
+  come and gone. A person's turn always wins: scheduled checks start only when nobody has chatted for 30 seconds, and a started check is short and capped.
 - **A canary failure that is the canary's fault** (a tool the model legitimately declined): needs 2 in a row, and the Repairs
   text says what was tried so an admin can judge it. The search canary uses a short fixed set of generic phrases, none with household data.
 - **Search service blocks us.** The search canary goes through the one search limiter like any search, sends a fixed generic

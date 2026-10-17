@@ -22,6 +22,9 @@ function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_
     const url = typeof input === "string" ? input : input.toString();
     paths.push(url.split("?")[0] ?? "");
     if (url.includes("/api/status/apps")) return Promise.resolve(Response.json(includeNeeds ? apps : apps.map(({ needs: _needs, ...app }) => app)));
+    if (url.includes("/api/health-checks")) return Promise.resolve(Response.json({ running: false, last_checked_at: new Date(Date.now() - 3 * 60_000).toISOString(),
+      groups: [{ group: "chat", label: "chat", state: "pass" }, { group: "tools", label: "tools", state: "pass" }, { group: "search", label: "search", state: "fail" }, { group: "voice", label: "voice", state: "unknown" }, { group: "pictures", label: "pictures", state: "pass" }],
+      checks: [{ id: "chat_search_trigger", name: "Chat searches the web", group: "search", state: "fail", at: null, duration_ms: 1, first_token_ms: null, note: "Chat is up but did not search the web when asked." }] }));
     if (url.includes("/api/health")) return Promise.resolve(Response.json({
       brain: "selection", voice: "spawned", ok: true, uptimeSeconds: 60,
       engines: { chat: { kind: "selection", pid: null, alive: true }, embed: { kind: "spawned", pid: null, alive: true }, background: { kind: "spawned", pid: null, alive: true }, voice: { kind: "spawned", pid: null, alive: true } }, sidecars: [],
@@ -33,6 +36,55 @@ function mockStatus(includeNeeds: boolean, history: StatusHistory = { generated_
   }) as unknown as typeof fetch;
   return { paths, restore: () => { globalThis.fetch = original; } };
 }
+
+describe("StatusPage health checks (CANARY-01)", () => {
+  test("admins see when it last checked and a pass or fail per group; members see no row", async () => {
+    const { restore } = mockStatus(true);
+    const base = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL) => {
+      const url = typeof input === "string" ? input : input.toString();
+      if (url.includes("/api/health-checks")) return Promise.resolve(Response.json({ running: false, last_checked_at: new Date(Date.now() - 3 * 60_000).toISOString(),
+        groups: [{ group: "chat", label: "chat", state: "pass" }, { group: "tools", label: "tools", state: "pass" }, { group: "search", label: "search", state: "fail" }, { group: "voice", label: "voice", state: "unknown" }, { group: "pictures", label: "pictures", state: "pass" }],
+        checks: [{ id: "chat_search_trigger", name: "Chat searches the web", group: "search", state: "fail", at: null, duration_ms: 1, first_token_ms: null, note: "Chat is up but did not search the web when asked." }] }));
+      return (base as typeof fetch)(input);
+    }) as unknown as typeof fetch;
+    try {
+      const admin = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      expect(await admin.findByText(/Last checked 3 minutes ago: chat, tools, search, voice, pictures/)).toBeTruthy();
+      expect(admin.getByText("search: Failed")).toBeTruthy();
+      expect(admin.getByText("voice: Not checked")).toBeTruthy();
+      expect(admin.getByRole("button", { name: "Run checks now" })).toBeTruthy();
+      cleanup();
+      const member = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
+      expect(await member.findByText("Apps")).toBeTruthy();
+      expect(member.queryByTestId("health-checks")).toBeNull();
+    } finally { globalThis.fetch = base; restore(); }
+  });
+});
+
+describe("StatusPage health checks (CANARY-01)", () => {
+  test("admins see when it last checked and a pass or fail per group, with the reason a check failed", async () => {
+    const { restore } = mockStatus(true);
+    try {
+      const view = renderWithQueryClient(<StatusPage person={makePerson("admin")} />);
+      expect(await view.findByText(/Last checked 3 minutes ago: chat, tools, search, voice, pictures/)).toBeTruthy();
+      expect(view.getByText("search: Failed")).toBeTruthy();
+      expect(view.getByText("voice: Not checked")).toBeTruthy();
+      expect(view.getByText(/did not search the web when asked/)).toBeTruthy();
+      expect(view.getByRole("button", { name: "Run checks now" })).toBeTruthy();
+    } finally { restore(); }
+  });
+
+  test("members see no health checks row and never ask for it", async () => {
+    const { paths, restore } = mockStatus(false);
+    try {
+      const view = renderWithQueryClient(<StatusPage person={makePerson("adult")} />);
+      expect(await view.findByText("Apps")).toBeTruthy();
+      expect(view.queryByTestId("health-checks")).toBeNull();
+      expect(paths.some((p) => p.includes("/api/health-checks"))).toBe(false);
+    } finally { restore(); }
+  });
+});
 
 describe("StatusPage app-first view", () => {
   test.each([

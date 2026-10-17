@@ -722,6 +722,14 @@ export interface InstallStatusView {
   items: Array<{ id: string; model: string; role: string | null; label: string; state: string; completedBytes: number; totalBytes: number; reason: string | null }>;
 }
 
+/** CANARY-01: GET /api/health-checks. */
+export type HealthChecks = {
+  running: boolean;
+  last_checked_at: string | null;
+  groups: Array<{ group: "chat" | "tools" | "search" | "voice" | "pictures"; label: string; state: "pass" | "fail" | "unknown" }>;
+  checks: Array<{ id: string; name: string; group: string; state: "pass" | "fail" | "skipped" | "unknown"; at: string | null; duration_ms: number | null; first_token_ms: number | null; note: string | null }>;
+};
+
 export const api = {
   referenceBooks: () => request<ReferenceBookView[]>("/api/reference/books"),
   referenceSuggest: (book: string | undefined, q: string) => request<ReferenceSuggestion[]>(`/api/reference/suggest?${book ? `book=${encodeURIComponent(book)}&` : ""}q=${encodeURIComponent(q)}`),
@@ -1345,6 +1353,8 @@ export const api = {
   statusBoard: () => request<StatusBoard>("/api/status/board"),
   engineComputerStatus: () => request<EngineComputerStatus>("/api/status/engine-computer"),
   statusApps: () => request<StatusAppsResponse>("/api/status/apps"),
+  healthChecks: () => request<HealthChecks>("/api/health-checks"),
+  runHealthChecks: (input: { include_search?: boolean; include_picture?: boolean } = {}) => request<HealthChecks>("/api/health-checks/run", { method: "POST", body: JSON.stringify(input), timeoutMs: 300_000 }),
   statusHistory: async (days = 90) => {
     const history = await request<StatusHistory>(`/api/status/history?days=${days}`);
     if (!Array.isArray(history.components) || !Array.isArray(history.incidents)) throw new Error("Status history is not available.");

@@ -427,7 +427,16 @@ export function privacyConnections(manifests = loadedManifests()): PrivacyConnec
     who: "Tailscale and the public certificate log operators", optIn: true,
     retention: "Certificate transparency records are public and permanent; Tailscale handles device names and addresses under its own policy.", direction: "outbound",
   }] : [];
-  return [...platformConnections(), ...inboundConnections(), ...remoteRows, ...homeTailnetRows, ...pluginConnections(manifests)];
+  // CANARY-01: the health check that asks the chat to look something up. Traffic nobody asked for, so it is listed, limited and switchable.
+  const healthSearchRows: PrivacyConnection[] = getHouseholdSettingValue("health.keep_warm") !== false ? [{
+    id: "platform:health-search-check", source: "MaiPai Home", sourceKind: "platform",
+    destination: "Your web search service, the one set in Settings, Web search",
+    when: "At most 3 times a day, never while someone is talking to the AI, and never again for a day after the search service refuses it",
+    what: "One fixed, general question about whether a public website is down. It carries no name, no account and nothing from your household, and nothing is saved.",
+    who: "The search service you chose, as any search would", optIn: true,
+    retention: "Nothing is kept by Home. Turn off Keep the AI warm (Settings, AI) to stop it.", direction: "outbound",
+  }] : [];
+  return [...platformConnections(), ...inboundConnections(), ...remoteRows, ...homeTailnetRows, ...healthSearchRows, ...pluginConnections(manifests)];
 }
 
 /** Both halves of the page from one pass over the packages. */

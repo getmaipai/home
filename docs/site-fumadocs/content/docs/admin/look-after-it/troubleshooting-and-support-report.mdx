@@ -46,6 +46,23 @@ The switch is **Restart engines that crash** in the Stack settings (on by defaul
 | Phone cannot reach Home | See [Reach Home when you are away](/docs/admin/connect-and-extend/remote-access). |
 | Someone cannot sign in | See [Cannot sign in](/docs/user/fix-a-problem/cannot-sign-in). |
 
+## Health checks
+
+Home checks itself the way a person would. Every few minutes it sends the AI a tiny made-up message ("hi"), asks it for the
+weather, has the voice say a short phrase and the speech engine hear it, and, at most 3 times a day, asks it whether a public
+website is down to see that web search still works. Open **Status** to see "Last checked 3 minutes ago: chat, tools, search,
+voice, pictures" with a pass or fail dot for each. Choose **Run checks now** to run them yourself (the web search check runs
+only if you ask for it).
+
+- A check that fails twice in a row becomes one item in **Repairs** with what went wrong and what to do, and you get one
+  notification. It clears itself when the check passes.
+- The checks use a built-in "health" visitor that is not a person. Nothing it says or hears is saved: not in memory, history,
+  feed, search history or notifications, and it is left out of usage counts.
+- They wait while an install, an engine update, a picture or video job, or low memory is going on, and while someone is
+  chatting.
+- **Settings, AI, Keep the AI warm** turns the timers and the web search check off. It also keeps the AI's opening prompt
+  ready so the first reply of the day is quicker. About 1,000 words of AI output an hour.
+
 ## 📄 Support report
 
 Home can build a redacted report for you to attach when you ask for help. Open `/api/storage/diagnostics` while signed in as an owner or admin. It returns:
