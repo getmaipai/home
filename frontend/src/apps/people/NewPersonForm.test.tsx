@@ -91,4 +91,34 @@ describe("NewPersonForm", () => {
     fireEvent.submit(view.getByLabelText("Name").closest("form")!);
     expect(view.onSubmit).toHaveBeenCalledWith({ displayName: "Sage", role: "child" });
   });
+  test("passcode boxes: neutral when empty, no early red, green on match, red on mismatch with sr status", () => {
+    const view = render(<NewPersonForm actorRole="owner" fixedRole="owner" onSubmit={mock(() => {})} submitLabel="Add" busy={false} error={null} checkSecret />);
+    const first = view.getByLabelText("PIN or password");
+    const confirm = view.getByLabelText("Confirm passcode");
+    const fix = "The two passcodes are different.";
+    fireEvent.change(first, { target: { value: "2468" } });
+    expect(confirm.getAttribute("aria-invalid")).toBe("false");
+    expect(confirm.hasAttribute("data-valid")).toBe(false);
+    fireEvent.change(confirm, { target: { value: "2" } });
+    expect(confirm.getAttribute("aria-invalid")).toBe("false");
+    expect(view.container.textContent).not.toContain(fix);
+    fireEvent.change(confirm, { target: { value: "2469" } });
+    expect(confirm.getAttribute("aria-invalid")).toBe("true");
+    expect(first.getAttribute("aria-invalid")).toBe("true");
+    expect(view.container.textContent).toContain(fix);
+    fireEvent.change(confirm, { target: { value: "2468" } });
+    expect(confirm.getAttribute("data-valid")).toBe("true");
+    expect(first.getAttribute("data-valid")).toBe("true");
+    expect(confirm.getAttribute("aria-invalid")).toBe("false");
+    expect(view.getByRole("status").textContent).toContain("Passcodes match");
+    expect(view.container.textContent).not.toContain(fix);
+  });
+  test("a short confirm turns red once the box loses focus", () => {
+    const view = render(<NewPersonForm actorRole="owner" fixedRole="owner" onSubmit={mock(() => {})} submitLabel="Add" busy={false} error={null} checkSecret />);
+    fireEvent.change(view.getByLabelText("PIN or password"), { target: { value: "2468" } });
+    const confirm = view.getByLabelText("Confirm passcode");
+    fireEvent.change(confirm, { target: { value: "24" } });
+    fireEvent.blur(confirm);
+    expect(confirm.getAttribute("aria-invalid")).toBe("true");
+  });
 });

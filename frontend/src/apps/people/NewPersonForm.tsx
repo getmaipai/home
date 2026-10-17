@@ -1,3 +1,4 @@
+import { CheckIcon } from "lucide-react";
 import { useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
@@ -45,11 +46,17 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
   const [secret, setSecret] = useState("");
   const [confirm, setConfirm] = useState("");
   const [confirmError, setConfirmError] = useState(false);
+  const [confirmBlurred, setConfirmBlurred] = useState(false);
   const [nameError, setNameError] = useState(false);
   const [secretError, setSecretError] = useState<string | null>(null);
   const mayCreateAdmin = creatableRoles(actorRole).includes("admin");
   const owner = role === "owner";
   const secretRequired = requiresSecret(roleAdminToServerRole({ role, admin }));
+  // Neutral while the confirm box is empty; green when equal; red once it is different and either
+  // the box lost focus or it is as long as the passcode (so the first characters never flash red).
+  const matches = secretRequired && confirm.length > 0 && confirm === secret;
+  const differs = secretRequired && confirm.length > 0 && confirm !== secret && (confirmBlurred || confirm.length >= secret.length);
+  const showConfirmError = differs || confirmError;
 
   function validateName() {
     const invalid = displayName.trim().length === 0;
@@ -71,6 +78,7 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
       setSecret("");
       setConfirm("");
       setConfirmError(false);
+      setConfirmBlurred(false);
       setAdmin(false);
       setRole(fixedRole ?? (choices.includes("adult") ? "adult" : choices[0] ?? "adult"));
       setNameError(false);
@@ -108,7 +116,7 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
           <FieldLabel htmlFor="new-person-secret">PIN or password (required for {ROLE_LABELS[roleAdminToServerRole({ role, admin })].toLowerCase()})</FieldLabel>
           <Input id="new-person-secret" type="password" placeholder="Enter a PIN or password" value={secret} disabled={busy}
             aria-label="PIN or password" required={!checkSecret}
-            aria-invalid={secretError !== null} aria-describedby={secretError ? "new-person-secret-error" : undefined}
+            aria-invalid={secretError !== null || showConfirmError} valid={matches} aria-describedby={secretError ? "new-person-secret-error" : undefined}
             onChange={(event) => { setSecret(event.target.value); if (secretError) setSecretError(secretProblem(event.target.value)); if (confirmError) setConfirmError(confirm !== event.target.value); }} />
           {secretError ? <FieldError id="new-person-secret-error">{secretError}</FieldError> : null}
           <FieldDescription>This person will use it to sign in.</FieldDescription>
@@ -116,10 +124,14 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
         {secretRequired ? <Field>
           <FieldLabel htmlFor="new-person-confirm">Confirm passcode</FieldLabel>
           <Input id="new-person-confirm" type="password" placeholder="Type it again" value={confirm} disabled={busy}
-            autoComplete="new-password" aria-invalid={confirmError} aria-describedby={confirmError ? "new-person-confirm-error" : undefined}
+            autoComplete="new-password" aria-invalid={showConfirmError} valid={matches}
+            aria-describedby={showConfirmError ? "new-person-confirm-error" : matches ? "new-person-confirm-match" : undefined}
             onChange={(event) => { setConfirm(event.target.value); if (confirmError) setConfirmError(event.target.value !== secret); }}
-            onBlur={() => { if (confirm.length > 0) setConfirmError(confirm !== secret); }} />
-          {confirmError ? <FieldError id="new-person-confirm-error">{CONFIRM_ERROR}</FieldError> : null}
+            onBlur={() => { setConfirmBlurred(true); if (confirm.length > 0) setConfirmError(confirm !== secret); }} />
+          {showConfirmError ? <FieldError id="new-person-confirm-error">{CONFIRM_ERROR}</FieldError> : null}
+          <div role="status" aria-live="polite">
+            {matches ? <FieldDescription id="new-person-confirm-match"><CheckIcon aria-hidden="true" className="inline size-4 align-text-bottom" /> Passcodes match</FieldDescription> : null}
+          </div>
         </Field> : null}
         {error ? <FieldError>{error}</FieldError> : null}
         {extra}
