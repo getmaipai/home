@@ -322,12 +322,25 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
 .dateline { margin: 2px 0 0; color: var(--muted-foreground); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .sfield { display: none; align-items: center; gap: 8px; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-pill); padding: 0 14px; min-height: 44px; color: var(--muted-foreground); flex: 0 1 300px; min-width: 0; font-size: 15px; text-align: left; }
 .sfield span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-@container app (min-width: 640px) { .sfield { display: flex; } }
+@container app (min-width: 640px) { .sfield { display: flex; } .ibtn.srch { display: none; } }
 .sfield.wide { display: flex; flex: 1 1 auto; max-width: 420px; margin-bottom: 8px; }
 .tabs.filter { padding-block: 0 12px; margin-top: -4px; }
 .tabs.filter .tab { min-height: 32px; padding: 4px 12px; font-size: 13px; border-color: transparent; background: var(--card-2); }
 .tabs.filter .tab[aria-selected="true"] { background: color-mix(in srgb, var(--primary) 22%, transparent); border-color: var(--primary); color: var(--foreground); }
 .app[data-mode="child"] .tab { min-height: 52px; font-size: 18px; padding: 8px 20px; }
+
+/* News search: the app's own box, scoped to News, modeled on chat's thread search (field, grouped results, keyboard) */
+.sfield.sq { display: flex; flex: 1 1 auto; max-width: 640px; min-height: 48px; margin: 0; }
+.sfield input { background: none; border: 0; outline: 0; color: var(--foreground); font: inherit; flex: 1; min-width: 0; }
+.sfield:focus-within { border-color: var(--primary); }
+.rescount { color: var(--muted-foreground); font-size: 14px; margin: 6px 0 0; }
+.recent { display: flex; align-items: center; gap: 10px; padding: 4px 0; border-bottom: 1px solid var(--muted); }
+.recent .rmain { display: flex; align-items: center; gap: 12px; flex: 1; min-height: 48px; text-align: left; font-weight: 600; }
+.recent svg.i { color: var(--muted-foreground); }
+.sfchips { display: flex; gap: 8px; flex-wrap: wrap; padding: 4px 0 8px; }
+.sfchip { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--border); font-weight: 650; font-size: 14px; }
+.sfchip.on { background: color-mix(in srgb, var(--primary) 22%, transparent); border-color: var(--primary); }
+.sfchip svg.i { width: 15px; height: 15px; }
 
 /* the editorial grid: one hero over two rows, two featured stacked beside it, two at half width */
 .nf { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
@@ -614,7 +627,7 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
   // ---------- state ----------
   const S = { screen: "today", kid: false, net: true, size: "fit", tv: false, theme: "dark", topic: "all", sid: "s1", ksid: "k1", hist: [], ftab: "topics", menuId: null,
     follow: { science: 1, local: 1, technology: 0, world: 0, business: 0, health: 0, sports: 0, entertainment: 0, environment: 0, kids: 0, "Space Example": 1, "Harbor Courier": 0, "Daily Example": 0, "Metro Example Times": 0, "Science Example": 1, "Example Wire": 0, "Greenfield Gazette": 0, "Kitchen Table Weekly": 0, "Sports Example": 0, "Kids Example Times": 1, "Sprout Science Kids": 1, "Planet Pals News": 0 },
-    listen: { on: false, playing: false, pct: 0.4, rate: 1, sid: "s1" }, tvi: 0 };
+    listen: { on: false, playing: false, pct: 0.4, rate: 1, sid: "s1" }, tvi: 0, q: "", recents: ["harbor path", "science", "winter demand"], sf: { topic: "all", source: "all", date: "any", saved: false } };
   const SCREENS = [
     ["today", "Today", "Today. One hero over two rows, two featured stories beside it, a shelf from your channels and headline rows by day. <b>Tap a story.</b> Try a topic chip, then <b>Internet off</b>."],
     ["mix", "My Mix", "My Mix: the same layout, ranked from what this person follows and reads on this hub. Each lead says why it is here. Nothing leaves the house."],
@@ -624,18 +637,21 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
     ["channel", "Channel: Science", "A channel is one topic or one source: a header with Follow, then the same hero, featured and rows. Filter by source with the chips."],
     ["story", "Story reader", "The reader. Clean text at 19 px on a comfortable line, Key points written on this hub, Also covering on the side. <b>Tap Listen</b> and the dock appears."],
     ["storylisten", "Story reader: Listen", "Listening. The dock at the bottom is the media apps' docked player: paragraph N of M, play and pause, speed. It stays while you browse."],
+    ["search", "Search: results", "News's own search box, scoped to News (stories, topics, sources, Saved), like chat's thread search. Filters: topic, source, date, Saved only. Saved stories come first, then by day. <b>Type to narrow.</b>"],
+    ["searchhome", "Search: recent", "An empty search shows the person's recent searches (kept on this hub, only they see them) and topics to try. On TV and for a child there are no recents."],
     ["kidtoday", "Kid: Today", "A kid's Today. Warmer colors, bigger buttons, Kids' sources only. A speaker on each card reads it aloud. <b>Tap the grey tile.</b>"],
     ["kidstory", "Kid: story", "A kid's story. Big type, a read-to-me button, no links out, no Open on site. Key points only appear when they passed the child check."],
   ];
-  const IMMERSIVE = new Set(["story", "storylisten", "kidstory", "channel"]);
+  const IMMERSIVE = new Set(["search", "story", "storylisten", "kidstory", "channel"]);
   const app = $("#app"), scroller = $("#scroller"), screensEl = $("#screens");
   const kidKey = (k) => (k === "today" ? "kidtoday" : k);
-  const baseOf = (scr) => ({ kidtoday: "today", storylisten: "story", kidstory: "story", followsrc: "following", channel: "following" }[scr] || scr);
+  const baseOf = (scr) => ({ search: "today", kidtoday: "today", storylisten: "story", kidstory: "story", followsrc: "following", channel: "following" }[scr] || scr);
 
   // ---------- pieces ----------
   const netBanner = () => `<div class="net">${ic("wifioff")}<span>The internet is down. Saved stories and stories you opened before are kept on this hub.</span></div>`;
   const hbtn = (icon, label, attrs = "", cls = "") => `<button class="ibtn ${cls}" aria-label="${label}" title="${label}" ${attrs}>${ic(icon)}</button>`;
   const head = (title, sub, actions = "") => `<div class="ahead pad"><div class="ttlblock"><h1>${title}</h1>${sub ? `<p class="dateline">${sub}</p>` : ""}</div>${actions}</div>`;
+  const searchbits = () => `<button class="sfield" data-go="search">${ic("search")}<span>Search News</span></button>${hbtn("search", "Search News", 'data-go="search"', "srch")}`;
   function sectionTabs() {
     const names = S.kid ? [["today", "Today"], ["following", "Following"], ["saved", "Saved"]] : [["today", "Today"], ["mix", "My Mix"], ["following", "Following"], ["saved", "Saved"]];
     const cur = baseOf(S.screen);
@@ -679,11 +695,11 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
       ${rowsByDay(ST.filter((s) => ["s11", "s12", "s13", "s14", "s15", "s16", "s17", "s18"].includes(s.id)))}
       <div class="more-rows"><button class="btn" data-toast="Twenty more stories">Show 20 more</button></div>`;
     return `<section class="screen">
-      ${head("Today", "Sat, Oct 17 · Updated 7:40")}
+      ${head("Today", "Sat, Oct 17 · Updated 7:40", S.kid ? "" : searchbits())}
       <div class="pad">${sectionTabs()}${topicChips()}${netBanner()}${body}</div></section>`;
   };
   R.mix = () => `<section class="screen">
-    ${head("My Mix", "Ranked on this hub · Updated 7:40")}
+    ${head("My Mix", "Ranked on this hub · Updated 7:40", searchbits())}
     <div class="pad">${sectionTabs()}${netBanner()}
       <div class="handoff" style="margin-top:0;margin-bottom:18px"><span class="ibtn solid">${ic("spark")}</span><div class="body"><b>Ranked from what you follow and read on this hub</b><span>Nothing leaves the house. Only you see this.</span></div><button class="btn sm" data-sheet="resetmix">Reset My Mix</button></div>
       ${grid("s6", "s2", "s8", "s7", "s10", { s6: "Because you follow Science", s2: "Because you follow Space Example", s8: "You read Space Example often", s7: "Because you follow Local" })}
@@ -799,6 +815,38 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
         <div class="tvfeat">${others.map((s) => scard(s, "feat")).join("")}</div></div></section>`;
   };
 
+  // ---------- search ----------
+  const SF_DATES = { any: "Any time", today: "Today", week: "This week" };
+  function searchHits() {
+    const pool = S.kid ? KIDS : ST; const q = S.q.trim().toLowerCase(); const f = S.sf;
+    const hits = pool.filter((s) => (!q || `${s.t} ${s.dek} ${s.src} ${TOPICS[s.topic][0]}`.toLowerCase().includes(q)) && (f.topic === "all" || s.topic === f.topic) && (f.source === "all" || s.src === f.source) && (f.date !== "today" || /h$/.test(s.ago)) && (!f.saved || s.saved));
+    const topics = q && !S.kid ? Object.entries(TOPICS).filter(([k, v]) => k !== "kids" && v[0].toLowerCase().includes(q)) : [];
+    const srcs = q && !S.kid ? Object.keys(SRC).filter((n) => !KSRC.includes(n) && n.toLowerCase().includes(q)) : [];
+    return { hits, topics, srcs };
+  }
+  function searchBody() {
+    const f = S.sf, filtered = f.topic !== "all" || f.source !== "all" || f.date !== "any" || f.saved;
+    if (!S.q.trim() && !filtered) {
+      const rec = S.kid || S.tv ? "" : `<div class="grp"><span>Recent searches</span><small><button data-sqclear style="font-weight:700;color:var(--kicker)">Clear</button></small></div>${S.recents.map((x, i) => `<div class="recent"><button class="rmain" data-sqrecent="${i}">${ic("clock")}${x}</button>${hbtn("x", "Remove from recent searches", `data-sqrm="${i}"`)}</div>`).join("") || `<p class="sub">No recent searches.</p>`}`;
+      const tries = (S.kid ? KTOP.map(([k, n]) => [k, n]) : ["science", "local", "technology", "health"].map((k) => [k, TOPICS[k][0]])).map(([k, n]) => `<button class="sfchip" data-sqtry="${n}">${ic("search")}${n}</button>`).join("");
+      return `${rec}<div class="grp"><span>Try</span></div><div class="sfchips" style="padding-top:12px">${tries}</div>`;
+    }
+    const { hits, topics, srcs } = searchHits();
+    const n = hits.length + topics.length + srcs.length;
+    if (!n) return `<div class="note">${ic("info")}<span>No stories match${S.q ? ` “${S.q}”` : ""}. Try fewer words, or take off a filter.</span></div>`;
+    const saved = hits.filter((s) => s.saved), rest = hits.filter((s) => !s.saved);
+    const grp = (name, list) => (list.length ? `<div class="grp"><span>${name}</span><small>${list.length}</small></div><div class="list">${list.map((s) => rowi(s)).join("")}</div>` : "");
+    const chan = topics.length + srcs.length ? `<div class="grp"><span>Topics and sources</span><small>${topics.length + srcs.length}</small></div>${topics.map(([k, v]) => fRow(k, v[0], TOPSUB[k], v[1], "topic")).join("")}${srcs.map((x) => fRow(x, x, "4 stories today", "", "source")).join("")}` : "";
+    const days = [["m", "This morning"], ["n", "Last night"], [undefined, "Earlier this week"]].map(([k, nm]) => grp(nm, rest.filter((s) => s.day === k))).join("");
+    return `<p class="rescount">${n} result${n === 1 ? "" : "s"}${S.q ? ` for “${S.q}”` : ""}</p>${chan}${grp("Saved", saved)}${days}`;
+  }
+  function searchFilters() {
+    const f = S.sf, tv = S.tv;
+    return `<div class="sfchips">${f.topic !== "all" || true ? `<button class="sfchip ${f.topic !== "all" ? "on" : ""}" data-sheet="sf-topic">Topic: ${f.topic === "all" ? "All" : TOPICS[f.topic][0]}${ic("down")}</button>` : ""}<button class="sfchip ${f.source !== "all" ? "on" : ""}" data-sheet="sf-source">Source: ${f.source === "all" ? "All" : f.source}${ic("down")}</button>${S.kid ? "" : `<button class="sfchip ${f.date !== "any" ? "on" : ""}" data-sheet="sf-date">Date: ${SF_DATES[f.date]}${ic("down")}</button>`}${tv ? "" : `<button class="sfchip ${f.saved ? "on" : ""}" data-sfsaved aria-pressed="${f.saved}">${ic("bookmark")}Saved only</button>`}</div>`;
+  }
+  R.search = () => `<section class="screen"><div class="ahead pad" style="gap:10px"><button class="ibtn" data-back aria-label="Back">${ic("left")}</button><label class="sfield sq">${ic("search")}<input id="sq" type="search" value="${S.q.replace(/"/g, "&quot;")}" placeholder="${S.kid ? "Find a story" : "Search News"}" autocomplete="off" aria-label="Search News"></label></div>
+    <div class="pad"><div id="sfilters">${searchFilters()}</div>${netBanner()}<div id="sresults" style="max-width:900px">${searchBody()}</div></div></section>`;
+
   // ---------- shell ----------
   const APPS = [["home", "Home", "home"], ["chat", "Chat", "chat"], ["news", "News", "news"], ["videos", "Videos", "videos"], ["shows", "Shows and Films", "film"], ["music", "Music", "music"], ["podcasts", "Podcasts", "podcast"], ["books", "Books", "book"]];
   const appList = () => (S.kid ? APPS.filter(([k]) => k !== "podcasts") : APPS);
@@ -826,16 +874,17 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
       <div class="mright"><button class="rate" data-lrate aria-label="Reading speed">${l.rate}x</button>${hbtn("cast", "Play on another screen", 'data-sheet="cast"')}${hbtn("x", "Stop listening", "data-lclose")}</div></div>`;
   }
   function render() {
-    if (S.kid && !(S.screen === "kidtoday" || S.screen === "kidstory" || S.screen === "following" || S.screen === "saved" || S.screen === "followsrc")) S.screen = "kidtoday";
+    if (S.kid && !(S.screen === "kidtoday" || S.screen === "kidstory" || S.screen === "following" || S.screen === "saved" || S.screen === "followsrc" || S.screen === "search")) S.screen = "kidtoday";
     if (!S.kid && (S.screen === "kidtoday" || S.screen === "kidstory")) S.screen = "today";
     const key = S.tv && S.screen === "today" ? "tvtoday" : S.screen;
     screensEl.innerHTML = R[key]();
     app.dataset.immersive = IMMERSIVE.has(S.screen) ? "1" : "0";
     app.dataset.mode = S.kid ? "child" : "adult";
     renderRail(); renderMini();
-    const meta = SCREENS.find(([k]) => k === S.screen) || SCREENS[0];
+    const mk = S.screen === "search" && !S.q.trim() ? "searchhome" : S.screen;
+    const meta = SCREENS.find(([k]) => k === mk) || SCREENS[0];
     $("#captag").textContent = meta[1]; $("#captext").innerHTML = meta[2];
-    $("#screenpick").value = SCREENS.some(([k]) => k === S.screen) ? S.screen : "today";
+    $("#screenpick").value = SCREENS.some(([k]) => k === mk) ? mk : "today";
     if (S.tv) setTimeout(() => { const f = screensEl.querySelector(".smain, .btn.primary, .rowmain"); f && f.focus({ preventScroll: true }); }, 30);
     if (S.size === "fit" && !$("#try").hidden) layout();
   }
@@ -851,6 +900,9 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
   const opt = (label, small = "", attrs = "", on = false) => `<button class="opt ${on ? "on" : ""}" ${attrs}>${label}<small>${small}</small></button>`;
   const SHEETS = {
     cast: () => `<h3>Listen on</h3><p>Moves the reading to another speaker or screen. It picks up at the same paragraph.</p>${CAST.map(([i, n, s], k) => `<button class="opt ${k === 0 ? "on" : ""}" data-toast="Now listening on ${n}"><span style="display:flex;gap:10px;align-items:center">${ic(i)}${n}</span><small>${s}</small></button>`).join("")}`,
+    "sf-topic": () => `<h3>Topic</h3>${opt("All topics", "", 'data-sfset="topic:all"', S.sf.topic === "all")}${(S.kid ? KTOP.map(([k, n]) => [k, [n]]) : Object.entries(TOPICS).filter(([k]) => k !== "kids")).map(([k, v]) => opt(v[0], "", `data-sfset="topic:${k}"`, S.sf.topic === k)).join("")}`,
+    "sf-source": () => `<h3>Source</h3>${opt("All sources", "", 'data-sfset="source:all"', S.sf.source === "all")}${(S.kid ? KSRC : Object.keys(SRC).filter((x) => !KSRC.includes(x))).map((x) => opt(x, "", `data-sfset="source:${x}"`, S.sf.source === x)).join("")}`,
+    "sf-date": () => `<h3>Date</h3>${Object.entries(SF_DATES).map(([k, v]) => opt(v, "", `data-sfset="date:${k}"`, S.sf.date === k)).join("")}`,
     resetmix: () => `<h3>Reset My Mix?</h3><p>This forgets what My Mix learned from your reading. What you follow stays. It starts again from what you follow.</p><div class="row-btns"><button class="btn accent" data-toast="My Mix was reset">Reset My Mix</button><button class="btn" data-closesheet>Cancel</button></div>`,
     menu: () => { const s = st(S.menuId); const kid = S.kid; return `<h3 style="font-size:16px">${s.t}</h3><p>${s.src} · ${s.ago}</p>
       ${opt(s.saved ? "Remove from Saved" : "Save", "", 'data-toast="' + (s.saved ? "Removed from Saved" : "Saved. The text is kept on this hub.") + '"')}
@@ -885,6 +937,12 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
     if (d.ftab) { S.ftab = d.ftab; if (S.screen === "followsrc") S.screen = "following"; return render(); }
     if (d.follow) { S.follow[d.follow] = S.follow[d.follow] ? 0 : 1; toast(S.follow[d.follow] ? "Following. Its newest story joins Today." : "Unfollowed"); return render(); }
     if (d.channel) { return go("channel"); }
+    if (d.sfset) { const [k, v] = d.sfset.split(":"); S.sf[k] = v; closeAll(); return render(); }
+    if (d.sfsaved !== undefined) { S.sf.saved = !S.sf.saved; return render(); }
+    if (d.sqrecent !== undefined) { S.q = S.recents[+d.sqrecent]; return render(); }
+    if (d.sqtry) { S.q = d.sqtry; return render(); }
+    if (d.sqrm !== undefined) { S.recents.splice(+d.sqrm, 1); return render(); }
+    if (d.sqclear !== undefined) { S.recents = []; return render(); }
     if (d.sheet) return sheet(d.sheet);
     if (d.keep !== undefined) return toast("Keeping on this phone");
     if (d.toast) { closeAll(); return toast(d.toast); }
@@ -893,6 +951,8 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
     if (d.lrate !== undefined) { const r = [1, 1.25, 1.5, 0.75]; S.listen.rate = r[(r.indexOf(S.listen.rate) + 1) % r.length]; toast(`Reading speed ${S.listen.rate}x`); return render(); }
     if (d.lclose !== undefined) { S.listen.on = false; S.listen.playing = false; return render(); }
   });
+  app.addEventListener("input", (e) => { if (e.target.id !== "sq") return; S.q = e.target.value; $("#sresults").innerHTML = searchBody(); const m = SCREENS.find(([k]) => k === (S.q.trim() ? "search" : "searchhome")); $("#captag").textContent = m[1]; $("#captext").innerHTML = m[2]; });
+  app.addEventListener("keydown", (e) => { if (e.target.id === "sq" && e.key === "Enter" && S.q.trim() && !S.kid && !S.tv) { S.recents = [S.q.trim(), ...S.recents.filter((x) => x !== S.q.trim())].slice(0, 5); } });
   // TV: arrow keys move focus by geometry
   app.addEventListener("keydown", (e) => {
     if (!S.tv) return;
@@ -919,7 +979,7 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
   }
   $("#screenpick").innerHTML = SCREENS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
   function setKid(on) { S.kid = on; $("#kidtoggle").setAttribute("aria-pressed", on); }
-  function pickScreen(v) { setKid(v.startsWith("kid")); if (v === "storylisten") Object.assign(S.listen, { on: true, playing: true, sid: "s1", pct: 0.4 }); if (v === "story") S.sid = "s1"; if (v === "followsrc") S.ftab = "sources"; if (v === "following") S.ftab = "topics"; S.hist = []; go(v === "storylisten" ? "story" : v, false); }
+  function pickScreen(v) { if (v === "searchhome") { S.q = ""; S.sf = { topic: "all", source: "all", date: "any", saved: false }; v = "search"; } else if (v === "search") { S.q = "path"; } setKid(v.startsWith("kid")); if (v === "storylisten") Object.assign(S.listen, { on: true, playing: true, sid: "s1", pct: 0.4 }); if (v === "story") S.sid = "s1"; if (v === "followsrc") S.ftab = "sources"; if (v === "following") S.ftab = "topics"; S.hist = []; go(v === "storylisten" ? "story" : v, false); }
   $("#screenpick").addEventListener("change", (e) => pickScreen(e.target.value));
   $("#kidtoggle").addEventListener("click", () => { setKid(!S.kid); S.hist = []; go(S.kid ? "kidtoday" : "today", false); });
   $("#nettoggle").addEventListener("click", () => { S.net = !S.net; $("#nettoggle").setAttribute("aria-pressed", !S.net); app.dataset.net = S.net ? "on" : "off"; render(); });
@@ -929,7 +989,7 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
   window.addEventListener("resize", layout);
   // a bare #token picks a screen, a size, or the light theme (artifact links allow only plain anchors)
   const h = location.hash.slice(1);
-  if (h === "light") setTheme("light");
+  if (h === "searchhome" || h === "search") { S.screen = "search"; S.q = h === "search" ? "path" : ""; } else if (h === "light") setTheme("light");
   else if (SCREENS.some(([k]) => k === h)) { setKid(h.startsWith("kid")); if (h === "storylisten") { Object.assign(S.listen, { on: true, playing: true, sid: "s1", pct: 0.4 }); S.screen = "story"; } else S.screen = h; if (h === "followsrc") S.ftab = "sources"; }
   if (h === "phone" || h === "desktop" || h === "tv") $(`.bar [data-size="${h}"]`).click();
   layout(); render();
