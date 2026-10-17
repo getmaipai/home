@@ -5,7 +5,7 @@
 // call site. THIN-6B (rule 8) narrows it to a child's or teen's turn: an
 // adult's turn on a model without a record gets tools and thinking.
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { CATALOG, thinkingModeFor } from "@/lib/modelCatalog";
+import { CATALOG, chatCatalogEntry, thinkingModeFor } from "@/lib/modelCatalog";
 import { listInstalledManifests } from "@/lib/plugins";
 import { allPackageStatuses } from "@/lib/smoke";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
@@ -116,7 +116,7 @@ export function resolveTurnBudget(modelId?: string, band?: AgeBand): TurnBudget 
       return band === "adult" ? withTurnToolGates(unmeasuredAdultBudget(), false) : NO_RECORD_BUDGET;
     }
   }
-  const entry = id ? CATALOG.find((m) => m.role === "chat" && m.id === id) : undefined;
+  const entry = chatCatalogEntry(id);
   const base = entry?.turn_budget ? withStreamDeadlines(internalBudgetFromRecord(entry.turn_budget)) : band === "adult" ? unmeasuredAdultBudget() : NO_RECORD_BUDGET;
   // VISION-02d (rule 8): a model whose record declares no thinking mode is
   // never asked to think, whatever the person's toggle says.
@@ -133,8 +133,12 @@ export async function resolveTurnBudgetWithStack(modelId?: string, band?: AgeBan
  * model's record to know whether the engine reasons on every turn, so the
  * one Stack read here serves both; no second health call per turn. */
 export async function resolveTurnBudgetAndEngineModel(modelId?: string, band?: AgeBand): Promise<{ budget: TurnBudget; engineModelId?: string }> {
-  const base = resolveTurnBudget(modelId, band);
   const context = await chatWindowContext();
+  // VOICE-REPLY-01: the budget is the RUNNING model's. `chat.model_id` is no
+  // longer written (aiKeys.ts), so reading it alone gave every turn the
+  // unmeasured defaults whatever the Stack ran; the model the Stack reports
+  // (or the person's pick) selects the record first.
+  const base = resolveTurnBudget(modelId ?? context.modelId, band);
   // VISION-02d (rule 8, a review): the model the Stack actually runs also
   // decides thinking; a chat model with no thinking mode is never asked to
   // think, whatever the household setting or the person's toggle says.

@@ -451,13 +451,32 @@ export function recommend(role: ModelCapabilities["role"], hw: HardwareInfo, con
     });
 }
 
+/** VOICE-REPLY-01 (live, 2026-10-17): the Stack serves some chat models as a
+ * second build of a model Home already has a record for (the MLX build under
+ * oMLX, ENGINE-MLX-01). The weights, template and reasoning behaviour are the
+ * same model's, so the build reads that model's record: thinking mode, turn
+ * budget, deadlines and knowledge cutoff. Without this the running model's id
+ * matched no record and every figure fell to the unmeasured defaults (no
+ * reasoning reserve, so a spoken reply's ceiling was spent on reasoning). */
+export const SERVED_AS_RECORD: Readonly<Record<string, string>> = {
+  "muse-glimmer-30b-mlx-4bit": "muse-glimmer-30b-q4-k-xl",
+};
+
+/** The chat record for a model id the Stack reports or the person picked,
+ * following SERVED_AS_RECORD. */
+export function chatCatalogEntry(modelId: string | undefined): ModelCapabilities | undefined {
+  if (!modelId) return undefined;
+  const id = SERVED_AS_RECORD[modelId] ?? modelId;
+  return CATALOG.find((model) => model.role === "chat" && model.id === id);
+}
+
 /** VISION-02a/02d: whether a chat model can reason before it answers, from
  * its record, never its id (rule 8). A record that predates the field
  * reads its turn budget (a toggled budget above 0 is switchable); a model
  * with no record keeps today's adult behaviour (THIN-6B: the reference
  * record's switch). */
 export function thinkingModeFor(modelId: string | undefined): "switchable" | "none" | "always" {
-  const entry = modelId ? CATALOG.find((model) => model.role === "chat" && model.id === modelId) : undefined;
+  const entry = chatCatalogEntry(modelId);
   if (!entry) return "switchable";
   if (entry.thinking_mode) return entry.thinking_mode;
   return (entry.turn_budget?.thinking_budget_tokens_toggled ?? 0) > 0 ? "switchable" : "none";

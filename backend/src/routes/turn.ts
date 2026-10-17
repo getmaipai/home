@@ -470,7 +470,7 @@ function startResumeSession(session: ResumeSession): void {
   const generation = session.generation;
   void (async () => {
     try {
-      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn })) {
+      for await (const rawEvent of streamTurnEvents(session.result, session.ownerId, session.spokenTurn ? SPOKEN_CUE_DELAY_MS : THINKING_CUE_DELAY_MS, session.controller.signal, session.dropReasoning, session.modelStatus, speakerAgeBand(session.viewer, new Date()), () => session.releasedText, () => session.heardChars, { spokenTurn: session.spokenTurn })) {
         // One shared counter for `delta` and `reasoning` alike (REASONING-01):
         // a resuming client's own replay filter (shouldDeliver()) needs a
         // real per-event sequence for both, or a `reasoning` event sitting
@@ -509,6 +509,12 @@ function startResumeSession(session: ResumeSession): void {
 // checking actually takes a moment" logic, applied to the model's own
 // generation latency instead of a tool call's.
 export const THINKING_CUE_DELAY_MS = 900;
+/** VOICE-REPLY-02: a spoken turn's bridge phrase ("One sec.") is for an answer that is
+ * genuinely late. Rule 13's bar is a first word in 3 seconds and speech takes about half
+ * a second to start, so the cue goes out at 2.5 seconds, not at 0.9; the quick lane
+ * (nodes/fastSpoken.ts) answers in about a second and no cue is spoken at all. The cue
+ * is never the answer and never the same phrase twice in a row (pickThinkingCue). */
+export const SPOKEN_CUE_DELAY_MS = 2500;
 
 /** Returns the timer alongside the promise so the common case (the real
  * token wins the race) can cancel it - a code review (2026-09-05) found

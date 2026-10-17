@@ -37,7 +37,7 @@ import type { Node, ContextItem, TurnState } from "../contract";
 import { picturesAttachedNote, picturesNotReadNote } from "@/lib/chatImageNote";
 import { chatModelReadsPictures, loadPictureParts, picturePartsAllowed } from "@/lib/chatPictures";
 import type { LlmImagePart } from "@/lib/llm";
-import { CATALOG } from "@/lib/modelCatalog";
+import { chatCatalogEntry } from "@/lib/modelCatalog";
 import { librarySnapshotDate } from "@/lib/retrieval/referenceReader";
 
 /** MEMORY-FLOOR-01: the floor on recall()'s own composite `score`
@@ -114,7 +114,7 @@ export function chatModelCutoff(): string | null {
   } catch {
     return null;
   }
-  const cutoff = id ? CATALOG.find((m) => m.role === "chat" && m.id === id)?.model_cutoff : undefined;
+  const cutoff = chatCatalogEntry(id)?.model_cutoff;
   // The spec schema already guarantees a YYYY-MM-DD date string.
   return typeof cutoff === "string" && cutoff.length >= 10 ? cutoff : null;
 }

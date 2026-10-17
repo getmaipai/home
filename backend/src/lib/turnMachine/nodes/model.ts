@@ -200,9 +200,29 @@ export function replyMaxTokensFor(state: Pick<TurnState, "planBasis" | "plan" | 
   // The engine's reasoning span is reserved on top of the visible ceiling;
   // the reply the person sees keeps the band's own cap (rule 0: the words
   // allowed never grow, only the room for reasoning nobody sees).
-  const reasonsAnyway = thinkingModeFor(state.modelId ?? state.engineModelId) === "always";
+  const runningId = state.modelId ?? state.engineModelId;
+  const reasonsAnyway = thinkingModeFor(runningId) === "always" || (runningId !== undefined && spendsCeilingInvisibly.has(runningId));
   return visibleReplyMaxTokens(state.plan.max_words, thinking || reasonsAnyway);
 }
+
+/** VOICE-REPLY-01 (live, 2026-10-17): a model whose record is missing or
+ * wrong cannot be trusted to say it reasons. The engine's own word is the
+ * evidence: a generation that stops on `length` with no visible text spent
+ * its whole ceiling on something the person never sees. The model's id is
+ * remembered for this process, so every later turn on it reserves the
+ * reasoning allowance up front instead of failing once per turn. Nothing is
+ * persisted and nothing is gated on one id (rule 8). */
+const spendsCeilingInvisibly = new Set<string>();
+export function rememberCeilingSpentInvisibly(modelId: string | undefined): void {
+  if (modelId) spendsCeilingInvisibly.add(modelId);
+}
+export function __resetLearnedCeilingsForTests(): void {
+  spendsCeilingInvisibly.clear();
+}
+/** The extra room the one empty-reply retry gets after a generation spent its
+ * whole ceiling without a visible character: the same ceiling would fail the
+ * same way. */
+export const EMPTY_LENGTH_RETRY_EXTRA_TOKENS = 1024;
 
 interface GenerationAttempt {
   ok: true;
@@ -220,6 +240,8 @@ interface GenerationAttempt {
   reasoning: string | undefined;
   toolCalls: ToolCall[] | undefined;
   thinking: boolean;
+  /** VOICE-REPLY-01: the engine stopped on its ceiling (`length`) with no visible text and no call. */
+  lengthEmpty?: boolean;
   /** ROUTER-BUILD-01e: how an armed search-assist hold ended (absent when not armed). */
   hold?: "rescue" | "tool_call" | "text_kept";
   /** The rescue came from the budget running out, not from the round ending. */
@@ -534,7 +556,8 @@ async function runWatchedGeneration(state: TurnState, messages: LlmMessage[], to
     else if (hold.phase === "text" || (hold.phase === "envelope" && visible.trim().length > 0)) heldEnd = "rescue";
     else heldEnd = "text_kept";
   }
-  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking, ...(heldEnd ? { hold: heldEnd } : {}), ...(holdAll ? { heldBack: true } : {}) };
+  const lengthEmpty = started.stats.stopReason === "length" && visible.trim().length === 0 && (!toolCalls || toolCalls.length === 0);
+  return { ok: true, text: visible, reasoning: nativeReasoning || extractReasoningText(raw), toolCalls, thinking, ...(lengthEmpty ? { lengthEmpty } : {}), ...(heldEnd ? { hold: heldEnd } : {}), ...(holdAll ? { heldBack: true } : {}) };
 }
 
 /** ENGINE-CONTRACT-02's builder row, shared by every path that reaches
@@ -1017,7 +1040,10 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   const afterMissedLookup = isPhrasingRound || input.retry === true;
   if ((!attempt.toolCalls || attempt.toolCalls.length === 0) && attempt.text.trim().length === 0) {
     // Rule 6: an empty reply (seen live on a plain written turn with thinking already off) is retried once, never shown as-is.
-    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false), "model_retry_no_thinking", signal, holdMedia ? "media" : false);
+    // VOICE-REPLY-01: a first attempt that hit its ceiling with nothing visible is
+    // remembered for this model, and its retry gets more room than the ceiling that failed.
+    if (attempt.lengthEmpty) rememberCeilingSpentInvisibly(state.modelId ?? state.engineModelId);
+    attempt = await runOneGeneration(state, messages, tools, tool_choice, false, replyMaxTokensFor(state, false) + (attempt.lengthEmpty ? EMPTY_LENGTH_RETRY_EXTRA_TOKENS : 0), "model_retry_no_thinking", signal, holdMedia ? "media" : false);
     if (!attempt.ok) {
       settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));
       const failureMessage = attempt.message ?? "";
