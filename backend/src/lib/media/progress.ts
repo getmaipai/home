@@ -197,6 +197,14 @@ function store(personId: string, mediaId: string, kind: ProgressKind, writes: re
   return { progress: progressFromRow(rowFor(personId, mediaId)!), positionApplied: merged.positionApplied };
 }
 
+/** Forget held ticks before an item is permanently removed, so the timer cannot recreate its progress. */
+export function discardItemProgress(mediaIds: readonly string[]): void {
+  const ids = new Set(mediaIds);
+  for (const [key, held] of pending) if (ids.has(held.mediaId)) pending.delete(key);
+  for (const key of lastDbWrite.keys()) if (ids.has(key.slice(key.indexOf("|") + 1))) lastDbWrite.delete(key);
+  if (pending.size === 0 && flushTimer) { clearTimeout(flushTimer); flushTimer = null; }
+}
+
 /** Stores every held write now. A read calls this first, so it always sees the newest state. */
 export function flushProgress(personId?: string): void {
   if (flushTimer) { clearTimeout(flushTimer); flushTimer = null; }

@@ -186,6 +186,10 @@ async function runScan(sourceId: string, deps: ScanDeps): Promise<ScanSummary> {
       unreadable.push(listing.rel || ".");
       continue;
     }
+    // Parsing yields to trash actions. Re-read tombstones before writing so a concurrent purge stays gone.
+    const currentSource = db.select().from(mediaSources).where(eq(mediaSources.id, sourceId)).get();
+    archive.clear();
+    for (const path of JSON.parse(currentSource?.archive ?? "[]") as string[]) archive.add(path);
     summary.skipped += built.skipped;
     const writes: Array<() => void> = [];
     for (const draft of built.drafts) {
@@ -196,6 +200,7 @@ async function runScan(sourceId: string, deps: ScanDeps): Promise<ScanSummary> {
         persist(parent.item, prior, scanId, parent.extras);
         prior ? summary.updated++ : summary.added++;
         for (const child of draft.children) {
+          if (archive.has(child.rel)) { summary.skipped++; continue; }
           const priorChild = existing.get(child.rel);
           const record = recordFor(child, source, priorChild, parent.item.id, parent.item.band_ok, now);
           persist(record.item, priorChild, scanId, record.extras);
@@ -203,7 +208,7 @@ async function runScan(sourceId: string, deps: ScanDeps): Promise<ScanSummary> {
         }
       });
     }
-    const touchedHere = built.touched.filter((path) => !archive.has(path) || existing.has(path));
+    const touchedHere = built.touched.filter((path) => !archive.has(path));
     summary.unchanged += touchedHere.length;
     sqlite.transaction(() => {
       for (const write of writes) write();
