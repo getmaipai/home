@@ -7,6 +7,31 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-10-17
+
+Chat answers while the faster engine downloads, and Home can pause chat and show what is installing.
+
+### Fixes
+- Chat said "The AI is still downloading" to every message while the faster chat engine's model downloaded in the background. Chat now works whenever the engine has a model ready, whatever else is downloading.
+- A child, teen or guest could save a "yes" for the household likeness switches. Only an adult for themselves, or an owner or admin turning it off, can change them now.
+- Finished pictures are checked once more before they show. A picture that fails the check is withheld and the person is told.
+
+### Chat
+- The composer shows why chat is paused: restarting, low memory, a model not installed, or an admin pause. An admin can pause chat for the household with a message, and the Status page counts the pauses.
+- While Home restarts or updates, the first message waits and a reply that was cut off is asked again once.
+
+### Install and storage
+- A bottom strip shows what is installing. Admins open it to see each download.
+- Settings, Models and storage lists every component with its size, installs and removes them, and shows whether each fits on the disk.
+- The install plan shows the home part and the AI part of the disk space separately.
+
+### Pictures and videos
+- Picture and video jobs show their stage, steps and time left, and pictures show a live preview.
+- Share sends a video file through the phone's share sheet, and Download saves it named from the prompt.
+
+### Voice
+- The microphone is opened once and shared for ten seconds, with a Safari tip when permission is blocked.
+
 ### Install
 - The installer and the setup wizard size the disk from one table (`shared/diskPlan.json`, from the AI engine's pins and measured install sizes) instead of "3 GB". A fresh install checks the whole plan (`--plan`, default Recommended, capped by the computer's memory), each disk that holds Home, its data folder or the AI on its own, with 20 percent more and the room an install uses while it runs. Too little room stops before any change with the figures and `--plan moderate` or `--plan minimal`; low headroom warns.
 - The wizard's plan screen lists every install with its size (Make videos, Make pictures, Chatterbox voice, the chat AI and the rest), the total, the free space and a green, amber or red check. Turning an extra off lowers the total and the files it would download. The storage step and the checks screen use the same numbers.

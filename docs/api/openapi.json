@@ -13199,13 +13199,36 @@
                           "ongoing"
                         ]
                       }
+                    },
+                    "chat_pauses": {
+                      "type": "object",
+                      "properties": {
+                        "count": {
+                          "type": "number"
+                        },
+                        "causes": {
+                          "type": "object",
+                          "additionalProperties": {
+                            "type": "number"
+                          }
+                        },
+                        "line": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "count",
+                        "causes",
+                        "line"
+                      ]
                     }
                   },
                   "required": [
                     "generated_at",
                     "days",
                     "components",
-                    "incidents"
+                    "incidents",
+                    "chat_pauses"
                   ]
                 }
               }
@@ -20969,6 +20992,9 @@
                     "models": {
                       "type": "string"
                     },
+                    "models_need_bytes": {
+                      "type": "integer"
+                    },
                     "chosen": {
                       "type": "object",
                       "properties": {
@@ -20984,6 +21010,7 @@
                   "required": [
                     "records",
                     "models",
+                    "models_need_bytes",
                     "chosen"
                   ]
                 }
@@ -22211,6 +22238,13 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 512
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The disk plan rows to install (ids from the plan's disk.plan.rows). Required rows are always installed; omitted means the plan's defaults."
                   }
                 },
                 "additionalProperties": false
@@ -22245,7 +22279,7 @@
             }
           },
           "409": {
-            "description": "There is nothing the AI can install on this computer.",
+            "description": "There is nothing the AI can install on this computer, or not enough free disk space for the rows chosen.",
             "content": {
               "application/json": {
                 "schema": {
@@ -22331,6 +22365,9 @@
                         },
                         "diskLine": {
                           "type": "string",
+                          "nullable": true
+                        },
+                        "disk": {
                           "nullable": true
                         }
                       },
@@ -24171,6 +24208,9 @@
                         "diskLine": {
                           "type": "string",
                           "nullable": true
+                        },
+                        "disk": {
+                          "nullable": true
                         }
                       },
                       "required": [
@@ -24210,6 +24250,13 @@
                     "type": "integer",
                     "minimum": 1,
                     "maximum": 512
+                  },
+                  "components": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The disk plan rows to install; omitted means the plan's defaults."
                   }
                 },
                 "additionalProperties": false
@@ -44178,6 +44225,58 @@
           },
           "404": {
             "description": "No such file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/messages.mp4": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "The clip prepared for texting: a sound track so a phone treats it as a video, a name from the prompt",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The mp4 as a download named after the prompt (paper-boat-in-the-rain.mp4). A clip made before the Stack added a silent AAC track is converted by the Stack on first request.",
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video",
             "content": {
               "application/json": {
                 "schema": {
