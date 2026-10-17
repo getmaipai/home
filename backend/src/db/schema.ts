@@ -1893,3 +1893,164 @@ export const likenessAdapters = sqliteTable(
   },
   (table) => [index("likeness_adapters_subject_idx").on(table.subjectPersonId), uniqueIndex("likeness_adapters_medium_adapter_idx").on(table.medium, table.adapterId)],
 );
+
+// MEDIA-LIB-01 / MEDIA-PROGRESS-01 (docs/design/media-apps-blend-2026-10-17.md, section 7): the four media records of
+// spec-v0.1.163 (MediaSource, MediaItem, MediaProgress, MediaCollection) in one migration so no later media slice needs
+// one. Each spec object field is stored as JSON text; the fields the app filters or joins on are real columns.
+// `deleted_at` and `trash_until` are the record envelope's soft delete (TRASH-01), one definition for every record.
+export const mediaSources = sqliteTable(
+  "media_sources",
+  {
+    id: text("id").primaryKey(), // msrc-...
+    kind: text("kind").notNull(), // root | feed | channel | link
+    scope: text("scope").notNull(), // household | person
+    ownerPersonId: text("owner_person_id").references(() => people.id),
+    label: text("label").notNull(),
+    rootMountId: text("root_mount_id"), // a nas_mounts row, null for a folder on the hub's own disk
+    rootPath: text("root_path"), // absolute folder, kind root only
+    rootKinds: text("root_kinds"), // JSON array of the media kinds the root holds
+    feedId: text("feed_id"),
+    url: text("url"),
+    extractor: text("extractor"),
+    auto: text("auto").notNull().default("{}"), // JSON (spec MediaSource.auto)
+    speed: real("speed"),
+    skipIntroS: integer("skip_intro_s").notNull().default(0),
+    skipOutroS: integer("skip_outro_s").notNull().default(0),
+    pollMinutes: integer("poll_minutes").notNull().default(60),
+    paused: integer("paused", { mode: "boolean" }).notNull().default(false),
+    lastCheckedAt: text("last_checked_at"),
+    lastStatus: text("last_status"), // ok | failed | quiet | root_missing
+    failures: integer("failures").notNull().default(0),
+    backoffUntil: text("backoff_until"),
+    visibleTo: text("visible_to").notNull().default('"household"'), // JSON: "household" or a list of person ids
+    archive: text("archive").notNull().default("[]"), // JSON string[]: deleted stays gone
+    // Hub-internal scan state (not on the spec record): prune is deferred while a root looks unavailable, and the last
+    // scan's counters feed the admin's "last scanned" line.
+    lastScanSummary: text("last_scan_summary"),
+    prune: integer("prune", { mode: "boolean" }).notNull().default(true),
+    deletedAt: text("deleted_at"),
+    trashUntil: text("trash_until"),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [index("media_sources_kind_idx").on(table.kind), index("media_sources_root_path_idx").on(table.rootPath)],
+);
+
+export const mediaItems = sqliteTable(
+  "media_items",
+  {
+    id: text("id").primaryKey(), // media-...
+    kind: text("kind").notNull(),
+    title: text("title").notNull(),
+    subtitle: text("subtitle"),
+    description: text("description"),
+    sourceId: text("source_id").notNull().references(() => mediaSources.id),
+    parentId: text("parent_id"), // a folder audiobook's chapter files point at the book
+    // location is exactly one shape: a saved copy, a root file, or a stream-only address.
+    locFileId: text("loc_file_id"),
+    locRootId: text("loc_root_id"),
+    locPath: text("loc_path"),
+    locUrl: text("loc_url"),
+    mediaType: text("media_type").notNull(),
+    durationS: real("duration_s"),
+    size: integer("size"),
+    width: integer("width"),
+    height: integer("height"),
+    videoCodec: text("video_codec"),
+    audioCodec: text("audio_codec"),
+    playable: text("playable").notNull(), // original | transcode | none | unknown
+    artwork: text("artwork"), // JSON {file_id} | {path} | null
+    previews: text("previews"), // JSON
+    chapters: text("chapters").notNull().default("[]"),
+    subtitles: text("subtitles").notNull().default("[]"),
+    series: text("series"),
+    season: integer("season"),
+    episode: integer("episode"),
+    artist: text("artist"),
+    album: text("album"),
+    albumArtist: text("album_artist"),
+    trackNo: integer("track_no"),
+    discNo: integer("disc_no"),
+    year: integer("year"),
+    genre: text("genre"),
+    author: text("author"),
+    narrator: text("narrator"),
+    seriesIndex: real("series_index"),
+    locatorKind: text("locator_kind").notNull().default("none"),
+    external: text("external"), // JSON (spec MediaItem.external)
+    externalId: text("external_id"), // external.id lifted for the (source_id, external id) identity
+    advisoryExplicit: integer("advisory_explicit", { mode: "boolean" }).notNull().default(false),
+    advisorySource: text("advisory_source").notNull().default("tag"),
+    bandOk: text("band_ok").notNull(), // child | teen | adult
+    verifiedByPersonId: text("verified_by_person_id"),
+    addedAt: text("added_at").notNull(),
+    fingerprint: text("fingerprint"), // size-mtime for a root file, sha256 for a saved copy
+    hidden: integer("hidden", { mode: "boolean" }).notNull().default(false),
+    // Hub-internal scan bookkeeping: the scan that last saw the file, and since when a pruned item has been missing.
+    lastSeenScan: text("last_seen_scan"),
+    missingSince: text("missing_since"),
+    pages: integer("pages"), // a PDF's page count (the spec item has no field for it)
+    probeFailedFp: text("probe_failed_fp"), // the fingerprint a probe gave up on; retried only when the file changes
+    deletedAt: text("deleted_at"),
+    trashUntil: text("trash_until"),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [
+    // Identity: one item per (source_id, external id) or per (root_id, path); a re-scan updates, never duplicates.
+    uniqueIndex("media_items_external_idx").on(table.sourceId, table.externalId).where(sql`${table.externalId} IS NOT NULL`),
+    uniqueIndex("media_items_root_path_idx").on(table.locRootId, table.locPath).where(sql`${table.locRootId} IS NOT NULL`),
+    index("media_items_source_kind_idx").on(table.sourceId, table.kind),
+    index("media_items_kind_band_idx").on(table.kind, table.bandOk),
+    index("media_items_parent_idx").on(table.parentId),
+    index("media_items_file_idx").on(table.locFileId),
+    index("media_items_dupes_idx").on(table.size, table.title),
+  ],
+);
+
+export const mediaProgress = sqliteTable(
+  "media_progress",
+  {
+    id: text("id").primaryKey(), // mprg-...
+    personId: text("person_id").notNull().references(() => people.id),
+    mediaId: text("media_id").notNull().references(() => mediaItems.id),
+    position: text("position").notNull(), // JSON {seconds} | {locator, percent}
+    durationS: real("duration_s"),
+    completed: integer("completed", { mode: "boolean" }).notNull().default(false),
+    plays: integer("plays").notNull().default(0),
+    skips: integer("skips").notNull().default(0),
+    finishes: integer("finishes").notNull().default(0),
+    marks: text("marks").notNull().default("[]"),
+    deviceId: text("device_id"),
+    updatedAt: text("updated_at").notNull(), // the server clock after skew correction
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("media_progress_person_media_idx").on(table.personId, table.mediaId), index("media_progress_person_updated_idx").on(table.personId, table.updatedAt)],
+);
+
+export const mediaCollections = sqliteTable(
+  "media_collections",
+  {
+    id: text("id").primaryKey(), // mcol-...
+    personId: text("person_id").notNull().references(() => people.id),
+    kind: text("kind").notNull(), // liked | watch_later | queue | playlist | watchlist | pins
+    title: text("title").notNull(),
+    items: text("items").notNull().default("[]"), // JSON [{media_id, added_at, position, status}]
+    pointer: integer("pointer"),
+    sharedTo: text("shared_to"), // JSON: null (private), "household" or a list of person ids
+    rules: text("rules"), // reserved for smart playlists, null today
+    deletedAt: text("deleted_at"),
+    trashUntil: text("trash_until"),
+    createdAt: text("created_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [
+    index("media_collections_person_kind_idx").on(table.personId, table.kind),
+    // One liked, one watch later and one queue per person exist by construction.
+    uniqueIndex("media_collections_singleton_idx").on(table.personId, table.kind).where(sql`${table.kind} IN ('liked', 'watch_later', 'queue')`),
+  ],
+);

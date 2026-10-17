@@ -70,6 +70,7 @@ import "@/lib/likeness/revoke";
 import { picturesRoutes } from "@/routes/pictures";
 import { picturesAdminRoutes } from "@/routes/picturesAdmin";
 import { videosRoutes } from "@/routes/videos";
+import { mediaRoutes } from "@/routes/media";
 import { likenessRoutes } from "@/routes/likeness";
 import { attachmentsRoutes } from "@/routes/attachments";
 import { updatesRoutes } from "@/routes/updates";
@@ -260,6 +261,7 @@ app.route("/api/pictures/admin", picturesAdminRoutes);
 app.route("/api/pictures", picturesRoutes);
 app.route("/api/likeness", likenessRoutes);
 app.route("/api/videos", videosRoutes);
+app.route("/api/media", mediaRoutes);
 app.route("/api/shares", sharesRoutes);
 app.route("/api/updates", updatesRoutes);
 // Root-mounted, not under /api: OpenAI's own wire contract names this

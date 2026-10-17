@@ -1,6 +1,7 @@
 // SINGLE-INSTANCE-01 (#194): must stay the FIRST import. It refuses a stray
 // data directory and takes the data directory's one-hub lock before any
-// later import (app, db, keystore) can open the database.
+// later import { startMediaScanner } from "@/lib/media/scan";
+import (app, db, keystore) can open the database.
 import { instanceLock } from "@/lib/bootGuard";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
@@ -320,6 +321,8 @@ ensureCoreJob("people.disable_expired_guests", "every:1d");
 ensureCoreJob("people.apply_age_band_changes", "every:1d");
 // CHAT-TITLE-02: repair pass for chats found with no title or only a provisional one (small cap, backs off while the engine is down).
 startConversationTitleSweep();
+// MEDIA-LIB-01: the media library's scan intervals (one per root).
+startMediaScanner();
 // SRC-ICON-01: the source favicon cache's own daily sweep -
 // lib/scheduler.ts's own CORE_JOBS entry, lib/favicons.ts for the
 // expiry and size-cap mechanics.

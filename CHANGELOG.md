@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Media library
+- Home can scan library folders on this computer or on a mounted network share and list what is in them: videos, shows, films, music, books and audiobooks, with posters, covers, chapters and tags. An owner or admin adds a folder and can rescan it; children see only the titles cleared for a child. No page uses it yet.
+
 ## [0.2.14] - 2026-10-17
 
 Conversation mode speaks a real answer again. Pictures and videos can look like a household adult who agreed, and the AI engine restarts itself after a crash.

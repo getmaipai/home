@@ -220,3 +220,17 @@ export function newLikenessUseId(): string {
 export function newLikenessAdapterId(): string {
   return `la-${randomSuffix(10)}`;
 }
+
+// MEDIA-LIB-01 / MEDIA-PROGRESS-01: the four media records (spec MediaItem, MediaSource, MediaProgress, MediaCollection).
+export function newMediaItemId(): string {
+  return `media-${randomSuffix(10)}`;
+}
+export function newMediaSourceId(): string {
+  return `msrc-${randomSuffix(10)}`;
+}
+export function newMediaProgressId(): string {
+  return `mprg-${randomSuffix(10)}`;
+}
+export function newMediaCollectionId(): string {
+  return `mcol-${randomSuffix(10)}`;
+}

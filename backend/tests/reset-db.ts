@@ -45,6 +45,10 @@ import {
   likenessConsentEvents,
   likenessUses,
   likenessAdapters,
+  mediaCollections,
+  mediaProgress,
+  mediaItems,
+  mediaSources,
   videoAdapterPrefs,
   artifacts,
   conversations,
@@ -181,6 +185,10 @@ export function resetDb(): void {
   db.delete(likenessUses).run(); // LIKENESS-01: references people
   db.delete(likenessAdapters).run();
   db.delete(likenessConsentEvents).run();
+  db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
+  db.delete(mediaProgress).run();
+  db.delete(mediaItems).run();
+  db.delete(mediaSources).run();
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();
   db.delete(conversations).run();
