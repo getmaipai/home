@@ -5398,7 +5398,7 @@ one row of.
       **Provenance, the one addition past the original draft
       (coordinator, 2026-09-21): the op records provenance the way
       `remember` already does** - `packageHost.ts`'s own `remember()`
-      sets `source = turnId ?? \`package:${manifest.id}\`` (a comment
+      sets `source = turnId ?? `package:${manifest.id}`` (a comment
       there: "the turn id when this call is happening inside a turn...
       package id otherwise") - `host.artifact.create`/`update`'s real
       implementation uses the IDENTICAL expression for
@@ -9834,3 +9834,17 @@ From `docs/design/chat-throughput-2026-10-17.md`: 25 tok/s is the bandwidth ceil
 
 - [ ] **SETTINGS-AUDIT-01: a household event for safety-relevant setting writes** (S, 2026-10-17; found by the SEARCH-DDGS-TEEN-01 review). Objective: an owner or admin change to a setting that widens what a child or teen can reach (`search.ddgs_for_minors`, `search.web.child_mode`, `search.web.teen_mode`, `search.web_sources`, blocked-site lists and the other age-gate keys) leaves a record of who changed it, which key and the new value, shown to owners. Today Home has no settings-change event type: `settings_values` keeps only `updated_at` (and `set_by` for a user override), `status_events` is service uptime and `issues` is health, so none fits. Files: `backend/src/lib/settings.ts` (the write path), a new typed event kind per rule 6a (key and value of a household setting are not a person's activity text; the actor id is the admin's own change, shown only to owners). Acceptance: a write of each listed key by an admin records one event with the actor, key and new value; a refused write records none; a teen or child can never write one. Architect verdict first (new record type, so spec first in `commons`). Exit: `bash scripts/check.sh`.
 - [ ] **SPEC-MINOR-DDGS-KEYS-01: move `search.ddgs_for_minors`, `ui.reasoning_open` and `voice.hesitations` into a commons spec tag** (S, 2026-10-17; spec first, then Home). Objective: the three keys that ride in Home (`backend/src/settings/minorDdgsKeys.ts`, the reasoning and voice key files, allowed by the settings drift check "absent only, never different" ahead of spec-v0.1.152) are declared once in `commons` `spec/settings/keys.json`, a new `spec-v*` tag is cut, Home bumps the pin (`docs/PINNING.md`) and deletes the local declarations. Acceptance: the drift check passes with the keys present in the spec and absent from Home; copy and options are byte-identical to today's; the registry visibility rule for `search.ddgs_for_minors` (kept visible while its value is not off) moves with it or stays in Home as a filter. Needs Jesse's word for the tag. Exit: `bash scripts/check.sh`.
+
+## Image editor tools (owner approved 2026-10-17)
+
+From [image-tools-2026-10-17.md](design/image-tools-2026-10-17.md): Apple Vision (Mac) or IS-Net for Remove BG, Big-LaMa for Erase, Real-ESRGAN general x4v3 for Upscale, Lanczos for Resize; one on-demand worker behind `POST /v1/images/edits` in the Stack.
+
+- [ ] **IMGTOOLS-01: Stack image tools service** (M, Stack, `backend/src/imagetools/*`, `routes/v1.ts`, `routes/imageTools.ts`, `lib/modelCatalog.ts`, `lib/installPlan.ts`). In progress 2026-10-17: see the Stack repo's BACKLOG row for the SHA.
+- [ ] **IMGTOOLS-02: architect verdict on the note, then Home endpoints design** (S).
+- [ ] **IMGTOOLS-03: Home route to edit a picture through the Stack** (S, `backend/src/routes/`, new `lib/imageEdit.ts`). Gates in Home; result stored as a new version.
+- [ ] **IMGTOOLS-04: tools status in Home** (S). Reads `GET /stack/v1/image-tools` to enable each tool.
+- [ ] **IMGTOOLS-05: canvas editor tools UI** (L, `frontend/src/apps/chat/**` canvas, `frontend/src/dev/elements-adoption.json`). Remove BG, Erase brush, Resize; kit parts only; record the canvas gap in RULES first (owner).
+- [ ] **IMGTOOLS-06: tests with real images** (M, Stack `tests/imageTools*.test.ts`, Home route tests, a browser flow).
+- [ ] **IMGTOOLS-07: erase large holes at native resolution** (M, Stack worker, tiled second pass).
+- [ ] **IMGTOOLS-08: compiled Apple helper as a release asset; Linux requirements** (S).
+- [ ] **IMGTOOLS-09: hair, fur, glass test set; BiRefNet-lite for p64 and p128** (M, bench).
