@@ -12,7 +12,8 @@ import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import { allVideoAdapters } from "./adapters";
 import { checkImages, isAdultOnlyJob } from "@/lib/pictures/ageCheck";
-import { gateFinished } from "@/lib/pictures/laneGate";
+import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
+import { videoModelForLane } from "@/lib/pictures/lane";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
@@ -284,7 +285,9 @@ export interface StartVideoInput {
 export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   // One clip at a time per person: a second one waits until the first is done or stopped, so no one can fill the Stack's line.
   if (activeVideoJobsFor(input.actor) > 0) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
-  const submitted = await submitVideo({ ...input.body, timeout_ms: 1 });
+  // Whoever calls, a teen or a child is on an allowed model (Quick, silent); only an adult's own choice reaches the engine.
+  const model = videoModelForLane(laneOfPerson(input.actor), input.body.model);
+  const submitted = await submitVideo({ ...input.body, ...(model ? { model } : {}), timeout_ms: 1 });
   // The finished-clip check needs the keyframe helper; compile it now, while the clip renders, so it is ready when the clip is.
   void ensureKeyframeHelper();
   const now = new Date().toISOString();

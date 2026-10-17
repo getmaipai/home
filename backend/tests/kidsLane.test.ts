@@ -12,10 +12,11 @@ import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversati
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { runGenerateVideo } from "@/lib/videos/tool";
+import { __resetVideoJobsForTests, startVideoJob } from "@/lib/videos/jobs";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { saveJob } from "@/lib/pictures/jobStore";
 import { __setAgeCheckRunnerForTests, MINOR_VIEWER_LINE } from "@/lib/pictures/ageCheck";
-import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_PROMPT_PREFIX, CHILD_VIDEO_LIMIT_LINE, childPromptUnsafe, laneOf, picturesMadeToday, videosMadeToday } from "@/lib/pictures/lane";
+import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_PROMPT_PREFIX, CHILD_VIDEO_LIMIT_LINE, childPromptUnsafe, laneOf, picturesMadeToday, videoModelForLane, videosMadeToday, WAN_QUICK_VIDEO_MODEL } from "@/lib/pictures/lane";
 import { __setChildSafetyRunnerForTests, type ChildSafetyCheck } from "@/lib/pictures/laneGate";
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { editToolsStatus, loadSource, startComment } from "@/lib/imageEdit";
@@ -337,5 +338,26 @@ describe("the daily limit is stored and atomic", () => {
     const o = await pic(kid, { prompt: "a friendly dragon" });
     expect(o.status).not.toBe("succeeded");
     expect(picturesMadeToday(kid)).toBe(0);
+  });
+});
+
+describe("a child and a teen are only ever on the Quick video model", () => {
+  test("the tool sends it for a child, and the job starter overrides any other model for a child or a teen, but not an adult", async () => {
+    expect((await vid(kid, { prompt: "a friendly dragon waving" })).status).toBe("succeeded");
+    expect((video.submitted[0] as { model?: string }).model).toBe(WAN_QUICK_VIDEO_MODEL);
+    const start = (actor: PersonRow, model?: string) => startVideoJob({ actor, conversationId: null, turnId: null, temporary: true, kind: "generate", prompt: "a friendly dragon", body: { prompt: "a friendly dragon", audience: "all-ages", ...(model ? { model } : {}) } });
+    // Nothing a caller passes gets a young person onto another model (LTX with sound is not allowed to them).
+    await start(teen, "ltx-2-sound");
+    expect((video.submitted.at(-1) as { model?: string }).model).toBe(WAN_QUICK_VIDEO_MODEL);
+    __resetVideoJobsForTests();
+    await start(teen);
+    expect((video.submitted.at(-1) as { model?: string }).model).toBe(WAN_QUICK_VIDEO_MODEL);
+    expect(videoModelForLane("child", "ltx-2-sound")).toBe(WAN_QUICK_VIDEO_MODEL);
+    expect(videoModelForLane("child")).toBe(WAN_QUICK_VIDEO_MODEL);
+    // An adult's own choice stands, and no choice is left to the engine.
+    expect(videoModelForLane("adult", "ltx-2-sound")).toBe("ltx-2-sound");
+    expect(videoModelForLane("adult")).toBeUndefined();
+    await start(bench.owner, "ltx-2-sound");
+    expect((video.submitted.at(-1) as { model?: string }).model).toBe("ltx-2-sound");
   });
 });

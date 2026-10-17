@@ -10,7 +10,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
-import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videosMadeToday } from "@/lib/pictures/lane";
+import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
@@ -248,6 +248,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
       body: {
         prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size: source.request.size, seconds: laneOf(audience) === "child" ? Math.min(source.request.seconds, 3) : source.request.seconds, audience: prep.likeness ? "adult" : stackAudienceFor(audience),
+        ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}) } : {}),
         ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}), ...(prep.negativePrompt && laneOf(audience) !== "child" ? { negative_prompt: prep.negativePrompt } : {}),
@@ -295,6 +296,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
       actor, conversationId: body.conversation_id, turnId: body.turn_id, temporary: false, kind: "animate", prompt, sourceFileId: fileId,
       body: {
         prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: prep.likeness ? "adult" : stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
+        ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),

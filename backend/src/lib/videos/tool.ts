@@ -20,7 +20,7 @@ import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import { createHash } from "node:crypto";
 import { peopleGuidanceSuffix, peoplePromptsOn } from "@/lib/pictures/policy";
-import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videosMadeToday } from "@/lib/pictures/lane";
+import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videoModelForLane, videosMadeToday } from "@/lib/pictures/lane";
 
 const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
@@ -197,6 +197,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         size,
         seconds,
         audience: likeness ? "adult" as const : stackAudienceFor(audience),
+        ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource, ...(consentProof ? { consent_proof: consentProof } : {}) } : {}),
         ...(adapter ? { loras: [{ id: adapter.id, strength: adapter.strength_default, ...(stylePrep.kind === "likeness" ? { likeness_proof: stylePrep.proof } : {}) }] } : {}),
         ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : negativePrompt ? { negative_prompt: negativePrompt } : {}),

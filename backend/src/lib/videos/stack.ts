@@ -86,6 +86,8 @@ export interface VideoBody {
   consent_proof?: string;
   loras?: Array<{ id: string; strength: number; likeness_proof?: string }>;
   audience: "all-ages" | "adult";
+  /** The video model, when the caller picks one; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
+  model?: string;
   timeout_ms: number;
 }
 

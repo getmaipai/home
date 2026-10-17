@@ -109,6 +109,18 @@ export function forceCartoon(prompt: string): string {
   return `${CHILD_PROMPT_PREFIX}${prompt.trim()}`;
 }
 
+// ---------------------------------------------------------------- which video model a young person gets
+
+/** The Quick video model (Wan 2.2, silent). A child and a teen get this one and nothing else until the owner allows more for their lane. */
+export const WAN_QUICK_VIDEO_MODEL = "wan2.2-ti2v-5b-fastwan-mlx";
+/** Models a teen or a child may be sent to. LTX (with sound) is not here: adding it is a decision for the owner, per lane (lane review, 2026-10-17). */
+export const YOUNG_VIDEO_MODELS: readonly string[] = [WAN_QUICK_VIDEO_MODEL];
+/** What goes in the video request's `model` for this lane: the adult's choice stands (undefined is the engine's default); a teen or a child is always on an allowed model. */
+export function videoModelForLane(lane: Lane, requested?: string | null): string | undefined {
+  if (lane === "adult") return requested ?? undefined;
+  return requested && YOUNG_VIDEO_MODELS.includes(requested) ? requested : WAN_QUICK_VIDEO_MODEL;
+}
+
 // ---------------------------------------------------------------- the daily limit
 
 /** Every day is the local day of this computer, written YYYY-MM-DD. */
