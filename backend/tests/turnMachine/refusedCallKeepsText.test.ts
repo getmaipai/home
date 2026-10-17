@@ -111,9 +111,30 @@ describe("SEARCH-ANSWER-06: a refused tool call never wipes a streamed answer", 
     expect(result.value.reply.text).toBe(TEXT);
   });
 
-  test("a refused call with no streamed text still gets the refusal line", async () => {
+  // GROUND-02 (live, 2026-10-17): the model proposed show_images with a subject the person never
+  // typed and wrote no text beside it; the whole answer became the honesty line. A picture is
+  // decoration, so a refused picture call is a tool failure (rule 6): it is dropped and the model
+  // answers once more without tools. The honesty line stays for a call whose arguments matter.
+  test("GROUND-02: a lone ungrounded show_images call is dropped and the model answers without it", async () => {
+    const requests: ChatCompletionRequest[] = [];
     const result = await withStub(
-      { reply: () => "", calls: (request) => (isFirst(request) ? call("show_images", { subject: "Zanzibar Quartz" }) : undefined) },
+      { reply: (request) => { requests.push(request); return "Mars has two moons, Phobos and Deimos."; }, calls: (request) => (isFirst(request) ? call("show_images", { subject: "Zanzibar Quartz" }) : undefined) },
+      () => runTurnNext(people.owner, "chat", "tell me briefly about the moons of Mars"),
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok || result.kind !== "immediate") throw new Error("expected an immediate result");
+    expect(result.value.reply.text).toBe("Mars has two moons, Phobos and Deimos.");
+    expect(result.value.reply.text).not.toBe(REFUSAL);
+    // The follow-up generation offers no tools, so it cannot loop on the same call.
+    expect((requests.at(-1)?.tools?.length ?? 0)).toBe(0);
+    const policy = (statsOf(result.value.turn_id).nodes ?? []).find((n) => n.node === "policy")?.outcome;
+    expect(policy?.arg).toBe("subject");
+  });
+
+  test("an ungrounded call to a tool whose arguments matter still gets the refusal line", async () => {
+    __setToolOfferOverridesForTests(["weather"]);
+    const result = await withStub(
+      { reply: () => "", calls: (request) => (isFirst(request) ? call("weather", { place: "Zanzibar" }) : undefined) },
       () => runTurnNext(people.owner, "chat", "tell me about that old film"),
     );
     expect(result.ok).toBe(true);

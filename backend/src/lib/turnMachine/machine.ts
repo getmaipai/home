@@ -20,6 +20,7 @@ import { policyNode, type PolicyOutput, type PolicyEntry } from "./nodes/policy"
 import { toolNode, type ToolOutput } from "./nodes/tool";
 import { retryEligible } from "./nodes/lookupFallback";
 import { START_PROJECT_TOOL_ID } from "@/lib/projects/tool";
+import { SHOW_IMAGES_TOOL_ID } from "@/lib/answerImages/turn";
 import { answerNode, type AnswerInput, type AnswerOutput, type PolicyRefusedReason } from "./nodes/answer";
 import { outputGateNode, type OutputGateOutput } from "./nodes/outputGate";
 import { planFor } from "@/lib/register";
@@ -98,6 +99,14 @@ interface MachineContext {
   // SEARCH-ANSWER-06: text the model wrote beside its tool calls this round; read once,
   // by answerInputFrom(), when policy refuses every call.
   modelDraft: string | undefined;
+  // GROUND-02: set once when a refused decorative call was dropped and the model is asked again
+  // without tools; a second refusal takes the ordinary path, so this can never loop.
+  decorativeDropped?: boolean;
+}
+
+/** GROUND-02: a tool whose call only decorates the answer (a picture). Refusing its call must never replace the answer. */
+function isDecorativeTool(tool: string): boolean {
+  return tool === SHOW_IMAGES_TOOL_ID;
 }
 
 /** T5 / THIN-2G: true while the one retry round (its model call, its policy
@@ -194,6 +203,18 @@ export const turnMachine = setup({
     queryWriterRefused: ({ context, event }) => {
       const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
       return toRun.length === 0 && parkedAsk === null && context.queryWriterUsed;
+    },
+    // GROUND-02 (rule 6, a failed tool never fails the answer): every call policy refused was a
+    // decorative picture call whose arguments were ungrounded. The picture is optional, so the call
+    // is dropped and the model answers once more without tools; the honesty line stays for a call
+    // whose arguments matter (a search, a write, a lookup). Text the model wrote beside the call is
+    // already the answer (answerInputFrom), so this only fires with none.
+    decorativeCallDropped: ({ context, event }) => {
+      const { toRun, parkedAsk } = proposalsFrom((event as unknown as { output: PolicyOutput }).output);
+      if (toRun.length > 0 || parkedAsk !== null || context.decorativeDropped || retryRound(context)) return false;
+      if (context.modelDraft && context.modelDraft.trim().length > 0) return false;
+      const entries = (event as unknown as { output: PolicyOutput }).output.entries;
+      return entries.length > 0 && entries.every((e) => !e.decision.allow && e.decision.reason === "ungrounded_args" && isDecorativeTool(e.proposal.request.tool));
     },
     moreRoundsAvailable: ({ context }) => context.turnState.budget.model_transitions && context.roundsUsed < context.turnState.budget.rounds,
     // THIN-1B (rule 6) removed SEARCH-EMPTY-01's `toolAllFailed` guard
@@ -442,6 +463,7 @@ export const turnMachine = setup({
           // T5: nothing the retry round called could run; on to the phrasing round
           // (roundsUsed 1 is what makes the next model call the phrasing one).
           { guard: "retryRefused", actions: assign({ roundsUsed: ({ context }) => context.roundsUsed + 1 }), target: "model" },
+          { guard: "decorativeCallDropped", actions: assign(({ context }) => ({ decorativeDropped: true, roundsUsed: Math.max(context.roundsUsed + 1, context.turnState.budget.rounds), modelDraft: undefined })), target: "model" },
           { guard: "policyAllRefused", actions: assign(({ event }) => ({ step: event.output })), target: "answer" },
           { actions: assign(({ event }) => ({ step: event.output })), target: "tool" },
         ],
