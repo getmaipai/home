@@ -1,37 +1,37 @@
 {
   "book-lookup": {
     "sha256": "0f1edd944957bc9196cc09d2e561f71a9fd49000cc2e804e9df864a6beddc019",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "plugins/info/book-lookup"
   },
   "joke": {
     "sha256": "12ad2f0a107dbe90d6ade5a062995df009236464dee278766183c5a4fe2834a2",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "plugins/fun/joke"
   },
   "media-lookup": {
     "sha256": "dfa2b838a04c28084c9f7283f71ab08c101ecaace763b5e13b0ef0ec54b37a9b",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "plugins/info/media-lookup"
   },
   "place-lookup": {
     "sha256": "d568311ca3e364d78ae32a4d606206bc000f136d1fa4967d1a7709ec7700318b",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "plugins/info/place-lookup"
   },
   "storytime-style": {
     "sha256": "aea745f9cb83564dbc6fd738c784a9f5447e0703255c7269a57ab9100808d21a",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "skills/family/storytime-style"
   },
   "trivia": {
     "sha256": "e2b229acf08dda4b0a8e38d922532cc2d3970d18a02449fdb525cdadcd41f8d1",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "plugins/fun/trivia"
   },
   "weather": {
     "sha256": "406d203fbc50ef350c02e30af1621e0db7d1c9a503e3c6d9916534be5dcf175a",
-    "source_commit": "f3d8c2f017f85dbb847fb7457b19369f9e5bcb37",
+    "source_commit": "b85487cecb7c12fc2484e109bfccf6ee966ea216",
     "catalog_path": "plugins/utilities/weather"
   }
 }
