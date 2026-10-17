@@ -358,3 +358,14 @@ test("leaving erases budget totals and session samples along with progress", asy
   expect(db.select().from(mediaWatchDays).where(eq(mediaWatchDays.personId, child.id)).all()).toEqual([]);
   expect(db.select().from(mediaWatchSessions).where(eq(mediaWatchSessions.personId, child.id)).all()).toEqual([]);
 });
+
+test("a reader tick (no seconds position) keeps the tight 12 s cap even when the client ticks once a minute", async () => {
+  const { child, item } = await setup(); const start = clock();
+  const book = item("media-book0000001", "msrc-library0001", "book");
+  const page = (percent: number) => ({ locator: { kind: "page" as const, page: 1 }, percent });
+  tick(child, book, start, 0, { position: page(0) }, "book");
+  tick(child, book, at(start, 60), 0, { position: page(1) }, "book");
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(12 / 60);
+  tick(child, book, at(start, 70), 0, { position: page(2) }, "book");
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(22 / 60);
+});

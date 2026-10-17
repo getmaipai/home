@@ -8,6 +8,11 @@ import { extensionOf } from "@/lib/media/parsers/text";
 import { readableItem } from "@/lib/media/access";
 import { itemByteMetadata, serveItemArtwork, serveItemBytes } from "@/lib/media/serve";
 import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
+import { mediaTimeUpRefusal, minorMayKeepOffline } from "@/lib/media/watchTime";
+import { getCookie } from "hono/cookie";
+import { hashSessionToken } from "@/lib/session";
+import type { Context } from "hono";
+import type { PersonRow } from "@/types";
 import { readAttachment } from "@/lib/attachments";
 import type { MediaItem } from "@/lib/media/model";
 
@@ -24,9 +29,25 @@ function playableItem(item: MediaItem | null): MediaItem | null {
   return { ...item, playable: decidePlayable({ ext: extensionOf(location.path ?? ""), hasVideo: item.video_codec !== null, hasAudio: item.audio_codec !== null, videoCodec: item.video_codec, audioCodec: item.audio_codec }) };
 }
 
+/** MEDIA-KID-01: keeping media is refused for a minor whose time is up, and for any minor with a daily media budget (offline
+ * time cannot be metered). Neither code is `device_revoked`, so the browser keeps its existing copies. */
+function keepRefusal(actor: PersonRow): { error: string; code: "media_time_up" | "budget_keep_refused" } | null {
+  const timeUp = mediaTimeUpRefusal(actor);
+  if (timeUp) return timeUp;
+  if (!minorMayKeepOffline(actor)) return { error: "Keeping a title for later is off while you have screen time limits. Ask a grown-up.", code: "budget_keep_refused" };
+  return null;
+}
+/** The metering cursor key, derived by the server: the paired device, else the hashed browser session. Never a body field. */
+function meterKeyOf(c: Context): string {
+  const deviceId = c.get("deviceId") as string | undefined;
+  if (deviceId) return `d:${deviceId}`;
+  const session = getCookie(c, "session");
+  return session ? `s:${hashSessionToken(session)}` : "-";
+}
+
 const SUBTITLE_TYPES = new Set(["text/vtt", "text/plain", "application/x-subrip", "text/srt"]);
 const missing = "This item is not available to you on Home. Check your library, then try again.";
-const errors = errorResponses({ 401: "Sign in to Home", 403: "Pair this device again or check its offline permission", 404: "Check the library for this item" });
+const errors = errorResponses({ 401: "Sign in to Home", 403: "Pair this device again, check its offline permission, or screen time is done (media_time_up, budget_keep_refused)", 404: "Check the library for this item" });
 
 const manifest = createRoute({
   method: "get", path: "/manifest", tags: ["Media offline"], summary: "A hub-only manifest for keeping one media item",
@@ -37,6 +58,8 @@ const manifest = createRoute({
 mediaOfflineRoutes.openapi(manifest, (c) => {
   const actor = c.get("person");
   const { id, kind = "media" } = c.req.valid("query");
+  const refused = keepRefusal(actor);
+  if (refused) return c.json(refused, 403);
   const item = playableItem(readableItem(actor, id));
   if (!matches(item, kind)) return c.json({ error: missing }, 404);
   const metadata = itemByteMetadata(actor, item);
@@ -70,6 +93,8 @@ const file = createRoute({
 mediaOfflineRoutes.openapi(file, async (c) => {
   const actor = c.get("person");
   const { id, kind } = c.req.valid("param");
+  const refused = keepRefusal(actor);
+  if (refused) return c.json(refused, 403);
   const item = playableItem(readableItem(actor, id));
   if (!item || (!["artwork", "subtitle"].includes(kind) && !matches(item, kind))) return c.json({ error: missing }, 404);
   if (kind === "artwork") {
@@ -130,6 +155,7 @@ mediaOfflineRoutes.openapi(progress, (c) => {
   const { sent_at, events } = c.req.valid("json");
   const actor = c.get("person");
   const now = new Date();
+  const meterKey = meterKeyOf(c);
   const sent = Date.parse(sent_at);
   // Reject the whole batch before writing anything. Event clocks may be skewed along with sent_at.
   if (sent > now.getTime() + 300_000 || events.some((event) => Date.parse(event.at) - sent > 300_000)) return c.json({ error: "restamp" }, 400);
@@ -142,7 +168,7 @@ mediaOfflineRoutes.openapi(progress, (c) => {
       ...(event.finished ? { completed: true } : {}),
       device_id: c.get("deviceId") ?? null,
       stamp: correctedStamp({ sampledAt: event.at, clientNow: sent_at, serverNow: now }),
-    }, { now, immediate: true });
+    }, { now, immediate: true, meterKey });
     if (!result.ok) return { kind, id, status: "refused" as const, reason: result.refusal === "other_persons_device" ? "This device belongs to someone else. Use your own device to save your place." : "This item needs a place in the text. Save book progress while online." };
     return { kind, id, status: result.positionApplied ? "applied" as const : "older" as const, reason: null };
   }) }, 200);

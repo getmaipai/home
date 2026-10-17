@@ -6,7 +6,8 @@ import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { OfflineManifest } from "@maipai/spec/gen/ts/offline-manifest.js";
 import { db } from "@/db";
-import { devices, deviceTokens, mediaItems, mediaSources, people, mediaProgress } from "@/db/schema";
+import { devices, deviceTokens, mediaItems, mediaSources, people, mediaProgress, mediaWatchDays, mediaWatchSessions } from "@/db/schema";
+import { mediaDay } from "@/lib/media/watchTime";
 import { issueDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
 import { deleteDevice, setDeviceOfflineScope } from "@/lib/devices";
 import { __resetProgressForTests, getProgress, writeProgress } from "@/lib/media/progress";
@@ -281,4 +282,49 @@ test("a real backup contains no device tokens or token hash bytes, while the liv
   finally { restored.close(); }
   expect(readFileSync(path).includes(Buffer.from(hashDeviceToken(s.issued.token)))).toBe(false);
   expect((await s.get(`/manifest?id=${s.id}`)).status).toBe(200);
+});
+
+describe("MEDIA-KID-01 on the offline routes", () => {
+  const codeOf = async (res: Response) => (await res.json() as { code?: string; error?: string });
+  async function minorWithBudget(s: Awaited<ReturnType<typeof setup>>, usedS: number) {
+    expect((await s.owner.put("/api/settings", { scope: `person:${s.actor.id}`, key: "allowance.media.daily_minutes", value: 5 })).status).toBe(200);
+    db.update(people).set({ role: "child", birthdate: "2018-03-01" }).run();
+    if (usedS > 0) db.insert(mediaWatchDays).values({ personId: s.actor.id, day: mediaDay(new Date()), usedS }).run();
+  }
+  test("an exhausted minor gets media_time_up (never device_revoked) on the manifest and every file kind", async () => {
+    const s = await setup(); s.allow(); await minorWithBudget(s, 600);
+    for (const path of [`/manifest?id=${s.id}`, `/file/media/${s.id}`, `/file/artwork/${s.id}`, `/file/subtitle/${s.id}`]) {
+      const res = await s.get(path);
+      expect(res.status).toBe(403);
+      expect(await codeOf(res)).toEqual({ error: "Screen time is done for today. Ask a grown-up for more.", code: "media_time_up" });
+    }
+  });
+  test("a minor with a media budget cannot keep media offline; an adult with one, and a minor without one, can", async () => {
+    const s = await setup(); s.allow();
+    db.update(people).set({ role: "child", birthdate: "2018-03-01" }).run();
+    expect((await s.get(`/manifest?id=${s.id}`)).status).toBe(200); // a minor with no budget keeps media on a granted device
+    db.update(people).set({ role: "owner", birthdate: null }).run();
+    await minorWithBudget(s, 0);
+    for (const path of [`/manifest?id=${s.id}`, `/file/media/${s.id}`]) {
+      const res = await s.get(path);
+      expect(res.status).toBe(403);
+      const body = await codeOf(res);
+      expect(body.code).toBe("budget_keep_refused");
+      expect(body.error).toContain("Ask a grown-up");
+    }
+    // Status and progress keep working for copies already kept; only keeping is refused.
+    expect((await s.post("/status", { items: [{ kind: "media", id: s.id, fingerprint: "old" }] })).status).toBe(200);
+    db.update(people).set({ role: "owner", birthdate: null }).run();
+    expect((await s.get(`/manifest?id=${s.id}`)).status).toBe(200);
+  });
+  test("offline progress is metered under the device key, and a browser session under its own", async () => {
+    const s = await setup(); s.allow();
+    const now = Date.now();
+    expect((await s.post("/progress", { sent_at: iso(now), events: [s.event(iso(now - 1000), 5)] })).status).toBe(200);
+    const keys = () => db.select().from(mediaWatchSessions).all().map((row) => (JSON.parse(row.sessionKey) as string[])[0]!);
+    expect(keys()).toEqual([`d:${s.issued.deviceId}`]);
+    expect((await s.owner.request(base + "/progress", { method: "POST", body: { sent_at: iso(now), events: [s.event(iso(now - 500), 6)] } })).status).toBe(200);
+    expect(keys().filter((key) => key.startsWith("s:"))).toHaveLength(1);
+    expect(keys()).not.toContain("-");
+  });
 });

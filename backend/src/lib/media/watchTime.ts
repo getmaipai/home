@@ -97,8 +97,8 @@ export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "k
         // wall-clock time plus slack is a seek: only the wall-clock part counts. No forward movement counts nothing.
         if (delta > 0) seconds = delta > elapsed + WRITE_SLACK_S ? seekCap : Math.min(delta, forwardCap);
       } else if (position === null && previous.positionS === null) {
-        // Reader ticks have no seconds locator: the bounded wall-clock interval.
-        seconds = forwardCap;
+        // Reader ticks have no seconds locator and nothing to cross-check the clock against: the tight 12-second cap.
+        seconds = seekCap;
       }
     }
     const audio = item.kind === "track" || item.kind === "audiobook" || item.kind === "chapter";

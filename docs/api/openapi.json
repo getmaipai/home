@@ -27305,7 +27305,6 @@
           },
           "403": {
             "description": "Use your own browser, and ask a grown-up if you are a child or teen",
-            "description": "Use your own browser to manage permissions",
             "content": {
               "application/json": {
                 "schema": {
@@ -47587,7 +47586,7 @@
             }
           },
           "403": {
-            "description": "Pair this device again or check its offline permission",
+            "description": "Pair this device again, check its offline permission, or screen time is done (media_time_up, budget_keep_refused)",
             "content": {
               "application/json": {
                 "schema": {
@@ -47675,7 +47674,7 @@
             }
           },
           "403": {
-            "description": "Pair this device again or check its offline permission",
+            "description": "Pair this device again, check its offline permission, or screen time is done (media_time_up, budget_keep_refused)",
             "content": {
               "application/json": {
                 "schema": {
@@ -47862,7 +47861,7 @@
             }
           },
           "403": {
-            "description": "Pair this device again or check its offline permission",
+            "description": "Pair this device again, check its offline permission, or screen time is done (media_time_up, budget_keep_refused)",
             "content": {
               "application/json": {
                 "schema": {
@@ -48045,7 +48044,7 @@
             }
           },
           "403": {
-            "description": "Pair this device again or check its offline permission",
+            "description": "Pair this device again, check its offline permission, or screen time is done (media_time_up, budget_keep_refused)",
             "content": {
               "application/json": {
                 "schema": {
