@@ -3,16 +3,19 @@
 // is no listing across people, no admin read and no count that names a person (RULES 6a). Every write crosses the spec's
 // generated validator (a row is always the spec shape) and stamps a fresh hlc. A person's forget removes all three tables'
 // rows (lib/personLifecycle.ts).
-import { and, desc, eq, lt } from "drizzle-orm";
+import { and, desc, eq, lt, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { newsInterests, newsReads, newsSaves } from "@/db/schema";
+import { newsInterests, newsReads, newsSaves, people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newNewsInterestId, newNewsReadId, newNewsSaveId } from "@/lib/id";
-import type { AgeBand } from "@/lib/ageBand";
+import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { NewsInterest } from "@maipai/spec/gen/ts/news-interest.js";
 import { NewsRead } from "@maipai/spec/gen/ts/news-read.js";
 import { NewsSave } from "@maipai/spec/gen/ts/news-save.js";
 import { validateNewsInterest } from "@maipai/spec/records/ts/validate.js";
+import { computeAffinity, type MixActivity } from "./mixAffinity";
+import type { MixSignal } from "./rankStories";
+import { getPersonSettingValue } from "@/lib/settings";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
 import { newsPictureCached, pinNewsPicture } from "./pictures";
 
@@ -67,11 +70,15 @@ export function setFollow(personId: string, band: AgeBand, kind: InterestKind, k
   db.update(newsInterests).set({ followed: false, inferred: true, updatedAt: nowIso, hlc: nextHlc() }).where(eq(newsInterests.id, existing.id)).run();
 }
 
-/** Reset My Mix: every inferred row goes, every read's feedback is cleared. Explicit follows stay. */
+/** Reset My Mix: forget learned rows and training reads, including feedback. Follows and saves stay. */
 export function resetMix(personId: string): { removed: number } {
-  const removed = db.delete(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.inferred, true))).returning({ id: newsInterests.id }).all().length;
-  db.update(newsReads).set({ feedback: null, hlc: nextHlc() }).where(eq(newsReads.personId, personId)).run();
-  return { removed };
+  return db.transaction(() => {
+    const removed = db.delete(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.inferred, true))).returning({ id: newsInterests.id }).all().length;
+    db.update(newsInterests).set({ affinity: 0, updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(newsInterests.personId, personId)).run();
+    // Forget training reads too, so the next sweep cannot restore the reset mix.
+    db.delete(newsReads).where(eq(newsReads.personId, personId)).run();
+    return { removed };
+  });
 }
 
 export function interestRowsOf(personId: string): NewsInterest[] {
@@ -154,8 +161,9 @@ export function recordRead(personId: string, input: { itemId: string; storyId: s
     const readS = Math.max(existing.read_s, Math.max(0, Math.floor(input.readS ?? 0)));
     const finished = existing.finished || input.finished === true;
     const feedback = input.feedback === undefined ? (existing.feedback ?? null) : input.feedback;
-    db.update(newsReads).set({ readS, finished, feedback, hlc: nextHlc() }).where(eq(newsReads.id, existing.id)).run();
-    return { ...existing, read_s: readS, finished, feedback };
+    db.update(newsReads).set({ readS, finished, feedback, ...(input.feedback !== undefined ? { openedAt: nowIso } : {}), hlc: nextHlc() }).where(eq(newsReads.id, existing.id)).run();
+    recomputeMix(personId, new Date(nowIso));
+    return { ...existing, opened_at: input.feedback !== undefined ? nowIso : existing.opened_at, read_s: readS, finished, feedback };
   }
   const record = NewsRead.parse({
     id: newNewsReadId(), person_id: personId, item_id: input.itemId, story_id: input.storyId, opened_at: nowIso,
@@ -165,6 +173,7 @@ export function recordRead(personId: string, input: { itemId: string; storyId: s
     id: record.id, personId, itemId: record.item_id, storyId: record.story_id, openedAt: record.opened_at, readS: record.read_s,
     finished: record.finished, feedback: record.feedback ?? null, hlc: record.hlc, provenance: record.provenance,
   }).run();
+  recomputeMix(personId, new Date(nowIso));
   return record;
 }
 
@@ -186,4 +195,60 @@ export function forgetNewsOfPerson(personId: string): void {
 export function pruneReads(now = new Date()): number {
   const cutoff = new Date(now.getTime() - READ_KEEP_DAYS * 86_400_000).toISOString();
   return db.delete(newsReads).where(lt(newsReads.openedAt, cutoff)).returning({ id: newsReads.id }).all().length;
+}
+
+
+/** Person-scoped computed signal. No model, no cross-person activity, no child inference. */
+export function recomputeMix(personId: string, now = new Date()): MixSignal {
+  const signal: MixSignal = { topics: new Map(), sources: new Map(), lessTopics: new Set(), lessSources: new Set() };
+  const person = db.select().from(people).where(eq(people.id, personId)).get();
+  if (!person || person.deletedAt) return signal;
+  if (person.role === "guest" || speakerAgeBand(person, now) === "child") {
+    // A profile moved to child controls must lose earlier adult or teen inference too.
+    db.transaction(() => {
+      db.delete(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.inferred, true))).run();
+      db.update(newsInterests).set({ affinity: 0, updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(newsInterests.personId, personId)).run();
+    });
+    return signal;
+  }
+  if (getPersonSettingValue(person, "news.my_mix") === false) return signal;
+  const store = sharedShelfStore();
+  const saves = savedItemIds(personId);
+  const activity: MixActivity[] = [];
+  for (const row of db.select().from(newsReads).where(eq(newsReads.personId, personId)).all()) {
+    const item = store?.get(row.itemId);
+    if (item) activity.push({ topics: item.topics ?? [], source: item.feed_id, at: row.openedAt, finished: row.finished, saved: saves.has(row.itemId), feedback: row.feedback === "more" || row.feedback === "less" ? row.feedback : null });
+  }
+  Object.assign(signal, computeAffinity(activity, now));
+  db.transaction(() => {
+    db.delete(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.inferred, true))).run();
+    db.update(newsInterests).set({ affinity: 0, updatedAt: now.toISOString(), hlc: nextHlc() }).where(eq(newsInterests.personId, personId)).run();
+    for (const [kind, scores] of [["topic", signal.topics], ["source", signal.sources]] as const) {
+      for (const [key, score] of scores) {
+        const affinity = score;
+        const existing = db.select().from(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.kind, kind), eq(newsInterests.key, key))).get();
+        const draft = NewsInterest.parse({ id: existing?.id ?? newNewsInterestId(), person_id: personId, kind, key, followed: existing?.followed ?? false, affinity, inferred: !existing?.followed, updated_at: now.toISOString(), hlc: nextHlc(), provenance: PROVENANCE, source: "hub" });
+        const problems = validateNewsInterest(draft, speakerAgeBand(person, now));
+        if (problems.length) throw new Error("My Mix could not update. Reset My Mix and try again.");
+        if (existing) db.update(newsInterests).set({ affinity, updatedAt: draft.updated_at, hlc: draft.hlc }).where(eq(newsInterests.id, existing.id)).run();
+        else db.insert(newsInterests).values({ id: draft.id, personId, kind, key, followed: false, affinity, inferred: true, updatedAt: draft.updated_at, hlc: draft.hlc, provenance: PROVENANCE }).run();
+      }
+    }
+  });
+  return signal;
+}
+
+/** The nightly maintenance entry point. Each computation reads only that person's activity. */
+export function recomputeAllMixes(now = new Date()): void {
+  for (const person of db.select().from(people).where(isNull(people.deletedAt)).all()) recomputeMix(person.id, now);
+}
+
+let lastMixNight = "";
+/** Reuses the shelf poll tick, once during the local 02:00 hour. A restart may safely repeat the computation. */
+export function recomputeNightlyMixes(now = new Date()): void {
+  if (now.getHours() !== 2) return;
+  const night = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
+  if (night === lastMixNight) return;
+  recomputeAllMixes(now);
+  lastMixNight = night;
 }

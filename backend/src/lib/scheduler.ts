@@ -1,3 +1,4 @@
+import { recomputeNightlyMixes, pruneReads } from "@/lib/news/records";
 // The durable scheduler (platform plan 4.7): "one-shot and recurring
 // jobs... persisted, survives restarts. Timers, reminders, routines,
 // warming, backups and updates are all jobs." Backs host.schedule for
@@ -310,9 +311,11 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // to the household's retention (news.retention_days).
   "news.shelf.poll": async () => {
     await runShelfTick();
+    recomputeNightlyMixes();
   },
   "news.shelf.prune": async () => {
     pruneShelf();
+    pruneReads();
   },
   // Session F (platform and trust), step 5: lib/householdCa.ts's own
   // "rotation as a Repairs item" - a real Repairs warning well before the

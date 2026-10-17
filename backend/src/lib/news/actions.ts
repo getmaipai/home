@@ -9,7 +9,7 @@ import type { PersonRow } from "@/types";
 import { loadContent } from "./article";
 import { releasedItem, storyIdOf, type Viewer } from "./cards";
 import { ensureAndPinNewsPicture, newsPictureCached, pinNewsPicture } from "./pictures";
-import { addSave, itemIsSaved, recordRead, removeSave, resetMix, setFollow } from "./records";
+import { addSave, itemIsSaved, recordRead, removeSave, resetMix, recomputeMix, setFollow } from "./records";
 import { topicOfferedTo } from "./topics";
 import { viewerOf } from "./data";
 
@@ -63,6 +63,7 @@ async function save(person: PersonRow, viewer: Viewer, body: Record<string, unkn
     addSave(person.id, { itemId: item.id, storyId: storyIdOf(item), canonicalUrl: item.canonical_url, title: item.title, publisher: item.publisher, offline: textKept && pictureKept });
     results.push(item.id);
   }
+  recomputeMix(person.id);
   return ok({ saved: wantOn, count: results.length });
 }
 
@@ -84,7 +85,7 @@ function read(person: PersonRow, viewer: Viewer, body: Record<string, unknown>):
 
 function feedback(person: PersonRow, viewer: Viewer, body: Record<string, unknown>): ActionResult {
   // "Less like this" is for teens and adults; a child's News infers nothing about them.
-  if (viewer.band === "child") return { ok: false, status: 403, error: "This is not available for you." };
+  if (person.role === "guest" || viewer.band === "child") return { ok: false, status: 403, error: "My Mix is not available for this profile. Open Today to read news." };
   const item = releasedItem(viewer, body.item_id ?? body.story_id ?? body.id);
   if (!item) return gone();
   const kind = body.kind === "more" || body.kind === "less" ? body.kind : body.kind === "none" ? null : undefined;
@@ -94,7 +95,7 @@ function feedback(person: PersonRow, viewer: Viewer, body: Record<string, unknow
 }
 
 function resetMixAction(person: PersonRow, viewer: Viewer): ActionResult {
-  if (viewer.band === "child") return { ok: false, status: 403, error: "This is not available for you." };
+  if (person.role === "guest" || viewer.band === "child") return { ok: false, status: 403, error: "My Mix is not available for this profile. Open Today to read news." };
   return ok({ removed: resetMix(person.id).removed });
 }
 

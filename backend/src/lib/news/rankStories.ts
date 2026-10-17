@@ -1,5 +1,5 @@
 // NEWS-02b: the News app's one ranking function (design note section 9). Pure and deterministic: stories and a clock in, an ordered
-// page out. No model, no network, no store. `today` mode only; `mix` is a hook NEWS-05 fills in.
+// page out. No model, no network, no store. Today and My Mix share freshness and diversity caps.
 //
 //   score = freshness x coverage x picture x channel
 //   freshness = 2^(-age_h / 8)        coverage = 1 + log2(publisher_count)
@@ -67,12 +67,24 @@ function newestFirst(a: RankInput, b: RankInput): number {
   return (publishedMs(b) - publishedMs(a) || 0) || (a.story_id < b.story_id ? -1 : a.story_id > b.story_id ? 1 : 0);
 }
 
-export function rankStories(input: { stories: RankInput[]; now: Date; followed: Followed; mode: "today" }): RankedPage {
-  if (input.mode !== "today") throw new Error(`rankStories: mode "${String(input.mode)}" is not supported here; use rankStoriesMix for "mix".`);
+export interface MixSignal {
+  topics: Map<string, number>;
+  sources: Map<string, number>;
+  lessTopics: Set<string>;
+  lessSources: Set<string>;
+}
+
+export function mixScore(story: RankInput, now: Date, followed: Followed, signal?: MixSignal): number {
+  const affinity = Math.max(0, ...story.topics.map((t) => signal?.topics.get(t) ?? (followed.topics.has(t) ? 0.5 : 0)), signal?.sources.get(story.feed_id) ?? (followed.sources.has(story.feed_id) ? 0.5 : 0));
+  const less = story.topics.some((t) => signal?.lessTopics.has(t)) || signal?.lessSources.has(story.feed_id);
+  return todayScore(story, now, { topics: new Set(), sources: new Set() }) * (1 + Math.min(1, affinity)) * (less ? 0.5 : 1);
+}
+
+export function rankStories(input: { stories: RankInput[]; now: Date; followed: Followed; mode: "today" | "mix"; signal?: MixSignal }): RankedPage {
   const seen = new Set<string>();
   const stories = input.stories.filter((s) => (seen.has(s.story_id) ? false : (seen.add(s.story_id), true)));
   const scores = new Map<RankInput, number>();
-  for (const s of stories) scores.set(s, todayScore(s, input.now, input.followed));
+  for (const s of stories) scores.set(s, input.mode === "mix" ? mixScore(s, input.now, input.followed, input.signal) : todayScore(s, input.now, input.followed));
   const ranked = [...stories].sort(byRank(scores));
 
   const hero = ranked.find((s) => s.has_image) ?? ranked[0];
@@ -96,8 +108,7 @@ export function rankStories(input: { stories: RankInput[]; now: Date; followed: 
   return { ...(hero ? { hero } : {}), featured, rest };
 }
 
-/** The My Mix hook (design note section 9: `channel = 1 + affinity`, "Less like this" x 0.5). NEWS-05 builds it; until then it
- * refuses, so no caller can mistake Today's order for a person's mix. */
-export function rankStoriesMix(_input: { stories: RankInput[]; now: Date; followed: Followed; mode: "mix" }): RankedPage {
-  throw new Error("rankStoriesMix: My Mix ranking is not implemented yet (NEWS-05).");
+/** Compatibility entry point for callers that name My Mix explicitly. */
+export function rankStoriesMix(input: { stories: RankInput[]; now: Date; followed: Followed; mode: "mix"; signal?: MixSignal }): RankedPage {
+  return rankStories(input);
 }

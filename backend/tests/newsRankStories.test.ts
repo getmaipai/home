@@ -145,9 +145,8 @@ describe("rankStories today", () => {
     const a = story({ topics: ["space"], published_at: hoursAgo(2) }), b = story({ published_at: hoursAgo(1) });
     expect(rank([a, b], none).hero).toBe(b);
   });
-  test("other modes are refused; the mix hook is not implemented yet", () => {
-    expect(() => rankStories({ stories: [], now: NOW, followed: none, mode: "mix" as unknown as "today" })).toThrow();
-    expect(() => rankStoriesMix({ stories: [], now: NOW, followed: none, mode: "mix" })).toThrow(/NEWS-05/);
+  test("mix accepts an empty candidate set", () => {
+    expect(rankStoriesMix({ stories: [], now: NOW, followed: none, mode: "mix" }).rest).toEqual([]);
   });
 });
 

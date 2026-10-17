@@ -1,3 +1,5 @@
+import { recomputeMix, recomputeAllMixes, interestRowsOf, setFollow, resetMix } from "@/lib/news/records";
+import { setValue } from "@/lib/settings";
 // NEWS-02a: the hub's News data, action and picture routes, per role and band. The news package is installed as an app over the
 // bundled one (its pages declared, as apps.test.ts does for list-view); feeds, pictures and article pages come from a localhost
 // fixture server, never a real address. The promises: a guest gets nothing; while pages are teen a child gets nothing; with the
@@ -412,7 +414,7 @@ describe("actions", () => {
     expect((await post(who.teen, "actions/read", { item_id: item.id, read_s: 30, finished: true })).status).toBe(200);
     expect(db.select().from(newsReads).where(eq(newsReads.personId, who.teenId)).all()).toHaveLength(1);
     expect((await post(who.teen, "actions/reset_mix")).status).toBe(200);
-    expect(db.select().from(newsReads).where(eq(newsReads.personId, who.teenId)).get()!.feedback).toBeNull();
+    expect(db.select().from(newsReads).where(eq(newsReads.personId, who.teenId)).all()).toHaveLength(0);
     expect((await post(who.teen, "actions/save", { item_id: item.id, on: false })).status).toBe(200);
     expect(db.select().from(newsSaves).where(eq(newsSaves.personId, who.teenId)).all()).toHaveLength(0);
     expect(sharedShelfStore()!.getContent(item.id, "teen")!.pinned).toBe(false);
@@ -596,5 +598,50 @@ describe("review fixes", () => {
     expect(picture).not.toBeNull();
     expect(publisher.requests.filter((path) => path.startsWith("/img/"))).toHaveLength(1);
     void who;
+  });
+});
+
+
+describe("My Mix learning and privacy", () => {
+  test("a teen and adult learn only from their own reads; reset survives the next sweep", async () => {
+    installNewsApp();
+    const who = await household();
+    const item = putItem(feeds.household, ADULT_HOST, { topics: ["science"] });
+    for (const client of [who.teen, who.adult]) expect((await post(client, "actions/read", { item_id: item.id, finished: true })).status).toBe(200);
+    expect(interestRowsOf(who.teenId).some((r) => r.inferred && r.affinity > 0)).toBe(true);
+    expect(interestRowsOf(who.adultId).some((r) => r.inferred && r.affinity > 0)).toBe(true);
+    setFollow(who.teenId, "teen", "topic", "science", true);
+    resetMix(who.teenId);
+    recomputeAllMixes();
+    expect(interestRowsOf(who.teenId)).toHaveLength(1);
+    expect(interestRowsOf(who.teenId)[0]).toMatchObject({ followed: true, affinity: 0, inferred: false });
+    expect(interestRowsOf(who.adultId).some((r) => r.affinity > 0)).toBe(true);
+    expect(recomputeMix(who.childId).topics.size).toBe(0);
+    expect(interestRowsOf(who.childId)).toEqual([]);
+  });
+
+  test("My Mix defaults on for a teen and switching it off hides the tab and direct data", async () => {
+    installNewsApp();
+    const who = await household();
+    const person = db.select().from(people).where(eq(people.id, who.teenId)).get()!;
+    expect((await post(who.teen, "data/mix")).status).toBe(200);
+    expect(setValue(person, `person:${person.id}`, "news.my_mix", false).ok).toBe(true);
+    const apps = await (await who.teen.get("/api/apps")).json() as Array<{ package: string; sections: Array<{ page: string }> }>;
+    expect(apps.find((a) => a.package === "news")!.sections.map((s) => s.page)).not.toContain("mix");
+    expect((await post(who.teen, "data/mix")).status).toBe(404);
+    expect((await who.teen.get("/api/plugins/news/pages/mix")).status).toBe(404);
+  });
+
+  test("an admin's News page exposes no other person's follows, reads or saves", async () => {
+    installNewsApp();
+    const who = await household();
+    const item = putItem(feeds.household, ADULT_HOST, { topics: ["science"] });
+    await post(who.teen, "actions/follow", { kind: "topic", key: "science" });
+    await post(who.teen, "actions/read", { item_id: item.id, finished: true });
+    const topics = await (await post(who.adult, "data/topics", { person_id: who.teenId })).json() as Array<{ key: string; followed: boolean }>;
+    expect(topics.find((r) => r.key === "science")?.followed).toBe(false);
+    expect(await (await post(who.adult, "data/saved", { person_id: who.teenId })).json()).toEqual([]);
+    expect(await text(await post(who.adult, "data/mix", { person_id: who.teenId }))).not.toContain('"read":true');
+    expect(interestRowsOf(who.adultId)).toEqual([]);
   });
 });

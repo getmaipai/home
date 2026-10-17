@@ -203,8 +203,12 @@ export function pageMinRole(manifest: PackageManifest, entry: AppPageEntry): str
   return own;
 }
 
-/** Whether the person's role clears one page's floor. Role only: age stays on the data path. */
-export function pageVisibleTo(person: Pick<PersonRow, "role">, manifest: PackageManifest, entry: AppPageEntry): boolean {
+/** Page role floors, plus the News My Mix opt-out and child floor. Data still checks age at release. */
+export function pageVisibleTo(person: Pick<PersonRow, "role"> & Partial<PersonRow>, manifest: PackageManifest, entry: AppPageEntry): boolean {
+  if (manifest.id === "news" && entry.id === "mix") {
+    if (!person.id || person.role === "guest" || person.role === "child") return false;
+    if (speakerAgeBand(person as PersonRow, new Date()) === "child" || getPersonSettingValue(person as PersonRow, "news.my_mix") === false) return false;
+  }
   return meetsMinRole(person.role, pageMinRole(manifest, entry));
 }
 

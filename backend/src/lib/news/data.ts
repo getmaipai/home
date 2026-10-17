@@ -4,6 +4,8 @@
 // release path (`releaseShelfItems` / `releaseShelfItem`), so a viewer is only ever shown what their lists and band release.
 // The routes (routes/newsRoutes.ts) check the role gate and the owning page's floor first; the block filter runs last, in
 // `finishBlocks`.
+import { getPersonSettingValue } from "@/lib/settings";
+import type { MixSignal } from "./rankStories";
 import { isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -20,7 +22,7 @@ import type { PersonRow } from "@/types";
 import { articleBlock } from "./article";
 import { cardEnv, cardOf, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, type CardEnv, type StoryCard, type Viewer } from "./cards";
 import { rankStories, type RankInput } from "./rankStories";
-import { followedChannels, isFollowing, listSaves, recordRead } from "./records";
+import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } from "./records";
 import { TOPICS, topicById, topicOfferedTo, topicsFor } from "./topics";
 import { bumpNewsCounter } from "./newsCounters";
 import { feedLabels } from "./feedLabels";
@@ -55,6 +57,7 @@ const blockBase = (kind: string, alt: string, provenance: string) => ({
 // ---- Ranked feeds ----------------------------------------------------------------------------
 
 interface FeedRequest {
+  signal?: MixSignal;
   layout: "today" | "channel" | "rows";
   title: string;
   subtitle?: string;
@@ -86,7 +89,7 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
     if (card) { cards.set(item.id, card); byItem.set(item.id, item); }
   }
   if (cards.size === 0) return [];
-  const ranked = rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: "today" });
+  const ranked = rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
   const cardFor = (input: RankInput): StoryCard => cards.get(input.item_id)!;
   const hero = ranked.hero ? cardFor(ranked.hero) : undefined;
   const featured = ranked.featured.map(cardFor);
@@ -146,14 +149,14 @@ export function todayData(person: PersonRow, body: Record<string, unknown>, now 
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
-/** `mix`: a teen's or an adult's My Mix. The ranking mode is NEWS-05's; until it lands this is Today's ranking over the person's own follows. A child never gets it. */
+/** My Mix uses only this person's reading and follows. A child, guest or opted-out person never gets it. */
 export function mixData(person: PersonRow, body: Record<string, unknown>, now = new Date()): BlocksData | null {
   const viewer = viewerOf(person, now);
-  if (viewer.band === "child") return null;
+  if (person.role === "guest" || viewer.band === "child" || getPersonSettingValue(person, "news.my_mix") === false) return null;
   if (!shelfEnabled()) return emptyBlocks(false);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
-  const raw = feedBlock(env, { layout: "today", title: "My Mix", windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), provenance: "news data mix" }, now);
+  const raw = feedBlock(env, { layout: "today", title: "My Mix", signal: recomputeMix(person.id, now), windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), provenance: "news data mix" }, now);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
@@ -237,7 +240,7 @@ export async function storyData(person: PersonRow, body: Record<string, unknown>
   const block = await articleBlock(item, env, { retry: body.retry === true });
   if (block) {
     bumpNewsCounter("story_opened");
-    recordRead(person.id, { itemId: item.id, storyId: storyIdOf(item) });
+    recordRead(person.id, { itemId: item.id, storyId: storyIdOf(item) }, now.toISOString());
   }
   return { as_of: now.toISOString(), blocks: block ? finishBlocks(person, viewer.band, [block]) : [] };
 }

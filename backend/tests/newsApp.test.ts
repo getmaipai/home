@@ -83,7 +83,7 @@ test("every reference is declared and every Mix-only data id and action stays ab
   expect([...mix.actions]).toContain("feedback");
   expect([...mix.actions]).toContain("reset_mix");
   for (const role of ["child", "teen", "adult", "guest"] as const) {
-    const person = { role } as PersonRow;
+    const person = { id: "person-floor-test", role } as PersonRow;
     for (const kind of ["data", "actions"] as const) {
       for (const id of kind === "data" ? ids : actions) {
         const owners = pages.filter((page) => refs.get(page)![kind].has(id));

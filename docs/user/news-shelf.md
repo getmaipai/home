@@ -55,3 +55,19 @@ For each feed, your hub asks the news site for its list of headlines, at most on
 ## Lists can be wrong
 
 A feed is chosen by people and its content is written by someone else. A headline may be sad, wrong, or not a good fit for the person reading it. The checks for children and teens still apply on top of the lists.
+
+
+## How My Mix learns
+
+My Mix is for teens and adults. It uses only your own news reading on this hub. Opening a story adds a small signal.
+Finishing or saving a story you opened adds more. **More like this** adds weight to its topics and source.
+**Less like this** lowers their weight and cuts their story scores in half for 30 days. Older reading counts less.
+No model scores your reading, and your reading is not sent to a news site. Other people, including admins, cannot see it.
+
+My Mix is on by default for teens and adults. Turning it off hides its tab and stops learning. Children never get My Mix.
+Their news still comes only from the Kids' lists.
+
+**Reset My Mix** forgets what it learned and clears your reading history and feedback for News. Your follows and saved
+stories stay. Stories you opened may look unread again. My Mix starts again from your follows and new reading.
+
+The News app pages and these controls ship with the News app package. The shelf settings above work without that package.
