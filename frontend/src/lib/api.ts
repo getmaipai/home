@@ -736,7 +736,7 @@ export const api = {
   installStatus: () => request<InstallStatusView>("/api/install"),
   installRetry: () => request<{ started: true }>("/api/install/retry", { method: "POST" }),
   /** Wizard web search screen: `dryRun` tests the address and saves nothing. */
-  setupUseSearchCandidate: (url: string, dryRun = false) => request<{ saved: boolean }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify(dryRun ? { url, dry_run: true } : { url }) }),
+  setupUseSearchCandidate: (url: string, dryRun = false) => request<{ saved: boolean; result?: import("@/shell/components/searchTestResult").SearchTestResultData }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify(dryRun ? { url, dry_run: true } : { url }) }),
   /** Wizard web search screen, skipped: SearXNG stays unset and DuckDuckGo (adults only) is turned on. */
   setupSkipSearch: () => request<{ saved: boolean }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify({ ddgs_default: true }) }),
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),

@@ -6,6 +6,7 @@
 // full `GET /api/setup/state`/`POST /api/setup/:step`) still land with
 // later steps that build the things each one actually configures.
 import { createRoute, z } from "@hono/zod-openapi";
+import { SearchTestSummarySchema } from "@/lib/searchTestSummary";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { getHouseholdCaCertificate, ensureHouseholdLeaf } from "@/lib/householdCa";
 import { getHubName } from "@/lib/hubIdentity";
@@ -138,7 +139,7 @@ const useSearchCandidateRoute = createRoute({
     /** With no url: setup is skipping SearXNG, so DuckDuckGo (adults only) is turned on (owner ruling 2026-10-17). */
     ddgs_default: z.boolean().optional(),
   }).strict() } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.boolean() }) } }, description: "The address passed. saved is false for a Test; true once it, or the skip choice, was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not a passing SearXNG on the home network." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.boolean(), result: SearchTestSummarySchema.optional() }) } }, description: "A Test answers 200 with result (pass, warn or fail in plain words) and saved false; a Save answers 200 with saved true once it, or the skip choice, was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not allowed, or a Save found the service not usable." } },
 });
 // The checker paces repeat probes of one address, so Test then Save would fail the second check. A pass from Test
 // stands for the same address for a few minutes; Save then skips the second probe.
@@ -160,12 +161,16 @@ setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
   const alreadyPassed = !dryRun && searchTestPassed?.url === address && Date.now() - searchTestPassed.at < SEARCH_TEST_VALID_MS;
   if (!alreadyPassed) {
     const { checkSearchInstance } = await import("@/lib/searchInstanceCheck");
+    const { summarizeSearchStatus } = await import("@/lib/searchTestSummary");
     const status = await checkSearchInstance({ candidateBaseUrl: address });
-    if (!status.checks.length || status.checks.some((check) => check.state !== "pass")) {
+    const result = summarizeSearchStatus(status, address);
+    if (!result.canUse) {
       searchTestPassed = null;
-      return c.json({ error: status.checks.find((check) => check.state !== "pass")?.fix ?? "Home couldn't reach a search service at that address. Check the address and that the service is running, then press Test." }, 400);
+      // A Test that ran always answers 200 with the result, so the screen can show it; a Save is refused.
+      if (dryRun) return c.json({ saved: false, result }, 200);
+      return c.json({ error: `${result.headline} ${result.verdict}`, next: result.recommendation }, 400);
     }
-    if (dryRun) { searchTestPassed = { url: address, at: Date.now() }; return c.json({ saved: false }, 200); }
+    if (dryRun) { searchTestPassed = { url: address, at: Date.now() }; return c.json({ saved: false, result }, 200); }
   }
   searchTestPassed = null;
   const saved = setHouseholdSettingValue("search.searxng_url", address);

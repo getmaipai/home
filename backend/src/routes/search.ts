@@ -8,6 +8,8 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { SEARCH_PROVIDERS } from "@/lib/search/providers";
+import { getHouseholdSettingValue } from "@/lib/settings";
+import { SearchTestSummarySchema, summarizeSearchStatus } from "@/lib/searchTestSummary";
 import { buildSearchInstanceSnippet, checkSearchInstance, SearchInstanceRefreshCooldownError } from "@/lib/searchInstanceCheck";
 import { getStackClient } from "@/lib/stackEngine";
 import { classifyStackError, STACK_ERROR_RESPONSES } from "@/lib/stack/httpErrors";
@@ -87,6 +89,8 @@ const SearchInstanceStatusSchema = z.object({
   checks: z.array(SearchCheckSchema),
   groups: z.array(z.object({ id: z.string(), label: z.string(), enabledEngines: z.array(z.string()), state: z.enum(["pass", "warn", "fail", "unknown"]) })),
   engineErrors: z.array(z.object({ name: z.string(), percentage: z.number() })),
+  /** Additive: the plain-words verdict and recommendation for the Web search page. */
+  summary: SearchTestSummarySchema.optional(),
 });
 
 const instanceRoute = createRoute({
@@ -106,7 +110,9 @@ const instanceRoute = createRoute({
 searchRoutes.openapi(instanceRoute, async (c) => {
   const refresh = c.req.valid("query").refresh === "1";
   try {
-    return c.json(await checkSearchInstance({ force: refresh, respectCooldown: refresh }), 200);
+    const status = await checkSearchInstance({ force: refresh, respectCooldown: refresh });
+    const address = String(getHouseholdSettingValue("search.searxng_url") ?? "").trim();
+    return c.json(status.mode === "owner" ? { ...status, summary: summarizeSearchStatus(status, address) } : status, 200);
   } catch (error) {
     if (error instanceof SearchInstanceRefreshCooldownError) {
       return c.json({ error: error.message, retryAfterSeconds: error.retryAfterSeconds }, 429);

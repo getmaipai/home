@@ -11,7 +11,7 @@ import { lastSearxngCanaryResult } from "@/lib/searxngHealth";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { isStackConfigured } from "@/lib/stackEngine";
 
-const CATALOG = SearxngEngines.parse(engineCatalogJson);
+export const SEARCH_CATALOG = SearxngEngines.parse(engineCatalogJson);
 const CHECK_CACHE_MS = 5 * 60_000;
 const JSON_CANARY_MAX_AGE_MS = 15 * 60_000;
 const MANUAL_REFRESH_COOLDOWN_MS = 60_000;
@@ -106,7 +106,7 @@ function invalidAddressStatus(now: number): SearchInstanceStatus {
     { id: "privacy-engines", title: "Extra engines that send searches abroad", state: "unknown", detail: "MaiPai couldn't check the extra engines until the address is fixed.", fix: null },
     { id: "default-safe-search", title: "Default safe search", state: "unknown", detail: "MaiPai couldn't check the default safe-search level until the address is fixed.", fix: null },
   ];
-  return { mode: "owner", checkedAt: new Date(now).toISOString(), version: null, checks, groups: CATALOG.groups.map((group) => ({ id: group.id, label: group.label, enabledEngines: [], state: "unknown" })), engineErrors: [] };
+  return { mode: "owner", checkedAt: new Date(now).toISOString(), version: null, checks, groups: SEARCH_CATALOG.groups.map((group) => ({ id: group.id, label: group.label, enabledEngines: [], state: "unknown" })), engineErrors: [] };
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -161,12 +161,12 @@ function engineRows(config: Record<string, unknown> | null): Array<Record<string
 }
 
 function groupSummaries(enabled: Set<string>, known: boolean): SearchEngineGroup[] {
-  return CATALOG.groups.map((group) => {
+  return SEARCH_CATALOG.groups.map((group) => {
     const groupEnabled = group.engines.filter((engine) => enabled.has(engine.name)).map((engine) => engine.name);
     const required = group.id === "general" || group.id === "reference" || group.id === "images";
-    const hasMinimum = group.id === "general" ? groupEnabled.length >= CATALOG.minimums.webEngines
+    const hasMinimum = group.id === "general" ? groupEnabled.length >= SEARCH_CATALOG.minimums.webEngines
       : group.id === "reference" ? groupEnabled.includes("wikipedia")
-        : group.id === "images" ? groupEnabled.length >= CATALOG.minimums.pictureEngines
+        : group.id === "images" ? groupEnabled.length >= SEARCH_CATALOG.minimums.pictureEngines
           : true;
     return { id: group.id, label: group.label, enabledEngines: groupEnabled, state: !known ? "unknown" : required && !hasMinimum ? "fail" : "pass" };
   });
@@ -209,7 +209,7 @@ function staleVersion(value: unknown, now: number): boolean | null {
 
 function relevantEngineNames(): Set<string> {
   const homeGroups = new Set(["general", "reference", "images", "news", "video"]);
-  return new Set(CATALOG.groups.filter((group) => homeGroups.has(group.id)).flatMap((group) => group.engines.map((engine) => engine.name)));
+  return new Set(SEARCH_CATALOG.groups.filter((group) => homeGroups.has(group.id)).flatMap((group) => group.engines.map((engine) => engine.name)));
 }
 
 function readEngineErrors(value: unknown): SearchEngineError[] | null {
@@ -224,8 +224,8 @@ function readEngineErrors(value: unknown): SearchEngineError[] | null {
   return errors;
 }
 
-function engineLabel(name: string): string {
-  const engine = CATALOG.groups.flatMap((group) => group.engines).find((item) => item.name === name);
+export function engineLabel(name: string): string {
+  const engine = SEARCH_CATALOG.groups.flatMap((group) => group.engines).find((item) => item.name === name);
   if (name === "wikicommons.images") return "Wikimedia Commons images";
   if (name === "brave.images") return "Brave images";
   if (name.endsWith(".images")) return `${name.slice(0, -7)} images`;
@@ -267,17 +267,17 @@ function buildChecks(args: {
 
   const configKnown = configStatus === 200 && config !== null;
   const enabled = enabledNames(config);
-  const general = CATALOG.groups.find((group) => group.id === "general")?.engines ?? [];
+  const general = SEARCH_CATALOG.groups.find((group) => group.id === "general")?.engines ?? [];
   const enabledWeb = enabledForCategory(config, "general");
   const webCount = general.filter((engine) => enabledWeb.has(engine.name)).length;
-  checks.push({ id: "web-engines", title: "Enough web engines", state: !configKnown ? "unknown" : webCount < CATALOG.minimums.webEngines ? "fail" : "pass", detail: !configKnown ? "MaiPai couldn't read the enabled search engines." : webCount < CATALOG.minimums.webEngines ? "Fewer than two web engines are on." : `${webCount} general web engines are on.`, fix: webCount < CATALOG.minimums.webEngines ? "Enable engines from the General web list." : null });
+  checks.push({ id: "web-engines", title: "Enough web engines", state: !configKnown ? "unknown" : webCount < SEARCH_CATALOG.minimums.webEngines ? "fail" : "pass", detail: !configKnown ? "MaiPai couldn't read the enabled search engines." : webCount < SEARCH_CATALOG.minimums.webEngines ? "Fewer than two web engines are on." : `${webCount} general web engines are on.`, fix: webCount < SEARCH_CATALOG.minimums.webEngines ? "Enable engines from the General web list." : null });
 
-  const reference = CATALOG.groups.find((group) => group.id === "reference")?.engines ?? [];
+  const reference = SEARCH_CATALOG.groups.find((group) => group.id === "reference")?.engines ?? [];
   const wikiOn = enabledWeb.has("wikipedia");
   const wikidataOn = enabledWeb.has("wikidata");
   checks.push({ id: "wikipedia", title: "Wikipedia is on", state: !configKnown ? "unknown" : wikiOn ? "pass" : "fail", detail: !configKnown ? "MaiPai couldn't read the reference engines." : wikiOn ? (wikidataOn ? "Wikipedia and Wikidata are on." : "Wikipedia is on; Wikidata is off.") : "Wikipedia is off.", fix: !wikiOn ? `Enable ${reference.find((engine) => engine.name === "wikipedia")?.name ?? "wikipedia"}.` : !wikidataOn ? "Enable wikidata for better reference matches." : null });
 
-  const imageGroup = CATALOG.groups.find((group) => group.id === "images");
+  const imageGroup = SEARCH_CATALOG.groups.find((group) => group.id === "images");
   const enabledImages = enabledForCategory(config, "images");
   const imageOn = imageGroup?.engines.filter((engine) => enabledImages.has(engine.name)) ?? [];
   checks.push({ id: "pictures", title: "Pictures can be found", state: !configKnown ? "unknown" : imageOn.length === 0 ? "fail" : "pass", detail: !configKnown ? "MaiPai couldn't read the picture engines." : imageOn.length === 0 ? "No picture engines are on, so answers can't show pictures from the web." : `${imageOn.length} picture engine${imageOn.length === 1 ? " is" : "s are"} on.`, fix: imageOn.length === 0 ? "Enable wikicommons.images and brave.images." : null });
@@ -294,7 +294,7 @@ function buildChecks(args: {
   checks.push({ id: "safe-search", title: "Safe search works for children and teens", state: safeState, detail: safeState === "pass" ? "A safe web engine and a safe picture engine are on." : safeState === "unknown" ? "MaiPai couldn't check safe-search support." : "No child-safe engines are on for pictures.", fix: safeState === "pass" ? null : "Enable a safe-search engine for web and pictures." });
 
   for (const id of ["news", "video"] as const) {
-    const group = CATALOG.groups.find((item) => item.id === id);
+    const group = SEARCH_CATALOG.groups.find((item) => item.id === id);
     const enabledGroup = group?.engines.filter((engine) => enabledNames(config).has(engine.name)).map((engine) => engine.name) ?? [];
     checks.push({ id, title: id === "news" ? "News engines" : "Video engines", state: configKnown ? "pass" : "unknown", detail: configKnown ? enabledGroup.length ? `${enabledGroup.join(", ")} are on.` : `No ${id} engines are on.` : `MaiPai couldn't read the ${id} engines.`, fix: null });
   }
@@ -304,10 +304,10 @@ function buildChecks(args: {
     checks.push({ id: "engine-errors", title: "Engines having trouble", state: "unknown", detail: "This SearXNG doesn't share error numbers.", fix: null });
   } else {
     const struggling = errors.filter((entry) => entry.percentage >= 50);
-    checks.push({ id: "engine-errors", title: "Engines having trouble", state: struggling.length ? "warn" : "pass", detail: struggling.length ? struggling.map((entry) => `${engineLabel(entry.name)} is failing in about ${Math.round(entry.percentage)}% of its searches.`).join(" ") : "No engine has an error rate above 50%.", fix: struggling.length ? "Check whether these engines are still enabled and available." : null });
+    checks.push({ id: "engine-errors", title: "Engines having trouble", state: struggling.length ? "warn" : "pass", detail: struggling.length ? struggling.map((entry) => `${engineLabel(entry.name)} is failing in about ${Math.round(entry.percentage)}% of its searches.`).join(" ") : "No engine has an error rate above 50%.", fix: struggling.length ? "Turn those engines off, or fix them, in SearXNG's settings under Preferences, Engines." : null });
   }
 
-  const extraGroup = CATALOG.groups.find((group) => group.id === "extra");
+  const extraGroup = SEARCH_CATALOG.groups.find((group) => group.id === "extra");
   const flagged = extraGroup?.engines.filter((engine) => enabled.has(engine.name) && engine.privacy_flag) ?? [];
   checks.push({ id: "privacy-engines", title: "Extra engines that send searches abroad", state: !configKnown ? "unknown" : flagged.length ? "warn" : "pass", detail: !configKnown ? "MaiPai couldn't check the extra engines." : flagged.length ? flagged.map((engine) => `${engine.name} is on: search words go to a company in ${engine.country}. MaiPai never uses it for children or teens.`).join(" ") : "No privacy-flagged extra engines are on.", fix: null });
 
@@ -342,17 +342,17 @@ export function buildSearchInstanceSnippet(status: SearchInstanceStatus): { sett
   const sections: string[] = [];
   if (failed.has("json-format")) sections.push("search:\n  formats:  # Keep any other formats you already list.\n    - html\n    - json");
   const engineNames = new Set<string>();
-  const group = CATALOG.groups.find((item) => item.id === "images");
+  const group = SEARCH_CATALOG.groups.find((item) => item.id === "images");
   if (failed.has("pictures")) for (const engine of group?.engines.slice(0, 2) ?? []) engineNames.add(engine.name);
   if (failed.has("wikipedia")) engineNames.add("wikipedia");
   if (failed.has("web-engines")) {
-    const web = CATALOG.groups.find((item) => item.id === "general")?.engines ?? [];
-    for (const engine of web.slice(0, CATALOG.minimums.webEngines)) engineNames.add(engine.name);
+    const web = SEARCH_CATALOG.groups.find((item) => item.id === "general")?.engines ?? [];
+    for (const engine of web.slice(0, SEARCH_CATALOG.minimums.webEngines)) engineNames.add(engine.name);
   }
   if (failed.has("safe-search")) {
-    const webSafe = CATALOG.groups.find((item) => item.id === "general")?.engines.find((engine) => engine.safe_search && !engine.privacy_flag);
+    const webSafe = SEARCH_CATALOG.groups.find((item) => item.id === "general")?.engines.find((engine) => engine.safe_search && !engine.privacy_flag);
     const imageSafe = group?.engines.find((engine) => engine.safe_search && !engine.privacy_flag);
-    const safeWebNames = new Set(CATALOG.groups.find((item) => item.id === "general")?.engines.filter((engine) => engine.safe_search && !engine.privacy_flag).map((engine) => engine.name));
+    const safeWebNames = new Set(SEARCH_CATALOG.groups.find((item) => item.id === "general")?.engines.filter((engine) => engine.safe_search && !engine.privacy_flag).map((engine) => engine.name));
     const safeImageNames = new Set(group?.engines.filter((engine) => engine.safe_search && !engine.privacy_flag).map((engine) => engine.name));
     const enabledGeneral = new Set(status.groups.find((item) => item.id === "general")?.enabledEngines ?? []);
     const enabledImages = new Set(status.groups.find((item) => item.id === "images")?.enabledEngines ?? []);

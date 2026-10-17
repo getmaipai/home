@@ -47,7 +47,12 @@ describe("setup web search address", () => {
   test("Test checks the address and saves nothing; Save stores it", async () => {
     const tested = await use({ url: "http://192.168.1.20:8888", dry_run: true });
     expect(tested.status).toBe(200);
-    expect(await tested.json()).toEqual({ saved: false });
+    const body = (await tested.json()) as { saved: boolean; result: { level: string; headline: string; recommendation: string; canUse: boolean; address: string } };
+    expect(body.saved).toBe(false);
+    expect(body.result.level).toBe("pass");
+    expect(body.result.address).toBe("192.168.1.20:8888");
+    expect(body.result.headline).toBe("192.168.1.20:8888 works. 6 search engines are turned on.");
+    expect(body.result.recommendation).toBe("Recommended: use it.");
     expect(getHouseholdSettingValue("search.searxng_url")).toBe("");
     const saved = await use({ url: "http://192.168.1.20:8888" });
     expect(saved.status).toBe(200);
@@ -65,11 +70,53 @@ describe("setup web search address", () => {
     expect(getHouseholdSettingValue("search.searxng_url")).toBe("");
   });
 
-  test("an address that does not answer says what happened and what to do", async () => {
+  test("an address that does not answer: Test names it and says what to do, Save is refused", async () => {
     __setSearchInstanceFetchForTests(async () => { throw new Error("down"); });
     const response = await use({ url: "http://192.168.1.20:8888", dry_run: true });
-    expect(response.status).toBe(400);
-    expect(((await response.json()) as { error: string }).error.length).toBeGreaterThan(10);
+    expect(response.status).toBe(200);
+    const { result } = (await response.json()) as { result: { level: string; canUse: boolean; headline: string; recommendation: string } };
+    expect(result.level).toBe("fail");
+    expect(result.canUse).toBe(false);
+    expect(result.headline).toBe("Home could not reach 192.168.1.20:8888.");
+    expect(result.recommendation).toContain("press Test again");
+    const refused = await use({ url: "http://192.168.1.20:8888" });
+    expect(refused.status).toBe(400);
+    expect(getHouseholdSettingValue("search.searxng_url")).toBe("");
+  });
+
+  test("engines having trouble: works with a warning, names the engines, recommends, and Save is allowed", async () => {
+    __setSearchInstanceFetchForTests(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/healthz") return new Response("OK", { status: 200 });
+      if (url.pathname === "/config") return Response.json({ version: "2026.10.4", safe_search: 2, limiter: { enabled: false }, engines: ENGINES });
+      if (url.pathname === "/search") return Response.json({ results: [] });
+      if (url.pathname === "/stats/errors") return Response.json({ brave: [{ percentage: 80 }], duckduckgo: [{ percentage: 90 }] });
+      return new Response("missing", { status: 404 });
+    });
+    const response = await use({ url: "http://192.168.1.20:8888", dry_run: true });
+    const { result } = (await response.json()) as { result: { level: string; canUse: boolean; verdict: string; recommendation: string; trouble: { label: string }[] } };
+    expect(result.level).toBe("warn");
+    expect(result.canUse).toBe(true);
+    expect(result.trouble.length).toBe(2);
+    expect(result.verdict).toContain("not answering right now. Results may be thinner.");
+    expect(result.recommendation).toStartWith("Recommended: use it anyway");
+    expect(JSON.stringify(result)).not.toContain("Check whether these engines");
+    expect((await use({ url: "http://192.168.1.20:8888" })).status).toBe(200);
+    expect(getHouseholdSettingValue("search.searxng_url")).toBe("http://192.168.1.20:8888");
+  });
+
+  test("a failing check blocks: no web engines gives a fail with the one next step", async () => {
+    __setSearchInstanceFetchForTests(async (input) => {
+      const url = new URL(String(input));
+      if (url.pathname === "/healthz") return new Response("OK", { status: 200 });
+      if (url.pathname === "/config") return Response.json({ version: "2026.10.4", safe_search: 2, limiter: { enabled: false }, engines: [] });
+      if (url.pathname === "/search") return Response.json({ results: [] });
+      return new Response("missing", { status: 404 });
+    });
+    const { result } = (await (await use({ url: "http://192.168.1.20:8888", dry_run: true })).json()) as { result: { level: string; canUse: boolean; recommendation: string } };
+    expect(result.level).toBe("fail");
+    expect(result.canUse).toBe(false);
+    expect(result.recommendation).toStartWith("Recommended: ");
   });
 
   test("skipping turns DuckDuckGo on by default for adults and saves no address", async () => {
