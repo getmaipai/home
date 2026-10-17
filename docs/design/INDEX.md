@@ -36,6 +36,14 @@ design that queues work, resumes something or keeps a collection cites that sect
 | [devices-and-robot-link-2026-10-17.md](devices-and-robot-link-2026-10-17.md) | new 2026-10-17, no code | ROBOTLINK-01, -02, ROBOTLINK-BENCH-01, DEVICES-01 to -03 (to be cut; today the Portability "Sync engine decision" and "A Device record and spec/link" rows) |
 | [stories-2026-10-17.md](stories-2026-10-17.md) | new 2026-10-17, no code | STORIES-01 to -04 (to be cut; today PROJECT-PACK-01, -02 in Projects) |
 | [media-apps-blend-2026-10-17.md](media-apps-blend-2026-10-17.md) (and its [sources](media-apps-blend-2026-10-17-sources.md)) | current; section 12 is the cross-app platform record | Media apps: MEDIA-SPEC-01 to MEDIA-GO-01, AUDIO-SESSION-01, KEEP-OFFLINE-01, SAVE-TO-HOME-01, TRASH-01, HANDOFF-01 |
+| [modes-and-child-protections-2026-10-17.md](modes-and-child-protections-2026-10-17.md) | new 2026-10-17, no code; MODE-BIRTHDATE-01 held behind Jesse's rule edit | MODE-NAMING-01, MODE-BIRTHDATE-01, MODE-GUEST-01, ROLE-RENAME-01 (the rung names), AGE-01, AGE-02, DOCS-GAP-02, CHILD-PROFANITY-01, TEEN-RESEARCH-01 |
+| [people-roles-and-account-2026-10-17.md](people-roles-and-account-2026-10-17.md) | new 2026-10-17, no code; RAIL-SWITCH-PROFILE-01 held behind S1 | NO-OWNER-ROLE-01, GRANTS-01, RELATION-INFER-01, PARENT-CONTROLS-UI-01, DOCS-GAP-03b, ACCOUNT-PIN-CHANGE-01, DEVICE-PHONE-01, BRANCH-SEC1-01, NO-CROSS-USER-VISIBILITY-01, LOG-PRIVACY-01 |
+| [security-and-data-lifecycle-2026-10-17.md](security-and-data-lifecycle-2026-10-17.md) | new 2026-10-17, no code | SEC-PRIVACY-01, CAP-06, CAP-08, SETTINGS-AUDIT-01, DIAG-REPORT-01, PERF-ALERT-01, ERASE-HUB-01, EXPORT-01, MEM-EXPORT-01, HUB-MIGRATE-01, SELF-UPDATE-TESTS-01, HOME-IMAGE-01 |
+| [answer-blocks-places-and-documents-2026-10-17.md](answer-blocks-places-and-documents-2026-10-17.md) | new 2026-10-17, no code; the record of the remaining block kinds | KIT-GENUI-01 to -05, GENUI-06 to -12, PLACE-MAPS-01, PLACE-SHARE-01, DOC-BLOCKS-01, DOC-RENDER-01, SINCE-01, LEARNED-01, CHAR-01 |
+| [memory-lifecycle-and-preferences-2026-10-17.md](memory-lifecycle-and-preferences-2026-10-17.md) | new 2026-10-17, no code | MEM-TIDY-01, MEM-REVIEW-02, EVAL-04, MEM-FEED-01, PI-MEM-00, MEM-SPEAKER-01, PREF-01 |
+| [notifications-and-asks-2026-10-17.md](notifications-and-asks-2026-10-17.md) | new 2026-10-17, no code | MEM-PUSH-01, NOTIFY-SOUND-01, BRAKES-02, PKG-ASK-01, PKG-RESULT-01 |
+| [packages-apps-and-integrations-2026-10-17.md](packages-apps-and-integrations-2026-10-17.md) | new 2026-10-17, no code | APPSTORE-DESIGN-01, SKILLS-PAGE-02, APP-STATE-01, PKG-EXPOSE-01, RUNTIME-01, SERVICE-WALL-01, PRESENCE-FIND-01, NOTES-01, SELF-KNOW-01, MEDIA-INT-06 |
+| [chat-engine-and-model-records-2026-10-17.md](chat-engine-and-model-records-2026-10-17.md) | new 2026-10-17, no code | THIN-2B, MODEL-RECORD-1.7B-01, THIN-6A, MODEL-VET-01, STACK-CATALOG-01, ENGINE-CANARY-01, STACK-LIGHT-PROFILE-01, GROUND-A-01, SEARCH-DDGS-01c, OWUI-ADOPT-06, TOOL-RESULT-TRUST-01, REVIEW-01, ACT-02, EVAL-05, IMG-PIPE-INTENT-01, IMG-VISION-SHADOW-01, IMG-VISION-VETO-01, IMG-REVERSE-01 |
 | news app, kid mode voice (2026-10-17) | written by other sessions the same day; listed here when they land | their own rows |
 
 ## Current design records in `docs/plans/`
@@ -136,12 +144,8 @@ Moved to [`retired/`](retired/) on 2026-10-17, each with a header naming why and
 
 Decided in the audit, so nobody writes one by reflex:
 
-- **Security against seizure and intrusion** (SEC-PRIVACY-01): the owner's row asks for a threat-model research pass first; a
-  design before that research would guess. Not written.
-- **Modes, not ages; teen experience** (MODE-MODEL, TEEN-RESEARCH-01): owner-framed rows with their own research output
-  named in `data-scratch/design/`; the kid-mode note of 2026-10-17 covers the child's surface. Not written here.
-- **Calendar, email, find people** (Integrations): each is a consent design of its own (the rows say so); none is smart
-  home. Not written.
+- **Email** (Integrations): a consent design of its own; none is smart home. Not written. Security against seizure
+  (SEC-PRIVACY-01), modes and the teen remainder, calendar and find people now have notes in the table above.
 - **Small bundled plugins** (almanac, convert, currency, joke, math, sports, translate, trivia, book, place and media
   lookups): each is a one-call lookup drawn by the existing answer blocks; no screen, no design.
 - **Companions**: designed in `dev.md` ("The chat design pass", section 9) and the assistant layer; no separate note.
