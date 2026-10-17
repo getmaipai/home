@@ -236,6 +236,8 @@ export interface WidgetItem {
 export interface WidgetData {
   as_of: string;
   items: WidgetItem[];
+  /** Set only when `items` is a handler's fallback text, not real data (backend/src/lib/widgets.ts). */
+  degraded?: true;
 }
 
 // Real and landed (F step 6, merged into this branch 2026-09-06):

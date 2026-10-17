@@ -1,20 +1,20 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
-import { cleanup, waitFor } from "@testing-library/react";
-import { MemoryRouter } from "react-router-dom";
+import { cleanup, fireEvent, waitFor } from "@testing-library/react";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
-import type { Dashboard, Roster, SetupChecklistItem } from "@/lib/api";
+import type { InstallStatusView, Roster, SetupChecklistItem, WidgetData, WidgetDescriptor } from "@/lib/api";
 
 afterEach(() => {
   cleanup();
 });
 
-function makePerson(): Roster {
+function makePerson(role: Roster["role"] = "owner"): Roster {
   return {
     id: "person-abc123",
     display_name: "Nova",
     nickname: null,
-    role: "owner",
+    role,
     avatar_seed: "person-abc123",
     source: "hub",
     local_only: false,
@@ -29,228 +29,180 @@ function makePerson(): Roster {
   };
 }
 
-function mockDashboardFetch(body: Dashboard, setupChecklist: SetupChecklistItem[] = []) {
-  const originalFetch = globalThis.fetch;
-  globalThis.fetch = mock((input: RequestInfo | URL) => {
-    const url = typeof input === "string" ? input : input.toString();
-    if (url.includes("/api/dashboard")) return Promise.resolve(Response.json(body));
-    if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(setupChecklist));
-    return Promise.resolve(new Response("{}", { status: 200 }));
-  }) as unknown as typeof fetch;
-  return () => {
-    globalThis.fetch = originalFetch;
-  };
+const checklistItem = (id: string, done: boolean): SetupChecklistItem => ({ id, title: `Step ${id}`, reason: "Because.", done, open: { label: "Open", href: `/settings/${id}` } });
+const widget = (id: string, title = `Widget ${id}`): WidgetDescriptor => ({ package: "pkg", id, title, size: "card", refresh_s: 300 });
+const data = (title: string): WidgetData => ({ as_of: "2026-10-17T12:00:00.000Z", items: [{ title, subtitle: "Sub", value: "72" }] });
+
+interface Mocks {
+  checklist?: SetupChecklistItem[];
+  widgets?: WidgetDescriptor[];
+  widgetData?: Record<string, WidgetData | "fail">;
+  install?: Partial<InstallStatusView>;
+  chat?: "ready" | "starting";
 }
 
-describe("DashboardPage", () => {
-  test("the home count line matches open checklist items and links to General", async () => {
-    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
-      { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
-      { id: "backup-target", title: "Choose where backups go", reason: "A second place keeps a copy if this computer fails.", done: true, open: { label: "Open Storage", href: "/settings/home/storage" } },
-    ]);
-    try {
-      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={makePerson()} /></MemoryRouter>);
-      const line = await view.findByRole("link", { name: "1 thing left to finish setting up" });
-      expect(line.getAttribute("href")).toBe("/settings/home/general");
-    } finally {
-      restore();
+function mockFetch(mocks: Mocks = {}) {
+  const originalFetch = globalThis.fetch;
+  const fetchMock = mock((input: RequestInfo | URL) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/api/setup-checklist")) return Promise.resolve(Response.json(mocks.checklist ?? []));
+    if (url.includes("/api/install")) return Promise.resolve(Response.json({ state: "none", ...mocks.install }));
+    if (url.includes("/api/widgets/") && url.endsWith("/data")) {
+      const id = decodeURIComponent(url.split("/").at(-2) ?? "");
+      const body = mocks.widgetData?.[id];
+      if (body === "fail" || body === undefined) return Promise.resolve(new Response(JSON.stringify({ error: "no" }), { status: 400 }));
+      return Promise.resolve(Response.json(body));
     }
-  });
-
-  test("nothing open means there is no home count line", async () => {
-    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
-      { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: true, open: { label: "Open People", href: "/settings/home/people" } },
-    ]);
-    try {
-      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={makePerson()} /></MemoryRouter>);
-      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      expect(view.queryByRole("link", { name: /left to finish setting up/ })).toBeNull();
-    } finally {
-      restore();
+    if (url.includes("/api/widgets")) return Promise.resolve(Response.json(mocks.widgets ?? []));
+    if (url.includes("/api/health")) {
+      return Promise.resolve(Response.json({ ok: true, engines: { chat: mocks.chat === "starting" ? { state: "down", kind: "starting", reason: "ai_installing" } : { state: "up" } } }));
     }
+    return Promise.resolve(new Response("{}", { status: 200 }));
   });
+  globalThis.fetch = fetchMock as unknown as typeof fetch;
+  return { fetchMock, restore: () => { globalThis.fetch = originalFetch; } };
+}
 
-  test("a regular adult sees no checklist line and makes no checklist request", async () => {
-    const restore = mockDashboardFetch({ people_count: 1, updates_available: false, recent_activity: [], turns_per_day: [] }, [
-      { id: "family", title: "Add your family", reason: "Home works best when everyone has their own account.", done: false, open: { label: "Open People", href: "/settings/home/people" } },
-    ]);
+function Where() {
+  const location = useLocation();
+  return <p data-testid="where">{location.pathname}{location.search}</p>;
+}
+
+function renderHome(person: Roster) {
+  return renderWithQueryClient(
+    <MemoryRouter initialEntries={["/"]}>
+      <Routes>
+        <Route path="/" element={<DashboardPage person={person} />} />
+        <Route path="/chat" element={<Where />} />
+      </Routes>
+    </MemoryRouter>,
+  );
+}
+
+const hrefOf = (label: string) => Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.trim() === label)?.getAttribute("href") ?? undefined;
+const urls = (fetchMock: ReturnType<typeof mock>) => fetchMock.mock.calls.map(([input]) => (typeof input === "string" ? input : String(input)));
+
+describe("DashboardPage (Home)", () => {
+  test("greets the person, asks first, and drops the old numbers and activity log", async () => {
+    const { restore } = mockFetch();
     try {
-      const person = { ...makePerson(), role: "adult" as const };
-      const view = renderWithQueryClient(<MemoryRouter><DashboardPage person={person} /></MemoryRouter>);
-      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
-      expect(view.queryByRole("link", { name: /left to finish setting up/ })).toBeNull();
-      const requested = (globalThis.fetch as unknown as ReturnType<typeof mock>).mock.calls
-        .map(([input]) => typeof input === "string" ? input : String(input));
-      expect(requested.some((url) => url.includes("/api/setup-checklist"))).toBe(false);
-    } finally {
-      restore();
-    }
-  });
-
-  // A review finding: the first cut checked only `isLoading`, so a
-  // failed fetch left the loading skeleton showing forever - AsyncState
-  // (the kit's own shared triad) is what actually surfaces the error
-  // and a retry button.
-  test("a failed fetch shows an error and a retry button, never a stuck loading state", async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = mock(() => Promise.resolve(new Response(JSON.stringify({ error: "Something broke" }), { status: 500 }))) as unknown as typeof fetch;
-    try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("Something broke"));
-      expect(document.body.textContent).toContain("Try again");
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
-  });
-
-
-  test("shows the greeting with the signed-in person's own name, and the household counts", async () => {
-    const restore = mockDashboardFetch({
-      people_count: 4,
-      updates_available: false,
-      recent_activity: [],
-      turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-    });
-    try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
+      const view = renderHome(makePerson("adult"));
       await waitFor(() => expect(document.body.textContent).toContain("Nova"));
       expect(document.body.textContent).toContain("Here is your household today.");
-      expect(document.body.textContent).toContain("4"); // people_count
-      expect(document.body.textContent).toContain("Up to date"); // updates_available: false
+      expect(view.getByRole("textbox", { name: "Ask" })).toBeDefined();
+      expect(document.body.textContent).not.toMatch(/Recent activity|People|Up to date|\b(Turns|Engines|Stack)\b/);
     } finally {
       restore();
     }
   });
 
-  test("owner/admin: repairs render when the wire carries them, while operator words stay off Home", async () => {
-    const restore = mockDashboardFetch({
-      people_count: 2,
-      updates_available: true,
-      recent_activity: [],
-      turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-      repairs_open: 3,
-      engines: { critical: 1, error: 0, warning: 2, total: 3 },
-    });
+  test("a typed line opens Chat with the words in the address, unsent", async () => {
+    const { restore } = mockFetch();
     try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("Repairs"));
-      expect(document.body.textContent).toContain("3"); // repairs_open
-      expect(document.body.textContent).not.toMatch(/\b(Turns|Engines|Stack)\b/);
-      expect(document.body.textContent).toContain("Available"); // updates_available: true
-      // ui-v0.5.23's rail restructuring dropped these three routes'
-      // permanent nav entry - the stat cards are now their real way
-      // back, not just a status glance.
-      for (const [label, href] of [
-        ["Updates", "/updates"],
-        ["Repairs", "/repairs"],
-      ] as const) {
-        const card = Array.from(document.querySelectorAll("a")).find((a) => a.textContent?.includes(label));
-        expect(card).toBeDefined();
-        expect(card!.getAttribute("href")).toBe(href);
-      }
+      const view = renderHome(makePerson("adult"));
+      const box = await view.findByRole("textbox", { name: "Ask" });
+      fireEvent.change(box, { target: { value: "What is for dinner?" } });
+      fireEvent.click(view.getByRole("button", { name: "Ask" }));
+      await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/chat?ask=What%20is%20for%20dinner%3F"));
     } finally {
       restore();
     }
   });
 
-  // The wire itself omits repairs_open/engines for anyone but owner/
-  // admin (backend/src/lib/dashboard.ts's own header). All roles still
-  // keep the chart and Engines card off Home.
-  test("non-admin: no repairs or operator words when the wire omits admin fields", async () => {
-    const restore = mockDashboardFetch({
-      people_count: 2,
-      updates_available: false,
-      recent_activity: [],
-      turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-    });
+  test("three starters open Chat with their prompt", async () => {
+    const { restore } = mockFetch();
     try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("People"));
-      expect(document.body.textContent).not.toContain("Repairs");
-      expect(document.body.textContent).not.toMatch(/\b(Turns|Engines|Stack)\b/);
+      const view = renderHome(makePerson("adult"));
+      const starters = (await view.findAllByRole("button")).filter((button) => /^(Plan|Explain|Write|Brainstorm) /.test(button.textContent ?? ""));
+      expect(starters).toHaveLength(3);
+      fireEvent.click(starters[0]!);
+      await waitFor(() => expect(view.getByTestId("where").textContent).toBe("/chat?ask=Help%20me%20plan%20a%20week%20of%20simple%20family%20dinners."));
     } finally {
       restore();
     }
   });
 
-  test("recent activity: renders real rows, and the empty state when there are none", async () => {
-    const restore = mockDashboardFetch({
-      people_count: 1,
-      updates_available: false,
-      recent_activity: [{ turn_id: "turn-1", person_id: "person-abc123", display_name: "Nova", created_at: "2026-09-21T12:00:00.000Z", surface: "chat", source: "model" }],
-      turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-    });
+  test("while the AI installs the box shows the install strip's own line, the starters are off and the warming-up art shows", async () => {
+    const { restore } = mockFetch({ chat: "starting", install: { state: "installing_engine", stageLabel: "Building the engine" } });
     try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("Recent activity"));
-      expect(document.querySelector('[data-slot="timeline"]')).not.toBeNull();
-      expect(document.querySelector("table")).toBeNull();
-      expect(document.body.textContent).toContain("chat");
-      expect(document.body.textContent).toContain("Nova");
-      expect(document.body.textContent).not.toContain("Nothing yet");
+      const view = renderHome(makePerson("adult"));
+      await waitFor(() => expect(view.getByRole("textbox", { name: "Ask" }).getAttribute("placeholder")).toBe("Building the engine"));
+      const starters = view.getAllByRole("button").filter((button) => /^(Plan|Explain|Write|Brainstorm)/.test(button.textContent ?? ""));
+      expect(starters).toHaveLength(3);
+      for (const starter of starters) expect((starter as HTMLButtonElement).disabled).toBe(true);
+      expect(view.container.querySelector('img[src="/setup-art/warming-up.webp"]')).not.toBeNull();
     } finally {
       restore();
     }
   });
 
-  test("recent activity: the empty state, not a blank table, when the wire carries no rows", async () => {
-    const restore = mockDashboardFetch({
-      people_count: 1,
-      updates_available: false,
-      recent_activity: [],
-      turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-    });
+  test("Today shows four cards and puts the rest behind More; a failed or fallback widget drops out", async () => {
+    const ids = ["a", "b", "c", "d", "e", "f", "g"];
+    const widgetData: Record<string, WidgetData | "fail"> = Object.fromEntries(ids.map((id) => [id, data(`Row ${id}`)]));
+    widgetData.b = "fail";
+    widgetData.c = { ...data("Fallback text"), degraded: true };
+    widgetData.d = { as_of: "2026-10-17T12:00:00.000Z", items: [] };
+    const { restore } = mockFetch({ widgets: ids.map((id) => widget(id)), widgetData });
     try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("Nothing yet"));
-      expect(document.querySelector('[data-slot="timeline"]')).not.toBeNull();
-      expect(document.querySelector("table")).toBeNull();
+      const view = renderHome(makePerson("adult"));
+      await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(4));
+      expect(document.body.textContent).not.toContain("Fallback text");
+      expect(document.body.textContent).not.toContain("Widget b");
+      expect(view.queryByRole("button", { name: "More" })).toBeNull();
+      view.unmount();
+    } finally {
+      restore();
+    }
+    const many = ["a", "b", "c", "d", "e", "f"];
+    const second = mockFetch({ widgets: many.map((id) => widget(id)), widgetData: Object.fromEntries(many.map((id) => [id, data(`Row ${id}`)])) });
+    try {
+      const view = renderHome(makePerson("adult"));
+      const more = await view.findByRole("button", { name: "More" });
+      expect(view.getAllByTestId("home-today-card").length).toBe(4);
+      fireEvent.click(more);
+      await waitFor(() => expect(view.getAllByTestId("home-today-card").length).toBe(6));
+    } finally {
+      second.restore();
+    }
+  });
+
+  test("a child sees only the widgets the server returns, and no admin links or setup steps", async () => {
+    const { restore, fetchMock } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("family", false)] });
+    try {
+      const view = renderHome(makePerson("child"));
+      await view.findByText("Weather");
+      expect(hrefOf("Updates")).toBeUndefined();
+      expect(hrefOf("Repairs")).toBeUndefined();
+      expect(document.body.textContent).not.toContain("Getting started");
+      expect(urls(fetchMock).some((url) => url.includes("/api/setup-checklist"))).toBe(false);
     } finally {
       restore();
     }
   });
 
-  test("operator words stay off Home even when the admin wire carries an empty engine state", async () => {
-    const restore = mockDashboardFetch({
-      people_count: 1,
-      updates_available: false,
-      recent_activity: [],
-      turns_per_day: Array.from({ length: 30 }, (_, i) => ({ date: `2026-09-${String(i + 1).padStart(2, "0")}`, count: 0 })),
-      repairs_open: 0,
-      engines: null,
-    });
+  test("owner: admin links and the open setup steps, three at a time with a link to the rest", async () => {
+    const { restore } = mockFetch({ checklist: ["a", "b", "c", "d", "e"].map((id) => checklistItem(id, id === "a")) });
     try {
-      renderWithQueryClient(
-        <MemoryRouter>
-          <DashboardPage person={makePerson()} />
-        </MemoryRouter>,
-      );
-      await waitFor(() => expect(document.body.textContent).toContain("People"));
-      expect(document.body.textContent).not.toMatch(/\b(Turns|Engines|Stack)\b/);
+      const view = renderHome(makePerson("owner"));
+      expect(hrefOf("Updates")).toBe("/updates");
+      expect(hrefOf("Repairs")).toBe("/repairs");
+      await view.findByText("Getting started");
+      await view.findByText("Step b");
+      expect(view.queryByText("Step a")).toBeNull();
+      expect(view.queryByText("Step e")).toBeNull();
+      expect(hrefOf("1 more")).toBe("/settings/home/general");
+    } finally {
+      restore();
+    }
+  });
+
+  test("nothing open means no Getting started block", async () => {
+    const { restore } = mockFetch({ checklist: [checklistItem("family", true)] });
+    try {
+      const view = renderHome(makePerson("owner"));
+      await waitFor(() => expect(document.body.textContent).toContain("Nova"));
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(view.queryByText("Getting started")).toBeNull();
     } finally {
       restore();
     }

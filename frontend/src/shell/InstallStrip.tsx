@@ -14,6 +14,11 @@ const STAGES = [
 ] as const;
 const ENGINE_STAGE_INDEX: Record<string, number> = { preflight: 0, fetching: 0, building: 1, starting: 2 };
 
+/** The strip's own words for the current install step; Home's ask box reads the same line (one definition). */
+export function installTitle(status: Pick<InstallStatusView, "state" | "stageLabel">): string {
+  return status.state === "installing_engine" ? (status.stageLabel ?? "Setting up your AI") : status.state === "engine_failed" ? "Setting up your AI stopped" : status.state === "starter_ready" ? "Home can chat now. Better AI is still downloading" : "Downloading your AI";
+}
+
 /** One line of install progress: the AI engine installing, then the AI models downloading in the
  * background. It hides itself when nothing is installing or everything
  * has landed. Polls fast while moving, slowly otherwise. */
@@ -49,7 +54,7 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
   if (!status || status.state === "none" || status.state === "ready") return null;
   const problem = status.problem;
   const engineStep = status.state === "installing_engine" || status.state === "engine_failed";
-  const title = status.state === "installing_engine" ? (status.stageLabel ?? "Setting up your AI") : status.state === "engine_failed" ? "Setting up your AI stopped" : status.state === "starter_ready" ? "Home can chat now. Better AI is still downloading" : "Downloading your AI";
+  const title = installTitle(status);
   const downloadState = status.state === "stalled" ? "stalled" : status.state === "failed" || status.state === "out_of_space" || status.state === "engine_failed" ? "failed" : "running";
   const onRetry = () => {
     setRetryError(null);

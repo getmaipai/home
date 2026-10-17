@@ -1,76 +1,35 @@
 import { Link } from "react-router-dom";
-import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
-import { Timeline } from "@maipai/ui/src/elements/timeline";
-import { ApiError, type Roster, type Dashboard } from "@/lib/api";
-import { useDashboard } from "@/shell/useDashboard";
-import { Greeting } from "@/shell/pages/dashboard/Greeting";
-import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { getIcon } from "@maipai/ui/src/icons";
-import { NumberTicker } from "@maipai/ui/src/elements/number-ticker";
-import { StatBody, StatLink } from "@/shell/pages/dashboard/StatCard";
-import { UpdatesStat } from "@/shell/pages/dashboard/UpdatesCard";
-import { recentActivityEvents } from "@/shell/pages/dashboard/recentActivityEvents";
+import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
+import { Greeting } from "@/shell/pages/dashboard/Greeting";
+import { AskBox } from "@/shell/pages/dashboard/AskBox";
+import { TodaySection } from "@/shell/pages/dashboard/TodaySection";
+import { GettingStarted } from "@/shell/pages/dashboard/GettingStarted";
 import { useTabItem } from "@/shell/tabIdentity";
-import { setupChecklistCountLine, useSetupChecklist } from "@/shell/useSetupChecklist";
 
-const UsersIcon = getIcon("users");
-const WrenchIcon = getIcon("wrench");
-
-/** The dashboard reads one route. Recent activity is presented by the
- * shipped Timeline from the route's existing rows; no extra person data
- * is fetched or joined in the browser. */
+/** Home (docs/design/home-page-2026-10-17.md, option C): the greeting, then the ask box, then a short
+ * glance at the day. Every block is left out when it has nothing to show. First slice: Ask (01h),
+ * Today (01e), Getting started (01g) and the admin links (01b). The server filters Today by the viewer's
+ * role and age; Home adds no gate and removes none. Nothing here shows another person's activity. */
 export function DashboardPage({ person }: { person: Roster }) {
   useTabItem("Home");
-  const query = useDashboard();
-  const setupChecklist = useSetupChecklist(person);
+  const admin = isOwnerOrAdminRole(person.role);
 
   return (
-    <AsyncState
-      data={query.data}
-      error={query.isError}
-      isFetching={query.isFetching}
-      onRetry={() => query.refetch()}
-      errorMessage={query.error instanceof ApiError ? query.error.message : "Could not load the dashboard."}
-      loadingLabel="Loading dashboard"
-    >
-      {(data: Dashboard) => {
-        // Owner/admin only - the wire itself omits these fields for
-        // anyone else (backend/src/lib/dashboard.ts's own header), so
-        // their presence IS the visibility check; no second,
-        // client-side role check invented.
-        const showRepairs = data.repairs_open !== undefined;
-        const activityEvents = recentActivityEvents(data.recent_activity);
-        const setupCount = (setupChecklist.checklist.data ?? []).filter((item) => !item.done).length;
-        const setupLine = setupChecklistCountLine(setupCount);
-
-        return (
-          <div className="pb-4">
-            <h1 className="sr-only">Home</h1>
-            {setupLine ? <p className="pb-3 text-sm text-muted-foreground"><Button variant="link" size="row" render={<Link to="/settings/home/general" />}>{setupLine}</Button></p> : null}
-            <div className="pb-4">
-              <Greeting displayName={person.display_name} />
-            </div>
-            <div className="grid grid-cols-12 gap-4">
-              <div className="lg:col-span-3 col-span-6">
-                <Card><CardContent><StatBody icon={UsersIcon}><NumberTicker value={data.people_count} label="People" /></StatBody></CardContent></Card>
-              </div>
-              <div className="lg:col-span-3 col-span-6">
-                <StatLink to="/updates"><Card><CardContent><UpdatesStat available={data.updates_available} /></CardContent></Card></StatLink>
-              </div>
-              {showRepairs && (
-                <div className="lg:col-span-3 col-span-6">
-                  <StatLink to="/repairs"><Card><CardContent><StatBody icon={WrenchIcon}><NumberTicker value={data.repairs_open!} label="Repairs" /></StatBody></CardContent></Card></StatLink>
-                </div>
-              )}
-              <div className="lg:col-span-5 col-span-12">
-                <h2 className="text-base leading-snug font-medium">Recent activity</h2>
-                <Timeline events={activityEvents} visibleCount={activityEvents.length} />
-              </div>
-            </div>
-          </div>
-        );
-      }}
-    </AsyncState>
+    <div className="flex flex-col gap-6 pb-4">
+      <h1 className="sr-only">Home</h1>
+      <Greeting displayName={person.display_name} />
+      {admin ? (
+        <nav aria-label="Looking after your hub" className="flex flex-wrap gap-2">
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/updates" />}>Updates</Button>
+          <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/repairs" />}>Repairs</Button>
+        </nav>
+      ) : null}
+      <div className="grid gap-6 lg:grid-cols-12">
+        <div className="lg:col-span-8"><AskBox /></div>
+        {admin ? <div className="lg:col-span-4"><GettingStarted person={person} /></div> : null}
+      </div>
+      <TodaySection />
+    </div>
   );
 }

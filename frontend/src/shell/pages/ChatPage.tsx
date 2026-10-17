@@ -65,6 +65,7 @@ import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { CHAT_COLUMN_ID, CHAT_SETTINGS_PATH, canTakeFocus, chatColumnShortcutLabel, focusQuietly, searchableThreadsFor, skipTooltipOnQuietFocus, useChatColumn, useChatThreadListState } from "@/shell/pages/ChatColumn";
 import { INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { useNotificationsQuery } from "@/shell/NotificationBell";
+import { AskHandoff } from "@/apps/chat/AskHandoff";
 import { ChatShortcutReference } from "@/shell/pages/ChatShortcutReference";
 import { ArtifactOpenContext, AdminContext, ChatAgeBandContext, type CompareTarget, CompareOpenContext, SourcesOpenContext, DetailsOpenContext, ThinkingModeContext, ThinkingModeCapabilityContext, BareModeContext, TemporaryChatContext, DraftConversationContext, WakeWordPersonContext, ConnectionStateContext, ChatComposerNoticeContext, type ConnectionState } from "@/apps/chat/chatThreadContexts";
 import { ConfirmAskAnswerProvider, ReloadMainThreadProvider } from "@/apps/chat/chatToolUis";
@@ -1420,6 +1421,7 @@ export function ChatPage({ person }: { person: Roster }) {
       <DictationLevelMeterProvider value={dictationLevelMeter}>
       <ChatColumnControlContext.Provider value={column.control}>
         <ChatShortcutReference />
+        <AskHandoff />
         <WakeWordController person={person} />
         <ArtifactCacheInvalidator />
               <ChatDocumentTitle person={person} />
