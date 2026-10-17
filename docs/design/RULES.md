@@ -117,6 +117,13 @@ and no setting reaches them. Web search runs without a parent's approval when th
    the model. Policy refusals (consent, crisis, temporary mode,
    ungrounded arguments) are not tool failures and keep their own
    replies. A robot with no hub and no network answers the same way.
+   One narrow exception (owner-approved 2026-10-17, SEARCH-DOWN-EMPTY-01):
+   when the only web source is down and the model's one retry after the
+   failed lookup also came back with no visible words, the reply may be
+   one fixed line that says web search is not answering and what to do
+   (try again later, or ask something that needs no search). It applies
+   only after that retry returned empty, only for a missing web source,
+   never replaces any words the model wrote, and is never the raw error.
    Fixed clips that play when no model can speak (an engine outage line,
    a robot's alarm, carry or pairing line) are not replies; each is
    reviewed by a person against the child floor when written and listed
