@@ -1,6 +1,6 @@
 # Studio voice: what was decided, what was not (2026-10-17)
 
-Status: open. Measured 2026-10-17 on the Studio: a recommendation is below; Jesse picks. Questions at the bottom.
+Status: slice 1 built and live on the Studio (Chatterbox Turbo default on p64 and p128, Pocket TTS fallback); Jesse picks by ear. Questions at the bottom.
 
 ## Decision trail
 
@@ -97,12 +97,43 @@ Voxtral) do not suit a product Jesse may sell.
 [Fish drama-3](https://huggingface.co/fishaudio/drama-3), [Fish S2 Pro](https://huggingface.co/fishaudio/s2-pro),
 [Maya1](https://huggingface.co/maya-research/maya1), [Artificial Analysis arena](https://artificialanalysis.ai/text-to-speech/leaderboard).
 
+## Built on the Studio, 2026-10-17 (stack commits fb93272, 89a6b01)
+
+Stack `VOICE-STUDIO-01` slice 1 is landed and running on the Studio. Until Jesse picks by ear, both engines stay available through one
+setting, `stack.voice.engine` (`auto`, `chatterbox-turbo`, `pocket`; applies at the voice engine's restart).
+
+- **Default:** `auto` is Chatterbox Turbo on p64 and p128 and Pocket TTS on p16 and p32 (p32 keeps Pocket: the 17 GB Muse 30B pin leaves no
+  room for a 4.8 GB voice). Pocket TTS is also the fallback: an engine that is not installed, or fails to start, leaves the voice on
+  Pocket with a health warning (`tts.engine-fallback`) and the reason on the role; chat and the Stack are untouched.
+- **Live check:** the Stack binary was swapped, `mlx-audio` 0.5.9 built into `data/engines/mlx-audio/0.5.9` (no torch, 36 packages), the
+  eight Chatterbox pins downloaded (2.99 GB weights), the voice engine restarted and then the whole Stack kickstarted: keep-warm loaded `tts`
+  on Chatterbox Turbo (warm in 4.6 s beside chat, embed, judge and stt). A real `POST /v1/audio/speech` with
+  "Oh, that is hilarious [laugh]. Sorry. [cough] Excuse me. Um, let me think. [sigh] Okay, here is the plan for tomorrow." returned 10.3 s of
+  audio, first byte 0.5 s. Sample: `scratchpad/chatterbox_turbo_via_stack_laugh_cough_sigh.wav`. While other bench jobs were using the GPU
+  the real-time factor read 0.5 to 0.6, not the idle 0.27; still faster than real time and streaming. Resident set about 2.8 GB RSS, 4.3 GB
+  measured footprint by the Stack.
+- **Capability flag (Home reads this):** `GET /stack/v1/roles` gives the `tts` role `tts: { engine, requested, tags, fallback_reason }` and
+  each entry of `GET /stack/v1/voices` carries `engine` and `tts: { engine, tags }`. `tags` is the list the engine renders as sounds;
+  Pocket TTS returns an empty array. The composer (REG-02) writes only listed tags into `reply.speech`.
+- **Tags verified (by measurement, not by ear):** each tag was synthesized alone, three runs, and compared with spoken words by voiced-frame
+  fraction and spectral flatness. Spoken words: voiced 0.82 to 0.99, flatness 0.0025 to 0.0033. Rendered as non-speech sound: `[laugh]`
+  (0.42, 0.053), `[chuckle]` (0.72, 0.019), `[cough]` (0.21, 0.019), `[sigh]` (0.23, 0.015), `[gasp]` (0.20, 0.029), `[clear throat]` (0.66,
+  0.0085, weakest). Not offered: `[groan]` measures like speech, `[sniff]` and `[shush]` render as non-speech but were not asked for. An
+  unknown bracket word is spoken aloud (`[banana]` read as "banana"). The model's tokenizer knows 19 bracket tokens (also `[whispering]`,
+  `[angry]`, `[crying]` and mood tokens); those were not tested. The vocabulary served is the six above; Jesse's ear is the final test.
+- **Licences recorded on the pins:** weights Apache-2.0 per the `mlx-community` card (the upstream ResembleAI card says MIT), `mlx-audio`
+  code MIT, no watermark code in the MLX port; downloaded at install, never vendored. Reference-clip cloning is not in slice 1 (it needs
+  S3TokenizerV2, 472 MB, pinned beside it).
+- **Orpheus:** not built. The registry has the slot (`orpheus`, `built: false`), the server script takes a new engine class, and the setting
+  gains the option when its pins land.
+- **Home side (other agent):** nothing in Home changes for speech to work (same wire); composer tags and REG-02 read `tts.tags`.
+
 ## Next, once Jesse answers
 
-1. STACK-TTS-02: bench Chatterbox Turbo and Orpheus on the Studio (time to first audio, real-time factor, memory, a WAV with one
-   hesitation, one laugh and one cough), then install the winner as a second `tts` engine with Pocket TTS kept as the small-machine
-   fallback.
-2. REG-02: tag vocabulary per engine, tag passthrough test from `reply.speech` to the engine.
+1. Jesse listens to the Chatterbox sample and, if wanted, Orpheus (`orpheus_mlx_4bit.wav`); Orpheus is built as slice 2 only if he
+   prefers it or Chatterbox's cough or sigh sounds weak.
+2. REG-02: tag vocabulary per engine (read `tts.tags`), tag passthrough test from `reply.speech` to the engine.
+3. Slice 3: reference-clip voices for Chatterbox (pin S3TokenizerV2).
 
 ## The one question
 
