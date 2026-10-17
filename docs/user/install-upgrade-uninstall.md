@@ -40,6 +40,10 @@ The wizard asks where the AI runs.
 - **This computer.** Home starts the AI engine install right away. A progress bar at the bottom of the wizard shows each step: fetch, build and start, then the model downloads. You can keep answering questions while it works.
 - **Another computer.** Nothing is installed on this one. You pair the other computer later.
 
+The plan lists what you get, including voice ("Voice: talk to Home"). The browser asks for the microphone the first time you use voice, not during setup.
+
+If Home's own web search is not ready when the plan finishes, one more screen, **Turn on web search**, asks for the address of a SearXNG you run on your home network. Press **Test** to check it and **Save** to use it, or **Skip for now**. Skipping turns on DuckDuckGo search for adults. You can change this later in **Settings**, then **Search**.
+
 The engine needs the Mac's logged-in desktop to use the graphics chip. If nobody is logged in at the Mac, the bar stops and says so. Log in at the Mac and press Try again.
 
 If the bar stops for any reason, it says what went wrong. Fix that and press Try again. It picks up where it stopped. You can also run the engine step by hand.

@@ -718,7 +718,7 @@ export const api = {
   referenceRemove: (id: string) => request<{ removed: boolean; freedBytes: number }>(`/api/reference/sets/${encodeURIComponent(id)}/remove`, { method: "POST" }),
   referenceJob: (id: string, action: "pause" | "resume" | "cancel") => request<ReferenceJob>(`/api/reference/jobs/${encodeURIComponent(id)}/${action}`, { method: "POST" }),
   setupState: () => request<SetupState | { done: true }>("/api/setup/state"),
-  setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null }>("/api/setup/checks/run", { method: "POST" }),
+  setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null; searchNeeded?: boolean }>("/api/setup/checks/run", { method: "POST" }),
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),
   repairsChecks: () => request<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>>("/api/repairs/checks", { method: "POST" }),
   setupPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/setup/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
@@ -733,7 +733,10 @@ export const api = {
   installStart: (vramGb?: number) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
   installStatus: () => request<InstallStatusView>("/api/install"),
   installRetry: () => request<{ started: true }>("/api/install/retry", { method: "POST" }),
-  setupUseSearchCandidate: (url: string) => request<{ saved: true }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify({ url }) }),
+  /** Wizard web search screen: `dryRun` tests the address and saves nothing. */
+  setupUseSearchCandidate: (url: string, dryRun = false) => request<{ saved: boolean }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify(dryRun ? { url, dry_run: true } : { url }) }),
+  /** Wizard web search screen, skipped: SearXNG stays unset and DuckDuckGo (adults only) is turned on. */
+  setupSkipSearch: () => request<{ saved: boolean }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify({ ddgs_default: true }) }),
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
   setupFolders: (path?: string) => request<SetupFolderListing>(`/api/setup/folders${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`),

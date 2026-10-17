@@ -355,6 +355,34 @@ describe("SetupWizard", () => {
     } finally { h.restore(); }
   });
 
+  test("the Web search screen follows the plan only when Home's own search is not ready; Skip for now turns DuckDuckGo on for adults and goes on", async () => {
+    for (const searchNeeded of [true, false]) {
+      const state = freshState();
+      for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+      const h = harness(state, GREEN_ROWS, "unreachable");
+      const inner = globalThis.fetch;
+      const searchBodies: unknown[] = [];
+      globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/api/setup/checks/run")) return new Response(JSON.stringify({ rows: GREEN_ROWS, state, searchCandidate: null, searchNeeded }), { status: 200 });
+        if (url.includes("/api/setup/search/use-candidate")) { searchBodies.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify({ saved: true }), { status: 200 }); }
+        return inner(input, init);
+      }) as unknown as typeof fetch;
+      try {
+        const rendered = view();
+        await waitFor(() => expect(rendered.container.textContent).toContain("Engine service"));
+        await advanceTo(rendered, "Continue", "Your setup plan");
+        await waitFor(() => expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false));
+        if (!searchNeeded) { await advanceTo(rendered, "Continue", "Create your owner account"); expect(searchBodies).toEqual([]); continue; }
+        await advanceTo(rendered, "Continue", "Turn on web search");
+        expect(rendered.container.textContent).toContain("SearXNG address");
+        await advanceTo(rendered, "Skip for now", "Create your owner account");
+        expect(searchBodies).toEqual([{ ddgs_default: true }]);
+        expect(h.posts).not.toContain("web_search");
+      } finally { h.restore(); cleanup(); }
+    }
+  });
+
   test("going Back from the plan reaches Checks and stays there instead of jumping forward", async () => {
     const state = freshState();
     for (const id of ["welcome", "engine_location", "storage", "checks"] as const) state.steps.find((step) => step.id === id)!.status = "done";

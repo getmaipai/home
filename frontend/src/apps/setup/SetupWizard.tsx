@@ -16,6 +16,7 @@ import { useIsDark } from "@/shell/ThemeToggle";
 import { InstallStrip } from "@/shell/InstallStrip";
 import { PlanStep } from "./PlanStep";
 import { HostTuneStep, useHostTuneSupported } from "./HostTuneStep";
+import { WebSearchStep } from "./WebSearchStep";
 import { StorageStep, type StorageChoice } from "./StorageStep";
 import { NewPersonForm } from "@/apps/people/NewPersonForm";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
@@ -32,7 +33,7 @@ const PHASES: WizardStep[] = [
 ];
 // Steps older installs recorded that no screen shows any more.
 const RETIRED_STEPS = new Set<string>(["away", "face", "profile", "hello"]);
-const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "owner", "backup", "done"] as const;
+const SCREEN_IDS = ["welcome", "before_start", "engine_location", "storage", "host_tune", "checks", "plan", "web_search", "owner", "backup", "done"] as const;
 type ScreenId = (typeof SCREEN_IDS)[number];
 const SCREEN_TITLE: Record<ScreenId, string> = {
   welcome: "Welcome to MaiPai Home",
@@ -42,6 +43,7 @@ const SCREEN_TITLE: Record<ScreenId, string> = {
   host_tune: "Tune this computer",
   checks: "Checking your computers",
   plan: "Your setup plan",
+  web_search: "Turn on web search",
   owner: "Create your owner account",
   backup: "Save your backup key",
   done: "You're all set",
@@ -54,6 +56,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   host_tune: "Optional. Skip it any time.",
   checks: "Home is checking that everything is ready.",
   plan: "Review the steps Home will complete.",
+  web_search: "Optional. Skip it any time.",
   owner: "Create the account that manages this Home.",
   backup: "Save this key somewhere other than this computer.",
   done: "Your Home is ready to use.",
@@ -64,6 +67,7 @@ const SCREEN_ART: Partial<Record<ScreenId, string>> = {
   engine_location: "/setup-art/where.webp",
   storage: "/setup-art/storage.webp",
   plan: "/setup-art/plan.webp",
+  // web_search: no art yet; add "/setup-art/search.webp" here once that file exists.
   owner: "/setup-art/owner.webp",
   backup: "/setup-art/backup.webp",
   checks: "/setup-art/checking.webp",
@@ -80,14 +84,10 @@ const SECRET_SERVER_TEXT = "secret must be 4-128 characters";
 const SECRET_LENGTH_COPY = "Use 4 to 128 characters for your PIN or password, then press Create owner account again.";
 const stepIsDone = (state: SetupState, id: string) => state.steps.find((step) => step.id === id)?.status === "done";
 
-export function renderSetupReviewScreen({ screen, engine = "this_computer", onEngineChange, searchCandidate, onChooseSearchCandidate, searchError, busy = false, readOnly = false, checkRows, checkError = false, checksFetching = false, onRetryChecks, showTitle = true }: {
+export function renderSetupReviewScreen({ screen, engine = "this_computer", onEngineChange, readOnly = false, checkRows, checkError = false, checksFetching = false, onRetryChecks, showTitle = true }: {
   screen: "engine_location" | "storage" | "checks" | "plan";
   engine?: "this_computer" | "another_computer";
   onEngineChange?: (value: "this_computer" | "another_computer") => void;
-  searchCandidate?: string | null;
-  onChooseSearchCandidate?: () => void;
-  searchError?: string | null;
-  busy?: boolean;
   readOnly?: boolean;
   checkRows?: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }> | null;
   checkError?: boolean;
@@ -97,7 +97,7 @@ export function renderSetupReviewScreen({ screen, engine = "this_computer", onEn
 }) {
   if (screen === "engine_location") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.engine_location}</CardTitle></CardHeader> : null}<CardContent><RadioGroup disabled={readOnly} value={engine} onValueChange={(v) => onEngineChange?.(v as typeof engine)}><FieldLabel htmlFor="engine-local"><Field orientation="horizontal"><RadioGroupItem value="this_computer" id="engine-local" /><FieldContent><span className="text-base font-medium md:text-lg">One computer</span><p className="text-base text-muted-foreground md:text-lg">Home and AI both run on this computer.</p></FieldContent></Field></FieldLabel><FieldLabel htmlFor="engine-remote"><Field orientation="horizontal"><RadioGroupItem value="another_computer" id="engine-remote" /><FieldContent><span className="text-base font-medium md:text-lg">Two computers</span><p className="text-base text-muted-foreground md:text-lg">Home runs on this computer. The AI runs on a bigger, more powerful computer on your network. You pair it on the last screen of setup.</p></FieldContent></Field></FieldLabel></RadioGroup></CardContent></Card>;
   if (screen === "storage") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.storage}</CardTitle><CardDescription>Home uses its ready-to-use default folder.</CardDescription></CardHeader> : null}<CardContent>{!showTitle ? <p>Home will use its default folder for AI models.</p> : null}</CardContent></Card>;
-  if (screen === "plan") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.plan}</CardTitle></CardHeader> : null}<CardContent><p>After setup, choose and download AI models in Home settings.</p>{searchCandidate ? <><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={onChooseSearchCandidate}>Use it</Button></> : null}{searchError ? <p role="alert">{searchError}</p> : null}</CardContent></Card>;
+  if (screen === "plan") return <Card>{showTitle ? <CardHeader><CardTitle>{SCREEN_TITLE.plan}</CardTitle></CardHeader> : null}<CardContent><p>After setup, choose and download AI models in Home settings.</p></CardContent></Card>;
   return <div>{showTitle ? <h2 className="mb-4 text-lg font-medium">{SCREEN_TITLE.checks}</h2> : null}<AsyncState data={checkRows ?? null} error={checkError} isFetching={checksFetching} onRetry={onRetryChecks ?? (() => {})} errorMessage="Home couldn't check these computers. Refresh this page and try again." loadingLabel="Checking your computers">{(items) => <CheckGrid rows={items} split={engine === "another_computer"} />}</AsyncState></div>;
 }
 
@@ -132,7 +132,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const [openThings, setOpenThings] = useState<number | null>(null);
   const [tailnetError, setTailnetError] = useState<string | null>(null);
   const [searchCandidate, setSearchCandidate] = useState<string | null>(null);
-  const [searchError, setSearchError] = useState<string | null>(null);
+  const [searchNeeded, setSearchNeeded] = useState(false);
+  const searchContinue = useRef<(() => Promise<void>) | null>(null);
   const [storageChoice, setStorageChoice] = useState<StorageChoice>({});
   const [storageBlocked, setStorageBlocked] = useState(false);
   // The optional "This computer" step shows only on a Mac that runs the AI itself.
@@ -140,8 +141,12 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
   const neighbour = (from: ScreenId, step: 1 | -1): ScreenId | undefined => {
     let index = SCREEN_IDS.indexOf(from) + step;
     if (SCREEN_IDS[index] === "host_tune" && !hostTuneShown) index += step;
+    // The Web search screen shows only when Home's own search is not ready (SETUP-SEARCH-02).
+    if (SCREEN_IDS[index] === "web_search" && !searchNeeded) index += step;
     return SCREEN_IDS[index];
   };
+
+  const rememberSearch = (result: { searchCandidate: string | null; searchNeeded?: boolean }) => { setSearchCandidate(result.searchCandidate); setSearchNeeded(result.searchNeeded === true); };
 
   const refresh = async () => {
     const result = await api.setupState();
@@ -190,7 +195,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       if (!active) return;
       setCheckRows(result.rows);
       setState(result.state);
-      setSearchCandidate(result.searchCandidate);
+      rememberSearch(result);
       setCheckError(false);
       if (result.rows.every((row) => row.state === "green" || row.state === "idle" || (row.id === "web-search" && row.state === "amber"))) {
         if (!arrivedByBack.current) timer = window.setTimeout(() => { if (active) setScreen("plan"); }, 1500);
@@ -268,6 +273,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       return;
     }
     const stepId = screen === "before_start" ? "welcome" : screen;
+    if (screen === "web_search") { await (searchContinue.current ?? (async () => { setScreen(neighbour(screen, 1) ?? "owner"); }))(); return; }
     if (screen === "host_tune") { arrivedByBack.current = false; setScreen(neighbour(screen, 1) ?? "checks"); return; }
     const deferred = (["checks", "plan"].includes(stepId) && !(stepId === "plan" && planInstalled.current)) || (screen === "engine_location" && engine === "another_computer");
     // The models folder belongs to the engine computer on a split setup, so it is never sent.
@@ -323,17 +329,9 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       const action = checkRows?.find((row) => row.action === "allow_tailnet");
       if (action?.actionRoute === "settings") await api.setSetting("household", "engines.stack.remote.allow_tailnet", true);
       else await api.setupAllowEngineTailnet();
-      const result = await api.setupChecks(); setCheckRows(result.rows); setState(result.state); setSearchCandidate(result.searchCandidate);
+      const result = await api.setupChecks(); setCheckRows(result.rows); setState(result.state); rememberSearch(result);
     }
     catch (reason) { setTailnetError(reason instanceof Error ? reason.message : "Home couldn't allow Tailscale for the engine link. Sign in as an owner or admin, then try again."); }
-    finally { setBusy(false); }
-  }
-
-  async function chooseSearchCandidate() {
-    if (!searchCandidate) return;
-    setBusy(true); setSearchError(null);
-    try { await api.setupUseSearchCandidate(searchCandidate); setSearchCandidate(null); }
-    catch (reason) { setSearchError(reason instanceof Error ? reason.message : "Home couldn't choose this search service."); }
     finally { setBusy(false); }
   }
 
@@ -364,7 +362,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "host_tune": body = <HostTuneStep onSkip={() => void next()} />; break;
     case "checks": {
       const blocking = checkRows?.some((row) => row.state === "red") ?? false;
-      body = initialScreen === "checks" ? renderSetupReviewScreen({ screen: "checks", checkRows, checkError, checksFetching, showTitle: false, onRetryChecks: () => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); setSearchCandidate(result.searchCandidate); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); } }) : <div>
+      body = initialScreen === "checks" ? renderSetupReviewScreen({ screen: "checks", checkRows, checkError, checksFetching, showTitle: false, onRetryChecks: () => { setCheckError(false); setChecksFetching(true); void api.setupChecks().then((result) => { setCheckRows(result.rows); setState(result.state); rememberSearch(result); }, () => setCheckError(true)).finally(() => setChecksFetching(false)); } }) : <div>
         <AsyncState data={checkRows} error={checkError} isFetching={checksFetching || (checkRows === null && !checkError)} onRetry={retryChecks} errorMessage="Home couldn't check these computers." loadingLabel="Checking your computers">
           {(rows) => <CheckGrid rows={rows} split={engine === "another_computer"} renderAction={(row) => row.action === "allow_tailnet" ? <Button type="button" variant="secondary" size="lg" disabled={busy} onClick={() => void allowEngineTailnet()}>{row.actionLabel ?? "Allow"}</Button> : null} />}
         </AsyncState>
@@ -373,7 +371,8 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
       </div>;
       break;
     }
-    case "plan": body = <><PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} onReady={setPlanBlocksContinue} />{searchCandidate ? <Card><CardContent><p>Found a private search service on this computer.</p><Button type="button" variant="secondary" disabled={busy} onClick={() => void chooseSearchCandidate()}>Use it</Button></CardContent></Card> : null}{searchError ? <p role="alert">{searchError}</p> : null}</>; break;
+    case "plan": body = <PlanStep onInstalled={() => { planInstalled.current = true; void next(); }} onReady={setPlanBlocksContinue} />; break;
+    case "web_search": body = <WebSearchStep candidate={searchCandidate} continueRef={searchContinue} onFinished={() => { arrivedByBack.current = false; setScreen(neighbour("web_search", 1) ?? "owner"); }} />; break;
     case "owner": body = <Card><CardContent><p>{OWNER_COPY}</p><NewPersonForm formRef={ownerFormRef} actorRole="owner" fixedRole="owner" onSubmit={async (values) => { await submitOwner(values.displayName, values.secret ?? ""); }} submitLabel="Create owner account" busy={busy} error={error} checkSecret hideSubmit /></CardContent></Card>; break;
     case "backup": body = <Card><CardContent><p className="text-base text-muted-foreground md:text-lg">If this computer breaks, this key restores your Home on a new one.</p><Button type="button" variant="secondary" size="lg" disabled={!backupKey} onClick={() => void downloadEmergencyKit()}>Download</Button>{backupDownloaded ? null : <p className="text-base text-muted-foreground md:text-lg">Download your backup key to continue.</p>}{backupKeyError ? <p role="alert">Home couldn't make your backup key. Press Download again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}{backupSavedError ? <p role="alert">Home couldn't save that choice. Try again. If it fails again, Home will show a fix under Home settings, Repairs.</p> : null}</CardContent></Card>; break;
     case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>You can talk with Home as soon as you open it. Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes. To have Home greet you by face, turn it on in your profile; face data stays on this computer.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
