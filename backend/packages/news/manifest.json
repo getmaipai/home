@@ -1,10 +1,10 @@
 {
   "id": "news",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "plugin",
   "category": "Info",
   "display": "News",
-  "description": "Read the top news headlines.",
+  "description": "Read today's stories, follow topics and sources, and keep saved stories on your home's News shelf.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -16,16 +16,302 @@
       "read me the headlines",
       "what's happening in the news"
     ],
-    "patterns": ["what's the news", "what's in the news today"]
+    "patterns": [
+      "what's the news",
+      "what's in the news today"
+    ]
   },
   "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home"],
+  "platforms": [
+    "home"
+  ],
   "min_role": "child",
   "consequential": false,
-  "offline": "unavailable",
-  "config": [],
+  "offline": "degraded",
+  "config": [
+    {
+      "key": "news.poll_interval_s",
+      "scope": "household",
+      "selector": "number",
+      "range": {
+        "min": 900
+      },
+      "default": 1800,
+      "label": "News poll interval (seconds)",
+      "help": "How often Home checks enabled news feeds. At least 900 seconds.",
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.retention_days",
+      "scope": "household",
+      "selector": "number",
+      "range": {
+        "min": 1
+      },
+      "default": 90,
+      "label": "News retention (days)",
+      "help": "How long Home keeps news items and stories.",
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.shelf.enabled",
+      "scope": "household",
+      "selector": "boolean",
+      "default": true,
+      "label": "News shelf",
+      "help": "Turn the household news shelf on or off.",
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.lists.child",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+        "options": [
+          "feeds-children"
+        ],
+        "multiple": true
+      },
+      "default": [
+        "feeds-children"
+      ],
+      "label": "News lists with child controls",
+      "help": "Which lists of news feeds appear on the news shelf for people using child controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this.",
+      "copy": {
+        "does": "Chooses which news feed lists this user type can read.",
+        "options": {
+          "feeds-children": "News written for young readers."
+        },
+        "option_labels": {
+          "feeds-children": "Kids' news"
+        }
+      },
+      "level": "basic",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.lists.teen",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+        "options": [
+          "feeds-household"
+        ],
+        "multiple": true
+      },
+      "default": [
+        "feeds-household"
+      ],
+      "label": "News lists with teen controls",
+      "help": "Which lists of news feeds appear on the news shelf for people using teen controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this.",
+      "copy": {
+        "does": "Chooses which news feed lists this user type can read.",
+        "options": {
+          "feeds-household": "Headlines from public news sites."
+        },
+        "option_labels": {
+          "feeds-household": "Household news"
+        }
+      },
+      "level": "basic",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.lists.adult",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+        "options": [
+          "feeds-household"
+        ],
+        "multiple": true
+      },
+      "default": [
+        "feeds-household"
+      ],
+      "label": "News lists with adult controls",
+      "help": "Which lists of news feeds appear on the news shelf for people using adult controls. A list that is not offered to this user type never appears here and is never shown to them. Every item is still checked by the age filter before anyone sees it. A list unchecked for every user type is switched off. Only an admin can change this.",
+      "copy": {
+        "does": "Chooses which news feed lists this user type can read.",
+        "options": {
+          "feeds-household": "Headlines from public news sites."
+        },
+        "option_labels": {
+          "feeds-household": "Household news"
+        }
+      },
+      "level": "basic",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.feeds.child",
+      "scope": "household",
+      "selector": "text",
+      "default": "",
+      "label": "Extra news feeds for child",
+      "help": "News feed addresses to add for people using child controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this.",
+      "copy": {
+        "does": "Adds feed addresses to the shelf on top of the checked lists."
+      },
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.feeds.teen",
+      "scope": "household",
+      "selector": "text",
+      "default": "",
+      "label": "Extra news feeds for teen",
+      "help": "News feed addresses to add for people using teen controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this.",
+      "copy": {
+        "does": "Adds feed addresses to the shelf on top of the checked lists."
+      },
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.feeds.adult",
+      "scope": "household",
+      "selector": "text",
+      "default": "",
+      "label": "Extra news feeds for adult",
+      "help": "News feed addresses to add for people using adult controls, starting with https:// and separated by commas or spaces. Remove an address to remove its feed. These sit on top of the checked lists. Home checks every item against the age filter, and an address that points inside your home network is refused. Only an admin can change this.",
+      "copy": {
+        "does": "Adds feed addresses to the shelf on top of the checked lists."
+      },
+      "level": "advanced",
+      "secret": false,
+      "lives_in": "household.news",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "news.my_mix",
+      "scope": "person",
+      "selector": "boolean",
+      "default": true,
+      "label": "My Mix",
+      "help": "Uses your reading on this hub to choose stories for My Mix.",
+      "copy": {
+        "does": "Uses your reading on this hub to choose stories for My Mix."
+      },
+      "level": "basic",
+      "lives_in": "news",
+      "honoured_by": [
+        "home"
+      ],
+      "control": {
+        "child": "guardian",
+        "teen": "self",
+        "adult": "self"
+      },
+      "band_default": {
+        "child": false,
+        "teen": true,
+        "adult": true
+      }
+    },
+    {
+      "key": "news.reader_open",
+      "scope": "person",
+      "selector": "select",
+      "default": "reader",
+      "label": "Open stories",
+      "help": "Chooses whether stories open in the reader or on the publisher's site.",
+      "copy": {
+        "does": "Chooses whether stories open in the reader or on the publisher's site.",
+        "options": {
+          "reader": "Read the story inside News.",
+          "site": "Open the publisher's website."
+        }
+      },
+      "level": "basic",
+      "lives_in": "news",
+      "honoured_by": [
+        "home"
+      ],
+      "control": {
+        "child": "guardian",
+        "teen": "self",
+        "adult": "self"
+      },
+      "band_default": {
+        "child": "reader",
+        "teen": "reader",
+        "adult": "reader"
+      },
+      "range": {
+        "options": [
+          "reader",
+          "site"
+        ]
+      }
+    },
+    {
+      "key": "news.digest",
+      "scope": "person",
+      "selector": "boolean",
+      "default": true,
+      "label": "News digest",
+      "help": "Receives a digest of stories from your News shelf.",
+      "copy": {
+        "does": "Receives a digest of stories from your News shelf."
+      },
+      "level": "basic",
+      "lives_in": "news",
+      "honoured_by": [
+        "home"
+      ],
+      "control": {
+        "child": "guardian",
+        "teen": "self",
+        "adult": "self"
+      },
+      "band_default": {
+        "child": false,
+        "teen": true,
+        "adult": true
+      }
+    }
+  ],
   "data_sources": [
     {
       "id": "npr-rss",
@@ -35,11 +321,72 @@
       "who": "NPR",
       "opt_in": true,
       "retention": "unknown, see NPR's own policy"
+    },
+    {
+      "id": "story-picture",
+      "destination": "the publisher picture host",
+      "when": "the first time a screen shows a story while news.images is on; never in the background",
+      "what": "a plain GET for the picture file named by the feed, plus your home internet address",
+      "who": "the publisher picture host",
+      "opt_in": true,
+      "retention": "unknown, see the service policy"
+    },
+    {
+      "id": "story-text",
+      "destination": "the publisher",
+      "when": "when you open a story; background requests only with full-text prefetch on",
+      "what": "a plain GET for that one page",
+      "who": "the publisher",
+      "opt_in": true,
+      "retention": "unknown, see the service policy"
+    },
+    {
+      "id": "story-archive",
+      "destination": "the Internet Archive",
+      "when": "when a teen or adult opens a page that is gone",
+      "what": "the missing page address",
+      "who": "the Internet Archive",
+      "opt_in": true,
+      "retention": "unknown, see the service policy"
+    },
+    {
+      "id": "story-pictures",
+      "destination": "The picture host named by a chosen feed",
+      "when": "the first time a screen shows a story while News pictures are on; never in the background",
+      "what": "a plain GET for the picture file and your home's internet address",
+      "who": "The publisher's picture host",
+      "opt_in": true,
+      "retention": "See the receiving site's own policy."
+    },
+    {
+      "id": "story-text",
+      "destination": "The publisher of a chosen story",
+      "when": "when you open a story whose feed has no full text; background reading requires the separate full-text prefetch setting",
+      "what": "a plain GET for that page and your home's internet address",
+      "who": "The publisher",
+      "opt_in": true,
+      "retention": "See the receiving site's own policy."
+    },
+    {
+      "id": "story-archive",
+      "destination": "Internet Archive",
+      "when": "when a teen or adult opens a story whose page is gone, while the archive fallback is on",
+      "what": "the missing page's address and your home's internet address",
+      "who": "Internet Archive",
+      "opt_in": true,
+      "retention": "See the receiving site's own policy."
     }
   ],
-  "permissions": ["net:feeds.npr.org"],
+  "permissions": [
+    "net:feeds.npr.org"
+  ],
   "notifications": [],
-  "cache": { "key_template": "news:top", "ttl_s": 900, "stale_ok_s": 3600, "max_bytes": 200000 },
+  "cache": {
+    "key_template": "news:top",
+    "ttl_s": 900,
+    "stale_ok_s": 3600,
+    "max_bytes": 200000
+  },
   "fallback_reply": {
     "text": "Sorry, I'm having trouble looking that up right now.",
     "speech": "Sorry, I'm having trouble looking that up right now."
@@ -47,11 +394,191 @@
   "backup": "exclude",
   "background": false,
   "contributes": {
-    "widgets": [{ "id": "headlines", "title": "News", "size": "row", "refresh_s": 900, "inputs": {} }]
+    "widgets": [
+      {
+        "id": "headlines",
+        "title": "News",
+        "size": "row",
+        "refresh_s": 900,
+        "inputs": {}
+      }
+    ],
+    "pages": [
+      {
+        "id": "index",
+        "label": "Today",
+        "icon": "newspaper",
+        "nav": true,
+        "kind": "schema",
+        "module": "index",
+        "keywords": [
+          "headlines",
+          "stories",
+          "feeds",
+          "topics",
+          "sources",
+          "reader",
+          "saved"
+        ]
+      },
+      {
+        "id": "mix",
+        "label": "My Mix",
+        "icon": "sparkles",
+        "nav": true,
+        "kind": "schema",
+        "module": "mix",
+        "min_role": "teen"
+      },
+      {
+        "id": "following",
+        "label": "Following",
+        "icon": "rss",
+        "nav": true,
+        "kind": "schema",
+        "module": "following"
+      },
+      {
+        "id": "saved",
+        "label": "Saved",
+        "icon": "bookmark",
+        "nav": true,
+        "kind": "schema",
+        "module": "saved"
+      },
+      {
+        "id": "channel",
+        "label": "Channel",
+        "icon": "hash",
+        "nav": false,
+        "kind": "schema",
+        "module": "channel"
+      },
+      {
+        "id": "story",
+        "label": "Story",
+        "icon": "book-open",
+        "nav": false,
+        "kind": "schema",
+        "module": "story"
+      }
+    ],
+    "data": [
+      {
+        "id": "today",
+        "refresh_s": 300
+      },
+      {
+        "id": "mix",
+        "refresh_s": 300
+      },
+      {
+        "id": "topics",
+        "rows": "list",
+        "refresh_s": 300
+      },
+      {
+        "id": "sources",
+        "rows": "list",
+        "refresh_s": 300
+      },
+      {
+        "id": "channel",
+        "refresh_s": 300
+      },
+      {
+        "id": "saved",
+        "rows": "list",
+        "refresh_s": 300
+      },
+      {
+        "id": "story",
+        "refresh_s": 300
+      },
+      {
+        "id": "household-today",
+        "refresh_s": 300
+      }
+    ],
+    "settings_area": {
+      "id": "news",
+      "title": "News",
+      "app": "/apps/news",
+      "audience": {
+        "min_role": "child"
+      },
+      "groups": [
+        {
+          "label": "News",
+          "sections": [
+            "reading",
+            "shelf"
+          ]
+        }
+      ],
+      "sections": [
+        {
+          "id": "reading",
+          "label": "Reading",
+          "icon": "book-open",
+          "kind": "keys",
+          "cards": [
+            {
+              "label": "Reading",
+              "group": "news",
+              "scope": "person"
+            }
+          ]
+        },
+        {
+          "id": "shelf",
+          "label": "News shelf",
+          "icon": "rss",
+          "kind": "keys",
+          "min_role": "admin",
+          "cards": [
+            {
+              "label": "News shelf",
+              "group": "household.news",
+              "scope": "household",
+              "matrix": {
+                "rows": "news/feed-lists",
+                "rows_label": "News list",
+                "columns": [
+                  {
+                    "label": "Kids",
+                    "key": "news.lists.child",
+                    "band": "child"
+                  },
+                  {
+                    "label": "Teens",
+                    "key": "news.lists.teen",
+                    "band": "teen"
+                  },
+                  {
+                    "label": "Adults",
+                    "key": "news.lists.adult",
+                    "band": "adult"
+                  }
+                ],
+                "unavailable_note": "A dash means the list is not offered to that user type, so it can never appear for them.",
+                "save_error": "That change was not saved. Check your connection, then tick the box again."
+              }
+            }
+          ]
+        }
+      ]
+    }
   },
   "min_app": "0.1.0",
   "timeout_ms": 8000,
   "tier": 1,
   "quality_scale": "bronze",
-  "smoke": { "kind": "deno_test" }
+  "smoke": {
+    "kind": "deno_test"
+  },
+  "returns_blocks": [
+    "story_feed",
+    "article"
+  ]
 }

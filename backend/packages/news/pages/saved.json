@@ -1,0 +1,54 @@
+{
+  "type": "page",
+  "id": "news-saved",
+  "title": "Saved",
+  "body": [
+    {
+      "type": "list",
+      "bind": {
+        "source": "package",
+        "path": "saved"
+      },
+      "item_key_field": "item_id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{publisher}",
+      "item_media_field": "image",
+      "row_action": {
+        "icon": "book-open",
+        "label": "Read {title}",
+        "action": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        }
+      },
+      "batch": {
+        "select_label": "Select stories",
+        "actions": [
+          {
+            "label": "Remove",
+            "scope": "selected",
+            "variant": "destructive",
+            "action": {
+              "call": {
+                "target": "/api/plugins/news/actions/save",
+                "args": {
+                  "item_id": "{item_id}",
+                  "on": false
+                }
+              }
+            }
+          }
+        ]
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "bookmark",
+        "text": "No saved stories yet. Save a story to find it here."
+      }
+    }
+  ]
+}

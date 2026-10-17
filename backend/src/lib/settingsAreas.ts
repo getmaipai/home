@@ -22,7 +22,13 @@ const ROLE_LADDER: readonly Role[] = ["owner", "admin", "adult", "teen", "child"
 
 let cached: AreasFile | null = null;
 export function getSettingsAreas(): AreasFile {
-  if (!cached) cached = JSON.parse(readFileSync(join(SPEC_DIR, "settings", "areas.json"), "utf-8")) as AreasFile;
+  if (!cached) {
+    cached = JSON.parse(readFileSync(join(SPEC_DIR, "settings", "areas.json"), "utf-8")) as AreasFile;
+    // NEWS-03, spec-owed: the News package owns this card now (SETTINGS rule 1).
+    for (const area of cached.areas) for (const section of area.sections) {
+      if (section.cards) section.cards = section.cards.filter((card) => card.group !== "household.news");
+    }
+  }
   return cached;
 }
 

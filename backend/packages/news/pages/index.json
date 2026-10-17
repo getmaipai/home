@@ -1,0 +1,42 @@
+{
+  "type": "page",
+  "id": "news-index",
+  "title": "Today",
+  "body": [
+    {
+      "type": "answer_blocks",
+      "bind": {
+        "source": "package",
+        "path": "today"
+      },
+      "kinds": [
+        "story_feed"
+      ],
+      "actions": {
+        "open": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "save": {
+          "call": {
+            "target": "/api/plugins/news/actions/save"
+          }
+        },
+        "follow": {
+          "call": {
+            "target": "/api/plugins/news/actions/follow"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "newspaper",
+        "text": "No stories yet. Check back soon."
+      }
+    }
+  ]
+}

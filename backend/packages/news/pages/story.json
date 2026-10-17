@@ -1,0 +1,40 @@
+{
+  "type": "page",
+  "id": "news-story",
+  "title": "Story",
+  "body": [
+    {
+      "type": "answer_blocks",
+      "bind": {
+        "source": "package",
+        "path": "story",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "kinds": [
+        "article"
+      ],
+      "actions": {
+        "open": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "save": {
+          "call": {
+            "target": "/api/plugins/news/actions/save"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "newspaper",
+        "text": "This story is not available."
+      }
+    }
+  ]
+}

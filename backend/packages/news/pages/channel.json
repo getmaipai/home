@@ -1,0 +1,80 @@
+{
+  "type": "page",
+  "id": "news-channel",
+  "title": "Channel",
+  "body": [
+    {
+      "type": "section",
+      "condition": "kind == 'source'",
+      "children": [
+        {
+          "type": "picker",
+          "state": "key",
+          "label": "Channel",
+          "bind": {
+            "source": "package",
+            "path": "sources"
+          },
+          "item_key_field": "key",
+          "item_label_field": "label"
+        }
+      ]
+    },
+    {
+      "type": "section",
+      "condition": "kind == 'topic'",
+      "children": [
+        {
+          "type": "picker",
+          "state": "key",
+          "label": "Channel",
+          "bind": {
+            "source": "package",
+            "path": "topics"
+          },
+          "item_key_field": "key",
+          "item_label_field": "label"
+        }
+      ]
+    },
+    {
+      "type": "answer_blocks",
+      "bind": {
+        "source": "package",
+        "path": "channel",
+        "params": {
+          "kind": "$state.kind",
+          "key": "$state.key"
+        }
+      },
+      "kinds": [
+        "story_feed"
+      ],
+      "actions": {
+        "open": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "save": {
+          "call": {
+            "target": "/api/plugins/news/actions/save"
+          }
+        },
+        "follow": {
+          "call": {
+            "target": "/api/plugins/news/actions/follow"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "newspaper",
+        "text": "No stories yet. Check back soon."
+      }
+    }
+  ]
+}

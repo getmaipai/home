@@ -4,7 +4,14 @@
 import areasFile from "@maipai/spec/settings/areas.json";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 
-export const SETTINGS_AREAS = areasFile.areas as unknown as SettingsAreaDef[];
+// NEWS-03, spec-owed: the News package owns its shelf card; remove the pinned Search placement.
+export const SETTINGS_AREAS = (areasFile.areas as unknown as SettingsAreaDef[]).map((area) => ({
+  ...area,
+  sections: area.sections.map((section) => ({
+    ...section,
+    ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news") } : {}),
+  })),
+}));
 
 /** The area a route segment names, if it is one of the spec's. */
 export function settingsArea(id: string | undefined): SettingsAreaDef | undefined {

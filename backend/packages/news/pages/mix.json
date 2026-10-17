@@ -1,0 +1,57 @@
+{
+  "type": "page",
+  "id": "news-mix",
+  "title": "My Mix",
+  "body": [
+    {
+      "type": "answer_blocks",
+      "bind": {
+        "source": "package",
+        "path": "mix"
+      },
+      "kinds": [
+        "story_feed"
+      ],
+      "actions": {
+        "open": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "save": {
+          "call": {
+            "target": "/api/plugins/news/actions/save"
+          }
+        },
+        "follow": {
+          "call": {
+            "target": "/api/plugins/news/actions/follow"
+          }
+        },
+        "feedback": {
+          "call": {
+            "target": "/api/plugins/news/actions/feedback"
+          }
+        },
+        "reset_mix": {
+          "confirm": {
+            "prompt": "Reset My Mix? This clears your learned interests and feedback.",
+            "on_confirm": {
+              "call": {
+                "target": "/api/plugins/news/actions/reset_mix"
+              }
+            }
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "newspaper",
+        "text": "No stories yet. Check back soon."
+      }
+    }
+  ]
+}

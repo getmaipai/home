@@ -1,36 +1,13 @@
-<!-- Store card. Dad test: grade 6, one action per step, no jargon. -->
 # News
 
-Ask MaiPai for today's top news headlines.
+News reads the household's local shelf in chat and at `/apps/news`. Today, Following, Saved, Channel and Story are available from the child role upward. My Mix requires the teen role. Guests cannot open the app or its data.
 
-## Try it
+The six pages are schema data. The hub supplies `story_feed` and `article` answer blocks; topics, sources and saved stories use bare list rows. `household-today` is declared for a later shared-screen surface and is used by no page. No browser fetches a publisher's pictures directly.
 
-- "what's the news"
-- "what's in the news today"
-- "read me the headlines"
+The News gear holds reading choices and the admin's News shelf matrix and feed boxes. The package declares `news.my_mix`, `news.reader_open` and `news.digest` in `config[]`, which Home's registry loads. These declarations are spec-owed until a shared spec tag carries them. Their consumers arrive in NEWS-04 through NEWS-06. A child's reader stays inside News and has no inferred interests.
 
-Reads the top headlines. When the News shelf is on in Settings, they come
-from the shelf: the feed lists an admin has switched on for your kind of
-person (children, teens or adults), saved a little at a time in the
-background. When the shelf is off, it reads NPR's own public news feed
-directly, the way it always did.
+Offline operation is degraded: the app can use stories already held by the hub; uncached pages and pictures need an internet connection. Saved-story pinning is supplied by the hub data slice.
 
-## What it needs
+The `headlines` widget keeps its existing fields. Its hero, data, surfaces, priority and role fields wait for HOME-PAGE-01. Key points, Listen and notifications arrive in later slices. The package adds no data routes or ranking code.
 
-Nothing to set up. Works as soon as it's installed.
-
-## What it uses
-
-With the shelf off, a plain, unauthenticated request to NPR's own public
-RSS feed, the same feed NPR publishes for any news reader to pull. With
-the shelf on, nothing is asked when you ask for the news; the shelf's own
-feed lists (see their privacy rows) fetch in the background. Nothing about your
-household is sent - just "give me the current headlines."
-
-## Offline
-
-Needs an internet connection. Says so plainly if it can't reach NPR.
-
-## License
-
-AGPL-3.0. See the repository's LICENSE.
+See [News](../../../docs/user/news.md), [the shelf](../../../docs/user/news-shelf.md) and [privacy](../../../docs/user/privacy.md) for the reading flow, feed controls and outbound requests.

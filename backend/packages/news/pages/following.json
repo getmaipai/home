@@ -1,0 +1,103 @@
+{
+  "type": "page",
+  "id": "news-following",
+  "title": "Following",
+  "body": [
+    {
+      "type": "tabs",
+      "state": "tab",
+      "tabs": [
+        {
+          "id": "topics",
+          "label": "Topics",
+          "body": [
+            {
+              "type": "list",
+              "bind": {
+                "source": "package",
+                "path": "topics"
+              },
+              "item_key_field": "key",
+              "item_label_field": "label",
+              "item_subtitle_field": "{count} stories today",
+              "item_media_field": "icon",
+              "row_toggle": {
+                "field": "followed",
+                "on_label": "Following",
+                "off_label": "Follow",
+                "action": {
+                  "call": {
+                    "target": "/api/plugins/news/actions/follow",
+                    "args": {
+                      "kind": "topic",
+                      "key": "{key}",
+                      "on": "{on}"
+                    }
+                  }
+                }
+              },
+              "row_action": {
+                "icon": "chevron-right",
+                "label": "Open {label}",
+                "action": {
+                  "navigate": {
+                    "to": "/apps/news/channel",
+                    "state": {
+                      "kind": "topic",
+                      "key": "{key}"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        },
+        {
+          "id": "sources",
+          "label": "Sources",
+          "body": [
+            {
+              "type": "list",
+              "bind": {
+                "source": "package",
+                "path": "sources"
+              },
+              "item_key_field": "key",
+              "item_label_field": "label",
+              "item_subtitle_field": "{site}",
+              "item_media_field": "icon",
+              "row_toggle": {
+                "field": "followed",
+                "on_label": "Following",
+                "off_label": "Follow",
+                "action": {
+                  "call": {
+                    "target": "/api/plugins/news/actions/follow",
+                    "args": {
+                      "kind": "source",
+                      "key": "{key}",
+                      "on": "{on}"
+                    }
+                  }
+                }
+              },
+              "row_action": {
+                "icon": "chevron-right",
+                "label": "Open {label}",
+                "action": {
+                  "navigate": {
+                    "to": "/apps/news/channel",
+                    "state": {
+                      "kind": "source",
+                      "key": "{key}"
+                    }
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

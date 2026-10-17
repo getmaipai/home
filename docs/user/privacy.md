@@ -53,3 +53,16 @@ Something on this page can look unfamiliar. You might not be sure why a connecti
 ## Book and place lookups
 
 When you ask for a book, Home sends the title or author you said to the Library of Congress. When you ask for a place, Home sends the place name you said to OpenStreetMap Nominatim. Teen and adult profiles can use these lookups. Child profiles cannot. Temporary chats can leave the lookup result in this computer's local cache until it expires.
+
+
+## News
+
+| What | When | What leaves | Who receives it |
+|---|---|---|---|
+| Feed checks | While the News shelf is on, at its set pace | A request for the feed and your home's internet address | The publisher |
+| A story's picture | The first time a screen shows that story, while pictures are on; never in the background | A plain request for the picture file named by the feed, plus your home's internet address | The publisher's picture host |
+| A story's full text | When you open it; in the background only if full-text prefetch is on | A plain request for that one page | The publisher |
+| An archived copy of a dead page | When a teen or adult opens a page that is gone | The missing page's address | The Internet Archive |
+| Follows, saves, reads, My Mix, Key points and Listen | Never sent | Nothing; these stay on the hub | Nobody |
+
+News uses the feeds the household chose. It sends no follows, saves or reading history to publishers.

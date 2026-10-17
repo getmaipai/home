@@ -2,6 +2,19 @@
 
 All notable changes to the News package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.0] - 2026-10-17
+
+### Added
+
+- Six schema pages: Today, My Mix, Following, Saved, Channel and Story.
+- News settings for reading choices, the shelf lists and extra feeds.
+- Package data declarations and privacy rows for pictures, full stories and archived pages.
+
+### Changed
+
+- The app can show cached shelf stories without internet.
+- My Mix requires teen controls; the other pages inherit child controls. Guests cannot open News.
+
 ## [0.2.0] - 2026-10-12
 
 ### Changed

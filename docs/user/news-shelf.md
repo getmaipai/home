@@ -9,7 +9,7 @@ When you ask MaiPai for the news, it does not go and fetch it at that moment. In
 
 ## What is on the shelf
 
-Headlines: a title, the name of the news site, a link, a short summary and the address of the picture the feed named. MaiPai opens an article, or fetches a picture, only when someone looks at that story on their own screen, never in the background.
+Headlines: a title, the name of the news site, a link, a short summary and the address of the picture the feed named. MaiPai opens an article, or fetches a picture, only when someone looks at that story on their own screen, never in the background. See [News](news.md) for reading and saving stories.
 
 The headlines come from lists of news feeds. Two lists come with MaiPai:
 
@@ -31,7 +31,7 @@ If no list is turned on for a person, MaiPai says so and points to Settings. If 
 
 Only an admin can change these.
 
-1. Open **Settings**, then **Home**, then **Search**.
+1. Open **News**, then its gear, then **News shelf**.
 2. Find the **News shelf** card. It has a row for each list and a column of boxes for **Kids**, **Teens** and **Adults**.
 3. Tick a box to show that list to that group, or clear it to hide it. Each tick saves on its own.
 
