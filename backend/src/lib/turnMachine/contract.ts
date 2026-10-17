@@ -93,7 +93,7 @@ export type PolicyDecision =
       // actually have that in this conversation") covers it, the same
       // closed set of named-then-defaulted reasons `ungrounded_args`/
       // `unknown_tool` already are.
-      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never";
+      reason: "min_role" | "consent_needed" | "confirm_needed" | "parent_required" | "ungrounded_args" | "unknown_tool" | "manifest_invalid" | "temporary_mode" | "crisis_state" | "anonymous_speaker" | "unknown_project_type" | "household_subject_never" | "picture_not_here" | "picture_refused_minor" | "picture_refused_person";
       ask?: PendingAskInfo;
     };
 
@@ -182,6 +182,9 @@ export interface TurnState {
   /** ANSWER-IMG-02: whether this turn may show pictures at all (rule 0's
    * gates, decided once in beginTurn); `show_images` is offered only then. */
   answerImagesAllowed?: boolean;
+  /** IMGGEN-HOME-01: whether this turn may make pictures (pictures/policy.ts, rule 0's gates, plus the Stack
+   * having a picture engine), decided once in beginTurn; `generate_image` is offered only then. */
+  picturesAllowed?: boolean;
   modelId?: string;
   /** MINOR-CEILING-01: the chat model the Stack runs this turn (the person's pick when they made
    * one), so a node can read the running model's record; never sent to a client. */

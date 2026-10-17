@@ -41110,6 +41110,742 @@
         }
       }
     },
+    "/api/pictures/status": {
+      "get": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Whether this person can make pictures now, and why not",
+        "responses": {
+          "200": {
+            "description": "Additive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "can_make": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "engine_ready": {
+                      "type": "boolean"
+                    },
+                    "adult_styles": {
+                      "type": "boolean"
+                    },
+                    "styles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "can_make",
+                    "reason",
+                    "engine_ready",
+                    "adult_styles",
+                    "styles"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Progress, then the finished pictures, of one picture job",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job as its owner sees it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "One plain line for the card: what the engine is doing now."
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "elapsed_ms": {
+                      "type": "number"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "generate",
+                        "variation",
+                        "edit"
+                      ]
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "seed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "model": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "alt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "width",
+                          "height",
+                          "seed",
+                          "model",
+                          "steps",
+                          "ms",
+                          "alt"
+                        ]
+                      }
+                    },
+                    "can_vary": {
+                      "type": "boolean"
+                    },
+                    "stop_id": {
+                      "type": "string",
+                      "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "percent",
+                    "label",
+                    "position",
+                    "elapsed_ms",
+                    "prompt",
+                    "kind",
+                    "conversation_id",
+                    "error",
+                    "files",
+                    "can_vary",
+                    "stop_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pictures are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such picture job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A picture is still being made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Stop a picture that is waiting or being drawn",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job, now stopped (a finished job stays finished).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "One plain line for the card: what the engine is doing now."
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "elapsed_ms": {
+                      "type": "number"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "generate",
+                        "variation",
+                        "edit"
+                      ]
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "seed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "model": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "alt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "width",
+                          "height",
+                          "seed",
+                          "model",
+                          "steps",
+                          "ms",
+                          "alt"
+                        ]
+                      }
+                    },
+                    "can_vary": {
+                      "type": "boolean"
+                    },
+                    "stop_id": {
+                      "type": "string",
+                      "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "percent",
+                    "label",
+                    "position",
+                    "elapsed_ms",
+                    "prompt",
+                    "kind",
+                    "conversation_id",
+                    "error",
+                    "files",
+                    "can_vary",
+                    "stop_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pictures are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such picture job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A picture is still being made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/pictures/jobs/{id}/variation": {
+      "post": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "Make another version of a picture with a new seed, or try a failed or stopped one again",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A new job in the same chat.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "queued",
+                        "running",
+                        "done",
+                        "failed",
+                        "cancelled"
+                      ]
+                    },
+                    "percent": {
+                      "type": "number"
+                    },
+                    "label": {
+                      "type": "string",
+                      "description": "One plain line for the card: what the engine is doing now."
+                    },
+                    "position": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "elapsed_ms": {
+                      "type": "number"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "generate",
+                        "variation",
+                        "edit"
+                      ]
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "error": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "files": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          },
+                          "width": {
+                            "type": "number"
+                          },
+                          "height": {
+                            "type": "number"
+                          },
+                          "seed": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "model": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "ms": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "alt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "width",
+                          "height",
+                          "seed",
+                          "model",
+                          "steps",
+                          "ms",
+                          "alt"
+                        ]
+                      }
+                    },
+                    "can_vary": {
+                      "type": "boolean"
+                    },
+                    "stop_id": {
+                      "type": "string",
+                      "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "percent",
+                    "label",
+                    "position",
+                    "elapsed_ms",
+                    "prompt",
+                    "kind",
+                    "conversation_id",
+                    "error",
+                    "files",
+                    "can_vary",
+                    "stop_id"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Pictures are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such picture job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A picture is still being made",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The picture engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The picture engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shares/{id}": {
       "delete": {
         "tags": [

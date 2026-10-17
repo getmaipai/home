@@ -2,6 +2,7 @@
 // data directory and takes the data directory's one-hub lock before any
 // later import (app, db, keystore) can open the database.
 import { instanceLock } from "@/lib/bootGuard";
+import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
@@ -197,6 +198,8 @@ registerAllPackageNotificationTypes();
 // manifest + plan.json becomes a real, registered project type before
 // the first turn could ever offer start_project.
 registerAllPackageProjectTypes();
+// IMGGEN-HOME-01: a picture a restart interrupted either finishes now or ends with an honest line.
+resumePictureJobs();
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();

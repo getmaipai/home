@@ -199,3 +199,8 @@ export function newFeedId(): string {
 export function newNewsItemId(): string {
   return `news-${randomSuffix(10)}`;
 }
+
+// IMGGEN-HOME-01: a picture job (hub-internal, like approvals).
+export function newPictureJobId(): string {
+  return `pic-${randomSuffix(10)}`;
+}

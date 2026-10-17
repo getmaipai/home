@@ -9,6 +9,7 @@ import type { Node, ToolExecutionOutcome, PolicyDecision } from "../contract";
 import type { Source } from "@maipai/spec/gen/ts/source.js";
 import { engineComputerAwayFromHome, failureLine, type FailureKind } from "@/lib/generationFailure";
 import { COMPOSE_FAILURE_LINE } from "@/lib/composer";
+import { PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 
 /** The reasons `policy` can refuse a proposal WITHOUT parking an ask
  * (consent_needed/confirm_needed always carry one, so machine.ts's
@@ -82,6 +83,9 @@ export const HOUSEHOLD_SUBJECT_NEVER_LINE = "I don't search the web for people i
 function policyRefusalLine(reason: PolicyRefusedReason): string {
   if (reason === "parent_required") return PARENT_REQUIRED_LINE;
   if (reason === "household_subject_never") return HOUSEHOLD_SUBJECT_NEVER_LINE;
+  if (reason === "picture_not_here") return PICTURE_NOT_HERE_LINE;
+  if (reason === "picture_refused_minor") return PROMPT_REFUSAL_LINE.minor_sexual;
+  if (reason === "picture_refused_person") return PROMPT_REFUSAL_LINE.real_person;
   if (reason === "min_role") return "That one needs a grown-up.";
   if (reason === "temporary_mode") return "I can't save anything in a temporary chat.";
   if (reason === "anonymous_speaker") return "I don't know who's talking yet, so I can't use anyone's memories.";

@@ -1,0 +1,139 @@
+{
+  "id": "generate_image",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make a Picture",
+  "description": "Make a new picture when someone asks you to draw, paint, illustrate or design one; never for real photos or charts.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "picturesAllowed",
+    "bench_row": "picture-tool",
+    "reason": "offered only to an adult on their own written screen, when the household has pictures on and the Stack has a picture model"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make me a picture of a red fox in the snow",
+      "draw a lighthouse at dusk",
+      "can you generate an image of a dragon reading a book",
+      "design a logo for my bakery called Sunrise Loaves",
+      "illustrate a bedtime story about a sleepy bear in watercolor",
+      "paint a mountain lake in the style of an old travel poster"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "prompt"
+    ],
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 1200,
+        "grounded": false,
+        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for."
+      },
+      "size": {
+        "type": "string",
+        "enum": [
+          "square",
+          "portrait",
+          "landscape",
+          "wide",
+          "tall"
+        ],
+        "grounded": false,
+        "description": "Optional shape of the picture. square is the default. Use portrait or tall for a person, a phone wallpaper or a poster, landscape or wide for scenery or a banner, only when the shape matters."
+      },
+      "count": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 4,
+        "grounded": false,
+        "description": "Optional. How many different pictures, 1 to 4. Leave it out for one. Use it only when the person asks for several or for options."
+      },
+      "style": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional. The name of one of the household's saved styles, only when the person names it, for example \"my pixel style\" gives \"pixel\". Leave it out otherwise; never invent one."
+      },
+      "depicts_real_person": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set true when the person asks for a picture that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home does not make those. Otherwise leave it out."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [
+    {
+      "key": "generation.adults",
+      "scope": "household",
+      "selector": "boolean",
+      "default": true,
+      "label": "Adults can make pictures",
+      "help": "Adults can ask chat for pictures. Children and teens cannot, whatever this says.",
+      "level": "basic",
+      "copy": {
+        "does": "Lets adults ask chat to make pictures on this computer. Children and teens never can."
+      },
+      "lives_in": "household.ai",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "generation.adult_adapters",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+        "options": [
+          "allowed",
+          "restricted"
+        ]
+      },
+      "default": "allowed",
+      "label": "Adult-only styles",
+      "help": "Whether adults can use styles marked adult-only. Children and teens never can.",
+      "level": "basic",
+      "copy": {
+        "does": "Chooses whether adults can use styles marked adult-only.",
+        "options": {
+          "allowed": "Adults can use every style in the library.",
+          "restricted": "Adults can use only styles marked for all ages."
+        }
+      },
+      "lives_in": "household.ai",
+      "honoured_by": [
+        "home"
+      ]
+    }
+  ],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

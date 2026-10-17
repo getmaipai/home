@@ -1,0 +1,146 @@
+// IMGGEN-UI-01: the picture card's routes. Signed-in, per person: a job is readable and stoppable by its owner only
+// (nobody sees another person's pictures, a parent included). Starting a variation passes the same age and surface
+// gate as the chat tool and the same prompt check, so a route is never a way around either (IMGGEN-SAFE-01).
+import { createRoute, z } from "@hono/zod-openapi";
+import { apiRouter, errorResponses } from "@/lib/openapi";
+import { requireAuth } from "@/middleware/auth";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { adapterAudiencesFor, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
+import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
+import { adaptersFor } from "@/lib/pictures/adapters";
+import { pictureEngineStatus, pictureEngineReady } from "@/lib/pictures/ready";
+import { StackPicturesError } from "@/lib/pictures/stack";
+import { adultAdaptersAllowed } from "@/lib/pictures/policy";
+import type { PersonRow } from "@/types";
+
+export const picturesRoutes = apiRouter();
+
+const FileSchema = z.object({ id: z.string(), url: z.string(), width: z.number(), height: z.number(), seed: z.number().nullable(), model: z.string().nullable(), steps: z.number().nullable(), ms: z.number().nullable(), alt: z.string() });
+const JobSchema = z.object({
+  id: z.string(),
+  state: z.enum(["queued", "running", "done", "failed", "cancelled"]),
+  percent: z.number(),
+  label: z.string().describe("One plain line for the card: what the engine is doing now."),
+  position: z.number().nullable(),
+  elapsed_ms: z.number(),
+  prompt: z.string(),
+  kind: z.enum(["generate", "variation", "edit"]),
+  conversation_id: z.string().nullable(),
+  error: z.string().nullable(),
+  files: z.array(FileSchema),
+  can_vary: z.boolean(),
+  stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
+});
+
+/** The audience of a route call: the signed-in person on the web chat screen. */
+export function routeAudience(actor: PersonRow): PictureAudience {
+  return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat", surfaceClass: "written", spoken: false };
+}
+
+function phaseLabel(job: PictureJob): string {
+  if (job.state === "queued") return job.position && job.position > 1 ? `Waiting in line, number ${job.position}` : "Waiting for the picture engine";
+  if (job.phase === "waiting for memory") return "Waiting for memory to free up";
+  if (job.phase === "starting" || job.phase === "setting up" || job.phase === "loading") return "Getting the picture model ready";
+  if (job.phase === "decoding") return "Finishing the picture";
+  return "Drawing";
+}
+
+/** The card for a job: the first picture and every variation made from it are one card. While any of them is
+ * being made the card shows that one's progress; the pictures finished so far stay in view. `job` is the id to
+ * stop (the one being made), or the card's own id when nothing is. */
+export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean) {
+  const group = root.turnId ? pictureJobsForTurn(actor, root.turnId).filter((j) => j.kind !== "edit") : [root];
+  const jobs = group.length > 0 ? group : [root];
+  const active = jobs.find((j) => j.state === "queued" || j.state === "running") ?? null;
+  const last = jobs[jobs.length - 1]!;
+  const alt = root.prompt.replace(/\s+/g, " ").trim().slice(0, 200);
+  const files = jobs.flatMap((j) => j.state === "done" ? j.files.map((f) => ({ id: f.id, url: fileUrl(j, f), width: f.width, height: f.height, seed: f.seed, model: f.model, steps: f.steps, ms: f.ms, alt })) : []);
+  const shown = active ?? last;
+  const state = active ? active.state : files.length > 0 ? "done" as const : last.state;
+  return {
+    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? phaseLabel(active) : "", position: active ? active.position : null,
+    elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
+    error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, stop_id: (active ?? root).id,
+    can_vary: canVary && !active && files.length > 0 && files.length < 12,
+  };
+}
+
+const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
+const refusals = errorResponses({ 401: "Not signed in", 403: "Pictures are off for this profile", 404: "No such picture job", 409: "A picture is still being made", 422: "That request is not allowed", 502: "The picture engine refused it", 503: "The picture engine is not available" });
+
+const statusRoute = createRoute({
+  method: "get", path: "/status", tags: ["Pictures"], summary: "Whether this person can make pictures now, and why not", middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ can_make: z.boolean(), reason: z.string().nullable(), engine_ready: z.boolean(), adult_styles: z.boolean(), styles: z.array(z.object({ id: z.string(), name: z.string() })) }) } }, description: "Additive." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+picturesRoutes.openapi(statusRoute, async (c) => {
+  const actor = c.get("person");
+  const audience = routeAudience(actor);
+  const denial = pictureDenial(audience);
+  const ready = await pictureEngineReady();
+  const styles = denial ? [] : (await adaptersFor(adapterAudiencesFor(audience))).map((a) => ({ id: a.id, name: a.name }));
+  const engine = await pictureEngineStatus();
+  return c.json({
+    can_make: denial === null && ready,
+    reason: denial ? PICTURE_DENIAL_LINE[denial] : ready ? null : engine?.reason ?? "No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.",
+    engine_ready: ready,
+    adult_styles: denial === null && adultAdaptersAllowed(),
+    styles,
+  }, 200);
+});
+
+const getRoute = createRoute({
+  method: "get", path: "/jobs/{id}", tags: ["Pictures"], summary: "Progress, then the finished pictures, of one picture job", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "The job as its owner sees it." }, ...refusals },
+});
+picturesRoutes.openapi(getRoute, (c) => {
+  const actor = c.get("person");
+  const job = getPictureJob(actor, c.req.valid("param").id);
+  if (!job) return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
+  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null), 200);
+});
+
+const cancelRoute = createRoute({
+  method: "post", path: "/jobs/{id}/cancel", tags: ["Pictures"], summary: "Stop a picture that is waiting or being drawn", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "The job, now stopped (a finished job stays finished)." }, ...refusals },
+});
+picturesRoutes.openapi(cancelRoute, async (c) => {
+  const actor = c.get("person");
+  const job = await cancelPictureJob(actor, c.req.valid("param").id);
+  if (!job) return c.json({ error: "That picture isn't available any more." }, 404) as never;
+  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null), 200);
+});
+
+const variationRoute = createRoute({
+  method: "post", path: "/jobs/{id}/variation", tags: ["Pictures"], summary: "Make another version of a picture with a new seed, or try a failed or stopped one again", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "A new job in the same chat." }, ...refusals },
+});
+picturesRoutes.openapi(variationRoute, async (c) => {
+  const actor = c.get("person");
+  const denial = pictureDenial(routeAudience(actor));
+  if (denial) return c.json({ error: PICTURE_DENIAL_LINE[denial], code: denial }, 403) as never;
+  const source = getPictureJob(actor, c.req.valid("param").id);
+  if (!source || source.state === "queued" || source.state === "running") return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
+  // One at a time: a card with a picture still being made takes no second one.
+  const group = source.turnId ? pictureJobsForTurn(actor, source.turnId) : [source];
+  if (group.some((j) => j.state === "queued" || j.state === "running")) return c.json({ error: "A picture is still being made. Wait for it or stop it first.", code: "busy" }, 409) as never;
+  const refused = refusePrompt(source.prompt);
+  if (refused) return c.json({ error: PROMPT_REFUSAL_LINE[refused], code: refused }, 422) as never;
+  if (!(await pictureEngineReady())) return c.json({ error: "No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.", code: "not_installed" }, 503) as never;
+  const adapters = await adaptersFor(adapterAudiencesFor(routeAudience(actor)));
+  // Only styles this person may still use ride along; a style turned off since is dropped.
+  const loras = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [{ id: a.id, scale: a.strength_default }] : []; });
+  try {
+    const job = await startPictureJob({
+      actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
+      body: { prompt: source.prompt, size: source.request.size, n: 1, audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+    });
+    void job;
+    return c.json(cardView(actor, source, true), 200);
+  } catch (error) {
+    const status = error instanceof StackPicturesError && error.status === 422 ? 422 : 503;
+    return c.json({ error: plainFailure(error), code: error instanceof StackPicturesError ? error.code : "failed" }, status) as never;
+  }
+});

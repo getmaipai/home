@@ -422,6 +422,10 @@ export interface TurnValue {
    * `artifact` above already uses for a version a client fetches
    * separately. */
   project?: { id: string };
+  /** IMGGEN-UI-01: this turn's `generate_image` call started a picture job - the id only (composer.ts's
+   * `pictureForOutcomes()`). The card polls GET /api/pictures/jobs/:id for progress, a Stop button and the finished
+   * pictures, the same "name it, don't inline it" shape as `project` above. */
+  picture?: { id: string };
   /** APPROVE-CARD-01: set only on the turn that just parked a
    * `confirm_needed`/`consent_needed` ask (turnNext.ts's `finishTurn()`
    * "asked" branch, never for a temporary conversation - `setPendingAsk`
@@ -514,7 +518,7 @@ export interface Media { kind: "image"; url: string; thumbnail: string | null; s
 // listConversationTurns()/list()) drops the raw column entirely for a
 // minor's own turn rather than sending `null`, matching the write-side
 // gate `reasoning`'s own wire event and POST /api/turn already apply.
-export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
+export type ConversationTurnWithMemoryIds = Omit<ConversationTurnRow, "sources" | "media" | "stats" | "reasoning" | "structuredPart" | "confirm" | "images" | "answerImages" | "blocks"> & { sources?: Source[]; media?: TurnValue["media"]; media_items?: Media[]; images?: ChatImagePart[]; blocks?: AnswerBlock[]; stats?: TurnStats; reasoning?: string; memory_ids: string[]; crisis_support?: CrisisSupport; artifact?: { id: string; version: number }; project?: { id: string }; picture?: { id: string }; structured_part?: StructuredPart; confirm?: { package_id: string; open: boolean } };
 
 // POST /api/turn/stream's real wire shape (2026-09-04): newline-delimited
 // JSON, one event per line (the same shape the legacy hub's own

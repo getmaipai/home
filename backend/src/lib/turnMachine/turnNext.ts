@@ -41,7 +41,7 @@ import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "./messages";
 import { topicBlockForTurn } from "@/lib/topicPrompt";
 import type { ContextSegmentKey } from "@/wire";
-import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes } from "@/lib/composer";
+import { structuredPartForOutcomes, artifactForOutcomes, projectForOutcomes, pictureForOutcomes } from "@/lib/composer";
 import { emptyTimings, outcomeOf, sensitiveAllowed } from "@/lib/turnContext";
 import { getActiveChatEngineIdentity, stackRefusal } from "@/lib/stackEngine";
 import { nudgeChatEngineRecovery } from "@/lib/llmSupervisor";
@@ -53,6 +53,8 @@ import { scheduleSummaryRefresh } from "@/lib/summaryRefresh";
 import { scheduleConversationTitle } from "@/lib/conversationTitle";
 import { StreamGate, gateGrainFor } from "./nodes/outputGate";
 import { resolveTurnBudgetAndEngineModel, withTurnToolGates } from "./budget";
+import { picturesAllowed } from "@/lib/pictures/policy";
+import { pictureEngineReady } from "@/lib/pictures/ready";
 import { turnMachine } from "./machine";
 import type { TraceRecorder } from "./trace";
 import type { TurnState, ActionProposal, TurnBudget } from "./contract";
@@ -201,6 +203,7 @@ function buildTurnValue(state: TurnState, startedAt: number, source: TurnValue["
     // it just launched, the same unconditional-line, no-new-dispatch
     // hookup the two fields above already use for their own outcomes.
     project: projectForOutcomes(state.outcomes) ?? undefined,
+    picture: pictureForOutcomes(state.outcomes) ?? undefined,
     ...(state.bare ? { bare: true } : {}),
     ...(source === "plugin" && packageId ? { plugin_id: packageId } : {}),
     ...(source === "command" && packageId ? { command_id: packageId } : {}),
@@ -546,7 +549,11 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // model's own record offers it AND this turn may show pictures; the
   // record keeps it out until ANSWER-IMG-05's bench passes.
   const answerImagesOk = answerImagesAllowed({ actor, band, surfaceClass, spoken: opts.spoken === true, temporary, bare, ephemeral: opts.ephemeral === true });
-  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk);
+  // IMGGEN-HOME-01 (rule 0): `generate_image` is offered only to an adult on their own written screen, with pictures on
+  // for the household and a picture engine installed on the Stack. A child, a teen, a guest, a spoken or shared surface
+  // never sees it.
+  const picturesOk = !bare && picturesAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await pictureEngineReady());
+  const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk);
 
   const state: TurnState = {
     turnId,
@@ -560,6 +567,7 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
     // shown-to-model mark is the hub's own (model.ts), never a client's.
     ...(opts.images?.length ? { images: opts.images.map(({ id, name, width, height, media_type }) => ({ id, name, width, height, media_type })) } : {}),
     ...(answerImagesOk ? { answerImagesAllowed: true } : {}),
+    ...(picturesOk ? { picturesAllowed: true } : {}),
     modelId: opts.model,
     ...(engineModelId ? { engineModelId } : {}),
     signal,

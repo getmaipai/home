@@ -62,6 +62,7 @@ import { recordEpisodes, deleteEpisodesForTurns, contentTerms } from "@/lib/epis
 import { FORGET_COMMAND_ID } from "@/lib/forgetCommand";
 import { artifactsByTurn, deleteArtifactsForTurns } from "@/lib/artifacts";
 import { projectsByTurn } from "@/lib/projects/store";
+import { pictureJobIdsByTurn } from "@/lib/pictures/jobs";
 import { nextHlc, compareHlc } from "@/lib/hlc";
 import { Conversation } from "@maipai/spec/gen/ts/conversation.js";
 import type { Surface } from "@/lib/turnShared";
@@ -1988,6 +1989,8 @@ export function listConversationTurns(
   // just above, keyed on `provenance.turnId`, no new column (store.ts's
   // own header on it).
   const projectByTurn = projectsByTurn(rows.map((r) => r.id));
+  // IMGGEN-UI-01: the same reload path for a picture job the turn started (keyed on the job's own `turn_id`).
+  const pictureByTurn = pictureJobIdsByTurn(actor, rows.map((r) => r.id));
 
   // MINOR-SEARCH-01m: a child reads no link in a reply and no page address in a source, old rows included (the stored row is untouched).
   const bandOut = speakerAgeBand(actor, new Date());
@@ -2016,7 +2019,7 @@ export function listConversationTurns(
     // side comment in buildTurnRow() for why. APPROVE-CARD-01's confirm
     // is the same: the card names which package is asking, not the
     // reasoning behind it.
-    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
+    return { ...row, outcomes: readsErrorDetail ? rawOutcomes : null, replyText: forBand(visibleText(r.replyText)), sources: r.sources ? sourcesForBand(JSON.parse(r.sources), bandOut) : undefined, ...(rawImages ? { images: JSON.parse(rawImages) as import("@/wire").ChatImagePart[] } : {}), ...blocksOut(blocksFor(r, rawBlocks, rawAnswerImages), bandOut), ...mediaFields(rawMedia), stats: r.stats ? statsForViewer(JSON.parse(r.stats) as TurnStats, actor) : undefined, ...(reasoning !== undefined ? { reasoning } : {}), ...(artifact ? { artifact } : {}), ...(project ? { project } : {}), ...(pictureByTurn.has(r.id) && !hideForRefusedChildTurn ? { picture: { id: pictureByTurn.get(r.id)! } } : {}), ...(structuredPart ? { structured_part: structuredPartForBand(JSON.parse(structuredPart) as StructuredPart, bandOut) } : {}), ...(confirm ? { confirm: { ...(JSON.parse(confirm) as { package_id: string; open: boolean }), open: pendingAsk?.turnId === r.id } } : {}), ...(crisisTurns.has(r.id) ? { crisis_support: crisisSupportFor(CRISIS_RESOURCES_TEXT, bandOut) } : {}), memory_ids: byTurn.get(r.id) ?? [] };
   }) };
 }
 

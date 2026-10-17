@@ -760,6 +760,16 @@ export function projectForOutcomes(outcomes: readonly ToolExecutionOutcome[]): {
   return null;
 }
 
+/** IMGGEN-UI-01: `TurnValue.picture`, the id of the picture job this turn's `generate_image` call started. */
+export function pictureForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
+  for (const outcome of outcomes) {
+    if (outcome.status !== "succeeded" || outcome.packageId !== "generate_image") continue;
+    const id = recordData(outcome.result?.data)?.pictureJobId;
+    if (typeof id === "string") return { id };
+  }
+  return null;
+}
+
 function almanacDateSpecSheet(outcome: Succeeded): Omit<StructuredPart, "tool_id"> | null {
   const data = recordData(outcome.result?.data);
   if (!data || typeof data.date !== "string") return null;

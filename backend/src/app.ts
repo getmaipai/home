@@ -64,6 +64,7 @@ import { searchRoutes } from "@/routes/search";
 import { storageRoutes } from "@/routes/storage";
 import { filesRoutes, sharesRoutes } from "@/routes/files";
 import { imageEditRoutes } from "@/routes/imageEdit";
+import { picturesRoutes } from "@/routes/pictures";
 import { attachmentsRoutes } from "@/routes/attachments";
 import { updatesRoutes } from "@/routes/updates";
 import { openaiRoutes } from "@/routes/openai";
@@ -245,6 +246,7 @@ app.route("/api/storage", storageRoutes);
 app.route("/api/files", filesRoutes);
 app.route("/api/attachments", attachmentsRoutes);
 app.route("/api/image-edit", imageEditRoutes);
+app.route("/api/pictures", picturesRoutes);
 app.route("/api/shares", sharesRoutes);
 app.route("/api/updates", updatesRoutes);
 // Root-mounted, not under /api: OpenAI's own wire contract names this

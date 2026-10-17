@@ -1752,3 +1752,45 @@ export const appUpdateState = sqliteTable("app_update_state", {
   // what's really one release's worth of denormalized data.
   assetsJson: text("assets_json"),
 });
+
+// IMGGEN-HOME-01: one picture job a person started in chat (a new picture, a
+// variation or a described edit). Home's own record of the Stack's job: the
+// chat card polls this row, never the Stack. The prompt is the person's own
+// text, kept on their own record and never written to a log (rule 6a). A
+// temporary or Incognito chat never writes a row; its jobs live in memory
+// (lib/pictures/jobs.ts). `files` is JSON: the stored pictures, in order.
+export const pictureJobs = sqliteTable(
+  "picture_jobs",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    conversationId: text("conversation_id"),
+    turnId: text("turn_id"),
+    kind: text("kind").notNull(),
+    state: text("state").notNull(),
+    stackJob: text("stack_job"),
+    percent: integer("percent").notNull().default(0),
+    phase: text("phase"),
+    position: integer("position"),
+    prompt: text("prompt").notNull(),
+    request: text("request").notNull(),
+    error: text("error"),
+    files: text("files").notNull().default("[]"),
+    createdAt: text("created_at").notNull(),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+  },
+  (table) => [index("picture_jobs_person_id_idx").on(table.personId), index("picture_jobs_turn_id_idx").on(table.turnId)],
+);
+
+// IMGGEN-SET-01: the household's switch on one adapter (LoRA) in the Stack's
+// library. The Stack owns the file and its metadata; Home owns whether the
+// household lets chat use it. A missing row reads as enabled.
+export const pictureAdapterPrefs = sqliteTable("picture_adapter_prefs", {
+  adapterId: text("adapter_id").primaryKey(),
+  enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+  updatedAt: text("updated_at").notNull(),
+  updatedBy: text("updated_by"),
+});

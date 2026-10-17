@@ -295,12 +295,13 @@ describe("GET /api/plugins", () => {
     const childClient = await child(ownerClient);
     const childResponse = await childClient.get("/api/plugins");
     const childPackages = (await childResponse.json()) as Array<{ id: string }>;
-    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup"].includes(id)));
+    expect(childPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => !["lock-doors", "feeds-household", "book-lookup", "place-lookup", "generate_image"].includes(id)));
 
     const teenClient = await teen(ownerClient);
     const teenResponse = await teenClient.get("/api/plugins");
     const teenPackages = (await teenResponse.json()) as Array<{ id: string }>;
-    expect(teenPackages.map((manifest) => manifest.id).sort()).toEqual(allIds);
+    // IMGGEN-HOME-01: pictures are for adults only, so the teen does not list generate_image.
+    expect(teenPackages.map((manifest) => manifest.id).sort()).toEqual(allIds.filter((id) => id !== "generate_image"));
     expect(teenPackages.map((manifest) => manifest.id)).toContain("lock-doors");
   });
 });

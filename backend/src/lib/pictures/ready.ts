@@ -1,0 +1,44 @@
+// IMGGEN-HOME-01: whether the Stack has a picture engine that can make a picture right now. The picture tool is
+// offered only then, so the model never sees a tool that would fail for want of a model (rule 6 still covers a
+// failure after the offer). A read failure is "not ready"; the answer is cached briefly so a chat turn pays for
+// it at most once every 20 seconds.
+import { isStackConfigured } from "@/lib/stackEngine";
+import { imageStatus, type StackImageStatus } from "./stack";
+
+let cached: { at: number; status: StackImageStatus | null } | null = null;
+let forTests: StackImageStatus | null | undefined;
+const TTL_MS = 20_000;
+
+/** Test seam: the Stack's picture status (null: no engine), or undefined to read for real. */
+export function __setPictureStatusForTests(status: StackImageStatus | null | undefined): void { forTests = status; cached = null; }
+
+export async function pictureEngineStatus(): Promise<StackImageStatus | null> {
+  if (forTests !== undefined) return forTests;
+  if (!isStackConfigured()) return null;
+  if (cached && Date.now() - cached.at < TTL_MS) return cached.status;
+  const status = await imageStatus();
+  cached = { at: Date.now(), status };
+  return status;
+}
+
+export function dropPictureStatusCache(): void { cached = null; }
+
+/** The engine is installed and able to take a job (building or running counts: the job queues). */
+export async function pictureEngineReady(): Promise<boolean> {
+  const status = await pictureEngineStatus();
+  if (!status) return false;
+  if (status.state === "unsupported" || status.state === "off" || status.state === "not-installed") return false;
+  return status.available !== false;
+}
+
+/** A test status that is ready. */
+export function readyStatusForTests(overrides: Partial<StackImageStatus> = {}): StackImageStatus {
+  return {
+    state: "idle", phase: null, available: true, reason: null, default_model: "flux2-klein-4b",
+    models: [{ id: "flux2-klein-4b", family: "flux2", installed: true, licence: "Apache-2.0", loras: true, edit: true, steps_default: 4, peak_gb: 13.5 }],
+    loras_supported: true, edit: { generative: true, masked: true },
+    limits: { min_side: 256, max_side: 2048, size_step: 16, max_n: 4, max_prompt_chars: 2000, max_loras: 3, queue_max: 8 }, idle_unload_s: 600,
+    memory: { fits: true, reason: null, peak_gb: 13.5 },
+    ...overrides,
+  };
+}

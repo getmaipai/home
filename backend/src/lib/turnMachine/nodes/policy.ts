@@ -16,6 +16,7 @@ import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { modelFacingArgs } from "./tool";
+import { GENERATE_IMAGE_TOOL_ID, audienceOf, refusalFor } from "@/lib/pictures/tool";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
 
@@ -309,6 +310,21 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
       }
       entries.push({ proposal, decision: { allow: true } });
       continue;
+    }
+
+    // IMGGEN-HOME-01 / IMGGEN-SAFE-01: the picture tool's gates run first and are not a grounding or a consent question.
+    // A person who may not make a picture here, or a prompt over one of the two absolute lines, is refused with a fixed
+    // reply before any job exists; the Stack is never asked.
+    if (call.tool === GENERATE_IMAGE_TOOL_ID) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const pictureProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const refusal = !state.picturesAllowed ? { kind: "denied" as const } : refusalFor(audienceOf(state, false), callArgs);
+      if (refusal) {
+        const reason = refusal.kind === "denied" ? "picture_not_here" as const : refusal.why === "minor_sexual" ? "picture_refused_minor" as const : "picture_refused_person" as const;
+        noteRefusal(reason);
+        entries.push({ proposal: pictureProposal, decision: { allow: false, reason } });
+        continue;
+      }
     }
 
     const loaded = loadManifestOnly(call.tool);

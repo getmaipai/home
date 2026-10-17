@@ -21,6 +21,7 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newOpenQuestionId", "oq-", 10],
   ["newGrantId", "grant-", 10],
   ["newApprovalId", "approval-", 10],
+  ["newPictureJobId", "pic-", 10],
   ["newReceivedBackupId", "recvbak-", 10],
   ["newListId", "list-", 10],
   ["newListItemId", "item-", 10],
