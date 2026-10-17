@@ -21,6 +21,7 @@
 import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
 import { householdHomePlaceName } from "@/lib/places";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
+import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 
 export interface WidgetDescriptor {
@@ -53,6 +54,16 @@ export interface WidgetData {
    * on a genuine success - the common case stays exactly as small as it
    * was. */
   degraded?: true;
+  /** One answer block (today only `weather_card`) the Today row may draw in place of `items` for an adult; `items`
+   * stays the text fallback for every other viewer and client (additive, HOME-PAGE-01 card block). */
+  card?: Record<string, unknown>;
+}
+
+/** The weather widget's `weather_card` block, for an adult viewer only: a child or teen keeps the text item. */
+export function widgetCardBlock(actor: PersonRow, blocks: unknown): Record<string, unknown> | undefined {
+  if (speakerAgeBand(actor, new Date()) !== "adult" || !Array.isArray(blocks)) return undefined;
+  const card = blocks.find((b): b is Record<string, unknown> => typeof b === "object" && b !== null && (b as { kind?: unknown }).kind === "weather_card");
+  return card;
 }
 
 export type OpResult<T> = { ok: true; status: 200; value: T } | { ok: false; status: 400 | 403 | 404; error: string };
@@ -116,5 +127,6 @@ export async function getWidgetData(actor: PersonRow, packageId: string, widgetI
   // CHAT-02: the one output boundary, for text that reaches the
   // dashboard without a chat turn.
   const text = (refusePackageReplyIfUnsafe(actor, result.value) ?? result.value).reply?.text ?? "";
-  return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items: [{ title: text }] } };
+  const card = packageId === "weather" ? widgetCardBlock(actor, (result.value as { blocks?: unknown }).blocks) : undefined;
+  return { ok: true, status: 200, value: { as_of: new Date().toISOString(), items: [{ title: text }], ...(card ? { card } : {}) } };
 }

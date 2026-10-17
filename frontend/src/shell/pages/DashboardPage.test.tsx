@@ -166,6 +166,20 @@ describe("DashboardPage (Home)", () => {
     }
   });
 
+  test("a weather widget that carries a card draws the compact weather card in place of the text", async () => {
+    const card = (await import("@maipai/spec/fixtures/answer-block/valid-weather_card.json")).default;
+    const withCard: WidgetData = { ...data("Sunny"), card: card as unknown as Record<string, unknown> };
+    const { restore } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: withCard } });
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByTestId("home-today-card");
+      expect(document.querySelector('[data-slot="weather-card"]')?.getAttribute("data-variant")).toBe("compact");
+      expect(view.queryByText("Sub")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   test("a child sees only the widgets the server returns, and no admin links or setup steps", async () => {
     const { restore, fetchMock } = mockFetch({ widgets: [widget("weather", "Weather")], widgetData: { weather: data("Sunny") }, checklist: [checklistItem("family", false)] });
     try {

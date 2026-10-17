@@ -7,6 +7,8 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
+import { widgetCardBlock } from "@/lib/widgets";
+import type { PersonRow } from "@/types";
 
 beforeEach(() => resetDb());
 
@@ -93,5 +95,21 @@ describe("GET /api/widgets/:package/:id/data", () => {
     const client = await owner();
     const res = await client.get("/api/widgets/weather/current/data");
     expect(res.status).toBe(404);
+  });
+});
+
+describe("widgetCardBlock", () => {
+  const blocks = [{ kind: "spec_sheet" }, { kind: "weather_card", props: {} }];
+  const who = (role: string) => ({ role, birthdate: null }) as unknown as PersonRow;
+
+  test("an adult gets the weather_card block, nothing else from the list", () => {
+    expect(widgetCardBlock(who("adult"), blocks)).toEqual({ kind: "weather_card", props: {} });
+    expect(widgetCardBlock(who("owner"), [{ kind: "chart" }])).toBeUndefined();
+  });
+
+  test("a child or a teen keeps the text item, and a missing list is no card", () => {
+    expect(widgetCardBlock(who("child"), blocks)).toBeUndefined();
+    expect(widgetCardBlock(who("teen"), blocks)).toBeUndefined();
+    expect(widgetCardBlock(who("adult"), undefined)).toBeUndefined();
   });
 });

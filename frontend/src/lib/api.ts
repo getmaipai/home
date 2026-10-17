@@ -238,6 +238,8 @@ export interface WidgetData {
   items: WidgetItem[];
   /** Set only when `items` is a handler's fallback text, not real data (backend/src/lib/widgets.ts). */
   degraded?: true;
+  /** A `weather_card` answer block for an adult; drawn by the Today row instead of `items`. */
+  card?: Record<string, unknown>;
 }
 
 // Real and landed (F step 6, merged into this branch 2026-09-06):

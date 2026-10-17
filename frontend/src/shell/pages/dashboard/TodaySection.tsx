@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboa
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/dashboard/components/ui/collapsible";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
+import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { api, type WidgetData, type WidgetDescriptor } from "@/lib/api";
 
@@ -40,7 +41,12 @@ export function TodaySection() {
   if (list.isPending) return <RouteSkeleton label="Loading Today" />;
   if (slots.length === 0) return null;
 
-  const cards = (shown: Slot[]) => shown.map((slot) => (
+  const cards = (shown: Slot[]) => shown.map((slot) => slot.data.card ? (
+    // The kit's compact weather card is its own card; the text Card is the fallback when no block came back.
+    <div key={`${slot.widget.package}/${slot.widget.id}`} data-testid="home-today-card">
+      <AnswerBlockView block={slot.data.card} compact />
+    </div>
+  ) : (
     <Card key={`${slot.widget.package}/${slot.widget.id}`} size="sm" data-testid="home-today-card">
       <CardHeader><CardTitle>{slot.widget.title}</CardTitle></CardHeader>
       <CardContent>
