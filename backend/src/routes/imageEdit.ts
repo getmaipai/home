@@ -5,7 +5,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { ImageEditError, applyPreview, cancelEdit, commentEdit, editErrorFrom, editToolsStatus, listVersions, pollEdit, readPicture, readPreview, saveUploadedVersion, startEdit, type EditOperation } from "@/lib/imageEdit";
+import { ImageEditError, applyPreview, cancelEdit, startComment, editErrorFrom, editToolsStatus, listVersions, pollEdit, readPicture, readPreview, saveUploadedVersion, startEdit, type EditOperation } from "@/lib/imageEdit";
 
 export const imageEditRoutes = apiRouter();
 
@@ -147,13 +147,13 @@ imageEditRoutes.openapi(saveRoute, async (c) => {
 });
 
 const commentRoute = createRoute({
-  method: "post", path: "/pictures/{id}/comment", tags: ["Image editor"], summary: "Ask for a change in words (needs the picture-making model)", middleware: [requireAuth] as const,
+  method: "post", path: "/pictures/{id}/comment", tags: ["Image editor"], summary: "Ask for a change in words; the picture engine changes the pointed-at area and returns a preview to apply", middleware: [requireAuth] as const,
   request: { params: pictureParams, body: { content: { "application/json": { schema: z.object({ conversation_id: z.string().min(1).max(80), prompt: z.string().min(1).max(2000), region: z.object({ x: z.number(), y: z.number(), width: z.number(), height: z.number() }).nullable().optional() }) } } } },
-  responses: { 200: { content: { "application/json": { schema: z.object({ done: z.literal(false), code: z.literal("not_set_up"), message: z.string() }) } }, description: "Plain words: picture creation is not set up yet. Nothing was changed." }, ...refusals },
+  responses: { 200: { content: { "application/json": { schema: ProgressSchema } }, description: "Running with a job to poll at GET /jobs/{job}, then done with a preview to apply (POST /previews/{token}/apply). Nothing changes until it is applied." }, ...refusals },
 });
 imageEditRoutes.openapi(commentRoute, async (c) => {
   try {
     const body = c.req.valid("json");
-    return c.json(await commentEdit(c.get("person"), body.conversation_id, c.req.valid("param").id), 200) as never;
+    return c.json(await startComment(c.get("person"), body.conversation_id, c.req.valid("param").id, { prompt: body.prompt, region: body.region ?? null }), 200) as never;
   } catch (error) { return fail(c, error) as never; }
 });

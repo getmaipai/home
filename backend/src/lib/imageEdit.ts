@@ -34,6 +34,10 @@ import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, mentionsSexualContent, type PictureAudience } from "@/lib/pictures/policy";
+import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
+import { pictureEngineStatus } from "@/lib/pictures/ready";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { StackError } from "@/lib/stack/errors";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
 import type { PersonRow } from "@/types";
@@ -44,8 +48,10 @@ export class ImageEditError extends Error {
 
 export const EDIT_OPERATIONS = ["remove_background", "erase", "upscale", "resize"] as const;
 export type EditOperation = typeof EDIT_OPERATIONS[number];
-/** An operation or `markup` (drawn in the browser, saved through the upload route). */
-export type EditProvenanceOp = EditOperation | "markup";
+/** The change a Comment asks for in words (the Stack's generative edit, IMGGEN-EDITOR-01). */
+export type AnyEditOp = EditOperation | "comment";
+/** An operation, a comment or `markup` (drawn in the browser, saved through the upload route). */
+export type EditProvenanceOp = AnyEditOp | "markup";
 
 /** The most pixels Home accepts for a saved markup picture (the Stack's own resize output limit). */
 const MAX_SAVED_PIXELS = 36_000_000;
@@ -76,14 +82,19 @@ let imageEngineForTests: boolean | undefined;
 /** Test seam: the Stack's tools answer (null = the Stack has no such route) and whether it reports a picture-making engine. */
 export function __setImageToolsForTests(status: StackImageToolsStatus | null | undefined, imageEngine?: boolean): void { toolsStatusForTests = status; imageEngineForTests = imageEngine; }
 
-async function stackImageEngineReady(): Promise<boolean> {
-  if (imageEngineForTests !== undefined) return imageEngineForTests;
-  try {
-    const { roles } = await getStackClient().roles();
-    const row = roles.find((role) => role.id === "image");
-    const state = row?.state.state;
-    return state === "ready" || state === "loaded" || state === "installed";
-  } catch { return false; }
+/** The editor's own audience: the signed-in person on the web chat screen. */
+function editorAudience(actor: PersonRow): PictureAudience {
+  return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat", surfaceClass: "written", spoken: false };
+}
+
+/** Whether Comment can change a picture in words for this person: they may make pictures at all (an adult on their own screen) and the Stack reports a generative edit model. */
+async function commentState(actor: PersonRow): Promise<EditToolState> {
+  const denial = pictureDenial(editorAudience(actor));
+  if (denial) return { enabled: false, reason: PICTURE_DENIAL_LINE[denial] };
+  if (imageEngineForTests !== undefined) return imageEngineForTests ? { enabled: true } : { enabled: false, reason: COMMENT_NOT_SET_UP };
+  const status = await pictureEngineStatus().catch(() => null);
+  if (status?.edit?.generative && status.available !== false) return { enabled: true };
+  return { enabled: false, reason: COMMENT_NOT_SET_UP };
 }
 
 function off(reason: string): Record<EditToolKey, EditToolState> {
@@ -92,8 +103,7 @@ function off(reason: string): Record<EditToolKey, EditToolState> {
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
   if (!photoUploadsAllowed(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), limits: {} };
-  const commentReady = await stackImageEngineReady().catch(() => false);
-  const comment: EditToolState = commentReady ? { enabled: true } : { enabled: false, reason: COMMENT_NOT_SET_UP };
+  const comment: EditToolState = await commentState(actor);
   const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment }, limits: {} });
   if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't available: no editing engine is set up on this computer.", "unavailable");
   let status: StackImageToolsStatus | null;
@@ -238,12 +248,12 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 // ---------------------------------------------------------------- running a Stack edit
 
-interface Preview { token: string; personId: string; png: Uint8Array; width: number; height: number; op: EditOperation; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
+interface Preview { token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
 const previews = new Map<string, Preview>();
-interface EditJob { personId: string; sourceId: string; conversationId: string; op: EditOperation; createdAt: number; finalising?: Promise<PreviewInfo> }
+interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean }
 const jobs = new Map<string, EditJob>();
 
-export interface PreviewInfo { token: string; url: string; width: number; height: number; operation: EditOperation; engine: string | null; model: string | null; ms: number | null; transparent: boolean }
+export interface PreviewInfo { token: string; url: string; width: number; height: number; operation: AnyEditOp; engine: string | null; model: string | null; ms: number | null; transparent: boolean }
 export type EditProgress =
   | { state: "done"; preview: PreviewInfo }
   | { state: "queued" | "running"; job: string; percent: number | null; label: string }
@@ -254,7 +264,7 @@ function sweep(now = Date.now()): void {
   for (const [id, value] of jobs) if (now - value.createdAt > JOB_TTL_MS) jobs.delete(id);
 }
 
-function keepPreview(actor: PersonRow, source: SourcePicture, op: EditOperation, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number }): PreviewInfo {
+function keepPreview(actor: PersonRow, source: SourcePicture, op: AnyEditOp, png: Uint8Array, item: { width: number; height: number; engine?: string; model?: string; ms?: number }): PreviewInfo {
   sweep();
   const mine = [...previews.values()].filter((value) => value.personId === actor.id).sort((a, b) => a.createdAt - b.createdAt);
   for (const old of mine.slice(0, Math.max(0, mine.length - (PREVIEWS_PER_PERSON - 1)))) previews.delete(old.token);
@@ -313,7 +323,7 @@ export async function startEdit(actor: PersonRow, conversationId: string, id: st
   }
 }
 
-const OP_LABEL: Record<EditOperation, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing" };
+const OP_LABEL: Record<AnyEditOp, string> = { remove_background: "Removing the background", erase: "Erasing", upscale: "Making it bigger", resize: "Resizing", comment: "Making your change" };
 
 /** The state of a running edit; the first poll that sees it finished takes the PNG from the Stack and keeps it as a preview. */
 export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditProgress> {
@@ -321,6 +331,7 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
   if (!job || job.personId !== actor.id) throw new ImageEditError(404, "That edit isn't running any more. Start it again.", "not_found");
   try {
     if (job.finalising) return { state: "done", preview: await job.finalising };
+    if (job.generative) return await pollComment(actor, jobId, job);
     const stack = await getStackClient().job(jobId);
     if (stack.state === "queued" || stack.state === "running" || stack.state === "paused" || stack.state === "stalled" || stack.state === "waiting_for_you") {
       return { state: stack.state === "queued" ? "queued" : "running", job: jobId, percent: stack.percent > 0 ? stack.percent : null, label: stack.position && stack.position > 1 ? `Waiting your turn (${stack.position})` : OP_LABEL[job.op] };
@@ -352,6 +363,7 @@ export async function cancelEdit(actor: PersonRow, jobId: string): Promise<void>
   const job = jobs.get(jobId);
   if (!job || job.personId !== actor.id) return;
   jobs.delete(jobId);
+  if (job.generative) { await cancelOrDelete(jobId); return; }
   try { await getStackClient().cancelJob(jobId); } catch { /* it had already finished or the Stack is gone: either way nothing is running for this person */ }
 }
 
@@ -366,7 +378,7 @@ export function readPreview(actor: PersonRow, token: string): Preview {
 export async function applyPreview(actor: PersonRow, token: string, label?: string): Promise<PictureVersion> {
   const preview = readPreview(actor, token);
   const source = loadSource(actor, preview.conversationId, preview.sourceId, true);
-  const defaults: Record<EditOperation, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized" };
+  const defaults: Record<AnyEditOp, string> = { remove_background: "Background removed", erase: "Object erased", upscale: "Enlarged", resize: "Resized", comment: "Changed as described" };
   const version = await saveVersion(actor, source, preview.png, { op: preview.op, label: label?.trim() || defaults[preview.op], engine: preview.engine, model: preview.model, ms: preview.ms });
   previews.delete(token);
   return version;
@@ -378,10 +390,102 @@ export async function saveUploadedVersion(actor: PersonRow, conversationId: stri
   return saveVersion(actor, source, bytes, { op: "markup", label: label.trim() || "Markup" });
 }
 
-/** Describe-a-change edits belong to the picture-making model; until one is installed this answers plainly and changes nothing. */
-export async function commentEdit(actor: PersonRow, conversationId: string, id: string): Promise<{ done: false; code: "not_set_up"; message: string }> {
-  loadSource(actor, conversationId, id, false);
-  return { done: false, code: "not_set_up", message: COMMENT_NOT_SET_UP };
+// ---------------------------------------------------------------- Comment: a change in words (IMGGEN-EDITOR-01)
+
+export interface CommentRegion { x: number; y: number; width: number; height: number }
+export const COMMENT_NOT_READY_LINE = COMMENT_NOT_SET_UP;
+
+function clamp01(value: number): number { return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0)); }
+
+/** The normalized x,y,w,h the Stack takes, from the editor's box. A click (no size) becomes a small box around the point; a box is kept inside the picture. */
+export function regionForStack(region: CommentRegion | null | undefined): string | null {
+  if (!region) return null;
+  let { x, y, width, height } = region;
+  const MIN = 0.12;
+  const cx = clamp01(x + width / 2);
+  const cy = clamp01(y + height / 2);
+  if (width < MIN) { width = MIN; x = cx - MIN / 2; }
+  if (height < MIN) { height = MIN; y = cy - MIN / 2; }
+  x = Math.min(clamp01(x), 1 - Math.min(width, 1));
+  y = Math.min(clamp01(y), 1 - Math.min(height, 1));
+  width = Math.min(width, 1 - x);
+  height = Math.min(height, 1 - y);
+  return [x, y, width, height].map((n) => Number(n.toFixed(4))).join(",");
+}
+
+/** A Comment: the person describes a change, optionally pointing at an area, and the picture engine changes only that area (the rest of the picture stays as it was). The result is a preview the person applies as a new version, exactly like Erase. Gates run first: only a person who may make pictures, and the two absolute lines on the words. */
+export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null }): Promise<EditProgress> {
+  const source = loadSource(actor, conversationId, id, true);
+  const denial = pictureDenial(editorAudience(actor));
+  if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);
+  const prompt = input.prompt.trim();
+  if (!prompt) throw new ImageEditError(422, "Say what to change, then send it.", "prompt_required");
+  const refused = refusePrompt(prompt);
+  if (refused) throw new ImageEditError(422, PROMPT_REFUSAL_LINE[refused], `refused_${refused}`);
+  // A picture the person did not generate here (an upload) may show a real person: it is never changed into something sexual.
+  const generated = await isGeneratedPicture(source);
+  if (!generated && mentionsSexualContent(prompt)) throw new ImageEditError(422, PROMPT_REFUSAL_LINE.real_person, "refused_real_person");
+  const comment = await commentState(actor);
+  if (!comment.enabled) throw new ImageEditError(503, comment.reason ?? COMMENT_NOT_SET_UP, "not_set_up");
+  const region = regionForStack(input.region);
+  const form = new FormData();
+  form.append("image", new File([new Uint8Array(source.bytes)], "picture", { type: source.mediaType }));
+  form.append("operation", region ? "edit_masked" : "edit");
+  form.append("instruction", prompt);
+  if (region) form.append("region", region);
+  form.append("timeout_ms", "1");
+  try {
+    const { job } = await submitEdit(form);
+    sweep();
+    jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true });
+    return { state: "running", job, percent: null, label: OP_LABEL.comment };
+  } catch (error) {
+    throw commentErrorFrom(error);
+  }
+}
+
+function commentErrorFrom(error: unknown): ImageEditError {
+  if (error instanceof ImageEditError) return error;
+  if (error instanceof StackPicturesError) {
+    if (error.code === "unreachable" || error.code === "no_stack") return new ImageEditError(503, "The picture engine isn't answering. Check that the engine is running, then try again.", "unavailable");
+    if (error.code === "queue_full" || error.code === "no_memory") return new ImageEditError(503, error.message, error.code);
+    if (error.status === 422) return new ImageEditError(422, error.message, error.code);
+    if (error.status === 503) return new ImageEditError(503, error.message, error.code);
+    return new ImageEditError(502, error.message, error.code);
+  }
+  return editErrorFrom(error);
+}
+
+async function isGeneratedPicture(source: SourcePicture): Promise<boolean> {
+  if (source.temporary) return source.name === "Generated picture";
+  const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
+  return Boolean(row?.provenance.startsWith("picture-gen:"));
+}
+
+async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promise<EditProgress> {
+  let status;
+  try {
+    status = await getGenerationJob(jobId);
+  } catch (error) {
+    jobs.delete(jobId);
+    const mapped = commentErrorFrom(error);
+    return { state: "failed", error: mapped.message, code: mapped.code };
+  }
+  if (status.state === "queued" || status.state === "running") {
+    return { state: status.state, job: jobId, percent: status.progress > 0 ? Math.min(99, Math.round(status.progress)) : null, label: status.position && status.position > 1 ? `Waiting your turn (${status.position})` : OP_LABEL.comment };
+  }
+  if (status.state === "cancelled") { jobs.delete(jobId); return { state: "cancelled", error: "The change was cancelled. Nothing was changed.", code: "cancelled" }; }
+  if (status.state === "failed") { jobs.delete(jobId); return { state: "failed", error: status.error ?? "The picture engine could not make that change. Try again, or describe it differently.", code: status.code ?? "failed" }; }
+  const source = loadSource(actor, job.conversationId, job.sourceId, true);
+  job.finalising = (async () => {
+    const png = await fetchPicture(jobId, 0);
+    const meta = await sharp(png).metadata();
+    const made = status.data[0];
+    void cancelOrDelete(jobId);
+    return keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms });
+  })();
+  job.finalising.catch(() => { job.finalising = undefined; });
+  return { state: "done", preview: await job.finalising };
 }
 
 export function __resetImageEditForTests(): void { previews.clear(); jobs.clear(); toolsStatusForTests = undefined; imageEngineForTests = undefined; }

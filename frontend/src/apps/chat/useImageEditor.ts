@@ -129,7 +129,20 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
         setCurrentId(version.id);
         return version;
       },
-      onComment: async (request) => ({ message: (await imageEditApi.comment(open.conversationId, sourceId, request)).message }),
+      onComment: async (request, ctl): Promise<{ message: string; pending?: ImageEditorPending }> => {
+        ctl.onProgress({ percent: null, label: "Sending your change" });
+        let progress = await imageEditApi.comment(open.conversationId, sourceId, request, ctl.signal);
+        while (progress.state === "queued" || progress.state === "running") {
+          ctl.onProgress({ percent: progress.percent, label: progress.label });
+          try { await wait(700, ctl.signal); } catch (error) { void imageEditApi.cancel(progress.job).catch(() => undefined); throw error; }
+          progress = await imageEditApi.poll(progress.job, ctl.signal);
+        }
+        if (progress.state === "done") {
+          const { token, url, width, height } = progress.preview;
+          return { message: "Here is the change. Apply it to keep it as a new version, or discard it.", pending: { token, previewUrl: url, width, height } };
+        }
+        throw new Error(progress.state === "failed" || progress.state === "cancelled" ? progress.error : "The change did not finish. Try again.");
+      },
     };
   }, [open, currentId, versionsQuery.data, statusQuery.data, statusQuery.isError, canShare, onShare, close, queryClient, versionsKey]);
 

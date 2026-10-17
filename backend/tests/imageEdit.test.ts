@@ -10,6 +10,8 @@ import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stac
 import type { StackClient, StackImageToolsStatus } from "@/lib/stack/client";
 import { StackError } from "@/lib/stack/errors";
 import { TestClient } from "./client";
+import { installFakeImageStack, type FakeImageStack } from "./pictureFixture";
+import { invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { resetDb } from "./reset-db";
 
 const READY: StackImageToolsStatus = { state: "idle", phase: null, vision: true, models: { isnet: true, lama: true, esrgan: true }, limits: { upscale_in: 6 }, operations: ["remove_background", "erase", "upscale", "resize"], reason: null };
@@ -268,15 +270,100 @@ describe("picture editor routes", () => {
     expect(list.versions.map((v) => v.op)).toEqual(["original", "remove_background"]);
   });
 
-  test("Comment answers that picture creation is not set up and changes nothing", async () => {
+  test("Comment says plainly that picture creation is not set up and changes nothing", async () => {
     const { client, actor } = await owner();
     __setStackClientForTests(stubStack().client);
     const conversation = resolveOrCreateConversation(actor, "chat");
     if (!conversation.ok) throw new Error("no conversation");
     const picture = await upload(client, conversation.value.id);
     const res = await client.post(`/api/image-edit/pictures/${picture.id}/comment`, { conversation_id: conversation.value.id, prompt: "make the sky pink", region: { x: 0.1, y: 0.1, width: 0.5, height: 0.5 } });
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ done: false, code: "not_set_up", message: expect.stringContaining("Picture creation isn't set up yet") });
+    expect(res.status).toBe(503);
+    expect(await res.json()).toEqual({ error: expect.stringContaining("Picture creation isn't set up yet"), code: "not_set_up" });
     expect(db.select().from(attachments).all()).toHaveLength(1);
+  });
+
+  describe("Comment with a picture engine (IMGGEN-EDITOR-01)", () => {
+    let fake: FakeImageStack;
+    beforeEach(() => { fake = installFakeImageStack(); __setStackClientForTests(stubStack().client); });
+    afterEach(() => { fake.restore(); });
+
+    async function commented(client: TestClient, conversationId: string, pictureId: string, body: Record<string, unknown>) {
+      return client.post(`/api/image-edit/pictures/${pictureId}/comment`, { conversation_id: conversationId, ...body });
+    }
+
+    test("the status reports Comment ready when the Stack has a generative edit model", async () => {
+      const { client } = await owner();
+      const status = (await (await client.get("/api/image-edit/status")).json()) as { tools: ToolMap };
+      expect(status.tools.comment).toEqual({ enabled: true });
+    });
+
+    test("a comment on a pointed-at area sends edit_masked with a region, then previews and applies as a new version", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      const started = (await (await commented(client, conversation.value.id, picture.id, { prompt: "Make the sky pink", region: { x: 0.1, y: 0.2, width: 0.5, height: 0.4 } })).json()) as { state: string; job: string };
+      expect(started.state).toBe("running");
+      expect(fake.edits).toHaveLength(1);
+      expect(fake.edits[0]).toMatchObject({ operation: "edit_masked", instruction: "Make the sky pink", region: "0.1,0.2,0.5,0.4", timeout_ms: "1" });
+      let progress = (await (await client.get(`/api/image-edit/jobs/${started.job}`)).json()) as { state: string; preview?: { token: string; operation: string } };
+      for (let i = 0; i < 6 && progress.state !== "done"; i += 1) progress = (await (await client.get(`/api/image-edit/jobs/${started.job}`)).json()) as typeof progress;
+      expect(progress.state).toBe("done");
+      expect(progress.preview!.operation).toBe("comment");
+      // Nothing is saved until Apply.
+      expect(db.select().from(attachments).all()).toHaveLength(1);
+      const applied = (await (await client.post(`/api/image-edit/previews/${progress.preview!.token}/apply`, {})).json()) as { version: { id: string; label: string; op: string } };
+      expect(applied.version).toMatchObject({ label: "Changed as described", op: "comment" });
+      expect(db.select().from(attachments).all()).toHaveLength(2);
+    });
+
+    test("a click with no size becomes a small box around the point; no region edits the whole picture", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      await commented(client, conversation.value.id, picture.id, { prompt: "Add a hat", region: { x: 0.5, y: 0.5, width: 0, height: 0 } });
+      expect(fake.edits[0]!.region).toBe("0.44,0.44,0.12,0.12");
+      await commented(client, conversation.value.id, picture.id, { prompt: "Make it evening", region: null });
+      expect(fake.edits[1]).toMatchObject({ operation: "edit" });
+      expect(fake.edits[1]!.region).toBeUndefined();
+    });
+
+    test("a child's editor, a teen's and a guest's refuse a comment and send nothing", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      db.update(people).set({ role: "teen" }).where(eq(people.id, actor.id)).run();
+      invalidateSessionCacheForPerson(actor.id);
+      const status = (await (await client.get("/api/image-edit/status")).json()) as { tools: ToolMap };
+      expect(status.tools.comment.enabled).toBe(false);
+      const refused = await commented(client, conversation.value.id, picture.id, { prompt: "Make it pink", region: null });
+      expect([403, 503]).toContain(refused.status);
+      expect(fake.edits).toHaveLength(0);
+    });
+
+    test("the two absolute lines apply to a comment, and an uploaded photo is never changed into something sexual", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      const minor = await commented(client, conversation.value.id, picture.id, { prompt: "make her a nude child", region: null });
+      expect(minor.status).toBe(422);
+      const photo = await commented(client, conversation.value.id, picture.id, { prompt: "put her in lingerie", region: null });
+      expect(photo.status).toBe(422);
+      expect(((await photo.json()) as { code: string }).code).toBe("refused_real_person");
+      expect(fake.edits).toHaveLength(0);
+    });
+
+    test("Stop reaches the picture engine", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      const started = (await (await commented(client, conversation.value.id, picture.id, { prompt: "Add a hat", region: null })).json()) as { job: string };
+      await client.request(`/api/image-edit/jobs/${started.job}`, { method: "DELETE" });
+      expect(fake.jobs[0]!.deleted).toBe(true);
+    });
   });
 });
