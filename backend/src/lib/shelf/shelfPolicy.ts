@@ -68,7 +68,13 @@ export interface FeedAudienceFields {
 
 /** Whether a feed's items may reach a user type right now. */
 export function feedVisibleTo(feed: FeedAudienceFields, band: AgeBand, ticked: ReadonlyMap<AgeBand, readonly string[]> = tickedByBand()): boolean {
-  if (!shelfEnabled() || !feed.enabled) return false;
+  return shelfEnabled() && feedOfferedTo(feed, band, ticked);
+}
+
+/** The same rule without the shelf switch: whether this feed is one the band is offered, whether or not the shelf is on right now
+ * (an answer that must not depend on the switch, such as whether a channel exists, asks this). */
+export function feedOfferedTo(feed: FeedAudienceFields, band: AgeBand, ticked: ReadonlyMap<AgeBand, readonly string[]> = tickedByBand()): boolean {
+  if (!feed.enabled) return false;
   // An admin's own feed (no package) is as visible as its audience.
   if (!feed.packageId) return audienceOf(feed.band).includes(band);
   // A bundled feed follows its list: ticked for this user type and offered to it

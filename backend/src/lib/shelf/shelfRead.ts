@@ -10,7 +10,7 @@ import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { listFeeds } from "./feedStore";
 import { adminAddresses } from "./shelfFeeds";
 import { bumpShelfCounter } from "./shelfCounters";
-import { bandOkAllowedFor, feedVisibleTo, shelfEnabled, tickedByBand } from "./shelfPolicy";
+import { bandOkAllowedFor, feedOfferedTo, feedVisibleTo, shelfEnabled, tickedByBand } from "./shelfPolicy";
 import { sharedShelfStore, type ShelfItem, type ShelfStore } from "./shelfStore";
 
 /** The ids of every feed whose items may reach this user type right now. */
@@ -24,6 +24,14 @@ export function visibleFeedIds(band: AgeBand): string[] {
     .filter((feed) => feed.package_id || typed.get(feed.url) === feed.band)
     .filter((feed) => feedVisibleTo({ band: feed.band, packageId: feed.package_id ?? null, enabled: feed.enabled }, band, ticked))
     .map((feed) => feed.id);
+}
+
+/** Whether a feed is one this user type is offered, independent of the shelf switch. */
+export function feedIsOfferedTo(band: AgeBand, feedId: string): boolean {
+  const feed = listFeeds().find((candidate) => candidate.id === feedId);
+  if (!feed) return false;
+  if (!feed.package_id && adminAddresses().get(feed.url) !== feed.band) return false;
+  return feedOfferedTo({ band: feed.band, packageId: feed.package_id ?? null, enabled: feed.enabled }, band, tickedByBand());
 }
 
 export function releaseShelfItems(band: AgeBand, limit: number, store: ShelfStore | null = sharedShelfStore()): ShelfItem[] {

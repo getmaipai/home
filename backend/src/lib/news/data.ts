@@ -13,7 +13,7 @@ import { nextHlc } from "@/lib/hlc";
 import { randomSuffix } from "@/lib/id";
 import { loadManifestOnly } from "@/lib/plugins";
 import { listFeeds } from "@/lib/shelf/feedStore";
-import { releaseShelfItem, releaseShelfItems, visibleFeedIds } from "@/lib/shelf/shelfRead";
+import { feedIsOfferedTo, releaseShelfItem, releaseShelfItems, visibleFeedIds } from "@/lib/shelf/shelfRead";
 import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 import { FEED_LISTS, shelfEnabled } from "@/lib/shelf/shelfPolicy";
 import type { PersonRow } from "@/types";
@@ -162,6 +162,9 @@ export function channelData(person: PersonRow, body: Record<string, unknown>, no
   const kind = body.kind === "topic" || body.kind === "source" ? body.kind : null;
   const key = typeof body.key === "string" ? body.key : "";
   if (!kind || !key) return null;
+  // Whether the channel exists for this band is settled first, from the topic set and the lists alone, so the answer
+  // (a 404 or a page) does not depend on the shelf switch.
+  if (kind === "topic" ? !topicOfferedTo(key, viewer.band) : !feedIsOfferedTo(viewer.band, key)) return null;
   if (!shelfEnabled()) return emptyBlocks(false);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);

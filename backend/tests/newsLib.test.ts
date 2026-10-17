@@ -6,7 +6,7 @@ import { type ArticleBlock } from "@/lib/retrieval/extractArticle";
 import { gateBlocks, gateFor, sentencesOf, speechFor, SPEECH_CHUNK_MAX } from "@/lib/news/childGate";
 import { openShelfStore } from "@/lib/shelf/shelfStore";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
-import { itemIdFrom, storyIdOf } from "@/lib/news/cards";
+import { itemIdFrom, publishedAtOf, storyIdOf } from "@/lib/news/cards";
 
 const NOW = Date.parse("2026-10-17T12:00:00Z");
 
@@ -82,13 +82,27 @@ describe("ids and the shelf store", () => {
     expect(store.get("news-abc123xyz")!.image_url).toBe("https://i.example.com/p.jpg");
     store.setImageRef("news-abc123xyz", "nimg_x");
     expect(store.get("news-abc123xyz")!.image_ref).toBe("nimg_x");
-    store.putContent("news-abc123xyz", "open", { blocks: [para("x")], source: "fetched", reading_s: 5, fetched_at: "2026-10-17T00:00:00.000Z" });
+    store.putContent("news-abc123xyz", "adult", { blocks: [para("x")], source: "fetched", reading_s: 5, fetched_at: "2026-10-17T00:00:00.000Z" });
     store.pinContent("news-abc123xyz", true);
     expect(store.prune("2027-01-01T00:00:00.000Z")).toBe(0);
     expect(store.get("news-abc123xyz")).not.toBeNull();
     store.pinContent("news-abc123xyz", false);
     expect(store.prune("2027-01-01T00:00:00.000Z")).toBe(1);
-    expect(store.getContent("news-abc123xyz", "open")).toBeNull();
+    expect(store.getContent("news-abc123xyz", "adult")).toBeNull();
     function para(text: string) { return { type: "paragraph", inlines: [{ type: "text", text }] }; }
+  });
+  test("a feed's own date never puts an item later than it was fetched or in the future; a removed feed keeps a saved story's item", () => {
+    const fetched = "2026-10-10T00:00:00.000Z";
+    expect(publishedAtOf(item({ published_at: "2026-11-30T00:00:00.000Z", fetched_at: fetched }), Date.parse("2026-10-17T00:00:00Z"))).toBe(fetched);
+    expect(publishedAtOf(item({ published_at: "2026-10-09T00:00:00.000Z", fetched_at: fetched }), Date.parse("2026-10-17T00:00:00Z"))).toBe("2026-10-09T00:00:00.000Z");
+    expect(publishedAtOf(item({ published_at: null, fetched_at: "2027-01-01T00:00:00.000Z" }), Date.parse("2026-10-17T00:00:00Z"))).toBe("2026-10-17T00:00:00.000Z");
+    const store = openShelfStore(":memory:");
+    store.put(item());
+    store.put(item({ id: "news-other00001", canonical_url: "https://n.example.com/b", url: "https://n.example.com/b" }));
+    store.putContent("news-abc123xyz", "adult", { blocks: [], source: "fetched", reading_s: 1, fetched_at: fetched });
+    store.pinContent("news-abc123xyz", true);
+    expect(store.forgetFeed("feed-aaaaaa")).toBe(1); // only the unsaved item goes
+    expect(store.get("news-abc123xyz")).not.toBeNull();
+    expect(store.get("news-other00001")).toBeNull();
   });
 });

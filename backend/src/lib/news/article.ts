@@ -24,8 +24,9 @@ export function __resetNewsArticleForTests(): void { failures = createFailureMem
 
 export type ContentSource = StoredContent["source"];
 
+/** One stored copy per band: a teen is never served text an adult's fetch kept (the minor floor and the blocked-site check ran for the adult's rules, not the teen's). */
 function variantOf(band: "child" | "teen" | "adult"): ContentVariant {
-  return band === "child" ? "plain" : "open";
+  return band;
 }
 
 function textOfBlocks(blocks: readonly ArticleBlock[]): string {
@@ -53,21 +54,40 @@ function teaserOf(item: ShelfItem): ArticleBlock[] {
 
 export interface LoadedContent { blocks: ArticleBlock[]; source: ContentSource; reading_s: number; stored: boolean }
 
+// One open of a story at a time per band: a second asker waits for the first fetch instead of making another request to the publisher.
+const opening = new Map<string, Promise<LoadedContent>>();
+
 /** The item's article for this band: the stored copy when it is fresh (or a saved story pinned it), else one fetch. */
-export async function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null } = {}): Promise<LoadedContent> {
+export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null } = {}): Promise<LoadedContent> {
+  const key = `${item.id}:${band}`;
+  const running = opening.get(key);
+  if (running && !options.retry) return running;
+  const next = loadContentOnce(item, band, options).finally(() => { if (opening.get(key) === next) opening.delete(key); });
+  opening.set(key, next);
+  return next;
+}
+
+async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null }): Promise<LoadedContent> {
   const store = options.store === undefined ? sharedShelfStore() : options.store;
   const variant = variantOf(band);
   const stored = store?.getContent(item.id, variant) ?? null;
-  if (stored && stored.source !== "teaser" && (stored.pinned || Date.now() - Date.parse(stored.fetched_at) < NEWS_TTL_MS)) {
-    return { blocks: stored.blocks as ArticleBlock[], source: stored.source, reading_s: stored.reading_s, stored: true };
+  // A stored copy is served again at release: a teen's meets the minor floor whether or not it was checked when it was kept (a child's is cut sentence by sentence by the child gate).
+  const usable = stored && stored.source !== "teaser" && (band !== "teen" || !tripsMinorFloor(textOfBlocks(stored.blocks as ArticleBlock[]))) ? stored : null;
+  if (usable && (usable.pinned || Date.now() - Date.parse(usable.fetched_at) < NEWS_TTL_MS)) {
+    return { blocks: usable.blocks as ArticleBlock[], source: usable.source, reading_s: usable.reading_s, stored: true };
   }
   const teaser = (): LoadedContent => {
     bumpNewsCounter("story_text_teaser");
     const blocks = teaserOf(item);
     return { blocks, source: "teaser", reading_s: readingSeconds(blocks), stored: false };
   };
+  // When a refetch fails, a stale copy still beats the feed's summary.
+  const fallback = (): LoadedContent => {
+    if (usable) return { blocks: usable.blocks as ArticleBlock[], source: usable.source, reading_s: usable.reading_s, stored: true };
+    return teaser();
+  };
   if (options.retry) failures.forget(item.url);
-  else if (failures.has(item.url)) return teaser();
+  else if (failures.has(item.url)) return fallback();
   try {
     const page = await pageHtml(item.url, undefined, band === "adult" ? undefined : band);
     const article = extractFullArticle(page.html, { book: "news", allowedBooks: new Set(), allowLinks: band !== "child", allowImages: false, mode: "news", baseUrl: item.url });
@@ -76,7 +96,7 @@ export async function loadContent(item: ShelfItem, band: "child" | "teen" | "adu
     // A minor's fetched text meets the same floor a search page does; one that trips it shows the feed's own text, never the page.
     if (!acceptArticleText(text) || (band !== "adult" && tripsMinorFloor(text))) {
       failures.record(item.url);
-      return teaser();
+      return fallback();
     }
     failures.forget(item.url);
     bumpNewsCounter("story_text_fetched");
@@ -88,7 +108,7 @@ export async function loadContent(item: ShelfItem, band: "child" | "teen" | "adu
   } catch {
     failures.record(item.url);
     bumpNewsCounter("story_text_failed");
-    return teaser();
+    return fallback();
   }
 }
 

@@ -22,11 +22,7 @@ export function pruneShelf(nowMs: number = Date.now(), store: ShelfStore | null 
   const removed = store.prune(cutoff);
   if (removed > 0) bumpShelfCounter("items_pruned", undefined, removed);
   // NEWS-02: the same daily job keeps the News picture cache to its size and 14 days, and drops reads older than 90 days.
-  try {
-    sweepNewsPictures();
-    pruneReads(new Date(nowMs));
-  } catch {
-    // both are disposable or best effort: a failed sweep never fails the shelf prune
-  }
+  try { sweepNewsPictures(); } catch { /* disposable: a failed sweep never fails the shelf prune */ }
+  try { pruneReads(new Date(nowMs)); } catch { /* best effort, and independent of the picture sweep */ }
   return removed;
 }

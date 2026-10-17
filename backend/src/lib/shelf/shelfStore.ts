@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS shelf_item_feed (
 CREATE INDEX IF NOT EXISTS shelf_item_feed_feed ON shelf_item_feed (feed_id);
 CREATE INDEX IF NOT EXISTS shelf_item_id ON shelf_item (id);
 -- NEWS-02: the cleaned article of an item a person opened (spec NewsItem.content_ref is the item id). One row per item
--- and link variant: "open" keeps outbound links (teens and adults), "plain" holds none (a child). A pinned row belongs
+-- and band: each band keeps its own copy (a child's holds no links, a teen's and an adult's keep them). A pinned row belongs
 -- to a saved story and is never pruned while the save exists.
 CREATE TABLE IF NOT EXISTS news_content (
   item_id TEXT NOT NULL,
@@ -86,7 +86,7 @@ export interface ShelfStore {
   close(): void;
 }
 
-export type ContentVariant = "open" | "plain";
+export type ContentVariant = "child" | "teen" | "adult";
 export interface StoredContent { blocks: unknown[]; source: "feed" | "fetched" | "archived" | "teaser"; reading_s: number; fetched_at: string; pinned: boolean }
 
 type Row = {
@@ -152,7 +152,8 @@ export function openShelfStore(path: string): ShelfStore {
   const pruneItems = sqlite.query("DELETE FROM shelf_item WHERE fetched_at < ?1 AND id NOT IN (SELECT item_id FROM news_content WHERE pinned = 1)");
   const pruneLinks = sqlite.query("DELETE FROM shelf_item_feed WHERE canonical_url NOT IN (SELECT canonical_url FROM shelf_item)");
   const dropLinks = sqlite.query("DELETE FROM shelf_item_feed WHERE feed_id = ?1");
-  const dropOrphans = sqlite.query("DELETE FROM shelf_item WHERE canonical_url NOT IN (SELECT canonical_url FROM shelf_item_feed)");
+  // A saved story's item stays when its feed is removed: its pinned text keeps it out of this delete as it does out of the prune.
+  const dropOrphans = sqlite.query("DELETE FROM shelf_item WHERE canonical_url NOT IN (SELECT canonical_url FROM shelf_item_feed) AND id NOT IN (SELECT item_id FROM news_content WHERE pinned = 1)");
   // A duplicate keeps the stricter verdict: if any carrier's text tripped the floor, the story is adult-only.
   const stricten = sqlite.query("UPDATE shelf_item SET band_ok = ?2 WHERE canonical_url = ?1 AND band_ok <> ?2 AND ?2 = 'adult'");
   const reattribute = sqlite.query(

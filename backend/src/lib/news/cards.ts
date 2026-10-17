@@ -47,9 +47,13 @@ export function hostOf(url: string): string {
   try { return new URL(url).hostname.replace(/^www\./, ""); } catch { return ""; }
 }
 
-export function publishedAtOf(item: ShelfItem): string {
+/** When the story was published, never later than when this hub fetched it (and never in the future): a feed that dates an item ahead
+ * cannot put it at the top of Today or keep it inside every time window. */
+export function publishedAtOf(item: ShelfItem, nowMs = Date.now()): string {
+  const fetched = Date.parse(item.fetched_at);
   const at = Date.parse(item.published_at ?? item.fetched_at);
-  return new Date(Number.isNaN(at) ? Date.parse(item.fetched_at) : at).toISOString();
+  const claimed = Number.isNaN(at) ? fetched : at;
+  return new Date(Math.min(claimed, Number.isNaN(fetched) ? claimed : fetched, nowMs)).toISOString();
 }
 
 export interface CardEnv {

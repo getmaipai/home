@@ -222,6 +222,16 @@ export function newsPictureCached(itemId: string): boolean {
   return readIndex()[pictureRefOf(itemId)] !== undefined;
 }
 
+/** One fetch per item at a time, shared by the picture route and a save. */
+function ensureShared(item: ShelfItem): Promise<boolean> {
+  let pending = inFlight.get(item.id);
+  if (!pending) {
+    pending = ensure(item).finally(() => inFlight.delete(item.id));
+    inFlight.set(item.id, pending);
+  }
+  return pending;
+}
+
 /** Fetches, resizes and stores an item's picture if it is not cached yet. True when the cache holds it afterwards. */
 async function ensure(item: ShelfItem): Promise<boolean> {
   const ref = pictureRefOf(item.id);
@@ -255,12 +265,7 @@ async function ensure(item: ShelfItem): Promise<boolean> {
 export async function newsPicture(item: ShelfItem, width: NewsPictureWidth): Promise<{ bytes: Uint8Array; etag: string } | null> {
   if (!newsImagesOn()) return null;
   const ref = pictureRefOf(item.id);
-  let pending = inFlight.get(item.id);
-  if (!pending) {
-    pending = ensure(item).finally(() => inFlight.delete(item.id));
-    inFlight.set(item.id, pending);
-  }
-  if (!(await pending)) return null;
+  if (!(await ensureShared(item))) return null;
   const path = fileOf(ref, width);
   if (!existsSync(path)) return null;
   const bytes = new Uint8Array(readFileSync(path));
@@ -272,6 +277,6 @@ export async function newsPicture(item: ShelfItem, width: NewsPictureWidth): Pro
 /** For a saved story: make sure the picture is stored (text-only items have none) and pin it. */
 export async function ensureAndPinNewsPicture(item: ShelfItem): Promise<boolean> {
   if (!newsImagesOn() || !item.image_url) return false;
-  if (!(await (inFlight.get(item.id) ?? ensure(item)))) return false;
+  if (!(await ensureShared(item))) return false;
   return pinNewsPicture(item.id, true);
 }

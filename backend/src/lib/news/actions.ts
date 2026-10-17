@@ -18,6 +18,8 @@ export type ActionResult = { ok: true; status: 200; value: Record<string, unknow
 export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix"] as const;
 export type NewsActionName = (typeof NEWS_ACTIONS)[number];
 
+const MAX_SAVE_BATCH = 20;
+const MAX_READ_S = 86_400;
 const bad = (error: string): ActionResult => ({ ok: false, status: 400, error });
 const gone = (): ActionResult => ({ ok: false, status: 404, error: "That story is not available." });
 const ok = (value: Record<string, unknown> = {}): ActionResult => ({ ok: true, status: 200, value: { ok: true, ...value } });
@@ -34,6 +36,7 @@ function follow(person: PersonRow, viewer: Viewer, body: Record<string, unknown>
 }
 
 async function save(person: PersonRow, viewer: Viewer, body: Record<string, unknown>): Promise<ActionResult> {
+  if (Array.isArray(body.item_ids) && body.item_ids.length > MAX_SAVE_BATCH) return bad(`Choose at most ${MAX_SAVE_BATCH} stories at a time.`);
   const items = Array.isArray(body.item_ids) ? body.item_ids : [body.item_id ?? body.story_id ?? body.id];
   const wantOn = on(body);
   const results: string[] = [];
@@ -72,8 +75,10 @@ function unpinIfUnsaved(itemId: string): void {
 function read(person: PersonRow, viewer: Viewer, body: Record<string, unknown>): ActionResult {
   const item = releasedItem(viewer, body.item_id ?? body.story_id ?? body.id);
   if (!item) return gone();
-  const readS = Number(body.read_s);
-  recordRead(person.id, { itemId: item.id, storyId: storyIdOf(item), readS: Number.isFinite(readS) ? readS : 0, finished: body.finished === true });
+  // Reading seconds are a whole number from 0 to a day, whatever was sent.
+  const sent = Number(body.read_s);
+  const readS = Number.isFinite(sent) ? Math.min(MAX_READ_S, Math.max(0, Math.floor(sent))) : sent === Infinity ? MAX_READ_S : 0;
+  recordRead(person.id, { itemId: item.id, storyId: storyIdOf(item), readS, finished: body.finished === true });
   return ok();
 }
 

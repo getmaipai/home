@@ -13,6 +13,8 @@ import { NewsInterest } from "@maipai/spec/gen/ts/news-interest.js";
 import { NewsRead } from "@maipai/spec/gen/ts/news-read.js";
 import { NewsSave } from "@maipai/spec/gen/ts/news-save.js";
 import { validateNewsInterest } from "@maipai/spec/records/ts/validate.js";
+import { sharedShelfStore } from "@/lib/shelf/shelfStore";
+import { newsPictureCached, pinNewsPicture } from "./pictures";
 
 export type InterestKind = "topic" | "source";
 const PROVENANCE = "hub:news";
@@ -164,6 +166,20 @@ export function recordRead(personId: string, input: { itemId: string; storyId: s
     finished: record.finished, feedback: record.feedback ?? null, hlc: record.hlc, provenance: record.provenance,
   }).run();
   return record;
+}
+
+/** The person-forget rule: every follow, save and read of this person goes, and a saved story no other person saved is let go of
+ * (its pinned text and picture return to the ordinary prune and cache limits). */
+export function forgetNewsOfPerson(personId: string): void {
+  const itemIds = db.select({ itemId: newsSaves.itemId }).from(newsSaves).where(eq(newsSaves.personId, personId)).all().map((row) => row.itemId);
+  db.delete(newsInterests).where(eq(newsInterests.personId, personId)).run();
+  db.delete(newsSaves).where(eq(newsSaves.personId, personId)).run();
+  db.delete(newsReads).where(eq(newsReads.personId, personId)).run();
+  for (const itemId of new Set(itemIds)) {
+    if (itemIsSaved(itemId)) continue;
+    try { sharedShelfStore()?.pinContent(itemId, false); } catch { /* disposable cache */ }
+    try { if (newsPictureCached(itemId)) pinNewsPicture(itemId, false); } catch { /* disposable cache */ }
+  }
 }
 
 /** The daily sweep: reads older than 90 days go. */
