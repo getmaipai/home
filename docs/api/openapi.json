@@ -43705,7 +43705,9 @@
                             "type": "string",
                             "enum": [
                               "picture",
-                              "video"
+                              "video",
+                              "edit",
+                              "photo"
                             ]
                           },
                           "prompt": {
