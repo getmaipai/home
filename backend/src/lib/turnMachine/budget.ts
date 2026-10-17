@@ -18,6 +18,15 @@ import type { TurnBudget } from "./contract";
 export const FIRST_TOKEN_DEADLINE_MS = 90000;
 export const STALL_DEADLINE_MS = 20000;
 
+/** MINOR-DEADLINE-01 (owner call, 2026-10-17): a model whose template reasons on every turn
+ * (thinking_mode "always": Muse Glimmer 30B) spends its seconds on reasoning a child's or teen's turn
+ * drops, so the record's wall-clock deadlines cut a safety-shaped question off with "That took me
+ * too long". A child's, a teen's and a spoken turn keep a wall-clock limit (rule 5); on such a
+ * model a minor's limit is raised to these figures, about twice the measured p95 on the Studio's
+ * Stack (docs/BACKLOG.md MINOR-DEADLINE-01). An adult's written reply is never wall-clock capped and
+ * a model that can switch thinking off keeps its record's figures. */
+export const MINOR_ALWAYS_THINKING_DEADLINES_MS = { model: 60000, total: 90000 } as const;
+
 type RecordedDeadlines = { model: number; tool: number; total: number; first_token_ms?: number; stall_ms?: number };
 let offerOverridesForTests = new Set<string>();
 
@@ -131,7 +140,16 @@ export async function resolveTurnBudgetAndEngineModel(modelId?: string, band?: A
   // think, whatever the household setting or the person's toggle says.
   const runs = modelId ?? context.modelId;
   const thinking = runs !== undefined && thinkingModeFor(runs) === "none" ? { thinking_budget_tokens: 0, thinking_budget_tokens_toggled: 0 } : {};
-  return { budget: { ...base, ...thinking, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null }, ...(runs !== undefined ? { engineModelId: runs } : {}) };
+  // MINOR-DEADLINE-01: the engine that actually runs decides, as above.
+  const minorAlways = band !== "adult" && runs !== undefined && thinkingModeFor(runs) === "always" && modelHasRecord(runs);
+  const deadlines = minorAlways
+    ? { ...base.deadlines_ms, model: Math.max(base.deadlines_ms.model, MINOR_ALWAYS_THINKING_DEADLINES_MS.model), total: Math.max(base.deadlines_ms.total, MINOR_ALWAYS_THINKING_DEADLINES_MS.total) }
+    : base.deadlines_ms;
+  return { budget: { ...base, ...thinking, deadlines_ms: deadlines, context_tokens: context.tokens, context_window_tokens: context.reported ? context.tokens : null }, ...(runs !== undefined ? { engineModelId: runs } : {}) };
+}
+
+function modelHasRecord(id: string): boolean {
+  return CATALOG.some((m) => m.role === "chat" && m.id === id);
 }
 
 function offerPassesGate(offer: { mode: string; gate?: string; bench_row?: string }, answerImagesOk: boolean): boolean {
