@@ -1,6 +1,6 @@
 {
   "name": "@maipai/home-frontend",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "MaiPai Home shell, kit, and the Chat package. See docs/dev.md.",
   "license": "AGPL-3.0",

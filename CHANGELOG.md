@@ -7,7 +7,16 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- A fresh install no longer starts with 12 built-in packages switched off (music, news, sports, the almanac set and the lookups). The installer now fetches their pinned Deno dependencies once, and Home reads them from its own cache folder. Closes #217.
+## [0.2.2] - 2026-10-17
+
+Computers with more than 24 GB of memory get a stronger chat model, and a fresh install starts with every built-in package on.
+
+### Added
+- Muse Glimmer 30B is the chat model on any computer with more than 24 GB of memory. The installer measures memory and picks it by itself: 32 GB gets the 17 GB build, 64 GB and more get the 20 GB build. Computers with 16 or 24 GB keep Qwen3 8B. Muse thinks before every answer, so its first words can take a little longer. Speed on real machines is not measured yet.
+
+### Fixed
+- A fresh install no longer starts with 12 built-in packages switched off (music, news, sports, the almanac set and the lookups). The installer now fetches their pinned Deno dependencies once, and Home reads them from its own cache folder. (#217)
+- Tests: files in one test run no longer leak state into each other, and each test gets 20 seconds under full-gate load instead of 5. The three flaky-test ledger entries are gone. (#216)
 
 ## [0.2.1] - 2026-10-16
 
