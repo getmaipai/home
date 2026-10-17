@@ -474,6 +474,7 @@ export function ChatWelcome() {
   return (
     <>
       <EngineStartingLoader />
+      {engineDown === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="mx-auto mb-2 h-auto w-40 max-w-full sm:w-52" />}
       <EmptyState>
         <EmptyStateGreeting>{on ? "Temporary chat" : "How can I help you today?"}</EmptyStateGreeting>
         {on ? <p className="text-muted-foreground text-center text-sm">This chat won&apos;t be saved to your history.</p> : null}
