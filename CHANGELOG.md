@@ -57,6 +57,9 @@ Conversation mode speaks a real answer again. Pictures and videos can look like 
 
 ### Pictures
 - Two kinds of picture, in plain words. **Quick** (a few seconds) stays the default; **Detailed** (15 to 30 seconds, finer detail, many more styles) is the choice for people who want it. Chat uses Detailed when you ask for the best quality, photoreal or a custom look and says so; a style made for Detailed uses it on its own; a **Make it Detailed** or **Make it Quick** button on each picture makes it again the other way. Settings, Pictures and videos has a **Picture quality** row, a **What is the difference?** comparison and **Get Detailed pictures** when it is not installed. Model names appear only under **Details**.
+### Videos
+- A new **Videos** app plays the videos saved on your hub, in a dark look like YouTube. Tabs: Home (a big picture, Continue watching, Recently added, more from what you watch most, Watch again), Library by channel, Watch later and History. A video resumes where you stopped, shows Up next, and a finished video leaves Watch later. A child sees only the videos cleared for children and no lists of new videos.
+- The Pick up shelf's media links open the video in its app. One video plays at a time, and its speed and the sleep timer follow the audio settings.
 
 ### Audio
 - One thing plays at a time. A spoken reply pauses a podcast or video, and starting one pauses MaiPai's voice.

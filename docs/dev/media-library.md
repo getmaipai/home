@@ -1,4 +1,4 @@
-# Media library (MEDIA-LIB-01, MEDIA-PROGRESS-01)
+# Media library (MEDIA-LIB-01, MEDIA-PROGRESS-01, MEDIA-VIDEOS-01)
 
 Design: [media-apps-blend-2026-10-17.md](../design/media-apps-blend-2026-10-17.md) sections 7, 8, 10, 11 and 12. The
 app packages (Videos, Shows, Music, Podcasts, Books) build on the routes below. Storage includes the shared Trash page.
@@ -100,3 +100,58 @@ The page fetches only the current person's authorized rows and refreshes after a
 
 Open: migrate Lists and Memories onto the envelope and register their providers. Media sources themselves are not providers
 in this slice. Subscription polling is not shipped yet; its future writer must honor the same source archive.
+
+## Media apps: the shared host (MEDIA-VIDEOS-01)
+
+Every media app (Videos, Shows, Music, Podcasts, Books) is a catalog `app` package (manifest `kind: "app"`, pages in `pages/*.json`,
+`contributes.data[]` of `rows: "list"`) whose pages bind to data ids served by one host. Videos is the first; the others add a package
+and their own rows, never a store.
+
+**Backend.** `backend/src/lib/media/appHost.ts` holds the rules and `backend/src/routes/mediaApps.ts` the wire. `MEDIA_APPS` is the one table
+of app id to item kinds (`videos`: video; `shows`: episode and film; `music`: track; `podcasts`: podcast episode; `books`: book and
+audiobook). `createMediaAppRoutes(appId)` returns the routes for one app; `app.ts` mounts one per id under `/api/plugins/<appId>` before
+the generic `pluginsRoutes`, so an app that is not installed (or a data id the host does not know) falls through to the generic 404.
+Gate: `mediaAppAllowed` is the existing `appVisibleTo` check on the package's manifest (role, smoke, capabilities, platform).
+
+Routes (all POST, signed in): `data/:dataId`, `progress`, `watch-later`, `like`.
+
+- `data/:dataId` body `{ id?, channel?, limit? }`; answer is a bare array of rows (the kit's `media_shelf` and `billboard` read an array),
+  `[]` for nothing, an object for `item`, and `{ as_of, rows }` for `channels` (the kit picker reads `rows`).
+- A row is `{ id, title, channel, summary, kind, thumbnail, backdrop, duration_s, progress? (0 to 1), completed?, copy_label }`.
+  `copy_label` is "Saved" (the copy is on the hub) or "Not saved" (stream only). `thumbnail` and `backdrop` are the item's artwork route or
+  null. `kind` lets the shell's `play` action find the owning app without another call.
+- Data ids (Videos): `featured` (billboard: newest items with art), `continue` (unfinished, newest first), `new` (newest from followed
+  sources: channel, feed or link, not library folders), `recent` (recently added), `more_from` (unfinished and unwatched from the channel
+  the person watches most), `liked`, `again` (finished), `library` (by channel, then title; `channel` filters), `channels` (picker rows),
+  `watch_later` (in saved order), `history` (newest progress first), `up_next` (the watch-later queue after this item, then the rest of its
+  channel, then the newest), `item` (`{ ...row, src, subtitle, description, poster, chapters[{start_s,title}], captions, position_s?
+  (absent once finished), liked, watch_later, up_next? }`; `[]` when the title is not readable), `item_actions` (the Like and Watch later
+  rows for the item).
+- `progress` body `{ media_id, position_s, duration_s, reason, device_id? }`. Numbers come from `call.args` placeholders as strings
+  ("12.5"); `coerceNumber` turns them into numbers, then `writeProgress` (the one `mergeProgress` path). `reason` `ended` is a finish event;
+  any reason but `interval` stores at once. Answers `{ ok, applied, completed }`.
+- `watch-later` and `like` body `{ media_id, on? }`: `on: true` adds, `on: false` removes, absent toggles. Answers `{ ok, on, label }`.
+
+**Bands and the child.** Every read goes through the person's band and each source's `visible_to` (`queryItems`, `readableIn`: `bandAllows`
+runs again on the words for a minor). A child (and a guest, read as a child) is allowlist-only until MEDIA-KID-01 adds `media.allowlist_only`:
+only library roots and sources an adult named for them (`visible_to` lists them), and `featured`, `new`, `recent` and `more_from` answer
+`[]`. The item view of a child carries no `up_next`, so the Player never counts down to the next video on a child's screen.
+
+**Shell** (`frontend/src/shell/`). `mediaApps.ts` maps an item kind to its app and play page (`playRoute`). `mediaHost.tsx`:
+`MediaHostProvider` supplies the kit `MediaHostContext` next to the `AudioSessionProvider`; `onPlay(mediaId, row)` opens
+`/apps/<app>/<page>?id=<id>` with the id as router state, and `/media/<id>` (the Pick up link) resolves to the same route.
+`PackageAppPage` reads the query of a media app's page into the page state (the kit reads state from router state only), so a reload or a
+shared link works; the first tab of a media app is named Home. `MediaPlayerRegistration` finds the kit Player's element (`data-slot="player-media"`)
+and registers it with the audio session (`useAudioRegistration`, kind `video`): one playing thing, the person's video speed, the sleep
+timer and the Media Session title.
+
+**Not built, and why (kit gaps).**
+
+- The docked mini bar. The kit `Player` owns its media element in every layout, so a bar bound to `useMiniBar()` cannot control an element
+  that lives in another Player. Videos stop when the person leaves the Watch page (their place is saved), so nothing needs a bar yet. A
+  hoistable Player (a `mediaElement` prop, or one Player instance the shell keeps) is the kit prop Music and Podcasts need first.
+- Like and Watch later on the Watch page. The kit `list` node ignores page state in its binding params, so a list bound to the item cannot
+  know which item; the `player` node has no actions slot. The `like` route and the `item_actions` data id are in place for the row toggle
+  when `list` passes page state. Until then Watch later is on the Home billboard (a press toggles it), and a finished video leaves Watch later.
+- Two-column Watch (player left, Up next right). `split_view` is not an allowed node on a package page; Up next is a shelf under the player.
+- Captions: the item's `subtitles` are file ids with no serving route yet, so `captions` is empty.
