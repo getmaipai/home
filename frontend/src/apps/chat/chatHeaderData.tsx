@@ -26,6 +26,12 @@ export interface ChatHeaderData {
   onAutoReadRepliesChange: (enabled: boolean) => void;
   onRename: (title: string) => Promise<void>;
   onDelete: () => Promise<void>;
+  /** The same Pin / Unpin and Archive the history column's row menu has.
+   * `pinnable` is false in a temporary chat (nothing is kept to pin). */
+  pinnable: boolean;
+  pinned: boolean;
+  onPinChange: (pinned: boolean) => Promise<void>;
+  onArchive: () => Promise<void>;
 }
 
 const ChatHeaderDataContext = createContext<{
@@ -74,9 +80,11 @@ export function useSetChatHeaderData(data: ChatHeaderData | null): void {
   const title = data?.title;
   const ttsAvailable = data?.ttsAvailable;
   const autoReadReplies = data?.autoReadReplies;
+  const pinnable = data?.pinnable;
+  const pinned = data?.pinned;
   useEffect(() => {
     setData(dataRef.current);
     return () => setData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- deliberately narrower than `data` itself; see this function's own comment above.
-  }, [data === null, title, ttsAvailable, autoReadReplies, setData]);
+  }, [data === null, title, ttsAvailable, autoReadReplies, pinnable, pinned, setData]);
 }

@@ -82,6 +82,9 @@ import { useChatHeaderData } from "@/apps/chat/chatHeaderData";
 
 const PencilIcon = getIcon("pencil");
 const TrashIcon = getIcon("trash");
+const PinIcon = getIcon("pin");
+const PinOffIcon = getIcon("pin-off");
+const ArchiveIcon = getIcon("archive");
 const MoreIcon = getIcon("more-horizontal");
 
 function ChatHeaderRename({ title, onRename, onDone }: { title: string; onRename: (title: string) => Promise<void>; onDone: () => void }) {
@@ -186,24 +189,42 @@ export function ChatHeaderBar({ phoneRow = false, trailing }: { phoneRow?: boole
                 <MoreIcon className="size-[18px]" />
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
+            {/* The same actions, labels, icons and order as the history
+                column's row menu (the kit's thread list: Rename, Pin or
+                Unpin, Archive, Delete last), at its compact size. The
+                row menu also has Move to project, which needs the row's
+                project list and stays there. Read replies aloud is the
+                header's own item, after the shared group. */}
+            <DropdownMenuContent align="end" density="compact">
               <DropdownMenuItem onClick={() => setRenaming(true)}>
                 <PencilIcon className="size-4" />
                 Rename
               </DropdownMenuItem>
-              {data.ttsAvailable ? (
-                <DropdownMenuCheckboxItem
-                  checked={data.autoReadReplies}
-                  onCheckedChange={data.onAutoReadRepliesChange}
-                >
-                  Read replies aloud
-                </DropdownMenuCheckboxItem>
+              {data.pinnable ? (
+                <DropdownMenuItem onClick={() => void data.onPinChange(!data.pinned)}>
+                  {data.pinned ? <PinOffIcon className="size-4" /> : <PinIcon className="size-4" />}
+                  {data.pinned ? "Unpin" : "Pin"}
+                </DropdownMenuItem>
               ) : null}
-              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => void data.onArchive()}>
+                <ArchiveIcon className="size-4" />
+                Archive
+              </DropdownMenuItem>
               <DropdownMenuItem variant="destructive" onClick={() => void data.onDelete()}>
                 <TrashIcon className="size-4" />
                 Delete
               </DropdownMenuItem>
+              {data.ttsAvailable ? (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuCheckboxItem
+                    checked={data.autoReadReplies}
+                    onCheckedChange={data.onAutoReadRepliesChange}
+                  >
+                    Read replies aloud
+                  </DropdownMenuCheckboxItem>
+                </>
+              ) : null}
             </DropdownMenuContent>
           </DropdownMenu>
         </>

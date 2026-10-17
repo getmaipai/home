@@ -7,7 +7,7 @@ import { voiceFailureLine, type VoiceFailureKind } from "@maipai/home-backend/sr
 import { AssistantRuntimeProvider, useAui, useAuiState, useLocalRuntime, useRemoteThreadListRuntime } from "@assistant-ui/react";
 import { ChatThread } from "@/apps/chat/ChatThread";
 import { PageContext } from "@/shell/pages/chatProjectPageContext";
-import type { ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
+import { isThreadPinned, type ThreadListProjects } from "@maipai/ui/src/elements/thread-list.aui";
 import { ThreadListSidebar } from "@maipai/ui/src/elements/thread-list-sidebar.aui";
 import { ThreadSearch } from "@maipai/ui/src/elements/thread-search";
 import type { ProjectSettingsValue } from "@maipai/ui/src/elements/project-settings";
@@ -757,13 +757,15 @@ function ChatTitleCatchUp({ incognito }: { incognito: boolean }) {
  * pushes it into the data context. Same side-effect-mount shape as
  * ArtifactCacheInvalidator/ChatDocumentTitle above, just carrying data
  * instead of a DOM/browser-API side effect. */
-function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable }: {
+function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailable, pinnable }: {
   autoReadReplies: boolean;
   setAutoReadReplies: (enabled: boolean) => void;
   ttsAvailable: boolean;
+  pinnable: boolean;
 }) {
   const aui = useAui();
   const title = useAuiState((s) => s.threadListItem.title) ?? "";
+  const pinned = useAuiState((s) => isThreadPinned(s.threadListItem.custom));
   useEffect(() => {
     const reloadThreads = () => void aui.threads.reload();
     window.addEventListener(INCOGNITO_DISCARDED_EVENT, reloadThreads);
@@ -773,6 +775,27 @@ function ChatHeaderDataBridge({ autoReadReplies, setAutoReadReplies, ttsAvailabl
     title,
     ttsAvailable,
     autoReadReplies,
+    pinnable,
+    pinned,
+    // Same call the row menu makes: updateCustom replaces the whole
+    // object, so keep the other keys.
+    onPinChange: async (next) => {
+      try {
+        const custom = aui.threadListItem().getState().custom;
+        await aui.threadListItem().updateCustom({ ...custom, pinned: next });
+      } catch {
+        toast.error(next ? "Could not pin this chat. Try again." : "Could not unpin this chat. Try again.");
+      }
+    },
+    onArchive: async () => {
+      try {
+        await aui.threadListItem.archive();
+      } catch {
+        // The adapter's archive() already toasts and restores the row.
+        return;
+      }
+      await aui.threads.switchToNewThread();
+    },
     onAutoReadRepliesChange: setAutoReadReplies,
     // A code review caught this: the vendored thread-list.aui.tsx's own
     // rename/delete already toast on failure (`toast.error("Could not
@@ -1433,7 +1456,7 @@ export function ChatPage({ person }: { person: Roster }) {
               <ChatDocumentTitle person={person} />
         <ChatTitleCatchUp incognito={temporaryNext} />
         <ChatMemoryPoll incognito={temporaryNext} />
-        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
+        <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} pinnable={!temporaryNext} />
         <ProjectResultReload />
         {settingsDialog}
         <Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}>

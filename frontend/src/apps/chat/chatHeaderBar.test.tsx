@@ -42,6 +42,10 @@ function baseData(overrides: Partial<ChatHeaderData> = {}): ChatHeaderData {
     onAutoReadRepliesChange: () => {},
     onRename: async () => {},
     onDelete: async () => {},
+    pinnable: true,
+    pinned: false,
+    onPinChange: async () => {},
+    onArchive: async () => {},
     ...overrides,
   };
 }
@@ -180,23 +184,57 @@ describe("ChatHeaderBar", () => {
     expect(view.queryByText("Read replies aloud")).toBeNull();
   });
 
-  // CHAT-FIND-0923-03: Jesse's own live finding - the menu held Rename,
-  // Start temporary chat, Share and Delete; a conversation's own
-  // actions menu holds only its own actions, the same set the thread
-  // row's own three-dots menu shows (Rename/Archive/Delete - Archive
-  // itself left out here too, since the row's own copy throws by
-  // deliberate design today, see chatThreadListAdapter.ts; CONV-
-  // ARCHIVE-01 gives both a real one from one definition once the
-  // record supports it). Temporary-chat's one real home is CHAT-LIST-
-  // 01's own button beside New Thread now, not a conversation action at
-  // all (it starts a NEW one).
-  test("the menu never shows Start temporary chat, Share, or Archive - only this conversation's own actions", async () => {
+  // Owner 2026-10-17: the header menu was large and different from the
+  // history column's row menu. It now carries the row menu's items in the
+  // row menu's order (Rename, Pin or Unpin, Archive, Delete last of the
+  // shared group), compact, with the header's own item after a separator.
+  const itemLabels = () =>
+    Array.from(document.querySelectorAll('[role="menuitem"], [role="menuitemcheckbox"]')).map((el) => el.textContent?.trim());
+
+  test("the menu holds the row menu's items in the row menu's order, Delete last of them", async () => {
     const view = renderBar(baseData());
     await openActionsMenu(view);
     await view.findByText("Rename");
-    await view.findByText("Delete");
+    expect(itemLabels()).toEqual(["Rename", "Pin", "Archive", "Delete"]);
     expect(view.queryByText("Start temporary chat")).toBeNull();
     expect(view.queryByText("Share")).toBeNull();
-    expect(view.queryByText("Archive")).toBeNull();
+  });
+
+  test("a pinned conversation offers Unpin, and Pin calls onPinChange", async () => {
+    const onPinChange = mock(async () => {});
+    const view = renderBar(baseData({ pinned: true, onPinChange }));
+    await openActionsMenu(view);
+    fireEvent.click(await view.findByText("Unpin"));
+    await waitFor(() => expect(onPinChange).toHaveBeenCalledWith(false));
+  });
+
+  test("a temporary chat has no Pin (nothing is kept)", async () => {
+    const view = renderBar(baseData({ pinnable: false }));
+    await openActionsMenu(view);
+    await view.findByText("Rename");
+    expect(itemLabels()).toEqual(["Rename", "Archive", "Delete"]);
+  });
+
+  test("Archive calls onArchive", async () => {
+    const onArchive = mock(async () => {});
+    const view = renderBar(baseData({ onArchive }));
+    await openActionsMenu(view);
+    fireEvent.click(await view.findByText("Archive"));
+    await waitFor(() => expect(onArchive).toHaveBeenCalled());
+  });
+
+  test("Read replies aloud is the header's own item, after the shared group", async () => {
+    const view = renderBar(baseData({ ttsAvailable: true }));
+    await openActionsMenu(view);
+    await view.findByText("Rename");
+    expect(itemLabels()).toEqual(["Rename", "Pin", "Archive", "Delete", "Read replies aloud"]);
+  });
+
+  test("the menu is the kit's compact density, with the destructive item styled by the kit variant and no className", async () => {
+    const view = renderBar(baseData());
+    await openActionsMenu(view);
+    await view.findByText("Rename");
+    expect(document.querySelector('[data-slot="dropdown-menu-content"]')?.getAttribute("data-density")).toBe("compact");
+    expect(view.getByText("Delete").closest('[role="menuitem"]')?.getAttribute("data-variant")).toBe("destructive");
   });
 });
