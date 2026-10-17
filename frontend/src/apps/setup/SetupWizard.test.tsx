@@ -458,6 +458,9 @@ describe("SetupWizard", () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       expect(rendered.container.textContent).not.toContain("chat-27b");
       expect(rendered.queryByRole("link", { name: "Details" })).toBeNull();
+      // The strip is one compact line below the form, not a panel above it.
+      expect(rendered.getByTestId("install-strip").textContent).not.toContain(" of ");
+      expect(rendered.getByTestId("install-strip").textContent).not.toContain("Fetch");
     } finally { jobRows = []; h.restore(); }
   });
 });

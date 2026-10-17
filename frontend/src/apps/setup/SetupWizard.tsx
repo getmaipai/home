@@ -411,7 +411,7 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     case "done": body = <Card><CardContent>{engine === "another_computer" ? <><p>Pair the computer that runs the AI. You can also do this later in Home settings, Engines and AI.</p><EngineLinkCredentialSection /></> : null}<p>Start a chat, add people, or choose apps whenever you're ready. If the AI is still downloading, chat starts answering when the first model finishes.</p>{thingsLeftLine ? <p>{thingsLeftLine}. You'll find them in Home settings.</p> : null}{certificate === "error" ? <p role="alert">Home couldn't make the certificate for your other devices. Phones and tablets can still use Home from this computer's address for now. Open Home settings, Repairs to fix it.</p> : null}</CardContent></Card>; break;
   }
 
-  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("engine_location")) body = <><InstallStrip detailsHref={null} read={api.setupInstallStatus} retry={state && stepIsDone(state, "owner") ? api.installRetry : () => api.setupEngineInstall().then(() => api.setupInstall().catch(() => undefined))} />{body}</>;
+  if (SCREEN_IDS.indexOf(screen) > SCREEN_IDS.indexOf("engine_location")) body = <>{body}<InstallStrip compact detailsHref={null} read={api.setupInstallStatus} retry={state && stepIsDone(state, "owner") ? api.installRetry : () => api.setupEngineInstall().then(() => api.setupInstall().catch(() => undefined))} /></>;
   const phaseStep = PHASES.find((item) => item.id === phase)!.id;
   const currentPhaseIndex = phase === "meet" ? 1 : 0;
   const screenIndex = SCREEN_IDS.indexOf(screen);

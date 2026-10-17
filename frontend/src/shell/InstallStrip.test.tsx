@@ -64,4 +64,23 @@ describe("InstallStrip", () => {
     await view.findByText("The AI engine isn't answering yet. Wait a minute and press Check again.");
     expect(calls).toEqual(["retry"]);
   });
+
+  test("compact is one line: title, percent, a thin bar, and no byte counts or stage table", async () => {
+    const view = render(<MemoryRouter><InstallStrip compact read={async () => status({ percent: 40, bytesPerSecond: 5, etaSeconds: 60 })} /></MemoryRouter>);
+    await view.findByTestId("install-strip");
+    view.getByText("Downloading your AI");
+    view.getByText("40%");
+    view.getByRole("progressbar");
+    expect(view.container.textContent).not.toContain(" of ");
+    expect(view.container.textContent).not.toContain("Fetch");
+  });
+
+  test("compact failure is one line with Try again", async () => {
+    const calls: string[] = [];
+    const view = render(<MemoryRouter><InstallStrip compact read={async () => status({ state: "failed", problem: "A download did not finish." })} retry={async () => { calls.push("retry"); }} /></MemoryRouter>);
+    await view.findByText("A download did not finish.");
+    expect(view.queryByRole("progressbar")).toBeNull();
+    fireEvent.click(view.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(calls).toEqual(["retry"]));
+  });
 });
