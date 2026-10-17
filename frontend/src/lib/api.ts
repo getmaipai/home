@@ -1131,6 +1131,11 @@ export const api = {
   // PLACE-ELEMENT-01a: geocoding candidates for the location field's search.
   searchPlaces: (q: string) =>
     request<Array<{ name: string; area: string | null; lat: number; lon: number }>>(`/api/places/search?q=${encodeURIComponent(q)}`),
+  // WEATHER-HOME-ASK-01: offline city lookup and nearest city for a point; nothing leaves the home.
+  localSearchPlaces: (q: string) =>
+    request<Array<{ name: string; area: string | null; lat: number; lon: number }>>(`/api/places/local-search?q=${encodeURIComponent(q)}`),
+  nearestPlace: (lat: number, lon: number) =>
+    request<{ name: string; area: string | null; lat: number; lon: number } | null>(`/api/places/nearest?lat=${lat}&lon=${lon}`),
   // kind is deliberately not editable (backend/src/lib/entities.ts's own
   // updateEntity() comment: "set once at creation and never move
   // afterward... a household that got a kind wrong deletes the entity

@@ -25,3 +25,12 @@ Privacy is unchanged: Open-Meteo is the one outbound host, coordinates rounded p
 1. `weather_card` spec and Element (commons), package emits it (Home), pin bump.
 2. PLACE-SPEC-01, PLACE-HUB-01, PLACE-WEATHER-01 (already in BACKLOG).
 3. `app` kind contract, then the Weather app package.
+
+## Household location on first use (2026-10-17, WEATHER-HOME-ASK-01)
+
+Owner's call: ask once, on first use, with no setup screen. While `household.home` is unset the Home page shows one card. An owner or admin
+taps "Use my location" (the browser's own prompt; never read without the tap, never an IP lookup) or types a city. Both resolve in the offline
+city-timezones gazetteer, so nothing leaves the home; the person confirms the city and it becomes the household home. Anyone else sees
+"Ask a grown-up to set the home location". Coordinates are rounded to 2 decimals and raw device coordinates are not stored. Device location
+for one person stays an opt-in under Current location (PLACE-WEATHER-01). A weather question with no place gets a plain "I don't know where
+you are yet" result that the model words, pointing at the same fix.

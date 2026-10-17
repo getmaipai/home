@@ -2,6 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { resolvePlace, searchPlaces } from "@/lib/places";
+import { nearestLocalPlace, searchLocalPlaces } from "@/lib/gazetteer";
 
 export const placesRoutes = apiRouter();
 
@@ -29,3 +30,20 @@ const searchRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: z.array(z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number() })) } }, description: "Geocoding candidates, coarsened for a child." }, ...errorResponses({ 401: "Not signed in" }) },
 });
 placesRoutes.openapi(searchRoute, async (c) => c.json(await searchPlaces(c.req.valid("query").q, c.get("person")), 200));
+
+const localShape = z.object({ name: z.string(), area: z.string().nullable(), lat: z.number(), lon: z.number() });
+const localSearchRoute = createRoute({
+  method: "get", path: "/local-search", tags: ["Places"], summary: "Find a city by name in the offline gazetteer",
+  middleware: [requireAuth] as const,
+  request: { query: z.object({ q: z.string().max(200) }) },
+  responses: { 200: { content: { "application/json": { schema: z.array(localShape) } }, description: "Up to five cities, coordinates rounded to 2 decimals. Nothing leaves the home." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+placesRoutes.openapi(localSearchRoute, (c) => c.json(searchLocalPlaces(c.req.valid("query").q), 200));
+
+const nearestRoute = createRoute({
+  method: "get", path: "/nearest", tags: ["Places"], summary: "Name the city nearest a point, offline",
+  middleware: [requireAuth] as const,
+  request: { query: z.object({ lat: z.coerce.number().min(-90).max(90), lon: z.coerce.number().min(-180).max(180) }) },
+  responses: { 200: { content: { "application/json": { schema: localShape.nullable() } }, description: "The nearest city within 150 km, or null. The point is not stored or logged." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+placesRoutes.openapi(nearestRoute, (c) => { const q = c.req.valid("query"); return c.json(nearestLocalPlace(q.lat, q.lon), 200); });

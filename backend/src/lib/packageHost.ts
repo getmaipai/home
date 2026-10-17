@@ -667,7 +667,7 @@ export async function homeAssistantGetState(args: unknown): Promise<unknown> {
 function requireSearxngSettings(): { baseUrl: string } {
   const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
   if (!baseUrl) {
-    throw new HostError("invalid_input", "Web search isn't set up yet - add a SearXNG URL in Settings first");
+    throw new HostError("invalid_input", "Web search isn't set up yet. An owner or admin can turn it on in Settings, under Web search.");
   }
   return { baseUrl };
 }

@@ -4,6 +4,7 @@ import { isOwnerOrAdminRole, type Roster } from "@/lib/api";
 import { Greeting } from "@/shell/pages/dashboard/Greeting";
 import { AskBox } from "@/shell/pages/dashboard/AskBox";
 import { TodaySection } from "@/shell/pages/dashboard/TodaySection";
+import { HomePlaceAsk } from "@/shell/pages/dashboard/HomePlaceAsk";
 import { GettingStarted } from "@/shell/pages/dashboard/GettingStarted";
 import { useTabItem } from "@/shell/tabIdentity";
 
@@ -29,6 +30,7 @@ export function DashboardPage({ person }: { person: Roster }) {
         <div className="lg:col-span-8"><AskBox /></div>
         {admin ? <div className="lg:col-span-4"><GettingStarted person={person} /></div> : null}
       </div>
+      <HomePlaceAsk person={person} />
       <TodaySection />
     </div>
   );
