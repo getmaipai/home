@@ -82,50 +82,7 @@
   "min_role": "adult",
   "consequential": false,
   "offline": "full",
-  "config": [
-    {
-      "key": "generation.video.enabled",
-      "scope": "household",
-      "selector": "boolean",
-      "default": true,
-      "label": "Adults can make videos",
-      "help": "Adults can ask chat for short videos. Children and teens cannot, whatever this says.",
-      "level": "basic",
-      "copy": {
-        "does": "Lets adults ask chat to make short videos on this computer. Children and teens never can."
-      },
-      "lives_in": "household.pictures",
-      "honoured_by": [
-        "home"
-      ]
-    },
-    {
-      "key": "generation.video.adult_adapters",
-      "scope": "household",
-      "selector": "select",
-      "range": {
-        "options": [
-          "allowed",
-          "restricted"
-        ]
-      },
-      "default": "allowed",
-      "label": "Adult-only video styles",
-      "help": "Whether adults can use video styles marked adult-only. Children and teens never can.",
-      "level": "basic",
-      "copy": {
-        "does": "Chooses whether adults can use video styles marked adult-only.",
-        "options": {
-          "allowed": "Adults can use every video style in the library.",
-          "restricted": "Adults can use only video styles marked for all ages."
-        }
-      },
-      "lives_in": "household.pictures",
-      "honoured_by": [
-        "home"
-      ]
-    }
-  ],
+  "config": [],
   "data_sources": [],
   "permissions": [],
   "notifications": [],

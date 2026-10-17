@@ -11,6 +11,8 @@ export type VideoAdapterAudience = "all-ages" | "adult-only";
 
 export interface VideoAdapter extends StackVideoLora {
   enabled: boolean;
+  /** Added but not yet confirmed by an admin: off for everyone until they have read the fingerprint and licence. */
+  needs_confirmation: boolean;
 }
 
 let cache: { at: number; loras: StackVideoLora[] } | null = null;
@@ -30,14 +32,17 @@ async function stackLoras(): Promise<StackVideoLora[]> {
 
 export function dropVideoAdapterCache(): void { cache = null; }
 
-function enabledMap(): Map<string, boolean> {
-  return new Map(db.select().from(videoAdapterPrefs).all().map((row) => [row.adapterId, row.enabled]));
+function prefMap(): Map<string, { enabled: boolean; pending: boolean }> {
+  return new Map(db.select().from(videoAdapterPrefs).all().map((row) => [row.adapterId, { enabled: row.enabled, pending: row.updatedBy === PENDING }]));
 }
+
+/** `updatedBy` on a LoRA that was just added and waits for an admin's confirmation. */
+export const PENDING = "pending";
 
 /** Every LoRA in the library with the household's switch (admin view; no audience filtering). */
 export async function allVideoAdapters(): Promise<VideoAdapter[]> {
-  const [loras, prefs] = [await stackLoras(), enabledMap()];
-  return loras.map((lora) => ({ ...lora, enabled: prefs.get(lora.id) !== false }));
+  const [loras, prefs] = [await stackLoras(), prefMap()];
+  return loras.map((lora) => { const pref = prefs.get(lora.id); return { ...lora, enabled: pref?.enabled !== false, needs_confirmation: pref?.pending === true }; });
 }
 
 /** The LoRAs a person may use now: enabled, and in a class they hold. */

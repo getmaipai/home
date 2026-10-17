@@ -7,7 +7,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
+import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, loadGeneratedReference, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { videoEngineStatus, videoStatusReady } from "@/lib/videos/ready";
@@ -239,7 +239,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
 // ---------------------------------------------------------------- settings page: the household's video LoRA library
 
 const AdapterSchema = z.object({
-  id: z.string(), name: z.string(), classification: z.enum(["all-ages", "adult-only"]), enabled: z.boolean(), trigger_words: z.array(z.string()),
+  id: z.string(), name: z.string(), classification: z.enum(["all-ages", "adult-only"]), enabled: z.boolean(), needs_confirmation: z.boolean(), sha256: z.string(), base_model: z.string(), trigger_words: z.array(z.string()),
   licence: z.string(), strength_default: z.number(), bytes: z.number(), source_url: z.string().nullable(), added_at: z.string(),
 });
 const settingsRoute = createRoute({
@@ -258,7 +258,7 @@ videosRoutes.openapi(settingsRoute, async (c) => {
     model_installed: engine?.model?.installed === true, limits: VIDEO_LIMITS_LINE,
     enabled: householdAllowsVideo(), adult_adapters: adultVideoAdaptersAllowed(),
     minors: "Videos are off for children and teens. No setting turns them on.",
-    adapters: adapters.map((a) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at })),
+    adapters: adapters.map((a) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at })),
   }, 200);
 });
 
@@ -280,7 +280,7 @@ videosRoutes.openapi(patchAdapterRoute, async (c) => {
     dropVideoAdapterCache();
     const found = (await allVideoAdapters()).find((a) => a.id === id);
     if (!found) return c.json({ error: "That style isn't in the library." }, 404) as never;
-    return c.json({ id: found.id, name: found.name, classification: found.classification, enabled: found.enabled, trigger_words: found.trigger_words, licence: found.licence, strength_default: found.strength_default, bytes: found.bytes, source_url: found.source_url, added_at: found.added_at }, 200);
+    return c.json({ id: found.id, name: found.name, classification: found.classification, enabled: found.enabled, needs_confirmation: found.needs_confirmation, sha256: found.sha256, base_model: found.base_model, trigger_words: found.trigger_words, licence: found.licence, strength_default: found.strength_default, bytes: found.bytes, source_url: found.source_url, added_at: found.added_at }, 200);
   } catch (error) {
     if (error instanceof StackVideoError) return c.json({ error: error.message, code: error.code }, (error.status === 404 || error.status === 409 || error.status === 422 ? error.status : 422) as 404 | 409 | 422) as never;
     throw error;
@@ -315,7 +315,6 @@ const addAdapterRoute = createRoute({
   responses: { 200: { content: { "application/json": { schema: AdapterSchema } }, description: "Added." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only", 409: "Already in the library", 413: "Too large", 422: "The file cannot be used", 503: "The video engine is not available" }) },
 });
 videosRoutes.openapi(addAdapterRoute, async (c) => {
-  const actor = c.get("person");
   const form = c.req.valid("form");
   const out = new FormData();
   out.set("file", form.file);
@@ -329,9 +328,10 @@ videosRoutes.openapi(addAdapterRoute, async (c) => {
   out.set("added_by", "household");
   try {
     const lora = await addVideoLora(out);
+    // A new style is off, for everyone, until an admin has read its fingerprint and licence and turns it on.
+    setVideoAdapterEnabled(lora.id, false, PENDING);
     dropVideoAdapterCache();
-    void actor;
-    return c.json({ id: lora.id, name: lora.name, classification: lora.classification, enabled: true, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at }, 200);
+    return c.json({ id: lora.id, name: lora.name, classification: lora.classification, enabled: false, needs_confirmation: true, sha256: lora.sha256, base_model: lora.base_model, trigger_words: lora.trigger_words, licence: lora.licence, strength_default: lora.strength_default, bytes: lora.bytes, source_url: lora.source_url, added_at: lora.added_at }, 200);
   } catch (error) {
     if (error instanceof StackVideoError) {
       const status = error.status === 409 || error.status === 413 || error.status === 422 ? error.status : 503;

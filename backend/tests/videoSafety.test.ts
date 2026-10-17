@@ -325,6 +325,25 @@ describe("the routes", () => {
     expect(fake.jobs[0]!.deleted).toBe(true);
   });
 
+  test("a newly added style is off for everyone until an admin confirms it, and an unsure add is adults only", async () => {
+    const owner = await signedIn("Sage", "owner");
+    const form = new FormData();
+    form.set("file", new File([new Uint8Array(16)], "ink.safetensors"));
+    form.set("name", "Ink");
+    form.set("licence", "apache-2.0");
+    const res = await owner.client.postForm("/api/videos/adapters", form);
+    expect(res.status).toBe(200);
+    const added = await res.json() as { id: string; classification: string; enabled: boolean; needs_confirmation: boolean };
+    expect(added).toMatchObject({ classification: "adult-only", enabled: false, needs_confirmation: true });
+    // Off for everyone: not in any person's list, an adult's included.
+    expect((await videoAdaptersFor(["all-ages", "adult-only"])).map((a) => a.id)).not.toContain(added.id);
+    const confirmed = await owner.client.request(`/api/videos/adapters/${added.id}`, { method: "PATCH", body: { enabled: true } });
+    expect(confirmed.status).toBe(200);
+    expect(await confirmed.json()).toMatchObject({ enabled: true, needs_confirmation: false });
+    expect((await videoAdaptersFor(["all-ages", "adult-only"])).map((a) => a.id)).toContain(added.id);
+    expect((await videoAdaptersFor(["all-ages"])).map((a) => a.id)).not.toContain(added.id);
+  });
+
   test("the settings routes are for owners and admins only", async () => {
     const adult = await signedIn("Sage", "adult");
     expect((await adult.client.get("/api/videos/settings")).status).toBe(403);

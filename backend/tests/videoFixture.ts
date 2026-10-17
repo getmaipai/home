@@ -77,6 +77,12 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
     }
     if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests() });
     if (method === "GET" && path === "/stack/v1/video/loras") return json({ loras: fake.loras });
+    if (method === "POST" && path === "/stack/v1/video/loras") {
+      const form = init?.body as FormData;
+      const added: StackVideoLora = { id: "lora-3333333333333333", name: String(form.get("name")), sha256: "3".repeat(64), bytes: 100, base_model: "wan2.2-ti2v-5b", licence: String(form.get("licence")), source_url: null, classification: form.get("classification") === "all-ages" ? "all-ages" : "adult-only", trigger_words: [], strength_default: 1, added_at: "2026-10-17T00:00:00Z" };
+      fake.loras.push(added);
+      return json(added);
+    }
     return json({ error: `The fake video engine has no route ${method} ${path}.`, code: "not_found" }, 404);
   }) as typeof fetch);
   return fake;

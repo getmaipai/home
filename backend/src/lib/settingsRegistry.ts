@@ -21,6 +21,7 @@ import { NOTIFICATION_SETTINGS_KEYS } from "@/settings/notificationKeys";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import { REFERENCE_SETTINGS_KEYS } from "@/settings/referenceKeys";
 import { PICTURE_SETTINGS_KEYS } from "@/settings/pictureKeys";
+import { VIDEO_SETTINGS_KEYS } from "@/settings/videoKeys";
 import { VOICE_SETTINGS_KEYS } from "@/settings/voiceKeys";
 
 const RETIRED_WIKIPEDIA_FALLBACK_KEY = "search.wikipedia_fallback";
@@ -61,7 +62,7 @@ function loadRegistry(): SettingsKey[] {
   // until the shared snapshot is advanced.
   const keys = new Set(parsed.map((entry) => entry.key));
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
-  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map(withPersonGuardFacts);
 }
 

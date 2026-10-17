@@ -19,6 +19,7 @@ import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettings";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
+import { VideoLibrary } from "@/apps/settings/VideoLibrary";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
@@ -71,7 +72,7 @@ function HomeEngineAdminSettings({ person }: SettingsViewProps) {
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
 function HomeDevicesAdminSettings() { return <><AddRobotSection /><RobotPasswordSection /></>; }
-function PicturesLibraryView() { useTabItem("Pictures and videos"); return <PicturesLibrary />; }
+function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
 export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = {

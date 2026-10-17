@@ -44341,6 +44341,15 @@
                           "enabled": {
                             "type": "boolean"
                           },
+                          "needs_confirmation": {
+                            "type": "boolean"
+                          },
+                          "sha256": {
+                            "type": "string"
+                          },
+                          "base_model": {
+                            "type": "string"
+                          },
                           "trigger_words": {
                             "type": "array",
                             "items": {
@@ -44369,6 +44378,9 @@
                           "name",
                           "classification",
                           "enabled",
+                          "needs_confirmation",
+                          "sha256",
+                          "base_model",
                           "trigger_words",
                           "licence",
                           "strength_default",
@@ -44486,6 +44498,15 @@
                     "enabled": {
                       "type": "boolean"
                     },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -44514,6 +44535,9 @@
                     "name",
                     "classification",
                     "enabled",
+                    "needs_confirmation",
+                    "sha256",
+                    "base_model",
                     "trigger_words",
                     "licence",
                     "strength_default",
@@ -44731,6 +44755,15 @@
                     "enabled": {
                       "type": "boolean"
                     },
+                    "needs_confirmation": {
+                      "type": "boolean"
+                    },
+                    "sha256": {
+                      "type": "string"
+                    },
+                    "base_model": {
+                      "type": "string"
+                    },
                     "trigger_words": {
                       "type": "array",
                       "items": {
@@ -44759,6 +44792,9 @@
                     "name",
                     "classification",
                     "enabled",
+                    "needs_confirmation",
+                    "sha256",
+                    "base_model",
                     "trigger_words",
                     "licence",
                     "strength_default",
