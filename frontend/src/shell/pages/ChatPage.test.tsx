@@ -2772,7 +2772,7 @@ describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
     } finally { globalThis.fetch = original; }
   });
 
-  test("a single non-thinking model renders accessible, non-focusable Instant text", async () => {
+  test("a model that never reasons shows no mode control or chip (INSTANT-01)", async () => {
     const original = globalThis.fetch;
     globalThis.fetch = mock((input: RequestInfo | URL) => {
       const url = typeof input === "string" ? input : input.toString();
@@ -2783,12 +2783,12 @@ describe("ChatPage (ELT-MODE-01: catalog-backed composer mode control)", () => {
     }) as unknown as typeof fetch;
     try {
       const view = renderPage(<MemoryRouter initialEntries={["/chat"]}><ChatPage person={makePerson()} /></MemoryRouter>);
-      await view.findByText("Instant");
-      const label = view.container.querySelector('[data-slot="model-selector-value"]');
-      expect(label).toBeTruthy();
-      expect(label?.textContent).toBe("Instant");
-      expect(label?.closest("button")).toBeNull();
-      expect(view.queryByRole("button", { name: "Thinking mode" })).toBeNull();
+      await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+      await new Promise((r) => setTimeout(r, 50));
+      expect(view.container.querySelector('[data-slot="model-selector-value"]')).toBeNull();
+      expect(view.queryByText("Instant")).toBeNull();
+      expect(view.queryByText("Thinking")).toBeNull();
+      expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
       expect(view.queryByText("Secret model name")).toBeNull();
     } finally { globalThis.fetch = original; }
   });
