@@ -49,21 +49,23 @@ const failure = (code: OfflineCode): OfflineResult => ({ ok: false, code, messag
 export const isWebKit = (ua: string): boolean => /AppleWebKit\//.test(ua) && (!/\b(?:Chrome|Chromium|Edg)\//.test(ua) || /iPhone|iPad|iPod/.test(ua));
 export const isChromium = (ua: string): boolean => /\b(?:Chrome|Chromium|Edg)\//.test(ua) && !isWebKit(ua);
 const codeFor = (status: number): OfflineCode => status === 401 || status === 403 ? "revoked" : status === 404 ? "notOnServer" : status === 409 ? "notPlayable" : status === 503 ? "notReady" : "network";
-const hubFile = (path: string): boolean => path.startsWith("/api/media/offline/file/") && !path.includes("\\") && new URL(path, location.origin).origin === location.origin;
-const indexUrl = (id: string): string => `${INDEX_PATH}${encodeURIComponent(id)}`;
+const hubFile = (path: string): boolean => (path.startsWith("/api/media/offline/file/") || path.startsWith("/api/offline/file/")) && !path.includes("\\") && new URL(path, location.origin).origin === location.origin;
+export interface OfflineRecordRef { kind: string; id: string }
+// Keep media's existing index key, so upgrades list and remove the same copies without a second bucket.
+const indexUrl = ({ kind, id }: OfflineRecordRef): string => `${INDEX_PATH}${kind === "media" ? "" : `${encodeURIComponent(kind)}/`}${encodeURIComponent(id)}`;
 
 /** Fetch directly from the hub, then explicitly put complete responses in the named bucket. No token is stored. */
-export async function keepOnDevice(item: { id: string }): Promise<OfflineResult> {
+export async function keepOnDevice(item: OfflineRecordRef): Promise<OfflineResult> {
   if (!isChromium(navigator.userAgent)) return failure(isWebKit(navigator.userAgent) ? "useGo" : "network");
   const name = bucket();
   if (!name) return failure("revoked");
   const started = generation();
-  const checkCurrent = () => { if (generation() !== started) throw new Error("copy_cancelled"); };
+  const checkCurrent = () => { if (generation() !== started || bucket() !== name) throw new Error("copy_cancelled"); };
   let cache: Cache | undefined;
   const written: string[] = [];
   try {
     const estimate = await navigator.storage.estimate();
-    const response = await fetch(`/api/media/offline/manifest?id=${encodeURIComponent(item.id)}`, { credentials: "same-origin", cache: "no-store", redirect: "error" });
+    const response = await fetch(`/api/offline/manifest?kind=${encodeURIComponent(item.kind)}&id=${encodeURIComponent(item.id)}`, { credentials: "same-origin", cache: "no-store", redirect: "error" });
     checkCurrent();
     if (!response.ok) {
       if (isDeviceRevoked(response.status, await response.clone().json().catch(() => null))) await removeAllOfflineMedia();
@@ -71,7 +73,7 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
     }
     const manifest = OfflineManifest.parse(await response.json());
     checkCurrent();
-    if (manifest.kind !== "media" || manifest.id !== item.id) return failure("network");
+    if (manifest.kind !== item.kind || manifest.id !== item.id) return failure("network");
     for (const entry of manifest.entries) {
       if (!entry.ready) return failure(entry.reason ?? "notReady");
       if (entry.playable !== "original") return failure(entry.playable === "none" ? "notPlayable" : "notReady");
@@ -82,7 +84,7 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
     const urls = [...new Set(manifest.entries.flatMap((entry) => [entry.url, ...(entry.artwork_url ? [entry.artwork_url] : []), ...entry.subtitles.map((s) => s.url)]))];
     if (!urls.every(hubFile)) return failure("network");
     // Replace the old copy first, so a failed update cannot leave a partial old manifest looking complete.
-    await removeFromDevice(item.id);
+    await removeFromDevice(item);
     checkCurrent();
     cache = await caches.open(name);
     checkCurrent();
@@ -93,6 +95,7 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
       const bytes = await fetch(networkUrl, { credentials: "same-origin", cache: "no-store", redirect: "error" });
       checkCurrent();
       if (!bytes.ok || bytes.status !== 200) {
+        if (isDeviceRevoked(bytes.status, await bytes.clone().json().catch(() => null))) await removeAllOfflineMedia();
         for (const path of written) await cache.delete(path);
         return failure(codeFor(bytes.status));
       }
@@ -105,13 +108,13 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
       written.push(url);
       checkCurrent();
     }
-    await cache.put(indexUrl(item.id), new Response(JSON.stringify(manifest), { headers: { "Content-Type": "application/json" } }));
+    await cache.put(indexUrl(item), new Response(JSON.stringify(manifest), { headers: { "Content-Type": "application/json" } }));
     checkCurrent();
     return { ok: true };
   } catch (error) {
     if (cache) for (const path of written) await cache.delete(path).catch(() => false);
-    if (cache && generation() !== started) await cache.delete(indexUrl(item.id)).catch(() => false);
-    return failure(generation() !== started ? "revoked" : error instanceof DOMException && error.name === "QuotaExceededError" ? "storageFull" : "network");
+    if (cache && (generation() !== started || bucket() !== name)) await cache.delete(indexUrl(item)).catch(() => false);
+    return failure((generation() !== started || bucket() !== name) ? "revoked" : error instanceof DOMException && error.name === "QuotaExceededError" ? "storageFull" : "network");
   }
 }
 
@@ -129,17 +132,17 @@ export async function listKept(): Promise<OfflineManifest[]> {
   return manifests;
 }
 
-export async function removeFromDevice(id: string): Promise<void> {
+export async function removeFromDevice(item: OfflineRecordRef): Promise<void> {
   const name = bucket();
   if (!name || !globalThis.caches) return;
   const cache = await caches.open(name);
-  const manifest = OfflineManifest.safeParse(await (await cache.match(indexUrl(id)))?.json().catch(() => null));
+  const manifest = OfflineManifest.safeParse(await (await cache.match(indexUrl(item)))?.json().catch(() => null));
   if (manifest.success) {
     for (const entry of manifest.data.entries) {
       for (const url of [entry.url, entry.artwork_url, ...entry.subtitles.map((s) => s.url)]) if (url && hubFile(url)) await cache.delete(url);
     }
   }
-  await cache.delete(indexUrl(id));
+  await cache.delete(indexUrl(item));
 }
 
 /** Sign-out and a revoked device: every person's copies on this browser go, and the worker stops serving. */
@@ -158,11 +161,22 @@ export async function reconcileKept(): Promise<number> {
   try {
     const kept = await listKept();
     if (kept.length === 0) return 0;
-    const items = kept.flatMap((m) => m.entries.slice(0, 1).map((e) => ({ kind: "media" as const, id: m.id, fingerprint: e.fingerprint })));
-    const response = await fetch("/api/media/offline/status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
-    if (!response.ok) return 0;
-    const { items: results } = await response.json() as { items: Array<{ id: string; status: "ok" | "changed" | "gone" }> };
-    for (const result of results) if (result.status !== "ok") { await removeFromDevice(result.id); removed++; }
+    const legacy = kept.filter((m) => m.kind === "media" && m.entries.some((e) => e.url.startsWith("/api/media/offline/file/")));
+    const items = legacy.flatMap((m) => m.entries.slice(0, 1).map((e) => ({ kind: "media" as const, id: m.id, fingerprint: e.fingerprint })));
+    const response = items.length ? await fetch("/api/media/offline/status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) }) : null;
+    if (response && !response.ok) return 0;
+    const { items: results } = (response ? await response.json() : { items: [] }) as { items: Array<{ id: string; status: "ok" | "changed" | "gone" }> };
+    for (const result of results) if (result.status !== "ok") { await removeFromDevice({ kind: "media", id: result.id }); removed++; }
+    for (const manifest of kept.filter((m) => !legacy.includes(m))) {
+      const response = await fetch(`/api/offline/manifest?kind=${encodeURIComponent(manifest.kind)}&id=${encodeURIComponent(manifest.id)}`, { credentials: "same-origin", cache: "no-store", redirect: "error" });
+      if (response.status === 404) { await removeFromDevice(manifest); removed++; continue; }
+      if (!response.ok) continue;
+      const current = OfflineManifest.safeParse(await response.json());
+      if (current.success && current.data.kind === manifest.kind && current.data.id === manifest.id &&
+        JSON.stringify(current.data.entries.map((e) => [e.id, e.fingerprint, e.ready])) !== JSON.stringify(manifest.entries.map((e) => [e.id, e.fingerprint, e.ready]))) {
+        await removeFromDevice(manifest); removed++;
+      }
+    }
   } catch { /* offline or signed out: keep what is there */ }
   return removed;
 }

@@ -48066,6 +48066,425 @@
         }
       }
     },
+    "/api/offline/manifest": {
+      "get": {
+        "tags": [
+          "Offline"
+        ],
+        "summary": "Keep one readable record using its registered provider",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "kind",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The record's hub-only files.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "minLength": 1,
+                      "description": "The provider's record kind: media, news_story, reference_page, conversation."
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "subtitle": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null
+                    },
+                    "entries": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "title": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "url": {
+                            "type": "string",
+                            "minLength": 1,
+                            "pattern": "^\\/",
+                            "description": "A hub path, never an outside address."
+                          },
+                          "bytes": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "mime": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "fingerprint": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "ready": {
+                            "type": "boolean",
+                            "description": "False while a transcode is queued; the file route answers 503 with Retry-After until it is."
+                          },
+                          "playable": {
+                            "type": "string",
+                            "enum": [
+                              "original",
+                              "transcode",
+                              "none",
+                              "unknown"
+                            ]
+                          },
+                          "reason": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "notReady"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "notPlayable"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "notOnServer"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "duration_s": {
+                            "anyOf": [
+                              {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "artwork_url": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "pattern": "^\\/"
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          },
+                          "chapters": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "start_s": {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                "title": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "start_s",
+                                "title"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
+                          },
+                          "subtitles": {
+                            "type": "array",
+                            "items": {
+                              "type": "object",
+                              "properties": {
+                                "lang": {
+                                  "type": "string"
+                                },
+                                "label": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "nullable": true
+                                    }
+                                  ],
+                                  "default": null
+                                },
+                                "url": {
+                                  "type": "string",
+                                  "pattern": "^\\/"
+                                }
+                              },
+                              "required": [
+                                "lang",
+                                "url"
+                              ],
+                              "additionalProperties": false
+                            },
+                            "default": []
+                          },
+                          "progress": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "position_s": {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  "completed": {
+                                    "type": "boolean"
+                                  }
+                                },
+                                "required": [
+                                  "position_s",
+                                  "completed"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "url",
+                          "bytes",
+                          "mime",
+                          "fingerprint",
+                          "ready",
+                          "playable"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "total_bytes": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "default": 0
+                    },
+                    "generated_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "kind",
+                    "id",
+                    "title",
+                    "entries",
+                    "generated_at"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 for KEEP-OFFLINE-01 (media design sections 9 and 12). What a device needs to keep a record on the device: one entry per byte stream with its address on the hub, size, type, fingerprint and readiness, plus the person's progress when the record has one. Served by the hub's offline routes for any record kind that registers a provider (media first). FileTube's offline manifest, generalized."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to Home and try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Check this device's offline permission, or screen time is done (media_time_up, budget_keep_refused)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Open the item in its app and try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/offline/file/{kind}/{entry}": {
+      "get": {
+        "tags": [
+          "Offline"
+        ],
+        "summary": "Read one kept record's file from Home",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "kind",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true,
+            "name": "entry",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete private bytes."
+          },
+          "206": {
+            "description": "Requested range."
+          },
+          "401": {
+            "description": "Sign in to Home and try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Check this device's offline permission, or screen time is done (media_time_up, budget_keep_refused)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Open the item in its app and try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Choose a playable item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "416": {
+            "description": "Request a range inside the file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Open the parts of this item",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Try this copy again later",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media/sources": {
       "get": {
         "tags": [

@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, waitFor } from "@testing-library/react";
 import { VoicesPage } from "@/shell/pages/VoicesPage";
@@ -57,7 +58,7 @@ describe("Next personal management pages", () => {
   test("a child can reach the real Devices section", async () => {
     const restore = mockApi();
     try {
-      renderWithQueryClient(<DevicesPage />);
+      renderWithQueryClient(<MemoryRouter><DevicesPage person={makePerson()} /></MemoryRouter>);
       await waitFor(() => expect(document.body.textContent).toContain("Signed-in sessions"));
       expect(document.body.textContent).toContain("Devices");
     } finally { restore(); }

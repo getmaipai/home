@@ -3,40 +3,17 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { OfflineManifest } from "@maipai/spec/gen/ts/offline-manifest.js";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireDeviceScope } from "@/middleware/auth";
-import { decidePlayable } from "@/lib/media/kinds";
-import { extensionOf } from "@/lib/media/parsers/text";
 import { readableItem } from "@/lib/media/access";
-import { itemByteMetadata, serveItemArtwork, serveItemBytes } from "@/lib/media/serve";
-import { correctedStamp, getProgress, writeProgress } from "@/lib/media/progress";
-import { mediaTimeUpRefusal, minorMayKeepOffline } from "@/lib/media/watchTime";
+import { correctedStamp, writeProgress } from "@/lib/media/progress";
 import { getCookie } from "hono/cookie";
 import { hashSessionToken } from "@/lib/session";
 import type { Context } from "hono";
-import type { PersonRow } from "@/types";
-import { readAttachment } from "@/lib/attachments";
-import type { MediaItem } from "@/lib/media/model";
+import { keepRefusal, matches, missing, mediaFile, mediaManifest, playableItem } from "@/lib/offline/media";
 
 export const mediaOfflineRoutes = apiRouter();
 const gate = requireDeviceScope("media.offline");
 const Kind = z.enum(["media", "video", "episode", "film", "track", "podcast_episode", "book", "audiobook", "chapter"]);
 const Ref = z.object({ kind: Kind, id: z.string().min(1) }).strict();
-const matches = (item: MediaItem | null, kind: string): item is MediaItem => item !== null && (kind === "media" || kind === item.kind);
-
-// A probed row already carries this decision. Reuse the same rule for a row whose codecs arrived before its decision.
-function playableItem(item: MediaItem | null): MediaItem | null {
-  if (!item || item.playable !== "unknown" || (!item.video_codec && !item.audio_codec)) return item;
-  const location = item.location as { path?: string };
-  return { ...item, playable: decidePlayable({ ext: extensionOf(location.path ?? ""), hasVideo: item.video_codec !== null, hasAudio: item.audio_codec !== null, videoCodec: item.video_codec, audioCodec: item.audio_codec }) };
-}
-
-/** MEDIA-KID-01: keeping media is refused for a minor whose time is up, and for any minor with a daily media budget (offline
- * time cannot be metered). Neither code is `device_revoked`, so the browser keeps its existing copies. */
-function keepRefusal(actor: PersonRow): { error: string; code: "media_time_up" | "budget_keep_refused" } | null {
-  const timeUp = mediaTimeUpRefusal(actor);
-  if (timeUp) return timeUp;
-  if (!minorMayKeepOffline(actor)) return { error: "Keeping a title for later is off while you have screen time limits. Ask a grown-up.", code: "budget_keep_refused" };
-  return null;
-}
 /** The metering cursor key, derived by the server: the paired device, else the hashed browser session. Never a body field. */
 function meterKeyOf(c: Context): string {
   const deviceId = c.get("deviceId") as string | undefined;
@@ -45,8 +22,6 @@ function meterKeyOf(c: Context): string {
   return session ? `s:${hashSessionToken(session)}` : "-";
 }
 
-const SUBTITLE_TYPES = new Set(["text/vtt", "text/plain", "application/x-subrip", "text/srt"]);
-const missing = "This item is not available to you on Home. Check your library, then try again.";
 const errors = errorResponses({ 401: "Sign in to Home", 403: "Pair this device again, check its offline permission, or screen time is done (media_time_up, budget_keep_refused)", 404: "Check the library for this item" });
 
 const manifest = createRoute({
@@ -56,28 +31,13 @@ const manifest = createRoute({
   responses: { 200: { content: { "application/json": { schema: OfflineManifest } }, description: "One byte stream with readiness and my progress." }, ...errors },
 });
 mediaOfflineRoutes.openapi(manifest, (c) => {
-  const actor = c.get("person");
   const { id, kind = "media" } = c.req.valid("query");
+  const actor = c.get("person");
   const refused = keepRefusal(actor);
   if (refused) return c.json(refused, 403);
-  const item = playableItem(readableItem(actor, id));
-  if (!matches(item, kind)) return c.json({ error: missing }, 404);
-  const metadata = itemByteMetadata(actor, item);
-  const ready = metadata !== null && item.fingerprint !== null && item.playable === "original";
-  const reason = !metadata || !item.fingerprint ? "notOnServer" : item.playable === "none" ? "notPlayable" : ready ? null : "notReady";
-  const progress = getProgress(actor.id, id);
-  const bytes = metadata?.size ?? item.size ?? 0;
-  return c.json(OfflineManifest.parse({
-    kind: "media", id, title: item.title, subtitle: item.subtitle, total_bytes: bytes, generated_at: new Date().toISOString(),
-    entries: [{
-      id, title: item.title, url: `/api/media/offline/file/media/${id}`, bytes, mime: item.media_type,
-      fingerprint: item.fingerprint ?? "unavailable", ready, playable: item.playable, reason, duration_s: item.duration_s,
-      artwork_url: item.artwork ? `/api/media/offline/file/artwork/${id}` : null,
-      chapters: item.chapters.map(({ start_s, title }) => ({ start_s, title })),
-      subtitles: item.subtitles.map(({ lang, label }, index) => ({ lang, label, url: `/api/media/offline/file/subtitle/${id}?track=${index}` })),
-      progress: progress && "seconds" in progress.position ? { position_s: progress.position.seconds, completed: progress.completed } : null,
-    }],
-  }), 200);
+  if (!matches(readableItem(actor, id), kind)) return c.json({ error: missing }, 404);
+  const result = mediaManifest(actor, id);
+  return result ? c.json(result, 200) : c.json({ error: missing }, 404);
 });
 
 const file = createRoute({
@@ -90,45 +50,12 @@ const file = createRoute({
     ...errors, ...errorResponses({ 409: "This file cannot play; choose another item", 422: "Play the parts of this folder", 416: "Request a range inside the file", 503: "Copy not ready; Retry-After: 60" }),
   },
 });
-mediaOfflineRoutes.openapi(file, async (c) => {
-  const actor = c.get("person");
+mediaOfflineRoutes.openapi(file, (c) => {
   const { id, kind } = c.req.valid("param");
+  const actor = c.get("person");
   const refused = keepRefusal(actor);
   if (refused) return c.json(refused, 403);
-  const item = playableItem(readableItem(actor, id));
-  if (!item || (!["artwork", "subtitle"].includes(kind) && !matches(item, kind))) return c.json({ error: missing }, 404);
-  if (kind === "artwork") {
-    const response = await serveItemArtwork(actor, item);
-    if (!(response instanceof Response)) return c.json({ error: "This picture is not available. Try keeping the item again later." }, response.status);
-    response.headers.set("Cache-Control", "private, no-store");
-    return response;
-  }
-  if (kind === "subtitle") {
-    const track = item.subtitles[c.req.valid("query").track ?? 0];
-    const read = track ? readAttachment(actor, track.file_id) : null;
-    if (!read?.ok) return c.json({ error: "This subtitle is not available. Try keeping the item again later." }, 404);
-    // Only caption types are served, always as text/vtt, sandboxed: a stored file can never run as a page or script.
-    if (!SUBTITLE_TYPES.has(read.value.record.media_type.split(";")[0]!.trim().toLowerCase())) return c.json({ error: "This subtitle is not available. Try keeping the item again later." }, 404);
-    return new Response(read.value.bytes as never, { headers: { "Content-Type": "text/vtt; charset=utf-8", "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff", "Content-Security-Policy": "sandbox" } });
-  }
-  if (item.playable === "none") return c.json({ error: "This file cannot play on this device. Choose another item." }, 409);
-  if (item.playable !== "original") {
-    c.header("Retry-After", "60");
-    return c.json({ error: "This copy is not ready. Try again later; files that need conversion are not supported yet." }, 503);
-  }
-  const metadata = itemByteMetadata(actor, item);
-  if (!metadata || !item.fingerprint) return c.json({ error: "This file is not saved on Home. Check its library folder, then try again." }, 404);
-  // JSON's string escaping also prevents a malformed stored fingerprint from becoming a header injection.
-  const etag = JSON.stringify(item.fingerprint);
-  const modified = metadata.modified.toUTCString();
-  const ifRange = c.req.header("if-range");
-  const dateMatches = ifRange !== undefined && !ifRange.startsWith('"') && !ifRange.startsWith("W/") && Number.isFinite(Date.parse(ifRange)) && Math.floor(metadata.modified.getTime() / 1000) === Math.floor(Date.parse(ifRange) / 1000);
-  const range = !ifRange || ifRange === etag || dateMatches ? c.req.header("range") : undefined;
-  const response = await serveItemBytes(actor, item, range);
-  if (!(response instanceof Response)) return c.json({ error: "This file could not be read. Check its library folder, then try again." }, response.status);
-  response.headers.set("ETag", etag);
-  response.headers.set("Last-Modified", modified);
-  return response;
+  return mediaFile(actor, id, kind, c.req.raw);
 });
 
 const status = createRoute({

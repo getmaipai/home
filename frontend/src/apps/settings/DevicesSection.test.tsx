@@ -498,7 +498,7 @@ test("a device owner can toggle offline permission and sees Remove all for this 
   const restore = stubFetch([device({ offlineScope: [] })], []);
   try {
     const view = renderSection();
-    const permission = await view.findByRole("switch", { name: "Can keep media on this device" });
+    const permission = await view.findByRole("switch", { name: "Can keep copies on this device" });
     expect(permission).not.toBeChecked();
     fireEvent.click(permission);
     await waitFor(() => expect(permission).toBeChecked());
@@ -511,6 +511,29 @@ test("robots, TVs and pods show no keep-media switch", async () => {
   try {
     const view = renderSection();
     await view.findByText(/TV/i);
-    expect(view.queryByRole("switch", { name: "Can keep media on this device" })).toBeNull();
+    expect(view.queryByRole("switch", { name: "Can keep copies on this device" })).toBeNull();
   } finally { restore(); }
+});
+
+
+test("kept copies show their record kind, including equal ids in different kinds", async () => {
+  const { setMediaOwner } = await import("@/lib/offlineMedia");
+  const previousCaches = globalThis.caches;
+  const restoreFetch = stubFetch([], []);
+  const manifests = ["media", "reference"].map((kind) => ({ kind, id: "nova", title: "nova", entries: [], total_bytes: 0, generated_at: new Date().toISOString() }));
+  Object.assign(globalThis, { caches: { open: async () => ({
+    keys: async () => manifests.map((m) => new Request(`https://example.com/api/media/offline/kept/${m.kind}/nova`)),
+    match: async (key: Request) => Response.json(manifests.find((m) => key.url.includes(`/${m.kind}/nova`))),
+  }) } });
+  try {
+    await setMediaOwner("person-atlas");
+    const view = renderSection();
+    expect(await view.findByText("Media")).toBeInTheDocument();
+    expect(await view.findByText("reference")).toBeInTheDocument();
+    expect(view.getAllByText("nova").length).toBe(2);
+  } finally {
+    await setMediaOwner(null);
+    restoreFetch();
+    if (previousCaches) Object.assign(globalThis, { caches: previousCaches }); else Reflect.deleteProperty(globalThis, "caches");
+  }
 });

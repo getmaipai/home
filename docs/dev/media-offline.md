@@ -62,4 +62,12 @@ Tested in `frontend/src/lib/offlineWipe.test.ts`.
 ## Open
 
 "Remove all devices" (one revoke-everything action; today only a password change revokes all device tokens).
-Transcode-on-save (needs the Stack's `media.transcode`), generic manifests (KEEP-OFFLINE-01), `offline.records` routes.
+Transcode-on-save (needs the Stack's `media.transcode`), News, reference and conversation providers (see [Keep a record](media-library.md#keep-a-record-on-this-device-keep-offline-01)).
+
+
+## Generic records
+
+KEEP-OFFLINE-01 adds `/api/offline/manifest?kind=&id=` and `/api/offline/file/:kind/:entry` with the separate `offline.records`
+scope, backed by the same media provider and browser bucket. The media URLs and `media.offline` scope still work for Go.
+Settings, Devices grants both scopes with "Can keep copies on this device". The guardian and shared-device rules above apply
+to both scopes. See [the provider contract and open kinds](media-library.md#keep-a-record-on-this-device-keep-offline-01).

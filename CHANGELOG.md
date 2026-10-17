@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 - **Podcasts review fixes.** Saved episodes and show pictures cannot bypass age or show access through Files, including old household shares. Downloads stream to disk within storage caps; keep rules run in a background queue, one run per show. OPML imports use the normal polling limit, and a News address conflict cannot stop Podcasts checks. Only a copy's owner or an adult admin can unsave it; removed copies go to Trash for 30 days. Removing a show cleans up its picture. Old http episode links use https, enclosure downloads allow five redirects, and the privacy text covers automatic downloads, file hosts and the home's IP.
+- "Keep on this device" now has one shared path for apps to use. Media uses it first, with the same browser storage and device protections. Settings, Devices labels copies by kind and clears them together. News stories, reference pages and chat exports are still open.
 
 ## [0.2.17] - 2026-10-17
 

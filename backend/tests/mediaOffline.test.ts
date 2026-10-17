@@ -12,6 +12,7 @@ import { issueDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
 import { deleteDevice, setDeviceOfflineScope } from "@/lib/devices";
 import { __resetProgressForTests, getProgress, writeProgress } from "@/lib/media/progress";
 import { readableItem } from "@/lib/media/access";
+import { genericMediaManifest } from "@/lib/offline/media";
 import { decidePlayable } from "@/lib/media/kinds";
 import { newMediaItemId, newMediaSourceId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
@@ -326,5 +327,67 @@ describe("MEDIA-KID-01 on the offline routes", () => {
     expect((await s.owner.request(base + "/progress", { method: "POST", body: { sent_at: iso(now), events: [s.event(iso(now - 500), 6)] } })).status).toBe(200);
     expect(keys().filter((key) => key.startsWith("s:"))).toHaveLength(1);
     expect(keys()).not.toContain("-");
+  });
+  test("the generic offline routes refuse an exhausted minor with media_time_up too", async () => {
+    const s = await setup(); s.allow(); await minorWithBudget(s, 600);
+    setDeviceOfflineScope(s.issued.deviceId, ["media.offline", "offline.records"]);
+    for (const path of [`/api/offline/manifest?kind=media&id=${s.id}`, `/api/offline/file/media/${s.id}`]) {
+      const res = await s.client.get(path, auth(s.issued.token));
+      expect(res.status).toBe(403);
+      expect((await codeOf(res)).code).toBe("media_time_up");
+    }
+  });
+});
+
+describe("generic offline routes", () => {
+  test("generic media equals the legacy manifest and byte server, with URLs for its own scope", async () => {
+    const s = await setup();
+    setDeviceOfflineScope(s.issued.deviceId, ["media.offline", "offline.records"]);
+    const legacy = OfflineManifest.parse(await (await s.get(`/manifest?id=${s.id}`)).json());
+    const genericResponse = await s.client.get(`/api/offline/manifest?kind=media&id=${s.id}`, auth(s.issued.token));
+    expect(genericResponse.status).toBe(200);
+    const generic = OfflineManifest.parse(await genericResponse.json());
+    expect({ ...generic, generated_at: legacy.generated_at }).toEqual(genericMediaManifest(legacy));
+    // Only offline.records is needed to follow every generic asset URL.
+    setDeviceOfflineScope(s.issued.deviceId, ["offline.records"]);
+    const entry = generic.entries[0]!;
+    expect(entry.url).toBe(`/api/offline/file/media/${s.id}`);
+    const full = await s.client.get(entry.url, auth(s.issued.token));
+    expect(full.status).toBe(200); expect(await full.text()).toBe("0123456789");
+    expect(full.headers.get("etag")).toBe('"10-1767225600000"');
+    expect(full.headers.get("cache-control")).toBe("private, no-store");
+    const range = await s.client.get(entry.url, { ...auth(s.issued.token), Range: "bytes=2-4", "If-Range": full.headers.get("etag")! });
+    expect(range.status).toBe(206); expect(await range.text()).toBe("234");
+    expect(await (await s.client.get(entry.artwork_url!, auth(s.issued.token))).text()).toBe("picture");
+  });
+  test("missing offline.records refuses both generic routes; unknown kinds are 404 after admission", async () => {
+    const s = await setup(); s.allow();
+    const paths = [`/api/offline/manifest?kind=media&id=${s.id}`, `/api/offline/file/media/${s.id}`];
+    for (const path of paths) expect((await s.client.get(path, auth(s.issued.token))).status).toBe(403);
+    setDeviceOfflineScope(s.issued.deviceId, ["offline.records"]);
+    for (const path of [`/api/offline/manifest?kind=unknown&id=${s.id}`, `/api/offline/file/unknown/${s.id}`]) expect((await s.client.get(path, auth(s.issued.token))).status).toBe(404);
+    deleteDevice(s.issued.deviceId, s.actor.id);
+    for (const path of paths) expect((await s.client.get(path, auth(s.issued.token))).status).toBe(403);
+  });
+  test("generic routes preserve child access and guardian requirements, including assets", async () => {
+    const s = await setup();
+    setDeviceOfflineScope(s.issued.deviceId, ["offline.records"]);
+    db.update(people).set({ role: "child", birthdate: "2018-03-01" }).run();
+    db.update(mediaItems).set({ bandOk: "adult" }).run();
+    for (const path of [`/api/offline/manifest?kind=media&id=${s.id}`, `/api/offline/file/media/${s.id}`, `/api/offline/file/media/artwork%3A${s.id}`, `/api/offline/file/media/subtitle%3A${s.id}`]) {
+      expect((await s.client.get(path, auth(s.issued.token))).status).toBe(404);
+      expect((await s.owner.get(path)).status).toBe(403);
+    }
+    db.update(mediaItems).set({ bandOk: "child" }).run();
+    expect((await s.client.get(`/api/offline/manifest?kind=media&id=${s.id}`, auth(s.issued.token))).status).toBe(200);
+  });
+  test("shared devices cannot gain generic offline permission or bypass admission with a forced scope", async () => {
+    const s = await setup();
+    for (const kind of ["robot", "tv", "pod"] as const) {
+      const issued = issueDeviceToken(s.actor.id, kind, "atlas");
+      expect((await s.owner.request(`/api/devices/${issued.deviceId}/offline-scope`, { method: "PATCH", body: { offline_scope: ["offline.records"] } })).status).toBe(400);
+      db.update(devices).set({ offlineScope: '["offline.records"]' }).where(eq(devices.id, issued.deviceId)).run();
+      expect((await s.client.get(`/api/offline/manifest?kind=media&id=${s.id}`, auth(issued.token))).status).toBe(403);
+    }
   });
 });

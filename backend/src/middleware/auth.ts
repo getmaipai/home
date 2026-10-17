@@ -370,7 +370,7 @@ export function requireDeviceScope(scope: "media.offline" | "offline.records") {
       const device = identity ? getDeviceById(identity.deviceId) : null;
       // `device_revoked` is the one code the browser treats as "wipe kept copies"; a missing scope is not a revocation.
       if (!identity || !device) return c.json({ error: "This device is no longer paired with Home. Pair it again to keep files.", code: "device_revoked" }, 403);
-      if (!device.offlineScope.includes(scope) || (scope === "media.offline" && !mayHoldMediaOffline(device))) {
+      if (!device.offlineScope.includes(scope) || !mayHoldMediaOffline(device)) {
         return c.json({ error: "This device cannot keep these files. Sign in to Home and check its offline permission, or pair it again.", code: "offline_scope_missing" }, 403);
       }
       c.set("person", identity.person);
@@ -386,12 +386,12 @@ export function requireDeviceScope(scope: "media.offline" | "offline.records") {
       const deviceId = resolveSessionDeviceId(token);
       // Redeeming a device bearer for a cookie must not bypass the offline scope.
       const sessionDevice = deviceId ? getDeviceById(deviceId) : null;
-      if (deviceId && (!sessionDevice?.offlineScope.includes(scope) || (scope === "media.offline" && !mayHoldMediaOffline(sessionDevice)))) {
+      if (deviceId && (!sessionDevice?.offlineScope.includes(scope) || !mayHoldMediaOffline(sessionDevice))) {
         return c.json({ error: "This device has no offline permission. Sign in on your own browser to change it.", code: "offline_scope_missing" }, 403);
       }
       // A child or teen keeps media only on a device a grown-up granted: a plain browser session has no device to grant.
-      if (!deviceId && scope === "media.offline" && mediaBandOf(result) !== "adult") {
-        return c.json({ error: "A grown-up needs to allow keeping media on this device. Ask a grown-up to turn it on in Settings, Devices.", code: "guardian_grant_required" }, 403);
+      if (!deviceId && mediaBandOf(result) !== "adult") {
+        return c.json({ error: "A grown-up needs to allow keeping copies on this device. Ask a grown-up to turn it on in Settings, Devices.", code: "guardian_grant_required" }, 403);
       }
       c.set("person", result);
       if (deviceId) c.set("deviceId", deviceId);

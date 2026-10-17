@@ -582,7 +582,7 @@ devicesRoutes.openapi(offlineScopeRoute, (c) => {
   // A child's or teen's keep permission is a guardian's to give: they cannot grant it to themselves.
   if (actor.role !== "owner" && actor.role !== "admin" && mediaBandOf(actor) !== "adult") return c.json({ error: "A grown-up sets this. Ask a grown-up to allow keeping media on this device." }, 403);
   const requested = c.req.valid("json").offline_scope;
-  if (requested.includes("media.offline") && !mayHoldMediaOffline(device)) return c.json({ error: "A shared device such as a robot, TV or pod cannot keep media. Use a phone, computer or browser." }, 400);
+  if (requested.length > 0 && !mayHoldMediaOffline(device)) return c.json({ error: "A shared device such as a robot, TV or pod cannot keep copies. Use a phone, computer or browser." }, 400);
   setDeviceOfflineScope(device.id, requested);
   return c.json({ success: true as const }, 200);
 });

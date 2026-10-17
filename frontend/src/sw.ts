@@ -96,7 +96,7 @@ if (!PASSTHROUGH) {
     const req = event.request;
     if (req.method !== "GET") return;
     const url = new URL(req.url);
-    if (CHROMIUM && url.origin === self.location.origin && url.pathname.startsWith("/api/media/offline/file/") && !url.searchParams.has("download")) {
+    if (CHROMIUM && url.origin === self.location.origin && (url.pathname.startsWith("/api/media/offline/file/") || url.pathname.startsWith("/api/offline/file/")) && !url.searchParams.has("download")) {
       // Only explicitly kept full copies enter this bucket. A network miss is never saved automatically.
       // Slicing a full cached response supports media players' Range requests without caching 206 responses.
       // Only the bucket of the person the page last announced is read; no announcement (signed out, expired) means the network.

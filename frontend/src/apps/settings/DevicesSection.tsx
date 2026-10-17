@@ -33,7 +33,8 @@ const DEVICE_KIND_LABELS: Record<DeviceInfo["kind"], string> = {
 // caller's own profile, not a household-wide admin view (devices.ts's
 // own comment) - a personal Profile action, the same PERSON_TREE scope
 // PIN/password change already has, not gated behind AdminGatedContent.
-export function DevicesSection() {
+export function DevicesSection({ search = "" }: { search?: string }) {
+  const matchesSearch = (text: string) => text.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase());
   const queryClient = useQueryClient();
   const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices(), refetchInterval: 5000 });
   const keptQuery = useQuery({ queryKey: ["offline-media"], queryFn: listKept });
@@ -66,8 +67,7 @@ export function DevicesSection() {
     setBusy(true);
     setActionError(null);
     try {
-      const scopes: NonNullable<DeviceInfo["offlineScope"]> = (device.offlineScope ?? []).filter((scope) => scope !== "media.offline");
-      if (enabled) scopes.push("media.offline");
+      const scopes: NonNullable<DeviceInfo["offlineScope"]> = enabled ? ["media.offline", "offline.records"] : [];
       await api.setDeviceOfflineScope(device.id, scopes);
       await devicesQuery.refetch();
     } catch {
@@ -88,7 +88,8 @@ export function DevicesSection() {
           errorMessage="Could not load your devices."
           loadingLabel="Loading devices"
         >
-          {(allDevices) => {
+          {(allRows) => {
+            const allDevices = allRows.filter((d) => matchesSearch(`${d.name} ${d.kind} ${d.area ?? ""}`));
             // ROBOT-CARD-01: a robot gets its live card (state polled every
             // 5s above); every other kind keeps the plain list row.
             const robots = allDevices.filter((d) => d.kind === "robot");
@@ -139,8 +140,8 @@ export function DevicesSection() {
                       </span>
                       {d.kind === "tv" || d.kind === "pod" ? null : (
                         <Label htmlFor={`offline-${d.id}`}>
-                          <Switch id={`offline-${d.id}`} checked={d.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
-                          Can keep media on this device
+                          <Switch id={`offline-${d.id}`} checked={d.offlineScope?.includes("offline.records") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
+                          Can keep copies on this device
                         </Label>
                       )}
                     </div>
@@ -175,9 +176,9 @@ export function DevicesSection() {
       </Section>
 
       <Section heading="Copies in this browser">
-        <p>Saved files on the hub still work when the internet is down. Copies here let this browser play when it cannot reach the hub.</p>
+        <p>Saved files on the hub still work when the internet is down. Copies here let this browser open kept items when it cannot reach the hub.</p>
         <AsyncState data={keptQuery.data} error={keptQuery.isError} isFetching={keptQuery.isFetching} onRetry={() => keptQuery.refetch()} errorMessage="Copies could not be listed. Try again." loadingLabel="Loading copies">
-          {(items) => items.length ? <List items={items} getKey={(item) => item.id} label="Offline copies" renderItem={(item) => <span>{item.title}</span>} /> : <EmptyState icon="inbox" text="No media kept in this browser." />}
+          {(rows) => { const items = rows.filter((item) => matchesSearch(`${item.title} ${item.kind}`)).sort((a, b) => a.kind.localeCompare(b.kind) || a.title.localeCompare(b.title)); return items.length ? <List items={items} getKey={(item) => `${item.kind}:${item.id}`} label="Offline copies" renderItem={(item) => <span>{item.title} <Badge variant="secondary">{item.kind === "media" ? "Media" : item.kind.replaceAll("_", " ")}</Badge></span>} /> : <EmptyState icon="inbox" text="No copies kept in this browser." />; }}
         </AsyncState>
         <Button variant="destructive" disabled={busy} onClick={async () => {
           setBusy(true);
@@ -196,7 +197,7 @@ export function DevicesSection() {
           errorMessage="Could not load your sessions."
           loadingLabel="Loading sessions"
         >
-          {(rows) =>
+          {(allRows) => { const rows = allRows.filter((row) => matchesSearch(row.userAgent ?? "Unknown browser")); return (
             rows.length === 0 ? (
               <EmptyState icon="inbox" text="No active sessions." />
             ) : (
@@ -256,7 +257,7 @@ export function DevicesSection() {
                 }}
               />
             )
-          }
+          ); }}
         </AsyncState>
       </Section>
     </>

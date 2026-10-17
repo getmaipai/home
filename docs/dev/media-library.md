@@ -297,3 +297,32 @@ shell to stop writing the show's speed back as the person's). Transcripts, perso
 `media-item` and would need another request per episode. The list tiles are the kit's 160 px vertical rows (the mockup's compact rows with
 a Play and a Save button each need a kit size and a row actions slot). Directory search is later by the design.
 
+
+
+## Keep a record on this device (KEEP-OFFLINE-01)
+
+`backend/src/lib/offline/registry.ts` registers `{ kind, manifest(person, id), file(person, entryId, request) }`.
+A provider checks the person's access on every call, including artwork and captions, and serves only bytes already on Home.
+`providers.ts` registers media first. Its manifest and byte logic moved out of `routes/mediaOffline.ts` into `offline/media.ts`;
+the media routes are compatibility adapters and retain their paths and scope for Go. Status and progress keep their existing routes.
+
+`GET /api/offline/manifest?kind=media&id=` and `GET /api/offline/file/:kind/:entry` use `requireDeviceScope("offline.records")`.
+Unknown kinds and unreadable records answer 404. Generic media manifests have the same fields as the media manifest, with asset
+URLs under the generic route so a token with only `offline.records` can follow them. The entry for media bytes is the item id;
+artwork and subtitles use an encoded `artwork:<id>` or `subtitle:<id>` entry (captions retain `?track=`). Range, If-Range,
+fingerprint, retry and band checks use the same implementation. Both scopes carry guardian-only grants for minors and refuse
+robots, TVs and pods, including a forced scope row.
+
+The shell exports `keepOnThisDeviceAction({ kind, id })` from `frontend/src/shell/offlineActions.ts`: a label and an async `run`
+handler returning the shared offline result. An app supplies it to its kit action control and shows failure copy in the form's
+existing Alert. `keepOnDevice` now takes `{ kind, id }` and reads the generic manifest. No cache is added: all kinds use the
+existing `maipai-media-v1:<personId>` bucket, owner handshake, quota and sign-out wipe. Media's old index keys still work; other
+kinds use a kind-qualified key, so equal record ids do not collide. The worker serves both file paths inside the same Chromium
+gate. WebKit and Firefox still have no fetch interception. Reconciliation uses generic manifests for new copies and the media
+status route for old media copies. Devices is declared through SettingsShell; copies in this browser are sorted and labelled by
+kind, with Remove all covering every kind. Other devices' private copy inventories are not collected by the hub.
+
+Open: `backend/src/lib/news/` contains quality and ranking helpers, but no existing function reads a saved story's cached body
+and picture. No `news_story` provider or offline News reader is added. Reference pages and conversation exports need their own
+providers and app use sites too. Media remains the sole built-in provider. Backend route test execution needs the normal test preload's
+TCP fixture support; the restricted sandbox cannot reserve its port. The registry unit test also runs through the frontend harness without that fixture. No live service requests are used for these tests.

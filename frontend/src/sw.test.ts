@@ -132,6 +132,14 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
       network = 0;
       await announce("maipai-media-v1:person-atlas");
       expect(await (await call(url))!.text()).toBe("0123456789");
+      // The generic route reads the very same active person bucket with the network unavailable.
+      const genericUrl = "https://example.com/api/offline/file/media/media-nova00";
+      store("maipai-media-v1:person-atlas").set(genericUrl, new Response("kept", { headers: { ETag: '"fp"', "Content-Length": "4" } }));
+      const networkFetch = globalThis.fetch;
+      globalThis.fetch = (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch;
+      expect(await (await call(genericUrl))!.text()).toBe("kept");
+      expect(await call(genericUrl + "?download=1")).toBeNull();
+      globalThis.fetch = networkFetch;
       const partial = await call(url, { Range: "bytes=2-4", "If-Range": '\"fp\"' });
       expect(partial!.status).toBe(206); expect(await partial!.text()).toBe("234");
       expect((await call(url, { Range: "bytes=2-4", "If-Range": '\"old\"' }))!.status).toBe(200);
