@@ -7,6 +7,22 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-10-17
+
+Home copes with low memory and restarts of the AI engine.
+
+### Chat and engine
+- A chat request that meets a restarting engine waits for it to come back and asks again once, instead of failing.
+- Warm-up no longer loops: Home checks the engine with a read and starts it once per need.
+- A picture or video the engine stopped because memory was low shows "Paused: low memory" on its card.
+- The engine watches memory, can free leftover helper processes, and answers "restarting, try again" while it shuts down.
+
+### Voice
+- Admins can preview any voice, and other people preview the voices installed on this computer.
+
+### Accounts
+- Settings has the consent keys for likenesses in pictures and videos (spec-v0.1.156).
+
 ## [0.2.9] - 2026-10-17
 
 Picture and video chat is safer and more honest.
