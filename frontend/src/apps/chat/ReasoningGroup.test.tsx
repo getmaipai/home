@@ -66,7 +66,7 @@ describe("reasoning group", () => {
     values.mockRestore();
   });
 
-  test("shows 'Reasoning (Ns)' after a live reasoning stream, collapsed", async () => {
+  test("shows 'Thought for Ns' after a live reasoning stream, collapsed", async () => {
     const values = spyOn(api, "settingsValues").mockResolvedValue([] as never);
     const adapter: ChatModelAdapter = { run: async function* () {
       yield { content: [{ type: "reasoning", text: "Thinking it through." }] };
@@ -82,7 +82,7 @@ describe("reasoning group", () => {
     fireEvent.change(input, { target: { value: "go" } });
     fireEvent.keyDown(input, { key: "Enter" });
     await waitFor(() => expect(view.container.textContent).toContain("Answer."));
-    await waitFor(() => expect(trigger(view.container).textContent).toContain("(1s)"));
+    await waitFor(() => expect(trigger(view.container).textContent).toContain("Thought for 1s"));
     expect(trigger(view.container).getAttribute("aria-expanded")).toBe("false");
     values.mockRestore();
   });

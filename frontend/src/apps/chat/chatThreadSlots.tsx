@@ -16,6 +16,9 @@ import { type ThreadGroupPart } from "@maipai/ui/src/elements/thread.aui";
 // binding; the lifted context below lets it send an answer as a new turn.
 import { useReasoningOpen } from "@/apps/chat/useReasoningOpen";
 import { ReasoningRoot, ReasoningTrigger, ReasoningContent, ReasoningText } from "@maipai/ui/src/elements/reasoning.aui";
+import { thoughtForLabel } from "@maipai/ui/src/elements/reasoning";
+import { useThinkingWord } from "@/apps/chat/useThinkingWord";
+import { DONE_THINKING_ANNOUNCEMENT, STATIC_THINKING_WORD } from "@/apps/chat/thinkingWords";
 import { Sources as SourcesCard } from "@maipai/ui/src/elements/sources";
 import { ThinkingIndicator } from "@maipai/ui/src/elements/thinking-indicator";
 import { EmptyState, EmptyStateGreeting, EmptyStateSuggestion, EmptyStateSuggestions } from "@maipai/ui/src/elements/empty-state";
@@ -518,14 +521,18 @@ export function ChatWelcome() {
 // label (one calm status line, no stream); when it ends the label gains the
 // measured seconds through the trigger's own `duration` prop. Open/closed is
 // the Element's controlled `open` prop, remembered per person in
-// `ui.reasoning_open` (default collapsed). Missing in the kit: a "Thought
-// for Ns" label (the trigger renders "Reasoning (Ns)").
+// `ui.reasoning_open` (default collapsed). While it runs the label is one
+// rotating plain word (`useThinkingWord`, list in `thinkingWords.ts`) with a
+// cross-fade; a screen reader hears "Thinking" once and "Done thinking" at the
+// end, never each word. Finished, the kit's `thoughtForLabel` gives
+// "Thought for Ns". Words reveal nothing, so every age band gets them.
 export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: ThreadGroupPart }>) {
   const running = group.status.type === "running";
   const person = useContext(WakeWordPersonContext);
   const [preferOpen, setPreferOpen] = useReasoningOpen(person);
   const [startedAt, setStartedAt] = useState<number | null>(null);
   const [seconds, setSeconds] = useState<number | undefined>(undefined);
+  const word = useThinkingWord(running);
   useEffect(() => {
     if (running) {
       setStartedAt((t) => t ?? Date.now());
@@ -541,7 +548,13 @@ export function ReasoningGroup({ children, group }: PropsWithChildren<{ group: T
       onOpenChange={(next) => { if (!running) setPreferOpen(next); }}
       variant="ghost"
     >
-      <ReasoningTrigger active={running} duration={running ? undefined : seconds} />
+      <ReasoningTrigger
+        active={running}
+        label={running ? word : undefined}
+        duration={running ? undefined : seconds}
+        doneLabel={thoughtForLabel}
+        announce={running ? STATIC_THINKING_WORD : seconds !== undefined ? DONE_THINKING_ANNOUNCEMENT : undefined}
+      />
       <ReasoningContent aria-busy={running}>
         {/* Live finding, 2026-09-22 (Jesse, in Firefox): the shipped
             ReasoningText carries `ps-6` (room under the trigger's own
