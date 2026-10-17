@@ -943,7 +943,7 @@ const DEDUPE_SCHEMA = {
 } as const;
 
 const DEDUPE_SYSTEM =
-  'You manage a memory store. Given a new fact and similar existing memories, decide what to do. Respond with EXACTLY one JSON object: {"action":"ADD"|"SUPERSEDE","id":"<existing id or null>","merged_text":"<merged statement if SUPERSEDE, else null>","contradiction":true|false}.\n\n- ADD: genuinely new information not captured in any existing memory.\n- SUPERSEDE: the new fact refines, extends, or replaces an existing one - provide merged_text with the single best statement to keep. Set contradiction:true only when the new fact makes the old one flatly false (moved, no longer true), false when it merely adds detail to something still true.\n\nPrefer SUPERSEDE with contradiction:false when the two can be merged into one accurate statement.';
+  'You manage a memory store. Given a new fact and similar existing memories, decide what to do. Respond with EXACTLY one JSON object: {"action":"ADD"|"SUPERSEDE","id":"<existing id or null>","merged_text":"<merged statement if SUPERSEDE, else null>","contradiction":true|false}.\n\n- ADD: genuinely new information not captured in any existing memory.\n- SUPERSEDE: the new fact refines, extends, or replaces an existing one - provide merged_text with the single best statement to keep. Set contradiction:true only when the new fact makes the old one flatly false (moved, no longer true), false when it merely adds detail to something still true.\n\nPrefer SUPERSEDE with contradiction:false when the two can be merged into one accurate statement, but only when both are about the same thing: the same subject and the same attribute (a favorite color and a later detail about that color, a home city and the neighborhood in it). Never join two facts about different things into one statement (a favorite color and a spouse are different things, even for the same person): answer ADD for those.';
 
 interface DedupeDecision {
   action: "ADD" | "SUPERSEDE";
@@ -954,6 +954,24 @@ interface DedupeDecision {
 
 const DEDUPE_COSINE_BAND_LOW = 0.60;
 const DEDUPE_COSINE_BAND_HIGH = 0.92;
+
+/** MEMORY-MERGE-01 (live, 2026-10-17): two facts about one person but
+ * different things ("my favorite color is blue", "Serena is my wife") scored
+ * 0.62 to 0.76 on the embed model, inside the dedupe band, and the judge
+ * joined them into one record. No cosine floor separates those from a real
+ * refinement (0.77 and up), so a merge that keeps the old fact true needs a
+ * second, structural proof that both texts state the same attribute: they
+ * share at least one word that is not a name. Names (capitalized in either
+ * text) are the subject; the subject alone never makes two facts one. */
+export function sharesAttribute(oldText: string, newText: string): boolean {
+  const names = new Set<string>();
+  for (const text of [oldText, newText]) {
+    for (const m of text.matchAll(/\b\p{Lu}[\p{L}']*/gu)) names.add(m[0].toLowerCase().replace(/'s$/, ""));
+  }
+  const words = (text: string) => [...contentWords(text)].filter((w) => !names.has(w) && !PRONOUNS.has(w));
+  const oldWords = new Set(words(oldText));
+  return words(newText).some((w) => oldWords.has(w));
+}
 
 /** Phase 2: never counts against the poison guard (see this file's own
  * header) - any failure here just defaults to ADD, the exact fallback
@@ -987,8 +1005,15 @@ async function decideDedupe(newText: string, candidates: SimilarMatch[]): Promis
       typeof parsed.id === "string" &&
       candidates.some((c) => c.record.id === parsed.id)
     ) {
-      const mergedText = typeof parsed.merged_text === "string" && parsed.merged_text.trim() ? parsed.merged_text.trim() : newText;
-      return { action: "SUPERSEDE", id: parsed.id, mergedText, contradiction: parsed.contradiction === true };
+      const target = candidates.find((c) => c.record.id === parsed.id)!;
+      const contradiction = parsed.contradiction === true;
+      // A merge that keeps the old fact true must be about the same attribute (MEMORY-MERGE-01);
+      // otherwise the new fact stands alone beside it. A correction replaces the old fact with the
+      // new one as the person said it, never with a joined statement.
+      if (!contradiction && !sharesAttribute(target.record.text, newText)) return { action: "ADD" };
+      const mergedText =
+        !contradiction && typeof parsed.merged_text === "string" && parsed.merged_text.trim() ? parsed.merged_text.trim() : newText;
+      return { action: "SUPERSEDE", id: parsed.id, mergedText, contradiction };
     }
     return { action: "ADD" };
   } catch {

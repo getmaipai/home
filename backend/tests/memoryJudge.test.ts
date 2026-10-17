@@ -444,6 +444,64 @@ describe("judgeTurn() - dedupe by supersede", () => {
     expect(newRow.validTo).toBe("2099-01-01T00:00:00.000Z"); // the new record keeps its own, real valid_to
   });
 
+  async function dedupeRun(oldText: string, newText: string, decision: Record<string, unknown>) {
+    const { actor } = await owner();
+    const { sqlite } = await import("@/db");
+    const older = remember(actor, { text: oldText, category: "fact", tier: "durable", scope: "person", person: actor.id, source: "turn-older", importance: 0.5 });
+    if (!older.ok) throw new Error("setup failed");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
+      .run(older.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+    const turn = makeTurn(actor, newText, "Got it.");
+    await withScriptedJudge(
+      (schemaName) => {
+        if (schemaName === "memory_extraction") return { facts: [{ text: newText, category: "fact", scope: "person", importance: 0.5 }] };
+        if (schemaName === "memory_dedupe") return { id: older.value.id, ...decision };
+        return undefined;
+      },
+      () => judgeTurn(turn),
+    );
+    const olderRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, older.value.id)).get()!;
+    const active = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all().map((r) => r.text).sort();
+    return { olderRow, active };
+  }
+
+  test("MEMORY-MERGE-01: a judge merge of two unrelated facts about one person is refused; both stay as separate records", async () => {
+    const { olderRow, active } = await dedupeRun("Bruno's favorite color is blue", "Serena is Bruno's wife", {
+      action: "SUPERSEDE",
+      merged_text: "Bruno's favorite color is blue and Serena is Bruno's wife",
+      contradiction: false,
+    });
+    expect(olderRow.status).toBe("active");
+    expect(active).toEqual(["Bruno's favorite color is blue", "Serena is Bruno's wife"]);
+  });
+
+  test("MEMORY-MERGE-01: a real extension of the same fact is still merged, and a correction still supersedes", async () => {
+    const merged = await dedupeRun("Marlow lives in Chicago", "Marlow lives in Chicago near the lake", {
+      action: "SUPERSEDE",
+      merged_text: "Marlow lives in Chicago near the lake",
+      contradiction: false,
+    });
+    expect(merged.olderRow.status).toBe("superseded");
+    expect(merged.active).toEqual(["Marlow lives in Chicago near the lake"]);
+  });
+
+  test("MEMORY-MERGE-01: a correction keeps the person's own words, never the judge's joined text", async () => {
+    const fixed = await dedupeRun("Bruno's favorite color is green", "Bruno's favorite color is blue", {
+      action: "SUPERSEDE",
+      merged_text: "Bruno's favorite color is blue and Serena is his wife",
+      contradiction: true,
+    });
+    expect(fixed.olderRow.status).toBe("superseded");
+    expect(fixed.active).toEqual(["Bruno's favorite color is blue"]);
+  });
+
+  test("MEMORY-MERGE-01: the dedupe prompt forbids joining facts about different things", async () => {
+    // Read from the source of truth the judge sends.
+    const src = await Bun.file(new URL("../src/lib/memoryJudge.ts", import.meta.url)).text();
+    expect(src).toContain("Never join two facts about different things");
+  });
+
   test("MEMORY-CORRECT-01: a record the same turn already wrote never takes the dedupe slot, so the contradicted older record is retired", async () => {
     // Live 2026-10-17: "actually my favorite color is blue, not green" had the model call
     // `remember` in the turn, so the judge's nearest candidate was the turn's own "blue"
