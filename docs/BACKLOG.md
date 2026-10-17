@@ -2299,27 +2299,11 @@ Track B: MEM-01, MEM-02, MEM-03, MEM-04, MEM-05. Then JOIN-01, JOIN-02.
     Design: [household-memory-permissions-2026-09-26](plans/household-memory-permissions-2026-09-26.md)
 - [ ] **MEM-HOUSE-01: household scope is admin-published, everyone else proposes** (M, after MEM-PROV-01; same design record). Objective: `assertCanWrite`'s household branch (`memory.ts:126`) returns ok for any member and lets a non-admin tombstone an admin's record (the gap named inline at `memory.ts:857`); require owner/admin for direct household writes, archive and supersede; a non-admin turn-pipeline household fact downgrades to person scope with `proposed_scope: "household"` (mirror: #52's `sanitizedRecordKind` downgrade), a direct non-admin API write gets 403; promotion is `supersede()` into a household record carrying both authors, decline clears the marker. Tests include the tombstone gap. Exit: `bash scripts/check.sh`.
     Design: [household-memory-permissions-2026-09-26](plans/household-memory-permissions-2026-09-26.md)
-- [x] **A household context block** (S) - shipped, Session A step 1
-      (2026-09-05): every active person's display name and role
-      (`lib/access.ts`'s `listActivePeople()`). Presence and "what
-      packages are installed" are not built - presence has no signal
-      source yet (robot/ambient-context, not this session), and the
-      plugins list already exists as its own separate prompt section
-      (`pluginsListLine()`, predates this item).
-    Done claim not verified 2026-10-17: Session A step 1 commits exist but listActivePeople is not in turnMachine/nodes/context.ts; one check: grep -rn listActivePeople backend/src/lib/turnMachine backend/src/lib/turnShared.ts.
-- [x] **Dated memories in the prompt, and a closing reminder** (S) -
-      shipped, Session A step 4 (2026-09-05): each bullet carries "(as of
-      Sep 2, 8 days ago)" off `created_at`; the block ends with one fixed
-      trust-these-facts reminder. Absolute day count, not legacy's "N
-      weeks ago" rounding - the plan's own text asked for "<n> days ago"
-      literally.
 Memory clock stamps and validity writes already exist. The remaining temporal-read gap is tracked by [CHAT-08](#chat-08).
 
 Maintenance is already scheduled in `backend/src/index.ts`; profile freshness and unified inference scheduling are tracked by [CHAT-11](#chat-11) and [CHAT-19](#chat-19).
 
 Loaded-history chips and the memory page exist. getmaipai/home#64 (2026-09-13) added a narrower live-status path (the chip polling a `memory.updated` notification); **CHAT-20 has since landed and replaced it** - `chatMemoryState.ts`'s own store now reads `judge_status`/`memory_ids` straight off the conversation-turns re-poll (real `pending`/`saved`/`not_saved`/`failed` states, the 5s/10min poll lifecycle, per-message save/forget wiring), and `memory.updated` is now purely the notification-center record (in-app + optional Telegram), not the chip's live data source. 2026-09-21: `memory.updated` finally got its own settings toggle (`notifications.memory.updated.telegram`, spec-v0.1.13) after being configurable with no way to configure it since #64, and its sibling `memory.judge_failed` (the judge's other terminal outcome, the poison guard giving up) now fires too - the 1:1 backend counterpart to the chip's pre-existing "failed" state, which previously had no notification-center record of its own.
-
-    Done claim not verified 2026-10-17: Session A step 4 commits exist but no "ago)" string in turnMachine/nodes/context.ts; one check: grep -rn "days ago" backend/src/lib/turnMachine backend/src/lib/memory.ts.
 - [ ] **Retire the chip's own poll in favor of notifications** (M) -
       now that both terminal outcomes the chip shows (`saved` via
       `memory.updated`, `failed` via `memory.judge_failed`) have a real
@@ -2631,10 +2615,6 @@ Three layers: user overrides over global defaults over user defaults (Kids, Teen
 - [ ] SETTINGS-LAYERS-01h (M): the house rules prompt: a global-defaults text added to every chat, never overriding a hard line.
 - [ ] SETTINGS-LAYERS-01i (S): custom sites on the People section; a consumer for `page_text_cleaning`; click-test the 01d section on a phone viewport.
 
-## Settings redesign
-
-- [x] **S4: Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured** (done in S2, card merging is in S7): the last two sections.
-    Done claim not verified 2026-10-17: No commit names S4 and the row says "done in S2"; check: the settings area data (spec areas.json or frontend/src/apps/settings) lists Voice and Notifications sections and Telegram shows only when configured.
 
 ## Settings
 
@@ -3314,20 +3294,6 @@ Plain boolean switches and selects in `/settings` call the save handler immediat
 
 - [ ] Real i18n (L) - "language and region" is a stored preference today
       with no translation behind it.
-- [x] **Doc drift the audit found: the plain corrections** (S) - done
-      2026-09-13. `spec/llm/README.md`'s "Non-streaming only" paragraph
-      was genuinely stale (streaming, tools, JSON-schema-constrained
-      output and `chat_template_kwargs` all shipped since it was
-      written, per `spec/llm/ts/types.ts`/`client.ts`) - rewritten to
-      say so, cross-referencing the file's own later "Tools: real,
-      native" section instead of duplicating it. `spec/ui/README.md`'s
-      named "single-shot JSON" claim was checked against the file and
-      isn't there anymore - no stale text to fix, the file already only
-      describes the schema/interpreter split accurately. The two
-      remaining parts of the original item, both genuinely Jesse's
-      call, are split out below rather than folded back into one line.
-
-    Done claim not verified 2026-10-17: The edited file (spec/llm/README.md) moved to commons with the spec, so nothing in this worktree proves the 2026-09-13 edit; check commons git log for "Non-streaming only" on spec/llm/README.md.
 - [ ] **Commit the platform plan into `home/spec/design/`** (S; answered
       by Jesse 2026-09-25: not yet - stays open, deliberately deferred,
       not a pending question) - `home/spec/` still does not exist (checked 2026-09-25);

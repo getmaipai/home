@@ -10887,3 +10887,47 @@ DONE: Commit 8ad19342 (2026-10-15) "UsersPage removal test waits without a match
 DONE: Commit ebb6d8ed (2026-10-15) "the graceful-exit test no longer fires the run-temp cleanup".
 
 - [x] **FLAKY-WATCHENGINE-01: sidecars.test.ts failed 33 tests after the registerGracefulExit test, including "watchEngine > a fresh healthy spawn clears a prior gave-up state"** (S). Cause: that test called `process.emit("exit", 0)`, which also fires the run-temp cleanup listener from `scripts/runTemp.ts` (TEST-TMP-LEAK-01); it deleted the per-run temp root holding the test SQLite data dir, so every later `resetDb()` threw "SQLiteError: disk I/O error" in under a millisecond (and the shard/solo runs of the file could stall once the data dir was gone). Fix: the test now invokes only the listeners `registerGracefulExit()` added, with a non-empty check, and never emits a synthetic process exit. No assertion weakened, no product code changed. Proof: the file alone 3 of 3 runs, 48 pass, about 15 s, exit 0.
+
+### Spot-check of unverified done claims (2026-10-17)
+
+The 2026-10-17 sweep left four `[x]` rows in place with a "Done claim not verified" note and the one check that decides. The check was run; each row leaves with the result.
+
+DONE (spot-check 2026-10-17): commons `spec/llm/README.md` line 24 now says streaming, tools, JSON schema and `chat_template_kwargs` all shipped; the stale "Non-streaming only" paragraph is gone (commons origin/main).
+
+- [x] **Doc drift the audit found: the plain corrections** (S) - done
+      2026-09-13. `spec/llm/README.md`'s "Non-streaming only" paragraph
+      was genuinely stale (streaming, tools, JSON-schema-constrained
+      output and `chat_template_kwargs` all shipped since it was
+      written, per `spec/llm/ts/types.ts`/`client.ts`) - rewritten to
+      say so, cross-referencing the file's own later "Tools: real,
+      native" section instead of duplicating it. `spec/ui/README.md`'s
+      named "single-shot JSON" claim was checked against the file and
+      isn't there anymore - no stale text to fix, the file already only
+      describes the schema/interpreter split accurately. The two
+      remaining parts of the original item, both genuinely Jesse's
+      call, are split out below rather than folded back into one line.
+
+
+DONE (spot-check 2026-10-17): the Notifications section folds Telegram until opened and holds its rows (`frontend/src/shell/pages/settings/SettingsAreaPorts.test.tsx:93`, "the Telegram card stays folded until opened"); the per-type Telegram keys are in `settingsMatrix.test.ts:56`. The Settings redesign heading left with it (no other rows).
+
+- [x] **S4: Me > Voice and AI and Notifications sections; Telegram folded and shown only when configured** (done in S2, card merging is in S7): the last two sections.
+
+OBSOLETE (spot-check 2026-10-17): built in the retired turn engine; the rebuilt turn machine dates each memory item by its day instead (`backend/src/lib/turnMachine/messages.ts:56`, " (YYYY-MM-DD)" off the item's `at`). The "N days ago" wording and the fixed trust reminder were not carried (principle 8, rebuilt not carried); reopen as a new row if the dated form proves weaker.
+
+- [x] **Dated memories in the prompt, and a closing reminder** (S) -
+      shipped, Session A step 4 (2026-09-05): each bullet carries "(as of
+      Sep 2, 8 days ago)" off `created_at`; the block ends with one fixed
+      trust-these-facts reminder. Absolute day count, not legacy's "N
+      weeks ago" rounding - the plan's own text asked for "<n> days ago"
+      literally.
+
+DONE (spot-check 2026-10-17): the rebuilt turn machine adds the household roster to every turn's context (`backend/src/lib/turnMachine/nodes/context.ts:386`, `subjectRosterFor(state.actor)`); `listActivePeople()` belonged to the retired engine's `householdLine()`.
+
+- [x] **A household context block** (S) - shipped, Session A step 1
+      (2026-09-05): every active person's display name and role
+      (`lib/access.ts`'s `listActivePeople()`). Presence and "what
+      packages are installed" are not built - presence has no signal
+      source yet (robot/ambient-context, not this session), and the
+      plugins list already exists as its own separate prompt section
+      (`pluginsListLine()`, predates this item).
+    Done claim not verified 2026-10-17: Session A step 1 commits exist but listActivePeople is not in turnMachine/nodes/context.ts; one check: grep -rn listActivePeople backend/src/lib/turnMachine backend/src/lib/turnShared.ts.
