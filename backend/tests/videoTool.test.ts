@@ -251,7 +251,7 @@ describe("VIDEO-GEN-05: animating a picture the Stack made", () => {
     });
   });
 
-  test("in a temporary chat a picture named like a generated one is still refused: nothing a person can set marks a picture as made by the Stack", async () => {
+  test("in a temporary chat a picture only named like a generated one is still refused: the mark is Home's, not a file name", async () => {
     const { storeTemporaryChatImage } = await import("@/lib/attachments");
     let conversationId = "";
     await withStub(script(undefined, "Hi."), async () => {
@@ -264,6 +264,24 @@ describe("VIDEO-GEN-05: animating a picture the Stack made", () => {
       const { value } = await streamValue(people.owner, "animate it", { conversationId, temporary: true });
       expect(value.video).toBeUndefined();
       expect(fake.submitted).toHaveLength(0);
+    });
+  });
+
+  test("in a temporary chat a picture Home marked generated is animated, and 'latest' finds it", async () => {
+    const { storeTemporaryChatImage } = await import("@/lib/attachments");
+    let conversationId = "";
+    await withStub(script(undefined, "Hi."), async () => {
+      const { value } = await streamValue(people.owner, "hello", { temporary: true });
+      conversationId = value.conversation_id;
+    });
+    const bytes = new Uint8Array([9, 8, 7, 6]);
+    storeTemporaryChatImage({ id: "file-realone", turnId: "turn-1", conversationId, ownerPersonId: people.owner.id, name: "Generated picture", mediaType: "image/png", width: 64, height: 64, bytes, generated: true });
+    const call = { id: "c", name: "generate_video", args: JSON.stringify({ prompt: "make it move", from_picture: "latest" }) };
+    await withStub(script(call), async () => {
+      const { value } = await streamValue(people.owner, "animate it", { conversationId, temporary: true });
+      expect(value.video?.id).toMatch(/^vid-/);
+      expect(Buffer.from(fake.submitted[0]!.image as string, "base64").equals(Buffer.from(bytes))).toBe(true);
+      expect(fake.submitted[0]!.image_source).toBe("generated");
     });
   });
 

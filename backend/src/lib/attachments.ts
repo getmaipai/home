@@ -368,6 +368,12 @@ export function getTemporaryChatImage(actor: PersonRow, conversationId: string, 
   if (!image || image.ownerPersonId !== actor.id || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000) return undefined;
   return image;
 }
+/** VIDEO-GEN-05: the newest picture of this temporary chat that Home marked as made by the picture engine, or undefined. */
+export function latestGeneratedTemporaryImage(actor: PersonRow, conversationId: string): TemporaryChatImage | undefined {
+  let best: TemporaryChatImage | undefined;
+  for (const image of temporaryChatImages.values()) if (image.generated === true && image.ownerPersonId === actor.id && image.conversationId === conversationId && (!best || image.createdAt >= best.createdAt)) best = image;
+  return best;
+}
 export function getTemporaryChatImageForReader(actor: PersonRow, conversationId: string, id: string): TemporaryChatImage | undefined {
   const image = temporaryChatImages.get(id);
   if (!image || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000 || !canAccessPerson(actor, image.ownerPersonId)) return undefined;

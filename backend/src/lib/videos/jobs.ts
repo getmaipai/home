@@ -6,7 +6,7 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
-import { createAttachment, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
+import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
@@ -192,10 +192,12 @@ export const CLIP_POSTER_NOTE = "video-poster:";
 export type ReferenceResult = { ok: true; id: string; base64: string; width: number | null; height: number | null } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
-/** The newest poster of a clip made in this temporary chat, or null. */
+/** The newest picture of this temporary chat the Stack made: a generated picture or the poster of a clip, whichever is newer. */
 export function latestTemporaryPosterId(actor: PersonRow, conversationId: string): string | null {
-  let best: TemporaryClip | null = null;
-  for (const clip of temporaryClips.values()) if (clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && (!best || clip.createdAt >= best.createdAt)) best = clip;
+  let best: { id: string; at: number } | null = null;
+  for (const clip of temporaryClips.values()) if (clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && (!best || clip.createdAt >= best.at)) best = { id: clip.id, at: clip.createdAt };
+  const image = latestGeneratedTemporaryImage(actor, conversationId);
+  if (image && (!best || image.createdAt >= best.at)) best = { id: image.id, at: image.createdAt };
   return best?.id ?? null;
 }
 
@@ -204,8 +206,10 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
   if (temporary) {
     const clip = temporaryClips.get(fileId);
     if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg") return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), width: null, height: null };
-    // In a temporary chat only a clip's own poster counts: nothing in memory records, in a field a person cannot set, that a
-    // picture was made by the Stack (an uploaded photo's name is the person's own), so a temporary picture is never trusted.
+    // A temporary picture counts only when Home marked it `generated` when the picture engine made it (a field no upload
+    // can set; a file name proves nothing). The Stack still checks the bytes' hash.
+    const image = getTemporaryChatImage(actor, conversationId, fileId);
+    if (image && image.generated === true) return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), width: image.width, height: image.height };
     return { ok: false, line: NOT_GENERATED_LINE };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();

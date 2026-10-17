@@ -50,4 +50,4 @@ The video engine checks the file and refuses any style that puts a child in an a
 
 ## Private chats
 
-In an Incognito or temporary chat, the video lives only in memory and is gone when the chat ends. In those chats you can animate a poster from a video you just made, but not a picture.
+In an Incognito or temporary chat, the video lives only in memory and is gone when the chat ends. In those chats you can still animate a picture chat made or the first frame of a video you just made.
