@@ -102,6 +102,7 @@ export const AI_SETTINGS_KEYS: SettingsKey[] = [
     default: true,
     label: "Keep the AI warm",
     help: "Home sends a tiny made-up message to the AI every few minutes so the first real reply is quick, and checks that chat, tools, search and voice still work. It uses about 1,000 words of AI output an hour, stores nothing, and never runs while someone is talking to the AI. Turn it off to stop these checks.",
+    copy: { does: "Sends a tiny test message every few minutes so replies start fast." },
     level: "basic",
     lives_in: "household.ai",
     honoured_by: ["home"],

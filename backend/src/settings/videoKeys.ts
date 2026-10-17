@@ -50,8 +50,8 @@ export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
     copy: {
       does: "Decides how chat makes a video when nobody asks for a kind.",
       options: {
-        quick: "5 seconds with no sound, in about two minutes. Can start from a picture.",
-        detailed: "Up to 10 seconds with sound and spoken words, in a minute or two. Starts from words, with many more styles.",
+        quick: "A silent 5 second clip in about two minutes, and it can start from a picture.",
+        detailed: "A clip up to 10 seconds with sound and speech, made from words, with many more styles.",
       },
     },
     lives_in: "household.pictures",
