@@ -37145,3 +37145,19 @@ failure log on a pass, and `check.sh`'s two-leg wait loop treated any line there
 The loop now stops the other leg only on a `fail` line, and the shard runner's tests always pass their own failure log so a test
 fixture's flaky line never lands in the log of the gate running it. The next run failed a third turn test the same way (`toolRecovery.test.ts` THIN-2G,
 green alone, red only inside the full shard), so it joined the two `turnNext` entries in the ledger under #216.
+**Resolved 2026-10-16 (#216).** Two causes, neither in the three tests. (1) `packageHost.ts`'s per-host quiet window, the
+shared rate limiter and `stackEngine.ts`'s remembered refusals and outages are module state, and bun runs every file of one
+`bun test` in one process: `plugins.test.ts`'s scripted 503 put `geocoding-api.open-meteo.com` to sleep for an hour and the 11
+weather tests in `packageBlocks.test.ts` then failed in any shard that ran both, deterministically. `tests/reset-db.ts` now
+clears all three in every file's `beforeEach` (`__resetPackageQuietWindowsForTests`, `__resetRateLimiterForTests`, the new
+`__forgetStackOutagesForTests`, which leaves an injected fixture client alone). (2) The three ledger tests were never broken by
+shared state: their failing gate logs are line for line the passing ones, they take 1 to 3 s alone, and they crossed bun's 5 s
+unit-test default only inside the full shard with the frontend leg on the same machine. `scripts/gate/shardTests.ts` now
+passes `--timeout 20000` to every `bun test` it spawns (`TEST_TIMEOUT_MS`; `check.sh`'s unsharded fallback passes the same
+number), so load alone no longer turns a gate red while a real hang still fails loudly. It has to be the CLI flag: a
+`setDefaultTimeout(20_000)` in `tests/preload.ts` was the first attempt and covered only the first file of each shard (bun
+1.3.14 resets the default at the start of every test file: THIN-0M in `safety01.test.ts` timed out at 5 s in the next gate),
+and bunfig's `timeout` key is ignored. The three ledger entries are removed.
+The gate run on this fix went red once more, on `frontend/src/apps/chat/liveVoiceSession.test.tsx`'s no_speech test: it asserted
+"Listening" 30 ms after a fixed sleep, and under full-gate load the first "Listening" arrived late enough that the 150 ms
+no_speech reconnect was still mid-flight ("Connecting"). It now waits for the second socket and then for the listening state.

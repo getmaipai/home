@@ -153,6 +153,14 @@ export function __resetStackEngineForTests(): void {
   defaultTestClientEnabled = false;
   cachedClient = null;
   cachedUrl = null;
+  __forgetStackOutagesForTests();
+}
+
+/** Test-only: forget every remembered refusal, outage and chat identity
+ * without touching the injected client, so tests/reset-db.ts can clear
+ * them in every file's beforeEach (getmaipai/home#216) while a file that
+ * installed its own fixture client keeps it. */
+export function __forgetStackOutagesForTests(): void {
   stackChatIdentity = null;
   refusals.clear();
   for (const role of [...downSince.keys()]) forgetDown(role);

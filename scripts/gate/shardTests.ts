@@ -35,6 +35,21 @@ export type FlakeLedger = { version: 2; flakes: FlakeEntry[]; serial: Record<str
 // `check.sh --bench` (lane "bench") runs only them, on demand, one shard.
 export type Lane = "gate" | "bench";
 
+// getmaipai/home#216: bun's default per-test timeout is 5 s, a unit-test
+// number. A turn test drives a real HTTP stub engine, a recording proxy, a
+// searxng stand-in and SQLite, and takes 1 to 3 s alone; inside the full
+// backend shard, with the frontend leg and the lints on the same machine,
+// tests crossed 5 s in about one gate in ten and passed on every rerun (38
+// red gates between 2026-10-12 and 2026-10-16, the failing runs' logs
+// identical to the passing ones). 20 s keeps a real hang loud and stops
+// load alone from turning a gate red. It has to be the CLI flag: bun 1.3.14
+// resets the default timeout at the start of every test file, so a
+// setDefaultTimeout() in the preload covers only the first file of a shard,
+// and bunfig's [test] timeout key is ignored. Every bun test this script
+// spawns (shards, serial files, the ledger's isolated rerun) passes it;
+// check.sh's unsharded fallback passes the same number by hand.
+export const TEST_TIMEOUT_MS = 20_000;
+
 export function validateLedger(value: unknown, today = new Date().toISOString().slice(0, 10)): FlakeLedger {
   if (!value || typeof value !== "object") throw new Error("flake ledger must be an object");
   const ledger = value as FlakeLedger;
@@ -434,7 +449,7 @@ export async function run(opts: RunOptions): Promise<number> {
     Bun.spawnSync([sysTool("mkdir", "/bin"), "-p", tmp]);
     const logPath = join(scratch, `s${index}.log`);
     const junit = join(scratch, `s${index}.xml`);
-    const args = ["test", ...(opts.record ? [`--reporter=junit`, `--reporter-outfile=${junit}`] : []), ...(opts.extraArgs ?? []), ...shardFiles.map((f) => (f.startsWith("./") ? f : `./${f}`))];
+    const args = ["test", "--timeout", String(TEST_TIMEOUT_MS), ...(opts.record ? [`--reporter=junit`, `--reporter-outfile=${junit}`] : []), ...(opts.extraArgs ?? []), ...shardFiles.map((f) => (f.startsWith("./") ? f : `./${f}`))];
     const proc = Bun.spawn(["bun", ...args], {
       cwd: dir,
       env: { ...process.env, TMPDIR: tmp },
@@ -589,7 +604,7 @@ export async function run(opts: RunOptions): Promise<number> {
   for (const file of serialFiles) {
     if (firstFail) break;
     const slot = await reserveForSingleWorker();
-    const proc = Bun.spawn(["bun", "test", file.startsWith("./") ? file : `./${file}`], {
+    const proc = Bun.spawn(["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), file.startsWith("./") ? file : `./${file}`], {
       cwd: dir,
       env: process.env,
       stdout: "pipe",
@@ -626,7 +641,7 @@ export async function run(opts: RunOptions): Promise<number> {
     // " > " the failure line prints; the " > " form matched 0 tests and the
     // rerun exited 1, so a listed flake still went red (#216, 2026-10-16).
     const exactName = `^${entry.test.split(" > ").join(" ").replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`;
-    const proc = Bun.spawn(["bun", "test", entry.file, "-t", exactName], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
+    const proc = Bun.spawn(["bun", "test", "--timeout", String(TEST_TIMEOUT_MS), entry.file, "-t", exactName], { cwd: dir, env: process.env, stdout: "pipe", stderr: "pipe" });
     setSlotOwner(slot, proc.pid);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
     const rerunCode = await proc.exited;

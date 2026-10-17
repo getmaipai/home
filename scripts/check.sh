@@ -529,7 +529,8 @@ fi
 run_tests() {
   local dir="$1" root="$2" shards="$3"
   if [ "${MAIPAI_GATE_SHARDED:-1}" = 0 ]; then
-    (cd "$dir" && bun test)
+    # The same 20 s per-test timeout scripts/gate/shardTests.ts passes (#216).
+    (cd "$dir" && bun test --timeout 20000)
   else
     GATE_FAILURE_LOG="$GATE_FAILURE_LOG" GATE_DIFF_BASE="${GATE_DIFF_BASE:-}" \
       MAIPAI_GATE_SHARD_PEAKS_DIR="$GATE_HOME_ROOT/data-scratch/gate-stats/shard-peaks" \

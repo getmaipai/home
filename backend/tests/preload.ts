@@ -7,6 +7,11 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach } from "bun:test";
+
+// getmaipai/home#216: the gate's 20 s per-test timeout is the --timeout
+// flag scripts/gate/shardTests.ts passes, not a setDefaultTimeout() here:
+// bun 1.3.14 resets the default at the start of every test file, so a
+// preload call only covered the first file of each shard.
 import { installTestIsolationGuard } from "./isolation";
 import { reserveFreePort } from "./fixtures/reserveFreePort";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";

@@ -13,6 +13,9 @@ import { __clearPendingConversationTitlesForTests } from "@/lib/conversationTitl
 import { __resetPackageCachesForTests } from "@/lib/plugins";
 import { __resetServiceHealthForTests } from "@/lib/serviceHealth";
 import { __resetSkillCacheForTests } from "@/lib/skills";
+import { __resetPackageQuietWindowsForTests } from "@/lib/packageHost";
+import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
+import { __forgetStackOutagesForTests } from "@/lib/stackEngine";
 import {
   people,
   personCredentials,
@@ -213,6 +216,19 @@ export function resetDb(): void {
   // five this pass added that reset-db.ts didn't already clear).
   __resetPackageCachesForTests();
   __resetSkillCacheForTests();
+  // getmaipai/home#216: bun runs every test file of one `bun test` in ONE
+  // process, so module-level state a test leaves behind is the next
+  // file's starting state. Three such leaks broke tests that pass alone:
+  // packageHost.ts's per-host quiet window (a 503 scripted for one file's
+  // warm test put geocoding-api.open-meteo.com to sleep for an hour, and
+  // every later weather test in the shard got "asked Home to slow down"),
+  // the shared token-bucket rate limiter, and stackEngine.ts's remembered
+  // refusals and outages (a 503 scripted in one file read as "chat is
+  // offline" in a later one). Cleared here, so a file's beforeEach never
+  // has to know which other file ran before it.
+  __resetPackageQuietWindowsForTests();
+  __resetRateLimiterForTests();
+  __forgetStackOutagesForTests();
   // ROUTE-02: the ordinary tool set is read from routing stats once per
   // installed set (boot); a fresh database is a fresh boot.
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
