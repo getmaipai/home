@@ -683,7 +683,10 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   BACKEND_RC=0
   FRONTEND_RC=0
   while [ ! -f "$GATE_LEG_DONE_DIR/backend.done" ] || [ ! -f "$GATE_LEG_DONE_DIR/frontend.done" ]; do
-    if [ -s "$GATE_FAILURE_LOG" ]; then
+    # Only a "fail" line stops the other leg: the ledger's isolated rerun
+    # writes a "flaky" line into the same log on a pass, and stopping the
+    # other leg on it turned a green flaky rerun into rc=143 (2026-10-16).
+    if grep -q '^fail' "$GATE_FAILURE_LOG" 2>/dev/null; then
       if [ -f "$GATE_LEG_DONE_DIR/backend.done" ] && [ ! -f "$GATE_LEG_DONE_DIR/frontend.done" ]; then
         stop_tree "$FRONTEND_PID"
         break

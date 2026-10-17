@@ -291,11 +291,16 @@ describe("run: the gate's pass/fail meaning", () => {
     const dir = fixture({ "a.test.ts": "" });
     const marker = join(dir, "first-run");
     writeFileSync(join(dir, "tests/a.test.ts"), `import {describe,test,expect} from "bun:test"; import {existsSync,writeFileSync} from "node:fs"; describe("group: a suite", () => { test("flaky nested",()=>{if(!existsSync(${JSON.stringify(marker)})){writeFileSync(${JSON.stringify(marker)},"seen"); expect(1).toBe(2)} expect(1).toBe(1)}); });`);
+    // Always hand run() its own failure log here: without one it appends
+    // to the GATE_FAILURE_LOG of the gate running this very test, and the
+    // gate stopped its other leg on that line (rc=143, 2026-10-16).
+    const log = join(dir, "failures.tsv");
     const messages: string[] = [];
     const originalLog = console.log;
     console.log = (...args: unknown[]) => messages.push(args.join(" "));
     try {
-      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "group: a suite > flaky nested"), changedFiles: [] })).toBe(0);
+      expect(await run({ ...fixtureBudget, dir, root: "tests", shards: 1, timingsPath: join(dir, "t.json"), ledger: ledger(dir, "group: a suite > flaky nested"), changedFiles: [], failureLog: log })).toBe(0);
+      expect(readFileSync(log, "utf8")).toContain("flaky\t");
       expect(messages.join("\n")).toContain("FLAKY");
     } finally { console.log = originalLog; rmSync(dir, { recursive: true, force: true }); }
   });
