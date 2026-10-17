@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-17T16:48:11.927Z",
-  "kitTag": "ui-v0.5.259",
+  "generatedAt": "2026-10-17T18:38:10.139Z",
+  "kitTag": "ui-v0.5.261",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -779,6 +779,14 @@
       "verdict": "wire-now",
       "verdictReason": "Selected for current Home UI adoption because the shipped Element fits a current or accepted Home feature.",
       "implemented": true
+    },
+    {
+      "file": "music-track.tsx",
+      "name": "music-track",
+      "group": "music",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
     },
     {
       "file": "number-ticker.tsx",
