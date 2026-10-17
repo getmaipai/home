@@ -8,6 +8,13 @@ export interface PictureCard {
   percent: number;
   label: string;
   position: number | null;
+  /** While running (GENPREVIEW-01): the engine's step, time left and the latest preview of where the picture is heading. */
+  stage_label: string | null;
+  eta_seconds: number | null;
+  step: number | null;
+  steps: number | null;
+  preview_url: string | null;
+  preview_step: number | null;
   elapsed_ms: number;
   prompt: string;
   kind: "generate" | "variation" | "edit";

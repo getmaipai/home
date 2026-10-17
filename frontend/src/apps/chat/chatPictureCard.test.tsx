@@ -10,7 +10,7 @@ import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 
 afterEach(cleanup);
 
-const card = (over: Partial<PictureCard> = {}): PictureCard => ({ id: "pic-1", state: "running", percent: 40, label: "Drawing", position: null, elapsed_ms: 3_000, prompt: "a red fox", kind: "generate", conversation_id: "conv-1", error: null, files: [], can_vary: false, size: "1024x1024", stop_id: "pic-1", ...over });
+const card = (over: Partial<PictureCard> = {}): PictureCard => ({ id: "pic-1", state: "running", percent: 40, label: "Drawing", position: null, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 3_000, prompt: "a red fox", kind: "generate", conversation_id: "conv-1", error: null, files: [], can_vary: false, size: "1024x1024", stop_id: "pic-1", ...over });
 const FILE = { id: "file-1", url: "https://example.test/api/image-edit/pictures/file-1?conversation_id=conv-1", width: 1024, height: 1024, seed: 7, model: "flux2-klein-4b", steps: 4, ms: 3900, alt: "a red fox" };
 const props = { toolCallId: "t", toolName: "picture", args: {}, argsText: "{}", result: { id: "pic-1" }, isError: false, status: { type: "complete" }, addResult: () => undefined, resume: () => undefined } as unknown as ComponentProps<typeof PictureToolRender>;
 
@@ -35,6 +35,24 @@ describe("the picture card", () => {
     fireEvent.click(v.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(picturesApi.stop).toHaveBeenCalledWith("pic-2"));
     restore();
+  });
+
+  test("GENPREVIEW-01: the card shows the engine's step in words and the time left, and the latest preview in the kit card, blurred by the step", async () => {
+    const realImage = globalThis.Image;
+    (globalThis as { Image: unknown }).Image = class { onload: (() => void) | null = null; onerror: (() => void) | null = null; set src(_v: string) { queueMicrotask(() => this.onload?.()); } };
+    const restore = stub(card({ label: "Drawing, step 2 of 4", stage_label: "Drawing, step 2 of 4", eta_seconds: 3, step: 1, steps: 4, preview_url: "/api/pictures/jobs/pic-1/preview?v=1", preview_step: 1 }));
+    try {
+      const v = renderWithQueryClient(<PictureProgressToolRender {...props} />);
+      await waitFor(() => expect(v.container.querySelector("img[data-slot=generation-preview]")).not.toBeNull());
+      const img = v.container.querySelector("img[data-slot=generation-preview]") as HTMLImageElement;
+      expect(img.getAttribute("src")).toBe("/api/pictures/jobs/pic-1/preview?v=1");
+      expect(img.getAttribute("data-blur")).toBe("8");
+      expect(v.getByText("Drawing, step 2 of 4")).toBeTruthy();
+      expect(v.getByText("almost done")).toBeTruthy();
+    } finally {
+      restore();
+      (globalThis as { Image: unknown }).Image = realImage;
+    }
   });
 
   test("a finished picture shows in the gallery with the Edit button", async () => {

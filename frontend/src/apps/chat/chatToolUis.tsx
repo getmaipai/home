@@ -15,6 +15,7 @@ import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ImageGallery } from "@maipai/ui/src/elements/image-gallery";
 import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { picturesApi, type PictureCard } from "@/lib/picturesApi";
+import { etaLabel } from "@/lib/etaLabel";
 import { VideoPlayer } from "@maipai/ui/src/elements/video-player";
 import { videosApi, type VideoItem } from "@/lib/videosApi";
 import { prepareClip, saveClip, shareClip } from "@/lib/shareClip";
@@ -460,6 +461,8 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
       statusLabel={card.label || "Making your picture"}
       elapsedLabel={`${elapsedSeconds}s`}
       sizeLabel={card.size.replace("x", " × ")}
+      {...(card.preview_url ? { previewSrc: card.preview_url, ...(card.preview_step !== null ? { previewStep: card.preview_step } : {}), ...(card.steps !== null ? { steps: card.steps } : {}) } : {})}
+      {...(etaLabel(card.eta_seconds, { short: true }) ? { etaLabel: etaLabel(card.eta_seconds, { short: true })! } : {})}
       stopLabel="Stop"
       onStop={() => { void picturesApi.stop(card.stop_id).then(() => query.refetch()).catch(() => query.refetch()); }}
     />
@@ -556,6 +559,8 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       {...(clip ? { src: clip.url, poster: clip.poster_url, width: clip.width, height: clip.height } : {})}
       progress={item.percent}
       phaseLabel={item.label}
+      {...(item.preview_url ? { previewSrc: item.preview_url } : {})}
+      {...(etaLabel(item.eta_seconds) ? { etaLabel: etaLabel(item.eta_seconds)! } : {})}
       queuePosition={item.position}
       startedAt={item.started_at}
       hint={card.limits}

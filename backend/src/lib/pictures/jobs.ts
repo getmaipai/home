@@ -13,7 +13,8 @@ import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPicture
 import { allAdapters } from "./adapters";
 import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "./ageCheck";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
-import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
+import { clearLive, updateLive } from "@/lib/genLive";
+import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
 export type { PictureFile, PictureJob, PictureJobKind, PictureJobState, PictureRequest } from "./jobStore";
@@ -150,6 +151,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
       job.phase = status.phase;
       job.position = status.position;
       saveJob(job);
+      await updateLive(job.id, status, () => fetchPicturePreview(job.stackJob!));
       await sleep(POLL_MS, controller.signal);
     }
     if (!controller.signal.aborted && !stopped(job)) { job.state = "failed"; job.error = `${PICTURE_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; saveJob(job); void cancelOrDelete(job.stackJob); }
@@ -161,6 +163,7 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
     }
   } finally {
     watching.delete(job.id);
+    clearLive(job.id);
     markSettled(job);
   }
 }

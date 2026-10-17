@@ -3,6 +3,7 @@
 // setting already guarantees it). The prompt and the reference picture travel in bodies and are never logged or
 // put in an error message (rule 6a). A test replaces `fetch` with `__setVideosFetchForTests`.
 import { getStackUrl } from "@/lib/stackEngine";
+import type { StackLiveFields } from "@/lib/genLive";
 
 export type StackVideoState = "queued" | "running" | "done" | "failed" | "cancelled";
 
@@ -24,7 +25,7 @@ export interface StackClip {
   poster_bytes?: number;
 }
 
-export interface StackVideoJob {
+export interface StackVideoJob extends StackLiveFields {
   job: string;
   state: StackVideoState;
   phase: string | null;
@@ -158,7 +159,16 @@ export async function getVideoJob(job: string): Promise<StackVideoJob> {
     error: body.error ?? null,
     code: body.code ?? null,
     data: Array.isArray(body.data) ? body.data : [],
+    progress_fraction: body.progress_fraction ?? null, stage: body.stage ?? null, stage_label: body.stage_label ?? null, step: body.step ?? null, steps: body.steps ?? null,
+    eta_seconds: body.eta_seconds ?? null, preview_url: body.preview_url ?? null, preview_step: body.preview_step ?? null,
   };
+}
+
+/** The first-frame preview JPEG of a running clip (GENPREVIEW-01). */
+export async function fetchVideoPreview(job: string): Promise<Uint8Array> {
+  const res = await request(`/v1/videos/generations/${encodeURIComponent(job)}/preview.jpg`, { method: "GET" });
+  if (!res.ok) return failure(res);
+  return new Uint8Array(await res.arrayBuffer());
 }
 
 /** The finished clip's mp4 bytes. */

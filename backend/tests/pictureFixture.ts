@@ -19,6 +19,9 @@ export interface FakeImageStack {
   failWith: { code: string; error: string } | null;
   /** When set, the submit itself is refused with this status, code and sentence. */
   refuseSubmit: { status: number; code: string; error: string } | null;
+  /** GENPREVIEW-01: when set, running polls carry the step, stage and ETA, and a preview from the third poll. */
+  live: { stage_label: string; eta_seconds: number } | null;
+  previewFetches: number;
   loras: StackLora[];
   /** The fields of each LoRA add (files as "file:<bytes>"). */
   loraAdds: Array<Record<string, unknown>>;
@@ -42,7 +45,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeImageStack(options: { pollsToFinish?: number } = {}): FakeImageStack {
   const fake: FakeImageStack = {
-    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, loras: [...TEST_LORAS], loraAdds: [], loraRefusal: null,
+    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, loras: [...TEST_LORAS], loraAdds: [], loraRefusal: null,
     restore() { __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
   };
   __setPictureStatusForTests(readyStatusForTests());
@@ -70,11 +73,12 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
       fake.jobs.push(job);
       return json({ created: 1, job: job.id, data: [] }, 202);
     }
-    const jobMatch = path.match(/^\/v1\/images\/generations\/([^/]+)(?:\/(\d+)\.png)?$/);
+    const jobMatch = path.match(/^\/v1\/images\/generations\/([^/]+)(?:\/(\d+\.png|preview\.jpg))?$/);
     if (jobMatch) {
       const job = fake.jobs.find((j) => j.id === jobMatch[1]);
       if (!job) return json({ error: "No such job.", code: "not_found" }, 404);
       if (method === "DELETE") { if (job.state === "queued" || job.state === "running") job.state = "cancelled"; job.deleted = true; return json({ ok: true }); }
+      if (jobMatch[2] === "preview.jpg") { fake.previewFetches += 1; return new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]), { status: 200, headers: { "content-type": "image/jpeg" } }); }
       if (jobMatch[2] !== undefined) return new Response(await testPng(), { status: 200, headers: { "content-type": "image/png" } });
       job.polls += 1;
       if (job.state === "cancelled") return json({ job: job.id, state: "cancelled", phase: null, progress: 0, phase_progress: null, position: null, error: null, code: null, data: [] });
@@ -86,7 +90,8 @@ export function installFakeImageStack(options: { pollsToFinish?: number } = {}):
         return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data });
       }
       job.state = job.polls === 1 ? "queued" : "running";
-      return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "queued" : "rendering", progress: job.polls * 30, phase_progress: null, position: job.state === "queued" ? 1 : null, error: null, code: null, data: [] });
+      const liveFields = fake.live && job.state === "running" ? { progress_fraction: job.polls / 10, stage: "steps", stage_label: fake.live.stage_label, step: 2, steps: 4, eta_seconds: fake.live.eta_seconds, preview_url: job.polls >= 3 ? `/v1/images/generations/${job.id}/preview.jpg?v=2` : null, preview_step: job.polls >= 3 ? 2 : null } : {};
+      return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "queued" : "rendering", progress: job.polls * 30, phase_progress: null, position: job.state === "queued" ? 1 : null, error: null, code: null, data: [], ...liveFields });
     }
     if (method === "GET" && path === "/stack/v1/image") return json({ image: readyStatusForTests() });
     if (method === "GET" && path === "/stack/v1/image/loras") return json({ loras: fake.loras, base_models: ["flux2-klein-4b", "z-image-turbo"], max_per_picture: 3 });

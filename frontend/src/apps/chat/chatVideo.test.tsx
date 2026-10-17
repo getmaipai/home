@@ -14,7 +14,7 @@ let calls: Array<{ url: string; method: string }>;
 let card: VideoCard;
 
 function item(over: Partial<VideoItem>): VideoItem {
-  return { id: "vid-1", state: "running", percent: 40, label: "Drawing the frames", position: null, started_at: Date.now() - 30_000, prompt: "a paper boat in the rain", kind: "generate", error: null, clip: null, ...over };
+  return { id: "vid-1", state: "running", percent: 40, label: "Drawing the frames", position: null, eta_seconds: null, step: null, steps: null, preview_url: null, started_at: Date.now() - 30_000, prompt: "a paper boat in the rain", kind: "generate", error: null, clip: null, ...over };
 }
 beforeEach(() => {
   calls = [];
@@ -42,6 +42,28 @@ describe("VideoToolRender", () => {
     expect(view.container.textContent).toMatch(/0:3\d/);
     fireEvent.click(view.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/videos/jobs/vid-1/cancel")).toBe(true));
+  });
+
+  test("GENPREVIEW-01: the card says the stage, the percent and the time left, shows the shimmer with the prompt until the first frame arrives, and then the frame", async () => {
+    const realImage = globalThis.Image;
+    (globalThis as { Image: unknown }).Image = class { onload: (() => void) | null = null; onerror: (() => void) | null = null; set src(_v: string) { queueMicrotask(() => this.onload?.()); } };
+    try {
+      card.items = [item({ percent: 12, label: "Loading the video model", eta_seconds: 118 })];
+      const view = mount();
+      await waitFor(() => expect(view.container.textContent).toContain("Loading the video model"));
+      expect(view.container.textContent).toMatch(/0:3\d · 12% · about 2 minutes left/);
+      expect(view.container.querySelector("[data-slot=video-player-stage]")!.textContent).toContain("a paper boat in the rain");
+      expect(view.container.querySelectorAll("span.rounded-full").length).toBe(64);
+      expect(view.container.textContent).toContain("take about 2 minutes");
+      expect(view.container.querySelector("img[data-slot=generation-preview]")).toBeNull();
+      card.items = [item({ percent: 40, label: "Putting the frames together, 20 of 60", eta_seconds: 70, preview_url: "/api/videos/jobs/vid-1/preview?v=1" })];
+      await waitFor(() => expect(view.container.querySelector("img[data-slot=generation-preview]")).not.toBeNull(), { timeout: 4000 });
+      expect(view.container.querySelector("img[data-slot=generation-preview]")!.getAttribute("src")).toBe("/api/videos/jobs/vid-1/preview?v=1");
+      expect(view.container.textContent).toContain("Putting the frames together, 20 of 60");
+      expect(view.container.textContent).toContain("about 1 minute left");
+    } finally {
+      (globalThis as { Image: unknown }).Image = realImage;
+    }
   });
 
   test("a queued clip shows the busy line from the engine", async () => {

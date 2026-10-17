@@ -23,7 +23,8 @@ import { __setVideoStatusForTests } from "@/lib/videos/ready";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import { hasAudioTrack, videoFileName } from "@/lib/videos/messagesCopy";
-import { installFakeVideoStack, type FakeVideoStack } from "./videoFixture";
+import { installFakeVideoStack, testJpeg, type FakeVideoStack } from "./videoFixture";
+import { videoCardView } from "@/routes/videos";
 import { until } from "./pictureFixture";
 import { TestClient } from "./client";
 import { invalidateSessionCacheForPerson } from "@/middleware/auth";
@@ -221,6 +222,29 @@ describe("the routes", () => {
     await until(() => getVideoJobFor(actor, job.id)?.state === "done");
     return job;
   }
+
+  test("GENPREVIEW-01: a running clip's card carries the stage in words, the ETA and, once the motion is done, the first frame, served to its owner only; all of it is gone when the clip is done", async () => {
+    fake.live = { stage_label: "Putting the frames together, part 3 of 12", eta_seconds: 70 };
+    fake.pollsToFinish = 14;
+    const owner = await signedIn("Sage", "owner");
+    const conv = await import("@/lib/conversationHistory");
+    const resolved = conv.resolveOrCreateConversation(owner.actor, "chat", undefined, {});
+    if (!resolved.ok) throw new Error("no conversation");
+    const job = await startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a paper boat", body: { prompt: "a paper boat", audience: "adult" } });
+    const card = () => videoCardView(owner.actor, getVideoJobFor(owner.actor, job.id)!, true).items[0]!;
+    await until(() => card().preview_url !== null);
+    const running = card();
+    expect(running).toMatchObject({ state: "running", label: "Putting the frames together, part 3 of 12", eta_seconds: 70, preview_url: `/api/videos/jobs/${job.id}/preview?v=1` });
+    expect(fake.previewFetches).toBe(1);
+    const served = await owner.client.get(`/api/videos/jobs/${job.id}/preview`);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-type")).toBe("image/jpeg");
+    expect(Array.from(new Uint8Array(await served.arrayBuffer()))).toEqual(Array.from(testJpeg()));
+    expect((await new TestClient().get(`/api/videos/jobs/${job.id}/preview`)).status).toBe(401);
+    await until(() => getVideoJobFor(owner.actor, job.id)?.state === "done");
+    expect(card()).toMatchObject({ state: "done", label: "", eta_seconds: null, preview_url: null });
+    expect((await owner.client.get(`/api/videos/jobs/${job.id}/preview`)).status).toBe(404);
+  });
 
   test("status says an adult can, with the limits in plain words, and says why a teen cannot", async () => {
     const adult = await signedIn("Sage", "owner");

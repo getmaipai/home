@@ -17,6 +17,9 @@ export interface FakeVideoStack {
   /** The Stack's memory watchdog stopped the job: cancelled, code no_memory, phase "paused: low memory". */
   pausedForMemory: boolean;
   refuseSubmit: { status: number; code: string; error: string } | null;
+  /** GENPREVIEW-01: when set, running polls carry the stage, ETA and a preview (the first-frame preview shows from the second running poll). */
+  live: { stage_label: string; eta_seconds: number } | null;
+  previewFetches: number;
   loras: StackVideoLora[];
   restore(): void;
 }
@@ -50,7 +53,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, loras: [...TEST_VIDEO_LORAS],
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: [...TEST_VIDEO_LORAS],
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
@@ -72,12 +75,13 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       fake.converted.push(decodeURIComponent(new Headers(init?.headers).get("x-title") ?? ""));
       return new Response(testMp4WithSound(), { status: 200, headers: { "content-type": "video/mp4" } });
     }
-    const jobMatch = path.match(/^\/v1\/videos\/generations\/([^/]+)(?:\/(video\.mp4|poster\.jpg))?$/);
+    const jobMatch = path.match(/^\/v1\/videos\/generations\/([^/]+)(?:\/(video\.mp4|poster\.jpg|preview\.jpg))?$/);
     if (jobMatch) {
       const job = fake.jobs.find((j) => j.id === jobMatch[1]);
       if (!job) return json({ error: "No such job.", code: "unknown_job" }, 404);
       if (method === "DELETE") { if (job.state === "queued" || job.state === "running") job.state = "cancelled"; job.deleted = true; return json({ ok: true }); }
       if (jobMatch[2] === "video.mp4") return new Response(testMp4(), { status: 200, headers: { "content-type": "video/mp4" } });
+      if (jobMatch[2] === "preview.jpg") { fake.previewFetches += 1; return new Response(testJpeg(), { status: 200, headers: { "content-type": "image/jpeg" } }); }
       if (jobMatch[2] === "poster.jpg") return new Response(testJpeg(), { status: 200, headers: { "content-type": "image/jpeg" } });
       job.polls += 1;
       if (job.state === "cancelled") return json({ job: job.id, state: "cancelled", phase: null, progress: 0, phase_progress: null, position: null, error: null, code: null, data: [] });
@@ -88,7 +92,8 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
         return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", width: 832, height: 480, frames: 121, fps: 24, seconds: 5, seed: 77, model: "wan2.2-ti2v-5b-fastwan-mlx", mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
       }
       job.state = job.polls === 1 ? "queued" : "running";
-      return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "waiting for memory" : "rendering", progress: job.polls * 25, phase_progress: null, position: job.state === "queued" ? 2 : null, error: null, code: null, data: [] });
+      const liveFields = fake.live && job.state === "running" ? { progress_fraction: job.polls / 4, stage: "frames", stage_label: fake.live.stage_label, step: null, steps: null, eta_seconds: fake.live.eta_seconds, preview_url: job.polls >= 3 ? `/v1/videos/generations/${job.id}/preview.jpg?v=1` : null } : {};
+      return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "waiting for memory" : "rendering", progress: job.polls * 25, phase_progress: null, position: job.state === "queued" ? 2 : null, error: null, code: null, data: [], ...liveFields });
     }
     if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests() });
     if (method === "GET" && path === "/stack/v1/video/loras") return json({ loras: fake.loras });

@@ -12,6 +12,7 @@ import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { prepareStylesUse } from "@/lib/likeness/apply";
 import { recordLikenessUse } from "@/lib/likeness/uses";
+import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
 
 export const picturesRoutes = apiRouter();
@@ -23,6 +24,11 @@ const JobSchema = z.object({
   percent: z.number(),
   label: z.string().describe("One plain line for the card: what the engine is doing now."),
   position: z.number().nullable(),
+  stage_label: z.string().nullable().describe("While running: the engine's stage in words (\"Drawing, step 2 of 4\")."),
+  eta_seconds: z.number().nullable().describe("While running: seconds left, from earlier pictures of this size."),
+  step: z.number().nullable(), steps: z.number().nullable(),
+  preview_url: z.string().nullable().describe("While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."),
+  preview_step: z.number().nullable().describe("The step the preview shows, out of `steps`."),
   elapsed_ms: z.number(),
   prompt: z.string(),
   kind: z.enum(["generate", "variation", "edit"]),
@@ -61,7 +67,8 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean) {
   const shown = active ?? last;
   const state = active ? active.state : files.length > 0 ? "done" as const : last.state;
   return {
-    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? phaseLabel(active) : "", position: active ? active.position : null,
+    id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? (active.state === "running" ? getLive(active.id)?.stageLabel : null) ?? phaseLabel(active) : "", position: active ? active.position : null,
+    ...(active && active.state === "running" ? liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
     can_vary: canVary && !active && files.length > 0 && files.length < 12,
@@ -101,6 +108,19 @@ picturesRoutes.openapi(getRoute, (c) => {
   const job = getPictureJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
   return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null), 200);
+});
+
+const previewRoute = createRoute({
+  method: "get", path: "/jobs/{id}/preview", tags: ["Pictures"], summary: "The latest preview of a picture being drawn (a small JPEG)", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "image/jpeg": { schema: z.string() } }, description: "The preview, for the job's owner only." }, ...errorResponses({ 401: "Not signed in", 404: "No preview" }) },
+});
+picturesRoutes.openapi(previewRoute, (c) => {
+  const actor = c.get("person");
+  const job = getPictureJob(actor, c.req.valid("param").id);
+  const preview = job ? getLive(job.id)?.preview : null;
+  if (!job || !preview) return c.json({ error: "There is no preview for that picture." }, 404) as never;
+  return new Response(preview, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
 const cancelRoute = createRoute({

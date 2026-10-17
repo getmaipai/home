@@ -19,6 +19,7 @@ import { people as peopleTable } from "@/db/schema";
 import { adapterAudiencesFor, pictureDenial, picturesAllowed, promptViolatesMinorLine, refusePrompt, PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE, type PictureAudience } from "@/lib/pictures/policy";
 import { adaptersFor } from "@/lib/pictures/adapters";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
+import { cardView } from "@/routes/pictures";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 import type { TurnValue } from "@/wire";
 import { installFakeImageStack, until, type FakeImageStack } from "./pictureFixture";
@@ -267,6 +268,28 @@ describe("the routes", () => {
     expect(teenBody.can_make).toBe(false);
     expect(teenBody.reason).toContain("off for this profile");
     expect(teenBody.styles).toEqual([]);
+  });
+
+  test("GENPREVIEW-01: a running picture's card carries the step in words, the ETA and the latest preview, served to its owner; all of it is gone when the picture is done", async () => {
+    fake.live = { stage_label: "Drawing, step 3 of 4", eta_seconds: 2 };
+    fake.pollsToFinish = 14;
+    const owner = await signedIn("Sage", "owner");
+    const conv = await import("@/lib/conversationHistory");
+    const resolved = conv.resolveOrCreateConversation(owner.actor, "chat", undefined, {});
+    if (!resolved.ok) throw new Error("no conversation");
+    const job = await startPictureJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a red fox", body: { prompt: "a red fox", size: "1024x1024", n: 1, audience: "adult" } });
+    const card = () => cardView(owner.actor, getPictureJob(owner.actor, job.id)!, true);
+    await until(() => card().preview_url !== null);
+    expect(card()).toMatchObject({ state: "running", label: "Drawing, step 3 of 4", eta_seconds: 2, step: 2, steps: 4, preview_step: 2, preview_url: `/api/pictures/jobs/${job.id}/preview?v=2` });
+    expect(fake.previewFetches).toBe(1);
+    const served = await owner.client.get(`/api/pictures/jobs/${job.id}/preview`);
+    expect(served.status).toBe(200);
+    expect(served.headers.get("content-type")).toBe("image/jpeg");
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 1, 2, 3]));
+    expect((await new TestClient().get(`/api/pictures/jobs/${job.id}/preview`)).status).toBe(401);
+    await until(() => getPictureJob(owner.actor, job.id)?.state === "done");
+    expect(card()).toMatchObject({ state: "done", label: "", eta_seconds: null, preview_url: null, preview_step: null });
+    expect((await owner.client.get(`/api/pictures/jobs/${job.id}/preview`)).status).toBe(404);
   });
 
   test("a variation of a finished picture works for its owner and is refused for a person who may not; another person's job is a 404", async () => {

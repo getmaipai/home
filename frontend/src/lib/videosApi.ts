@@ -8,6 +8,11 @@ export interface VideoItem {
   percent: number;
   label: string;
   position: number | null;
+  /** While running (GENPREVIEW-01): seconds left from earlier clips, and the first frame once the motion is done. */
+  eta_seconds: number | null;
+  step: number | null;
+  steps: number | null;
+  preview_url: string | null;
   started_at: number;
   prompt: string;
   kind: "generate" | "animate";

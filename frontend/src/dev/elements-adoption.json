@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-17T14:35:24.435Z",
-  "kitTag": "ui-v0.5.249",
+  "generatedAt": "2026-10-17T15:34:01.778Z",
+  "kitTag": "ui-v0.5.250",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -493,6 +493,14 @@
       "verdict": "wire-now",
       "verdictReason": "E14 wires the shipped Element to optional suggestions from only the current completed adult chat turn; minor and temporary chats receive none.",
       "implemented": true
+    },
+    {
+      "file": "generation-stage.tsx",
+      "name": "generation-stage",
+      "group": "image",
+      "verdict": "support",
+      "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
+      "implemented": false
     },
     {
       "file": "github.tsx",

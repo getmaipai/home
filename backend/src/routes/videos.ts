@@ -10,6 +10,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
+import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
 import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
@@ -43,6 +44,9 @@ const ItemSchema = z.object({
   percent: z.number(),
   label: z.string().describe("One plain line for the card: what the engine is doing now."),
   position: z.number().nullable(),
+  eta_seconds: z.number().nullable().describe("While running: seconds left, from earlier clips of this size and length."),
+  step: z.number().nullable(), steps: z.number().nullable(),
+  preview_url: z.string().nullable().describe("While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."),
   started_at: z.number().describe("Epoch milliseconds the job started, for the card's elapsed clock."),
   prompt: z.string(),
   kind: z.enum(["generate", "animate"]),
@@ -66,8 +70,9 @@ function itemView(job: VideoJob) {
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
-    label: job.state === "queued" || job.state === "running" ? phaseLabel(job) : "",
-    position: job.position, started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
+    label: job.state === "queued" ? phaseLabel(job) : job.state === "running" ? getLive(job.id)?.stageLabel ?? phaseLabel(job) : "",
+    position: job.position,
+    ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
     clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id } : null,
   };
@@ -118,6 +123,19 @@ videosRoutes.openapi(getRoute, (c) => {
   const job = getVideoJobFor(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
   return c.json(videoCardView(actor, job, videoDenial(videoRouteAudience(actor)) === null), 200);
+});
+
+const previewRoute = createRoute({
+  method: "get", path: "/jobs/{id}/preview", tags: ["Videos"], summary: "The first frame of a clip being made (a JPEG), once the motion is done", middleware: [requireAuth] as const,
+  request: { params: idParams },
+  responses: { 200: { content: { "image/jpeg": { schema: z.string() } }, description: "The preview, for the job's owner only." }, ...errorResponses({ 401: "Not signed in", 404: "No preview" }) },
+});
+videosRoutes.openapi(previewRoute, (c) => {
+  const actor = c.get("person");
+  const job = getVideoJobFor(actor, c.req.valid("param").id);
+  const preview = job ? getLive(job.id)?.preview : null;
+  if (!job || !preview) return c.json({ error: "There is no preview for that video." }, 404) as never;
+  return new Response(preview, { status: 200, headers: { "content-type": "image/jpeg", "cache-control": "private, no-store", "x-content-type-options": "nosniff" } }) as never;
 });
 
 const fileParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }), fileId: z.string().min(1).max(80).openapi({ param: { name: "fileId", in: "path" } }) });

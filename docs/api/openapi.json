@@ -43329,6 +43329,34 @@
                       "type": "number",
                       "nullable": true
                     },
+                    "stage_label": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "While running: the engine's stage in words (\"Drawing, step 2 of 4\")."
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "While running: seconds left, from earlier pictures of this size."
+                    },
+                    "step": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "steps": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "preview_url": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
+                    },
+                    "preview_step": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "The step the preview shows, out of `steps`."
+                    },
                     "elapsed_ms": {
                       "type": "number"
                     },
@@ -43419,6 +43447,12 @@
                     "percent",
                     "label",
                     "position",
+                    "stage_label",
+                    "eta_seconds",
+                    "step",
+                    "steps",
+                    "preview_url",
+                    "preview_step",
                     "elapsed_ms",
                     "prompt",
                     "kind",
@@ -43506,6 +43540,58 @@
         }
       }
     },
+    "/api/pictures/jobs/{id}/preview": {
+      "get": {
+        "tags": [
+          "Pictures"
+        ],
+        "summary": "The latest preview of a picture being drawn (a small JPEG)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The preview, for the job's owner only.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No preview",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/pictures/jobs/{id}/cancel": {
       "post": {
         "tags": [
@@ -43555,6 +43641,34 @@
                     "position": {
                       "type": "number",
                       "nullable": true
+                    },
+                    "stage_label": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "While running: the engine's stage in words (\"Drawing, step 2 of 4\")."
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "While running: seconds left, from earlier pictures of this size."
+                    },
+                    "step": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "steps": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "preview_url": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
+                    },
+                    "preview_step": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "The step the preview shows, out of `steps`."
                     },
                     "elapsed_ms": {
                       "type": "number"
@@ -43646,6 +43760,12 @@
                     "percent",
                     "label",
                     "position",
+                    "stage_label",
+                    "eta_seconds",
+                    "step",
+                    "steps",
+                    "preview_url",
+                    "preview_step",
                     "elapsed_ms",
                     "prompt",
                     "kind",
@@ -43783,6 +43903,34 @@
                       "type": "number",
                       "nullable": true
                     },
+                    "stage_label": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "While running: the engine's stage in words (\"Drawing, step 2 of 4\")."
+                    },
+                    "eta_seconds": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "While running: seconds left, from earlier pictures of this size."
+                    },
+                    "step": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "steps": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "preview_url": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "While running: the latest preview of where the picture is heading (a small JPEG); the `v` query changes with each new one."
+                    },
+                    "preview_step": {
+                      "type": "number",
+                      "nullable": true,
+                      "description": "The step the preview shows, out of `steps`."
+                    },
                     "elapsed_ms": {
                       "type": "number"
                     },
@@ -43873,6 +44021,12 @@
                     "percent",
                     "label",
                     "position",
+                    "stage_label",
+                    "eta_seconds",
+                    "step",
+                    "steps",
+                    "preview_url",
+                    "preview_step",
                     "elapsed_ms",
                     "prompt",
                     "kind",
@@ -44297,6 +44451,24 @@
                             "type": "number",
                             "nullable": true
                           },
+                          "eta_seconds": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "While running: seconds left, from earlier clips of this size and length."
+                          },
+                          "step": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "preview_url": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                          },
                           "started_at": {
                             "type": "number",
                             "description": "Epoch milliseconds the job started, for the card's elapsed clock."
@@ -44364,6 +44536,10 @@
                           "percent",
                           "label",
                           "position",
+                          "eta_seconds",
+                          "step",
+                          "steps",
+                          "preview_url",
                           "started_at",
                           "prompt",
                           "kind",
@@ -44442,6 +44618,58 @@
           },
           "503": {
             "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/preview": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "The first frame of a clip being made (a JPEG), once the motion is done",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The preview, for the job's owner only.",
+            "content": {
+              "image/jpeg": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No preview",
             "content": {
               "application/json": {
                 "schema": {
@@ -44639,6 +44867,24 @@
                             "type": "number",
                             "nullable": true
                           },
+                          "eta_seconds": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "While running: seconds left, from earlier clips of this size and length."
+                          },
+                          "step": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "preview_url": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                          },
                           "started_at": {
                             "type": "number",
                             "description": "Epoch milliseconds the job started, for the card's elapsed clock."
@@ -44706,6 +44952,10 @@
                           "percent",
                           "label",
                           "position",
+                          "eta_seconds",
+                          "step",
+                          "steps",
+                          "preview_url",
                           "started_at",
                           "prompt",
                           "kind",
@@ -44857,6 +45107,24 @@
                             "type": "number",
                             "nullable": true
                           },
+                          "eta_seconds": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "While running: seconds left, from earlier clips of this size and length."
+                          },
+                          "step": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "preview_url": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                          },
                           "started_at": {
                             "type": "number",
                             "description": "Epoch milliseconds the job started, for the card's elapsed clock."
@@ -44924,6 +45192,10 @@
                           "percent",
                           "label",
                           "position",
+                          "eta_seconds",
+                          "step",
+                          "steps",
+                          "preview_url",
                           "started_at",
                           "prompt",
                           "kind",
@@ -45104,6 +45376,24 @@
                             "type": "number",
                             "nullable": true
                           },
+                          "eta_seconds": {
+                            "type": "number",
+                            "nullable": true,
+                            "description": "While running: seconds left, from earlier clips of this size and length."
+                          },
+                          "step": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "steps": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "preview_url": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "While running, once the motion is done: the clip's first frame (a JPEG); the `v` query changes with each new one."
+                          },
                           "started_at": {
                             "type": "number",
                             "description": "Epoch milliseconds the job started, for the card's elapsed clock."
@@ -45171,6 +45461,10 @@
                           "percent",
                           "label",
                           "position",
+                          "eta_seconds",
+                          "step",
+                          "steps",
+                          "preview_url",
                           "started_at",
                           "prompt",
                           "kind",

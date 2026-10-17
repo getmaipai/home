@@ -14,7 +14,8 @@ import { allVideoAdapters } from "./adapters";
 import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "@/lib/pictures/ageCheck";
 import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
-import { cancelOrDeleteVideo, fetchClip, fetchPoster, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
+import { clearLive, updateLive } from "@/lib/genLive";
+import { cancelOrDeleteVideo, fetchClip, fetchPoster, fetchVideoPreview, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
 export type VideoJobKind = "generate" | "animate";
 export type VideoJobState = "queued" | "running" | "done" | "failed" | "cancelled";
@@ -377,6 +378,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       job.phase = status.phase;
       job.position = status.position;
       save(job);
+      await updateLive(job.id, status, () => fetchVideoPreview(job.stackJob!));
       await sleep(POLL_MS, controller.signal);
     }
     if (!controller.signal.aborted) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} It took longer than expected. Try again, or ask for something simpler.`; save(job); void cancelOrDeleteVideo(job.stackJob); }
@@ -386,6 +388,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
     try { save(job); } catch { /* the job ends here either way */ }
   } finally {
     watching.delete(job.id);
+    clearLive(job.id);
     liveJobs.delete(job.id);
   }
 }
