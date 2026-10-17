@@ -119,7 +119,7 @@ auth.openapi(profilesRoute, (c) => {
     rows.map((r) => ({
       ...toRoster(r.person),
       hasSecret: r.secretHash != null,
-      pinDigits: pinDigitsHint(r.secretDigits),
+      pinDigits: r.secretHash != null ? pinDigitsHint(r.secretDigits) : null,
       hasPasskeys: withPasskeys.has(r.person.id),
     })),
     200,
