@@ -197,7 +197,7 @@ acknowledgement). No adult LoRA was downloaded or tested in this session.
   `image-engine-2026-10-17.md` section 15). A possible minor in a sexual frame, or in any frame of an adult-only clip, withholds the clip: it is never
   stored in Home, the Stack's copy is deleted, and the job ends with "I can't show that video. It may show a child in a sexual situation, and that is
   never allowed." A check that cannot run fails closed for an adult-only clip and passes an ordinary one. Frames come from a Swift/AVFoundation helper
-  (`keyframes.swift`); a Mac without `swiftc` or `ffmpeg` checks the poster (frame 0) alone.
+  (`keyframes.swift`); a Mac without `swiftc` or `ffmpeg` checks the poster (frame 0) alone, which passes an ordinary clip and withholds an adult-only one as unchecked.
 - Privacy: nothing leaves the home. The pins download on install; the tokenizer pin removes the one runtime fetch; the worker runs offline. No
   prompt, image or clip is logged (rule 6a); the worker reports phase, size and milliseconds only.
 - Rule 11: only a Stack-installed, pinned, tested component runs the model. Rule 8: nothing gated on a model id; the status route reports capability.

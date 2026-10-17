@@ -76,6 +76,12 @@ describe("the decision, with scripted verdicts", () => {
     expect(effectiveLabel(verdict("adult", true, { apparent_min_age_estimate: 18 }))).toBe("adult");
     expect(decideAgeCheck([ok("adult", true, { apparent_min_age_estimate: 14 })], false, "picture").action).toBe("withhold");
   });
+  test("an adult label the model is not sure of (confidence under 0.5) is read as possibly_minor", () => {
+    expect(effectiveLabel(verdict("adult", true, { confidence: 0.3 }))).toBe("possibly_minor");
+    expect(effectiveLabel(verdict("adult", true, { confidence: 0.5 }))).toBe("adult");
+    expect(decideAgeCheck([ok("adult", true, { confidence: 0.2 })], false, "picture").action).toBe("withhold");
+    expect(decideAgeCheck([ok("none", false, { confidence: 0.1 })], true, "picture").action).toBe("allow");
+  });
 });
 
 describe("reading the model's answer", () => {
@@ -96,6 +102,7 @@ describe("reading the model's answer", () => {
     expect(parseVerdict(JSON.stringify({ people_count: 1, label: "adult", is_nude_or_sexual: false }))).toBeNull();
     expect(parseVerdict(JSON.stringify({ ...good, label: "none" }))).toBeNull();
     expect(parseVerdict(JSON.stringify({ ...good, people_count: 0 }))).toBeNull();
+    expect(parseVerdict(JSON.stringify({ ...good, people_count: 0.4, apparent_min_age_estimate: 9 }))).toBeNull();
   });
   test("the system prompt asks for a classification only and names every label", () => {
     for (const word of ["adult", "possibly_minor", "child", "none", "is_nude_or_sexual", "apparent_min_age_estimate", "people_count", "confidence"]) expect(AGE_CHECK_SYSTEM_PROMPT).toContain(word);
@@ -109,6 +116,8 @@ describe("what makes a job adult-only", () => {
     expect(await isAdultOnlyJob("a nude statue study", [], classOf)).toBe(true);
     expect(await isAdultOnlyJob("a fox in the snow", [], classOf)).toBe(false);
     expect(await isAdultOnlyJob("a woman in a bikini on the beach", [], classOf)).toBe(false);
+    // A plain "no clothes" phrase is a nudity wording too.
+    expect(await isAdultOnlyJob("a person wearing nothing by a lake", [], classOf)).toBe(true);
   });
   test("any adult-only style, and a style the library no longer knows", async () => {
     expect(await isAdultOnlyJob("a fox", ["good"], classOf)).toBe(false);
@@ -293,12 +302,16 @@ describe("a video job", () => {
     expect(listPending(people.owner).filter((n) => n.typeId === "safety.picture_withheld")).toHaveLength(1);
   });
 
-  test("when this Mac cannot decode a clip, the poster alone is checked and a good clip is shown", async () => {
+  test("when this Mac cannot decode a clip, the poster alone is checked: an ordinary clip is shown, an adult-only clip is withheld as unchecked", async () => {
     __setKeyframesForTests(async () => null);
     let count = 0;
     __setAgeCheckRunnerForTests(async (images) => { count = images.length; return images.map(() => ok("adult", false)); });
     expect((await run("a paper boat in the rain")).state).toBe("done");
     expect(count).toBe(1);
+    const adultStyle = TEST_VIDEO_LORAS.find((l) => l.classification === "adult-only")!;
+    const closed = await run("a dancer", [{ id: adultStyle.id, strength: 0.9 }]);
+    expect(closed.state).toBe("failed");
+    expect(closed.error).toBe("I couldn't check that video, so I can't show it. Try again in a minute.");
   });
 
   test("an adult-only LoRA makes the clip adult-only: a failed check fails closed", async () => {

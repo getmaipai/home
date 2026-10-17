@@ -341,7 +341,8 @@ pixels before Home stores or shows it. The whole policy is one module, `backend/
 
 - **When it runs.** On every finished picture and every clip, because the vision answer itself says "nobody is in it" (`label: none`) for a
   landscape or an animal, which is safer than a keyword guess about the prompt. A job is **adult-only** when the prompt carries a sexual or
-  nudity word (`minorLine.ts`), or any style used is adult-only, or a style is no longer in the library.
+  nudity word or a plain "no clothes" phrase (`minorLine.ts`), or any style used is adult-only, or a style is no longer in the library. A described
+  change made with the editor's Comment (`lib/imageEdit.ts`) is checked the same way before it is kept as a preview.
 - **Where it runs.** The resident chat model reads the picture through its projector (the Stack's `/v1/chat/completions` on this computer,
   model `chat`; the role must be ready and declare `imageInput`). Zero outbound: no cloud service. The check is a chat request, so it does not
   take the generation lock; the generation worker has exited by the time the Stack answers "done". It waits up to 4 s while
@@ -351,7 +352,7 @@ pixels before Home stores or shows it. The whole policy is one module, `backend/
   forbids describing or naming anyone.
 - **The verdict.** `people_count`, `apparent_min_age_estimate`, `label` (`adult`, `possibly_minor`, `child`, `none`; it describes the youngest
   depicted person), `is_nude_or_sexual`, `confidence`. An answer that contradicts itself (`none` with people counted, `adult` with nobody) is
-  not a verdict. An `adult` label beside an estimated age under 18 is read as the younger answer.
+  not a verdict. An `adult` label beside an estimated age under 18, or with a confidence under 0.5, is read as the younger answer.
 - **The decision** (`decideAgeCheck`, pure). Any depicted person possibly a minor or a child AND (the image is nude or sexual OR the job is
   adult-only): **withhold**. A check that could not run (no vision model, memory critical, a timeout, an unreadable answer) on an adult-only
   job: **withhold** (fails closed). On an ordinary job a failed check **passes** (fails open, so a busy model never blocks an ordinary
@@ -366,7 +367,8 @@ pixels before Home stores or shows it. The whole policy is one module, `backend/
 - **Clips.** Three keyframes (first, middle, last) are taken by Apple's decoder through a 60-line Swift helper (`keyframes.swift`, compiled
   once with `swiftc`, about 2 s on a quiet Mac, started when the clip is submitted so it is ready when the clip is; `ffmpeg` on the PATH is the
   second choice) and each goes through the same check; one bad frame withholds the clip. A Mac with neither checks the Stack's poster
-  (frame 0) alone. The Stack serves only that poster, so the middle and last frames need the helper.
+  (frame 0) alone: an ordinary clip passes on that, an adult-only clip is withheld as "could not check", because frame 0 cannot answer for the rest. The
+  Stack serves only that poster, so the middle and last frames need the helper (Stack follow-up: serve keyframes).
 
 **Calibration (2026-10-17, the live Stack's resident Muse Glimmer 30B, scratch Home, innocuous pictures only).**
 `backend/scripts/agecheck-calibrate.ts` makes eight pictures from fixed innocuous prompts on the live image engine, then runs the real check.

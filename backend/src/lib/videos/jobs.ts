@@ -362,8 +362,10 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
     // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
     const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
-    const frames = (await extractKeyframes(video, clip.seconds ?? job.request.seconds)) ?? [poster];
-    const checks = await checkImages(frames, "video");
+    const keyframes = await extractKeyframes(video, clip.seconds ?? job.request.seconds);
+    const checks = await checkImages(keyframes ?? [poster], "video");
+    // The poster is frame 0 only. For an adult-only clip that is not enough to answer for the rest of it, so it counts as "could not check".
+    if (!keyframes) checks.push({ ok: false, why: "unavailable" });
     if (signal.aborted) return;
     const decision = decideAgeCheck(checks, adult, "video");
     if (decision.action === "withhold") {

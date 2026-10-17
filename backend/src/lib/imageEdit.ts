@@ -34,6 +34,8 @@ import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
+import { checkImages, decideAgeCheck, promptHash, recordWithheld } from "@/lib/pictures/ageCheck";
+import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
@@ -250,7 +252,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
 
 interface Preview { token: string; personId: string; png: Uint8Array; width: number; height: number; op: AnyEditOp; engine?: string; model?: string; ms?: number; sourceId: string; conversationId: string; createdAt: number }
 const previews = new Map<string, Preview>();
-interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean }
+interface EditJob { personId: string; sourceId: string; conversationId: string; op: AnyEditOp; createdAt: number; finalising?: Promise<PreviewInfo>; /** A Comment: the job lives on the picture engine (/v1/images/generations/{job}), not the editing tools. */ generative?: boolean; /** The words carry a sexual or nudity word: the finished picture is checked as an adult-only one. */ adultOnly?: boolean; /** A hash of the words, for the safety log; never the words. */ promptHash?: string }
 const jobs = new Map<string, EditJob>();
 
 export interface PreviewInfo { token: string; url: string; width: number; height: number; operation: AnyEditOp; engine: string | null; model: string | null; ms: number | null; transparent: boolean }
@@ -440,7 +442,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   try {
     const { job } = await submitEdit(form);
     sweep();
-    jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true });
+    jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true, adultOnly: mentionsSexualWord(prompt), promptHash: promptHash(prompt) });
     return { state: "running", job, percent: null, label: OP_LABEL.comment };
   } catch (error) {
     throw commentErrorFrom(error);
@@ -485,6 +487,13 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     const png = await fetchPicture(jobId, 0);
     const meta = await sharp(png).metadata();
     const made = status.data[0];
+    // IMGGEN-SAFE-01: a described change is a new picture, so it passes the same finished-output check before it is kept as a preview.
+    const checks = await checkImages([png], "picture");
+    const decision = decideAgeCheck(checks, job.adultOnly === true, "picture");
+    if (decision.action === "withhold") {
+      if (decision.reason === "minor_sexual") await recordWithheld({ kind: "picture", personId: actor.id, jobId, promptHash: job.promptHash, adultOnly: job.adultOnly === true, checks });
+      throw new ImageEditError(422, decision.line, `withheld_${decision.reason}`);
+    }
     const kept = keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms });
     await cancelOrDelete(jobId);
     return kept;

@@ -17,7 +17,7 @@ import { people } from "@/db/schema";
 import { toWireMessage, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
 import { getStackClient } from "@/lib/stackEngine";
-import { mentionsSexualWord } from "./minorLine";
+import { UNCLOTHED_PHRASES, hasWord, mentionsSexualWord, normalise } from "./minorLine";
 
 // ---------------------------------------------------------------- the lines the person reads
 
@@ -101,7 +101,7 @@ export function parseVerdict(text: string): AgeVerdict | null {
   const sexual = o.is_nude_or_sexual;
   const confidence = o.confidence;
   const estimate = o.apparent_min_age_estimate;
-  if (typeof count !== "number" || !Number.isFinite(count) || count < 0) return null;
+  if (typeof count !== "number" || !Number.isInteger(count) || count < 0) return null;
   if (label !== "adult" && label !== "possibly_minor" && label !== "child" && label !== "none") return null;
   if (typeof sexual !== "boolean") return null;
   if (typeof confidence !== "number" || !Number.isFinite(confidence)) return null;
@@ -109,17 +109,24 @@ export function parseVerdict(text: string): AgeVerdict | null {
   // "None" with people counted, or a person label with nobody counted and no age, contradict themselves: not a verdict to trust either way.
   if (label === "none" && count > 0) return null;
   if (label === "adult" && count === 0) return null;
-  return { people_count: Math.round(count), apparent_min_age_estimate: typeof estimate === "number" ? Math.round(estimate) : null, label, is_nude_or_sexual: sexual, confidence: Math.max(0, Math.min(1, confidence)) };
+  return { people_count: count, apparent_min_age_estimate: typeof estimate === "number" ? Math.round(estimate) : null, label, is_nude_or_sexual: sexual, confidence: Math.max(0, Math.min(1, confidence)) };
 }
 
-/** The label with the model's own age number taken into account: an "adult" label beside an estimate under 18 is read as the younger answer. */
+/** A verdict the model is not sure of is not an "adult" verdict: below this confidence an adult label counts as possibly_minor. */
+export const MIN_ADULT_CONFIDENCE = 0.5;
+
+/**
+ * The label with the model's other answers taken into account, always toward the younger reading: an "adult" label beside an
+ * estimated age under 18, or with confidence under 0.5, is read as the younger answer.
+ */
 export function effectiveLabel(verdict: AgeVerdict): AgeLabel {
   const age = verdict.apparent_min_age_estimate;
   let label = verdict.label;
-  if (age !== null && verdict.people_count > 0) {
+  if (age !== null) {
     if (age < 13 && label !== "child") label = "child";
     else if (age < 18 && label !== "child" && label !== "possibly_minor") label = "possibly_minor";
   }
+  if (label === "adult" && verdict.confidence < MIN_ADULT_CONFIDENCE) label = "possibly_minor";
   return label;
 }
 
@@ -160,11 +167,13 @@ export function decideAgeCheck(checks: readonly ImageCheck[], adultOnly: boolean
 export type AdapterClass = "all-ages" | "adult-only";
 
 /**
- * Whether a job is adult-only: the prompt carries a sexual or nudity word, or any style used is adult-only. A style the
+ * Whether a job is adult-only: the prompt carries a sexual or nudity word or a plain "no clothes" phrase, or any style used is adult-only. A style the
  * library no longer knows (`undefined`) counts as adult-only: the check cannot tell what it did.
  */
 export async function isAdultOnlyJob(prompt: string, styleIds: readonly string[], classOf: (id: string) => Promise<AdapterClass | undefined>): Promise<boolean> {
   if (mentionsSexualWord(prompt)) return true;
+  const words = normalise(prompt);
+  if (UNCLOTHED_PHRASES.some((phrase) => hasWord(words, phrase))) return true;
   for (const id of styleIds) {
     let cls: AdapterClass | undefined;
     try { cls = await classOf(id); } catch { cls = undefined; }
@@ -313,7 +322,9 @@ export interface WithheldEvent {
   kind: CheckedKind;
   personId: string;
   jobId: string;
-  prompt: string;
+  /** The words (hashed here, never logged) or, where the caller already holds only a hash, that hash. */
+  prompt?: string;
+  promptHash?: string;
   adultOnly: boolean;
   checks: readonly ImageCheck[];
 }
@@ -328,17 +339,18 @@ export async function recordWithheld(event: WithheldEvent): Promise<void> {
   const minor = event.checks.find((check) => check.ok && showsPossibleMinor(check.verdict));
   const verdict = minor && minor.ok ? minor.verdict : null;
   console.warn(`[age-check] withheld ${JSON.stringify({
-    kind: event.kind, job: event.jobId, person: event.personId, prompt_hash: promptHash(event.prompt), adult_only: event.adultOnly,
+    kind: event.kind, job: event.jobId, person: event.personId, prompt_hash: event.promptHash ?? promptHash(event.prompt ?? ""), adult_only: event.adultOnly,
     label: verdict ? effectiveLabel(verdict) : null, age: verdict?.apparent_min_age_estimate ?? null, people: verdict?.people_count ?? null,
     sexual: verdict?.is_nude_or_sexual ?? null, confidence: verdict?.confidence ?? null,
   })}`);
   const now = Date.now();
   const last = lastNotified.get(event.personId);
   if (last !== undefined && now - last < NOTIFY_EVERY_MS) return;
-  lastNotified.set(event.personId, now);
   try {
     const row = db.select({ name: people.displayName }).from(people).where(eq(people.id, event.personId)).get();
     await trigger("safety.picture_withheld", { kind: event.kind, personName: row?.name ?? "Someone" });
+    // Only a notification that went out starts the quiet period: a failed one is tried again on the next withheld item.
+    lastNotified.set(event.personId, now);
   } catch (error) {
     console.error(`[age-check] the admin notification failed: ${(error as Error).message}`);
   }

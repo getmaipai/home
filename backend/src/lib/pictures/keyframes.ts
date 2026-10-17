@@ -1,10 +1,10 @@
 // AGECHECK: three keyframes (first, middle, last) of a finished clip, for the finished-video safety check
 // (ageCheck.ts). On this Mac the frames come from Apple's decoder through a tiny Swift helper (`keyframes.swift`,
-// compiled once with `swiftc` when the command line tools are there, the same pattern as the Stack's
+// compiled once per source version with `swiftc` when the command line tools are there, the same pattern as the Stack's
 // foreground helper); `ffmpeg` on the PATH is the second choice. When neither exists the caller checks the
 // Stack's poster (frame 0) alone and says so. Everything is local: the clip goes to a temporary folder on this
 // computer, three JPEGs come back, the folder is removed.
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -20,33 +20,48 @@ function workRoot(): string {
 }
 
 let helperPromise: Promise<string | null> | null = null;
-/** Compiles the helper once per process (and once per boot: the folder is temporary). Null when the Mac has no `swiftc`. */
+let helperFailedAt = 0;
+const RETRY_AFTER_FAILURE_MS = 5 * 60 * 1000;
+/**
+ * Compiles the helper once per process and returns its path. Null when the Mac has no `swiftc` or the compile failed; a null
+ * is retried after five minutes, so installing the command line tools later takes effect without a restart.
+ */
 export function ensureKeyframeHelper(): Promise<string | null> {
   if (forTests || process.platform !== "darwin") return Promise.resolve(null);
-  helperPromise ??= compileHelper().catch(() => null);
+  if (helperPromise && helperFailedAt > 0 && Date.now() - helperFailedAt > RETRY_AFTER_FAILURE_MS) helperPromise = null;
+  if (!helperPromise) {
+    helperFailedAt = 0;
+    helperPromise = compileHelper().catch(() => null).then((path) => { if (!path) helperFailedAt = Date.now(); return path; });
+  }
   return helperPromise;
 }
 
 async function compileHelper(): Promise<string | null> {
-  const target = join(workRoot(), "keyframes");
+  if (!existsSync(HELPER_SOURCE)) return null;
+  // The file name carries a hash of the source, so an edited helper is never run from an older build, and the compile goes
+  // to a private name first and is renamed into place, so a second process never runs a half-written binary.
+  const hash = new Bun.CryptoHasher("sha256").update(readFileSync(HELPER_SOURCE)).digest("hex").slice(0, 12);
+  const target = join(workRoot(), `keyframes-${hash}`);
   if (existsSync(target)) return target;
   const swiftc = Bun.which("swiftc");
-  if (!swiftc || !existsSync(HELPER_SOURCE)) return null;
+  if (!swiftc) return null;
   const cache = join(workRoot(), "swift-cache");
   mkdirSync(cache, { recursive: true });
-  const child = Bun.spawn([swiftc, "-O", HELPER_SOURCE, "-o", target], { stdout: "ignore", stderr: "ignore", env: { ...process.env, CLANG_MODULE_CACHE_PATH: cache } });
+  const building = `${target}.${process.pid}.${Date.now()}.tmp`;
+  const child = Bun.spawn([swiftc, "-O", HELPER_SOURCE, "-o", building], { stdout: "ignore", stderr: "ignore", env: { ...process.env, CLANG_MODULE_CACHE_PATH: cache } });
   const timer = setTimeout(() => child.kill(), COMPILE_DEADLINE_MS);
   const code = await child.exited;
   clearTimeout(timer);
-  if (code !== 0) { rmSync(target, { force: true }); return null; }
-  chmodSync(target, 0o755);
+  if (code !== 0) { rmSync(building, { force: true }); return null; }
+  chmodSync(building, 0o755);
+  renameSync(building, target);
   return target;
 }
 
 /** Test seam: replaces the whole extraction. */
 let forTests: ((mp4: Uint8Array, seconds: number | null) => Promise<Uint8Array[] | null>) | null = null;
 export function __setKeyframesForTests(fn: typeof forTests): void { forTests = fn; }
-export function __resetKeyframeHelperForTests(): void { helperPromise = null; }
+export function __resetKeyframeHelperForTests(): void { helperPromise = null; helperFailedAt = 0; }
 
 async function run(cmd: string[], deadlineMs: number): Promise<number> {
   const child = Bun.spawn(cmd, { stdout: "ignore", stderr: "ignore" });
