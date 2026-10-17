@@ -451,9 +451,10 @@ const [specDir, outputPath] = process.argv.slice(2);
 const spec = JSON.parse(execFileSync("git", ["-C", specDir, "show", "HEAD:spec/settings/keys.json"], { encoding: "utf8" }));
 const generated = JSON.parse(fs.readFileSync(outputPath, "utf8"));
 const byKey = new Map(spec.map((entry) => [entry.key, entry]));
-// Keys Home declares ahead of the pinned spec tag (spec first is still owed in commons). An entry may be absent from
-// the tag, never different from it; delete the key here when a spec tag carries it.
-const aheadOfSpec = new Set(["ui.reasoning_open", "voice.hesitations", "chat.paused", "chat.paused_message"]);
+// Keys Home declares ahead of the pinned spec tag (spec first is still owed in commons), listed once in
+// scripts/settings-ahead-of-spec.json for this check and the full gate's. An entry may be absent from the tag, never
+// different from it; delete the key there when a spec tag carries it.
+const aheadOfSpec = new Set(JSON.parse(fs.readFileSync("scripts/settings-ahead-of-spec.json", "utf8")));
 const missing = generated.filter((entry) => !entry.key.startsWith("engines.stack.") && !(aheadOfSpec.has(entry.key) && !byKey.has(entry.key)) && JSON.stringify(byKey.get(entry.key)) !== JSON.stringify(entry));
 const required = ["engines.stack.where", "engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"];
 const localPort = byKey.get("engines.stack.remote.local_port");
@@ -606,7 +607,8 @@ const [specDir, outputPath] = process.argv.slice(2);
 const spec = JSON.parse(execFileSync("git", ["-C", specDir, "show", "HEAD:spec/settings/keys.json"], { encoding: "utf8" }));
 const generated = JSON.parse(fs.readFileSync(outputPath, "utf8"));
 const byKey = new Map(spec.map((entry) => [entry.key, entry]));
-const missing = generated.filter((entry) => !entry.key.startsWith("engines.stack.") && JSON.stringify(byKey.get(entry.key)) !== JSON.stringify(entry));
+const aheadOfSpec = new Set(JSON.parse(fs.readFileSync("scripts/settings-ahead-of-spec.json", "utf8")));
+const missing = generated.filter((entry) => !entry.key.startsWith("engines.stack.") && !(aheadOfSpec.has(entry.key) && !byKey.has(entry.key)) && JSON.stringify(byKey.get(entry.key)) !== JSON.stringify(entry));
 const required = ["engines.stack.where", "engines.stack.remote.host", "engines.stack.remote.ssh_port", "engines.stack.remote.local_port", "engines.stack.remote.allow_tailnet"];
 const localPort = byKey.get("engines.stack.remote.local_port");
 if (localPort?.level !== "advanced") missing.push({ key: "engines.stack.remote.local_port (expected advanced)" });
