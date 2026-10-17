@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { APP_CATALOG, favoriteApps, filterApps } from "@/shell/appCatalog";
+import { favoriteApps, filterApps } from "@/shell/appCatalog";
+import { useAppCatalog } from "@/shell/useAppCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { runSearchProviders, type SearchGroup, type SearchResultItem } from "@/shell/search/providers";
 
@@ -13,6 +14,7 @@ import { runSearchProviders, type SearchGroup, type SearchResultItem } from "@/s
  * pass one anyway - every signed-in surface already has a real person. */
 export function useSearchCommand(personId: string, query: string, enabled = true) {
   const { pinned } = usePinnedApps(personId);
+  const apps = useAppCatalog();
   const trimmed = query.trim();
 
   // Gated on a real query, not just `enabled`: the empty-query state
@@ -24,15 +26,15 @@ export function useSearchCommand(personId: string, query: string, enabled = true
   // unprompted background traffic CLAUDE.md's "only what the user asked
   // for" rules out, even for same-origin calls.
   const { data: groups } = useQuery({
-    queryKey: ["search", query],
-    queryFn: () => runSearchProviders(query),
+    queryKey: ["search", query, apps.length],
+    queryFn: () => runSearchProviders(query, apps),
     enabled: enabled && trimmed !== "",
     placeholderData: (previous) => previous,
   });
 
-  const localApps = filterApps(APP_CATALOG, query).slice(0, 8);
-  const localFavorites = trimmed ? [] : favoriteApps(pinned).slice(0, 6);
-  const toItem = (app: (typeof APP_CATALOG)[number]): SearchResultItem => ({
+  const localApps = filterApps(apps, query).slice(0, 8);
+  const localFavorites = trimmed ? [] : favoriteApps(pinned, apps).slice(0, 6);
+  const toItem = (app: (typeof apps)[number]): SearchResultItem => ({
     id: `app:${app.to}`,
     label: app.label,
     sublabel: app.description,

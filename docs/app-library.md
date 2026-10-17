@@ -22,9 +22,13 @@ people choose shortcuts by pinning apps. `ui.pinned_apps` stores routes per
 person, with optimistic updates and rollback on failed saves. Pins preserve
 selection order; stale routes are ignored.
 
-Installed backend plugins are not automatically launchable frontend apps.
-Automatic package discovery needs a route-registration and app-metadata
-contract before it can safely contribute entries to this catalog. That
-contract is designed (not built) in
-[plans/app-kind-2026-10-16.md](plans/app-kind-2026-10-16.md): one `apps/*`
-route, `GET /api/apps` merged into the catalog, and pins unchanged.
+Package apps (APP-KIND-01 to 04) join this catalog with no rebuild. A package whose manifest lists
+`contributes.pages` is an app: `GET /api/apps` lists the ones the asking person may open (role, enabled, platform and
+capabilities, the same gate as the page and data routes), `useAppCatalog()` in `shell/useAppCatalog.ts` merges them with
+`APP_CATALOG`, and the merged list feeds search, favorites and the route header. One route, `apps/*`, opens every one of them:
+`PackageAppPage` fetches the page document (`GET /api/plugins/:id/pages/:pageId`) and draws it with the kit's SchemaPage inside
+the package scope, so a package page reads only its own package and navigates only inside `/apps/<id>`. Pins are unchanged: a
+package app pins by its route (`/apps/<id>`) in `ui.pinned_apps`; an app that is uninstalled, disabled or hidden by role is
+absent from the catalog, `favoriteApps` skips its pin, and the stored pin stays so a reinstall brings it back. While Incognito
+is on, an app whose manifest says `incognito: "blocked"` is left out. How to write one: "Writing an app package" in the org
+`docs/PACKAGES.md`. The design is [plans/app-kind-2026-10-16.md](plans/app-kind-2026-10-16.md).

@@ -1,4 +1,4 @@
-import type { StatusAppsWire } from "@maipai/home-backend/src/wire";
+import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
 import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
@@ -661,6 +661,7 @@ export type StatusHistoryComponent = { component: StatusHistoryIncident["compone
 export type StatusHistory = { generated_at: string; days: number; components: StatusHistoryComponent[]; incidents: StatusHistoryIncident[] };
 
 export type StatusAppsResponse = StatusAppsWire;
+export type AppRow = AppRowWire;
 export type EngineComputerStatus = { configured: boolean; state: "working" | "connecting" | "slow_to_answer" | "reconnecting" | "not_reachable"; reason: string | null; details?: { path: "home" | "tailnet" | null; lastProbeAt: string | null; contract: string | null } };
 export type StatusApp = StatusAppsResponse[number];
 export type StatusAppNeed = NonNullable<StatusApp["needs"]>[number];
@@ -1179,6 +1180,10 @@ export const api = {
         throw e;
       },
     ),
+  // APP-KIND-03/04: the package apps this person may open, and one of an app's page documents
+  // (a spec `page`, drawn by the kit's SchemaPage). A hidden or unknown app and page are both 404.
+  apps: () => request<AppRow[]>("/api/apps"),
+  appPage: (pkg: string, page: string) => request<unknown>(`/api/plugins/${encodeURIComponent(pkg)}/pages/${encodeURIComponent(page)}`),
   // GET /api/repairs (backend/src/routes/repairs.ts): real and fully
   // landed (F step 1), unlike widgets/lists above - no graceful-404
   // handling needed, a failure here is a real failure.

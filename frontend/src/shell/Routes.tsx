@@ -12,6 +12,7 @@ import { useAppearance } from "@/shell/useAppearance";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
+import { PackageAppPage } from "@/shell/pages/PackageAppPage";
 import { ProjectsPage } from "@/shell/pages/ProjectsPage";
 import { FamilyPage } from "@/shell/pages/FamilyPage";
 import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
@@ -269,6 +270,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="users" element={<UsersPage person={person} />} />
             <Route path="files" element={<FilesPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />
+            {/* APP-KIND-04: every installed package app, with no rebuild. Static routes above win over this splat. */}
+            <Route path="apps/*" element={<PackageAppPage person={person} />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
             <Route path="*" element={<NotFoundPage />} />

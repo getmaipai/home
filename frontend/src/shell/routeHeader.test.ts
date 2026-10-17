@@ -1,5 +1,6 @@
 import { expect, test } from "bun:test";
 import { routeHeader } from "./routeHeader";
+import { mergeAppCatalog } from "./appCatalog";
 import type { Roster } from "@/lib/api";
 
 const person: Roster = {
@@ -39,4 +40,10 @@ test("a nested route matches its ancestor destination, not the root", () => {
 
 test("an unregistered route falls back rather than showing a stale title", () => {
   expect(routeHeader("/nothing-registered", person)).toEqual({ title: "MaiPai Home", subtitle: "" });
+});
+
+test("a package app route takes its title and subtitle from the merged catalog", () => {
+  const apps = mergeAppCatalog([{ package: "demo", page: "index", label: "Demo weather", icon: "cloud-sun", description: "A fixture app.", category: "Utilities", keywords: [], sections: [], to: "/apps/demo", incognito: "unaffected" }], false);
+  expect(routeHeader("/apps/demo/week", person, apps)).toEqual({ title: "Demo weather", subtitle: "A fixture app." });
+  expect(routeHeader("/apps/demo", person).title).toBe("MaiPai Home");
 });

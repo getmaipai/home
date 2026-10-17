@@ -1,6 +1,6 @@
 import { isActiveNavPath } from "@maipai/ui/src/nav";
 import { greetingFor } from "@/apps/home/greeting";
-import { APP_CATALOG } from "@/shell/appCatalog";
+import { APP_CATALOG, type AppEntry } from "@/shell/appCatalog";
 import type { Roster } from "@/lib/api";
 
 interface RouteHeaderOverride {
@@ -27,14 +27,14 @@ export interface RouteHeader {
   subtitle: string;
 }
 
-export function routeHeader(pathname: string, person: Roster): RouteHeader {
+export function routeHeader(pathname: string, person: Roster, apps: readonly AppEntry[] = APP_CATALOG): RouteHeader {
   // Longest `to` first, so "/settings/models" matches "/settings"
   // rather than accidentally the root "/" entry (isActiveNavPath's own
   // segment-boundary rule keeps "/media" from matching "/media-library",
   // but every non-root entry is itself under "/").
   const override = [...ROUTE_HEADER_OVERRIDES].sort((a, b) => b.to.length - a.to.length).find((candidate) => isActiveNavPath(pathname, candidate.to));
   if (override) return { title: override.title, subtitle: typeof override.subtitle === "function" ? override.subtitle(person) : override.subtitle };
-  const catalogEntry = [...APP_CATALOG].sort((a, b) => b.to.length - a.to.length).find((entry) => isActiveNavPath(pathname, entry.to));
+  const catalogEntry = [...apps].sort((a, b) => b.to.length - a.to.length).find((entry) => isActiveNavPath(pathname, entry.to));
   if (catalogEntry) return { title: catalogEntry.label, subtitle: catalogEntry.description };
   return { title: "MaiPai Home", subtitle: "" };
 }

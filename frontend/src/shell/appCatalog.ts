@@ -1,4 +1,5 @@
 import { NAV_ENTRIES, type NavEntry } from "./nav";
+import type { AppRow } from "@/lib/api";
 
 export interface AppEntry extends NavEntry {
   description: string;
@@ -34,6 +35,22 @@ export function filterApps(apps: readonly AppEntry[], query: string, category = 
     words.every((word) => `${app.label} ${app.description} ${app.keywords.join(" ")}`.toLocaleLowerCase().includes(word)));
 }
 
-export function favoriteApps(pinned: readonly string[]): AppEntry[] {
-  return [...new Set(pinned)].flatMap((to) => { const app = APP_CATALOG.find((entry) => entry.to === to); return app ? [app] : []; });
+/** `apps` defaults to the static core list; the shell passes the merged list from `useAppCatalog`. A pinned
+ * route with no entry (an uninstalled, disabled or role-hidden package app) is skipped here and stays in the
+ * stored list, so a reinstall brings the pin back. */
+export function favoriteApps(pinned: readonly string[], apps: readonly AppEntry[] = APP_CATALOG): AppEntry[] {
+  return [...new Set(pinned)].flatMap((to) => { const app = apps.find((entry) => entry.to === to); return app ? [app] : []; });
+}
+
+/** One `GET /api/apps` row as a catalog entry. */
+export function appEntryFromRow(row: AppRow): AppEntry {
+  return { to: row.to, icon: row.icon, label: row.label, description: row.description, category: row.category, keywords: row.keywords };
+}
+
+/** The core apps plus the package apps the hub lists for this person. While Incognito is on, an app whose
+ * manifest says `incognito: "blocked"` is left out (the hub cannot see the browser's Incognito state). */
+export function mergeAppCatalog(rows: readonly AppRow[] | undefined, incognito: boolean): AppEntry[] {
+  const packageApps = (rows ?? []).filter((row) => !(incognito && row.incognito === "blocked")).map(appEntryFromRow);
+  const known = new Set(APP_CATALOG.map((app) => app.to));
+  return [...APP_CATALOG, ...packageApps.filter((app) => !known.has(app.to))];
 }
