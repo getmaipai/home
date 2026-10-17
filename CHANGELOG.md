@@ -7,6 +7,20 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-10-17
+
+Chat can make pictures and short videos, and the picture editor can edit with a comment.
+
+### Pictures and videos
+- Ask for a picture in chat and Home makes it with the AI engine. The picture shows as a card in the chat, and a job keeps going if you leave the page.
+- Ask for a short video, or ask to animate a picture. Videos are offered on the largest Mac setting only, because a clip needs a lot of memory.
+- Settings has a Pictures and videos page. Children and teens only get pictures and videos when a grown-up allows them, and every result passes the same safety checks as chat.
+- The picture editor has a Comment tool.
+
+### Under the hood
+- The database moves to version 62 (picture jobs and video jobs). The installer saves a copy of your data first, so a rollback restores it.
+- The installer builds the Stack from a newer pin with FLUX.2 Klein picture generation, masked edits, LoRA styles and the video service.
+
 ## [0.2.7] - 2026-10-17
 
 The AI engine gains picture tools and video, and an upgrade now fetches the picture reader it needs.
