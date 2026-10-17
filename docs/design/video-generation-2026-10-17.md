@@ -17,7 +17,7 @@ are upper bounds. Scripts, logs, clips and keyframe sheets are in the author's s
 | Fallback / second pin, not default | **Kandinsky 6.0 Video Lite distill (3B, MIT)**: text and image to video **with synchronized 44 kHz audio**, 10 steps | MIT on the card | Measured on this Mac through PyTorch MPS: 22.7 s per step, **227 s denoise alone**, and the untiled decode died at a 194 GB peak. Fails the speed bar today; revisit when an MLX port exists. See section 2 |
 | Smaller tiers (p16, p32) | **Off.** `video` stays "not available" | | Peak 44 GB at 121 frames. A smaller-frame, quantized path was not measured; claiming it would be a guess. Row VIDEO-GEN-09 measures a 480p, 61 frame q8 profile for p32 before any promise |
 
-The bar was "5 s at 480p to 720p in under about 3 minutes warm". 480p meets it (129 to 141 s). 720p is in section 4.
+The bar was "5 s at 480p to 720p in under about 3 minutes warm". 480p meets it (122 to 141 s); 720p does not (308 s, 53.9 GB), see section 4.
 
 ## 2. Candidates and why each lost (licence texts read; numbers are measured unless marked)
 
@@ -81,7 +81,9 @@ aggressive`, and the governor admits a video job only against the 44 GB figure (
 worker saves those 3 s and the 11 GB text-encoder read on a first job, not the decode.
 
 **Time target.** About 130 to 160 s at 480p, inside the 3 minute bar and inside Jesse's earlier "minutes, not tens of minutes".
-**720p (1280 x 704): measurement in progress, recorded in the next commit of this note.**
+**720p (1280 x 704), same prompt, aggressive tiling: denoise 35.2 s, decode 269.3 s, total 308 s, peak 53.9 GB.** That misses the 3 minute bar and
+exceeds the 50 GB job budget, so **720p is not offered**: the cap is 832 x 480 (480p) on p64 and p128 until the decode is faster
+(VIDEO-GEN-11) or a smaller peak is measured. 540p (960 x 544) was not run; the cost scales with area, so it would land near 200 s and 50 GB, not under the bar.
 
 ## 5. Quality, judged by opening keyframes
 
@@ -95,7 +97,9 @@ saturation, a little glossy.
 - **Coffee pour (fictional, no face)**: pot tilts, a continuous stream, steam rises, the cup fills; no hand artefacts because the hand stays out of frame.
 - **Paper boat in rain**: the boat holds its shape across the clip, ripples and falling drops appear; the first frames flash and the boat renders blue
   where the prompt said white (colour adherence is weak under DMD).
-- **Image to video, and the LoRA test**: in progress, recorded in the next commit of this note.
+- **Image to video** (the first frame of the robot clip as the still, prompt "turns its head, blinks, gives a thumbs up"): 13.6 s denoise, 112.8 s decode,
+  132 s total, 44.1 GB. The robot keeps its identity (head, headphones, vent, palette) and ends in a two-handed thumbs up; fine detail such as the vent
+  slats is redrawn cleaner than the still. The image conditions the first frame only, as in the Wan2.2 5B design.
 
 ## 6. Samples (author's scratchpad, `scratchpad/videogen/out`)
 
@@ -145,7 +149,14 @@ spreads misinformation, or targets vulnerable populations"; it is a restatement 
 text. LTX-2.x: item 2 of the use list bars exploiting or harming minors, nothing bars adult content. Kandinsky 6.0 (MIT): no clause. HunyuanVideo 1.5
 and MiniMax H3: territory exclusions, rejected before this question mattered.
 
-**First tested LoRA.** in progress, recorded in the next commit of this note.
+**First tested LoRA.** `AlekseyCalvin/HSToric_Color_Wan2.2_5B_LoRA_BySilverAgePoets` (`HSToric_color_Wan22_5b_LoRA.safetensors`), **Apache-2.0** on its card, 323 MB, rank 64, sha256
+`5c2fc21b1e74d5088318fea72c676181650a0f771cc521151edfc43f6ea9ec77`, base `Wan-AI/Wan2.2-TI2V-5B`, style of early 1900s colour photography, trigger
+`HST style HD film, early 1900s`. Loaded with `--lora ... 1.0`: "Applying LoRAs to 300 modules", no error. The weights are merged into the model, so the
+cost is small: the run took 122 s total against 130 to 134 s for the unadapted runs (a per-run load time was not separated out, it is inside that number).
+Effect on the dog prompt, same seed: a wider, more filmic frame, gentler warm tone, a walking rather than running dog, a different shoreline; the sepia
+character is real but modest at strength 1.0 (the clip is `wan_dog_lora.mp4`, sheet `wan_dog_lora.jpg`). The adult-only flag defaults to all-ages for this
+file (style LoRA, metadata names no adult subject). Also seen and refused by policy: `JonneyWang/AnyID` (cc-by-nc-sa-4.0, non-commercial, would import only with the
+acknowledgement). No adult LoRA was downloaded or tested in this session.
 
 ## 8. Memory, keep-warm and jobs
 
@@ -159,8 +170,8 @@ and MiniMax H3: territory exclusions, rejected before this question mattered.
   a percentage inside rendering and decoding; **cancel** stops the worker and frees its memory; a job past its deadline answers `202` with the
   id, as the image and tool routes do. Results are held in memory about 10 minutes (the six newest) and Home stores the file as a new
   attachment; nothing is logged with a prompt (rule 6a).
-- **Caps per tier.** p128: up to 121 frames (5 s) at 832 x 480, 720p after the 720p result is recorded. p64: the same at 480p only. p16 and p32: off.
-  Hard ceilings in the Stack, not settings: 121 frames, 24 fps, the pixel area of 1280 x 704.
+- **Caps per tier.** p128 and p64: up to 121 frames (5 s) at 832 x 480. p16 and p32: off.
+  Hard ceilings in the Stack, not settings: 121 frames, 24 fps, the pixel area of 832 x 480 (720p measured at 308 s and 53.9 GB, not offered).
 
 ## 9. Stack API (additive; contract number unchanged)
 
