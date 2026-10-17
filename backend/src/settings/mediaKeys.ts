@@ -17,7 +17,7 @@ export const MEDIA_SETTINGS_KEYS: SettingsKey[] = [
     label: "Audio outside screen time",
     help: "Music and audiobooks do not use the daily media minutes when this is on.",
     copy: { does: "Leaves music and audiobooks out of the daily media minutes." },
-    // Expert until a spec areas tag carries a media group: no settings card places it yet (settingsAreasRegistry.test.ts).
+    // Expert: spec-v0.1.174 places it in the household Developer tools card "Media minutes".
     level: "expert", lives_in: "media.budget", honoured_by: ["home"],
   }),
 ];
