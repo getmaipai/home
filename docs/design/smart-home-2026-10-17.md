@@ -40,8 +40,7 @@ An app on the rail named by the household (default **House**), emulating the Hom
    websocket subscription, never polled.
 2. **Scenes**: Home Assistant's scenes and scripts the admin exposed, one button each ("Movie night", "Goodnight").
 3. **Settings, House** (an app settings area per S4, declared as data): the existing `home.base_url` and `home.access_token`
-   keys (the token a write-only secret, CREDENTIALS.md), a Test button,
-   (a write-only secret, CREDENTIALS.md), a Test button, the exposure list (areas and entities, with a kid-safe column per
+   keys (the token a write-only secret, CREDENTIALS.md), a Test button, the exposure list (areas and entities, with a kid-safe column per
    entity), the per-person overrides (teen locks), and the alarm sensors (existing SAFETY-ALARM-01 mapping, moved here).
 4. **Chat and voice**: the three plugins become real: `lights-on`, `lights-off` and a new `switch-set` call `host.integration.call`
    with the entity id resolved from the exposure list by its area and name ("the kitchen light"), and `lock-doors` asks first.

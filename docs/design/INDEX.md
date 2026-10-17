@@ -31,7 +31,7 @@ from FileTube" section); a new design that queues work or keeps a collection cit
 | [image-tools-2026-10-17.md](image-tools-2026-10-17.md) | current; Stack half landed | IMGTOOLS-01 to -09 |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
 | [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (to be cut; today the Integrations rows it supersedes) |
-| [image-generation-2026-10-17.md](image-generation-2026-10-17.md) | new 2026-10-17, no code | PICTURES-01 to -06 (to be cut; today "Image generation (L)" and CHAT-MEDIA-01 in Generation) |
+| [image-generation-2026-10-17.md](image-generation-2026-10-17.md) | new 2026-10-17, no code | PICTURES-01 to -05 (to be cut; today "Image generation (L)" and CHAT-MEDIA-01 in Generation) |
 | [devices-and-robot-link-2026-10-17.md](devices-and-robot-link-2026-10-17.md) | new 2026-10-17, no code | ROBOTLINK-01, -02, ROBOTLINK-BENCH-01, DEVICES-01 to -03 (to be cut; today the Portability "Sync engine decision" and "A Device record and spec/link" rows) |
 | [stories-2026-10-17.md](stories-2026-10-17.md) | new 2026-10-17, no code | STORIES-01 to -04 (to be cut; today PROJECT-PACK-01, -02 in Projects) |
 | media apps blend, news app, kid mode voice (2026-10-17) | written by other sessions the same day; listed here when they land | their own rows |
