@@ -70,6 +70,82 @@ Ranked recommendation: first prove whether a second GPU job halves generation (f
 live slowdown), then DFlash (biggest gain for the model Jesse already chose, no quality change), then a reasoning budget. A MoE
 model is a product decision for Jesse and the vetting process, not a flag.
 
+## DFlash draft, measured (CHAT-TPS-02, 2026-10-17)
+
+**Result: 1.26x to 1.88x at the Stack's own flags, 1.55x on average across five prompt kinds. Worth shipping.**
+
+Draft file, from the model card (`meta-models/Muse-Glimmer-30B-GGUF`, revision `70bf1b61ac09f91b24d39038091b41c582bc5d7a`):
+`dflash-Muse-Glimmer-30B-Q4_K_M.gguf`, 1,631,208,128 bytes, sha256
+`b2e808bf656086fe86bd0d0bd990f01d33e377537a07c02d45371517c8b264ef` (the Hugging Face file listing's value; the downloaded file
+matched it). The card documents only `-md <file> -ngld 99`; `llama-server --help` on the live b10797 build adds
+`--spec-type draft-dflash` and `--spec-draft-n-max N` (default 3). Both are needed: `-md` alone is not the DFlash path.
+
+Method: a separate llama-server on port 18998 with the Stack's exact launch flags (the Q4_K_XL file, `-fa on -ngl all --reasoning off
+-ub 1024 --jinja --chat-template-kwargs {"reasoning_strength":"low"} --cache-reuse 256 -ctk q8_0 -ctv q8_0`), seed 7, temperature 1.0,
+top_p 0.95, top_k 64, 200 generated tokens per run, 3 runs per prompt, streamed through `/v1/chat/completions`. Tokens/s is the
+engine's `predicted_per_second`. The bench lock was held; the live Stack and chat were not touched.
+
+| Prompt | No draft, 128k ctx | With draft, 128k | Speedup | Acceptance | With draft, 16k ctx (no draft) |
+|---|---:|---:|---:|---:|---:|
+| short chat | 25.9 | 32.6 | 1.26x | 42% | 30.4 (25.9) |
+| code | 26.0 | 42.1 | 1.62x | 64% | 41.7 (25.6) |
+| long explanation | 25.8 | 32.6 | 1.26x | 42% | 32.4 (25.3) |
+| tool-call JSON | 25.5 | 47.0 | 1.84x | 77% | 47.2 (25.1) |
+| reasoning-heavy | 25.9 | 46.4 | 1.79x | 77% | 47.0 (25.9) |
+
+Time to first token (short prompts): 505 to 521 ms with the draft against 549 to 563 ms without. No penalty; prompt processing is
+unchanged. Memory: resident size of the server was 20.05 GB without and 22.23 GB with the draft at 128k (+2.2 GB), and 19.27 against
+21.44 GB at 16k (+2.2 GB); the file is 1.6 GB, the rest is the draft's own context. A 16k context changes speed by under 3%.
+
+Draft length (`--spec-draft-n-max`), 16k context, tokens/s for chat / code / explain / JSON / reasoning:
+
+| n-max | chat | code | explain | JSON | reasoning |
+|---:|---:|---:|---:|---:|---:|
+| 3 (default) | 30.4 | 41.7 | 32.4 | 47.2 | 47.0 |
+| 6 | 20.9 | 33.1 | 23.1 | 34.5 | 34.4 |
+| 16 (the drafter's block size) | 11.8 | 22.4 | 11.6 | 33.7 | 22.8 |
+
+Longer drafts are slower: acceptance falls (42% to 24% to 10% on chat) and every rejected token is verified for nothing. Keep the
+default of 3. Lower values (1 and 2) were not run.
+
+Honest limits of these numbers:
+
+- **Variance is small by construction.** A fixed seed makes each prompt's three runs near-identical (spread under 1 tok/s, one
+  outlier run at 25.9 against 32.7 for the same prompt, likely another process on the GPU). The real variance is across prompts and
+  sampling seeds, which these runs do not sample; expect each figure to move by a few tokens/s in daily use.
+- **Runs are 200 tokens.** All 200 were the model's reasoning text (the stream's `reasoning_content`), so the table measures the
+  thinking phase. Final-answer prose was not isolated. The code and JSON rows are structured text and gain most; open prose gains
+  least (1.26x). A chat that is mostly prose should expect the low end.
+- **"Same output" holds in distribution, not byte for byte.** At temperature 0 with the same seed, 1 of 5 prompts matched exactly
+  (code). The other four diverged after 170 to 690 characters (about 40 to 170 tokens). That is floating-point difference between
+  one-token and batched verification on the GPU, not a changed distribution, but it means "identical answers" cannot be a test
+  gate. Gate on quality benches (search, tool, reasoning) with the draft against without, not on string equality.
+- Acceptance at temperature 0 was within 2 points of temperature 1 (44% to 76% at 0 against 42% to 77% at 1.0), so the sampling
+  temperature Muse uses does not hurt the draft.
+- b10797 is enough. The newer Metal few-row kernels (b11404+) were not tried; no pin bump is needed to ship.
+
+### How to ship it (CHAT-TPS-02 plan)
+
+1. **Pin the draft in the model record**, the same way the projector is pinned (VISION-03b): `draft: { url, revision, sha256,
+   bytes }` with the repo, revision and sha256 above and 1,631,208,128 bytes. The install downloads it once and verifies the sha256;
+   a mismatch fails the install with the file name and the expected hash.
+2. **The Stack passes the flags per tier**: `--spec-type draft-dflash -md <file> -ngld 99`, and leaves `--spec-draft-n-max` at its
+   default of 3. Nothing else in the launch changes.
+3. **Memory plan counts +2.2 GB** for the draft (not the 1.6 GB file size). At p128 and p64 it fits with room (the Studio has 76% free with all roles loaded). At
+   p32 memory is tight (the chat process alone peaks near 21.4 GB), so the draft is on only when the fit plan shows at least 3 GB
+   spare after the other roles; otherwise it is dropped and chat runs at normal speed. p16 does not use it: the drafter is made
+   for Muse Glimmer, and the p16 chat model is a different one.
+4. **Keep-warm:** the draft loads and unloads with the chat process (it is part of the same launch), so keep-warm needs no change
+   beyond the memory number.
+5. **Thinking tokens and tool calls behave the same:** the drafter only proposes tokens; the main model accepts or replaces each,
+   so reasoning, tool-call JSON and stop tokens come from the main model's distribution. Structured output gains most (JSON 1.84x).
+6. **Verification before the catalog change:** run the existing search, tool and reasoning benches once with and once without the
+   draft and require equal scores within run noise (byte equality is not expected, see above). Architect verdict first, since the
+   record shape and `engineArgs.ts` change.
+
+**Not done:** the installed Stack was not changed. The approval needed is to add the pinned draft to the Muse Glimmer 30B record (p32
+and larger) and the flags to `engineArgs.ts`; see the CHAT-TPS-02 row.
+
 ## Rules check
 
 - Local only: DFlash is a file the install downloads once like any model; nothing is sent out at run time.
