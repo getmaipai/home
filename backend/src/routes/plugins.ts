@@ -18,6 +18,7 @@ import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
 import { appRunAllowed, getAppData, getAppPage, manifestForViewer } from "@/lib/apps";
+import { newsRoutes } from "./newsRoutes";
 
 export const pluginsRoutes = apiRouter();
 
@@ -180,6 +181,10 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   const blocks = filterAnswerBlocks(rawBlocks, id, loaded.ok ? loaded.value.returns_blocks ?? [] : [], speakerAgeBand(actor, new Date()), actor);
   return c.json(blocks.length > 0 ? { ...rest, blocks } : rest);
 });
+
+// NEWS-02: the News app's own data, action and picture routes. Registered before the generic `/:id/data/:dataId` below so
+// `/news/...` reaches them; they apply the same app gate and the owning page's floor (lib/apps.ts).
+pluginsRoutes.route("/news", newsRoutes);
 
 // APP-KIND-03: a package app's page document and its data. Both apply the one gate in lib/apps.ts
 // (appVisibleTo); a package the person may not use is a 404, so its existence does not leak.

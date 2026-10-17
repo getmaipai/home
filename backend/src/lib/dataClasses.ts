@@ -313,7 +313,7 @@ export const DATA_CLASSES: DataClass[] = [
     help: "Saved answers from package lookups. Home rebuilds it on its own.",
     level: "expert",
     default: { base: "root", subpath: "cache" },
-    holds: "package fetch responses; knowledge.db (the reference reader's extracted-article cache)",
+    holds: "package fetch responses; knowledge.db (the reference reader's extracted-article cache, the news shelf and opened stories); news-images (News pictures, to the size set in Settings)",
     size: "MB",
     access: "small random writes",
     durability: "disposable",

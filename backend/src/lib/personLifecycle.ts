@@ -460,6 +460,8 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   sqlite.query("DELETE FROM open_questions WHERE person = ?").run(personId);
   const grantRows = sqlite.query("DELETE FROM grants WHERE person = ?").run(personId).changes;
   const approvalRows = sqlite.query("DELETE FROM approvals WHERE person_id = ?").run(personId).changes;
+  // NEWS-02: what they follow, saved and read in News goes with them (the person-forget rule, news note section 7).
+  for (const table of ["news_interests", "news_saves", "news_reads"] as const) sqlite.query(`DELETE FROM ${table} WHERE person_id = ?`).run(personId);
   // Session-cache invalidation (resolveSession's 10-second in-memory
   // cache, auth.ts) already happened above inside
   // revokeAllCredentialsAndSessions() - a deleted person's session stops

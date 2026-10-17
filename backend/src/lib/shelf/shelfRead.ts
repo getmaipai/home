@@ -43,3 +43,20 @@ export function releaseShelfItems(band: AgeBand, limit: number, store: ShelfStor
   }
   return released;
 }
+
+/** NEWS-02: one item by id, released to this user type or null. The same rules as `releaseShelfItems` (a carrying feed visible to
+ * the band, band_ok at or below it, the minor floor run again on the text), so a story, a picture or a save can never be reached by
+ * guessing an id the asker's lists do not release. */
+export function releaseShelfItem(band: AgeBand, id: string, store: ShelfStore | null = sharedShelfStore()): ShelfItem | null {
+  if (!store || !shelfEnabled()) return null;
+  const item = store.get(id);
+  if (!item) return null;
+  const visible = new Set(visibleFeedIds(band));
+  if (!store.feedIdsOf(item.canonical_url).some((feedId) => visible.has(feedId))) return null;
+  if (!bandOkAllowedFor(band).includes(item.band_ok)) return null;
+  if (band !== "adult" && tripsMinorFloor(item.summary ? `${item.title}. ${item.summary}` : item.title)) {
+    bumpShelfCounter("release_floor_dropped", band);
+    return null;
+  }
+  return item;
+}

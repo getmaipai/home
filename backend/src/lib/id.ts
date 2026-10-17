@@ -200,6 +200,21 @@ export function newNewsItemId(): string {
   return `news-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/news-interest.schema.json's `^interest-[a-z0-9]{6,}$` (NEWS-02). */
+export function newNewsInterestId(): string {
+  return `interest-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/news-save.schema.json's `^save-[a-z0-9]{6,}$` (NEWS-02). */
+export function newNewsSaveId(): string {
+  return `save-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/news-read.schema.json's `^read-[a-z0-9]{6,}$` (NEWS-02). */
+export function newNewsReadId(): string {
+  return `read-${randomSuffix(10)}`;
+}
+
 // IMGGEN-HOME-01: a picture job (hub-internal, like approvals).
 export function newPictureJobId(): string {
   return `pic-${randomSuffix(10)}`;

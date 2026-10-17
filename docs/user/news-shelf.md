@@ -9,7 +9,7 @@ When you ask MaiPai for the news, it does not go and fetch it at that moment. In
 
 ## What is on the shelf
 
-Headlines only: a title, the name of the news site and a link. MaiPai never opens the articles themselves.
+Headlines: a title, the name of the news site, a link, a short summary and the address of the picture the feed named. MaiPai opens an article, or fetches a picture, only when someone looks at that story on their own screen, never in the background.
 
 The headlines come from lists of news feeds. Two lists come with MaiPai:
 

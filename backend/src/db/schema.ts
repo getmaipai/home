@@ -2078,6 +2078,62 @@ export const mediaCollections = sqliteTable(
     // One liked, one watch later and one queue per person exist by construction.
     uniqueIndex("media_collections_singleton_idx").on(table.personId, table.kind).where(sql`${table.kind} IN ('liked', 'watch_later', 'queue')`),
   ],
+// NEWS-02 (docs/design/news-app-2026-10-17.md section 7): the three person-scope News records. Each row belongs to one
+// person, is shown to that person only (never to another person or an admin page, RULES 6a), carries the spec's id,
+// provenance and clock stamp, and goes with the person when they are forgotten (lib/personLifecycle.ts).
+// A person's follow of a topic or a source (spec NewsInterest). One row per person and channel.
+export const newsInterests = sqliteTable(
+  "news_interests",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id),
+    kind: text("kind").notNull(), // topic|source
+    key: text("key").notNull(), // a topic id or a feed- id
+    followed: integer("followed", { mode: "boolean" }).notNull().default(false),
+    affinity: real("affinity").notNull().default(0),
+    inferred: integer("inferred", { mode: "boolean" }).notNull().default(false),
+    updatedAt: text("updated_at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("news_interests_person_channel_idx").on(table.personId, table.kind, table.key)],
+);
+
+// A story a person saved (spec NewsSave). The title and publisher are kept so the Saved list still draws if the item left the shelf.
+export const newsSaves = sqliteTable(
+  "news_saves",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id),
+    itemId: text("item_id").notNull(),
+    storyId: text("story_id").notNull(),
+    canonicalUrl: text("canonical_url").notNull(),
+    title: text("title").notNull(),
+    publisher: text("publisher").notNull(),
+    savedAt: text("saved_at").notNull(),
+    offline: integer("offline", { mode: "boolean" }).notNull().default(false),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("news_saves_person_item_idx").on(table.personId, table.itemId)],
+);
+
+// One person's open of a story (spec NewsRead): pruned at 90 days, feeds only the affinity and the person's own dimmed cards.
+export const newsReads = sqliteTable(
+  "news_reads",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id),
+    itemId: text("item_id").notNull(),
+    storyId: text("story_id").notNull(),
+    openedAt: text("opened_at").notNull(),
+    readS: integer("read_s").notNull().default(0),
+    finished: integer("finished", { mode: "boolean" }).notNull().default(false),
+    feedback: text("feedback"), // more|less|null
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [index("news_reads_person_item_idx").on(table.personId, table.itemId)],
 );
 
 // MEDIA-KID-01: internal, private metering. Not synced as media records or exposed to admins.

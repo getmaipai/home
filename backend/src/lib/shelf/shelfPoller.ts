@@ -127,7 +127,33 @@ async function request(feed: FeedRecord, deps: PollDeps, now: () => number, sign
   }
 }
 
-interface Entry { url: string; title: string; summary: string; published: string | null }
+interface Entry { url: string; title: string; summary: string; published: string | null; image?: string }
+
+/** NEWS-02: the picture address the feed itself named: media:content (an image), media:thumbnail, an image enclosure, a JSON
+ * Feed `image`, or else the first <img> in the feed's own content. Never read from a fetched page. Only a web address
+ * is kept; the hub fetches it later, once, only when a screen shows the story. */
+function feedImage(e: Record<string, any>, links: { href?: string; rel?: string; type?: string }[] = []): string | undefined {
+  const media = e.media as { contents?: { url?: string; medium?: string; type?: string }[]; thumbnails?: { url?: string }[] } | undefined;
+  const candidates: unknown[] = [
+    ...(media?.contents ?? []).filter((c) => c.medium === "image" || (c.type ?? "").startsWith("image/") || (!c.medium && !c.type)).map((c) => c.url),
+    ...(media?.thumbnails ?? []).map((t) => t.url),
+    ...((e.enclosures ?? []) as { url?: string; type?: string }[]).filter((c) => (c.type ?? "").startsWith("image/")).map((c) => c.url),
+    ...links.filter((l) => l.rel === "enclosure" && (l.type ?? "").startsWith("image/")).map((l) => l.href),
+    e.image, e.banner_image,
+  ];
+  const html = [text(e.content?.encoded), text(e.content), text(e.content_html), text(e.description), text(e.summary)].join(" ");
+  const inline = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i.exec(html)?.[1];
+  for (const candidate of [...candidates, inline]) {
+    if (typeof candidate !== "string") continue;
+    const value = candidate.trim().replace(/&amp;/g, "&");
+    if (value.length > 2000) continue;
+    try {
+      const url = new URL(value);
+      if ((url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password) return url.href;
+    } catch { /* not an address: try the next */ }
+  }
+  return undefined;
+}
 
 function text(value: unknown): string {
   if (typeof value === "string") return value;
@@ -158,18 +184,18 @@ export function extractEntries(body: string, nowMs: number): { language: string 
     for (const e of (feed.entries ?? []) as Record<string, any>[]) {
       const links = (e.links ?? []) as { href?: string; rel?: string }[];
       const link = links.find((l) => l.rel === "alternate") ?? links.find((l) => !l.rel) ?? links[0];
-      entries.push({ url: link?.href ?? "", title: text(e.title), summary: text(e.summary) || text(e.content), published: isoDate(e.published ?? e.updated, nowMs) });
+      entries.push({ url: link?.href ?? "", title: text(e.title), summary: text(e.summary) || text(e.content), published: isoDate(e.published ?? e.updated, nowMs), image: feedImage(e, links) });
     }
     return { language: null, entries };
   }
   if (parsed.format === "json") {
     for (const e of (feed.items ?? []) as Record<string, any>[]) {
-      entries.push({ url: String(e.url ?? ""), title: text(e.title), summary: text(e.summary) || text(e.content_text), published: isoDate(e.date_published, nowMs) });
+      entries.push({ url: String(e.url ?? ""), title: text(e.title), summary: text(e.summary) || text(e.content_text), published: isoDate(e.date_published, nowMs), image: feedImage(e) });
     }
     return { language: typeof feed.language === "string" ? feed.language : null, entries };
   }
   for (const e of (feed.items ?? []) as Record<string, any>[]) {
-    entries.push({ url: String(e.link ?? ""), title: text(e.title), summary: text(e.description), published: isoDate(e.pubDate ?? e.dc?.date, nowMs) });
+    entries.push({ url: String(e.link ?? ""), title: text(e.title), summary: text(e.description), published: isoDate(e.pubDate ?? e.dc?.date, nowMs), image: feedImage(e) });
   }
   return { language: typeof feed.language === "string" ? feed.language : null, entries };
 }
@@ -219,6 +245,7 @@ async function ingest(feed: FeedRecord, body: string, deps: PollDeps, nowMs: num
       title,
       summary,
       published_at: entry.published,
+      ...(entry.image ? { image_url: entry.image } : {}),
       fetched_at: fetchedAt,
       publisher: feed.publisher,
       lang,

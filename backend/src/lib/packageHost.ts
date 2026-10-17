@@ -1836,13 +1836,22 @@ export function __setPageFetchForTests(fetcher: ((url: string) => Promise<Attemp
 export async function searxngPageRead(args: unknown, signal?: AbortSignal, minorBand?: MinorBand, opts: PageReadOptions = {}): Promise<PageReadResult> {
   const url = (args as { url?: unknown } | undefined)?.url;
   if (typeof url !== "string" || url.length === 0) throw new HostError("invalid_input", "page.read needs a string \"url\" argument");
-  let parsedUrl: URL;
   try {
-    parsedUrl = new URL(url);
+    new URL(url);
   } catch {
     throw new HostError("invalid_input", "page.read needs a valid URL");
   }
   if (pageReaderForTests) return pageReaderForTests(url);
+  const page = await pageHtml(url, signal, minorBand, opts);
+  const parsed = parseReadablePage(page.html, url);
+  return page.wayback ? { ...parsed, title: `${parsed.title} (Wayback Machine copy of ${new URL(url).hostname}, ${page.wayback.captured})`.slice(0, 400) } : parsed;
+}
+
+/** One page's raw HTML through the shared guards: the band's blocked-site check, the fetch cache, robots.txt, the per-host pace,
+ * the SSRF guard and (404, teen or adult) the Archive copy. `searxngPageRead` parses it for the model; News (NEWS-02) runs the
+ * one reader over it. A page the site declines or cannot serve throws the same errors `searxngPageRead` always threw. */
+export async function pageHtml(url: string, signal?: AbortSignal, minorBand?: MinorBand, opts: PageReadOptions = {}): Promise<{ html: string; wayback?: { captured: string } }> {
+  const parsedUrl = new URL(url);
   const band: AgeBand = minorBand ?? "adult";
   const temporary = opts.temporary === true;
   // KS-07: the band's blocked-site check runs before the cache is consulted, so a cached body is never served
@@ -1859,7 +1868,7 @@ export async function searxngPageRead(args: unknown, signal?: AbortSignal, minor
     }
     if (hit) {
       bumpReferenceCounter("fetch_hit", band);
-      return parseReadablePage(hit.body, url);
+      return { html: hit.body };
     }
     bumpReferenceCounter("fetch_miss", band);
   }
@@ -1883,9 +1892,8 @@ export async function searxngPageRead(args: unknown, signal?: AbortSignal, minor
         },
       });
       if (copy) {
-        const page = parseReadablePage(copy.html, url);
         bumpReferenceCounter("wayback_served", band);
-        return { ...page, title: `${page.title} (Wayback Machine copy of ${parsedUrl.hostname}, ${copy.captured})`.slice(0, 400) };
+        return { html: copy.html, wayback: { captured: copy.captured } };
       }
     }
     pageFailure(result, url);
@@ -1896,7 +1904,7 @@ export async function searxngPageRead(args: unknown, signal?: AbortSignal, minor
   } catch {
     // the cache is disposable: a failed write never fails the read
   }
-  return parseReadablePage(result.value, url);
+  return { html: result.value };
 }
 
 /** The settings lookup, rate limit, and real call shared by every real

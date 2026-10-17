@@ -37,28 +37,80 @@ CREATE TABLE IF NOT EXISTS shelf_item_feed (
   PRIMARY KEY (canonical_url, feed_id)
 );
 CREATE INDEX IF NOT EXISTS shelf_item_feed_feed ON shelf_item_feed (feed_id);
+CREATE INDEX IF NOT EXISTS shelf_item_id ON shelf_item (id);
+-- NEWS-02: the cleaned article of an item a person opened (spec NewsItem.content_ref is the item id). One row per item
+-- and link variant: "open" keeps outbound links (teens and adults), "plain" holds none (a child). A pinned row belongs
+-- to a saved story and is never pruned while the save exists.
+CREATE TABLE IF NOT EXISTS news_content (
+  item_id TEXT NOT NULL,
+  variant TEXT NOT NULL,
+  blocks TEXT NOT NULL,
+  source TEXT NOT NULL,
+  reading_s INTEGER NOT NULL,
+  fetched_at TEXT NOT NULL,
+  pinned INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (item_id, variant)
+);
 `;
+
+/** NEWS-02: columns added after the first release of the table; added in place on an older knowledge.db. */
+const ADDED_COLUMNS: ReadonlyArray<readonly [string, string]> = [
+  ["image_url", "TEXT"],
+  ["image_ref", "TEXT"],
+  ["topics", "TEXT"],
+];
 
 export interface ShelfStore {
   /** Stores a new item, or adds the feed to an existing one's links. */
   put(item: ShelfItem): { inserted: boolean };
   /** The newest items carried by any of these feeds whose band_ok is one of `bandOk`. */
   list(feedIds: readonly string[], bandOk: readonly AgeBand[], limit: number): ShelfItem[];
-  /** Deletes items fetched before `cutoffIso`; returns how many. */
+  /** Deletes items fetched before `cutoffIso`, except those a saved story pinned; returns how many. */
   prune(cutoffIso: string): number;
+  /** NEWS-02: one item by its id, or null. */
+  get(id: string): ShelfItem | null;
+  /** NEWS-02: the feeds that carried an item (a story two feeds linked has two). */
+  feedIdsOf(canonicalUrl: string): string[];
+  /** NEWS-02: records that a screen asked for the item's picture and the cache holds it (null forgets it). */
+  setImageRef(id: string, ref: string | null): void;
+  /** NEWS-02: the topic ids the classifier gave an item. */
+  setTopics(id: string, topics: readonly string[]): void;
+  /** NEWS-02: the cleaned article of an item, if one is stored for this variant. */
+  getContent(itemId: string, variant: ContentVariant): StoredContent | null;
+  putContent(itemId: string, variant: ContentVariant, content: Omit<StoredContent, "pinned">): void;
+  /** NEWS-02: a saved story keeps its stored text out of the prune (every variant stored for it). */
+  pinContent(itemId: string, pinned: boolean): void;
   /** Drops a feed's links, and every item no feed carries any more. */
   forgetFeed(feedId: string): number;
   count(): number;
   close(): void;
 }
 
+export type ContentVariant = "open" | "plain";
+export interface StoredContent { blocks: unknown[]; source: "feed" | "fetched" | "archived" | "teaser"; reading_s: number; fetched_at: string; pinned: boolean }
+
 type Row = {
+  image_url?: string | null; image_ref?: string | null; topics?: string | null;
   id: string; canonical_url: string; feed_id: string; url: string; title: string; summary: string;
   published_at: string | null; fetched_at: string; publisher: string; lang: string; band_ok: string; hlc: string; provenance: string;
 };
 
+function topicsOf(value: string | null | undefined): string[] | undefined {
+  if (!value) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === "string") : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function toItem(row: Row): ShelfItem | null {
+  const topics = topicsOf(row.topics);
   const parsed = NewsItem.safeParse({
+    ...(row.image_url ? { image_url: row.image_url } : {}),
+    image_ref: row.image_ref ?? null,
+    ...(topics ? { topics } : {}),
     id: row.id, feed_id: row.feed_id, url: row.url, canonical_url: row.canonical_url, title: row.title, summary: row.summary,
     published_at: row.published_at, fetched_at: row.fetched_at, publisher: row.publisher, lang: row.lang, band_ok: row.band_ok,
     hlc: row.hlc, provenance: row.provenance,
@@ -75,12 +127,29 @@ export function openShelfStore(path: string): ShelfStore {
   sqlite.exec("PRAGMA journal_mode = WAL");
   sqlite.exec("PRAGMA busy_timeout = 5000");
   sqlite.exec(SCHEMA);
+  const have = new Set(sqlite.query<{ name: string }, []>("PRAGMA table_info(shelf_item)").all().map((column) => column.name));
+  for (const [name, type] of ADDED_COLUMNS) if (!have.has(name)) sqlite.exec(`ALTER TABLE shelf_item ADD COLUMN ${name} ${type}`);
   const insert = sqlite.query(
-    `INSERT OR IGNORE INTO shelf_item (id, canonical_url, feed_id, url, title, summary, published_at, fetched_at, publisher, lang, band_ok, hlc, provenance)
-     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)`,
+    `INSERT OR IGNORE INTO shelf_item (id, canonical_url, feed_id, url, title, summary, published_at, fetched_at, publisher, lang, band_ok, hlc, provenance, image_url, topics)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)`,
   );
+  const byId = sqlite.query<Row, [string]>("SELECT * FROM shelf_item WHERE id = ?1");
+  const carriers = sqlite.query<{ feed_id: string }, [string]>("SELECT feed_id FROM shelf_item_feed WHERE canonical_url = ?1");
+  const setRef = sqlite.query("UPDATE shelf_item SET image_ref = ?2 WHERE id = ?1");
+  const setTopicList = sqlite.query("UPDATE shelf_item SET topics = ?2 WHERE id = ?1");
+  // A feed that gave no picture on the first poll may give one later: fill it in, never replace one.
+  const fillImage = sqlite.query("UPDATE shelf_item SET image_url = ?2 WHERE canonical_url = ?1 AND image_url IS NULL");
+  const readContent = sqlite.query<{ blocks: string; source: string; reading_s: number; fetched_at: string; pinned: number }, [string, string]>(
+    "SELECT blocks, source, reading_s, fetched_at, pinned FROM news_content WHERE item_id = ?1 AND variant = ?2",
+  );
+  const writeContent = sqlite.query(
+    `INSERT INTO news_content (item_id, variant, blocks, source, reading_s, fetched_at, pinned) VALUES (?1, ?2, ?3, ?4, ?5, ?6, COALESCE((SELECT MAX(pinned) FROM news_content WHERE item_id = ?1), 0))
+     ON CONFLICT (item_id, variant) DO UPDATE SET blocks = excluded.blocks, source = excluded.source, reading_s = excluded.reading_s, fetched_at = excluded.fetched_at`,
+  );
+  const pin = sqlite.query("UPDATE news_content SET pinned = ?2 WHERE item_id = ?1");
+  const pruneContent = sqlite.query("DELETE FROM news_content WHERE pinned = 0 AND item_id NOT IN (SELECT id FROM shelf_item)");
   const link = sqlite.query("INSERT OR IGNORE INTO shelf_item_feed (canonical_url, feed_id) VALUES (?1, ?2)");
-  const pruneItems = sqlite.query("DELETE FROM shelf_item WHERE fetched_at < ?1");
+  const pruneItems = sqlite.query("DELETE FROM shelf_item WHERE fetched_at < ?1 AND id NOT IN (SELECT item_id FROM news_content WHERE pinned = 1)");
   const pruneLinks = sqlite.query("DELETE FROM shelf_item_feed WHERE canonical_url NOT IN (SELECT canonical_url FROM shelf_item)");
   const dropLinks = sqlite.query("DELETE FROM shelf_item_feed WHERE feed_id = ?1");
   const dropOrphans = sqlite.query("DELETE FROM shelf_item WHERE canonical_url NOT IN (SELECT canonical_url FROM shelf_item_feed)");
@@ -95,10 +164,13 @@ export function openShelfStore(path: string): ShelfStore {
     put(item) {
       const result = insert.run(
         item.id, item.canonical_url, item.feed_id, item.url, item.title, item.summary, item.published_at ?? null,
-        item.fetched_at, item.publisher, item.lang, item.band_ok, item.hlc, item.provenance,
+        item.fetched_at, item.publisher, item.lang, item.band_ok, item.hlc, item.provenance, item.image_url ?? null, item.topics && item.topics.length > 0 ? JSON.stringify(item.topics) : null,
       );
       link.run(item.canonical_url, item.feed_id);
-      if (result.changes === 0) stricten.run(item.canonical_url, item.band_ok);
+      if (result.changes === 0) {
+        stricten.run(item.canonical_url, item.band_ok);
+        if (item.image_url) fillImage.run(item.canonical_url, item.image_url);
+      }
       return { inserted: result.changes > 0 };
     },
     list(feedIds, bandOk, limit) {
@@ -116,7 +188,38 @@ export function openShelfStore(path: string): ShelfStore {
     prune(cutoffIso) {
       const removed = pruneItems.run(cutoffIso).changes;
       pruneLinks.run();
+      pruneContent.run();
       return removed;
+    },
+    get(id) {
+      const row = byId.get(id);
+      return row ? toItem(row) : null;
+    },
+    feedIdsOf(canonicalUrl) {
+      return carriers.all(canonicalUrl).map((row) => row.feed_id);
+    },
+    setImageRef(id, ref) {
+      setRef.run(id, ref);
+    },
+    setTopics(id, topics) {
+      setTopicList.run(id, JSON.stringify([...new Set(topics)]));
+    },
+    getContent(itemId, variant) {
+      const row = readContent.get(itemId, variant);
+      if (!row) return null;
+      try {
+        const blocks: unknown = JSON.parse(row.blocks);
+        if (!Array.isArray(blocks)) return null;
+        return { blocks, source: row.source as StoredContent["source"], reading_s: row.reading_s, fetched_at: row.fetched_at, pinned: row.pinned === 1 };
+      } catch {
+        return null;
+      }
+    },
+    putContent(itemId, variant, content) {
+      writeContent.run(itemId, variant, JSON.stringify(content.blocks), content.source, content.reading_s, content.fetched_at);
+    },
+    pinContent(itemId, pinned) {
+      pin.run(itemId, pinned ? 1 : 0);
     },
     forgetFeed(feedId) {
       dropLinks.run(feedId);

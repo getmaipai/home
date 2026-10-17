@@ -52,6 +52,9 @@ import {
   mediaWatchSessions,
   mediaItems,
   mediaSources,
+  newsInterests,
+  newsSaves,
+  newsReads,
   videoAdapterPrefs,
   artifacts,
   conversations,
@@ -195,6 +198,9 @@ export function resetDb(): void {
   db.delete(mediaWatchDays).run();
   db.delete(mediaItems).run();
   db.delete(mediaSources).run();
+  db.delete(newsInterests).run(); // NEWS-02: reference people
+  db.delete(newsSaves).run();
+  db.delete(newsReads).run();
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns
   db.delete(conversationTurns).run();
   db.delete(conversations).run();

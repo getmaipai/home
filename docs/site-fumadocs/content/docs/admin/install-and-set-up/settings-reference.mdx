@@ -94,6 +94,8 @@ Each table gives the label as shown, the key (useful in a support report), the d
 
 | Setting | Key | Default | Level | What it does |
 |---|---|---|---|---|
+| **Pictures in News** | `news.images` | on | advanced | Show the picture each news story came with. Home asks the publisher for a picture once, the first time a screen shows that story, and keeps a copy; it never fetches pictures in the background. Turn this off and News shows text only. |
+| **News picture storage (MB)** | `news.image_cache_mb` | 512 | advanced | How much disk space News pictures may use. When it fills, Home removes the pictures nobody has looked at for the longest time. A picture nobody opens for 14 days is removed either way. |
 | **News poll interval (seconds)** | `news.poll_interval_s` | 1800 | advanced | How often Home checks enabled news feeds. At least 900 seconds. |
 | **News retention (days)** | `news.retention_days` | 90 | advanced | How long Home keeps news items and stories. |
 | **News shelf** | `news.shelf.enabled` | on | advanced | Turn the household news shelf on or off. |
