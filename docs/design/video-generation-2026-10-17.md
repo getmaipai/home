@@ -218,6 +218,37 @@ acknowledgement). No adult LoRA was downloaded or tested in this session.
 | VIDEO-GEN-11 | Measure a tiny Wan2.2 decoder to cut the 115 s decode |
 | VIDEO-GEN-12 | Post-render check for the two absolute lines (design first; a gap today) |
 
+## 12. Stack API as built (Stack commit 1ed4e61, 2026-10-17)
+
+The Stack side of VIDEO-GEN-01 to 03 is built and verified on a scratch Stack. The full contract is the "Video generation" section of the Stack's
+`docs/integrations.md`; what Home needs is here.
+
+**Measured on the Studio (real runs through the job API, scratch data directory, GPU lock held):** text to video 132 s wall for 121 frames at 832 x 480
+(mp4 4.6 MB, poster 54 KB, H.264 High yuv420p, moov box first, 5.04 s); picture to video 132 s (3.7 MB); one LoRA (the HSToric colour file, 300 modules,
+rank 64) 168 s including a 323 MB merge; the idle worker holds about 2.3 GB resident and exits after ten minutes. Progress is real: rendering reports
+the three steps, decoding reports tiles, so a poll shows movement every few seconds.
+
+**Calls Home makes.**
+- Enable the control from `GET /stack/v1/video` (`available`, `state`, `limits`, `reference_images`, `install`). p16 and p32 answer `available: false`.
+- Install: `POST /stack/v1/engines/video-gen/install`, then `POST /stack/v1/models` for each entry of `install.models` (the Stack fills in the folder's file list).
+- Make a clip: `POST /v1/videos/generations` `{ prompt, size?, seconds? (1 to 5), seed?, image?, image_source?, loras?, audience?, timeout_ms? }`. Send `audience: "adult"`
+  only for an identified adult on a written, private surface; everything else sends `all-ages` (the default). Expect 202 almost always (a clip takes over two minutes) and poll
+  `GET /v1/videos/generations/{job}` (`state`, `phase`, `progress`, `phase_progress`, `position`, `data`). Fetch `data[0].url` and `poster_url`, store the file as an
+  attachment, then `DELETE /v1/videos/generations/{job}` to free the Stack's copy. Cancel is the same DELETE while it runs.
+- LoRA library: `GET/POST /stack/v1/video/loras`, `PATCH/DELETE .../{id}`. Home passes `added_by` as an opaque label, decides who may add, reclassify (only an adult moves a file
+  to all-ages) and use a file, and names the allowed ids in each clip request. The Stack refuses wrong-base files (`wrong_base_model`), un-acknowledged non-open licences,
+  and any file whose own description names a minor in a sexual context (`lora_refused`); a file whose description names adult content cannot be all-ages. It also refuses an
+  adult-only id when `audience` is `all-ages`, as a second lock.
+
+**Reference pictures (VIDEO-GEN-12).** The Stack accepts `image_source: "generated"` only, and only for bytes whose sha256 it recorded when its own image generator (or one of its clips'
+posters) produced them. So Home must send the stored picture unchanged (no re-encode, resize or metadata edit), and an uploaded photo can never start a clip until the real-person check
+exists. Home's own gates (age, surface, household names) still run first; Home must not set `generated` for anything else.
+
+**Home still owes:** the `video.*` settings and the age and surface gate (VIDEO-GEN-04; minors off by default), the package and chat tool (05), the player, progress and cancel UI (06),
+the bench and safety review (07), the Settings page for models and LoRAs, and the end-to-end verification (08). The image-generation Stack work by another agent shares the one-at-a-time
+generator admission (a governor `generator` item blocks another), so a picture job and a clip never overlap; a request can sit in `waiting for memory`.
+On a 64 GB Mac the clip cannot fit beside the chat model and is refused at once with `no_memory`; p64 is "on demand" in the profile but will in practice refuse until chat is smaller.
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s video table: the animated path is Wan2.2 TI2V-5B FastWan on MLX, not LTX-2 (licence), and the
