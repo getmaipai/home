@@ -13,7 +13,7 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { videoAdaptersFor, matchVideoAdapter, withVideoTriggerWords } from "./adapters";
 import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, loadUploadedPhoto, plainVideoFailure, startVideoJob } from "./jobs";
 import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
-import { resolveDeclaredAdult } from "@/lib/likeness/resolve";
+import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
@@ -71,7 +71,7 @@ export function latestGeneratedPictureId(actor: PersonRow, conversationId: strin
 }
 
 export interface RunGenerateVideoInput {
-  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images">;
+  state: Pick<TurnState, "actor" | "surface" | "speakerEvidence" | "planBasis" | "plan" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
   args: Record<string, unknown>;
   callId: string;
   spoken: boolean;
@@ -122,8 +122,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     if (attached.length !== 1) return refuseWith("reference", PHOTO_ATTACH_LINE);
     const photo = loadUploadedPhoto(actor, state.conversationId, attached[0]!.id, temporary);
     if (!photo.ok) return refuseWith("reference", photo.line);
-    const declared = resolveDeclaredAdult(args.photo_subject, actor);
-    if (!declared) return refuseWith("likeness", PHOTO_SUBJECT_LINE);
+    // The model's `photo_subject` is a proposal: only the person's own message (a name, or a claim that it is them) attests who is in the photo.
+    const { proposed, attested: declared } = attestedAdult(args.photo_subject, state.utterance, actor);
+    if (!declared) return refuseWith("likeness", proposed ? WHO_IS_IN_PHOTO_LINE : PHOTO_SUBJECT_LINE);
     // The photo must show exactly the one declared adult, nobody who could be a child: counted by the household's own model, fail closed.
     const verdict = await singleAdultPhoto(photo.bytes);
     if (!verdict.ok) return refuseWith("likeness", verdict.line);

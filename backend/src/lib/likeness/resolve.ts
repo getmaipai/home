@@ -42,3 +42,11 @@ export function messageAttests(utterance: unknown, requester: PersonRow, declare
   const candidates = [declared.displayName, declared.nickname, norm(declared.displayName).split(" ")[0], declared.nickname ? norm(declared.nickname).split(" ")[0] : null].filter((n): n is string => !!n).map(norm).filter((n) => n.length >= 2);
   return candidates.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
 }
+
+export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you) and make sure they have agreed. I only use a photo of someone who lives here and said yes.";
+
+/** The adult a tool call may treat as the person in a photo: the model's proposal (`photo_subject`) resolved against the household, kept only when the person's own message names or claims that adult. The one rule for every tool that takes a photo and a subject (pictures and videos). */
+export function attestedAdult(proposal: unknown, utterance: unknown, requester: PersonRow): { proposed: PersonRow | null; attested: PersonRow | null } {
+  const proposed = resolveDeclaredAdult(proposal, requester);
+  return { proposed, attested: proposed && messageAttests(utterance, requester, proposed) ? proposed : null };
+}

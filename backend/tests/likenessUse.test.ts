@@ -61,9 +61,9 @@ beforeEach(() => {
 });
 afterEach(() => { imageStack.restore(); videoStack.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); });
 
-type StateOver = { surfaceClass?: "written" | "glance" | "spoken"; surface?: string; images?: Array<{ id: string; name: string; width: number; height: number; media_type: string }> };
+type StateOver = { surfaceClass?: "written" | "glance" | "spoken"; surface?: string; images?: Array<{ id: string; name: string; width: number; height: number; media_type: string }>; utterance?: string };
 function stateFor(actor: PersonRow, over: StateOver = {}) {
-  return { actor, surface: (over.surface ?? "chat") as never, speakerEvidence: undefined, planBasis: { surfaceClass: over.surfaceClass ?? "written" } as never, plan: undefined as never, conversationId: "conv-1", turnId: "turn-1", temporary: true, ephemeral: false, images: over.images } as never;
+  return { actor, surface: (over.surface ?? "chat") as never, speakerEvidence: undefined, planBasis: { surfaceClass: over.surfaceClass ?? "written" } as never, plan: undefined as never, conversationId: "conv-1", turnId: "turn-1", temporary: true, ephemeral: false, images: over.images, utterance: over.utterance ?? "" } as never;
 }
 const replyText = (outcome: ToolExecutionOutcome) => (outcome.result?.reply as { text?: string } | undefined)?.text ?? "";
 const refusedWith = (outcome: ToolExecutionOutcome) => (outcome.result?.data as { refused?: string } | undefined)?.refused;
@@ -183,8 +183,10 @@ async function attachPhoto(owner: PersonRow): Promise<{ id: string; name: string
   storeTemporaryChatImage({ id: "photo-1", turnId: "turn-1", conversationId: "conv-1", ownerPersonId: owner.id, name: "photo.png", mediaType: "image/png", width: 64, height: 64, bytes });
   return { id: "photo-1", name: "photo.png", width: 64, height: 64, media_type: "image/png" };
 }
-const animate = async (actor: PersonRow, args: Record<string, unknown>, images?: StateOver["images"]) =>
-  runGenerateVideo({ state: stateFor(actor, { images }), args: { prompt: "she smiles and turns her head", from_picture: "attached", ...args }, callId: "c2", spoken: false });
+// The person's own message is what attests who is in the photo (the model's `photo_subject` is only a proposal): by default the message says it.
+const sayWho = (subject: unknown) => (typeof subject !== "string" || !subject ? "" : subject.toLowerCase() === "me" ? "animate this photo of me" : `animate this photo, it is ${subject}`);
+const animate = async (actor: PersonRow, args: Record<string, unknown>, images?: StateOver["images"], utterance = sayWho(args.photo_subject)) =>
+  runGenerateVideo({ state: stateFor(actor, { images, utterance }), args: { prompt: "she smiles and turns her head", from_picture: "attached", ...args }, callId: "c2", spoken: false });
 
 describe("an attached photo of a household adult (video)", () => {
   test("allowed only when the requester names the adult, that adult agreed, and the photo shows exactly them: the photo's own hash is what the proof is for", async () => {
@@ -352,5 +354,29 @@ describe("review fixes", () => {
     expect(likenessUseLog(marlow.id)).toHaveLength(0);
     expect(consentHistory(marlow.id)).toHaveLength(0);
     expect(getStyleSubject("picture", STYLE_ID)!.state).not.toBe("active");
+  });
+});
+
+describe("the model's photo_subject never attests who is in a video photo (safety review)", () => {
+  test("a stranger's photo plus an invented 'me', a wrong name, and no claim at all ask who it is and start no clip; the person's own claim or the name works", async () => {
+    const photo = await attachPhoto(nadia);
+    switchOn(marlow);
+    const noClaim = await animate(nadia, { photo_subject: "me" }, [photo], "make this photo move");
+    expect(replyText(noClaim)).toContain("Who is in this photo?");
+    const wrong = await animate(nadia, { photo_subject: "Marlow" }, [photo], "make this photo move, it is my neighbour");
+    expect(replyText(wrong)).toContain("Who is in this photo?");
+    expect(videoStack.submitted).toHaveLength(0);
+    const self = await animate(nadia, { photo_subject: "me" }, [photo], "animate this photo of me");
+    expect(self.status).toBe("succeeded");
+    expect(videoStack.submitted).toHaveLength(1);
+    expect(videoStack.submitted[0]).toMatchObject({ image_source: "household_photo" });
+  });
+
+  test("a named adult counts only when the message names them", async () => {
+    const photo = await attachPhoto(nadia);
+    switchOn(marlow);
+    const named = await animate(nadia, { photo_subject: "Marlow" }, [photo], "animate this, the photo is Marlow");
+    expect(named.status).toBe("succeeded");
+    expect(videoStack.submitted[0]).toMatchObject({ image_source: "household_photo" });
   });
 });

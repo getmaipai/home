@@ -15,7 +15,7 @@ import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { latestTemporaryChatImage } from "@/lib/attachments";
 import { generatedPictureLikeness, isGeneratedPicture, loadSource, ImageEditError, type SourcePicture } from "@/lib/imageEdit";
-import { messageAttests, resolveDeclaredAdult } from "@/lib/likeness/resolve";
+import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { inspectPhoto } from "@/lib/likeness/inspector";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
@@ -34,7 +34,7 @@ import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, sub
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
 export const EDIT_KINDS = ["remove_people", "remove_background", "upscale", "change"] as const;
 
-export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you) and make sure they have agreed. I only use a photo of someone who lives here and said yes.";
+export { WHO_IS_IN_PHOTO_LINE };
 const NOT_FOUND_LINE = "I can't find that picture any more. Attach it again and ask once more.";
 const NOTHING_TO_CHANGE_LINE = "There is no picture to change yet. Attach one, or ask me to make one first.";
 const EDIT_NOT_SET_UP_LINE = "Changing a picture needs the picture model to be installed and running on this computer. An admin can check Settings, Pictures and videos.";
@@ -173,8 +173,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
 
   // The person named is the one in the reference when there is one (the person to add), else the one in the picture being changed.
   // The model's `photo_subject` is a proposal, never the attestation: it counts only when the person's own message names or claims that adult.
-  const proposed = resolveDeclaredAdult(args.photo_subject, actor);
-  const declared = proposed && messageAttests(state.utterance, actor, proposed) ? proposed : null;
+  const declared = attestedAdult(args.photo_subject, state.utterance, actor).attested;
   const named = typeof args.photo_subject === "string" && args.photo_subject.trim() !== "";
 
   const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
