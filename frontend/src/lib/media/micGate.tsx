@@ -6,7 +6,7 @@
 // re-checks are the PermissionStatus change event and window focus, and
 // both only read the state: getUserMedia is never called from an effect.
 import { useCallback, useEffect, useRef, useState } from "react";
-import { detectBrowser, probeMic, queryMicPermission, type BrowserFamily, type MicProbeDeps, type MicProblem } from "@/lib/media/micPermission";
+import { detectBrowser, probeMic, queryMicPermission, safariTipDue, SAFARI_ASK_STEPS, SAFARI_ASK_TIP, type MicPermission, BrowserFamily, type MicProbeDeps, type MicProblem } from "@/lib/media/micPermission";
 
 export function useMicGate(onGranted: () => void, deps?: MicProbeDeps) {
   const [problem, setProblem] = useState<MicProblem | null>(null);
@@ -16,8 +16,23 @@ export function useMicGate(onGranted: () => void, deps?: MicProbeDeps) {
   const depsRef = useRef(deps);
   depsRef.current = deps;
 
+  // The last permission state the browser reported, read ahead of the tap
+  // (Safari needs the mic request to start inside the tap, so no await there).
+  const permRef = useRef<MicPermission>("unknown");
+  useEffect(() => {
+    let alive = true;
+    void (deps?.query ?? queryMicPermission)().then((state) => { if (alive) permRef.current = state; });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are test-only and stable.
+  }, []);
+
   const run = useCallback(async (open: boolean) => {
     if (inFlight.current) return;
+    // Safari on "Ask": say once per page session how to make it stop asking, then carry on at "Continue".
+    if (open && safariTipDue(permRef.current, depsRef.current?.userAgent ?? (typeof navigator === "undefined" ? "" : navigator.userAgent), true)) {
+      setProblem("safari_ask");
+      return;
+    }
     inFlight.current = true;
     try {
       const result = await probeMic(depsRef.current);
@@ -71,6 +86,7 @@ export function useMicGate(onGranted: () => void, deps?: MicProbeDeps) {
 }
 
 const TITLES: Record<MicProblem, string> = {
+  safari_ask: "Stop Safari asking every time",
   denied: "Microphone is blocked",
   not_found: "No microphone found",
   in_use: "Microphone is busy",
@@ -79,6 +95,7 @@ const TITLES: Record<MicProblem, string> = {
 };
 
 const CAUSES: Record<MicProblem, string> = {
+  safari_ask: SAFARI_ASK_TIP,
   denied: "This browser is not allowing Home to use the microphone.",
   not_found: "This computer has no microphone. Plug in a microphone, or a display or headset with one, then try again.",
   in_use: "Another app is using the microphone. Close it, then try again.",
@@ -113,5 +130,5 @@ export function micFixSteps(browser: BrowserFamily): string[] {
 /** Copy for the help dialog ChatPage renders with the kit Dialog directly. */
 export function micHelp(problem: MicProblem, userAgent?: string) {
   const browser = detectBrowser(userAgent ?? (typeof navigator === "undefined" ? "" : navigator.userAgent));
-  return { title: TITLES[problem], cause: CAUSES[problem], steps: problem === "denied" ? micFixSteps(browser) : problem === "not_found" ? micDeviceSteps(browser) : problem === "error" ? [MAC_MIC] : [] };
+  return { title: TITLES[problem], cause: CAUSES[problem], steps: problem === "safari_ask" ? SAFARI_ASK_STEPS : problem === "denied" ? micFixSteps(browser) : problem === "not_found" ? micDeviceSteps(browser) : problem === "error" ? [MAC_MIC] : [] };
 }

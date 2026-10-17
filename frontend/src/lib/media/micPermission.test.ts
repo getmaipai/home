@@ -1,5 +1,10 @@
-import { describe, expect, test } from "bun:test";
-import { classifyMicError, detectBrowser, probeMic } from "./micPermission";
+import { beforeEach, describe, expect, test } from "bun:test";
+import { classifyMicError, detectBrowser, probeMic as probeMicShared, type MicProbeDeps } from "./micPermission";
+import { resetMicStreamForTests } from "./micStream";
+
+// graceMs 0: the shared stream stops at once, so each test sees its own stream.
+const probeMic = (deps: MicProbeDeps = {}) => probeMicShared({ graceMs: 0, ...deps });
+beforeEach(resetMicStreamForTests);
 
 const stream = () => ({ getTracks: () => [{ stop() { stopped++; } }] }) as unknown as MediaStream;
 let stopped = 0;

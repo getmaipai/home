@@ -17,6 +17,7 @@
 // voice - the household's own hardware doing the echo cancellation the
 // legacy pod's XVF3800 mic array did for real.
 
+import { acquireMicStream, type MicLease } from "@/lib/media/micStream";
 import { StreamResampler } from "@/lib/voice/resampler";
 import { beginMicAttempt, errMessage, errName, noteMicDegraded, recordMicFailure, type MicStep } from "@/lib/voice/micDiagnostics";
 
@@ -124,6 +125,14 @@ export async function openMicStream(deviceId?: string): Promise<MediaStream> {
   }
 }
 
+/** The shared-stream key: one per chosen device. */
+export const micStreamKey = (deviceId?: string) => `mic:${deviceId ?? ""}`;
+
+function releaseStream(stream: MediaStream, lease: MicLease | null) {
+  if (lease) { lease.release(); return; }
+  stream.getTracks().forEach((track) => { try { track.stop(); } catch { /* ignore */ } });
+}
+
 export interface MicCaptureHandle {
   stop: () => void;
   sampleRate: number;
@@ -165,8 +174,16 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
   }
   step = "microphone request";
   let stream: MediaStream;
+  // Shared page-wide stream (micStream.ts): reopening within the grace period
+  // reuses it, so Safari does not ask again. A caller-supplied getStream
+  // (tests) bypasses the share and is stopped on stop().
+  let lease: MicLease | null = null;
   try {
-    stream = await (options.getStream ?? (() => openMicStream(options.deviceId)))();
+    if (options.getStream) stream = await options.getStream();
+    else {
+      lease = await acquireMicStream(micStreamKey(options.deviceId), () => openMicStream(options.deviceId));
+      stream = lease.stream;
+    }
   } catch (err) {
     releasePrimedAudio();
     const name = errName(err);
@@ -246,7 +263,7 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
     }
   } catch (err) {
     try { source?.disconnect(); } catch { /* ignore */ }
-    stream.getTracks().forEach((track) => { try { track.stop(); } catch { /* ignore */ } });
+    releaseStream(stream, lease);
     const state = context ? `state ${context.state}, ${context.sampleRate} Hz` : undefined;
     void context?.close().catch(() => {});
     throw new MicCaptureError("setup", err, step, state);
@@ -271,13 +288,7 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
     } catch {
       /* ignore */
     }
-    stream.getTracks().forEach((track) => {
-      try {
-        track.stop();
-      } catch {
-        /* ignore */
-      }
-    });
+    releaseStream(stream, lease);
     void ctx.close().catch(() => {});
   };
 

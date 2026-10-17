@@ -1,8 +1,11 @@
-import { afterEach, describe, expect, mock, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { micHelp, micFixSteps, useMicGate } from "@/lib/media/micGate";
 
 afterEach(cleanup);
+beforeEach(() => { try { sessionStorage.clear(); } catch { /* ignore */ } });
+const SAFARI = "Mozilla/5.0 (Macintosh) AppleWebKit/605 Version/27.0 Safari/605";
+const CHROME = "Mozilla/5.0 (Macintosh) AppleWebKit/537 Chrome/140 Safari/537";
 const stream = { getTracks: () => [] } as unknown as MediaStream;
 
 describe("useMicGate", () => {
@@ -43,6 +46,44 @@ describe("useMicGate.diagnose (regression: open/close loop on a capture failure)
     await act(async () => { ok = await result.current.diagnose(); });
     expect(ok).toBeUndefined();
     expect(result.current.problem).toBe("denied");
+  });
+});
+
+describe("Safari ask-every-time tip", () => {
+  const gate = (state: "prompt" | "granted", userAgent: string, onGranted = mock(() => {})) =>
+    renderHook(() => useMicGate(onGranted, { isSecureContext: true, userAgent, query: async () => state, getUserMedia: async () => stream, graceMs: 0 }));
+  test("Safari on prompt shows the tip once per session, then carries on", async () => {
+    const onGranted = mock(() => {});
+    const { result } = gate("prompt", SAFARI, onGranted);
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await result.current.request(); });
+    expect(result.current.problem).toBe("safari_ask");
+    expect(onGranted).not.toHaveBeenCalled();
+    await act(async () => { await result.current.request(); });
+    expect(result.current.problem).toBeNull();
+    expect(onGranted).toHaveBeenCalledTimes(1);
+    await act(async () => { await result.current.request(); });
+    expect(result.current.problem).toBeNull(); // not shown a second time
+    expect(onGranted).toHaveBeenCalledTimes(2);
+  });
+  test("Safari already on Allow shows nothing", async () => {
+    const onGranted = mock(() => {});
+    const { result } = gate("granted", SAFARI, onGranted);
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await result.current.request(); });
+    expect(result.current.problem).toBeNull();
+    expect(onGranted).toHaveBeenCalledTimes(1);
+  });
+  test("Chrome on prompt shows nothing", async () => {
+    const { result } = gate("prompt", CHROME);
+    await act(async () => { await Promise.resolve(); });
+    await act(async () => { await result.current.request(); });
+    expect(result.current.problem).toBeNull();
+  });
+  test("the help copy names both Safari routes", () => {
+    const help = micHelp("safari_ask");
+    expect(help.cause).toMatch(/Settings > Websites > Microphone/);
+    expect(help.steps.join(" ")).toMatch(/Settings for this site/);
   });
 });
 

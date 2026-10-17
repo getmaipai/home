@@ -9,6 +9,8 @@ You can talk to Home and hear it talk back.
 
 The first time you tap the microphone or start a voice conversation, your browser asks to use the microphone. Choose **Allow**. Setup does not ask.
 
+**Safari asks every time unless you choose Allow.** In Safari, open **Safari**, **Settings**, **Websites**, **Microphone**, find your Home address (for example `localhost`), and choose **Allow**. Or open the **Safari** menu, **Settings for this site**, **Microphone**, and choose **Allow**. Home shows this tip once per visit when Safari is still on Ask. Closing and reopening a voice conversation within about 10 seconds reuses the microphone without asking again. After that the microphone turns off, and the browser's microphone light goes out.
+
 If the browser says no, Home does not open the voice conversation and then close it. It shows a short help box instead. The box names your browser and tells you what to change, and it also covers the Mac's own switch in System Settings, **Privacy and Security**, **Microphone**. After you change it, press **Try again**. Home checks again when you come back to the page.
 
 The help box has a different message for each problem:
@@ -49,6 +51,7 @@ These sounds only happen in spoken replies, never in the written chat, and never
 ## Something not working?
 
 - **A help box when you start a conversation.** Why: the browser or the Mac blocks the microphone. Fix: follow the box for your browser. In Safari, open **Safari**, **Settings**, **Websites**, **Microphone** and choose **Allow**. In Chrome, click the icon left of the address, then **Site settings**, **Microphone**. On the Mac, open **System Settings**, **Privacy and Security**, **Microphone** and switch your browser on. Then press **Try again**.
+- **Safari asks for the microphone every time.** Why: Safari's default for each site is Ask. Fix: **Safari**, **Settings**, **Websites**, **Microphone**, find your Home address, choose **Allow**. Or **Safari** menu, **Settings for this site**, **Microphone**, **Allow**.
 - **The box says the address is not secure.** Why: browsers only allow the microphone on `localhost` or an `https` address. Fix: open Home from one of those.
 - **The box says another app is using the microphone.** Why: another app has it. Fix: close that app, then press **Try again**.
 - **The conversation button is missing.** Why: speech in or speech out is not installed yet. Fix: wait for the downloads to finish, or look in **Repairs**.

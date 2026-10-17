@@ -1507,11 +1507,11 @@ export function ChatPage({ person }: { person: Roster }) {
                     <DialogDescription>{help.cause}</DialogDescription>
                   </DialogHeader>
                   {help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}
-                  {micGate.problem !== "insecure" && lastMicFailure() ? <p className="break-words text-xs text-muted-foreground">{micFailureLine(lastMicFailure()!)}</p> : null}
+                  {micGate.problem !== "insecure" && micGate.problem !== "safari_ask" && lastMicFailure() ? <p className="break-words text-xs text-muted-foreground">{micFailureLine(lastMicFailure()!)}</p> : null}
                   <DialogFooter>
-                    {micGate.problem !== "insecure" && lastMicFailure() ? <Button variant="ghost" onClick={() => void copyMicDetails().then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead."))}>Copy details</Button> : null}
+                    {micGate.problem !== "insecure" && micGate.problem !== "safari_ask" && lastMicFailure() ? <Button variant="ghost" onClick={() => void copyMicDetails().then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead."))}>Copy details</Button> : null}
                     <Button variant="outline" onClick={micGate.dismiss}>Close</Button>
-                    <Button onClick={() => void micGate.request()}>Try again</Button>
+                    <Button onClick={() => void micGate.request()}>{micGate.problem === "safari_ask" ? "Continue" : "Try again"}</Button>
                   </DialogFooter>
                 </>
               );
