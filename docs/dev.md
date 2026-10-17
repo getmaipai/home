@@ -37140,3 +37140,7 @@ failure line's `describe > test` name, bun matches `describe test` joined by sin
 two `turnNext.test.ts` tests that failed 38 gates since 2026-10-12 at the 5 second timeout, and pass alone in under 2 seconds,
 are listed in the ledger until 2026-10-23 while the shared-state cause is found. `check.sh --pre` also failed from a bare
 checkout because the commons path was exported relative before it was made absolute; fixed in the same landing.
+The first gate on this landing then ended rc=143 with every test green: the ledger rerun appends a `flaky` line to the gate's
+failure log on a pass, and `check.sh`'s two-leg wait loop treated any line there as a failure and stopped the still-running leg.
+The loop now stops the other leg only on a `fail` line, and the shard runner's tests always pass their own failure log so a test
+fixture's flaky line never lands in the log of the gate running it.
