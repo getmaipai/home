@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { people as peopleTable } from "@/db/schema";
+import { kidUsage, people as peopleTable } from "@/db/schema";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { createBenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
@@ -19,6 +19,7 @@ import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { videoAdapterAudiencesFor } from "@/lib/videos/policy";
 import { TEEN_CONTENT_LINE, laneOf } from "@/lib/pictures/lane";
 import { editToolsStatus, startComment } from "@/lib/imageEdit";
+import { TEEN_PHOTO_LINE } from "@/lib/pictures/editSources";
 import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { __setStackTrustForTests } from "@/lib/likeness/proof";
 import { __resetAttestationsForTests } from "@/lib/likeness/resolve";
@@ -183,5 +184,23 @@ describe("a teen edits pictures", () => {
     image.edits.length = 0;
     expect(text(await pic(teen, { ...args, prompt: "remove my shirt" }, [photo], "this is a photo of me, remove my shirt"))).toContain(TEEN_CONTENT_LINE);
     expect(image.edits).toHaveLength(0);
+  });
+
+  test("lane review: a photo that looks like an adult (a stranger's) cannot be claimed as the teen's own; both outcomes are in the admins' list", async () => {
+    const args = { prompt: "change the sweater to blue", change: "attached", affects_people: true, photo_subject: "me" };
+    for (const under18 of ["no", "unsure"] as const) {
+      __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18 }));
+      const photo = await put(teen, `stranger-${under18}`);
+      const o = await pic(teen, args, [photo], "this is a photo of me, change the sweater to blue");
+      expect([under18, text(o).includes(TEEN_PHOTO_LINE)]).toEqual([under18, true]);
+    }
+    expect(image.edits).toHaveLength(0);
+    // A photo that plausibly shows a teen goes through.
+    __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
+    const mine = await put(teen, "mine-1");
+    expect((await pic(teen, args, [mine], "this is a photo of me, change the sweater to blue")).status).toBe("succeeded");
+    expect(image.edits).toHaveLength(1);
+    const rows = db.select().from(kidUsage).where(eq(kidUsage.kind, "photo")).all();
+    expect(rows.map((r) => [r.personId, r.outcome, r.units]).sort()).toEqual([[teen.id, "asked", 0], [teen.id, "withheld", 0], [teen.id, "withheld", 0]]);
   });
 });

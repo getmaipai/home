@@ -274,7 +274,7 @@ picturesAdminRoutes.openapi(removeRoute, async (c) => {
 const KidsActivitySchema = z.object({
   items: z.array(z.object({
     person: z.object({ id: z.string(), name: z.string() }),
-    kind: z.enum(["picture", "video", "edit"]),
+    kind: z.enum(["picture", "video", "edit", "photo"]),
     prompt: z.string(),
     state: z.string(),
     created_at: z.string(),
@@ -301,6 +301,12 @@ picturesAdminRoutes.openapi(kidsActivityRoute, (c) => {
     }
     for (const row of db.select({ prompt: videoJobs.prompt, state: videoJobs.state, createdAt: videoJobs.createdAt, error: videoJobs.error }).from(videoJobs).where(and(eq(videoJobs.personId, kid.id), gte(videoJobs.createdAt, since))).all()) {
       items.push({ person: { id: kid.id, name: kid.displayName }, kind: "video", prompt: row.prompt, state: row.state, created_at: row.createdAt, withheld: row.state === "failed" && row.error === CHILD_CONTENT_LINE });
+    }
+  }
+  // A teen's edit of a photo they say is of themselves (no limit applies; listed so a parent can see it).
+  for (const teen of db.select().from(people).all().filter((person) => laneOfPerson(person as never) === "teen")) {
+    for (const row of db.select({ prompt: kidUsage.prompt, outcome: kidUsage.outcome, createdAt: kidUsage.createdAt }).from(kidUsage).where(and(eq(kidUsage.personId, teen.id), eq(kidUsage.kind, "photo"), gte(kidUsage.createdAt, since))).all()) {
+      items.push({ person: { id: teen.id, name: teen.displayName }, kind: "photo", prompt: row.prompt, state: row.outcome === "withheld" ? "failed" : "done", created_at: row.createdAt, withheld: row.outcome === "withheld" });
     }
   }
   items.sort((a, b) => b.created_at.localeCompare(a.created_at));

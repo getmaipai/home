@@ -7,7 +7,7 @@
 import { preparePhotoUse } from "@/lib/likeness/apply";
 import { inspectPhoto, PHOTO_LINES, photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
 import { asksToUndress } from "./policy";
-import { TEEN_CONTENT_LINE, laneOf } from "./lane";
+import { TEEN_CONTENT_LINE, laneOf, noteTeenPhotoEdit } from "./lane";
 import { subjectEligibility } from "@/lib/likeness/consent";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import type { UseSource } from "@/lib/likeness/uses";
@@ -34,6 +34,7 @@ export type EditSourcePrep =
   | { ok: true; imageSource: EditImageSource; proof?: string; likeness?: JobLikeness; subjectId: string | null }
   | { ok: false; status: 403 | 422; code: string; line: string };
 
+export const TEEN_PHOTO_LINE = "That photo doesn't look like it is of you. I only change a photo of yourself that you upload. Try another photo of you.";
 export const SUBJECT_NOT_ALLOWED_LINE = "I can only change a photo of an adult who lives in this household and has agreed. Choose that adult from the list, or a photo with no one in it.";
 
 export async function prepareEditSource(input: PrepareEditSourceInput): Promise<EditSourcePrep> {
@@ -49,6 +50,10 @@ export async function prepareEditSource(input: PrepareEditSourceInput): Promise<
     const facts = await inspectPhoto(input.bytes);
     if (!facts) return { ok: false, status: 422, code: "photo_check_unavailable", line: PHOTO_LINES.unavailable };
     if (facts.people !== 1 || facts.faces !== 1) return { ok: false, status: 422, code: "photo_not_single_adult", line: PHOTO_LINES.count };
+    // "It's me" is the teen's word, and a word is not a proof (lane review, 2026-10-17): the photo must also plausibly show someone of a teen's age, so a
+    // stranger's adult photo cannot be claimed. "unsure" is not enough. Either way the edit is in the admins' activity list.
+    if (facts.under18 !== "yes") { noteTeenPhotoEdit(input.audience.actor, input.text, "withheld"); return { ok: false, status: 422, code: "photo_not_teen", line: TEEN_PHOTO_LINE }; }
+    noteTeenPhotoEdit(input.audience.actor, input.text, "asked");
     return { ok: true, imageSource: "uploaded", subjectId: null };
   }
   const declared = input.rootLikeness ?? input.declaredSubjectId;

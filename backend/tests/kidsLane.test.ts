@@ -239,6 +239,7 @@ describe("what the children made, for the admins", () => {
     const client = new TestClient();
     await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const child = addPerson("Pippa", "child");
+    const rill = addPerson("Rill", "teen");
     const now = new Date().toISOString();
     const base = { personId: child.id, conversationId: null, turnId: null, kind: "generate" as const, stackJob: null, percent: 100, phase: "ready", position: null, request: { size: "1024x1024", n: 1, seed: null, loras: [], source_file_id: null, audience: "all-ages" as const }, files: [], temporary: false, createdAt: now, updatedAt: now };
     saveJob({ ...base, id: "pj-1", state: "done", prompt: "a friendly dragon", error: null });
@@ -247,13 +248,15 @@ describe("what the children made, for the admins", () => {
       { id: "ku-1", personId: child.id, day: "2026-10-17", kind: "edit", units: 1, prompt: "make the dragon green", outcome: "asked", createdAt: now },
       { id: "ku-2", personId: child.id, day: "2026-10-17", kind: "edit", units: 1, prompt: "make the dragon scary", outcome: "withheld", createdAt: now },
       { id: "ku-3", personId: child.id, day: "2026-10-17", kind: "picture", units: 1, prompt: "a friendly dragon", outcome: "asked", createdAt: now },
+      { id: "ku-4", personId: rill.id, day: "2026-10-17", kind: "photo", units: 0, prompt: "change my sweater to blue", outcome: "withheld", createdAt: now },
     ]).run();
     const res = await client.get("/api/pictures/admin/kids-activity");
     expect(res.status).toBe(200);
     const body = await res.json() as { items: Array<{ person: { name: string }; prompt: string; withheld: boolean; kind: string }>; daily_pictures: number; daily_videos: number };
     expect(body).toMatchObject({ daily_pictures: 20, daily_videos: 5 });
-    expect(body.items.map((i) => [i.person.name, i.prompt, i.withheld]).sort()).toEqual([["Pippa", "a friendly dragon", false], ["Pippa", "a friendly turtle", true], ["Pippa", "make the dragon green", false], ["Pippa", "make the dragon scary", true]]);
+    expect(body.items.filter((i) => i.kind !== "photo").map((i) => [i.person.name, i.prompt, i.withheld]).sort()).toEqual([["Pippa", "a friendly dragon", false], ["Pippa", "a friendly turtle", true], ["Pippa", "make the dragon green", false], ["Pippa", "make the dragon scary", true]]);
     expect(JSON.stringify(body)).not.toContain("b64");
+    expect(body.items.filter((i) => i.kind === "photo").map((i) => [i.person.name, i.prompt, i.withheld])).toEqual([["Rill", "change my sweater to blue", true]]);
     // A child cannot read it.
     db.update(peopleTable).set({ role: "child" }).where(eq(peopleTable.displayName, "Sage")).run();
     const { invalidateSessionCacheForPerson } = await import("@/middleware/auth");

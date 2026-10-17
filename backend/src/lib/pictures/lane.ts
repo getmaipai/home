@@ -143,7 +143,7 @@ function dayOf(now = new Date()): string {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-export type KidKind = "picture" | "video" | "edit";
+export type KidKind = "picture" | "video" | "edit" | "photo";
 export type KidOutcome = "asked" | "made" | "withheld";
 
 /** What a child asked for today, from the stored ledger (`kid_usage`): every ask counts, failed and held-back ones too, and a deleted chat or a restart gives nothing back. */
@@ -171,6 +171,12 @@ export function reserveKid(actor: PersonRow, kind: KidKind, units: number, promp
   });
 }
 export function releaseKid(id: string | null): void { if (id) db.delete(kidUsage).where(eq(kidUsage.id, id)).run(); }
+/** A teen's edit of a photo they say is of themselves goes in the admins' activity list, allowed or refused (it takes nothing from any allowance: zero units). */
+export function noteTeenPhotoEdit(actor: PersonRow, prompt: string, outcome: "asked" | "withheld", now = new Date()): void {
+  try {
+    db.insert(kidUsage).values({ id: `ku-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`, personId: actor.id, day: dayOf(now), kind: "photo", units: 0, prompt: prompt.slice(0, 500), outcome, createdAt: now.toISOString() }).run();
+  } catch (error) { console.error("[lane] could not log a teen's photo edit", error instanceof Error ? error.name : "error"); }
+}
 /** Remembers which job a ledger row became. */
 export function attachKid(id: string | null, ref: string): void { if (id) db.update(kidUsage).set({ ref }).where(eq(kidUsage.id, id)).run(); }
 /** Marks the ledger row of a job whose finished item was held back (the admins' activity list reads it). */
