@@ -19,6 +19,8 @@ import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
+/** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
+const MAX_UPLOAD_BYTES = 120 * 1024 * 1024;
 const size = (n: number) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n >= 1e6 ? `${Math.round(n / 1e6)} MB` : `${Math.max(1, Math.round(n / 1e3))} KB`);
 const messageOf = (error: unknown, fallback: string) => (error instanceof ApiError ? error.message : fallback);
 
@@ -180,6 +182,10 @@ function AddStyle({ refresh }: { refresh: () => void }) {
   async function submit(event: React.FormEvent) {
     event.preventDefault();
     setError(null);
+    if (source === "file" && file && file.size > MAX_UPLOAD_BYTES) {
+      setError(`That file is ${size(file.size)}. Home can take files up to ${size(MAX_UPLOAD_BYTES)} here. For a bigger one, paste its Hugging Face link instead.`);
+      return;
+    }
     setBusy(true);
     const form = new FormData();
     form.append("name", name.trim());
@@ -218,7 +224,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            <Label htmlFor="style-file">The .safetensors file</Label>
+            <Label htmlFor="style-file">The .safetensors file (up to 120 MB)</Label>
             <Input id="style-file" type="file" accept=".safetensors" onChange={(e) => setFile(e.target.files?.[0] ?? null)} required disabled={busy} />
           </div>
         )}
