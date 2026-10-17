@@ -76,3 +76,55 @@ APPROVED with four amendments, applied above: (1) extend `POST /search/use-candi
 (2) correct the rule 0 line; (3) list what the fallback replaces under Supersedes; (4) SETUP-SEARCH-03 depends on
 SEARXNG-SET-02 and wires the existing `stackSearchState` hook. Ruled 2026-10-17 against RULES.md rules 0, 6, 9 and 11. The
 ddgs-by-default question was answered by Jesse on 2026-10-17 (Ruling): on by default for adults.
+
+## Investigation: could teens or children use ddgs? (2026-10-17, no change made)
+
+Jesse asked why ddgs is adults only. Nothing in the code or gates changes until he approves.
+
+**Why adults only: no safety reason was ever written down.** The first record is `.github` commit `00582f4`
+("THIRD-PARTY-SERVICES: allow an optional ddgs sidecar", owner-approved 2026-10-11, "off by default, adults only, one fixed
+browser identity, no rotation, no proxies"). `81fbf91b` (SEARCH-DDGS-01, 2026-10-12) built it as "adult-only", with three locks
+(`ModeSource "ddgs"` closed for child and teen, guest filtered in `packageHost.ts`, `ddgsSearch` refuses a non-adult band).
+The BACKLOG row says "adults only (child, teen and guest never reach it)" and `docs/dev.md` repeats it. The design file it
+cites (`data-scratch/design/SEARCH-DDGS-01.md`) is not in the repo. No note mentions safe search, scraping or filtering as
+the reason. The conservative default fits rule 0 (any doubt means no), but the reasoning was not recorded.
+
+**Facts about ddgs (read from the library source on its main branch; the pinned 9.16.0 could not be run here, the Mac has
+only Python 3.9):**
+- The README lists `safesearch` as on, moderate, off (default moderate) for text, images, videos and news.
+- For text search that value is mostly not applied. The DuckDuckGo text engine posts to `html.duckduckgo.com/html/` with only
+  query, region and paging: `safesearch` is accepted and ignored (maintainer, issue #289: unstable and unused). Bing and
+  Yandex text engines also ignore it (and are marked disabled). Brave sets a cookie; Mojeek sends `safe=1` only for "on".
+  Only images use it reliably.
+- The sidecar (`scripts/ddgs-sidecar/server.py`) calls `CLIENT.text(query, max_results=...)`: no safesearch argument and no
+  backend choice, so the library's automatic engine mix runs. Strict is not asked for even today.
+- DuckDuckGo itself does not guarantee blocking: its help page says some content can still get through. Strict works through
+  `kp=1` or `safe.duckduckgo.com`, which this unofficial HTML client does not use.
+- The library says "for educational purposes only", scrapes without an API contract, and is blocked or CAPTCHA'd from home
+  addresses at times (`docs/dev/session-d.md` around line 1126: a cold request was bot-blocked on the first call).
+  Rate limits and 429s are why the sidecar has quiet mode. This is the "behave as the user would" boundary in
+  THIRD-PARTY-SERVICES.md; adults accepted that, a child's search is a worse place to lean on it.
+- Sources: [DuckDuckGo SafeSearch help](https://duckduckgo.com/duckduckgo-help-pages/features/safe-search),
+  [ddgs README](https://github.com/deedy5/ddgs), [ddgs issue 289](https://github.com/deedy5/ddgs/issues/289).
+
+**How Home protects minors on SearXNG today:** a per-request `safesearch` of 2 for a child (strict) and the person's level
+for a teen (`packageHost.ts`, `safeSearch.ts`), only engines that SearXNG's own `/config` marks safesearch-capable
+(`safesearchEnginesFor`, `webRotationPool`), privacy-flagged engines (Yandex, Baidu) excluded (SEARXNG-SET-04), the adult-site
+host list always applied, page text cleaned before the model sees it, and the output gate. The engine list is an instance
+setting Home can read and check. With ddgs none of the first two exist: Home cannot see or set which engine answered or
+whether a safe level took effect. Only the host list, page cleaning and output gate would remain.
+
+**Live test: not run.** No Python 3.10+ on this Mac and no SearXNG reachable. The source reading above already shows the
+text path does not send a safe level, so a leak test would only measure DuckDuckGo's default moderate filter. Run it on the
+box (STACK-DDGS-01 time) if teens are ever reconsidered.
+
+**Recommendation: keep ddgs adults only, for children and teens alike.** Reasons: the safe level is not sent on the text
+path, Home cannot verify the engine, DuckDuckGo disclaims a guarantee, and rule 0 says any doubt means no. Teens without
+SearXNG keep "Library only" plus the Wikipedia fallback the settings already offer; the setup screen should say so in one line.
+Options, if Jesse wants teens later (all need his approval and an architect verdict, none for children):
+1. Adults only (now). Cost: nothing.
+2. Teens with a Home gate: needs ddgs images-style strict (`kp=1`) support in the sidecar or `safe.duckduckgo.com`, a
+   backend pin to engines that honor safe search, a domain allowlist or a result classifier ahead of page fetch, an admin
+   toggle per household (off by default), and a 15-query leak bench with zero unsafe hits. Risk: medium, unofficial scraper.
+3. Never for minors, written as a rule in RULES.md (Jesse only).
+Tracked as SEARCH-DDGS-TEEN-01 (open, no build).
