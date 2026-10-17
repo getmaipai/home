@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MaiPai Local Coding</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="data:,">
+<meta name="description" content="Design preview of local coding in MaiPai Home: the admin Coding settings, a person's API keys with a copy-once key and connect snippets, and the Code app (sessions, a live session with transcript, tool calls, diff, file tree, terminal and plan approval) at phone and desktop sizes. Placeholder content only.">
+<style>
+/* Layout concept: the media-apps mockup's frame (design bar, one app frame that is the hub's shell: 56 px rail from 640 px,
+   a drawer below it). The frame is a CSS container, so the same markup draws the phone and desktop layouts.
+   Tokens: hex values copied by hand from commons/ui/src/tokens.css (Home's dark set). Placeholder content only; people are
+   from the org persona roster, repositories and addresses are made up (example.com, example.ts.net). */
+:root {
+  color-scheme: dark;
+  --background: #07111f; --deep: #040a14; --card: #102238; --card-2: #0b1a2c; --foreground: #f4f8ff;
+  --muted: #142a43; --muted-foreground: #a9bed7; --border: #294563; --scrim: rgba(4, 10, 20, 0.86);
+  --primary: #21a6ff; --primary-foreground: #07111f;
+  --hue-violet: #a434ff; --hue-teal: #00e3ae; --hue-orange: #ff8a35; --hue-pink: #ff3e9a;
+  --hue-red: #ff4b62; --hue-green: #22c55e; --hue-yellow: #facc15;
+  --add-bg: rgba(34, 197, 94, 0.14); --del-bg: rgba(255, 75, 98, 0.14);
+  --radius-card: 16px; --radius-control: 10px; --radius-pill: 999px;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --target: 44px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--deep); color: var(--foreground); font-family: var(--font-sans); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+input, textarea, select { font: inherit; color: inherit; }
+button:focus-visible, [tabindex]:focus-visible, select:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+svg.i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.sm { width: 16px; height: 16px; }
+h1, h2, h3 { text-wrap: balance; }
+code, pre, .mono { font-family: var(--font-mono); }
+
+/* ---------- design bar (outside the app) ---------- */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; background: color-mix(in srgb, var(--deep) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--muted);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.bar .name { font-weight: 800; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; margin-right: auto; }
+.bar .name .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--primary), var(--hue-violet)); }
+.bar .name small { color: var(--muted-foreground); font-weight: 600; }
+.seg { display: inline-flex; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-pill); padding: 3px; gap: 2px; }
+.seg button { padding: 6px 12px; border-radius: var(--radius-pill); font-weight: 650; font-size: 13px; color: var(--muted-foreground); min-height: 32px; }
+.seg button[aria-pressed="true"] { background: var(--foreground); color: var(--deep); }
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ctl label { font-size: 12px; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+.ctl select { background: var(--card-2); color: var(--foreground); border: 1px solid var(--muted); border-radius: var(--radius-pill); padding: 7px 12px; font-size: 13px; font-weight: 650; min-height: 34px; max-width: 240px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: var(--radius-pill); background: var(--card-2); border: 1px solid var(--muted); font-size: 13px; font-weight: 650; min-height: 34px; }
+.toggle .sw { width: 30px; height: 18px; border-radius: 99px; background: var(--muted); position: relative; transition: background .15s; }
+.toggle .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted-foreground); transition: transform .15s; }
+.toggle[aria-pressed="true"] .sw { background: var(--hue-orange); }
+.toggle[aria-pressed="true"] .sw::after { transform: translateX(12px); background: var(--deep); }
+@media (max-width: 700px) {
+  .bar { position: static; gap: 8px; padding-block: 8px; }
+  .bar .name small { display: none; }
+  .ctl { width: 100%; gap: 6px; }
+  .ctl select { max-width: none; flex: 1 1 120px; min-width: 0; }
+  .seg button { padding: 6px 10px; }
+  .bar [data-size="phone"] { display: none; }
+  .ctl label { display: none; }
+  .caption .tag { display: none; }
+  .caption p { font-size: 14px; }
+}
+
+/* ---------- try view ---------- */
+.try { padding-block: 14px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.caption { max-width: 860px; margin: 0 auto 12px; display: flex; gap: 12px; align-items: flex-start; }
+.caption .tag { flex: none; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-foreground); background: var(--primary); border-radius: var(--radius-pill); padding: 3px 9px; margin-top: 2px; }
+.caption p { margin: 0; color: var(--muted-foreground); font-size: 15px; min-width: 0; }
+.caption p b { color: var(--foreground); }
+.stage { display: flex; justify-content: center; min-width: 0; }
+.fitbox { position: relative; flex: none; }
+.frame { container: app / inline-size; position: relative; overflow: hidden; background: var(--background); border-radius: 22px; border: 1px solid var(--muted); box-shadow: 0 30px 80px -30px rgba(0,0,0,.8); transform-origin: top left; }
+body[data-size="fit"] .try { padding-left: 0; padding-right: 0; padding-top: 0; }
+body[data-size="fit"] .caption { padding: 12px max(16px, env(safe-area-inset-left, 0px)) 0; }
+body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0; }
+
+/* ---------- the app shell ---------- */
+.app { position: absolute; inset: 0; background: var(--background); --rail-w: 0px; }
+@container app (min-width: 640px) { .app { --rail-w: 56px; } }
+.rail { position: absolute; left: 0; top: 0; bottom: 0; width: 56px; background: var(--deep); border-right: 1px solid var(--muted); display: none; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; z-index: 20; }
+@container app (min-width: 640px) { .rail { display: flex; } }
+.rail .brand { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--primary), var(--hue-violet)); margin-bottom: 8px; }
+.rail button { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--muted-foreground); position: relative; }
+.rail button:hover { background: var(--muted); color: var(--foreground); }
+.rail button[aria-current="page"] { background: var(--muted); color: var(--foreground); }
+.rail button[aria-current="page"]::before { content: ""; position: absolute; left: -6px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--primary); }
+.rail .sep { width: 24px; height: 1px; background: var(--muted); margin: 6px 0; }
+.rail .grow { flex: 1; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: var(--primary-foreground); background: var(--hue-teal); flex: none; }
+.menubtn { position: absolute; top: 10px; left: 10px; z-index: 25; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--scrim); border: 1px solid var(--muted); backdrop-filter: blur(10px); }
+@container app (min-width: 640px) { .menubtn { display: none; } }
+.app[data-immersive="1"] .menubtn { display: none; }
+.view { position: absolute; top: 0; bottom: 0; right: 0; left: var(--rail-w); overflow: hidden; }
+.scroll { overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+
+/* generic parts */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 0 14px; border-radius: var(--radius-control); font-weight: 700; font-size: 14px; background: var(--muted); color: var(--foreground); white-space: nowrap; }
+.btn:hover { filter: brightness(1.12); }
+.btn.primary { background: var(--foreground); color: var(--deep); }
+.btn.accent { background: var(--primary); color: var(--primary-foreground); }
+.btn.danger { background: color-mix(in srgb, var(--hue-red) 22%, var(--card)); color: #ffd3da; border: 1px solid color-mix(in srgb, var(--hue-red) 45%, transparent); }
+.btn.outline { background: transparent; border: 1px solid var(--border); }
+.btn.sm { min-height: 32px; padding: 0 10px; font-size: 13px; }
+.btn[disabled] { opacity: .45; cursor: not-allowed; }
+.ibtn { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; color: var(--muted-foreground); flex: none; }
+.ibtn:hover { background: var(--muted); color: var(--foreground); }
+.badge { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: var(--radius-pill); background: var(--muted); color: var(--muted-foreground); white-space: nowrap; }
+.badge.ok { background: color-mix(in srgb, var(--hue-green) 20%, transparent); color: #b9f5cd; }
+.badge.warn { background: color-mix(in srgb, var(--hue-orange) 22%, transparent); color: #ffd2b0; }
+.badge.info { background: color-mix(in srgb, var(--primary) 20%, transparent); color: #bfe4ff; }
+.badge.bad { background: color-mix(in srgb, var(--hue-red) 22%, transparent); color: #ffc7cf; }
+.dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted-foreground); flex: none; }
+.dot.run { background: var(--primary); box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 25%, transparent); }
+.dot.you { background: var(--hue-orange); }
+.dot.done { background: var(--hue-green); }
+.dot.fail { background: var(--hue-red); }
+.plus { color: #6ee79a; font-weight: 700; } .minus { color: #ff8b9b; font-weight: 700; }
+.muted { color: var(--muted-foreground); }
+.small { font-size: 13px; }
+
+/* switch */
+.switch { width: 44px; height: 26px; border-radius: 99px; background: var(--muted); position: relative; flex: none; border: 1px solid var(--border); transition: background .15s; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: var(--muted-foreground); transition: transform .15s; }
+.switch[aria-checked="true"] { background: var(--primary); border-color: var(--primary); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); background: var(--primary-foreground); }
+.switch[disabled] { opacity: .45; }
+
+/* ---------- settings shell ---------- */
+.settings { display: flex; height: 100%; }
+.snav { width: 236px; flex: none; border-right: 1px solid var(--muted); padding: 18px 10px; display: none; flex-direction: column; gap: 2px; overflow-y: auto; }
+@container app (min-width: 900px) { .snav { display: flex; } }
+.snav .t { font-weight: 800; font-size: 18px; padding: 2px 10px 12px; }
+.snav button { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 10px; color: var(--muted-foreground); font-weight: 600; text-align: left; }
+.snav button[aria-current="page"] { background: var(--muted); color: var(--foreground); }
+.scontent { flex: 1; min-width: 0; height: 100%; }
+.sinner { max-width: 760px; margin: 0 auto; padding: 18px 16px 40px; }
+@container app (min-width: 640px) { .sinner { padding: 26px 28px 48px; } }
+.shead { display: flex; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 4px; }
+.shead h1 { margin: 0; font-size: 24px; letter-spacing: -0.02em; }
+.app:not([data-wide="1"]) .shead { padding-left: 50px; }
+.slede { color: var(--muted-foreground); margin: 2px 0 18px; }
+.card { background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); margin-bottom: 14px; overflow: hidden; }
+.card > .ch { padding: 14px 16px 4px; font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+.card > .ch .badge { margin-left: auto; }
+.row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: 1px solid var(--muted); min-width: 0; }
+.card > .ch + .row { border-top: 0; }
+.row .txt { flex: 1; min-width: 0; }
+.row .txt b { display: block; font-weight: 650; }
+.row .txt span { display: block; color: var(--muted-foreground); font-size: 13px; }
+.row.off { opacity: .5; }
+.radios { display: flex; flex-direction: column; gap: 6px; padding: 6px 16px 14px; }
+.radio { display: flex; gap: 10px; align-items: flex-start; text-align: left; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--muted); }
+.radio .rd { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--border); flex: none; margin-top: 2px; }
+.radio[aria-checked="true"] { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 8%, transparent); }
+.radio[aria-checked="true"] .rd { border-color: var(--primary); box-shadow: inset 0 0 0 3px var(--card-2); background: var(--primary); }
+.radio b { display: block; font-weight: 650; } .radio span { display: block; font-size: 13px; color: var(--muted-foreground); }
+.people { padding: 0 16px 12px; display: flex; flex-direction: column; gap: 2px; }
+.people .p { display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.people .p b { flex: 1; font-weight: 600; }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; flex: none; }
+.stepper button { width: 34px; height: 34px; display: grid; place-items: center; color: var(--muted-foreground); }
+.stepper button:hover { background: var(--muted); color: var(--foreground); }
+.stepper span { min-width: 34px; text-align: center; font-weight: 700; }
+.mem { padding: 4px 16px 14px; }
+.membar { display: flex; height: 14px; border-radius: 99px; overflow: hidden; background: var(--muted); margin: 8px 0 8px; }
+.membar i { display: block; height: 100%; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted-foreground); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.note { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; border-radius: 12px; background: color-mix(in srgb, var(--primary) 10%, var(--card-2)); border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent); font-size: 14px; margin: 0 16px 14px; }
+.note.warn { background: color-mix(in srgb, var(--hue-orange) 10%, var(--card-2)); border-color: color-mix(in srgb, var(--hue-orange) 35%, transparent); }
+.note svg { margin-top: 1px; color: var(--primary); } .note.warn svg { color: var(--hue-orange); }
+.counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; padding: 4px 16px 14px; }
+@container app (min-width: 640px) { .counts { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.counts div { background: var(--card); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.counts b { display: block; font-size: 20px; } .counts span { font-size: 12.5px; color: var(--muted-foreground); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 16px 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border); font-size: 13px; font-weight: 650; color: var(--muted-foreground); }
+.chip[aria-pressed="true"] { border-color: var(--primary); color: var(--foreground); background: color-mix(in srgb, var(--primary) 14%, transparent); }
+
+/* keys */
+.klist .row { align-items: flex-start; }
+.kicon { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: var(--muted); color: var(--primary); flex: none; }
+.kmeta { display: flex; flex-wrap: wrap; gap: 4px 10px; margin-top: 4px; font-size: 12.5px; color: var(--muted-foreground); }
+.kmeta .mono { color: var(--foreground); }
+.row .txt .kmeta span { display: inline-flex; font-size: 12.5px; }
+.kmeta > span { white-space: nowrap; }
+.kmeta { align-items: center; }
+@container app (max-width: 480px) { .klist .row.mk { flex-wrap: wrap; } .klist .row.mk .btn { margin-left: 0; } }
+.tabsrow { display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding: 4px 16px 0; border-bottom: 1px solid var(--muted); }
+.tabsrow::-webkit-scrollbar { display: none; }
+.tabsrow button { flex: none; padding: 9px 10px; font-weight: 650; font-size: 14px; color: var(--muted-foreground); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tabsrow button[aria-selected="true"] { color: var(--foreground); border-bottom-color: var(--primary); }
+.snip { position: relative; margin: 12px 16px 6px; background: var(--deep); border: 1px solid var(--muted); border-radius: 12px; }
+.snip pre { margin: 0; padding: 12px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.6; color: #d6e6fb; }
+.snip .copy { position: absolute; top: 6px; right: 6px; }
+.snip .cm { color: #7f95b0; } .snip .k { color: #8fd0ff; } .snip .s { color: #b9f5cd; }
+.subtle { padding: 0 16px 14px; font-size: 13px; color: var(--muted-foreground); }
+
+/* dialog */
+.dlg-wrap { position: absolute; inset: 0; z-index: 40; background: rgba(0,0,0,.55); display: flex; align-items: flex-end; justify-content: center; }
+@container app (min-width: 640px) { .dlg-wrap { align-items: center; } }
+.dlg { width: 100%; max-width: 520px; background: var(--card); border: 1px solid var(--border); border-radius: 22px 22px 0 0; padding: 18px 18px 20px; max-height: 92%; overflow-y: auto; }
+@container app (min-width: 640px) { .dlg { border-radius: 20px; } }
+.dlg h2 { margin: 0 0 6px; font-size: 20px; }
+.dlg p { margin: 0 0 12px; color: var(--muted-foreground); font-size: 14px; }
+.field { display: block; margin: 12px 0; }
+.field > span { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+.input { width: 100%; min-height: 42px; background: var(--card-2); border: 1px solid var(--border); border-radius: 10px; padding: 0 12px; }
+.keybox { display: flex; gap: 8px; align-items: center; background: var(--deep); border: 1px solid var(--primary); border-radius: 12px; padding: 8px 8px 8px 12px; margin: 10px 0; min-width: 0; }
+.keybox code { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 13px; color: #d6e6fb; }
+.dlg .acts { display: flex; gap: 8px; justify-content: flex-end; margin-top: 16px; flex-wrap: wrap; }
+.optrow { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---------- the Code app ---------- */
+.code { display: flex; height: 100%; }
+.slist { width: 100%; height: 100%; display: flex; flex-direction: column; border-right: 1px solid var(--muted); background: var(--background); }
+.code[data-has-session="1"] .slist { display: none; }
+@container app (min-width: 1000px) { .code .slist { width: 280px; flex: none; display: flex !important; } }
+.slist .top { padding: 12px 12px 8px; display: flex; flex-direction: column; gap: 10px; }
+.slist .top .ttl { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.app:not([data-wide="1"]) .slist .top .ttl { padding-left: 50px; }
+.slist .top .ttl h1 { margin: 0; font-size: 20px; flex: 1; }
+.search { display: flex; align-items: center; gap: 8px; background: var(--card-2); border: 1px solid var(--muted); border-radius: 10px; min-height: 38px; padding: 0 10px; color: var(--muted-foreground); font-size: 14px; }
+.filters { display: flex; gap: 6px; }
+.sitems { flex: 1; overflow-y: auto; padding: 0 8px 12px; }
+.sitem { display: flex; gap: 10px; align-items: flex-start; width: 100%; text-align: left; padding: 10px 10px; border-radius: 12px; }
+.sitem:hover { background: var(--card-2); }
+.sitem[aria-current="true"] { background: var(--muted); }
+.sitem .dot { margin-top: 7px; }
+.sitem .b { flex: 1; min-width: 0; }
+.sitem .b b { display: block; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sitem .b span { display: flex; gap: 6px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted-foreground); margin-top: 2px; }
+.sgroup { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); padding: 12px 10px 4px; }
+
+/* new session home */
+.newhome { flex: 1; min-width: 0; display: none; flex-direction: column; align-items: center; justify-content: center; padding: 24px; gap: 14px; }
+@container app (min-width: 1000px) { .code:not([data-has-session="1"]) .newhome { display: flex; } }
+.newhome h2 { margin: 0; font-size: 26px; letter-spacing: -0.02em; text-align: center; }
+.newhome p { margin: 0; color: var(--muted-foreground); text-align: center; max-width: 52ch; }
+.newbox { width: 100%; max-width: 640px; background: var(--card-2); border: 1px solid var(--border); border-radius: 18px; padding: 12px; }
+.newbox textarea { width: 100%; min-height: 76px; resize: none; background: transparent; border: 0; outline: none; font-size: 15px; padding: 4px 4px; }
+.newbox .pick { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pickbtn { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 10px; border: 1px solid var(--border); font-size: 13px; font-weight: 650; color: var(--muted-foreground); max-width: 100%; }
+.pickbtn b { color: var(--foreground); font-weight: 650; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.send { margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: var(--foreground); color: var(--deep); display: grid; place-items: center; flex: none; }
+.slist .newm { margin: 0 12px 10px; }
+@container app (min-width: 1000px) { .slist .newm { display: none; } }
+
+/* session */
+.sess { flex: 1; min-width: 0; display: none; flex-direction: column; height: 100%; }
+.code[data-has-session="1"] .sess { display: flex; }
+.shdr { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 8px; border-bottom: 1px solid var(--muted); min-height: 56px; }
+.shdr .tt { flex: 1; min-width: 0; }
+.shdr .tt b { display: block; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shdr .tt span { display: flex; gap: 6px; align-items: center; font-size: 12.5px; color: var(--muted-foreground); white-space: nowrap; overflow: hidden; }
+.shdr .meta { display: none; align-items: center; gap: 8px; }
+@container app (min-width: 760px) { .shdr .meta { display: flex; } }
+.shdr .pr .lbl { display: none; }
+@container app (min-width: 520px) { .shdr .pr .lbl { display: inline; } }
+.ctxm { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted-foreground); }
+.ctxm i { width: 46px; height: 6px; border-radius: 9px; background: var(--muted); position: relative; overflow: hidden; display: inline-block; }
+.ctxm i::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 34%; background: var(--primary); }
+.mtabs { display: flex; border-bottom: 1px solid var(--muted); padding: 0 6px; }
+.mtabs button { flex: 1; padding: 10px 4px; font-weight: 650; font-size: 14px; color: var(--muted-foreground); border-bottom: 2px solid transparent; margin-bottom: -1px; display: inline-flex; gap: 6px; justify-content: center; align-items: center; }
+.mtabs button[aria-selected="true"] { color: var(--foreground); border-bottom-color: var(--primary); }
+@container app (min-width: 1000px) { .mtabs { display: none; } }
+.sbody { flex: 1; min-height: 0; display: flex; }
+.thread { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.panel { width: 100%; display: none; flex-direction: column; min-width: 0; border-left: 1px solid var(--muted); background: var(--card-2); }
+.sess[data-tab="chat"] .thread { display: flex; }
+.sess:not([data-tab="chat"]) .thread { display: none; }
+.sess:not([data-tab="chat"]) .panel { display: flex; }
+@container app (min-width: 1000px) {
+  .sess .thread { display: flex !important; }
+  .sess .panel { display: flex !important; width: 44%; max-width: 560px; flex: none; }
+  .sess[data-tab="chat"] .panel .ptabs button[data-ptab="changes"] { }
+}
+.msgs { flex: 1; overflow-y: auto; padding: 14px 14px 8px; }
+.mcol { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.umsg { align-self: flex-end; max-width: 88%; background: var(--muted); border-radius: 16px 16px 4px 16px; padding: 10px 14px; }
+.amsg { line-height: 1.55; }
+.amsg p { margin: 0 0 6px; }
+.amsg code { background: var(--muted); padding: 1px 5px; border-radius: 5px; font-size: 13px; }
+.reason { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted-foreground); }
+.tool { border: 1px solid var(--muted); border-radius: 12px; background: var(--card-2); overflow: hidden; }
+.tool > button { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; padding: 9px 12px; font-size: 13.5px; }
+.tool > button .nm { font-weight: 700; }
+.tool > button .arg { color: var(--muted-foreground); font-family: var(--font-mono); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0; }
+.tool > button .st { margin-left: auto; flex: none; }
+.tool .tb { border-top: 1px solid var(--muted); }
+.tool:not(.open) .tb { display: none; }
+.term { background: #050b14; font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; padding: 10px 12px; overflow-x: auto; color: #cfe0f5; white-space: pre; }
+.term .cmd { color: #8fd0ff; } .term .ok { color: #6ee79a; } .term .err { color: #ff8b9b; } .term .dim { color: #6f86a3; }
+.diff { font-family: var(--font-mono); font-size: 12.5px; line-height: 1.55; overflow-x: auto; }
+.diff div { padding: 0 12px; white-space: pre; }
+.diff .a { background: var(--add-bg); color: #c9f7d8; } .diff .d { background: var(--del-bg); color: #ffd1d8; } .diff .h { color: #7f95b0; background: rgba(255,255,255,.03); }
+.diff .ln { display: inline-block; width: 30px; color: #5d7593; user-select: none; }
+.approve { border: 1px solid color-mix(in srgb, var(--hue-orange) 45%, transparent); background: color-mix(in srgb, var(--hue-orange) 8%, var(--card-2)); border-radius: 14px; padding: 12px; }
+.approve .at { display: flex; gap: 8px; align-items: center; font-weight: 700; }
+.approve .at svg { color: var(--hue-orange); }
+.approve code.cmdbox { display: block; background: var(--deep); border-radius: 8px; padding: 8px 10px; margin: 8px 0; font-size: 12.5px; overflow-x: auto; white-space: pre; }
+.approve .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.approve.done { border-color: var(--muted); background: var(--card-2); }
+.plan { border: 1px solid var(--border); border-radius: 14px; background: var(--card-2); padding: 12px 14px; }
+.plan h4 { margin: 0 0 8px; font-size: 14px; display: flex; gap: 8px; align-items: center; }
+.plan ol { margin: 0; padding-left: 20px; }
+.plan li { margin: 4px 0; }
+.todo { list-style: none; padding: 0 !important; }
+.todo li { display: flex; gap: 8px; align-items: flex-start; }
+.todo .ck { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border); flex: none; margin-top: 3px; }
+.todo .ck.done { background: var(--hue-green); border-color: var(--hue-green); }
+.todo .ck.act { border-color: var(--primary); box-shadow: inset 0 0 0 3px var(--card-2); background: var(--primary); }
+.todo .dn { color: var(--muted-foreground); text-decoration: line-through; }
+.working { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted-foreground); }
+.spin { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted); border-top-color: var(--primary); animation: sp 1s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.stopped { display: flex; gap: 8px; align-items: center; font-size: 13.5px; color: var(--muted-foreground); padding: 8px 12px; border: 1px dashed var(--border); border-radius: 12px; }
+.planbar { margin: 0 14px 8px; border: 1px solid var(--primary); background: color-mix(in srgb, var(--primary) 9%, var(--card-2)); border-radius: 14px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.planbar .pt { flex: 1 1 200px; font-size: 14px; min-width: 0; }
+.planbar .pt b { display: block; }
+.queue { margin: 0 14px 6px; display: flex; flex-direction: column; gap: 4px; }
+.queue .q { display: flex; gap: 8px; align-items: center; font-size: 13px; background: var(--card-2); border: 1px solid var(--muted); border-radius: 10px; padding: 6px 6px 6px 10px; }
+.queue .q span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.composer { padding: 6px 14px 14px; }
+.cbox { max-width: 760px; margin: 0 auto; background: var(--card-2); border: 1px solid var(--border); border-radius: 18px; padding: 8px 8px 8px 12px; display: flex; flex-direction: column; gap: 6px; }
+.cbox textarea { width: 100%; min-height: 40px; max-height: 120px; resize: none; background: transparent; border: 0; outline: none; padding: 6px 0; font-size: 15px; }
+.cbox .crow { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.cbox .crow { flex-wrap: nowrap; min-width: 0; }
+.cbox .crow > * { flex-shrink: 0; }
+.cbox .crow .pickbtn { flex-shrink: 1; min-width: 0; overflow: hidden; white-space: nowrap; }
+@container app (max-width: 420px) { .cbox .crow .pickbtn .lb { display: none; } }
+.modechip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: var(--radius-pill); border: 1px solid var(--border); font-size: 12.5px; font-weight: 700; }
+.modechip.plan { border-color: var(--primary); color: #bfe4ff; }
+.stopbtn { margin-left: auto; width: 38px; height: 38px; border-radius: 50%; background: var(--foreground); color: var(--deep); display: grid; place-items: center; }
+.stopbtn i { width: 12px; height: 12px; background: var(--deep); border-radius: 2px; display: block; }
+.paused { max-width: 760px; margin: 0 auto 6px; font-size: 13.5px; color: #ffd2b0; display: flex; gap: 8px; align-items: center; }
+
+/* panel */
+.ptabs { display: none; gap: 2px; padding: 6px 8px 0; border-bottom: 1px solid var(--muted); }
+@container app (min-width: 1000px) { .ptabs { display: flex; } }
+.ptabs button { padding: 8px 10px; font-weight: 650; font-size: 13.5px; color: var(--muted-foreground); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.ptabs button[aria-selected="true"] { color: var(--foreground); border-bottom-color: var(--primary); }
+.pbody { flex: 1; min-height: 0; overflow-y: auto; }
+.phead { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font-size: 13px; color: var(--muted-foreground); border-bottom: 1px solid var(--muted); flex-wrap: wrap; }
+.phead b { color: var(--foreground); }
+.ftree { padding: 6px 6px; border-bottom: 1px solid var(--muted); }
+.fnode { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; padding: 5px 8px; border-radius: 8px; font-size: 13px; font-family: var(--font-mono); }
+.fnode:hover { background: var(--muted); }
+.fnode[aria-current="true"] { background: var(--muted); }
+.fnode .fn { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fnode .fc { font-size: 12px; flex: none; }
+.dfile { padding: 8px 12px; font-size: 13px; font-weight: 700; display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--muted); font-family: var(--font-mono); }
+.dfile span { margin-left: auto; font-family: var(--font-sans); }
+.cmt { margin: 6px 12px; font-size: 12.5px; color: var(--muted-foreground); display: flex; gap: 6px; align-items: center; }
+
+/* drawer, toast */
+.drawer-wrap { position: absolute; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
+.drawer { position: absolute; top: 0; bottom: 0; left: 0; width: min(300px, 84%); background: var(--deep); border-right: 1px solid var(--muted); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.drawer .dhead { display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px; font-weight: 800; }
+.drawer .dhead .brand { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--primary), var(--hue-violet)); }
+.drawer .item { display: flex; align-items: center; gap: 12px; min-height: 46px; padding: 0 10px; border-radius: 12px; font-weight: 650; text-align: left; width: 100%; }
+.drawer .item[aria-current="page"] { background: var(--muted); }
+.drawer .lbl { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); padding: 14px 10px 4px; }
+.drawer .item.secn { padding-left: 42px; color: var(--muted-foreground); min-height: 40px; font-size: 15px; }
+.drawer .foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px 0; border-top: 1px solid var(--muted); }
+.toast { position: absolute; left: 50%; bottom: 92px; transform: translateX(-50%) translateY(10px); z-index: 45; background: var(--foreground); color: var(--deep); font-weight: 700; font-size: 14px; padding: 10px 16px; border-radius: 12px; opacity: 0; transition: .2s; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* ---------- how it works ---------- */
+.how { padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.how .wrap { max-width: 760px; margin: 0 auto; }
+.how h1 { font-size: clamp(30px, 6vw, 44px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 10px; }
+.how .lede { font-size: 19px; color: var(--muted-foreground); margin: 0 0 8px; max-width: 62ch; }
+.how h2 { font-size: 24px; letter-spacing: -0.02em; margin: 40px 0 12px; }
+.how p, .how li { font-size: 17px; line-height: 1.6; max-width: 66ch; }
+.how ul, .how ol { padding-left: 22px; margin: 8px 0; }
+.how li { margin: 4px 0; }
+.how .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+.how .hc { background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.how .hc h3 { margin: 4px 0 0; font-size: 18px; }
+.how .hc p { font-size: 15px; margin: 0; color: var(--muted-foreground); line-height: 1.5; }
+.how .hc .see { margin-top: auto; padding-top: 6px; font-weight: 700; font-size: 14px; text-align: left; display: inline-flex; gap: 6px; align-items: center; color: var(--primary); }
+.how .decide { background: var(--card-2); border: 1px solid var(--muted); border-radius: 14px; padding: 12px 14px; margin: 8px 0; }
+.how .decide b { display: block; } .how .decide span { color: var(--muted-foreground); font-size: 15px; }
+</style>
+</head>
+<body data-size="fit">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></symbol>
+  <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 7-5 5 5 5"/><path d="m16 7 5 5-5 5"/><path d="m14 4-4 16"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></symbol>
+  <symbol id="i-key" viewBox="0 0 24 24"><circle cx="7.5" cy="15.5" r="4.5"/><path d="m10.7 12.3 9.3-9.3M16 7l3 3M14 9l2 2"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0"/><path d="M16 4a4 4 0 0 1 0 8M22 21a7 7 0 0 0-4-6.3"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+  <symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="7" r="2.5"/><path d="M6 7.5v9M18 9.5c0 4-6 3-11.5 7"/></symbol>
+  <symbol id="i-pr" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M6 7.5v9M18 16.5V9a3 3 0 0 0-3-3h-4"/><path d="m13 3-3 3 3 3"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/></symbol>
+  <symbol id="i-term" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3M13 15h4"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6Z"/></symbol>
+  <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="i-up" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></symbol>
+  <symbol id="i-sparkle" viewBox="0 0 24 24"><path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></symbol>
+  <symbol id="i-laptop" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="11" rx="2"/><path d="M2 19h20"/></symbol>
+  <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2"/><path d="M9 2v4M15 2v4M9 18v4M15 18v4M2 9h4M2 15h4M18 9h4M18 15h4"/></symbol>
+  <symbol id="i-history" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></symbol>
+</svg>
+
+<header class="bar" role="banner">
+  <div class="name"><span class="dot" aria-hidden="true"></span>Local coding <small>design preview</small></div>
+  <div class="seg" role="group" aria-label="View">
+    <button id="v-try" aria-pressed="true" data-view="try">Try it</button>
+    <button id="v-how" aria-pressed="false" data-view="how">How it works</button>
+  </div>
+  <div class="ctl" id="tryctl">
+    <label for="screenpick">Screen</label>
+    <select id="screenpick" aria-label="Jump to a screen"></select>
+    <div class="seg" role="group" aria-label="Size">
+      <button data-size="fit" aria-pressed="true">Fit</button>
+      <button data-size="phone" aria-pressed="false">Phone</button>
+      <button data-size="desktop" aria-pressed="false">Desktop</button>
+    </div>
+    <button class="toggle" id="pausetoggle" aria-pressed="false"><span class="sw" aria-hidden="true"></span>Coding paused</button>
+  </div>
+</header>
+
+<main class="try" id="try">
+  <div class="caption"><span class="tag" id="captag">Screen</span><p id="captext"></p></div>
+  <div class="stage" id="stage">
+    <div class="fitbox" id="fitbox">
+      <div class="frame" id="frame">
+        <div class="app" id="app">
+          <nav class="rail" id="rail" aria-label="Apps"></nav>
+          <button class="menubtn" id="menubtn" aria-label="Open the menu"><svg class="i"><use href="#i-menu"/></svg></button>
+          <div class="view" id="screens"></div>
+          <div class="drawer-wrap" id="drawer" hidden></div>
+          <div class="dlg-wrap" id="dlg" hidden></div>
+          <div class="toast" id="toast" role="status" aria-live="polite"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<article class="how" id="how" hidden>
+  <div class="wrap">
+    <h1>Coding with Home's own AI</h1>
+    <p class="lede">Home can help the adults in the house write code. The AI runs on the home's own computer, so the code never goes to a cloud company.</p>
+
+    <h2>The short version</h2>
+    <ul>
+      <li>An admin turns <b>Coding</b> on in Home settings. It is off until then.</li>
+      <li>Adults can use it. Guests never can. Kids and teens cannot in this version.</li>
+      <li>There are two ways to code: your own coding tool on your laptop, with a <b>personal key</b>, or the <b>Code app</b> in the browser.</li>
+      <li>Family chat always comes first. Coding waits or slows down, never chat.</li>
+      <li>Nothing goes on the internet unless you allow a site for a session.</li>
+    </ul>
+
+    <h2>Three screens</h2>
+    <div class="cards">
+      <div class="hc"><h3>Coding settings</h3><p>For admins. Turn coding on, pick who can use it, set how many sessions run at once, and stop everything with one button.</p><button class="see" data-goto="admin">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
+      <div class="hc"><h3>Your keys</h3><p>Make a key for your coding tool. You see the key once. Copy the setup lines for Claude Code, Codex and others.</p><button class="see" data-goto="keys">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
+      <div class="hc"><h3>The Code app</h3><p>Pick a project, describe the change, and watch it work. See every command, every changed line, and approve the plan first.</p><button class="see" data-goto="session">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
+    </div>
+
+    <h2>How the Code app keeps things safe</h2>
+    <ul>
+      <li>Each session runs in its own small, closed-off computer on the hub. It sees only that project.</li>
+      <li>It cannot see your family's chats, memories, photos or files, unless you add a folder yourself.</li>
+      <li>No internet unless you allow a site, like a package download site, for that session.</li>
+      <li>It never has your GitHub password. Only you can push or open a pull request, after you see the changes.</li>
+      <li>Home checks the changes for passwords and keys before anything is pushed.</li>
+    </ul>
+
+    <h2>What it is good at</h2>
+    <p>Clear, small jobs: fix this test, add this field, write tests for this file. It is slower than the big cloud models and it does not make design choices well. Give it exact steps and check its work.</p>
+
+    <h2>Still to decide</h2>
+    <div class="decide"><b>A. A second AI model for coding</b><span>It loads only while someone is coding and frees its memory after 15 quiet minutes (the plan), or coding shares the chat model and slows family chat down.</span></div>
+    <div class="decide"><b>B. Teens</b><span>Adults only now, with a "learn to code" version for teens later (the plan), or never.</span></div>
+    <div class="decide"><b>C. Away from home</b><span>Keys work away from home only through the home's own Tailscale, and only if an admin turns it on (the plan), or only at home.</span></div>
+    <p style="color:var(--muted-foreground);font-size:14px;margin-top:28px">Design only. People, projects and addresses in the mockup are made up. Full design: docs/design/local-coding-2026-10-17.md.</p>
+  </div>
+</article>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const ic = (n, cls = "") => `<svg class="i ${cls}"><use href="#i-${n}"/></svg>`;
+  const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // ---------- placeholder data (people from the org persona roster; made-up repositories) ----------
+  const ADULTS = [["Nadia", "N", "var(--hue-teal)", "Admin"], ["Marlow", "M", "var(--hue-orange)", "Adult"], ["Iris", "I", "var(--hue-pink)", "Adult"], ["Atlas", "A", "var(--primary)", "Adult"]];
+  const SESSIONS = [
+    { id: "s1", t: "Add a due date to tasks", repo: "rivet/garage-planner", br: "maipai/due-date-qx4k", st: "you", stl: "Needs you", add: 64, del: 9, when: "Now" },
+    { id: "s2", t: "Fix the flaky date test", repo: "rivet/garage-planner", br: "maipai/flaky-date-test-b7mr", st: "run", stl: "Working", add: 6, del: 4, when: "2 min" },
+    { id: "s3", t: "Write tests for the CSV parser", repo: "nadia/budget-sheets", br: "maipai/csv-tests-h2pa", st: "done", stl: "Done · PR #14", add: 212, del: 0, when: "1 h" },
+    { id: "s4", t: "Upgrade the router package", repo: "nadia/budget-sheets", br: "maipai/router-upgrade-9fzt", st: "wait", stl: "Waiting for a free slot", add: 0, del: 0, when: "1 h" },
+    { id: "s5", t: "Rename the settings page", repo: "Hub folder · home-scripts", br: "maipai/rename-settings-w3cd", st: "done", stl: "Done · pushed", add: 18, del: 18, when: "Yesterday" },
+  ];
+  const FILES = [
+    { p: "src/tasks/task.ts", d: 1, a: 14, r: 2 }, { p: "src/tasks/TaskForm.tsx", d: 1, a: 31, r: 5 },
+    { p: "src/tasks/task.test.ts", d: 1, a: 17, r: 0 }, { p: "db/migrations/0007_due_date.sql", d: 1, a: 2, r: 2 },
+  ];
+  const DIFFS = {
+    "src/tasks/task.ts": [["h", "@@ -1,14 +1,26 @@"], ["c", 1, "export interface Task {"], ["c", 2, "  id: string;"], ["c", 3, "  title: string;"], ["d", 4, "  done: boolean;"], ["a", 4, "  done: boolean;"], ["a", 5, "  /** The day it is due, as YYYY-MM-DD. Empty when it has none. */"], ["a", 6, "  dueDate?: string;"], ["c", 7, "}"], ["c", 8, ""], ["a", 9, "export function isOverdue(task: Task, today: string): boolean {"], ["a", 10, "  if (!task.dueDate || task.done) return false;"], ["a", 11, "  return task.dueDate < today;"], ["a", 12, "}"]],
+    "src/tasks/TaskForm.tsx": [["h", "@@ -18,9 +18,21 @@ export function TaskForm({ onSave }: Props) {"], ["c", 18, "  const [title, setTitle] = useState(\"\");"], ["a", 19, "  const [dueDate, setDueDate] = useState(\"\");"], ["c", 20, ""], ["d", 21, "  const save = () => onSave({ title });"], ["a", 21, "  const save = () => onSave({ title, dueDate: dueDate || undefined });"], ["c", 22, "  return ("], ["c", 23, "    <form onSubmit={save}>"], ["a", 24, "      <label>"], ["a", 25, "        Due date"], ["a", 26, "        <input type=\"date\" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />"], ["a", 27, "      </label>"]],
+    "src/tasks/task.test.ts": [["h", "@@ -0,0 +1,17 @@"], ["a", 1, "import { describe, expect, it } from \"vitest\";"], ["a", 2, "import { isOverdue } from \"./task\";"], ["a", 3, ""], ["a", 4, "describe(\"isOverdue\", () => {"], ["a", 5, "  it(\"is false with no due date\", () => {"], ["a", 6, "    expect(isOverdue({ id: \"1\", title: \"Oil\", done: false }, \"2026-10-17\")).toBe(false);"], ["a", 7, "  });"], ["a", 8, "  it(\"is true the day after\", () => {"], ["a", 9, "    expect(isOverdue({ id: \"1\", title: \"Oil\", done: false, dueDate: \"2026-10-16\" }, \"2026-10-17\")).toBe(true);"], ["a", 10, "  });"]],
+    "db/migrations/0007_due_date.sql": [["h", "@@ -1,2 +1,2 @@"], ["d", 1, "-- next migration"], ["a", 1, "ALTER TABLE tasks ADD COLUMN due_date TEXT;"], ["c", 2, ""]],
+  };
+  const TERM = [
+    ["cmd", "$ npm test -- src/tasks"], ["dim", "> garage-planner@1.4.0 test"], ["dim", "> vitest run src/tasks"], ["", ""], ["ok", " ✓ src/tasks/task.test.ts (4 tests) 12ms"], ["ok", " ✓ src/tasks/TaskForm.test.tsx (6 tests) 88ms"], ["", ""], ["", " Test Files  2 passed (2)"], ["", "      Tests  10 passed (10)"], ["dim", "   Duration  1.31s · exit 0"], ["", ""],
+    ["cmd", "$ npx tsc --noEmit"], ["dim", "exit 0 · 4.2s"], ["", ""], ["cmd", "$ npm run lint"], ["err", "src/tasks/TaskForm.tsx:26:9  warning  Prefer a labelled input id"], ["dim", "1 warning · exit 0 · 2.0s"],
+  ];
+  const PLAN = ["Add an optional dueDate field to the Task type", "Add a date input to the task form and save it", "Add a migration for the due_date column", "Show a small Overdue badge in the task list", "Write tests for isOverdue and the form, then run the test suite"];
+
+  // ---------- state ----------
+  const S = { screen: "session", size: "fit", paused: false, coding: true, api: true, web: true, away: false, who: "all", picks: { Nadia: true, Marlow: true, Iris: false, Atlas: true },
+    maxS: 2, perP: 2, rpm: 60, net: "none", hosts: { npm: true, PyPI: false, "crates.io": false, "Go proxy": false, RubyGems: false },
+    tab: "chat", ptab: "changes", file: "src/tasks/task.ts", sid: "s1", mode: "ask", approved: false, planDone: false, stopped: false, queue: ["Also show the date on the phone layout"], snip: "claude", keys: 2, newKey: null, pr: false, openTools: { t2: true } };
+  const SCREENS = [
+    ["admin", "Admin: Coding settings", "Home settings, <b>Coding</b>. An admin turns coding on, picks who may use it, shares the computer fairly, and can <b>Stop all coding now</b>. Admins see counts only, never whose session."],
+    ["keys", "Your keys", "Settings, <b>Coding</b>, for one person. Their keys, what each can do, when it expires and where it was last used (only they see that). <b>Tap Create a key.</b>"],
+    ["newkey", "New key: copy once", "The key is shown <b>once</b>. Copy it, then copy the setup lines for your tool. Try the <b>Codex CLI</b> tab."],
+    ["sessions", "Code: sessions", "The Code app, like Claude Code on the web. Your sessions with their state and changes, and a box to start a new one with a project, a branch, an environment and a mode."],
+    ["session", "Code: live session", "A session at work: the agent's messages, tool calls with real output, an approval it needs, and a message you queued. On a computer the changes are on the right. <b>Tap a file</b> or <b>Allow once</b>."],
+    ["plan", "Code: approve the plan", "In <b>Plan</b> mode the agent reads and plans but changes nothing. <b>Approve plan and start</b>, or keep planning."],
+    ["changes", "Code: changes", "Every changed file with its added and removed lines, against the base branch. Tap a line to comment; comments go with your next message."],
+    ["terminal", "Code: terminal", "Every command the agent ran, in order, with its output, exit code and time."],
+    ["pr", "Code: pull request", "Only you can push or open a pull request. Home checks the changes for passwords and keys first."],
+  ];
+  const IMM = new Set(["session", "plan", "changes", "terminal", "pr"]);
+  const APPS = [["home", "Home", "home"], ["chat", "Chat", "chat"], ["code", "Code", "code"]];
+  const APPOF = { admin: "settings", keys: "settings", newkey: "settings", sessions: "code", session: "code", plan: "code", changes: "code", terminal: "code", pr: "code" };
+
+  const app = $("#app"), screensEl = $("#screens");
+  const wide = () => $("#frame").getBoundingClientRect().width / (S.scale || 1) >= 640;
+
+  // ---------- pieces ----------
+  const sw = (on, attrs = "", dis = false) => `<button class="switch" role="switch" aria-checked="${on}" ${dis ? "disabled" : ""} ${attrs}></button>`;
+  const row = (title, sub, ctl, off = false) => `<div class="row ${off ? "off" : ""}"><div class="txt"><b>${title}</b>${sub ? `<span>${sub}</span>` : ""}</div>${ctl}</div>`;
+  const stepper = (k, v) => `<span class="stepper"><button aria-label="Less" data-step="${k}" data-d="-1">−</button><span>${v}</span><button aria-label="More" data-step="${k}" data-d="1">+</button></span>`;
+  const dotFor = (st) => ({ you: "you", run: "run", done: "done", fail: "fail" }[st] || "");
+
+  function settingsNav(cur) {
+    const items = cur === "home" ? [["General", "home"], ["People", "users"], ["Engines and AI", "cpu"], ["Pictures, videos and music", "sparkle"], ["Coding", "code"], ["Network and access", "globe"], ["Privacy", "shield"]]
+      : [["Profile", "users"], ["Notifications", "bell"], ["Voice", "chat"], ["Coding", "code"], ["Developer tools", "term"]];
+    return `<nav class="snav" aria-label="Settings sections"><div class="t">${cur === "home" ? "Home settings" : "Settings"}</div>${items.map(([n, i]) => `<button ${n === "Coding" ? 'aria-current="page"' : ""} data-toast="${n} is not drawn in this mockup">${ic(i)}${n}</button>`).join("")}</nav>`;
+  }
+
+  // ---------- screens ----------
+  const R = {};
+  R.admin = () => {
+    const on = S.coding, d = !on;
+    return `<div class="settings">${settingsNav("home")}<div class="scontent scroll"><div class="sinner">
+      <div class="shead"><h1>Coding</h1></div>
+      <p class="slede">Let people write code with Home's own AI. It runs on this computer; code never goes to a cloud company.</p>
+      <div class="card"><div class="ch">${ic("code")}Coding<span class="badge ${S.paused ? "warn" : on ? "ok" : ""}">${S.paused ? "Paused" : on ? "On" : "Off"}</span></div>
+        ${row("Let people write code with Home's AI", "Loads a coding model when someone uses it. It uses about 40 GB while busy and gives it back after 15 quiet minutes.", sw(on, 'data-set="coding"'))}
+        ${row("The Code app", "Code in the browser, on a phone or a computer.", sw(S.web && on, 'data-set="web"', d), d)}
+        ${row("Coding tools on people's own computers", "With personal API keys: Claude Code, Codex, OpenCode, Aider and others.", sw(S.api && on, 'data-set="api"', d), d)}
+        ${row("Keys work away from home", "Only through your Tailscale. Off means keys work on the home network only.", sw(S.away && on, 'data-set="away"', d || !S.api), d || !S.api)}
+        <div class="row"><div class="txt"><b>Stop all coding now</b><span>Stops every session and refuses every key until you resume. Work is kept.</span></div><button class="btn ${S.paused ? "outline" : "danger"} sm" data-kill ${d ? "disabled" : ""}>${S.paused ? "Resume coding" : "Stop all"}</button></div>
+      </div>
+      <div class="card"><div class="ch">${ic("users")}Who can code</div>
+        <div class="radios" role="radiogroup" aria-label="Who can code">
+          ${[["all", "Every adult", "Everyone on Adult controls."], ["admins", "Only admins", ""], ["chosen", "Only people I choose", ""]].map(([k, b, s]) => `<button class="radio" role="radio" aria-checked="${S.who === k}" data-who="${k}" ${d ? "disabled" : ""}><span class="rd"></span><span><b>${b}</b>${s ? `<span>${s}</span>` : ""}</span></button>`).join("")}
+        </div>
+        ${S.who === "chosen" ? `<div class="people">${ADULTS.map(([n, l, c, r]) => `<div class="p"><span class="avatar" style="background:${c}">${l}</span><b>${n} <span class="muted small">${r}</span></b>${sw(S.picks[n], `data-pick="${n}"`)}</div>`).join("")}</div>` : ""}
+        <div class="note">${ic("info")}<span>Coding is for adults. A version for teens is planned. Guests can never use it.</span></div>
+      </div>
+      <div class="card"><div class="ch">${ic("cpu")}Sharing the computer</div>
+        <div class="subtle" style="padding-top:2px">Chat always comes first. Coding waits or slows down, never chat. While busy, coding uses about 40 GB; one picture, video or music job can still run beside it.</div>
+        ${row("Code app sessions at once", "More wait for a free slot and start by themselves.", stepper("maxS", S.maxS), d)}
+        ${row("Requests running at once, per person", "", stepper("perP", S.perP), d)}
+        ${row("Requests per minute, per key", "", stepper("rpm", S.rpm), d)}
+        ${row("Model", "Fast answers in seconds. Careful is slower and a little better at hard changes.", `<span class="seg" role="group" aria-label="Model"><button aria-pressed="true" data-toast="Fast: Qwen3.6 35B, about 90 tokens a second">Fast</button><button aria-pressed="false" data-toast="Careful: Qwen3.8 27B, about 18 tokens a second">Careful</button></span>`, d)}
+      </div>
+      <div class="card"><div class="ch">${ic("globe")}Internet for coding</div>
+        <div class="radios" role="radiogroup" aria-label="Default for new sessions">
+          ${[["none", "No internet", "The default. Nothing a session does can leave the house."], ["registries", "Package downloads", "Sessions may use the sites you tick below."]].map(([k, b, s]) => `<button class="radio" role="radio" aria-checked="${S.net === k}" data-net="${k}" ${d ? "disabled" : ""}><span class="rd"></span><span><b>${b}</b><span>${s}</span></span></button>`).join("")}
+        </div>
+        <div class="subtle">Sites people may allow for their own sessions. A site not on this list needs an admin to add it. Video sites can never be added.</div>
+        <div class="chips">${Object.keys(S.hosts).map((h) => `<button class="chip" aria-pressed="${S.hosts[h]}" data-host="${h}">${S.hosts[h] ? ic("check", "sm") : ic("plus", "sm")}${h}</button>`).join("")}<button class="chip" data-toast="Add a site: type its address, like registry.example.com">${ic("plus", "sm")}Add a site</button></div>
+      </div>
+      <div class="card"><div class="ch">${ic("history")}What is running</div>
+        ${row("Sessions, the coding model and its memory", "Shown on the Status page as counts. Each person's sessions, projects and keys are theirs alone.", `<button class="btn sm outline" data-toast="Opens the Status page: Coding, 3 sessions running, model busy">See what is running</button>`)}
+        ${row("Someone's keys or GitHub access", "Open them in Family to see each key's status and expiry and revoke it. Names and use stay private.", `<button class="btn sm outline" data-toast="Family, Marlow: Coding access, 2 keys and 1 GitHub connection, each with Revoke">Open Family</button>`)}
+      </div></div>
+    </div></div></div>`;
+  };
+
+  const keyRow = (n, scope, made, exp, used, hint, extra = "") => `<div class="row"><span class="kicon">${ic(scope === "Coding" ? "code" : "chat")}</span><div class="txt"><b>${n} ${extra}</b><div class="kmeta"><span class="badge info">${scope}</span><span>Key ends&nbsp;<span class="mono">${hint}</span></span><span>Made ${made}</span><span>Expires ${exp}</span><span>Last used ${used}</span></div></div><button class="ibtn" aria-label="Key options" data-toast="Rename or Revoke">${ic("more")}</button></div>`;
+  const keysCard = () => `<div class="card klist"><div class="ch">${ic("key")}Your keys<span class="badge">${S.keys} of 10</span></div>
+      ${S.newKey ? keyRow("Laptop, Codex CLI", "Coding", "just now", "Jan 15, 2027", "never", "r7Qe", '<span class="badge ok">New</span>') : ""}
+      ${keyRow("Laptop, Claude Code", "Coding", "Oct 2", "Dec 31", "today, on the home network", "4mXa")}
+      ${keyRow("Voice and Home Assistant", "Voice", "Sep 6", "Sep 6, 2027", "yesterday, on the home network", "9kLp")}
+      <div class="row mk"><div class="txt"><b>Make a key for a coding tool</b><span>Keys work only for coding, only on the home network unless an admin allows away use, and stop when they expire.</span></div><button class="btn accent sm" data-newkey>${ic("plus", "sm")}Create a key</button></div></div>`;
+
+  const SNIPS = {
+    claude: ["Claude Code", `<span class="cm"># Add to ~/.zshrc, then open a new terminal and run: claude</span>
+<span class="k">export</span> ANTHROPIC_BASE_URL=<span class="s">"https://home.example.ts.net/code"</span>
+<span class="k">export</span> ANTHROPIC_AUTH_TOKEN=<span class="s">"&lt;your key&gt;"</span>
+<span class="k">export</span> ANTHROPIC_MODEL=<span class="s">"maipai-coder"</span>
+<span class="k">export</span> ANTHROPIC_DEFAULT_OPUS_MODEL=<span class="s">"maipai-coder"</span>
+<span class="k">export</span> ANTHROPIC_DEFAULT_SONNET_MODEL=<span class="s">"maipai-coder"</span>
+<span class="k">export</span> ANTHROPIC_DEFAULT_HAIKU_MODEL=<span class="s">"maipai-coder"</span>
+<span class="k">export</span> CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1
+<span class="k">export</span> CLAUDE_CODE_DISABLE_EXPERIMENTAL_BETAS=1
+<span class="k">export</span> CLAUDE_CODE_AUTO_COMPACT_WINDOW=131072`, "Claude Code still asks Anthropic before it reads a web page. Its settings can turn that off."],
+    codex: ["Codex CLI", `<span class="cm"># ~/.codex/config.toml  (and in your shell: export MAIPAI_API_KEY="&lt;your key&gt;")</span>
+model = <span class="s">"maipai-coder"</span>
+model_provider = <span class="s">"maipai"</span>
+
+[model_providers.maipai]
+name = <span class="s">"MaiPai Home"</span>
+base_url = <span class="s">"https://home.example.ts.net/code/v1"</span>
+env_key = <span class="s">"MAIPAI_API_KEY"</span>
+wire_api = <span class="s">"responses"</span>`, "Codex talks only to the address above."],
+    opencode: ["OpenCode", `<span class="cm">// opencode.json</span>
+{ <span class="s">"provider"</span>: { <span class="s">"maipai"</span>: {
+  <span class="s">"npm"</span>: <span class="s">"@ai-sdk/openai-compatible"</span>,
+  <span class="s">"options"</span>: { <span class="s">"baseURL"</span>: <span class="s">"https://home.example.ts.net/code/v1"</span>, <span class="s">"apiKey"</span>: <span class="s">"{env:MAIPAI_API_KEY}"</span> },
+  <span class="s">"models"</span>: { <span class="s">"maipai-coder"</span>: { <span class="s">"limit"</span>: { <span class="s">"context"</span>: 131072, <span class="s">"output"</span>: 8000 } } } } } }`, "OpenCode talks only to the address above."],
+    aider: ["Aider", `<span class="k">export</span> OPENAI_API_BASE=<span class="s">"https://home.example.ts.net/code/v1"</span>
+<span class="k">export</span> OPENAI_API_KEY=<span class="s">"&lt;your key&gt;"</span>
+aider --model openai/maipai-coder`, "Continue and Cline use the same address and model name."],
+  };
+  const snipCard = () => `<div class="card"><div class="ch">${ic("laptop")}Connect a tool</div>
+      <div class="tabsrow" role="tablist">${Object.entries(SNIPS).map(([k, [n]]) => `<button role="tab" aria-selected="${S.snip === k}" data-snip="${k}">${n}</button>`).join("")}<button role="tab" aria-selected="false" data-toast="Cursor sends requests through its own servers, so it cannot reach a home AI">Cursor</button></div>
+      <div class="snip"><pre>${SNIPS[S.snip][1]}</pre><button class="btn sm copy" data-toast="Copied. Put your key where it says your key.">${ic("copy", "sm")}Copy</button></div>
+      <div class="subtle">${SNIPS[S.snip][2]} At home without Tailscale? <button style="color:var(--primary);font-weight:700" data-toast="maipai-home-ca.pem downloaded. Add NODE_EXTRA_CA_CERTS to the lines above.">Download the home certificate</button>.</div></div>`;
+
+  R.keys = () => `<div class="settings">${settingsNav("account")}<div class="scontent scroll"><div class="sinner">
+      <div class="shead"><h1>Coding</h1></div>
+      <p class="slede">Keys let your own coding tools use Home's AI. Each key is yours alone; nobody else, admins included, sees where you used it.</p>
+      ${keysCard()}${snipCard()}
+      <div class="card"><div class="ch">${ic("branch")}Projects</div>
+        ${row("GitHub", "Connected · 3 repositories · expires Jan 2", `<button class="btn outline sm" data-toast="Disconnected GitHub">Disconnect</button>`)}
+        ${row("Gitea", "Connect your home's own Gitea with a token.", `<button class="btn sm" data-toast="Paste a Gitea token with repository access">Connect</button>`)}
+      </div>
+      <div class="card"><div class="ch">${ic("history")}Today</div><div class="counts"><div><b>184</b><span>Requests</span></div><div><b>1.2M</b><span>Words read</span></div><div><b>96k</b><span>Words written</span></div><div><b>0</b><span>Refused</span></div></div></div>
+    </div></div></div>`;
+  R.newkey = () => { S.newKey = S.newKey || "maipai_key_8hq2_r4nk7vd2w9xyc3qmz6tbf5ejpls8ua7gh1okr7Qe"; return R.keys(); };
+
+  // Code app
+  function slist(curId) {
+    const g = (title, items) => `<div class="sgroup">${title}</div>${items.map((s) => `<button class="sitem" ${s.id === curId ? 'aria-current="true"' : ""} data-open="${s.id}"><span class="dot ${dotFor(s.st)}"></span><span class="b"><b>${s.t}</b><span><span>${s.repo}</span><span>${s.stl}</span>${s.add || s.del ? `<span><span class="plus">+${s.add}</span> <span class="minus">−${s.del}</span></span>` : ""}</span></span><span class="small muted">${s.when}</span></button>`).join("")}`;
+    return `<aside class="slist" aria-label="Sessions"><div class="top"><div class="ttl"><h1>Code</h1><button class="ibtn" aria-label="Code settings" data-goto="keys">${ic("gear")}</button></div>
+      <div class="search">${ic("search", "sm")}Search sessions</div><div class="filters"><span class="chip" aria-pressed="true">Active</span><button class="chip" data-toast="Archived sessions">Archived</button></div></div>
+      <button class="btn accent newm" data-goto="newsession">${ic("plus", "sm")}New session</button>
+      <div class="sitems">${g("Today", SESSIONS.slice(0, 4))}${g("Yesterday", SESSIONS.slice(4))}</div></aside>`;
+  }
+  const pausedLine = () => S.paused ? `<div class="paused">${ic("pause", "sm")}Coding is paused by an admin. Your work is kept. Try again later.</div>` : "";
+  const newBox = () => `<div class="newbox">${pausedLine()}<textarea aria-label="Describe a task" placeholder="Describe a task. Best for clear, small jobs: fix this test, add this field.">Add a due date to tasks, with an Overdue badge in the list</textarea>
+      <div class="pick"><button class="pickbtn" data-toast="Pick a repository: GitHub, Gitea, a folder on the hub, or Empty">${ic("branch", "sm")}<b>rivet/garage-planner</b>${ic("down", "sm")}</button><button class="pickbtn" data-toast="Base branch">main${ic("down", "sm")}</button>
+      <button class="pickbtn" data-toast="Environment: Default (no internet, Node and Python)">${ic("cpu", "sm")}Default${ic("down", "sm")}</button><button class="pickbtn" data-toast="Plan, Ask before acting, or Auto-edit">${S.mode === "plan" ? "Plan" : "Ask before acting"}${ic("down", "sm")}</button>
+      <button class="send" aria-label="Start" data-start ${S.paused ? "disabled" : ""}>${ic("up")}</button></div></div>`;
+  R.sessions = () => `<div class="code" data-has-session="0">${slist("")}<section class="newhome"><h2>What should we build?</h2><p>Pick a project and describe the change. It runs on this home's computer, in its own closed-off space, with no internet unless you allow it.</p>${newBox()}</section></div>`;
+  R.newsession = () => `<div class="code" data-has-session="1">${slist("")}<section class="sess" data-tab="chat"><div class="shdr"><button class="ibtn" aria-label="Back to sessions" data-goto="sessions">${ic("left")}</button><div class="tt"><b>New session</b><span>Pick a project and describe the change</span></div></div><div class="msgs"><div class="mcol" style="justify-content:center;min-height:100%">${newBox()}</div></div></section></div>`;
+
+  function toolCard(id, name, arg, state, body) {
+    const open = S.openTools[id];
+    return `<div class="tool ${open ? "open" : ""}"><button data-tool="${id}" aria-expanded="${!!open}">${ic(name === "Run" ? "term" : name === "Edit" ? "code" : name === "Read" ? "file" : "list", "sm")}<span class="nm">${name}</span><span class="arg">${arg}</span><span class="st">${state}</span>${ic(open ? "down" : "right", "sm")}</button><div class="tb">${body}</div></div>`;
+  }
+  const diffHtml = (path, limit = 99) => (DIFFS[path] || []).slice(0, limit).map(([k, n, t]) => k === "h" ? `<div class="h">${esc(n)}</div>` : `<div class="${k === "a" ? "a" : k === "d" ? "d" : ""}"><span class="ln">${n}</span>${k === "a" ? "+" : k === "d" ? "−" : " "} ${esc(t)}</div>`).join("");
+  const termHtml = (lines) => lines.map(([k, t]) => `<span class="${k}">${esc(t)}</span>`).join("\n");
+
+  function thread(kind) {
+    const planning = kind === "plan" && !S.approved;
+    const parts = [];
+    parts.push(`<div class="umsg">Add a due date to tasks, with an Overdue badge in the list. Keep the migration small.</div>`);
+    parts.push(`<div class="amsg"><span class="reason">${ic("sparkle", "sm")}Thought for 6 seconds</span></div>`);
+    parts.push(toolCard("t1", "Search", "\"interface Task\" in src", `<span class="badge">3 files</span>`, `<div class="term">${termHtml([["", "src/tasks/task.ts:1"], ["", "src/tasks/TaskList.tsx:4"], ["", "src/tasks/TaskForm.tsx:2"]])}</div>`));
+    parts.push(toolCard("t0", "Read", "src/tasks/task.ts", `<span class="badge">14 lines</span>`, `<div class="diff">${diffHtml("src/tasks/task.ts", 4).replace(/class="a"|class="d"/g, "")}</div>`));
+    if (planning) {
+      parts.push(`<div class="plan"><h4>${ic("list", "sm")}Plan</h4><ol>${PLAN.map((p) => `<li>${p}</li>`).join("")}</ol></div>`);
+      parts.push(`<div class="amsg"><p>That is the plan. Nothing is changed yet. I will ask before running any command that is not a test, a type check or the linter.</p></div>`);
+      return parts.join("");
+    }
+    parts.push(`<div class="plan"><h4>${ic("list", "sm")}Plan · 3 of 5 done</h4><ul class="todo">${PLAN.map((p, i) => `<li><span class="ck ${i < 3 ? "done" : i === 3 ? "act" : ""}"></span><span class="${i < 3 ? "dn" : ""}">${p}</span></li>`).join("")}</ul></div>`);
+    parts.push(toolCard("t2", "Edit", "src/tasks/task.ts", `<span class="small"><span class="plus">+14</span> <span class="minus">−2</span></span>`, `<div class="diff">${diffHtml("src/tasks/task.ts")}</div>`));
+    parts.push(toolCard("t3", "Edit", "src/tasks/TaskForm.tsx", `<span class="small"><span class="plus">+31</span> <span class="minus">−5</span></span>`, `<div class="diff">${diffHtml("src/tasks/TaskForm.tsx")}</div>`));
+    parts.push(toolCard("t4", "Run", "npm test -- src/tasks", `<span class="badge ok">${ic("check", "sm")}exit 0</span>`, `<div class="term">${termHtml(TERM.slice(0, 10))}</div>`));
+    parts.push(`<div class="amsg"><p>The type, the form and the migration are done and the tests pass. Next I want to add the Overdue badge, which uses the date library already in the project.</p></div>`);
+    if (!S.allowed) parts.push(`<div class="approve"><div class="at">${ic("shield", "sm")}Allow this command?</div><code class="cmdbox">npm install date-fns@4.1.0</code><div class="small muted" style="margin-bottom:8px">It needs <b>registry.npmjs.org</b>, which your admin allows for coding. Allowed for this session only.</div><div class="acts"><button class="btn accent sm" data-allow="once">Allow once</button><button class="btn sm" data-allow="session">Allow for this session</button><button class="btn outline sm" data-allow="deny">Deny</button></div></div>`);
+    else parts.push(`<div class="approve done"><div class="at" style="font-weight:600">${ic("check", "sm")}Allowed: <code>npm install date-fns@4.1.0</code></div></div>`, `<div class="amsg">${S.stopped ? "" : `<span class="working"><span class="spin"></span>Working · adding the badge</span>`}</div>`);
+    if (S.stopped) parts.push(`<div class="stopped">${ic("pause", "sm")}<span style="flex:1">You stopped it. Everything so far is kept.</span><button class="btn sm" data-continue>Continue</button></div>`);
+    return parts.join("");
+  }
+
+  function panel() {
+    const tot = FILES.reduce((a, f) => [a[0] + f.a, a[1] + f.r], [0, 0]);
+    const tabs = `<div class="ptabs" role="tablist">${[["changes", "Changes"], ["files", "Files"], ["terminal", "Terminal"], ["plan", "Plan"]].map(([k, n]) => `<button role="tab" aria-selected="${S.ptab === k}" data-ptab="${k}">${n}</button>`).join("")}</div>`;
+    let body = "";
+    const pt = S.tab === "chat" ? S.ptab : S.tab;
+    if (pt === "changes") body = `<div class="phead"><span><b>${FILES.length} files</b> <span class="plus">+${tot[0]}</span> <span class="minus">−${tot[1]}</span></span><span style="margin-left:auto">Compared with <b>main</b></span></div>
+        <div class="ftree">${FILES.map((f) => `<button class="fnode" ${f.p === S.file ? 'aria-current="true"' : ""} data-file="${f.p}">${ic("file", "sm")}<span class="fn">${f.p}</span><span class="fc"><span class="plus">+${f.a}</span> <span class="minus">−${f.r}</span></span></button>`).join("")}</div>
+        <div class="dfile">${S.file}<span><button class="btn sm outline" data-toast="Tap a line to leave a comment">Comment</button></span></div><div class="diff">${diffHtml(S.file)}</div>
+        <div class="cmt">${ic("chat", "sm")}Comments you leave go with your next message.</div>`;
+    if (pt === "files") body = `<div class="phead"><b>Workspace</b><span style="margin-left:auto">Read only</span></div><div class="ftree">${["src/", "src/tasks/", "db/migrations/", "package.json", "README.md", "vitest.config.ts"].map((p) => `<button class="fnode" data-toast="Opens ${p} read only">${ic(p.endsWith("/") ? "folder" : "file", "sm")}<span class="fn">${p}</span></button>`).join("")}</div>`;
+    if (pt === "terminal") body = `<div class="phead"><b>3 commands</b><span style="margin-left:auto">No internet · npm allowed</span></div><div class="term" style="min-height:100%">${termHtml(TERM)}</div>`;
+    if (pt === "plan") body = `<div style="padding:12px"><div class="plan"><h4>${ic("list", "sm")}Plan · 3 of 5 done</h4><ul class="todo">${PLAN.map((p, i) => `<li><span class="ck ${i < 3 ? "done" : i === 3 ? "act" : ""}"></span><span class="${i < 3 ? "dn" : ""}">${p}</span></li>`).join("")}</ul></div></div>`;
+    return `<aside class="panel" aria-label="Changes and terminal">${tabs}<div class="pbody">${body}</div></aside>`;
+  }
+
+  function session(kind) {
+    const s = SESSIONS.find((x) => x.id === S.sid) || SESSIONS[0];
+    const planning = kind === "plan" && !S.approved;
+    const tab = { changes: "changes", terminal: "terminal" }[kind] || S.tab;
+    const prBtn = S.pr ? `<a class="btn sm outline pr" data-toast="Opens pull request #15 on GitHub">${ic("pr", "sm")}<span class="lbl">PR #15</span></a>` : `<button class="btn accent sm pr" data-goto="pr">${ic("pr", "sm")}<span class="lbl">Create pull request</span></button>`;
+    return `<div class="code" data-has-session="1">${slist(s.id)}<section class="sess" data-tab="${tab}">
+      <div class="shdr"><button class="ibtn" aria-label="Back to sessions" data-goto="sessions">${ic("left")}</button><div class="tt"><b>${s.t}</b><span>${ic("branch", "sm")}${s.repo} · ${s.br}</span></div>
+        <div class="meta"><span class="modechip ${planning ? "plan" : ""}">${planning ? "Plan" : S.mode === "auto" ? "Auto-edit" : "Ask before acting"}</span><span class="ctxm" title="Context used">${ic("cpu", "sm")}<i></i>34%</span></div>${prBtn}</div>
+      <div class="mtabs" role="tablist">${[["chat", "Chat"], ["changes", `Changes <span class="plus small">+64</span>`], ["terminal", "Terminal"]].map(([k, n]) => `<button role="tab" aria-selected="${tab === k}" data-tab="${k}">${n}</button>`).join("")}</div>
+      <div class="sbody"><div class="thread"><div class="msgs" id="msgs"><div class="mcol">${thread(kind)}</div></div>
+        ${planning ? `<div class="planbar"><div class="pt"><b>Approve the plan?</b><span class="small muted">Nothing changes until you say so.</span></div><button class="btn accent sm" data-approve>Approve plan and start</button><button class="btn sm" data-toast="Tell it what to change in the plan">Keep planning</button></div>` : ""}
+        ${!planning && S.queue.length ? `<div class="queue" aria-label="Waiting to be read">${S.queue.map((q, i) => `<div class="q">${ic("history", "sm")}<span>Waiting: ${esc(q)}</span><button class="ibtn" style="width:30px;height:30px" aria-label="Take back" data-unqueue="${i}">${ic("x", "sm")}</button></div>`).join("")}</div>` : ""}
+        <div class="composer">${pausedLine()}<div class="cbox"><textarea aria-label="Message" id="cmsg" placeholder="${planning ? "Change the plan, or ask a question" : "Steer it: your message is read at its next step"}"></textarea>
+          <div class="crow"><span class="modechip ${planning ? "plan" : ""}">${planning ? "Plan" : "Ask before acting"}${ic("down", "sm")}</span><button class="pickbtn" data-toast="No internet, plus npm for this session">${ic("globe", "sm")}<span class="lb">npm only</span></button>
+          ${planning || S.stopped ? `<button class="send" aria-label="Send" data-sendmsg>${ic("up")}</button>` : `<button class="stopbtn" aria-label="Stop" data-stop><i></i></button><button class="send" style="margin-left:0" aria-label="Send" data-sendmsg>${ic("up")}</button>`}</div></div></div>
+      </div>${panel()}</div></section></div>`;
+  }
+  R.session = () => session("session");
+  R.plan = () => session("plan");
+  R.changes = () => session("changes");
+  R.terminal = () => session("terminal");
+  R.pr = () => session("session");
+
+  function prDialog() {
+    return `<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="prh"><h2 id="prh">Create a pull request</h2><p>From <b>maipai/due-date-qx4k</b> into <b>main</b> on rivet/garage-planner.</p>
+      <div class="note" style="margin:0 0 12px">${ic("shield")}<span>Checked 4 changed files for passwords and keys. None found.</span></div>
+      <label class="field"><span>Title</span><input class="input" value="Add a due date to tasks, with an Overdue badge"></label>
+      <label class="field"><span>Description</span><textarea class="input" style="min-height:96px;padding:10px 12px;resize:vertical">Adds an optional due date to a task, a date field on the form, a migration for the new column and an Overdue badge in the list. Tests for isOverdue and the form pass (10 of 10).</textarea></label>
+      <div class="acts"><button class="btn outline" data-closedlg>Cancel</button><button class="btn" data-mkpr="draft">Create draft</button><button class="btn accent" data-mkpr="ready">Create pull request</button></div></div>`;
+  }
+  function keyDialog() {
+    if (!S.creating) return `<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="kh"><h2 id="kh">Your new key</h2><p>Copy it now. You will not see it again. Anyone with this key can use coding as you.</p>
+      <div class="keybox"><code>${S.newKey}</code><button class="btn accent sm" data-toast="Copied">${ic("copy", "sm")}Copy</button></div>
+      <p class="small">Name: <b>Laptop, Codex CLI</b> · Coding · expires in 90 days</p><div class="acts"><button class="btn primary" data-closedlg>I copied it</button></div></div>`;
+    return `<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="kh"><h2 id="kh">Create a key</h2><p>A key lets one of your coding tools use Home's AI as you.</p>
+      <label class="field"><span>Name</span><input class="input" value="Laptop, Codex CLI"></label>
+      <div class="field"><span>Expires</span><div class="optrow">${["7 days", "30 days", "90 days", "1 year"].map((o) => `<button class="chip" aria-pressed="${o === "90 days"}">${o}</button>`).join("")}</div></div>
+      <div class="field"><span>What it can do</span><div class="optrow"><span class="chip" aria-pressed="true">${ic("check", "sm")}Coding</span></div></div>
+      <div class="acts"><button class="btn outline" data-closedlg>Cancel</button><button class="btn accent" data-mkkey>Create key</button></div></div>`;
+  }
+
+  // ---------- shell ----------
+  function renderRail() {
+    const cur = APPOF[S.screen];
+    $("#rail").innerHTML = `<span class="brand" aria-hidden="true"></span><button aria-label="Search everywhere" title="Search everywhere" data-toast="Search is not drawn in this mockup">${ic("search")}</button><span class="sep"></span>
+      ${APPS.map(([k, n, i]) => `<button aria-label="${n}" title="${n}" ${cur === k ? 'aria-current="page"' : ""} data-app="${k}">${ic(i)}</button>`).join("")}
+      <span class="grow"></span><button aria-label="Settings" title="Settings" ${cur === "settings" ? 'aria-current="page"' : ""} data-app="settings">${ic("gear")}</button><button aria-label="Profile" title="Profile" data-toast="Profile menu"><span class="avatar">N</span></button>`;
+  }
+  function renderDrawer() {
+    const cur = APPOF[S.screen];
+    const secs = cur === "code" ? `<div class="lbl">Code</div>${SESSIONS.slice(0, 3).map((s) => `<button class="item secn" data-open="${s.id}">${s.t}</button>`).join("")}` : cur === "settings" ? `<div class="lbl">Settings</div><button class="item secn" data-goto="admin">Home settings, Coding</button><button class="item secn" data-goto="keys">Your keys</button>` : "";
+    $("#drawer").innerHTML = `<nav class="drawer" aria-label="Apps"><div class="dhead"><span class="brand" aria-hidden="true"></span>MaiPai Home</div>
+      ${APPS.map(([k, n, i]) => `<button class="item" ${cur === k ? 'aria-current="page"' : ""} data-app="${k}">${ic(i)}${n}</button>`).join("")}${secs}
+      <div class="foot"><span class="avatar">N</span><b style="flex:1">Nadia</b><button class="ibtn" aria-label="Settings" data-app="settings">${ic("gear")}</button></div></nav>`;
+  }
+  function render() {
+    screensEl.innerHTML = (R[S.screen] || R.session)();
+    app.dataset.immersive = IMM.has(S.screen) ? "1" : "0";
+    app.dataset.wide = wide() ? "1" : "0";
+    renderRail();
+    const meta = SCREENS.find(([k]) => k === S.screen) || SCREENS.find(([k]) => k === "sessions");
+    $("#captag").textContent = meta[1]; $("#captext").innerHTML = meta[2];
+    $("#screenpick").value = SCREENS.some(([k]) => k === S.screen) ? S.screen : "sessions";
+    if (S.screen === "pr" && !S.pr) { $("#dlg").innerHTML = prDialog(); $("#dlg").hidden = false; }
+    else if (S.screen === "newkey" && S.newKey && S.showKey) { $("#dlg").innerHTML = keyDialog(); $("#dlg").hidden = false; }
+    const m = $("#msgs"); if (m) m.scrollTop = m.scrollHeight;
+  }
+  function go(screen) {
+    if (screen === "newkey") { S.newKey = null; S.creating = false; S.showKey = true; }
+    if (screen === "plan") { S.approved = false; S.mode = "plan"; }
+    if (screen === "changes") S.tab = "changes";
+    else if (screen === "terminal") S.tab = "terminal";
+    else if (["session", "plan", "pr"].includes(screen)) S.tab = "chat";
+    if (screen === "pr") S.pr = false;
+    S.screen = screen; closeAll(); render();
+  }
+  let toastT;
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2400); }
+  function closeAll() { $("#drawer").hidden = true; $("#dlg").hidden = true; }
+
+  // ---------- events ----------
+  app.addEventListener("click", (e) => {
+    const t = e.target.closest("button, a"); if (!t) { if (e.target.id === "drawer" || e.target.id === "dlg") closeAll(); return; }
+    const d = t.dataset;
+    if (t.disabled) return;
+    if (t.id === "menubtn") { renderDrawer(); $("#drawer").hidden = false; return; }
+    if (d.app) { if (d.app === "home" || d.app === "chat") { closeAll(); return toast(`${d.app === "home" ? "Home" : "Chat"} is not part of this mockup`); } return go(d.app === "settings" ? "keys" : "sessions"); }
+    if (d.goto) return go(d.goto);
+    if (d.open) { S.sid = d.open; return go(d.open === "s1" ? "session" : "session"); }
+    if (d.toast) { return toast(d.toast); }
+    if (d.set) { S[d.set] = !S[d.set]; if (d.set === "coding" && !S.coding) S.paused = false; syncPause(); return render(); }
+    if (d.kill !== undefined) { if (S.paused) { S.paused = false; syncPause(); toast("Coding resumed"); return render(); } $("#dlg").innerHTML = `<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="kk"><h2 id="kk">Stop all coding now?</h2><p>Every running session stops and every key is refused until you resume. Nobody loses work.</p><div class="acts"><button class="btn outline" data-closedlg>Cancel</button><button class="btn danger" data-killyes>Stop all coding</button></div></div>`; $("#dlg").hidden = false; return; }
+    if (d.killyes !== undefined) { S.paused = true; syncPause(); closeAll(); toast("Coding is paused for everyone"); return render(); }
+    if (d.who) { S.who = d.who; return render(); }
+    if (d.pick) { S.picks[d.pick] = !S.picks[d.pick]; return render(); }
+    if (d.net) { S.net = d.net; return render(); }
+    if (d.host) { S.hosts[d.host] = !S.hosts[d.host]; return render(); }
+    if (d.step) { const lim = { maxS: [1, 4], perP: [1, 4], rpm: [10, 600] }[d.step]; const inc = d.step === "rpm" ? 10 : 1; S[d.step] = Math.max(lim[0], Math.min(lim[1], S[d.step] + (+d.d) * inc)); return render(); }
+    if (d.newkey !== undefined) { S.creating = true; S.screen = "newkey"; S.newKey = "maipai_key_8hq2_r4nk7vd2w9xyc3qmz6tbf5ejpls8ua7gh1okr7Qe"; render(); $("#dlg").innerHTML = keyDialog(); $("#dlg").hidden = false; return; }
+    if (d.mkkey !== undefined) { S.creating = false; S.keys = 3; render(); $("#dlg").innerHTML = keyDialog(); $("#dlg").hidden = false; return; }
+    if (d.closedlg !== undefined) { closeAll(); if (S.screen === "pr") { S.screen = "session"; render(); } if (S.screen === "newkey") { S.showKey = false; S.keys = 3; render(); toast("The key is hidden for good. Make a new one if you lose it."); } return; }
+    if (d.snip) { S.snip = d.snip; return render(); }
+    if (d.tool) { S.openTools[d.tool] = !S.openTools[d.tool]; return render(); }
+    if (d.file) { S.file = d.file; if (!wide()) S.tab = "changes"; return render(); }
+    if (d.ptab) { S.ptab = d.ptab; return render(); }
+    if (d.tab) { S.tab = d.tab; S.screen = d.tab === "changes" ? "changes" : d.tab === "terminal" ? "terminal" : "session"; return render(); }
+    if (d.allow) { if (d.allow === "deny") { toast("Denied. It will try another way."); } else { S.allowed = true; toast(d.allow === "once" ? "Allowed once" : "Allowed for this session"); } return render(); }
+    if (d.approve !== undefined) { S.approved = true; S.mode = "ask"; S.allowed = false; S.screen = "session"; toast("Plan approved. It asks before commands that are not tests."); return render(); }
+    if (d.stop !== undefined) { S.stopped = true; return render(); }
+    if (d.continue !== undefined) { S.stopped = false; return render(); }
+    if (d.unqueue !== undefined) { S.queue.splice(+d.unqueue, 1); toast("Taken back"); return render(); }
+    if (d.sendmsg !== undefined) { const v = ($("#cmsg").value || "").trim(); if (!v) return toast("Type a message first"); if (S.paused) return toast("Coding is paused by an admin"); S.queue.push(v); return render(); }
+    if (d.start !== undefined) { if (S.paused) return toast("Coding is paused by an admin"); S.sid = "s1"; return go("plan"); }
+    if (d.mkpr) { S.pr = true; closeAll(); S.screen = "session"; toast(d.mkpr === "draft" ? "Draft pull request #15 created" : "Pull request #15 created"); return render(); }
+  });
+
+  // ---------- design bar ----------
+  const SIZES = { phone: [390, 844], desktop: [1280, 800] };
+  function layout() {
+    const frame = $("#frame"), box = $("#fitbox"), stage = $("#stage");
+    document.body.dataset.size = S.size;
+    if (S.size === "fit") { S.scale = 1; const top = stage.getBoundingClientRect().top + window.scrollY; frame.style.cssText = `width:100%;height:${Math.max(600, window.innerHeight - Math.min(top, 220))}px`; box.style.cssText = "width:100%"; return; }
+    const [w, h] = SIZES[S.size]; const k = Math.min(1, stage.clientWidth / w); S.scale = k;
+    frame.style.cssText = `width:${w}px;height:${h}px;transform:scale(${k})`; box.style.cssText = `width:${w * k}px;height:${h * k}px`;
+  }
+  function syncPause() { $("#pausetoggle").setAttribute("aria-pressed", S.paused); }
+  $("#screenpick").innerHTML = SCREENS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+  $("#screenpick").addEventListener("change", (e) => go(e.target.value));
+  $("#pausetoggle").addEventListener("click", () => { S.paused = !S.paused; if (S.paused) S.coding = true; syncPause(); render(); });
+  $$(".bar [data-size]").forEach((b) => b.addEventListener("click", () => { S.size = b.dataset.size; $$(".bar [data-size]").forEach((x) => x.setAttribute("aria-pressed", x === b)); layout(); render(); }));
+  function view(v) { $("#try").hidden = v !== "try"; $("#how").hidden = v !== "how"; $("#tryctl").style.display = v === "try" ? "" : "none"; $("#v-try").setAttribute("aria-pressed", v === "try"); $("#v-how").setAttribute("aria-pressed", v === "how"); if (v === "try") { layout(); render(); } window.scrollTo(0, 0); }
+  $$(".bar [data-view]").forEach((b) => b.addEventListener("click", () => view(b.dataset.view)));
+  $$("#how [data-goto]").forEach((b) => b.addEventListener("click", () => { view("try"); go(b.dataset.goto); }));
+  window.addEventListener("resize", () => { layout(); render(); });
+  // a bare #token picks the view, a screen or a size (artifact links allow only plain anchors)
+  const hs = location.hash.slice(1).split("-");
+  for (const h of hs) {
+    if (h === "how") view("how");
+    else if (SCREENS.some(([k]) => k === h)) { S.screen = h; if (h === "plan") { S.mode = "plan"; } if (h === "changes") S.tab = "changes"; if (h === "terminal") S.tab = "terminal"; if (h === "newkey") { S.newKey = "maipai_key_8hq2_r4nk7vd2w9xyc3qmz6tbf5ejpls8ua7gh1okr7Qe"; S.showKey = true; S.keys = 3; } }
+    else if (h === "phone" || h === "desktop") { S.size = h; $$(".bar [data-size]").forEach((x) => x.setAttribute("aria-pressed", x.dataset.size === h)); }
+    else if (h === "paused") { S.paused = true; syncPause(); }
+  }
+  layout(); render();
+  window.__mp = { go, S, layout, render };
+})();
+</script>
+</body>
+</html>
