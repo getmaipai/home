@@ -102,11 +102,15 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
     const previousFetch = globalThis.fetch;
     (globalThis as { self?: unknown }).self = fakeSelf;
     let network = 0;
-    let bucket = "";
-    Object.assign(globalThis, { caches: { open: async (name: string) => {
-      bucket = name;
-      return { match: async () => new Response("0123456789", { headers: { ETag: '\"fp\"', "Content-Length": "10" } }) };
-    } }, fetch: async () => { network++; return new Response("network"); } });
+    const stores = new Map<string, Map<string, Response>>();
+    const store = (name: string) => stores.get(name) ?? stores.set(name, new Map()).get(name)!;
+    Object.assign(globalThis, { caches: { open: async (name: string) => ({
+      match: async (key: string) => store(name).get(key)?.clone(),
+      put: async (key: string, value: Response) => { store(name).set(key, value); },
+      delete: async (key: string) => store(name).delete(key),
+    }) }, fetch: async () => { network++; return new Response("network"); } });
+    const url = "https://example.com/api/media/offline/file/media/media-nova00";
+    store("maipai-media-v1:person-atlas").set(url, new Response("0123456789", { headers: { ETag: '\"fp\"', "Content-Length": "10" } }));
     try {
       const listener = listenersByType.get("fetch")![0] as (event: unknown) => void;
       const call = async (url: string, headers: Record<string, string> = {}) => {
@@ -114,7 +118,19 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
         listener({ request: new Request(url, { headers }), respondWith: (value: Promise<Response>) => { response = value; } });
         return response ? await response : null;
       };
-      const url = "https://example.com/api/media/offline/file/media/media-nova00";
+      const announce = async (bucket: string | null) => {
+        const pending: Promise<unknown>[] = [];
+        for (const handler of listenersByType.get("message") ?? []) (handler as (event: unknown) => void)({ data: { type: "maipai-media-owner", bucket }, waitUntil: (p: Promise<unknown>) => pending.push(p) });
+        await Promise.all(pending);
+      };
+      // Nobody announced: the worker never reads a bucket, so another person on this browser gets the network, not a stranger's copy.
+      expect(await (await call(url))!.text()).toBe("network");
+      await announce("maipai-media-v1:person-pippa");
+      expect(await (await call(url))!.text()).toBe("network");
+      await announce("not-a-media-bucket");
+      expect(await (await call(url))!.text()).toBe("network");
+      network = 0;
+      await announce("maipai-media-v1:person-atlas");
       expect(await (await call(url))!.text()).toBe("0123456789");
       const partial = await call(url, { Range: "bytes=2-4", "If-Range": '\"fp\"' });
       expect(partial!.status).toBe(206); expect(await partial!.text()).toBe("234");
@@ -123,7 +139,9 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
       expect(await call(url + "?download=1")).toBeNull();
       expect(await call("https://example.com/api/media/items")).toBeNull();
       expect(await call("https://other.example.com/api/media/offline/file/media/media-nova00")).toBeNull();
-      expect(bucket).toBe("maipai-media-v1"); expect(network).toBe(0);
+      expect(network).toBe(0);
+      await announce(null); // signed out or session expired: locked again
+      expect(await (await call(url))!.text()).toBe("network");
     } finally {
       (globalThis as { self?: unknown }).self = previousSelf;
       Object.assign(globalThis, { caches: previousCaches, fetch: previousFetch });

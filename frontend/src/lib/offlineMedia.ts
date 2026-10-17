@@ -1,6 +1,21 @@
 import { OfflineManifest } from "@maipai/spec/gen/ts/offline-manifest.js";
 
+/** Bucket prefix. Each person's copies live in `${MEDIA_CACHE}:${personId}`; the service worker serves only the bucket of the
+ * person the page last announced, so another person on this browser neither sees nor plays someone else's copies. */
 export const MEDIA_CACHE = "maipai-media-v1";
+export const OWNER_CACHE = "maipai-media-owner";
+export const OWNER_MESSAGE = "maipai-media-owner";
+let owner: string | null = null;
+const bucket = (): string | null => (owner ? `${MEDIA_CACHE}:${owner}` : null);
+
+/** Tell this module and the service worker who is signed in (null: nobody, so no copy is served or listed). */
+export async function setMediaOwner(personId: string | null): Promise<void> {
+  owner = personId;
+  try {
+    const registration = await navigator.serviceWorker?.ready;
+    registration?.active?.postMessage({ type: OWNER_MESSAGE, bucket: bucket() });
+  } catch { /* No worker (Firefox, Safari, tests): nothing is served from the bucket anyway. */ }
+}
 const GENERATION_KEY = "maipai-media-generation";
 let localGeneration = 0;
 function generation(): string {
@@ -32,6 +47,8 @@ const indexUrl = (id: string): string => `${INDEX_PATH}${encodeURIComponent(id)}
 /** Fetch directly from the hub, then explicitly put complete responses in the named bucket. No token is stored. */
 export async function keepOnDevice(item: { id: string }): Promise<OfflineResult> {
   if (!isChromium(navigator.userAgent)) return failure(isWebKit(navigator.userAgent) ? "useGo" : "network");
+  const name = bucket();
+  if (!name) return failure("revoked");
   const started = generation();
   const checkCurrent = () => { if (generation() !== started) throw new Error("copy_cancelled"); };
   let cache: Cache | undefined;
@@ -59,7 +76,7 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
     // Replace the old copy first, so a failed update cannot leave a partial old manifest looking complete.
     await removeFromDevice(item.id);
     checkCurrent();
-    cache = await caches.open(MEDIA_CACHE);
+    cache = await caches.open(name);
     checkCurrent();
     for (const url of urls) {
       // A bypass query avoids a cache-first worker returning the old fingerprint during a refresh.
@@ -91,8 +108,9 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
 }
 
 export async function listKept(): Promise<OfflineManifest[]> {
-  if (!("caches" in globalThis)) return [];
-  const cache = await caches.open(MEDIA_CACHE);
+  const name = bucket();
+  if (!name || !("caches" in globalThis)) return [];
+  const cache = await caches.open(name);
   const manifests: OfflineManifest[] = [];
   for (const key of await cache.keys()) {
     if (!new URL(key.url).pathname.startsWith(INDEX_PATH)) continue;
@@ -104,8 +122,9 @@ export async function listKept(): Promise<OfflineManifest[]> {
 }
 
 export async function removeFromDevice(id: string): Promise<void> {
-  if (!("caches" in globalThis)) return;
-  const cache = await caches.open(MEDIA_CACHE);
+  const name = bucket();
+  if (!name || !("caches" in globalThis)) return;
+  const cache = await caches.open(name);
   const manifest = OfflineManifest.safeParse(await (await cache.match(indexUrl(id)))?.json().catch(() => null));
   if (manifest.success) {
     for (const entry of manifest.data.entries) {
@@ -115,8 +134,27 @@ export async function removeFromDevice(id: string): Promise<void> {
   await cache.delete(indexUrl(id));
 }
 
+/** Sign-out and a revoked device: every person's copies on this browser go, and the worker stops serving. */
 export async function removeAllOfflineMedia(): Promise<void> {
   localGeneration++;
   try { localStorage.setItem(GENERATION_KEY, crypto.randomUUID()); } catch { /* The local counter still cancels this tab's save. */ }
-  if ("caches" in globalThis) await caches.delete(MEDIA_CACHE);
+  if (!("caches" in globalThis)) return;
+  const names = typeof caches.keys === "function" ? await caches.keys() : [];
+  for (const name of new Set([...names.filter((n) => n === MEDIA_CACHE || n.startsWith(`${MEDIA_CACHE}:`)), MEDIA_CACHE])) await caches.delete(name);
+}
+
+/** Ask the hub whether each kept copy is still readable and unchanged; remove the ones that are gone or changed.
+ * Run at app start and when the browser comes back online. A failed check changes nothing (offline is the point). */
+export async function reconcileKept(): Promise<number> {
+  let removed = 0;
+  try {
+    const kept = await listKept();
+    if (kept.length === 0) return 0;
+    const items = kept.flatMap((m) => m.entries.slice(0, 1).map((e) => ({ kind: "media" as const, id: m.id, fingerprint: e.fingerprint })));
+    const response = await fetch("/api/media/offline/status", { method: "POST", credentials: "same-origin", cache: "no-store", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ items }) });
+    if (!response.ok) return 0;
+    const { items: results } = await response.json() as { items: Array<{ id: string; status: "ok" | "changed" | "gone" }> };
+    for (const result of results) if (result.status !== "ok") { await removeFromDevice(result.id); removed++; }
+  } catch { /* offline or signed out: keep what is there */ }
+  return removed;
 }

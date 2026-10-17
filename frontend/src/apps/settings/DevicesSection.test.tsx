@@ -505,3 +505,12 @@ test("a device owner can toggle offline permission and sees Remove all for this 
     expect(view.getByRole("button", { name: "Remove all offline copies" })).toBeInTheDocument();
   } finally { restore(); }
 });
+
+test("robots, TVs and pods show no keep-media switch", async () => {
+  const restore = stubFetch([device({ id: "device-robot0001", kind: "robot", offlineScope: [] }), device({ id: "device-tv000001", kind: "tv", offlineScope: [] })], []);
+  try {
+    const view = renderSection();
+    await view.findByText(/TV/i);
+    expect(view.queryByRole("switch", { name: "Can keep media on this device" })).toBeNull();
+  } finally { restore(); }
+});

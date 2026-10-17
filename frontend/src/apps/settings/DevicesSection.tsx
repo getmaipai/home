@@ -99,10 +99,6 @@ export function DevicesSection() {
               <div className="flex flex-col gap-4">
               {robots.map((r) => (
                 <Card key={r.id} data-testid="robot-card">
-                <Label htmlFor={`offline-${r.id}`}>
-                  <Switch id={`offline-${r.id}`} checked={r.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(r, checked)} />
-                  Can keep media on this device
-                </Label>
                 <RobotBody
                   device={r}
                   busy={busy}
@@ -141,10 +137,12 @@ export function DevicesSection() {
                         {d.area ? `${d.area} · ` : ""}
                         {d.lastSeenAt ? `last seen ${whenText(d.lastSeenAt)}` : "never connected"}
                       </span>
-                      <Label htmlFor={`offline-${d.id}`}>
-                        <Switch id={`offline-${d.id}`} checked={d.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
-                        Can keep media on this device
-                      </Label>
+                      {d.kind === "tv" || d.kind === "pod" ? null : (
+                        <Label htmlFor={`offline-${d.id}`}>
+                          <Switch id={`offline-${d.id}`} checked={d.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
+                          Can keep media on this device
+                        </Label>
+                      )}
                     </div>
                   );
                 }}

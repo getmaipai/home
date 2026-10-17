@@ -72,7 +72,26 @@ const UA = self.navigator?.userAgent ?? "";
 const CHROMIUM = /\b(?:Chrome|Chromium|Edg)\//.test(UA) && !/iPhone|iPad|iPod/.test(UA);
 const PASSTHROUGH = /\bFirefox\//.test(UA) || (/AppleWebKit\//.test(UA) && !CHROMIUM);
 
+const OWNER_CACHE = "maipai-media-owner";
+const OWNER_KEY = "/__media-owner";
+const MEDIA_PREFIX = "maipai-media-v1:";
+/** The page announces the signed-in person's bucket by message; it is stored so a restarted worker still knows. */
+async function activeMediaBucket(): Promise<string | null> {
+  const stored = await (await caches.open(OWNER_CACHE)).match(OWNER_KEY);
+  const name = stored ? await stored.text() : "";
+  return name.startsWith(MEDIA_PREFIX) ? name : null;
+}
+
 if (!PASSTHROUGH) {
+  self.addEventListener("message", (event: ExtendableMessageEvent) => {
+    const data = event.data as { type?: string; bucket?: string | null } | null;
+    if (!CHROMIUM || data?.type !== "maipai-media-owner") return;
+    event.waitUntil((async () => {
+      const cache = await caches.open(OWNER_CACHE);
+      if (typeof data.bucket === "string" && data.bucket.startsWith(MEDIA_PREFIX)) await cache.put(OWNER_KEY, new Response(data.bucket));
+      else await cache.delete(OWNER_KEY);
+    })());
+  });
   self.addEventListener("fetch", (event: FetchEvent) => {
     const req = event.request;
     if (req.method !== "GET") return;
@@ -80,7 +99,10 @@ if (!PASSTHROUGH) {
     if (CHROMIUM && url.origin === self.location.origin && url.pathname.startsWith("/api/media/offline/file/") && !url.searchParams.has("download")) {
       // Only explicitly kept full copies enter this bucket. A network miss is never saved automatically.
       // Slicing a full cached response supports media players' Range requests without caching 206 responses.
-      event.respondWith(caches.open("maipai-media-v1").then(async (cache) => {
+      // Only the bucket of the person the page last announced is read; no announcement (signed out, expired) means the network.
+      event.respondWith(activeMediaBucket().then(async (name) => {
+        if (!name) return fetch(req);
+        const cache = await caches.open(name);
         const cached = await cache.match(req.url);
         if (!cached) return fetch(req);
         const range = req.headers.get("range");

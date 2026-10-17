@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
-import { keepOnDevice, listKept, removeFromDevice, removeAllOfflineMedia, MEDIA_CACHE, USE_GO } from "./offlineMedia";
+import { keepOnDevice, listKept, removeFromDevice, removeAllOfflineMedia, reconcileKept, setMediaOwner, MEDIA_CACHE, USE_GO } from "./offlineMedia";
 
 const locationDescriptor = Object.getOwnPropertyDescriptor(globalThis, "location");
 const originalFetch = globalThis.fetch;
@@ -12,14 +12,15 @@ let calls: string[] = [];
 let quota = 10_000_000;
 let failPut = false;
 const keyOf = (key: RequestInfo | URL) => new URL(typeof key === "string" ? key : key instanceof URL ? key.href : key.url, location.origin).href;
-beforeEach(() => {
+beforeEach(async () => {
+  await setMediaOwner("person-atlas");
   Object.defineProperty(globalThis, "location", { configurable: true, value: { origin: "https://example.com" } });
   kept = new Map(); calls = []; quota = 10_000_000; failPut = false;
   Object.defineProperty(navigator, "userAgent", { configurable: true, value: "Mozilla/5.0 Chrome/128.0.0.0 Safari/537.36" });
   Object.defineProperty(navigator, "storage", { configurable: true, value: { estimate: async () => ({ usage: 0, quota }) } });
   Object.assign(globalThis, { caches: {
     open: async (name: string) => {
-      expect(name).toBe(MEDIA_CACHE);
+      expect(name).toBe(`${MEDIA_CACHE}:person-atlas`);
       return {
         match: async (key: RequestInfo | URL) => kept.get(keyOf(key))?.clone(),
         put: async (key: RequestInfo | URL, response: Response) => { if (failPut) throw new DOMException("quota", "QuotaExceededError"); kept.set(keyOf(key), response.clone()); },
@@ -79,4 +80,38 @@ test("unready and unplayable manifests, outside asset paths and changed fingerpr
   globalThis.fetch = (async (url: unknown) => String(url).includes("manifest?") ? Response.json(manifest()) : new Response("0123456789", { headers: { ETag: '\"changed\"', "Content-Length": "10" } })) as unknown as typeof fetch;
   expect(await keepOnDevice({ id: "media-nova00" })).toMatchObject({ ok: false, code: "notReady" });
   expect(await listKept()).toEqual([]);
+});
+
+test("copies belong to the signed-in person: nobody signed in keeps nothing, and listings follow the owner", async () => {
+  await setMediaOwner(null);
+  expect(await keepOnDevice({ id: "media-nova00" })).toMatchObject({ ok: false, code: "revoked" });
+  expect(await listKept()).toEqual([]);
+  await setMediaOwner("person-atlas");
+  expect(await keepOnDevice({ id: "media-nova00" })).toEqual({ ok: true });
+  await setMediaOwner(null);
+  expect(await listKept()).toEqual([]); // expired session: the copies stay, locked
+  await setMediaOwner("person-atlas");
+  expect((await listKept()).map((m) => m.id)).toEqual(["media-nova00"]);
+});
+test("a different person's bucket is never listed", async () => {
+  await keepOnDevice({ id: "media-nova00" });
+  const real = globalThis.caches.open;
+  Object.assign(globalThis.caches, { open: async (name: string) => name.endsWith("person-pippa") ? { match: async () => undefined, keys: async () => [] } : real(name) });
+  await setMediaOwner("person-pippa");
+  expect(await listKept()).toEqual([]);
+});
+test("reconcile removes copies the hub reports gone or changed and keeps the ok ones", async () => {
+  await keepOnDevice({ id: "media-nova00" });
+  const original = globalThis.fetch;
+  for (const [status, expected] of [["ok", 1], ["changed", 0], ["gone", 0]] as const) {
+    await keepOnDevice({ id: "media-nova00" });
+    globalThis.fetch = (async () => Response.json({ items: [{ kind: "media", id: "media-nova00", status }] })) as unknown as typeof fetch;
+    await reconcileKept();
+    expect((await listKept()).length).toBe(expected);
+    globalThis.fetch = original;
+  }
+  await keepOnDevice({ id: "media-nova00" });
+  globalThis.fetch = (async () => { throw new TypeError("offline"); }) as unknown as typeof fetch;
+  expect(await reconcileKept()).toBe(0);
+  expect((await listKept()).length).toBe(1); // offline: nothing is removed
 });
