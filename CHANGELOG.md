@@ -27,7 +27,7 @@ Chat can make pictures and short videos, and the picture editor can edit with a 
 ### Pictures and videos
 - Ask for a picture in chat and Home makes it with the AI engine. The picture shows as a card in the chat, and a job keeps going if you leave the page.
 - Ask for a short video, or ask to animate a picture. Videos are offered on the largest Mac setting only, because a clip needs a lot of memory.
-- Settings has a Pictures and videos page. Children and teens only get pictures and videos when a grown-up allows them, and every result passes the same safety checks as chat.
+- Settings has a Pictures and videos page. Pictures and videos are for adults on their own written chat. Children and teens cannot make them yet, and no setting turns them on.
 - The picture editor has a Comment tool.
 
 ### Under the hood

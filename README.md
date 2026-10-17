@@ -9,14 +9,33 @@
 
 <p align="center"><a href="https://github.com/getmaipai/home/releases">Releases</a></p>
 
+Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.
+
 Your chats, people and memories stay in your house. Home goes online only to do what you ask: downloads, updates and web searches.
 
-## What you get
+## What Home does today (v0.2.9)
 
-- **A private chat** with an AI that runs on your own hardware, with sources you can check.
-- **A real household:** one profile per person, safe by default for children and private for teens.
-- **Memory you control:** see what it remembered, correct it, or make it forget.
-- **Backups and updates** you start yourself, and a privacy page that lists every outside connection.
+- **Private chat with memory.** Talk to an AI that runs on your own computer. It remembers what matters, shows its sources, and lets you see, fix or forget any memory.
+- **Reads your pictures.** Attach a photo and ask about it. This needs a computer with 32 GB of memory or more.
+- **Makes pictures and short videos.** Adults can ask for a picture, make variations, and add styles (LoRAs). Videos are up to 5 seconds and need a Mac with 128 GB of memory. Everything is made on your computer.
+- **Edits pictures.** The Edit button opens an editor with Remove background, Erase, Upscale, Resize, Markup, and Comment (describe a change in words).
+- **Natural voice.** Talk and listen. Home speaks with Chatterbox Turbo on bigger computers, and can add small laughs and sighs. An owner or admin can turn that off.
+- **Web search.** Home searches with DuckDuckGo, or with your own SearXNG. Teens and children use your own SearXNG unless a grown-up allows more.
+- **Weather.** A Weather app and a weather card in chat, with your places and your choice of Fahrenheit or Celsius.
+- **A Home page** with an ask box, a Today row, and Getting started steps.
+- **Apps as packages.** A package can be an app with its own pages and settings. Weather is the first.
+- **A real household.** One profile per person. Children are restricted by default, teens get more privacy, and the safety gates cannot be switched off.
+- **Sign-in with passcode boxes.** One box per digit, a lockout after repeated wrong tries.
+- **Backups and updates** you start yourself.
+- **A one-line installer** for a Mac. It opens the setup wizard in your browser, and Home works in Chrome and Safari.
+
+## Coming soon
+
+Not shipped yet: a faster chat engine (oMLX) for 64 GB and 128 GB Macs, pictures and videos for children and teens, pictures of a family member's own face (needs the owner's ruling), music, videos, podcasts, maps and books apps, and the Go and Bot apps.
+
+## The privacy promise
+
+Nothing leaves your home unless you ask for it. The things that do go out are ones you start: web searches, weather lookups, a word or place lookup, downloads of models and updates, and a daily check for a new release. The privacy page in Settings lists every one and what it sends. There is no tracking, no crash reporting and no training on your family's words.
 
 ## Read the guides
 
