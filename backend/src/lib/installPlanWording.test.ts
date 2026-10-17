@@ -33,3 +33,11 @@ test("the memory question tells a Mac owner to pick the total memory", () => {
   const ask = wordPlan({ ...base, level: null, tier: null, memory_source: "unknown", memory_gb: 0 });
   expect(ask.detail).toContain("On a Mac, pick the Mac's total memory");
 });
+
+test("the plan line names voice when the plan carries speech in and out", () => {
+  const model = (role: string) => ({ id: role, role, url: "u", sha256: "s", licence: "l", revision: "r", starter: false, installed: false });
+  const withVoice = wordPlan({ ...base, models: [model("chat"), model("stt"), model("tts")] });
+  expect(withVoice.gets).toContain("Voice: talk to Home");
+  expect(wordPlan(base).gets).toContain("Voice: talk to Home");
+  expect(wordPlan({ ...base, models: [model("chat"), model("stt")] }).gets).not.toContain("Voice: talk to Home");
+});

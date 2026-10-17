@@ -18,12 +18,23 @@ export interface PlanWording {
 const GB = 1_073_741_824;
 export const gbText = (bytes: number) => `${(bytes / GB).toFixed(bytes < 10 * GB ? 1 : 0)} GB`;
 
-const ALWAYS = ["Chat with Home", "Talk to Home and hear it answer", "Home remembers what matters"];
+/** SETUP-VOICE-01: voice is in every plan (speech to text and speech out). The line names it so the person
+ * sees it is included; the microphone is asked at first use, not in setup. */
+export const VOICE_LINE = "Voice: talk to Home";
+const ALWAYS = ["Chat with Home", "Home remembers what matters"];
 const GETS = {
   minimal: [...ALWAYS],
   moderate: [...ALWAYS, "Better answers from a second, smaller AI that double-checks"],
   recommended: [...ALWAYS, "Better answers from a second, smaller AI that double-checks", "Make pictures"],
 } as const;
+
+/** The plan lists voice when its models carry both voice roles; a plan with no model list yet falls back to the
+ * role lists in setupDownloads.ts, which hold both for every level. */
+function planHasVoice(plan: StackInstallPlan): boolean {
+  if (plan.models.length === 0) return true;
+  const roles = new Set(plan.models.map((model) => model.role));
+  return roles.has("stt") && roles.has("tts");
+}
 
 export function wordPlan(plan: StackInstallPlan | null): PlanWording {
   if (!plan) {
@@ -40,5 +51,5 @@ export function wordPlan(plan: StackInstallPlan | null): PlanWording {
   const headline = `${name} setup for this computer`;
   const sizeLine = plan.models.length ? `Download: ${gbText(plan.remaining_bytes)}` : null;
   const diskLine = plan.fits_disk === false ? `There is not enough free disk space. Home needs ${gbText(plan.remaining_bytes)} and this computer has ${gbText(plan.free_disk_bytes ?? 0)} free. Free some space or pick another folder.` : null;
-  return { level: plan.level, headline, detail: plan.label, gets: [...GETS[plan.level]], needsMemoryAnswer: false, sizeLine, diskLine };
+  return { level: plan.level, headline, detail: plan.label, gets: [...GETS[plan.level]].flatMap((line, i) => (i === 1 && planHasVoice(plan) ? [VOICE_LINE, line] : [line])), needsMemoryAnswer: false, sizeLine, diskLine };
 }

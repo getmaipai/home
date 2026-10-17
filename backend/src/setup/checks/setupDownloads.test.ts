@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { startSetupDownloads, type SetupDownloadClient } from "./setupDownloads";
+import { PLAN_ROLES, startSetupDownloads, type SetupDownloadClient } from "./setupDownloads";
 
 test("setup downloads start four jobs concurrently, chat first, and keep going after a failure", async () => {
   const starts: string[] = [];
@@ -48,4 +48,10 @@ test("setup downloads install each named engine build before pulling models", as
   };
   await startSetupDownloads(client);
   expect(order).toEqual(["install:llama-server", "pull:a", "pull:b"]);
+});
+
+test("voice roles (speech in, speech out, wake word) are in all three plan levels", () => {
+  for (const tier of ["minimal", "moderate", "recommended"]) {
+    expect(PLAN_ROLES[tier]).toEqual(expect.arrayContaining(["stt", "tts", "wakeword"]));
+  }
 });

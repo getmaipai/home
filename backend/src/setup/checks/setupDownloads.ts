@@ -13,7 +13,7 @@ export interface SetupDownloadClient {
 }
 
 const MAX_PARALLEL = 4;
-const PLAN_ROLES: Record<string, readonly string[]> = {
+export const PLAN_ROLES: Record<string, readonly string[]> = {
   minimal: ["chat", "judge", "stt", "tts", "embed", "wakeword"],
   moderate: ["chat", "judge", "stt", "tts", "embed", "rerank", "wakeword"],
   recommended: ["chat", "judge", "stt", "tts", "embed", "rerank", "image", "wakeword"],
