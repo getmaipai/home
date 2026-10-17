@@ -321,7 +321,7 @@ Part B (UPLOAD-IMG) runs independently: 01 and 02 can start now; the model readi
 
 Design (person-facing half): [pictures people make](design/image-generation-2026-10-17.md) (2026-10-17); the engine half stays in `plans/hub-on-apple-silicon-2026-09-17.md`.
 
-- [ ] **MEDIA-HOST-03: Generate music with licence-aware export** (M) -
+- [ ] **MEDIA-HOST-03: Generate music with licence-aware export** (M; carried by MUSIC-GEN-01 to -03 and -08, section "Music generation") -
       benchmark ACE-Step 1.5 and the selected Stability model for one minute
       of audio, store model/prompt/seed/source provenance, and block a
       monetized export when the model or data terms are not cleared. Check:
@@ -369,6 +369,27 @@ From [image-tools-2026-10-17.md](design/image-tools-2026-10-17.md): Apple Vision
 - [ ] **IMGTOOLS-07: erase large holes at native resolution** (M, Stack worker, tiled second pass).
 - [ ] **IMGTOOLS-08: compiled Apple helper as a release asset; Linux requirements** (S).
 - [ ] **IMGTOOLS-09: hair, fur, glass test set; BiRefNet-lite for p64 and p128** (M, bench).
+
+## Music generation (owner, 2026-10-17)
+
+From [music-generation-2026-10-17.md](design/music-generation-2026-10-17.md): ACE-Step 1.5 (MIT, official MLX path) makes and edits songs in chat; `generate_music` and `edit_music` are conditional tools; adults only, written own-screen turns; no uploaded audio; licence-aware export. Carries MEDIA-HOST-03, the music part of CHAT-MEDIA-01 and Stack STACK-99.
+
+- [ ] **MUSIC-SPEC-01: music settings key and the generation provenance shape** (S, `commons` spec). `generation.music.enabled` (household, default on, on the `household.pictures` card retitled "Pictures, videos and music"), `generation-provenance.schema.json` (`GenerationProvenance`), `file.provenance.generation`, `StackJob.kind` names `music`; fixtures with roster personas, Python round trip, tag under the commons-tag lock, Home pin bump per `docs/PINNING.md`. Exit: commons `scripts/check.sh`, Home `bash scripts/check.sh --pre`.
+- [ ] **MUSIC-GEN-01: Stack music engine** (M, Stack `backend/src/music/*`, `lib/modelCatalog.ts`, `lib/engineCatalog.ts`, `lib/components.ts`, `lib/diskPlan*.{ts,json}`, `routes/music.ts`). The `music-gen` uv environment from ACE-Step's lock (commit `ca1e85f`), the JSON-lines worker (offline env, tiled VAE, MLX cache cap), the pins of section 3 with sizes and hashes, component `music` (group `music`, optional, p64 and p128), `GET /stack/v1/music`. Mirror: `backend/src/video/*`. Acceptance: a 30 s song through the worker on the Studio under the bench lock, time and peak recorded. Exit: Stack `bash scripts/check.sh`.
+- [ ] **MUSIC-GEN-02: Stack music job API** (M, Stack `routes/musicGenerations.ts`, `music/jobs.ts`, `music/provenance.ts`). `POST /v1/audio/music` with the tasks of the note's section 12, stages, time left, cancel, 202, governor `generator` admission, the made-here ledger (`source_not_made_here`), trim, fade and loudness in the worker, AAC output. Acceptance: tests per task with a fake worker; one real run per task on the Studio. Exit: Stack `bash scripts/check.sh`.
+- [ ] **MUSIC-GEN-03: Home music jobs, gates and tools** (L, `backend/src/lib/music/*`, `backend/src/routes/music.ts`, `backend/src/db/schema.ts` plus one migration, `lib/turnMachine/nodes/{policy,tool}.ts`, `turnMachine/budget.ts`). `music_jobs`, `musicDenial` over `pictureDenial`, the minor line on description, lyrics and title, `imitates_real_voice`, `generate_music` and `edit_music`, versions as attachments with `GenerationProvenance`, `/api/music/jobs/*` and `/api/music/files/:id` with the commercial check. Risky surface (age gates, migration): full `check.sh` and `code-review` at medium.
+- [ ] **MUSIC-GEN-04: the MusicTrack card** (M, `commons` ui `elements/music-track.tsx`; Home `frontend/src/dev/elements-adoption.json`, `elementBindings.ts`). Elements decision row first; the Element owns the stages, the kit `Player` (audio layout), the lyrics, the version stepper (`stepVersion`), Download and Share; Home's `TOOL_BINDINGS` entry passes versions, the current id and the Use this version handler; Home's ui pin moves to the new tag (at or above `ui-v0.5.257`). Exit: commons check, Home `bash scripts/check.sh --pre` and the frontend tests beside the change.
+- [ ] **MUSIC-GEN-05: music in Settings** (S). The key on the Pictures, videos and music card; the Models and storage row through COMPONENTS-01's route; the refusal lines in `pictures/policy.ts` and `videos/policy.ts` that name "Settings, Pictures and videos" follow the new title; the shared busy line in `videos/jobs.ts` names songs too.
+- [ ] **MUSIC-GEN-06: verify end to end on the Studio** (M). A throwaway Home (ports 8893 to 8898, its own data dir) and scratch Stack: make a song, then every edit of the note's section 7, play each in the built-in browser, judge, screenshots at 1440 and 390.
+- [ ] **MUSIC-GEN-07: chat tool bench rows and safety review** (S). Rule 1 budget rows for both tools; child, teen, guest, spoken and shared-screen refusals; the minor line on lyrics; the voice line.
+- [ ] **MUSIC-GEN-08: privacy check** (S). Zero outbound connections from the worker during a job; the privacy page lists the music pins.
+- [ ] **MUSIC-GEN-09: Save to Music and the Created by you shelf** (M, after MEDIA-LIB-01 and MEDIA-MUSIC-01). A `media-item` per saved version through the media record API; the shelf lists the person's made tracks; Share by the household share pointer.
+- [ ] **MUSIC-GEN-10: ACE-Step 1.5 XL turbo as p128's detailed profile** (S, bench first).
+- [ ] **MUSIC-GEN-11: Stable Audio 3.0 for beds and effects** (M, bench and licence gate first; tracks it makes are `personal_only`).
+- [ ] **MUSIC-GEN-12: stems** (M). ACE-Step base `extract` or Demucs, licence read first.
+- [ ] **MUSIC-GEN-13: a parent's per-child music switch** (M, design first: the band's lyric ceiling).
+- [ ] **MUSIC-GEN-14: uploaded audio as a source** (decision for Jesse). A person's own recording, or a consenting household adult's voice, as a cover or reference source; refused until he rules.
+- [ ] **MUSIC-STUDIO-01: music studio app** (L, later; design note first). Versions timeline, region repaint, stems, lyrics beside the waveform; reuses the music Stack API and records.
 
 ## Media apps (2026-10-17)
 
@@ -3623,7 +3644,9 @@ otherwise be lost with the mirror.
 - [ ] **Verdicts for the features absent from both this file and the
       rebuild** (L, one line each, recorded here before anything is
       built) - MaiPai TV linear channels; Music Studio, karaoke and
-      stems; Podcasts (with generated shows, gpodder, snips); Books,
+      stems (music generation, the studio and stems are decided in
+      design/music-generation-2026-10-17.md: MUSIC-GEN rows,
+      MUSIC-STUDIO-01, MUSIC-GEN-12; karaoke still needs its verdict); Podcasts (with generated shows, gpodder, snips); Books,
       readers, OPDS and KOSync; Bookmarks, Reader and Clipper;
       Reference (Kiwix ZIM); the coding agent and sandbox; Remote (SSH,
       VNC, RDP); Notes and voice memos; Photo Frame; Cameras (Frigate);
