@@ -167,6 +167,19 @@ describe("picture editor routes", () => {
     expect((await client.get("/api/image-edit/jobs/job-2")).status).toBe(404);
   });
 
+  test("a job the tool declines (no subject found) reads as a plain failure with the Stack's sentence", async () => {
+    const { client, actor } = await owner();
+    const stub = stubStack();
+    stub.script.reply = async () => ({ kind: "running", job: "job-nosubject" });
+    stub.script.job = () => ({ id: "job-nosubject", state: "done", percent: 100, position: null, result: { rejected: { code: "no_subject", message: "No subject was found. Try Erase instead." } } });
+    __setStackClientForTests(stub.client);
+    const conversation = resolveOrCreateConversation(actor, "chat");
+    if (!conversation.ok) throw new Error("no conversation");
+    const picture = await upload(client, conversation.value.id);
+    await client.postForm(`/api/image-edit/pictures/${picture.id}/edit`, editForm(conversation.value.id, { operation: "remove_background" }));
+    expect(await (await client.get("/api/image-edit/jobs/job-nosubject")).json()).toEqual({ state: "failed", error: "No subject was found. Try Erase instead.", code: "no_subject" });
+  });
+
   test("erase without a mask, a bad size and the Stack's refusals come back in plain words", async () => {
     const { client, actor } = await owner();
     const stub = stubStack();

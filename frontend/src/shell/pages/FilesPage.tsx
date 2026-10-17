@@ -38,7 +38,8 @@ export function FilesPage({ person }: { person: Roster }) {
   const [search, setSearch] = useState("");
   const [source, setSource] = useState("all");
   const [kind, setKind] = useState("all");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // The picture editor's Share opens the Library with that file chosen (`/files?file=<id>`): sharing stays this page's one mechanism.
+  const [selectedId, setSelectedId] = useState<string | null>(() => (typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("file")));
   const [shareTarget, setShareTarget] = useState("household");
   const queryClient = useQueryClient();
   const filesQuery = useQuery<VisibleFile[]>({ queryKey: ["files"], queryFn: () => api.files() });

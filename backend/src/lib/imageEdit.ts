@@ -330,11 +330,15 @@ export async function pollEdit(actor: PersonRow, jobId: string): Promise<EditPro
       jobs.delete(jobId);
       return { state: "failed", error: stack.reason ?? "The editing tools could not finish this edit. Try again.", code: "failed" };
     }
+    // A tool that declines the picture (an empty mask, no subject found) finishes the job with a reason, not a failure.
+    const outcome = stack.result as { images?: Array<{ width: number; height: number; engine?: string; model?: string; ms?: number }>; rejected?: { code: string; message: string } } | null;
+    if (outcome?.rejected) { jobs.delete(jobId); return { state: "failed", error: outcome.rejected.message, code: outcome.rejected.code }; }
     const source = loadSource(actor, job.conversationId, job.sourceId, true);
     job.finalising = (async () => {
       const png = await getStackClient().imageEditResult(jobId);
       const meta = await sharp(png).metadata();
-      return keepPreview(actor, source, job.op, png, { width: meta.width ?? 0, height: meta.height ?? 0 });
+      const made = outcome?.images?.[0];
+      return keepPreview(actor, source, job.op, png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, engine: made?.engine, model: made?.model, ms: made?.ms });
     })();
     job.finalising.catch(() => { job.finalising = undefined; });
     return { state: "done", preview: await job.finalising };

@@ -9,7 +9,9 @@
 // is an `image_gallery` block like any other (the separate `answer-images`
 // data part, its renderer and its placer path are retired), so this file is the
 // one place a visual is placed in the reply.
+import { useContext } from "react";
 import type { DataMessagePartComponent, ThreadAssistantMessagePart } from "@assistant-ui/react";
+import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
 import { AnswerBlockView } from "@maipai/ui/src/elements/answer-block";
 import { AnswerBlock } from "@maipai/spec/gen/ts/answer-block.js";
 import { splitAfterParagraph } from "@maipai/spec/interpreters/ts/paragraphs.js";
@@ -83,5 +85,13 @@ export function textWithAnswerParts(text: string, visuals: { blocks?: readonly u
 export const AnswerBlockDataRender: DataMessagePartComponent<AnswerBlock> = ({ data }) => {
   const block: Record<string, unknown> = { ...data };
   delete block.after_paragraph;
-  return <AnswerBlockView block={block} />;
+  // IMGTOOLS-05: a picture gallery shows the kit's Edit button only when every picture in it is one the person
+  // may edit (a stored attachment or a saved edit); a web picture an answer shows carries its own licence and is
+  // not theirs to alter, so such a gallery gets no handler at all.
+  const edit = useContext(ImageEditContext);
+  const images = data.kind === "image_gallery" && Array.isArray((data.props as { images?: unknown }).images) ? ((data.props as { images: Array<{ id?: string; src?: string; alt?: string }> }).images) : [];
+  const targets = images.map((image) => ({ id: String(image.id ?? ""), name: String(image.alt ?? "picture"), src: String(image.src ?? "") }));
+  const editable = edit !== null && targets.length > 0 && targets.every((target) => target.id !== "" && (edit.canEdit ? edit.canEdit(target) : true));
+  const onImageEdit = editable ? (_blockId: string, imageId: string) => { const target = targets.find((candidate) => candidate.id === imageId); if (target) edit.onEdit(target); } : undefined;
+  return <AnswerBlockView block={block} {...(onImageEdit ? { onImageEdit } : {})} />;
 };

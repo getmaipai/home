@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-17T08:53:23.000Z",
-  "kitTag": "ui-v0.5.241",
+  "generatedAt": "2026-10-17T10:02:56.410Z",
+  "kitTag": "ui-v0.5.243",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -557,6 +557,30 @@
       "verdict": "support",
       "verdictReason": "Supporting file for the shipped kit UI; it is not a standalone Home adoption target.",
       "implemented": false
+    },
+    {
+      "file": "image-editor-state.ts",
+      "name": "image-editor-state",
+      "group": "image",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "image-editor-surface.tsx",
+      "name": "image-editor-surface",
+      "group": "image",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": false
+    },
+    {
+      "file": "image-editor.tsx",
+      "name": "image-editor",
+      "group": "image",
+      "verdict": "unassessed",
+      "verdictReason": "Recorded unassessed verdict in elements-plan.json; see the plan entry for its dependency or scope.",
+      "implemented": true
     },
     {
       "file": "image-gallery.tsx",

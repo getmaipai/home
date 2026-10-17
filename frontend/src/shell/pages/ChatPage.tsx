@@ -23,6 +23,9 @@ import { MarkdownDocument } from "@/shell/pages/MarkdownDocument";
 // row.
 import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, CanvasSplitLine, CanvasSplitMessage, CanvasSplitThread } from "@maipai/ui/src/elements/canvas-split";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
+import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
+import { ImageEditor } from "@maipai/ui/src/elements/image-editor";
+import { useImageEditor } from "@/apps/chat/useImageEditor";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
@@ -1153,6 +1156,25 @@ export function ChatPage({ person }: { person: Roster }) {
   // versa would be reasonable too, but nothing forces it; both panels
   // rendering at once on a wide enough screen is a fine, harmless state).
   const [compareTarget, setCompareTarget] = useState<CompareTarget | null>(null);
+  // IMGTOOLS-05: a picture opened for editing shares the canvas pane with the
+  // document view; the kit's ImageEditor draws it and the hook feeds it.
+  const openFilesForShare = useCallback((versionId: string) => navigate(`/files?file=${encodeURIComponent(versionId)}`), [navigate]);
+  const onImageEditorOpen = useCallback(() => { setOpenArtifactId(null); setCompareTarget(null); }, []);
+  const imageEditor = useImageEditor({ canShare: !temporaryNext, onShare: openFilesForShare, onOpen: onImageEditorOpen });
+  const closeImageEditor = imageEditor.close;
+  const [lastImageEditorProps, setLastImageEditorProps] = useState<typeof imageEditor.props>(null);
+  useEffect(() => {
+    if (imageEditor.props) setLastImageEditorProps(imageEditor.props);
+  }, [imageEditor.props]);
+  useEffect(() => {
+    if (imageEditor.props !== null) return;
+    const timeout = setTimeout(() => setLastImageEditorProps(null), 750);
+    return () => clearTimeout(timeout);
+  }, [imageEditor.props]);
+  // Opening a document closes the picture editor: the pane shows one thing.
+  useEffect(() => {
+    if (openArtifactId !== null) closeImageEditor();
+  }, [openArtifactId, closeImageEditor]);
   // Sources trigger-in-bar (2026-09-22, Jesse's own screenshots): the
   // trigger lives in the assistant message's own action bar
   // (`AssistantActionBarExtra`), the compact list it opens renders below
@@ -1222,6 +1244,7 @@ export function ChatPage({ person }: { person: Roster }) {
     setSheetOpen(false);
     setOpenArtifactId(null);
     setCompareTarget(null);
+    imageEditor.close();
   }, temporaryNext, voiceOpen, setOpenArtifactId, setDraftConversationId, projectPage?.folderId);
   const threadListState = useChatThreadListState(runtime);
   const searchableThreads = useMemo(() => searchableThreadsFor(threadListState, temporaryNext), [threadListState, temporaryNext]);
@@ -1450,6 +1473,7 @@ export function ChatPage({ person }: { person: Roster }) {
       <TemporaryChatContext.Provider value={temporaryChatValue}>
       <DraftConversationContext.Provider value={draftConversationId}>
       <PackageScopeContext.Provider value={packageScopeValue}>
+      <ImageEditContext.Provider value={imageEditor.editContext}>
       <PhotoUploadsContext.Provider value={{ settingAllowed: photoUploadsEnabled, modelCanReadPictures: imagePartsAvailable }}>
       <VoiceSessionProvider value={{ open: voiceOpen, setOpen: closeAwareSetVoiceOpen, openFromWake: openVoiceFromWake }}>
       <WakeWordPersonContext.Provider value={person}>
@@ -1708,13 +1732,13 @@ export function ChatPage({ person }: { person: Roster }) {
                 className={cn(
                   // eslint-disable-next-line shadcn/no-arbitrary-values -- transition-[width] is the only way to animate this panel's own dynamic width, the same rule the rail's own collapse animation above is already exempted for
                   "hidden shrink-0 overflow-hidden transition-[width] duration-300 ease-out motion-reduce:transition-none lg:block",
-                  openArtifactId !== null ? "w-full max-w-xl" : "w-0",
+                  openArtifactId !== null ? "w-full max-w-xl" : imageEditor.props !== null ? "w-full max-w-3xl" : "w-0",
                 )}
                 onTransitionEnd={(e) => {
-                  if (e.target === e.currentTarget && e.propertyName === "width" && openArtifactId === null) setLastCanvasArtifactId(null);
+                  if (e.target === e.currentTarget && e.propertyName === "width" && openArtifactId === null && imageEditor.props === null) { setLastCanvasArtifactId(null); setLastImageEditorProps(null); }
                 }}
               >
-                {lastCanvasArtifactId !== null ? artifactCanvas : null}
+                {lastImageEditorProps !== null ? <ImageEditor {...lastImageEditorProps} variant="pane" /> : lastCanvasArtifactId !== null ? artifactCanvas : null}
               </div>
             ) : null}
             {compareTarget !== null ? (
@@ -1788,6 +1812,7 @@ export function ChatPage({ person }: { person: Roster }) {
             {!isDesktopCanvas && openArtifactId !== null ? artifactCanvas : null}
           </SheetContent>
         </Sheet>
+        {!isDesktopCanvas && imageEditor.props !== null ? <ImageEditor {...imageEditor.props} variant="screen" /> : null}
         <Sheet open={compareTarget !== null} onOpenChange={(next) => { if (!next) closeCompare(); }}>
           {/* eslint-disable-next-line shadcn/no-restyle, shadcn/no-arbitrary-values -- max-height and scroll are intentional for the mobile compare sheet; max-h-[85vh] has no scale-token equivalent since Sheet has no max-height prop of its own (commons/ui/docs/dashboard-upstream.md) */}
           <SheetContent side="bottom" className="max-h-[85vh] overflow-y-auto lg:hidden">
@@ -1804,6 +1829,7 @@ export function ChatPage({ person }: { person: Roster }) {
       </WakeWordPersonContext.Provider>
       </VoiceSessionProvider>
       </PhotoUploadsContext.Provider>
+      </ImageEditContext.Provider>
       </PackageScopeContext.Provider>
       </DraftConversationContext.Provider>
       </TemporaryChatContext.Provider>
