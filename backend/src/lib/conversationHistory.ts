@@ -53,6 +53,7 @@ import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings"
 import { complete, type LlmMessage, completeBackground } from "@/lib/llm";
 import { countTokens } from "@/lib/tokenCount";
 import { evaluateReply } from "@/lib/safety";
+import { ensureProvisionalTitle } from "@/lib/conversationTitle";
 import { resolveTurnBudgetWithStack } from "@/lib/turnMachine/budget";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -657,6 +658,9 @@ export function logTurn(
   value.parent_turn_id = storedRow.parentTurnId;
   value.branch_chosen = storedRow.branchChosen;
   if (branchFrom) value.continued_from_turn_id = branchFrom;
+  // CHAT-TITLE-02: a stored chat is never left untitled; the first message names it until the model does.
+  // Failed turns count (the person still sent a message); a title problem never costs the turn.
+  try { ensureProvisionalTitle(value.conversation_id); } catch (err) { console.error(`[turn] provisional title failed: ${(err as Error).message}`); }
   // A failed turn is not something the household said and heard: it
   // records no episode and retires nothing it might have superseded.
   if (opts.status === "failed") return storedRow;
@@ -2042,9 +2046,13 @@ export function updateConversationTitle(actor: PersonRow, id: string, title: str
   }
   // CHAT-TITLE-01: a person's own rename is final (a model title never overwrites it); clearing
   // the title hands it back to the model.
-  const renamed = title !== undefined && title !== found.value.title;
+  const priorSource = db.select({ titleSource: conversations.titleSource }).from(conversations).where(eq(conversations.id, id)).get()?.titleSource ?? null;
+  // Saving the provisional text as it stands is still the person's own choice.
+  const renamed = title !== undefined && (title !== found.value.title || (title !== null && priorSource === "provisional"));
   db.update(conversations).set({ title: nextTitle, pinned: nextPinned, ...(renamed ? { titleSource: nextTitle === null ? null : "user" } : {}), updatedAt: now, hlc: newHlc }).where(eq(conversations.id, id)).run();
-  return { ok: true, value: parsed.data };
+  // Clearing the title hands it back: it is re-filled at once, never left on the default.
+  const refilled = renamed && nextTitle === null ? ensureProvisionalTitle(id) : null;
+  return { ok: true, value: refilled ? { ...parsed.data, title: refilled } : parsed.data };
 }
 
 /** CONV-ARCHIVE-01: shelve or restore a chat. Same access rule as a rename. Leaves updated_at

@@ -51,7 +51,11 @@ async function stubEngine() {
   return stub;
 }
 
-const storedTitle = (id: string) => db.select().from(conversations).where(eq(conversations.id, id)).get()?.title ?? null;
+// The model's title only: every stored chat now carries a provisional one from its first message (CHAT-TITLE-02).
+const storedTitle = (id: string) => {
+  const row = db.select().from(conversations).where(eq(conversations.id, id)).get();
+  return row?.titleSource === "model" ? row.title : null;
+};
 
 describe("the title survives the client leaving", () => {
   test("a turn whose stream body is cancelled mid-reply still finishes, is stored, and gets a title", async () => {

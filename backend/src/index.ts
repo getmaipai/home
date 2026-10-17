@@ -17,6 +17,7 @@ import { sweepOrphanEngineProcesses, getChatClient, setWarmupPrompt } from "@/li
 import { turnWarmupPrompt } from "@/lib/turnMachine/warmup";
 import { engineWarmupsForStackRoles } from "@/lib/engineBoot";
 import { runAllSmokeTests } from "@/lib/smoke";
+import { startConversationTitleSweep } from "@/lib/conversationTitle";
 import { startIdleSweep, registerDenoHostGracefulExit } from "@/lib/denoHost";
 import { hasHouseholdLeaf, getHouseholdLeafForServer, checkLeafExpiry, registerRenewFixHandler } from "@/lib/householdCa";
 import { advertiseMdns } from "@/lib/mdns";
@@ -297,6 +298,8 @@ syncTailscaleRenewalSetting();
 // both.
 ensureCoreJob("people.disable_expired_guests", "every:1d");
 ensureCoreJob("people.apply_age_band_changes", "every:1d");
+// CHAT-TITLE-02: repair pass for chats found with no title or only a provisional one (small cap, backs off while the engine is down).
+startConversationTitleSweep();
 // SRC-ICON-01: the source favicon cache's own daily sweep -
 // lib/scheduler.ts's own CORE_JOBS entry, lib/favicons.ts for the
 // expiry and size-cap mechanics.
