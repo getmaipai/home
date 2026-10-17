@@ -10,6 +10,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
+import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, noteKidVideo, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
@@ -108,7 +109,7 @@ videosRoutes.openapi(statusRoute, async (c) => {
     can_make: denial === null && ready,
     reason: denial ? VIDEO_DENIAL_LINE[denial] : ready ? null : videoNotReadyReason(engine),
     engine_ready: ready,
-    adult_styles: denial === null && adultVideoAdaptersAllowed(),
+    adult_styles: denial === null && laneOf(audience) === "adult" && adultVideoAdaptersAllowed(),
     limits: VIDEO_LIMITS_LINE,
     styles,
   }, 200);
@@ -211,8 +212,9 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
   const audience = videoRouteAudience(actor);
   const denial = videoDenial(audience);
   if (denial) return { status: 403, body: { error: VIDEO_DENIAL_LINE[denial], code: denial } };
-  const refused = refuseVideoPrompt(prompt);
+  const refused = refuseVideoPrompt(prompt, { lane: laneOf(audience) });
   if (refused) return { status: 422, body: { error: promptRefusalLineFor(refused, "video", actor, audience.band, prompt, VIDEO_REFUSAL_LINE[refused]), code: refused } };
+  if (laneOf(audience) === "child" && videosMadeToday(actor) + 1 > kidsDailyVideos()) return { status: 422, body: { error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" } };
   { const engine = await videoEngineStatus(); if (!videoStatusReady(engine)) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
   return null;
 }
@@ -242,12 +244,14 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
       body: {
-        prompt: source.prompt, size: source.request.size, seconds: source.request.seconds, audience: prep.likeness ? "adult" : stackAudienceFor(audience),
+        prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size: source.request.size, seconds: laneOf(audience) === "child" ? Math.min(source.request.seconds, 3) : source.request.seconds, audience: prep.likeness ? "adult" : stackAudienceFor(audience),
+        ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}) } : {}),
-        ...(prep.loras.length ? { loras: prep.loras } : {}), ...(prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(prep.loras.length && laneOf(audience) !== "child" ? { loras: prep.loras } : {}), ...(prep.negativePrompt && laneOf(audience) !== "child" ? { negative_prompt: prep.negativePrompt } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
+    if (laneOf(audience) === "child") noteKidVideo(actor);
     if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
     return c.json(videoCardView(actor, started, true), 200);
   } catch (error) {
@@ -270,6 +274,8 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const prompt = body.prompt ?? "Bring this picture to life with gentle, natural motion.";
   const blocked = await gateRoute(actor, prompt);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
+  // A child animates only a cartoon made for them: never a photo or a named person.
+  if (laneOf(videoRouteAudience(actor)) === "child" && body.photo_subject_id) return c.json({ error: CHILD_NO_PHOTOS_LINE, code: "child_cartoons_only" }, 422) as never;
   const ownTurn = db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, body.turn_id), eq(conversationTurns.conversationId, body.conversation_id), eq(conversationTurns.personId, actor.id))).get();
   if (!ownTurn) return c.json({ error: "That chat isn't available any more. Open it again and try once more.", code: "not_found" }, 404) as never;
   const fileId = body.file_id ?? latestGeneratedPictureId(actor, body.conversation_id);
@@ -283,11 +289,12 @@ videosRoutes.openapi(animateRoute, async (c) => {
     const job = await startVideoJob({
       actor, conversationId: body.conversation_id, turnId: body.turn_id, temporary: false, kind: "animate", prompt, sourceFileId: fileId,
       body: {
-        prompt, size, seconds: 5, audience: prep.likeness ? "adult" : stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
-        ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        prompt: laneOf(audience) === "child" ? forceCartoon(prompt) : prompt, size, seconds: laneOf(audience) === "child" ? 3 : 5, audience: prep.likeness ? "adult" : stackAudienceFor(audience), image: prep.image!, image_source: prep.imageSource ?? "generated",
+        ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}), ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
+    if (laneOf(audience) === "child") noteKidVideo(actor);
     if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
     return c.json(videoCardView(actor, job, true), 200);
   } catch (error) {

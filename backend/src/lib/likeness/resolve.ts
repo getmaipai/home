@@ -2,6 +2,7 @@
 // depicted adult; the model only carries their words into the tool call (rule 1: the model decides when a tool is
 // needed, code checks what it may do). Only a household adult resolves: "someone else", a friend, a celebrity, a child,
 // a name that matches two people, or no name at all resolves to nothing, and the request is refused.
+import { speakerAgeBand } from "@/lib/ageBand";
 import { subjectEligibility } from "./consent";
 import { db } from "@/db";
 import { people } from "@/db/schema";
@@ -47,7 +48,7 @@ export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult i
 
 /** The adult a tool call may treat as the person in a photo: the model's proposal (`photo_subject`) resolved against the household, kept only when the person's own message names or claims that adult. The one rule for every tool that takes a photo and a subject (pictures and videos). */
 export function attestedAdult(proposal: unknown, utterance: unknown, requester: PersonRow, remember?: { photoKeys: readonly string[]; on: boolean }): { proposed: PersonRow | null; attested: PersonRow | null } {
-  const proposed = resolveDeclaredAdult(proposal, requester);
+  const proposed = resolveDeclaredAdult(proposal, requester) ?? ownTeenPhoto(proposal, requester);
   if (!proposed) return { proposed, attested: null };
   const keys = (remember?.photoKeys ?? []).map((key) => `${requester.id}:${key}`);
   if (messageAttests(utterance, requester, proposed)) {
@@ -63,3 +64,9 @@ export function attestedAdult(proposal: unknown, utterance: unknown, requester: 
 /** Who a person said is in a photo, by person and photo (its hash and its chain's first picture). Process memory only: a restart asks again once. */
 const attestations = new Map<string, string>();
 export function __resetAttestationsForTests(): void { attestations.clear(); }
+
+/** A teen's own photo: "me" resolves to the teen themselves (an adult subject must be an adult, so this is the one way a minor is a subject). It is only ever used for a non-sexual edit of their own photo (pictures/editSources.ts); a child never reaches it. */
+function ownTeenPhoto(proposal: unknown, requester: PersonRow): PersonRow | null {
+  if (typeof proposal !== "string" || !SELF_WORDS.has(norm(proposal))) return null;
+  return speakerAgeBand(requester, new Date()) === "teen" && requester.role !== "guest" ? requester : null;
+}

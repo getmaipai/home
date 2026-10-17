@@ -9,11 +9,13 @@ import { requireRole } from "@/middleware/auth";
 import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
 import { addLoraFile, addLoraUrl, getStackJob, imageStatus, installPictureModel, patchLora, removeLora, StackPicturesError } from "@/lib/pictures/stack";
 import { adultAdaptersAllowed, householdAllowsAdults, householdPictureQuality } from "@/lib/pictures/policy";
+import { CHILD_CONTENT_LINE, kidsDailyPictures, kidsDailyVideos, kidsHomeOn } from "@/lib/pictures/lane";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { detailedReady } from "@/lib/pictures/quality";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { db } from "@/db";
-import { pictureAdapterPrefs, people } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { pictureAdapterPrefs, people, pictureJobs, videoJobs } from "@/db/schema";
+import { and, eq, gte } from "drizzle-orm";
 import { declareStyleSubject, forgetStyleSubject, getStyleSubject } from "@/lib/likeness/adapters";
 import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
 
@@ -41,8 +43,9 @@ const OverviewSchema = z.object({
 const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Admins only", 404: "No such style or job", 409: "Already added", 413: "Too big", 422: "That cannot be added", 502: "The picture engine refused it", 503: "The picture engine is not available" });
 
 const BAND_NOTES = {
-  children: "Children cannot make pictures. This stays off until pictures have a safety check on the finished picture, which is not built yet.",
-  teens: "Teens cannot make pictures. This stays off until pictures have a safety check on the finished picture, which is not built yet.",
+  childrenOn: "Children can make cartoon pictures and videos of safe things, within a daily limit. No photos, no real people, nothing scary or grown-up. Turn it off with Let kids make cartoon pictures and videos above, or for one child on their page.",
+  childrenOff: "Children cannot make pictures or videos while Let kids make cartoon pictures and videos is off.",
+  teens: "Teens can make pictures, videos and edits. Nothing adult or sexual is made for them, and they only get all-ages styles.",
   adultsOn: "Adults can ask chat for pictures on their own screen.",
   adultsOff: "Adults cannot make pictures while this is off.",
 };
@@ -100,8 +103,8 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
     },
     adapters: adapters.map((a) => present(a, pending)),
     bands: [
-      { band: "children" as const, label: "Children", on: false, locked: true, note: BAND_NOTES.children },
-      { band: "teens" as const, label: "Teens", on: false, locked: true, note: BAND_NOTES.teens },
+      { band: "children" as const, label: "Children", on: kidsHomeOn(), locked: true, note: kidsHomeOn() ? BAND_NOTES.childrenOn : BAND_NOTES.childrenOff },
+      { band: "teens" as const, label: "Teens", on: true, locked: true, note: BAND_NOTES.teens },
       { band: "adults" as const, label: "Adults", on: adultsOn, locked: false, note: adultsOn ? BAND_NOTES.adultsOn : BAND_NOTES.adultsOff },
     ],
     adult_adapters: adultAdaptersAllowed() ? "allowed" as const : "restricted" as const,
@@ -264,4 +267,38 @@ picturesAdminRoutes.openapi(removeRoute, async (c) => {
     dropAdapterCache();
     return c.json({ ok: true as const }, 200);
   } catch (error) { return stackFailure(c, error) as never; }
+});
+
+// ---------------------------------------------------------------- what the children made (KIDS-CREATE-01)
+
+const KidsActivitySchema = z.object({
+  items: z.array(z.object({
+    person: z.object({ id: z.string(), name: z.string() }),
+    kind: z.enum(["picture", "video"]),
+    prompt: z.string(),
+    state: z.string(),
+    created_at: z.string(),
+    withheld: z.boolean().describe("The finished item was held back by the child-safety check; the child saw one friendly line."),
+  })),
+  daily_pictures: z.number(),
+  daily_videos: z.number(),
+});
+const kidsActivityRoute = createRoute({
+  method: "get", path: "/kids-activity", tags: ["Pictures admin"], summary: "What each child made in the last seven days: the words, when, and whether it was held back (no pictures)", middleware: [requireRole("owner", "admin")] as const,
+  responses: { 200: { content: { "application/json": { schema: KidsActivitySchema } }, description: "Owners and admins only; no image or clip is returned." }, ...refusals },
+});
+picturesAdminRoutes.openapi(kidsActivityRoute, (c) => {
+  const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const kids = db.select().from(people).all().filter((person) => laneOfPerson(person as never) === "child");
+  const items: z.infer<typeof KidsActivitySchema>["items"] = [];
+  for (const kid of kids) {
+    for (const row of db.select({ prompt: pictureJobs.prompt, state: pictureJobs.state, createdAt: pictureJobs.createdAt, error: pictureJobs.error }).from(pictureJobs).where(and(eq(pictureJobs.personId, kid.id), gte(pictureJobs.createdAt, since))).all()) {
+      items.push({ person: { id: kid.id, name: kid.displayName }, kind: "picture", prompt: row.prompt, state: row.state, created_at: row.createdAt, withheld: row.state === "failed" && row.error === CHILD_CONTENT_LINE });
+    }
+    for (const row of db.select({ prompt: videoJobs.prompt, state: videoJobs.state, createdAt: videoJobs.createdAt, error: videoJobs.error }).from(videoJobs).where(and(eq(videoJobs.personId, kid.id), gte(videoJobs.createdAt, since))).all()) {
+      items.push({ person: { id: kid.id, name: kid.displayName }, kind: "video", prompt: row.prompt, state: row.state, created_at: row.createdAt, withheld: row.state === "failed" && row.error === CHILD_CONTENT_LINE });
+    }
+  }
+  items.sort((a, b) => b.created_at.localeCompare(a.created_at));
+  return c.json({ items: items.slice(0, 200), daily_pictures: kidsDailyPictures(), daily_videos: kidsDailyVideos() }, 200);
 });

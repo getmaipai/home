@@ -16,6 +16,7 @@ import { useDefaultScriptedStack } from "./stackFixture";
 import { withStub } from "./turnMachine/toolHarness";
 import { db } from "@/db";
 import { people as peopleTable } from "@/db/schema";
+import { laneOf } from "@/lib/pictures/lane";
 import { adapterAudiencesFor, pictureDenial, picturesAllowed, promptViolatesMinorLine, refusePrompt, PICTURE_NOT_HERE_LINE, PROMPT_REFUSAL_LINE, type PictureAudience } from "@/lib/pictures/policy";
 import { adaptersFor } from "@/lib/pictures/adapters";
 import { getPictureJob, startPictureJob } from "@/lib/pictures/jobs";
@@ -60,15 +61,24 @@ describe("band by surface", () => {
     expect(pictureDenial(audience(asRole(people.child.id, "adult")))).toBeNull();
   });
 
-  test("a child and a teen may not, whatever the surface or any setting", () => {
+  test("a child is in the strict cartoon lane (on by default, off with the home switch), a teen may too (owner rulings 2026-10-17), and the person's own record decides the band", () => {
     setHouseholdSettingValue("generation.adults", true);
     const child = asRole(people.child.id, "child");
+    expect(pictureDenial(audience(child))).toBeNull();
+    setHouseholdSettingValue("generation.kids", false);
     expect(pictureDenial(audience(child))).toBe("minor");
+    setHouseholdSettingValue("generation.kids", true);
     const teen = asRole(people.child.id, "teen");
-    expect(pictureDenial(audience(teen))).toBe("minor");
-    // Even if a caller lies about the band, the person's own record decides.
-    expect(pictureDenial(audience(teen, { band: "adult" }))).toBe("minor");
+    expect(pictureDenial(audience(teen))).toBeNull();
+    // Even if a caller lies about the band, the person's own record decides: a teen who claims to be an adult is still a teen, a child stays a child.
+    expect(laneOf(audience(teen, { band: "adult" }))).toBe("teen");
+    expect(laneOf(audience(child, { band: "adult" }))).toBe("child");
+    setHouseholdSettingValue("generation.kids", false);
     expect(pictureDenial(audience(child, { band: "adult" }))).toBe("minor");
+    setHouseholdSettingValue("generation.kids", true);
+    // A teen is still held to the surface gate.
+    expect(pictureDenial(audience(teen, { spoken: true }))).toBe("spoken");
+    expect(pictureDenial(audience(teen, { surface: "tv" }))).toBe("shared_screen");
   });
 
   test("a guest may not", () => {
@@ -87,7 +97,8 @@ describe("band by surface", () => {
   test("the household switch turns adults off, and only adults", () => {
     setHouseholdSettingValue("generation.adults", false);
     expect(pictureDenial(audience(people.owner))).toBe("household_off");
-    expect(picturesAllowed(audience(asRole(people.child.id, "teen")))).toBe(false);
+    // The adult household switch is for adults only: a teen does not depend on it.
+    expect(picturesAllowed(audience(asRole(people.child.id, "teen")))).toBe(true);
   });
 });
 
@@ -99,8 +110,12 @@ describe("adapter audiences", () => {
   });
 
   test("nobody who may not make a picture is allowed any adapter, adult-only included", () => {
-    expect(adapterAudiencesFor(audience(asRole(people.child.id, "child")))).toEqual([]);
-    expect(adapterAudiencesFor(audience(asRole(people.child.id, "teen")))).toEqual([]);
+    expect(adapterAudiencesFor(audience(asRole(people.child.id, "child")))).toEqual(["all-ages"]);
+    // A teen is offered exactly the all-ages styles, and the adult-only household setting is never read for them.
+    for (const value of ["allowed", "restricted"]) {
+      setHouseholdSettingValue("generation.adult_adapters", value);
+      expect(adapterAudiencesFor(audience(asRole(people.child.id, "teen")))).toEqual(["all-ages"]);
+    }
     expect(adapterAudiencesFor(audience(asRole(people.child.id, "guest"), { band: "adult" }))).toEqual([]);
     expect(adapterAudiencesFor(audience(people.owner, { spoken: true }))).toEqual([]);
     expect(adapterAudiencesFor(audience(people.owner, { surface: "tv" }))).toEqual([]);
@@ -152,7 +167,7 @@ describe("the two absolute lines", () => {
     setHouseholdSettingValue("generation.adult_adapters", "allowed");
     expect(refusePrompt("naked child")).toBe("minor_sexual");
     // PEOPLE-PROMPTS-01: every generation key, the new one included, flipped both ways: the two absolute lines hold either way.
-    for (const [key, values] of [["generation.adults", [true, false]], ["generation.adult_adapters", ["allowed", "restricted"]], ["generation.people_prompts", [true, false]], ["generation.picture_quality", ["quick", "detailed"]]] as const) {
+    for (const [key, values] of [["generation.adults", [true, false]], ["generation.adult_adapters", ["allowed", "restricted"]], ["generation.people_prompts", [true, false]], ["generation.picture_quality", ["quick", "detailed"]], ["generation.kids", [true, false]], ["generation.kids_daily_pictures", [0, 20]], ["generation.kids_daily_videos", [0, 5]]] as const) {
       for (const value of values) {
         setHouseholdSettingValue(key, value);
         expect(refusePrompt("naked child")).toBe("minor_sexual");
@@ -172,8 +187,9 @@ async function turn(actor: PersonRow, text: string, surface: "chat" | "overlay" 
 const call = (args: Record<string, unknown>) => ({ id: "c", name: "generate_image", args: JSON.stringify(args) });
 
 describe("the chat tool, even when a model calls it without being offered it", () => {
-  test("a child, a teen and a guest who somehow get a picture call are refused with a fixed line and no job", async () => {
-    for (const role of ["child", "teen", "guest"] as const) {
+  test("a guest, and a child while the home switch is off, who somehow get a picture call are refused with a fixed line and no job", async () => {
+    setHouseholdSettingValue("generation.kids", false);
+    for (const role of ["child", "guest"] as const) {
       const actor = asRole(people.child.id, role);
       await withStub({ calls: (r) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call({ prompt: "a red fox in the snow" })]), reply: () => "Here you go." }, async () => {
         const value = await turn(actor, "make me a picture of a red fox");
@@ -262,7 +278,7 @@ describe("the routes", () => {
     return { client, actor: db.select().from(peopleTable).where(eq(peopleTable.id, actor.id)).get()! };
   }
 
-  test("status says an adult can, and says why a teen or a guest cannot", async () => {
+  test("status says an adult can, a teen can with all-ages styles only, and says why a child cannot", async () => {
     const adult = await signedIn("Sage", "owner");
     const res = await adult.client.get("/api/pictures/status");
     expect(res.status).toBe(200);
@@ -272,10 +288,17 @@ describe("the routes", () => {
     asRole(adult.actor.id, "teen");
     invalidateSessionCacheForPerson(adult.actor.id);
     const teen = await adult.client.get("/api/pictures/status");
-    const teenBody = await teen.json() as { can_make: boolean; reason: string | null; styles: unknown[] };
-    expect(teenBody.can_make).toBe(false);
-    expect(teenBody.reason).toContain("off for this profile");
-    expect(teenBody.styles).toEqual([]);
+    const teenBody = await teen.json() as { can_make: boolean; styles: Array<{ id: string }> };
+    expect(teenBody.can_make).toBe(true);
+    expect(teenBody.styles.map((s) => s.id)).toEqual(["lora-aaaaaaaaaaaaaaaa"]);
+    asRole(adult.actor.id, "child");
+    invalidateSessionCacheForPerson(adult.actor.id);
+    setHouseholdSettingValue("generation.kids", false);
+    const child = await adult.client.get("/api/pictures/status");
+    const childBody = await child.json() as { can_make: boolean; reason: string | null; styles: unknown[] };
+    expect(childBody.can_make).toBe(false);
+    expect(childBody.reason).toContain("off for this profile");
+    expect(childBody.styles).toEqual([]);
   });
 
   test("GENPREVIEW-01: a running picture's card carries the step in words, the ETA and the latest preview, served to its owner; all of it is gone when the picture is done", async () => {
@@ -310,8 +333,9 @@ describe("the routes", () => {
     const ok = await owner.client.post(`/api/pictures/jobs/${job.id}/variation`, {});
     expect(ok.status).toBe(200);
     expect(fake.submitted).toHaveLength(2);
-    // The same route for a teen: refused, nothing submitted.
-    asRole(owner.actor.id, "teen");
+    // The same route for a child while the home switch is off: refused, nothing submitted.
+    setHouseholdSettingValue("generation.kids", false);
+    asRole(owner.actor.id, "child");
     invalidateSessionCacheForPerson(owner.actor.id);
     const refused = await owner.client.post(`/api/pictures/jobs/${job.id}/variation`, {});
     expect(refused.status).toBe(403);

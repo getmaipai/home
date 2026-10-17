@@ -5,7 +5,9 @@
 // exactly one household adult who agreed (named by the person, checked, and given a signed proof). Anything else is
 // refused with a sentence that says what to do. Nothing here asks the Stack; the caller attaches the answer to its request.
 import { preparePhotoUse } from "@/lib/likeness/apply";
-import { photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
+import { inspectPhoto, PHOTO_LINES, photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
+import { asksToUndress } from "./policy";
+import { TEEN_CONTENT_LINE, laneOf } from "./lane";
 import { subjectEligibility } from "@/lib/likeness/consent";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import type { UseSource } from "@/lib/likeness/uses";
@@ -35,12 +37,21 @@ export type EditSourcePrep =
 export const SUBJECT_NOT_ALLOWED_LINE = "I can only change a photo of an adult who lives in this household and has agreed. Choose that adult from the list, or a photo with no one in it.";
 
 export async function prepareEditSource(input: PrepareEditSourceInput): Promise<EditSourcePrep> {
-  const declared = input.rootLikeness ?? input.declaredSubjectId;
   // A picture this home did not make is screened before anything else is asked of it (ageCheck.screenInputImage).
   if (!input.generated && !input.rootLikeness) {
     const screen = await screenInputImage(input.bytes, input.text, viewerOf(input.audience.actor, input.audience.band));
     if (!screen.ok) return { ok: false, status: 422, code: screen.code, line: screen.line };
   }
+  // A teen's own photo: allowed for a non-sexual edit (the words and the finished picture are checked elsewhere). Exactly one person, one face, and
+  // the teen said it is them; no proof and no household person is involved, and nobody else's likeness is ever made this way.
+  if (input.declaredSubjectId && input.declaredSubjectId === input.audience.actor.id && laneOf(input.audience) === "teen") {
+    if (asksToUndress(input.text)) return { ok: false, status: 422, code: "refused_real_person", line: TEEN_CONTENT_LINE };
+    const facts = await inspectPhoto(input.bytes);
+    if (!facts) return { ok: false, status: 422, code: "photo_check_unavailable", line: PHOTO_LINES.unavailable };
+    if (facts.people !== 1 || facts.faces !== 1) return { ok: false, status: 422, code: "photo_not_single_adult", line: PHOTO_LINES.count };
+    return { ok: true, imageSource: "uploaded", subjectId: null };
+  }
+  const declared = input.rootLikeness ?? input.declaredSubjectId;
   if (!declared && input.generated) return { ok: true, imageSource: "generated", subjectId: null };
   if (!declared) {
     const verdict = await photoShowsNoPerson(input.bytes);

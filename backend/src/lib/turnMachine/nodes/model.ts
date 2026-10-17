@@ -14,6 +14,8 @@ import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun } from "@/lib/text";
 import { asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { peopleGuidanceSuffix, PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
+import type { Lane } from "@/lib/pictures/lane";
 import { visibleText, extractReasoningText, feedThinkSplit, flushThinkSplit, newThinkSplitState } from "@/lib/wellFormed";
 import { visibleReplyMaxTokens } from "@/lib/turnShared";
 import { streamWatchdog, replyIsUncapped } from "../deadline";
@@ -148,7 +150,7 @@ export type ModelOutput =
   // never empty text.
   | { kind: "model_failed"; reasoning?: string; failure?: FailureKind };
 
-export function toolSpecFor(id: string): ToolSpec | null {
+export function toolSpecFor(id: string, lane: Lane = "adult"): ToolSpec | null {
   // PROJECT-START-01: start_project is a virtual tool (tool.ts's own
   // header) - it never has a backend/packages/start_project manifest.json
   // for loadManifestOnly() to find below.
@@ -160,7 +162,7 @@ export function toolSpecFor(id: string): ToolSpec | null {
   if (missingRequired(loaded.value).length > 0) return null;
   // PEOPLE-PROMPTS-01: while the household has the extra questions about people off, the picture and video tools say so to the model.
   const media = id === "generate_image" || id === "generate_video";
-  return { id, description: media ? `${loaded.value.description}${peopleGuidanceSuffix()}` : loaded.value.description, args: loaded.value.args };
+  return { id, description: media ? `${loaded.value.description}${peopleGuidanceSuffix(lane)}` : loaded.value.description, args: loaded.value.args };
 }
 
 /** The reply floor (spec-v0.1.28, U4b-2, turn-machine-state-record-
@@ -920,7 +922,7 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
     tools = state.budget.tools_offered
       .slice()
       .sort()
-      .map(toolSpecFor)
+      .map((id) => toolSpecFor(id, laneOfPerson(state.actor)))
       .filter((t): t is ToolSpec => t !== null);
     tool_choice = "auto";
   }

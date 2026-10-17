@@ -12,7 +12,8 @@ import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
 import { qualityOfModel } from "./quality";
-import { viewerOf, checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "./ageCheck";
+import { checkImages, isAdultOnlyJob } from "./ageCheck";
+import { gateFinished } from "./laneGate";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
 import { clearLive, updateLive } from "@/lib/genLive";
 import { cancelOrDelete, fetchPicture, fetchPicturePreview, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
@@ -248,12 +249,8 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
     const adult = await adultOnly(job);
     const checks = await checkImages(made.map((m) => m.raw), "picture");
     if (stopped(job)) return;
-    const decision = decideAgeCheck(checks, adult, "picture", viewerOf(actor));
-    if (decision.action === "withhold") {
-      fail(decision.line);
-      if (decision.reason === "minor_sexual") await recordWithheld({ kind: "picture", personId: actor.id, jobId: job.id, prompt: job.prompt, adultOnly: adult, checks });
-      return;
-    }
+    const decision = await gateFinished({ actor, kind: "picture", jobId: job.id, adultOnly: adult, checks, images: made.map((m) => m.raw), prompt: job.prompt });
+    if (decision.action === "withhold") { fail(decision.line); return; }
     for (let index = 0; index < made.length; index += 1) {
       if (stopped(job)) { discardStored(storedIds); return; }
       const { raw, width, height, meta } = made[index]!;

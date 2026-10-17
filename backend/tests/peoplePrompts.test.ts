@@ -107,11 +107,15 @@ describe("the hard lines hold with the switch off and on", () => {
     describe(`people_prompts = ${on}`, () => {
       beforeEach(() => setHouseholdSettingValue("generation.people_prompts", on));
 
-      test("a child is refused for pictures and videos, with the profile line", async () => {
-        const p = await pic(child, { prompt: "a friendly dragon" });
-        expect(text(p)).toContain("Making pictures is off for this profile");
-        const v = await vid(child, { prompt: "a friendly dragon waving" });
-        expect(text(v)).toContain("Making videos is off for this profile");
+      test("a child is held to the cartoon lane whatever this says: refused with the home switch off, never a photo or a real person", async () => {
+        setHouseholdSettingValue("generation.kids", false);
+        expect(text(await pic(child, { prompt: "a friendly dragon" }))).toContain("Making pictures is off for this profile");
+        expect(text(await vid(child, { prompt: "a friendly dragon waving" }))).toContain("Making videos is off for this profile");
+        setHouseholdSettingValue("generation.kids", true);
+        const real = await pic(child, { prompt: "a picture of a famous singer", depicts_real_person: true });
+        expect(text(real)).toContain("how about a friendly dragon");
+        const photo = await put(child, "photo-1");
+        expect(text(await pic(child, { prompt: "make it pink", change: "attached" }, [photo]))).toContain("not from photos");
         expect(image.submitted).toHaveLength(0);
         expect(video.submitted).toHaveLength(0);
       });

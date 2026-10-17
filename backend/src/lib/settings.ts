@@ -622,7 +622,7 @@ export const ROBOT_MAY_ADDRESS_KEY = "person.robot.may_address";
  * rule: the registry help says a parent turns them on for a child, so a child never writes them for themselves. */
 export const ROBOT_FOLLOW_UP_KEY = "person.robot.follow_up";
 export const VISION_WATCH_KEY = "person.vision.watch";
-const PARENT_GATED_ROBOT_KEYS: ReadonlySet<string> = new Set([ROBOT_MAY_ADDRESS_KEY, ROBOT_FOLLOW_UP_KEY, VISION_WATCH_KEY]);
+const PARENT_GATED_ROBOT_KEYS: ReadonlySet<string> = new Set([ROBOT_MAY_ADDRESS_KEY, ROBOT_FOLLOW_UP_KEY, VISION_WATCH_KEY, "generation.kid_enabled"]);
 function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
   // The band, not the role alone: a birthdate under 13 makes an adult-role person a child here too (speakerAgeBand is role-floored).
   if (actor.id === targetId && speakerAgeBand(actor, new Date()) === "child") {

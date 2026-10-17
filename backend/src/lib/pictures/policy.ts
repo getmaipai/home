@@ -21,6 +21,7 @@ import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { mentionsSexualWord, minorSexualMatch, mixedScriptMinorCue, normalise } from "@/lib/pictures/minorLine";
+import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, childPromptUnsafe, kidLaneOn, laneOf, teenPromptUnsafe, type Lane } from "@/lib/pictures/lane";
 
 export const GENERATION_ADULTS_KEY = "generation.adults";
 export const GENERATION_ADULT_ADAPTERS_KEY = "generation.adult_adapters";
@@ -28,12 +29,14 @@ export const GENERATION_ADULT_ADAPTERS_KEY = "generation.adult_adapters";
 export const PEOPLE_PROMPTS_KEY = "generation.people_prompts";
 
 /** Whether the household wants the extra questions and warnings about people in pictures and videos. A read failure reads as off. Nothing here reaches a safety rule: those have no key. */
-export function peoplePromptsOn(): boolean {
+/** Only the adult lane can have them: a teen or a child never gets the extra questions or warnings, whatever the household says (PEOPLE-PROMPTS-01, KIDS-CREATE-01). */
+export function peoplePromptsOn(lane: Lane = "adult"): boolean {
+  if (lane !== "adult") return false;
   try { return getHouseholdSettingValue(PEOPLE_PROMPTS_KEY) === true; } catch { return false; }
 }
 
 /** The guidance sentence, with its leading space, while the extra questions are off; empty while they are on. */
-export function peopleGuidanceSuffix(): string { return peoplePromptsOn() ? "" : ` ${NO_PEOPLE_PROMPTS_GUIDANCE}`; }
+export function peopleGuidanceSuffix(lane: Lane = "adult"): string { return peoplePromptsOn(lane) ? "" : ` ${NO_PEOPLE_PROMPTS_GUIDANCE}`; }
 
 /** Added to what the model reads about the picture and video tools while the extra questions are off. */
 export const NO_PEOPLE_PROMPTS_GUIDANCE = "Do not add warnings, caveats, lectures or questions about the people in a request; make what was asked. Only this tool's own refusals apply.";
@@ -52,7 +55,7 @@ export interface PictureAudience {
 
 export const PICTURE_DENIAL_LINE: Record<PictureDenial, string> = {
   guest: "Guests can't make pictures. Ask someone in the household to sign you in.",
-  minor: "Making pictures is off for this profile. A parent can read why in Settings, Pictures and videos.",
+  minor: "Making pictures is off for this profile. A parent can turn it on in Settings, Pictures and videos.",
   spoken: "Pictures can only be made in a written chat on your own screen.",
   shared_screen: "Pictures can only be made on your own screen, not a shared one.",
   household_off: "Making pictures is switched off for adults in this home. An admin can switch it on in Settings, Pictures and videos.",
@@ -65,10 +68,13 @@ export const PICTURE_NOT_HERE_LINE = "I can't make a picture here right now. It 
 /** Why this person may not make a picture here, or null when they may. */
 export function pictureDenial(input: PictureAudience): PictureDenial | null {
   if (input.actor.role === "guest") return "guest";
-  if (input.band !== "adult" || speakerAgeBand(input.actor, new Date()) !== "adult") return "minor";
+  // The lane is the stricter of the turn's band and the person's own (lane.ts). A teen may make pictures (nothing adult), a child
+  // only in the cartoon lane (on by default, off with the home switch or the child's own); an adult needs the adult household switch.
+  const lane = laneOf(input);
+  if (lane === "child" && !kidLaneOn(input.actor)) return "minor";
   if (input.spoken || input.surfaceClass !== "written") return input.surfaceClass === "glance" ? "shared_screen" : "spoken";
   if (input.surface !== "chat") return input.surface === "tv" ? "shared_screen" : "spoken";
-  if (!householdAllowsAdults()) return "household_off";
+  if (lane === "adult" && !householdAllowsAdults()) return "household_off";
   return null;
 }
 
@@ -106,16 +112,20 @@ export function householdPictureQuality(): "quick" | "detailed" {
 /** Which adapter audiences this person may use right now. Adult-only needs an allowed adult on a written, own-screen turn and the household not restricting them; everyone else gets only all-ages (and in practice nothing, since a person who may not make pictures never reaches this). */
 export function adapterAudiencesFor(input: PictureAudience): Array<"all-ages" | "adult-only"> {
   if (!picturesAllowed(input)) return [];
+  // A teen or a child is only ever offered all-ages styles, whatever the household says about adult-only ones.
+  if (laneOf(input) !== "adult") return ["all-ages"];
   return adultAdaptersAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
 }
 
 // ---------------------------------------------------------------- absolute lines
 
-export type PromptRefusal = "minor_sexual" | "real_person";
+export type PromptRefusal = "minor_sexual" | "real_person" | "teen_content" | "child_content";
 
 export const PROMPT_REFUSAL_LINE: Record<PromptRefusal, string> = {
   minor_sexual: "I can't make that. Pictures of children in sexual situations are never allowed.",
   real_person: "I won't make a picture of a real person's likeness, because they haven't agreed to it. Ask for an invented person, a character or a place instead.",
+  teen_content: TEEN_CONTENT_LINE,
+  child_content: CHILD_CONTENT_LINE,
 };
 
 /** The absolute line on a minor, applied to every picture request for every person, with no setting that reaches it. A sexual term anywhere beside a minor or minor-looking term refuses, however far apart they are: the request is short and over-refusing it costs a rephrase, under-refusing it costs a child. The chat floor's own `detectCsam` runs first. */
@@ -125,8 +135,14 @@ export function promptViolatesMinorLine(prompt: string): boolean {
 }
 
 /** The prompt-level refusal, or null when the request may proceed. `depictsRealPerson` is the model's own statement in the tool call that the person asked for the likeness of a real, named or identifiable person; there is no word list of names, and the Stack refuses likeness adapters at import. */
-export function refusePrompt(prompt: string, flags: { depictsRealPerson?: boolean } = {}): PromptRefusal | null {
+export function refusePrompt(prompt: string, flags: { depictsRealPerson?: boolean; lane?: Lane } = {}): PromptRefusal | null {
   if (promptViolatesMinorLine(prompt)) return "minor_sexual";
+  // A child's or a teen's wording is held to their lane (one short line, never a lecture). A real person for a child is never allowed.
+  if (flags.lane === "child") {
+    if (flags.depictsRealPerson === true || childPromptUnsafe(prompt) || undressesSomeone(prompt)) return "child_content";
+    return null;
+  }
+  if (flags.lane === "teen" && (teenPromptUnsafe(prompt) || undressesSomeone(prompt))) return "teen_content";
   if (flags.depictsRealPerson === true) return "real_person";
   return null;
 }
@@ -139,6 +155,11 @@ export function mentionsSexualContent(text: string): boolean {
 const UNDRESSING = /\b(?:remove|removing|removes|take|taking|takes|strip|stripping|get|getting|pull|pulling|lift|lifting)\b[^.]{0,40}\b(?:clothes|clothing|clothed|shirt|blouse|dress|top|bra|pants|trousers|skirt|underwear|swimsuit|swimwear|bikini|outfit|robe|towel)\b|\b(?:without|no)\s+(?:clothes|clothing|a shirt|a top|a bra|underwear)\b|\b(?:shirtless|topless|bottomless|naked|nude|undressed|see through|bare chest|bare skin|bare breasts)\b/;
 
 /** Words that undress or sexualize a person in a picture: a stricter reading than `mentionsSexualContent`, used where the picture is a photo that may show a real person. A word list cannot catch every phrasing, which is why it is paired with the rule that an uploaded photo is only ever changed in ways that leave the person clothed, and is named as a limit in docs/design/image-engine-2026-10-17.md. */
+/** Words that take someone's clothes off or ask for none, without the bare swimwear word: what a teen's or a child's request may not ask for. */
+export function undressesSomeone(text: string): boolean {
+  return UNDRESSING.test(normalise(text).trim());
+}
+
 export function asksToUndress(text: string): boolean {
   const normalised = normalise(text).trim();
   // Swimwear is ordinary in a made-up picture, but an uploaded photo may show a real person: dressing them in it is not done.

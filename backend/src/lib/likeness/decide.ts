@@ -5,6 +5,7 @@
 // permissive than an adult picture already is: the second switch (adult content) exists only to keep a person's likeness
 // out of adult-only requests unless they said it may be there.
 import { pictureDenial, asksToUndress, type PictureAudience } from "@/lib/pictures/policy";
+import { laneOf } from "@/lib/pictures/lane";
 import { consentState, subjectEligibility, type SubjectWhy } from "./consent";
 import type { PersonRow } from "@/types";
 
@@ -34,7 +35,7 @@ const SUBJECT_LINES: Record<SubjectWhy, string> = {
 };
 
 export const LIKENESS_LINES = {
-  requester: "Pictures and videos that look like a person can only be made by an adult on their own screen.",
+  requester: "Pictures and videos that look like another person can only be made by an adult, with that person's agreement.",
   no_subject: "Say which adult in this household it should look like, and make sure they have agreed. I won't make a picture or video of someone else.",
   consent_off: (name: string) => `${name} hasn't agreed to pictures, videos or styles that look like them. They can turn that on in their own Settings, Pictures and videos. I made nothing.`,
   adult_content_off: (name: string) => `${name} has agreed to pictures and videos that look like them, but not to adult content. They can change that in their own Settings, Pictures and videos. I made nothing.`,
@@ -51,6 +52,9 @@ export const NO_ADULT_CONTENT_NEGATIVE = "nude, naked, nudity, topless, nsfw, ex
 /** May this request make something that looks like this person? */
 export function decideLikeness(ask: LikenessAsk): LikenessDecision {
   if (pictureDenial(ask.requester) !== null) return { ok: false, denial: "requester", line: LIKENESS_LINES.requester };
+  // The agreement an adult records is "other adults may": a teen or a child never makes something that looks like another person, and a
+  // minor is never the subject here (subjectEligibility). A teen's own photo for a non-sexual edit is handled by the photo path (editSources).
+  if (laneOf(ask.requester) !== "adult") return { ok: false, denial: "requester", line: LIKENESS_LINES.requester };
   if (!ask.subjectPersonId) return { ok: false, denial: "no_subject", line: LIKENESS_LINES.no_subject };
   const eligible = subjectEligibility(ask.subjectPersonId);
   if (!eligible.ok) return { ok: false, denial: eligible.why === "minor" ? "subject_minor" : "subject_unknown", line: SUBJECT_LINES[eligible.why] };

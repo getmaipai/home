@@ -20,6 +20,9 @@ import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import { createHash } from "node:crypto";
 import { peopleGuidanceSuffix, peoplePromptsOn } from "@/lib/pictures/policy";
+import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, noteKidVideo, videosMadeToday } from "@/lib/pictures/lane";
+
+const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
@@ -55,7 +58,7 @@ export function videoRefusalFor(audience: VideoAudience, args: Record<string, un
   const style = typeof args.style === "string" ? args.style : "";
   // A request that names a style, or animates an attached photo, may be of a household adult who agreed (LIKENESS-01): the tool
   // decides that once it has matched the style or read the photo, so the model's "real person" flag alone does not end the call here.
-  const refused = refuseVideoPrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" && !isAttached(args.from_picture) });
+  const refused = refuseVideoPrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" && !isAttached(args.from_picture), lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "video", audience.actor, audience.band, `${prompt} ${style}`, VIDEO_REFUSAL_LINE[refused]) };
   return null;
 }
@@ -108,6 +111,12 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
 
   const temporary = state.temporary === true || state.ephemeral === true;
   const actor = state.actor as PersonRow;
+  // KIDS-CREATE-01: a child's clip is a short cartoon of a safe thing, made from words or from their own cartoon; never from a photo, never a
+  // style, with a daily limit. One short friendly line when it cannot be done.
+  const lane = laneOf(audience);
+  const kid = lane === "child";
+  if (kid && isAttached(args.from_picture)) return refused(callId, args, { kind: "likeness", why: "reference", line: CHILD_NO_PHOTOS_LINE });
+  if (kid && videosMadeToday(actor) + 1 > kidsDailyVideos()) return refused(callId, args, { kind: "likeness", why: "likeness", line: CHILD_VIDEO_LIMIT_LINE });
 
   // A clip can start from a picture this home's Stack made ("latest" or an id), or from a photo the person attached to this
   // message when they say which household adult is in it (LIKENESS-01). Never from an upload of anyone else.
@@ -129,7 +138,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     const screened = await screenInputImage(photo.bytes, prompt, viewerOf(actor, audience.band));
     if (!screened.ok) return refuseWith("reference", screened.line);
     // The model's `photo_subject` is a proposal: only the person's own message (a name, or a claim that it is them) attests who is in the photo.
-    const { proposed, attested: declared } = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [createHash("sha256").update(photo.bytes).digest("hex"), photo.id], on: !peoplePromptsOn() });
+    const { proposed, attested: declared } = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [createHash("sha256").update(photo.bytes).digest("hex"), photo.id], on: !peoplePromptsOn(laneOf(audience)) });
     if (!declared) return refuseWith("likeness", proposed ? WHO_IS_IN_PHOTO_LINE : PHOTO_SUBJECT_LINE);
     // The photo must show exactly the one declared adult, nobody who could be a child: counted by the household's own model, fail closed.
     const verdict = await singleAdultPhoto(photo.bytes);
@@ -161,9 +170,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   // Only a LoRA this person may use right now can match; the model never sees the library.
   const available = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
   const named = typeof args.style === "string" ? args.style.trim() : "";
-  const adapter = named ? matchVideoAdapter(available, named) : null;
+  const adapter = named && !kid ? matchVideoAdapter(available, named) : null;
   const styleNote = named && !adapter ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
-  const seconds = clampSeconds(args.seconds);
+  const seconds = kid ? Math.min(clampSeconds(args.seconds), KID_MAX_SECONDS) : clampSeconds(args.seconds);
   // A style of a household adult is made only if they agreed; a real person with no such style or photo is refused (LIKENESS-01).
   const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat" });
   if (stylePrep.kind === "refused") return stylePrep.why === "real_person" ? refused(callId, args, { kind: "prompt", why: "real_person", line: VIDEO_REFUSAL_LINE.real_person }) : refuseWith("likeness", stylePrep.line);
@@ -182,21 +191,22 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       prompt,
       sourceFileId,
       body: {
-        prompt: withVideoTriggerWords(prompt, adapter),
+        prompt: kid ? forceCartoon(prompt) : withVideoTriggerWords(prompt, adapter),
         size,
         seconds,
         audience: likeness ? "adult" as const : stackAudienceFor(audience),
         ...(image ? { image, image_source: imageSource, ...(consentProof ? { consent_proof: consentProof } : {}) } : {}),
         ...(adapter ? { loras: [{ id: adapter.id, strength: adapter.strength_default, ...(stylePrep.kind === "likeness" ? { likeness_proof: stylePrep.proof } : {}) }] } : {}),
-        ...(negativePrompt ? { negative_prompt: negativePrompt } : {}),
+        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : negativePrompt ? { negative_prompt: negativePrompt } : {}),
       },
       ...(likeness ? { likeness } : {}),
     });
+    if (kid) noteKidVideo(actor);
     if (subjectForLog) await recordLikenessUse({ subjectPersonId: subjectForLog.subjectId, requesterPersonId: actor.id, medium: "video", way: photoLikeness ? "photo" : "style", adultContent: likeness?.adult_content ?? false, source: "chat" });
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `A ${seconds} second video is being made from this description: ${prompt}. It takes about two minutes and appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${peopleGuidanceSuffix()}` },
+        reply: { text: `A ${seconds} second video is being made from this description: ${prompt}. It takes about two minutes and appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${peopleGuidanceSuffix(laneOf(audience))}` },
         data: { videoJobId: job.id },
         actions: [],
       },

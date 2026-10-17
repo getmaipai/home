@@ -95,10 +95,13 @@ describe("VIDEO-GEN-05: where generate_video is offered (rule 0)", () => {
     expect(await toolsSeen(() => runTurnNext(people.owner, "overlay", "hello"))).not.toContain("generate_video");
     expect(await toolsSeen(() => runTurnNext(people.owner, "tv", "hello"))).not.toContain("generate_video");
   });
-  test("never offered to a child, a teen or a guest", async () => {
+  test("not offered to a guest or to a child while the home switch is off; offered to a teen and to a child (cartoon lane) on their own screen", async () => {
+    expect(await toolsSeen(() => runTurnNext(people.child, "chat", "hello"))).toContain("generate_video");
+    setHouseholdSettingValue("generation.kids", false);
     expect(await toolsSeen(() => runTurnNext(people.child, "chat", "hello"))).not.toContain("generate_video");
+    setHouseholdSettingValue("generation.kids", true);
     const teen = asRole(people.child.id, "teen");
-    expect(await toolsSeen(() => runTurnNext(teen, "chat", "hello"))).not.toContain("generate_video");
+    expect(await toolsSeen(() => runTurnNext(teen, "chat", "hello"))).toContain("generate_video");
     const guest = asRole(people.child.id, "guest");
     expect(await toolsSeen(() => runTurnNext(guest, "chat", "hello"))).not.toContain("generate_video");
   });

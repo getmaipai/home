@@ -46,7 +46,7 @@ By default Home makes what you ask for without extra questions or warnings about
 
 ## Who can make pictures
 
-Adults can, on their own screen, in a written chat. Children and teens cannot. Spoken answers, the TV and other shared screens never make pictures. A guest cannot.
+Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual: they only get the everyday styles, a teen's own photo can be changed in ordinary ways (not into anything sexual), and a teen is never shown a picture that may be adult. Children can make cartoon pictures of safe things, a few each day: the look is always a cartoon, nothing scary or grown-up is made, and photos and real people are never used. A parent or admin can turn this off for the home or for one child. Spoken answers, the TV and other shared screens never make pictures. A guest cannot.
 
 Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a picture of a real person who has not agreed to it. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
 
@@ -72,7 +72,7 @@ The picture engine checks the file and refuses styles of public figures and anyt
 
 ## Pictures that look like someone in your home
 
-Home can make a picture that looks like an adult in your home, but only if that adult said yes. A style of a person comes from a file you add; a photo of a person comes from a photo you attach. Children and teens are never made this way, and neither is anyone outside your home.
+Home can make a picture that looks like an adult in your home, but only if that adult said yes. A style of a person comes from a file you add; a photo of a person comes from a photo you attach. Children and teens are never made this way (a teen can change their own photo, see above), and neither is anyone outside your home.
 
 To say yes, an adult opens **Settings**, **Pictures and videos** on their own account and turns on **Let other adults in this household make pictures, videos and styles that look like me**. Nobody else can turn it on for them, not even an owner. They can turn it off at any time. When they do, anything still waiting is stopped, nobody can ask for it again, and every saved style of them is removed. Things already made stay with the person who made them.
 
@@ -84,7 +84,7 @@ The page also lists every time someone made something that looks like them, and 
 
 | What you see | Why | What to do |
 |---|---|---|
-| Home says it cannot make pictures for you | You are a child, a teen or a guest, or you are on a shared screen or a spoken chat | Ask an adult, or use your own written chat |
+| Home says it cannot make pictures for you | You are a guest, or you are on a shared screen or a spoken chat, or a parent turned cartoon pictures off for you | Ask an adult, or use your own written chat |
 | "No picture model is installed" | The model is not on this computer | An owner or admin presses **Install the picture model** in Settings, Pictures and videos |
 | "The picture engine isn't answering", or Home says it cannot reach the engine | The AI engine is restarting or stopped | Wait a minute and ask again. If it stays, open **Repairs** |
 | "Waiting for memory to free up" | A video or another big job holds the memory | Wait. It starts by itself |

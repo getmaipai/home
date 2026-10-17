@@ -111,3 +111,29 @@ One household setting, `generation.people_prompts`, default off, on Settings, Pi
 - **C, soft friction (3, removed while off):** the model's hedging and lecturing about people (its tool description says to make what was asked), the same sentence in each tool answer, and the repeated "who is in this photo" question. No code-level soft refusal for an ordinary adult request was found: every refusal there is an A line.
 
 Teens and children are out of this setting: the extra questions are always off for them (see the teen and kid lanes when they land).
+
+## 8. The teen lane (owner ruling 2026-10-17: "Teens can edit and create picture and video without annoying messages")
+
+RULES.md and SAFETY.md name no ban on teen generation (rule 0 is the age and surface gate; SAFETY.md keeps child-safety protections non-removable and child profiles restricted). The "off for teens" lines were in the image and video design notes, now marked superseded. What a teen gets, in code (`lib/pictures/lane.ts`, `laneGate.ts`):
+
+- **Lane:** the stricter of the turn's band and the person's own band. A teen is allowed on their own written screen (the surface gate is unchanged); the adult household switch does not apply to them.
+- **Words:** nothing adult or sexual (`teen_content`, one line: "I can't make that one. Want to try something different?"), after the absolute lines, which run first and are not changed.
+- **Styles:** exactly the all-ages ones; the Stack is told `all-ages`; the adult-only household settings are never read for a teen.
+- **People:** another person's likeness is never made for a teen (`decideLikeness` requires the adult lane: the agreement an adult records is for other adults). A teen's own photo is allowed for a non-sexual edit when the teen says it is them (once, remembered): one person, one face, no proof, never sexual.
+- **Finished picture:** anything nude or sexual is withheld whoever is in it, a check that could not run withholds (fail closed), one short line, an admin notification with no image.
+- **Friction:** the people-prompts setting never applies to a teen: no hedging text, no clarifying question with a safe default, no extra confirmation.
+- Children: see section 9.
+
+## 9. The child cartoon lane (KIDS-CREATE-01, owner ruling 2026-10-17: "Kids can make cartoon images and videos of safe content.")
+
+Architect verdict (the architect agent was not available to this session; one line): APPROVED as a clarification of rule 0 (RULES.md edited in its own commit with `Owner-approved: 2026-10-17`): a child's picture and video are made inside a lane that adds checks, loosens none of the existing child protections, and fails closed.
+
+On by default for children, with a household switch ("Let kids make cartoon pictures and videos"), a switch per child (a parent or admin writes it; a child never does) and two daily limits (default 20 pictures, 5 videos) on Settings, Pictures and videos.
+
+- **Style:** the cartoon look is forced (`forceCartoon` prefix, `CHILD_NEGATIVE_PROMPT` against photoreal, real faces, logos, text and everything below); Quick only (the Klein maker, a child never sees a model name or a Detailed choice); no styles; at most two pictures a request; videos at most three seconds.
+- **Content:** after the absolute lines, a child-safe topic gate (no violence or weapons, gore, scary or horror, sexual or romantic, drugs or alcohol, hate, self-harm, real people, brands, celebrities, nudity wording): ONE friendly line, "Let's make something else: how about a friendly dragon?".
+- **No real people:** a child cannot attach a photo, use a second picture, name a person or make a likeness; edits (chat and editor) only in words and only on their own generated cartoons; a photo is refused with "I can make cartoons for you, but not from photos."
+- **Finished picture or clip:** the apparent-age check (anything nude or sexual withholds), and a second question to the household's own vision model: clearly a cartoon, not a photo, no real person or brand, nothing violent or scary or sexual or romantic, no weapon, drug or alcohol, with confidence. Every part must pass for every picture or keyframe; no answer withholds. Withheld means the friendly line and an admin note (no picture, once in ten minutes for a child).
+- **Limits and log:** the daily limits above (stored jobs plus a memory ledger so deleting a chat does not give them back while Home runs); owners and admins read what each child made, with the words, the time and whether it was held back, on `GET /api/pictures/admin/kids-activity`. **Not built:** thumbnails and a page for the log (row KIDS-CREATE-02).
+- **Friction:** none: no hedging text for an allowed request, whatever the household's people-prompts setting says.
+- **Limits of this build:** the child-safe topic list is a floor, not a judge (the finished-picture check is the second half); the daily ledger resets when Home restarts for the part not in stored jobs.

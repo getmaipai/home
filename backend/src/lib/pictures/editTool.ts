@@ -26,6 +26,7 @@ import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
 import sharp from "sharp";
 import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, inverseMask, maskCoverage, peopleMask, peopleMaskWithCount, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
+import { CHILD_NO_PHOTOS_LINE, laneOf, type Lane } from "./lane";
 import { asksToUndress, peopleGuidanceSuffix, peoplePromptsOn, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
@@ -91,10 +92,14 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
   if (instruction.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");
   const temporary = state.temporary === true || state.ephemeral === true;
   const kind = args.kind === "remove_people" || args.kind === "remove_background" || args.kind === "upscale" ? args.kind : "change";
+  const kid = laneOf(audience) === "child";
+  // KIDS-CREATE-01: a child changes only the cartoons made for them: no photo, no person tools, no second picture.
+  if (kid && (kind === "remove_people" || (typeof args.reference === "string" && args.reference.trim() !== "") || (typeof args.photo_subject === "string" && args.photo_subject.trim() !== ""))) return line(callId, args, CHILD_NO_PHOTOS_LINE, { refused: "child_cartoons_only" });
 
   const base = load(input, args.change === true ? "latest" : args.change);
-  if (!base) return line(callId, args, typeof args.change === "string" && /^attached/i.test(args.change) ? NOT_FOUND_LINE : NOTHING_TO_CHANGE_LINE);
+  if (!base) return line(callId, args, kid && typeof args.change === "string" && /^attached/i.test(args.change) ? CHILD_NO_PHOTOS_LINE : typeof args.change === "string" && /^attached/i.test(args.change) ? NOT_FOUND_LINE : NOTHING_TO_CHANGE_LINE);
   const generated = await isGeneratedPicture(actor, base);
+  if (kid && !generated) return line(callId, args, CHILD_NO_PHOTOS_LINE, { refused: "child_cartoons_only" });
   // A picture the person did not make here may show a real person: it is never changed into something sexual.
   if (!generated && asksToUndress(instruction)) return line(callId, args, PROMPT_REFUSAL_LINE.real_person, { refused: "real_person" });
   const rootLikeness = generated ? await generatedPictureLikeness(base) : null;
@@ -117,7 +122,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
           return [{ b64_json: Buffer.from(made.png).toString("base64"), width: made.width, height: made.height, model: made.model, ms: made.ms }];
         },
       });
-      return started(callId, args, job.id, kind === "upscale" ? "The picture is being made bigger." : "The background is being removed.");
+      return started(callId, args, job.id, kind === "upscale" ? "The picture is being made bigger." : "The background is being removed.", laneOf(audience));
     } catch (error) {
       return startFailure(callId, args, error);
     }
@@ -156,7 +161,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
           return [pic];
         },
       });
-      return started(callId, args, job.id, "The person (or people) you asked about are being taken out of the picture and the background filled in.");
+      return started(callId, args, job.id, "The person (or people) you asked about are being taken out of the picture and the background filled in.", laneOf(audience));
     } catch (error) {
       return startFailure(callId, args, error);
     }
@@ -174,7 +179,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
   // The person named is the one in the reference when there is one (the person to add), else the one in the picture being changed.
   // The model's `photo_subject` is a proposal, never the attestation: it counts only when the person's own message names or claims that adult.
   const photoWithPerson = ref ?? base;
-  const declared = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [photoWithPerson.sha256, photoWithPerson.rootId], on: !peoplePromptsOn() }).attested;
+  const declared = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [photoWithPerson.sha256, photoWithPerson.rootId], on: !peoplePromptsOn(laneOf(audience)) }).attested;
   const named = typeof args.photo_subject === "string" && args.photo_subject.trim() !== "";
 
   const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
@@ -221,7 +226,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
           return [{ b64_json: Buffer.from(kept).toString("base64"), model: edited.meta?.model, ms: edited.meta?.ms }];
         },
       });
-      return started(callId, args, job.id, "The change is being made, and the people in the picture are kept exactly as they are.");
+      return started(callId, args, job.id, "The change is being made, and the people in the picture are kept exactly as they are.", laneOf(audience));
     } catch (error) {
       return startFailure(callId, args, error);
     }
@@ -247,7 +252,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
     const form = new FormData();
     form.append("image", new File([new Uint8Array(base.bytes)], "picture", { type: base.mediaType }));
     form.append("operation", "edit");
-    form.append("instruction", instruction);
+    form.append("instruction", kid ? `${instruction}. Keep it a friendly children's cartoon drawing, not a photograph.` : instruction);
     form.append("image_source", baseSource);
     if (basePrep.proof) form.append("consent_proof", basePrep.proof);
     if (household) form.append("audience", "adult");
@@ -274,7 +279,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
       },
     });
     for (const subjectId of new Set(subjects)) await recordLikenessUse({ subjectPersonId: subjectId, requesterPersonId: actor.id, medium: "picture", way: "photo", adultContent: false, source: "chat" });
-    return started(callId, args, job.id, ref ? "The change, using the second picture, is being made." : "The change is being made.");
+    return started(callId, args, job.id, ref ? "The change, using the second picture, is being made." : "The change is being made.", laneOf(audience));
   } catch (error) {
     return startFailure(callId, args, error);
   }
@@ -316,11 +321,11 @@ async function runStackEdit(form: FormData, progress: (phase: string, percent: n
   }
 }
 
-function started(callId: string, args: Record<string, unknown>, jobId: string, what: string): ToolExecutionOutcome {
+function started(callId: string, args: Record<string, unknown>, jobId: string, what: string, lane: Lane): ToolExecutionOutcome {
   return outcomeOf({
     callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
     result: {
-      reply: { text: `${what} The changed picture appears below your reply when it is ready, and the original stays as it was (Edit on the picture shows both, with Undo). You have not seen the result: do not describe how it looks. Tell the person in one short sentence that it is on its way.${peopleGuidanceSuffix()}` },
+      reply: { text: `${what} The changed picture appears below your reply when it is ready, and the original stays as it was (Edit on the picture shows both, with Undo). You have not seen the result: do not describe how it looks. Tell the person in one short sentence that it is on its way.${peopleGuidanceSuffix(lane)}` },
       data: { pictureJobId: jobId },
       actions: [],
     },

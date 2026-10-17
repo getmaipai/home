@@ -452,7 +452,7 @@ async function notifyAdmins(kind: CheckedKind, personId: string): Promise<void> 
 }
 
 /** The kind of refusal a prompt got, for the one line a teen or a child reads. */
-export type PromptRefusalKind = "minor_sexual" | "real_person";
+export type PromptRefusalKind = "minor_sexual" | "real_person" | "teen_content" | "child_content";
 
 /**
  * KID-SAFE-REFUSAL: the line for a prompt the word floor refused. The floor is strict on purpose and a few harmless words trip it

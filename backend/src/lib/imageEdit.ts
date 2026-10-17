@@ -34,7 +34,9 @@ import { createAttachment, getTemporaryChatImage, getTemporaryChatImageForReader
 import { isTemporaryConversation } from "@/lib/conversationHistory";
 import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
-import { promptRefusalLineFor, viewerOf, checkImages, decideAgeCheck, promptHash, recordWithheld } from "@/lib/pictures/ageCheck";
+import { promptRefusalLineFor, checkImages, promptHash } from "@/lib/pictures/ageCheck";
+import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
+import { CHILD_NO_PHOTOS_LINE, kidLaneOn, laneOf } from "@/lib/pictures/lane";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
@@ -108,7 +110,7 @@ function off(reason: string): Record<EditToolKey, EditToolState> {
 }
 
 export async function editToolsStatus(actor: PersonRow): Promise<EditToolsStatus> {
-  if (!photoUploadsAllowed(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), limits: {} };
+  if (!photoUploadsAllowed(actor) && !childOwnCartoonsOnly(actor)) return { state: "off", note: PICTURES_OFF_REASON, tools: off(PICTURES_OFF_REASON), limits: {} };
   const comment: EditToolState = await commentState(actor);
   const withStackDown = (note: string, state: EditToolsStatus["state"]): EditToolsStatus => ({ state, note, tools: { ...off(note), markup: { enabled: true }, comment }, limits: {} });
   if (toolsStatusForTests === undefined && !isStackConfigured()) return withStackDown("Editing tools aren't available: no editing engine is set up on this computer.", "unavailable");
@@ -175,9 +177,29 @@ function parseProvenance(note: string): EditProvenance | null {
 function sha(bytes: Uint8Array): string { return createHash("sha256").update(bytes).digest("hex"); }
 
 /** Reads a picture the actor may see (the conversation reader's rule). `write` also requires the conversation to be theirs. */
+/** Whether the first picture of this chain was made by the picture engine (Home marks it; a file name proves nothing). */
+function rootMadeHere(actor: PersonRow, conversationId: string, rootId: string): boolean {
+  const temp = getTemporaryChatImageForReader(actor, conversationId, rootId);
+  if (temp) return temp.generated === true;
+  const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, rootId)).get();
+  return typeof row?.provenance === "string" && row.provenance.startsWith("picture-gen:");
+}
+
+/** KIDS-CREATE-01: a child (never allowed photos) opens the editor only on cartoons the picture engine made for them, while the child lane is on. */
+function childOwnCartoonsOnly(actor: PersonRow): boolean {
+  return !photoUploadsAllowed(actor) && laneOfPerson(actor) === "child" && kidLaneOn(actor);
+}
+
 export function loadSource(actor: PersonRow, conversationId: string, id: string, write: boolean): SourcePicture {
-  if (!photoUploadsAllowed(actor)) throw new ImageEditError(403, PICTURES_OFF_REASON, "pictures_off");
+  const childLane = childOwnCartoonsOnly(actor);
+  if (!photoUploadsAllowed(actor) && !childLane) throw new ImageEditError(403, PICTURES_OFF_REASON, "pictures_off");
   const gone = new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
+  const loaded = loadSourceChecked(actor, conversationId, id, write, gone);
+  if (childLane && !rootMadeHere(actor, conversationId, loaded.rootId)) throw new ImageEditError(403, CHILD_NO_PHOTOS_LINE, "child_cartoons_only");
+  return loaded;
+}
+
+function loadSourceChecked(actor: PersonRow, conversationId: string, id: string, write: boolean, gone: ImageEditError): SourcePicture {
   if (isTemporaryConversation(conversationId) || getTemporaryChatImageForReader(actor, conversationId, id)) {
     const image = write ? getTemporaryChatImage(actor, conversationId, id) : getTemporaryChatImageForReader(actor, conversationId, id);
     if (!image || !image.mediaType.startsWith("image/")) throw gone;
@@ -433,7 +455,9 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);
   const prompt = input.prompt.trim();
   if (!prompt) throw new ImageEditError(422, "Say what to change, then send it.", "prompt_required");
-  const refused = refusePrompt(prompt);
+  // A child changes their own cartoons in words only: no painted area from outside, no second picture, no person named.
+  if (laneOf(editorAudience(actor)) === "child" && (input.referenceId || input.subjectPersonId || input.referenceSubjectPersonId || (input.maskPng && input.maskPng.byteLength > 0))) throw new ImageEditError(422, CHILD_NO_PHOTOS_LINE, "child_cartoons_only");
+  const refused = refusePrompt(prompt, { lane: laneOf(editorAudience(actor)) });
   if (refused) throw new ImageEditError(422, promptRefusalLineFor(refused, "picture", actor, editorAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), `refused_${refused}`);
   // A picture the person did not generate here (an upload) may show a real person: it is never changed into something sexual.
   const generated = await isGeneratedPicture(actor, source);
@@ -468,7 +492,7 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   form.append("image", new File([new Uint8Array(source.bytes)], "picture", { type: source.mediaType }));
   const painted = input.maskPng && input.maskPng.byteLength > 0 ? input.maskPng : null;
   form.append("operation", region || painted ? "edit_masked" : "edit");
-  form.append("instruction", prompt);
+  form.append("instruction", laneOf(editorAudience(actor)) === "child" ? `${prompt}. Keep it a friendly children's cartoon drawing, not a photograph.` : prompt);
   if (painted) form.append("mask", new File([new Uint8Array(painted)], "mask.png", { type: "image/png" }));
   else if (region) form.append("region", region);
   form.append("image_source", imageSource);
@@ -562,11 +586,8 @@ async function pollComment(actor: PersonRow, jobId: string, job: EditJob): Promi
     const made = status.data[0];
     // IMGGEN-SAFE-01: a described change is a new picture, so it passes the same finished-output check before it is kept as a preview.
     const checks = await checkImages([png], "picture");
-    const decision = decideAgeCheck(checks, job.adultOnly === true, "picture", viewerOf(actor));
-    if (decision.action === "withhold") {
-      if (decision.reason === "minor_sexual") await recordWithheld({ kind: "picture", personId: actor.id, jobId, promptHash: job.promptHash, adultOnly: job.adultOnly === true, checks });
-      throw new ImageEditError(422, decision.line, `withheld_${decision.reason}`);
-    }
+    const decision = await gateFinished({ actor, kind: "picture", jobId, adultOnly: job.adultOnly === true, checks, images: [png], ...(job.promptHash ? { promptHash: job.promptHash } : {}) });
+    if (decision.action === "withhold") throw new ImageEditError(422, decision.line, `withheld_${decision.reason}`);
     const kept = keepPreview(actor, source, "comment", png, { width: meta.width ?? made?.width ?? 0, height: meta.height ?? made?.height ?? 0, model: made?.model, ms: made?.ms, ...(job.likeness ? { likeness: job.likeness } : {}) });
     await cancelOrDelete(jobId);
     return kept;

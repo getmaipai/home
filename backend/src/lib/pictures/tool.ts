@@ -18,6 +18,9 @@ import { prepareStyleUse } from "@/lib/likeness/apply";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
+import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, noteKidPictures, picturesMadeToday } from "./lane";
+
+const KID_MAX_COUNT = 2;
 export { GENERATE_IMAGE_TOOL_ID };
 
 export const PICTURE_SIZES: Record<string, string> = {
@@ -50,7 +53,7 @@ export function refusalFor(audience: PictureAudience, args: Record<string, unkno
   const style = typeof args.style === "string" ? args.style : "";
   // A request that names a style may be a style of a household adult who agreed (LIKENESS-01): the tool decides that once it
   // has matched the style, so the model's "real person" flag alone does not end the call here when a style was named.
-  const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" });
+  const refused = refusePrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "", lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "picture", audience.actor, audience.band, `${prompt} ${style}`, PROMPT_REFUSAL_LINE[refused]) };
   return null;
 }
@@ -101,14 +104,19 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   // Only an adapter this person may use right now can match; the model never sees the library.
   const available = await adaptersFor(adapterAudiencesFor(audience));
   const named = typeof args.style === "string" ? args.style.trim() : "";
-  const adapter = named ? matchAdapter(available, named) : null;
+  const lane = laneOf(audience);
+  const kid = lane === "child";
+  // A child never picks a style (the cartoon look is the style).
+  const adapter = named && !kid ? matchAdapter(available, named) : null;
   // The absolute line is checked again on what is actually sent: the style's trigger words are added by Home, so they
   // are part of the request too.
   const sentPrompt = withTriggerWords(prompt, adapter);
-  const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`);
+  const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`, { lane });
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: promptRefusalLineFor(second, "picture", audience.actor, audience.band, sentPrompt, PROMPT_REFUSAL_LINE[second]) });
+  // KIDS-CREATE-01: a child gets a daily limit, the cartoon look forced, Quick only, one or two pictures, and no friction text.
+  if (kid && picturesMadeToday(state.actor as PersonRow) + Math.min(count, KID_MAX_COUNT) > kidsDailyPictures()) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
-  const choice = chooseQuality({ requested: isPictureQuality(args.quality) ? args.quality : undefined, style: adapter, engine });
+  const choice: ReturnType<typeof chooseQuality> = kid ? { quality: "quick", model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(args.quality) ? args.quality : undefined, style: adapter, engine });
   const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
   // LIKENESS-01: a style of a household adult is made only if they agreed; a real person with no such style is refused.
@@ -125,22 +133,24 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       kind: "generate",
       prompt,
       body: {
-        prompt: sentPrompt,
+        prompt: kid ? forceCartoon(sentPrompt) : sentPrompt,
         size,
-        n: count,
+        n: kid ? Math.min(count, KID_MAX_COUNT) : count,
         ...(choice.model ? { model: choice.model } : {}),
-        audience: adultAdaptersAllowed() ? "adult" : "all-ages",
+        // Only an adult whose household allows adult-only styles is ever sent as `adult`: a teen and a child are always `all-ages`.
+        audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages",
         ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" ? { likeness_proof: prep.proof } : {}) }] } : {}),
-        ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
+        ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
       },
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
     if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: state.actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
+    if (kid) noteKidPictures(state.actor as PersonRow, Math.min(count, KID_MAX_COUNT));
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}${qualityNote}${peopleGuidanceSuffix()}` },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}${qualityNote}${peopleGuidanceSuffix(lane)}` },
         data: { pictureJobId: job.id },
         actions: [],
       },

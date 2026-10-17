@@ -186,6 +186,9 @@ acknowledgement). No adult LoRA was downloaded or tested in this session.
 
 ## 10. Safety posture and rules check
 
+> **Superseded in part (owner, 2026-10-17: "Teens can edit and create picture and video without annoying messages"):** a teen may make pictures and videos and edit pictures, on their own written screen, with nothing adult or sexual (the prompt gate and the finished-picture check refuse it in one short line), all-ages styles only, another person's likeness never (an adult's agreement is for other adults), their own photo for non-sexual edits, and no extra questions or warnings whatever the household setting. The design is the teen lane in [image-editing-2026-10-17.md](image-editing-2026-10-17.md); a child may make cartoon pictures and videos of safe things in a strict lane (owner, 2026-10-17: "Kids can make cartoon images and videos of safe content."), designed in the same note, section 9.
+
+
 - **Age and surface gates are unchanged and outrank this note (rule 0).** Video generation is **off for children and teens**: RULES.md and SAFETY.md
   name no video allowance for a minor, and the hub-on-Apple plan lists child-safety evaluation as an open item (MEDIA-HOST-01). A parent's
   per-child switch can be a later row; it is not designed here and the default for every minor is off. This is consistent with SAFETY.md (child profiles

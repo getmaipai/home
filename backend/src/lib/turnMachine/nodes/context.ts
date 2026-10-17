@@ -18,6 +18,7 @@ import { chatFolders } from "@/db/schema";
 import { countTokens } from "@/lib/tokenCount";
 import { contextToMessages } from "../messages";
 import { toolSpecFor, replyMaxTokensFor } from "./model";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { runSearchAssistShadow } from "@/lib/searchAssist/shadow";
 import { recall, getProfileParagraph, embedQueryForRecall, bumpUsage } from "@/lib/memory";
 import { subjectRosterFor } from "@/lib/subjects";
@@ -429,7 +430,7 @@ export const contextNode: Node<ContextInput, ContextOutput> = async (state, inpu
   const surfaceClass = state.planBasis.surfaceClass ?? "spoken";
   const thinking = state.budget.thinking_budget_tokens > 0 && reasoning.emit;
   const summaryItem: ContextItem[] = preview.summaryLine ? [{ id: "window-system-summary", text: preview.summaryLine, source: "window", subjects: [], disclosure: "child_ok" }] : [];
-  const tools = state.budget.tools_offered.slice().sort().map(toolSpecFor).filter((t): t is NonNullable<typeof t> => t !== null);
+  const tools = state.budget.tools_offered.slice().sort().map((id) => toolSpecFor(id, laneOfPerson(state.actor))).filter((t): t is NonNullable<typeof t> => t !== null);
   const rest = await countTokens(contextToMessages([...items, ...summaryItem], input.utterance, state.persona, state.plan, state.signal, surfaceClass, pictureParts, false, state.topicBlock), { tools });
   // A Stack that reports no context length leaves the window unmeasured
   // too (THIN-3A's named minimum): its 2,048-token stand-in is a floor,

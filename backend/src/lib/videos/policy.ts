@@ -11,7 +11,8 @@
 //     them and every route refuses them;
 //   - never a guest, a spoken turn, a glance or shared screen (a TV), a robot or a pod.
 import { getHouseholdSettingValue } from "@/lib/settings";
-import { pictureDenial, promptViolatesMinorLine, type PictureAudience, type PromptRefusal } from "@/lib/pictures/policy";
+import { pictureDenial, promptViolatesMinorLine, refusePrompt, type PictureAudience, type PromptRefusal } from "@/lib/pictures/policy";
+import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, laneOf, type Lane } from "@/lib/pictures/lane";
 
 export const VIDEO_ENABLED_KEY = "generation.video.enabled";
 export const VIDEO_ADULT_ADAPTERS_KEY = "generation.video.adult_adapters";
@@ -21,7 +22,7 @@ export type VideoDenial = "guest" | "minor" | "spoken" | "shared_screen" | "hous
 
 export const VIDEO_DENIAL_LINE: Record<VideoDenial, string> = {
   guest: "Guests can't make videos. Ask someone in the household to sign you in.",
-  minor: "Making videos is off for this profile. A parent can read why in Settings, Pictures and videos.",
+  minor: "Making videos is off for this profile. A parent can turn it on in Settings, Pictures and videos.",
   spoken: "Videos can only be made in a written chat on your own screen.",
   shared_screen: "Videos can only be made on your own screen, not a shared one.",
   household_off: "Making videos is switched off for adults in this home. An admin can switch it on in Settings, Pictures and videos.",
@@ -62,6 +63,7 @@ export function videosAllowed(input: VideoAudience): boolean {
 /** Which LoRA classes this person may use right now. Adult-only needs an allowed adult on a written, own-screen turn and the household not restricting them. */
 export function videoAdapterAudiencesFor(input: VideoAudience): Array<"all-ages" | "adult-only"> {
   if (!videosAllowed(input)) return [];
+  if (laneOf(input) !== "adult") return ["all-ages"];
   return adultVideoAdaptersAllowed() ? ["all-ages", "adult-only"] : ["all-ages"];
 }
 
@@ -75,11 +77,11 @@ export function stackAudienceFor(input: VideoAudience): "all-ages" | "adult" {
 export const VIDEO_REFUSAL_LINE: Record<PromptRefusal, string> = {
   minor_sexual: "I can't make that. Videos of children in sexual situations are never allowed.",
   real_person: "I won't make a video of a real person's likeness, because they haven't agreed to it. Ask for an invented person, a character or a place instead.",
+  teen_content: TEEN_CONTENT_LINE,
+  child_content: CHILD_CONTENT_LINE,
 };
 
 /** The prompt-level refusal, or null when the request may proceed. The minor line is the picture policy's check (one list), applied to the clip's prompt for everyone. `depictsRealPerson` is the model's own statement in the tool call; there is no word list of names. */
-export function refuseVideoPrompt(prompt: string, flags: { depictsRealPerson?: boolean } = {}): PromptRefusal | null {
-  if (promptViolatesMinorLine(prompt)) return "minor_sexual";
-  if (flags.depictsRealPerson === true) return "real_person";
-  return null;
+export function refuseVideoPrompt(prompt: string, flags: { depictsRealPerson?: boolean; lane?: Lane } = {}): PromptRefusal | null {
+  return refusePrompt(prompt, flags);
 }

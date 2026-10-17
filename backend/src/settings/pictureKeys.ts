@@ -59,6 +59,7 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
   }),
   // PEOPLE-PROMPTS-01 (owner ruling 2026-10-17: "it's annoying"): the extra questions and warnings about people in pictures and videos
   // are one household switch, off by default. It never reaches a safety rule: nothing sexual involving a minor, a real person's
+  // are one household switch, off by default. It never reaches a safety rule: children, nothing sexual involving a minor, a real person's
   // likeness without their recorded consent, the finished-picture check and the fail-closed freeze have no key at all.
   SettingsKey.parse({
     key: "generation.people_prompts",
@@ -70,6 +71,59 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     level: "basic",
     copy: { does: "Turns the extra questions and warnings about people in pictures and videos on or off." },
     lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
+  // KIDS-CREATE-01 (owner ruling 2026-10-17: "Kids can make cartoon images and videos of safe content"): a strict child lane, on by
+  // default, with a switch for the home, a switch for one child and two daily limits. Everything a child makes is cartoon-only and passes
+  // the child-safety check; real people, photos and adult content are never part of it (lib/pictures/lane.ts).
+  SettingsKey.parse({
+    key: "generation.kids",
+    scope: "household",
+    selector: "boolean",
+    default: true,
+    label: "Let kids make cartoon pictures and videos",
+    help: "Children can ask chat for cartoon pictures and videos of safe things. Photos, real people and anything scary or grown-up are never made for them.",
+    level: "basic",
+    copy: { does: "Lets children make cartoon pictures and videos of safe things." },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "generation.kids_daily_pictures",
+    scope: "household",
+    selector: "number",
+    default: 20,
+    label: "Cartoon pictures a child can make each day",
+    help: "How many cartoon pictures each child can make in a day. 0 means none.",
+    level: "basic",
+    copy: { does: "Sets how many cartoon pictures each child can make in a day." },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "generation.kids_daily_videos",
+    scope: "household",
+    selector: "number",
+    default: 5,
+    label: "Cartoon videos a child can make each day",
+    help: "How many cartoon videos each child can make in a day. 0 means none.",
+    level: "basic",
+    copy: { does: "Sets how many cartoon videos each child can make in a day." },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
+  SettingsKey.parse({
+    key: "generation.kid_enabled",
+    scope: "person",
+    selector: "boolean",
+    default: true,
+    label: "This child can make cartoon pictures and videos",
+    help: "On by default while the home switch is on. A parent or admin can turn it off for one child.",
+    level: "basic",
+    copy: { does: "Lets this child make cartoon pictures and videos." },
+    control: { child: "guardian", teen: "self", adult: "self" },
+    band_default: { child: true, teen: true, adult: true },
+    lives_in: "person.likeness",
     honoured_by: ["home"],
   }),
 ];

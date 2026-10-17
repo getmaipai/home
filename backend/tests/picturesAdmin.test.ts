@@ -39,7 +39,7 @@ describe("overview", () => {
     expect(body.engine).toMatchObject({ default_model: "flux2-klein-4b", edit_ready: true });
     expect(body.adapters.map((a) => a.id)).toEqual(["lora-aaaaaaaaaaaaaaaa", "lora-bbbbbbbbbbbbbbbb"]);
     expect(body.adapters.find((a) => a.id === "lora-bbbbbbbbbbbbbbbb")).toMatchObject({ classification: "adult-only", licence: "No licence stated", enabled: true });
-    expect(body.bands).toEqual([expect.objectContaining({ band: "children", on: false, locked: true }), expect.objectContaining({ band: "teens", on: false, locked: true }), expect.objectContaining({ band: "adults", on: true, locked: false })]);
+    expect(body.bands).toEqual([expect.objectContaining({ band: "children", on: true, locked: true }), expect.objectContaining({ band: "teens", on: true, locked: true }), expect.objectContaining({ band: "adults", on: true, locked: false })]);
     expect(body.adult_adapters).toBe("allowed");
   });
 

@@ -35,6 +35,8 @@ they made and the settings an admin sets.
 
 > **Superseded in part (owner, 2026-10-17):** an adult may make a picture, video or style of a consenting household adult, and edit an uploaded photo of one. The design is [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md); the absolute lines below otherwise stand.
 
+> **Superseded in part (owner, 2026-10-17: "Teens can edit and create picture and video without annoying messages"):** a teen may make pictures and videos and edit pictures, on their own written screen, with nothing adult or sexual (the prompt gate and the finished-picture check refuse it in one short line), all-ages styles only, another person's likeness never (an adult's agreement is for other adults), their own photo for non-sexual edits, and no extra questions or warnings whatever the household setting. The design is the teen lane in [image-editing-2026-10-17.md](image-editing-2026-10-17.md); a child may make cartoon pictures and videos of safe things in a strict lane (owner, 2026-10-17: "Kids can make cartoon images and videos of safe content."), designed in the same note, section 9.
+
 ## Users and gates
 
 | Person | Generates | Edits own pictures | Edits of real people | Adapters |

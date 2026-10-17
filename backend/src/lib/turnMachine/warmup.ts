@@ -12,7 +12,7 @@ export function turnWarmupPrompt(): WarmupPrompt {
   const tools = resolveTurnBudget(undefined, "adult")
     .tools_offered.slice()
     .sort()
-    .map(toolSpecFor)
+    .map((id) => toolSpecFor(id))
     .filter((t): t is ToolSpec => t !== null);
   return { system: buildStablePrefix(), tools: tools.map(toToolDefinition) };
 }

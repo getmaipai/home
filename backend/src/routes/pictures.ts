@@ -13,6 +13,8 @@ import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "
 import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { prepareStylesUse } from "@/lib/likeness/apply";
+import { laneOfPerson } from "@/lib/pictures/laneGate";
+import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, noteKidPictures, picturesMadeToday } from "@/lib/pictures/lane";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
@@ -76,12 +78,15 @@ function qualityFields(job: PictureJob, detailedReadyNow: boolean, can: boolean)
  * being made the card shows that one's progress; the pictures finished so far stay in view. `job` is the id to
  * stop (the one being made), or the card's own id when nothing is. */
 export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, detailedReadyNow = false) {
+  // A child never sees a maker's name or a Detailed or Quick choice (KIDS-CREATE-01): Quick is all they get.
+  const kid = laneOfPerson(actor) === "child";
+  if (kid) detailedReadyNow = false;
   const group = root.turnId ? pictureJobsForTurn(actor, root.turnId).filter((j) => j.kind !== "edit") : [root];
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.find((j) => j.state === "queued" || j.state === "running") ?? null;
   const last = jobs[jobs.length - 1]!;
   const alt = root.prompt.replace(/\s+/g, " ").trim().slice(0, 200);
-  const files = jobs.flatMap((j) => j.state === "done" ? j.files.map((f) => ({ id: f.id, url: fileUrl(j, f), width: f.width, height: f.height, seed: f.seed, model: f.model, steps: f.steps, ms: f.ms, alt })) : []);
+  const files = jobs.flatMap((j) => j.state === "done" ? j.files.map((f) => ({ id: f.id, url: fileUrl(j, f), width: f.width, height: f.height, seed: f.seed, model: kid ? null : f.model, steps: kid ? null : f.steps, ms: f.ms, alt })) : []);
   const shown = active ?? last;
   const state = active ? active.state : files.length > 0 ? "done" as const : last.state;
   return {
@@ -112,7 +117,7 @@ picturesRoutes.openapi(statusRoute, async (c) => {
     can_make: denial === null && ready,
     reason: denial ? PICTURE_DENIAL_LINE[denial] : ready ? null : pictureNotReadyReason(engine),
     engine_ready: ready,
-    adult_styles: denial === null && adultAdaptersAllowed(),
+    adult_styles: denial === null && laneOf(routeAudience(actor)) === "adult" && adultAdaptersAllowed(),
     styles,
   }, 200);
 });
@@ -172,24 +177,29 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // Only styles this person may still use ride along (one turned off since is dropped); their trigger words go with them.
   const used = source.request.loras.flatMap((id) => { const a = adapters.find((x) => x.id === id); return a ? [a] : []; });
   const prompt = used.reduce((text, a) => withTriggerWords(text, a), source.prompt);
-  const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`);
+  const lane = laneOf(routeAudience(actor));
+  const kid = lane === "child";
+  const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`, { lane });
   if (refused) return c.json({ error: promptRefusalLineFor(refused, "picture", actor, routeAudience(actor).band, prompt, PROMPT_REFUSAL_LINE[refused]), code: refused }, 422) as never;
+  // KIDS-CREATE-01: a child's another-one is also a cartoon, Quick, within the daily limit, and never with a style.
+  if (kid && picturesMadeToday(actor) + 1 > kidsDailyPictures()) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   // LIKENESS-01: another picture in a style of a household adult is decided again, now: their agreement may have been taken back since.
   const prep = await prepareStylesUse({ medium: "picture", audience: routeAudience(actor), styles: used, text: `${prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat" });
   if (prep.kind === "refused") return c.json({ error: prep.line || PROMPT_REFUSAL_LINE.real_person, code: "likeness" }, 403) as never;
   // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
-  const choice = chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
+  const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default, ...(prep.kind === "likeness" && prep.proofs.has(a.id) ? { likeness_proof: prep.proofs.get(a.id)! } : {}) }));
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
-      body: { prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt: kid ? forceCartoon(prompt) : prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: lane === "adult" && adultAdaptersAllowed() ? "adult" : "all-ages", ...(kid ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}), ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
     if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     void job;
+    if (kid) noteKidPictures(actor, 1);
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);
   } catch (error) {
     const status = error instanceof StackPicturesError && (error.status === 422 || error.status === 409) ? error.status : 503;

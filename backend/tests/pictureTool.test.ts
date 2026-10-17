@@ -98,10 +98,13 @@ describe("IMGGEN-HOME-01: where generate_image is offered (rule 0)", () => {
     expect(await toolsSeen(() => runTurnNext(people.owner, "tv", "hello"))).not.toContain("generate_image");
   });
 
-  test("never offered to a child, a teen or a guest", async () => {
+  test("not offered to a guest or to a child while the home switch is off; offered to a teen and to a child (cartoon lane) on their own screen", async () => {
+    expect(await toolsSeen(() => runTurnNext(people.child, "chat", "hello"))).toContain("generate_image");
+    setHouseholdSettingValue("generation.kids", false);
     expect(await toolsSeen(() => runTurnNext(people.child, "chat", "hello"))).not.toContain("generate_image");
+    setHouseholdSettingValue("generation.kids", true);
     const teen = asRole(people.child.id, "teen");
-    expect(await toolsSeen(() => runTurnNext(teen, "chat", "hello"))).not.toContain("generate_image");
+    expect(await toolsSeen(() => runTurnNext(teen, "chat", "hello"))).toContain("generate_image");
     const guest = asRole(people.child.id, "guest");
     expect(await toolsSeen(() => runTurnNext(guest, "chat", "hello"))).not.toContain("generate_image");
   });

@@ -44,12 +44,12 @@
         "grounded": false,
         "description": "Optional. Set to \"latest\" only when the person asks to animate or bring to life a picture that was made earlier in this chat. Set to \"attached\" only when the person attached one photo of an adult in this household to this message and asks to animate it, and also set photo_subject. Leave it out for a video from words alone. A photo of anyone else cannot be animated."
       },
-    "photo_subject": {
-      "type": "string",
-      "maxLength": 80,
-      "grounded": false,
-      "description": "Only with from_picture \"attached\": the name of the adult in this household who is in the attached photo, exactly as the person said it, or \"me\" when they say it is themselves. Never guess a name; if they did not say, ask them who it is."
-    },
+      "photo_subject": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Only with from_picture \"attached\": the name of the adult in this household who is in the attached photo, exactly as the person said it, or \"me\" when they say it is themselves. Never guess a name; if they did not say, ask them who it is."
+      },
       "orientation": {
         "type": "string",
         "enum": [
@@ -85,7 +85,7 @@
   "platforms": [
     "home"
   ],
-  "min_role": "adult",
+  "min_role": "child",
   "consequential": false,
   "offline": "full",
   "config": [],

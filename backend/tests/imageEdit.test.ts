@@ -257,8 +257,8 @@ describe("picture editor routes", () => {
     expect([403, 404]).toContain(run.status);
     expect(stub.calls.edits).toHaveLength(0);
     const childStatus = (await (await childClient.get("/api/image-edit/status")).json()) as { state: string; tools: ToolMap };
-    expect(childStatus.state).toBe("off");
-    expect(childStatus.tools.remove_background.enabled).toBe(false);
+    // KIDS-CREATE-01: a child's editor is open for the cartoons made for them only; a photo (this one) is refused above whatever the status says.
+    expect(childStatus.state).toBe("ready");
     const ok = await client.postForm(`/api/image-edit/pictures/${picture.id}/edit`, editForm(conversation.value.id, { operation: "resize", width: "10", height: "10" }));
     const token = ((await ok.json()) as { preview: { token: string } }).preview.token;
     expect((await childClient.get(`/api/image-edit/previews/${token}`)).status).toBe(404);
@@ -413,17 +413,20 @@ describe("picture editor routes", () => {
       expect(fake.edits[1]!.region).toBeUndefined();
     });
 
-    test("a child's editor, a teen's and a guest's refuse a comment and send nothing", async () => {
+    test("a child's editor refuses a photo and sends nothing; a teen's is open (owner rulings 2026-10-17)", async () => {
       const { client, actor } = await owner();
       const conversation = resolveOrCreateConversation(actor, "chat");
       if (!conversation.ok) throw new Error("no conversation");
       const picture = await upload(client, conversation.value.id);
       db.update(people).set({ role: "teen" }).where(eq(people.id, actor.id)).run();
       invalidateSessionCacheForPerson(actor.id);
-      const status = (await (await client.get("/api/image-edit/status")).json()) as { tools: ToolMap };
-      expect(status.tools.comment.enabled).toBe(false);
+      const teenStatus = (await (await client.get("/api/image-edit/status")).json()) as { tools: ToolMap };
+      expect(teenStatus.tools.comment.enabled).toBe(true);
+      db.update(people).set({ role: "child" }).where(eq(people.id, actor.id)).run();
+      invalidateSessionCacheForPerson(actor.id);
+      // A child: the editor works on their own cartoons only, so a photo they were sent or uploaded is refused.
       const refused = await commented(client, conversation.value.id, picture.id, { prompt: "Make it pink", region: null });
-      expect([403, 503]).toContain(refused.status);
+      expect([403, 404, 503]).toContain(refused.status);
       expect(fake.edits).toHaveLength(0);
     });
 

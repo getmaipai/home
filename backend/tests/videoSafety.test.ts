@@ -2,6 +2,7 @@
 // everything. The matrix is band by surface by LoRA class, then the two absolute lines, then every entrance (the chat
 // tool, the card's routes, the status and settings routes): none of them reaches the Stack for a person or a surface
 // that may not, and no household setting reaches the absolute lines or turns video on for a minor.
+import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
@@ -62,14 +63,23 @@ describe("band by surface", () => {
     expect(videoDenial(audience(asRole(people.child.id, "admin")))).toBeNull();
     expect(videoDenial(audience(asRole(people.child.id, "adult")))).toBeNull();
   });
-  test("a child and a teen may not, whatever the surface or any setting, even if a caller lies about the band", () => {
+  test("a child is in the strict cartoon lane while the home switch is on, even if a caller lies about the band; a teen may too (owner rulings 2026-10-17) and never depends on the adult switch", () => {
     setHouseholdSettingValue("generation.video.enabled", true);
     const child = asRole(people.child.id, "child");
+    expect(videoDenial(audience(child))).toBeNull();
+    setHouseholdSettingValue("generation.kids", false);
     expect(videoDenial(audience(child))).toBe("minor");
+    setHouseholdSettingValue("generation.kids", true);
     const teen = asRole(people.child.id, "teen");
-    expect(videoDenial(audience(teen))).toBe("minor");
-    expect(videoDenial(audience(teen, { band: "adult" }))).toBe("minor");
+    expect(videoDenial(audience(teen))).toBeNull();
+    expect(videoDenial(audience(teen, { band: "adult" }))).toBeNull();
+    expect(laneOfPerson(child)).toBe("child");
+    setHouseholdSettingValue("generation.kids", false);
     expect(videoDenial(audience(child, { band: "adult" }))).toBe("minor");
+    setHouseholdSettingValue("generation.kids", true);
+    expect(videoDenial(audience(teen, { spoken: true }))).toBe("spoken");
+    setHouseholdSettingValue("generation.video.enabled", false);
+    expect(videoDenial(audience(teen))).toBe("household_off");
   });
   test("a guest may not", () => {
     expect(videoDenial(audience(asRole(people.child.id, "guest"), { band: "adult" }))).toBe("guest");
@@ -101,8 +111,16 @@ describe("LoRA classes", () => {
     expect(stackAudienceFor(audience(people.owner))).toBe("all-ages");
   });
   test("nobody who may not make a video is allowed any LoRA, adult-only included, and the Stack is told all-ages", () => {
-    for (const a of [audience(asRole(people.child.id, "child")), audience(asRole(people.child.id, "teen")), audience(asRole(people.child.id, "guest"), { band: "adult" }), audience(people.owner, { spoken: true }), audience(people.owner, { surface: "tv" })]) {
+    for (const a of [audience(asRole(people.child.id, "guest"), { band: "adult" }), audience(people.owner, { spoken: true }), audience(people.owner, { surface: "tv" })]) {
       expect(videoAdapterAudiencesFor(a)).toEqual([]);
+      expect(stackAudienceFor(a)).toBe("all-ages");
+    }
+  });
+  test("a teen is offered exactly the all-ages LoRAs and the Stack is told all-ages, whatever the household says about adult-only ones", () => {
+    for (const value of ["allowed", "restricted"]) {
+      setHouseholdSettingValue("generation.video.adult_adapters", value);
+      const a = audience(asRole(people.child.id, "teen"));
+      expect(videoAdapterAudiencesFor(a)).toEqual(["all-ages"]);
       expect(stackAudienceFor(a)).toBe("all-ages");
     }
   });
@@ -143,8 +161,9 @@ const call = (args: Record<string, unknown>) => ({ id: "c", name: "generate_vide
 const calling = (args: Record<string, unknown>, reply = "ignored") => ({ calls: (r: ChatCompletionRequest) => (isPhrasing(r) || r.tool_choice === "none" ? undefined : [call(args)]), reply: () => reply });
 
 describe("the chat tool, even when a model calls it without being offered it", () => {
-  test("a child, a teen and a guest who somehow get a video call are refused and no job starts", async () => {
-    for (const role of ["child", "teen", "guest"] as const) {
+  test("a guest, and a child while the home switch is off, who somehow get a video call are refused and no job starts", async () => {
+    setHouseholdSettingValue("generation.kids", false);
+    for (const role of ["child", "guest"] as const) {
       const actor = asRole(people.child.id, role);
       await withStub(calling({ prompt: "a paper boat in the rain" }, "Here you go."), async () => {
         const value = await turn(actor, "make a video of a paper boat");
@@ -246,7 +265,7 @@ describe("the routes", () => {
     expect((await owner.client.get(`/api/videos/jobs/${job.id}/preview`)).status).toBe(404);
   });
 
-  test("status says an adult can, with the limits in plain words, and says why a teen cannot", async () => {
+  test("status says an adult can, with the limits in plain words, and says why a child cannot", async () => {
     const adult = await signedIn("Sage", "owner");
     const res = await adult.client.get("/api/videos/status");
     expect(res.status).toBe(200);
@@ -254,21 +273,23 @@ describe("the routes", () => {
     expect(body.can_make).toBe(true);
     expect(body.limits).toBe("Videos are 5 seconds at 480p and take about 2 minutes.");
     expect(body.styles.map((s) => s.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
-    asRole(adult.actor.id, "teen");
+    asRole(adult.actor.id, "child");
     invalidateSessionCacheForPerson(adult.actor.id);
+    setHouseholdSettingValue("generation.kids", false);
     const teenBody = await (await adult.client.get("/api/videos/status")).json() as { can_make: boolean; reason: string | null; styles: unknown[] };
     expect(teenBody.can_make).toBe(false);
     expect(teenBody.reason).toContain("off for this profile");
     expect(teenBody.styles).toEqual([]);
   });
 
-  test("Make another works for the owner; the same route, Animate, and the card's other actions are refused for a teen with nothing sent", async () => {
+  test("Make another works for the owner; the same route, Animate, and the card's other actions are refused for a child with nothing sent", async () => {
     const owner = await signedIn("Sage", "owner");
     const job = await finishedJob(owner.actor);
     const ok = await owner.client.post(`/api/videos/jobs/${job.id}/another`, {});
     expect(ok.status).toBe(200);
     expect(fake.submitted).toHaveLength(2);
-    asRole(owner.actor.id, "teen");
+    setHouseholdSettingValue("generation.kids", false);
+    asRole(owner.actor.id, "child");
     invalidateSessionCacheForPerson(owner.actor.id);
     const another = await owner.client.post(`/api/videos/jobs/${job.id}/another`, {});
     expect(another.status).toBe(403);
