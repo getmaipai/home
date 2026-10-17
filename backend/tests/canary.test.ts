@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
 import { listIssues } from "@/lib/issues";
-import { CHECKS, wordMatch } from "@/lib/canary/checks";
+import { CHECKS, WEATHER_PHRASE, wordMatch } from "@/lib/canary/checks";
 import { HEALTH_ACTOR_ID, healthActor } from "@/lib/canary/identity";
 import { __resetCanaryResultsForTests, failuresInARow, last } from "@/lib/canary/results";
 import { __resetCanaryRunnerForTests, canaryStatus, canaryTick, MANUAL_DEBOUNCE_MS, runNow, runSuite } from "@/lib/canary/runner";
@@ -16,6 +16,10 @@ const OK_PROBE: ChatProbe = { ok: true, text: "Hello!", toolCalls: [], toolError
 let clock = 1_800_000_000_000;
 let calls: string[] = [];
 let restarts = 0;
+let budgetFree = true;
+const budget = { allowed: () => budgetFree, note: () => { budgetFree = false; } };
+const HUNG: ChatProbe = { ...OK_PROBE, ok: false, text: "", firstTokenMs: null, error: "timeout" };
+const SLOW: ChatProbe = { ...OK_PROBE, ok: false, text: "", firstTokenMs: 90_000, error: "timeout" };
 
 function deps(over: Partial<CanaryDeps> = {}): CanaryDeps {
   return {
@@ -35,6 +39,9 @@ function deps(over: Partial<CanaryDeps> = {}): CanaryDeps {
     turnActive: () => false,
     async requestRestart() { restarts += 1; return true; },
     searchTrouble: () => false,
+    loadHigh: () => false,
+    searchConfigured: () => true,
+    restartBudget: budget,
     keepWarm: () => true,
     now: () => clock,
     random: () => 0.5,
@@ -50,6 +57,7 @@ beforeEach(() => {
   clock = 1_800_000_000_000;
   calls = [];
   restarts = 0;
+  budgetFree = true;
 });
 afterEach(() => { __resetCanaryRunnerForTests(); });
 
@@ -146,17 +154,71 @@ describe("results and Repairs", () => {
     expect(groups.find((g) => g.group === "search")!.state).toBe("unknown");
   });
 
-  test("a live chat that fails twice asks the Stack for ONE restart per incident", async () => {
-    const d = deps({ chat: async () => ({ ...OK_PROBE, text: "" }) });
-    for (let i = 0; i < 4; i++) await runSuite(d, { reason: "manual", only: ["chat_hello"] });
+});
+
+describe("restarts only for a dead or hung engine", () => {
+  const hellos = async (d: CanaryDeps, n: number) => { for (let i = 0; i < n; i++) { await runSuite(d, { reason: "manual", only: ["chat_hello"] }); clock += 31_000; } };
+
+  test("a slow engine (a token arrived, the deadline passed) or a wrong answer never restarts", async () => {
+    await hellos(deps({ chat: async () => SLOW }), 5);
+    await hellos(deps({ chat: async () => ({ ...OK_PROBE, text: "" }) }), 5);
+    expect(restarts).toBe(0);
+    expect(canaryIssues()).toHaveLength(1); // still told to the admin, just not restarted
+  });
+
+  test("a dead engine (its role is not ready) asks for exactly one restart", async () => {
+    await hellos(deps({ chatRole: async () => ({ availability: "unavailable", reason: "failed_start" }) }), 4);
     expect(restarts).toBe(1);
   });
 
-  test("a dead process does not ask for a restart (the Stack's own self-heal owns that)", async () => {
-    const d = deps({ chatRole: async () => ({ availability: "unavailable", reason: "failed_start" }) });
-    for (let i = 0; i < 3; i++) await runSuite(d, { reason: "manual", only: ["chat_hello"] });
+  test("three hellos in a row with no token at all ask for one restart; two do not", async () => {
+    await hellos(deps({ chat: async () => HUNG }), 2);
     expect(restarts).toBe(0);
-    expect(canaryIssues()).toHaveLength(1);
+    await hellos(deps({ chat: async () => HUNG }), 3);
+    expect(restarts).toBe(1);
+  });
+
+  test("never under load, with the memory low or a blocker, or twice inside 30 minutes", async () => {
+    const dead = { chatRole: async () => ({ availability: "unavailable" as const, reason: "failed_start" }) };
+    await hellos(deps({ ...dead, loadHigh: () => true }), 4);
+    await hellos(deps({ ...dead, blocker: async () => "This computer is low on memory." }), 4);
+    expect(restarts).toBe(0);
+    budgetFree = false; // one already went inside the window
+    __resetCanaryResultsForTests();
+    await hellos(deps(dead), 4);
+    expect(restarts).toBe(0);
+    budgetFree = true;
+    __resetCanaryResultsForTests();
+    await hellos(deps(dead), 4);
+    expect(restarts).toBe(1);
+  });
+
+  test("the budget is remembered across restarts: one per 30 minutes", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { fileRestartBudget, RESTART_WINDOW_MS } = await import("@/lib/canary/restartBudget");
+    const path = join(mkdtempSync(join(tmpdir(), "canary-")), "r.json");
+    let t = 1_000_000_000_000;
+    const first = fileRestartBudget(path, () => t);
+    expect(first.allowed()).toBe(true);
+    first.note();
+    const afterRestart = fileRestartBudget(path, () => t + 60_000); // a new object, as after a Home restart
+    expect(afterRestart.allowed()).toBe(false);
+    t += RESTART_WINDOW_MS + 1;
+    expect(fileRestartBudget(path, () => t).allowed()).toBe(true);
+  });
+
+  test("an unconfigured web search is skipped, not failed", async () => {
+    const out = await runSuite(deps({ searchConfigured: () => false }), { reason: "manual", only: ["chat_search_trigger"] });
+    expect(out[0]!.status).toBe("skipped");
+    expect(out[0]!.note).toContain("not set up");
+    expect(canaryIssues()).toHaveLength(0);
+    expect(calls).toEqual([]);
+  });
+
+  test("the weather prompt names a place", () => {
+    expect(WEATHER_PHRASE).toContain("Hartford");
   });
 });
 
@@ -260,24 +322,25 @@ describe("when checks must not run", () => {
 });
 
 describe("the one restart", () => {
-  test("a restart goes to the Stack's engine route for the chat engine named by its setting, or by the model when the setting is automatic", async () => {
+  test("it goes to the Stack's supervised self-heal route, never the manual engine route; a refusal or an older Stack means no restart", async () => {
     const { stackRestart } = await import("@/lib/canary/probes");
     const { __setStackClientForTests } = await import("@/lib/stackEngine");
-    const restarted: string[] = [];
-    const client = (setting: string, modelId: string) => ({
-      settings: async () => ({ sections: [], settings: [{ key: "stack.engines.chat.engine", value: setting, default: "auto" }] }),
-      roles: async () => ({ roles: [{ id: "chat", model: { id: modelId } }] }),
-      engineAction: async (name: string, action: string) => { restarted.push(`${name}:${action}`); return { ok: true }; },
+    const asked: string[] = [];
+    const manual: string[] = [];
+    const client = (accepted: boolean) => ({
+      requestSelfHealRestart: async (role: string, reason: string) => { asked.push(`${role}:${reason}`); return { accepted, why: null }; },
+      engineAction: async (name: string) => { manual.push(name); return {}; },
     }) as never;
-    __setStackClientForTests(client("llama-server", "x"));
+    __setStackClientForTests(client(true));
     expect(await stackRestart("test")).toBe(true);
-    __setStackClientForTests(client("auto", "muse-glimmer-30b-mlx-4bit"));
-    expect(await stackRestart("test")).toBe(true);
-    __setStackClientForTests(client("auto", "some-gguf"));
-    expect(await stackRestart("test")).toBe(true);
-    expect(restarted).toEqual(["llama-server:restart", "omlx:restart", "llama-server:restart"]);
-    __setStackClientForTests({ settings: async () => { throw new Error("down"); } } as never);
+    __setStackClientForTests(client(false));
     expect(await stackRestart("test")).toBe(false);
+    __setStackClientForTests({ engineAction: async (name: string) => { manual.push(name); return {}; } } as never); // an older Stack
+    expect(await stackRestart("test")).toBe(false);
+    __setStackClientForTests({ requestSelfHealRestart: async () => { throw new Error("404"); } } as never);
+    expect(await stackRestart("test")).toBe(false);
+    expect(asked).toEqual(["chat:test", "chat:test"]);
+    expect(manual).toEqual([]);
     __setStackClientForTests(null);
   });
 });

@@ -35,8 +35,14 @@ export interface CanaryDeps {
   blocker(): Promise<string | null>;
   /** A person's turn started or finished recently. */
   turnActive(): boolean;
-  /** Ask the Stack for ONE restart of the chat engine (never resets its breaker). False when it declines. */
+  /** Ask the Stack for ONE supervised restart of the chat engine (its own self-heal path; the breaker keeps its count). False when it declines. */
   requestRestart(reason: string): Promise<boolean>;
+  /** Home's load average is above twice the core count. */
+  loadHigh(): boolean;
+  /** A web search address is set, so the search check can mean something. */
+  searchConfigured(): boolean;
+  /** At most one canary restart per 30 minutes, remembered across restarts. */
+  restartBudget: { allowed(): boolean; note(): void };
   /** The search service already reports a block, rate limit or outage. */
   searchTrouble(): boolean;
   keepWarm(): boolean;
@@ -46,7 +52,8 @@ export interface CanaryDeps {
 
 export type Outcome =
   | { kind: "pass"; firstTokenMs?: number | null }
-  | { kind: "fail"; cause: string; fix: string }
+  /** `life`: "dead" the role reports not ready, "hung" no token at all before the deadline; absent means slow or wrong, never a reason to restart. */
+  | { kind: "fail"; cause: string; fix: string; life?: "dead" | "hung" }
   | { kind: "skip"; reason: string };
 
 export interface CanaryCheck {
@@ -67,4 +74,5 @@ export interface CheckResult {
   firstTokenMs: number | null;
   /** Plain cause (fail) or reason (skipped). Never any person's words. */
   note: string | null;
+  life?: "dead" | "hung";
 }

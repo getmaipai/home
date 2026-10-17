@@ -120,6 +120,8 @@ export interface StackClient {
   roles(opts?: { signal?: AbortSignal }): Promise<RolesListResponse>;
   engines(opts?: { signal?: AbortSignal }): Promise<EnginesListResponse>;
   voices(opts?: { signal?: AbortSignal }): Promise<StackVoice[]>;
+  /** CANARY-01: ask the Stack's own supervised restart path for ONE restart of a role's engine (the circuit breaker keeps its count). An older Stack answers 404. */
+  requestSelfHealRestart?(role: string, reason: string, opts?: { signal?: AbortSignal }): Promise<{ accepted: boolean; why: string | null }>;
   engineAction(
     name: string,
     action: "start" | "stop" | "restart" | "install",
@@ -436,6 +438,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     pullModel: (body, opts) => call("/stack/v1/models", jsonInit(body), json<Record<string, unknown>>, opts),
     modelAction: (id, action, opts) => call(`/stack/v1/models/${encodeURIComponent(id)}/actions`, jsonInit({ action }), json<Record<string, unknown>>, opts),
     health: (opts) => call("/stack/v1/health", { method: "GET" }, json<{ health: HealthItem[] }>, opts),
+    requestSelfHealRestart: (role, reason, opts) => call("/stack/v1/engines/self-heal/restart", jsonInit({ role, reason }), json<{ accepted: boolean; why: string | null }>, opts),
     selfHeal: (opts) => call("/stack/v1/engines/self-heal", { method: "GET" }, json<StackSelfHeal>, opts),
     healthFix: (code, opts) => call(`/stack/v1/health/${encodeURIComponent(code)}/fix`, { method: "POST" }, json<Record<string, unknown>>, opts),
     settings: (opts) => call("/stack/v1/settings", { method: "GET" }, json<{ sections: Array<{ id: string; label: string }>; settings: StackSetting[] }>, opts),

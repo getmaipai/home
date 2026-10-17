@@ -10,15 +10,15 @@ export const SEARCH_PHRASES = [
 ] as const;
 
 export const LOOPBACK_PHRASE = "The kitchen light is on and the door is open";
-export const WEATHER_PHRASE = "What's the weather in Oslo right now?";
+export const WEATHER_PHRASE = "What's the weather in Hartford right now?";
 const PICTURE_PHRASE = "What colour is this picture? Answer in one word.";
 
 const pass = (probe?: ChatProbe): Outcome => ({ kind: "pass", firstTokenMs: probe?.firstTokenMs ?? null });
-const fail = (cause: string, fix: string): Outcome => ({ kind: "fail", cause, fix });
+const fail = (cause: string, fix: string, life?: "dead" | "hung"): Outcome => ({ kind: "fail", cause, fix, ...(life ? { life } : {}) });
 const CHECK_AGAIN = "Open Status, then choose Run checks now. If it fails again, restart the AI from Settings, AI.";
 
 function transport(probe: ChatProbe, what: string): Outcome | null {
-  if (probe.error === "timeout") return fail(`${what} did not answer within the time allowed.`, `${CHECK_AGAIN} A busy or low-memory computer is the usual reason.`);
+  if (probe.error === "timeout") return fail(`${what} did not answer within the time allowed.`, `${CHECK_AGAIN} A busy or low-memory computer is the usual reason.`, probe.firstTokenMs === null ? "hung" : undefined);
   if (!probe.ok) return fail(`${what} was refused or stopped before it answered.`, CHECK_AGAIN);
   return null;
 }
@@ -33,11 +33,11 @@ export function wordMatch(expected: string, heard: string): boolean {
 
 export const CHECKS: CanaryCheck[] = [
   {
-    id: "chat_hello", name: "Chat answers", group: "chat", timeoutMs: 60_000, title: "Chat is not answering",
+    id: "chat_hello", name: "Chat answers", group: "chat", timeoutMs: 125_000, title: "Chat is not answering",
     async run(deps) {
       const role = await deps.chatRole();
-      if (role.availability === "unavailable") return fail("The chat engine is not running.", "Open Repairs for the engine problem, or restart the AI from Settings, AI.");
-      const probe = await deps.chat({ text: "hi", timeoutMs: 60_000 });
+      if (role.availability === "unavailable") return fail("The chat engine is not running.", "Open Repairs for the engine problem, or restart the AI from Settings, AI.", "dead");
+      const probe = await deps.chat({ text: "hi", timeoutMs: 120_000 });
       const bad = transport(probe, "Chat");
       if (bad) return bad;
       if (!probe.text.trim()) return fail("Chat is running but answered with nothing.", CHECK_AGAIN);
@@ -100,6 +100,7 @@ export const CHECKS: CanaryCheck[] = [
     id: "chat_search_trigger", name: "Chat searches the web", group: "search", timeoutMs: 120_000, title: "Chat did not search the web when asked",
     async run(deps, ctx) {
       if (ctx.chatDown) return { kind: "skip", reason: "Chat is not running." };
+      if (!deps.searchConfigured()) return { kind: "skip", reason: "Web search is not set up. Add its address in Settings, Web search." };
       const probe = await deps.chat({ text: ctx.searchPhrase, timeoutMs: 120_000 });
       const bad = transport(probe, "Chat");
       if (bad) return bad;

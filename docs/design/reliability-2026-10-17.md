@@ -166,7 +166,7 @@ One scheduler tick (60 s) in Home decides all synthetic work, so checks, prewarm
   few). It is skipped while the search health already reports trouble. It is traffic the person did not ask for, so it is
   covered by Keep the AI warm (off stops it), gets its own row on the privacy page in the same commit as the code, and is
   listed there with its limit of 3 a day (PRIVACY.md, THIRD-PARTY-SERVICES.md).
-- **Restart loop.** The canary asks for one restart per incident and never again until `chat_hello` has passed once.
+- **Restart loop.** The canary asks for one restart per incident and never again until `chat_hello` has passed once. It asks only for a dead engine (role not ready) or a hung one (no token at all at three hellos in a row, 120 s deadline), never for a slow one; never under load above twice the core count, low memory or a self-heal blocker; at most once in 30 minutes, kept on disk; through the Stack's `POST /stack/v1/engines/self-heal/restart`, which never resets the breaker. An older Stack has no route, so nothing restarts.
 - **Home restarts mid-suite.** Results are in process; the post-start suite refills them.
 
 ## Rollout and tests

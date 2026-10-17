@@ -36,6 +36,7 @@ async function runOne(check: CanaryCheck, deps: CanaryDeps, ctx: { searchPhrase:
     durationMs: Math.max(0, deps.now() - started),
     firstTokenMs: outcome.kind === "pass" ? outcome.firstTokenMs ?? null : null,
     note: outcome.kind === "fail" ? outcome.cause : outcome.kind === "skip" ? outcome.reason : null,
+    ...(outcome.kind === "fail" && outcome.life ? { life: outcome.life } : {}),
   };
   return { result, outcome };
 }
@@ -53,18 +54,26 @@ async function applyResult(check: CanaryCheck, result: CheckResult, outcome: Out
   } else if (verdict.resolve) {
     resolveIssue(ISSUE_SOURCE, check.id);
   }
-  // A dead chat with a live process: ask the Stack for ONE restart per incident.
-  if (check.id === "chat_hello" && verdict.raise && !results.restartAlreadyAsked(check.id)) {
-    const role = await deps.chatRole();
-    if (role.availability !== "unavailable") {
-      results.markRestartAsked(check.id);
-      await deps.requestRestart("chat did not answer a health check twice in a row").catch(() => false);
-    }
-  }
+  if (check.id === "chat_hello" && verdict.raise) await maybeRestart(deps);
   // The canary must never become the load: a hello far slower than usual pauses scheduled checks.
   if (check.id === "chat_hello" && result.status === "pass" && before.length >= 5 && result.durationMs > 3 * median(before)) {
     schedule.slowUntil = deps.now() + SLOW_BACKOFF_MS;
   }
+}
+
+/** One supervised restart per incident, only for an engine that is DEAD (its role reports not ready) or HUNG (three hellos in a row with no token at all after the long deadline). Slowness is never a reason, and nothing restarts under load, low memory or a blocker. */
+async function maybeRestart(deps: CanaryDeps): Promise<void> {
+  if (results.restartAlreadyAsked("chat_hello")) return;
+  const role = await deps.chatRole();
+  const dead = role.availability === "unavailable";
+  const recent = results.history("chat_hello").slice(-3);
+  const hung = recent.length === 3 && recent.every((r) => r.status === "fail" && r.life === "hung");
+  if (!dead && !hung) return;
+  if (deps.loadHigh() || (await deps.blocker()) || !deps.restartBudget.allowed()) return;
+  results.markRestartAsked("chat_hello");
+  deps.restartBudget.note();
+  console.log(JSON.stringify({ event: "engine.restart_requested_by_canary", why: dead ? "role_not_ready" : "no_token_three_times" }));
+  await deps.requestRestart(dead ? "chat role not ready at a health check" : "chat gave no token at three health checks").catch(() => false);
 }
 
 export interface RunOptions { reason: RunReason; only?: CanaryId[]; includeSearch?: boolean; includeImage?: boolean }

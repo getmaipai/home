@@ -56,6 +56,8 @@ only if you ask for it).
 
 - A check that fails twice in a row becomes one item in **Repairs** with what went wrong and what to do, and you get one
   notification. It clears itself when the check passes.
+- A check never restarts an engine because it was slow. Only an engine that is not running, or that gave no sign of life at three checks in a row (a 2 minute wait each), is restarted, once, through the Stack's own self-heal path, and never more than once in 30 minutes, under heavy load, or while memory is low or an install is running.
+- A web search check is skipped, with no Repairs item, until a search address is set in Settings, Web search.
 - The checks use a built-in "health" visitor that is not a person. Nothing it says or hears is saved: not in memory, history,
   feed, search history or notifications, and it is left out of usage counts.
 - They wait while an install, an engine update, a picture or video job, or low memory is going on, and while someone is

@@ -1,6 +1,8 @@
 // CANARY-01: the real probes. The chat probes run the production pipeline (runTurnNextStream and the wire event
 // generator the chat route uses) as the health actor in temporary mode, then discard the session: nothing is stored.
 import sharp from "sharp";
+import { cpus, loadavg } from "node:os";
+import { fileRestartBudget } from "./restartBudget";
 import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { streamTurnEvents, SPOKEN_CUE_DELAY_MS, THINKING_CUE_DELAY_MS } from "@/routes/turn";
 import { discardTemporarySessions, resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -137,29 +139,18 @@ export async function stackBlocker(): Promise<string | null> {
   return null;
 }
 
-/** The name of the engine that runs the chat role: the Stack setting when it names one, else the engine the chat model is built for. */
-export async function chatEngineName(): Promise<string | null> {
-  const client = getStackClient();
-  const { settings } = await client.settings();
-  const row = settings.find((s) => s.key === "stack.engines.chat.engine") as ({ value?: unknown; default?: unknown }) | undefined;
-  const chosen = String(row?.value ?? row?.default ?? "auto");
-  if (chosen === "omlx" || chosen === "llama-server") return chosen;
-  const { roles } = await client.roles();
-  const model = roles.find((r) => r.id === "chat")?.model?.id ?? "";
-  return /mlx/i.test(model) ? "omlx" : model ? "llama-server" : null;
-}
-
-/** One restart of the chat engine through the Stack's own engine route (POST /stack/v1/engines/{name}/restart). */
+/** One supervised restart of the chat engine through the Stack's self-heal path. An older Stack has no such route: then nothing restarts. */
 export async function stackRestart(reason: string): Promise<boolean> {
-  void reason; // the Stack logs the restart; the reason stays here so it can be recorded later without a signature change
   try {
-    const name = await chatEngineName();
-    if (!name) return false;
-    await getStackClient().engineAction(name, "restart");
-    return true;
+    const answer = await getStackClient().requestSelfHealRestart?.("chat", reason.slice(0, 200));
+    return answer?.accepted === true;
   } catch {
     return false;
   }
+}
+
+export function loadIsHigh(): boolean {
+  return loadavg()[0]! > 2 * cpus().length;
 }
 
 export function searchTroubleNow(): boolean {
@@ -187,6 +178,9 @@ export const realDeps: CanaryDeps = {
   blocker: stackBlocker,
   turnActive: () => turnActiveWithin(IDLE_WINDOW_MS),
   requestRestart: stackRestart,
+  loadHigh: loadIsHigh,
+  searchConfigured: () => Boolean(getHouseholdSettingValue("search.searxng_url")),
+  restartBudget: fileRestartBudget(),
   searchTrouble: searchTroubleNow,
   keepWarm: () => getHouseholdSettingValue("health.keep_warm") !== false,
   now: () => Date.now(),
