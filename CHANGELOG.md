@@ -60,6 +60,8 @@ Chat looks things up for live-status questions, and pictures can be edited in wo
 - The Stack is updated to the build that repairs tool names the chat engine mangles and carries the media service and the music engine (no page uses them yet).
 
 ### Media library
+- A paired device can keep media for offline play when a grown-up allows it. The permission starts off for every device, a removed device or a changed password ends it, tokens are left out of backups, and Chrome and Edge keep the copies in the browser (iPhone and iPad use Go). Files that need conversion are not supported yet.
+- Child controls use approved media sources by default. Media now has one daily budget across kinds and screens, protected settings, same-day admin extensions, saved places after time runs out, explicit masking tests, and a private time-up notice. The player hook is ready; app player wiring, allowed hours and ask-a-grown-up actions are still open.
 - Home can scan library folders on this computer or on a mounted network share and list what is in them: videos, shows, films, music, books and audiobooks, with posters, covers, chapters and tags. An owner or admin adds a folder and can rescan it; children see only the titles cleared for a child. No page uses it yet.
 - Home remembers where each person stopped in a video, episode, podcast, audiobook or book, on every screen. The newest place wins, a finished title stays finished, and a child's place is saved only from the child's own screen. Liked, watch later and up next exist for everyone, and playlists, watchlists and pins can be made. The "Pick up where you left off" data now includes unfinished titles beside chats.
 

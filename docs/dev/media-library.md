@@ -159,3 +159,47 @@ name with icon buttons and chip tabs (`TabsList variant="pill"`); its play page 
 **Not built, and why.**
 
 - Captions: the item's `subtitles` are file ids with no serving route yet, so `captions` is empty.
+## Kid mode
+
+MEDIA-KID-01 adds the backend policy and the minimum player hook. `media.allowlist_only` is a person key: on for Child controls,
+off for Teen and Adult controls. A child or teen cannot set or reset it. An owner or admin may override one person's setting.
+`access.ts` applies it to every source read: only household roots or sources whose `visible_to` explicitly includes the person
+pass. Existing scope, visibility, `band_ok`, explicit advisory and text-floor checks still apply after any override. Search uses
+that same library gate. `discoveryAllowed(person)` is the app-route gate for discovery shelves and chips; such rows must be empty
+when it returns false. No discovery route or media player is shipped by this slice.
+
+The daily budget reuses `allowance.media.daily_minutes`, read by `dailyMinutesAllowed(personId, "Media")`. There is no
+`media.daily_minutes` key. Child and Teen controls cannot set or reset the allowance. Zero means no limit. An admin can set the
+limit and add whole minutes for today with `POST /api/media/budget/:personId/extend {minutes}` (1 to 1440 per call). The response
+only confirms the change; it reveals no usage. `GET /api/media/budget` returns the asking person's
+`{limit_min, used_min, left_min, exhausted}`; `left_min: 0` with `exhausted: false` means unlimited. There is no admin usage route.
+
+`watchTime.ts` meters accepted progress writes before coalescing, across all kinds and screens. Migration 0108 (schema version 65)
+adds private `media_watch_days` totals (seconds, audio seconds, today's extension and notification latch) and
+`media_watch_sessions` sample cursors. Both are erased when the person leaves. Session cursors survive a restart; duplicate or
+older samples never count twice. Players should send a `session_id` for each player run, `playing: false` on pause, and
+`seeking: true` on a seek. The fallback for older clients is one cursor per device, or one signed-in browser cursor when the
+request has no device. A new play, changed item or changed session establishes a baseline. A positive seconds delta counts only
+up to the elapsed sample interval, bounded to the 10-second write cadence plus 2 seconds of slack; larger jumps and rewinds count
+nothing. Reader locator ticks use that same bounded elapsed time. Pause/resume writes must identify their playing state so idle
+reading or listening is not counted. Progress uses the existing skew-corrected sample stamp, capped to server time.
+
+Days follow the household host's local calendar midnight, as other daily hub limits do. A crossing interval is split at midnight;
+calendar dates handle daylight saving changes. Extensions and the notification latch expire with that day. Usage is derived
+from accumulated seconds, never from the current position. `media.budget.exempt_bedtime_audio` is household/admin-only and off
+by default. When on, today's music tracks, audiobooks and audiobook chapters are left out; podcasts, video and reader ticks still
+count. Turning it off restores their counted seconds for today.
+
+An exhausted progress write still saves the person's place immediately and returns `budget` alongside `progress` and `applied`.
+Batch results include it for each accepted write too. The player must pause on `exhausted`. A child's exhaustion claims a durable
+once-per-day latch and raises the passive `media_time_up` notification for household admins. Its fixed text contains no person,
+media, source or activity details. Teens get the same exhausted flag with no admin notification. Kid copy placeholders are in
+`MEDIA_KID_COPY`, awaiting the shared kid-mode catalog.
+
+`frontend/src/lib/useMediaBudget.ts` reads the signed-in person's budget and returns `{exhausted, leftMinutes}`. Pass the person id
+so changing profiles cannot reuse another person's allowance. Unknown or failed reads return exhausted. Players feed every
+progress response's `budget` to `updateMediaBudget(queryClient, personId, budget)`; after an extension, invalidate that person's
+`mediaBudgetQueryKey`. This uses React Query and progress responses, with no new status surface or polling loop.
+
+Open: `media.allowed_hours` needs a shipped time selector (see `allowanceKeys.ts`); every app must wire pause, ticks, resume and
+extension refresh; the ask-a-grown-up action must use the one Ask record. No second ask store or UI is added here.
