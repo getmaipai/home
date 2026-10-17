@@ -10,6 +10,8 @@ import { newFileId, newPictureJobId } from "@/lib/id";
 import { pictureUrl } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
+import { allAdapters } from "./adapters";
+import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "./ageCheck";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitGeneration, type GenerationBody, type StackPic } from "./stack";
 
 export { getPictureJob, pictureJobsForTurn, pictureJobIdsByTurn, plainFailure, PICTURE_FAILED_PREFIX, __clearPictureStoreForTests } from "./jobStore";
@@ -144,37 +146,58 @@ function discardStored(ids: readonly string[]): void {
   removeFileBlobs(blobs);
 }
 
+/** Whether this job is adult-only for the finished-picture check: a sexual word in the prompt, or any style used that is adult-only (or no longer in the library). */
+async function adultOnly(job: PictureJob): Promise<boolean> {
+  return isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allAdapters()).find((a) => a.id === id)?.classification);
+}
+
 async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Promise<void> {
   const stackJob = job.stackJob!;
   const files: PictureFile[] = [];
   const storedIds: string[] = [];
   const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; saveJob(job); void cancelOrDelete(stackJob); };
   try {
+    // Fetch and prove every picture first; nothing is stored until the safety check has seen all of them.
+    const made: Array<{ raw: Uint8Array; width: number; height: number; meta: { seed: number | null; model: string | null; steps: number | null; ms: number | null } }> = [];
     for (let index = 0; index < pics.length; index += 1) {
-      if (stopped(job)) { discardStored(storedIds); return; }
+      if (stopped(job)) return;
       const pic = pics[index]!;
       const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob, index);
       // The bytes are stored exactly as the Stack made them: image-to-video checks their digest against what the engine
       // returned, so nothing may re-encode them. They are decoded here only to prove they are a picture and read the size.
       const info = await sharp(raw, { failOn: "error", limitInputPixels: 64_000_000 }).metadata();
       if (!info.width || !info.height || info.format !== "png") throw new Error("not a png picture");
-      const meta = { seed: pic.seed ?? null, model: pic.model ?? null, steps: pic.steps ?? null, ms: pic.ms ?? null };
+      made.push({ raw, width: info.width, height: info.height, meta: { seed: pic.seed ?? null, model: pic.model ?? null, steps: pic.steps ?? null, ms: pic.ms ?? null } });
+    }
+    // IMGGEN-SAFE-01: the second, independent check, on the finished pixels, before anything is stored or shown.
+    const adult = await adultOnly(job);
+    const checks = await checkImages(made.map((m) => m.raw), "picture");
+    if (stopped(job)) return;
+    const decision = decideAgeCheck(checks, adult, "picture");
+    if (decision.action === "withhold") {
+      fail(decision.line);
+      if (decision.reason === "minor_sexual") await recordWithheld({ kind: "picture", personId: actor.id, jobId: job.id, prompt: job.prompt, adultOnly: adult, checks });
+      return;
+    }
+    for (let index = 0; index < made.length; index += 1) {
+      if (stopped(job)) { discardStored(storedIds); return; }
+      const { raw, width, height, meta } = made[index]!;
       const conversationId = job.conversationId;
       if (!conversationId) throw new Error("no conversation");
       if (job.temporary) {
         const id = newFileId();
-        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width: info.width, height: info.height, bytes: raw, generated: true });
-        files.push({ id, width: info.width, height: info.height, ...meta });
+        storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, generated: true });
+        files.push({ id, width, height, ...meta });
         continue;
       }
       if (!job.turnId || !(await waitForTurnRow(job.turnId, job))) { if (stopped(job)) { discardStored(storedIds); return; } throw new Error("turn row never appeared"); }
-      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, job: job.id, index, ...meta, width: info.width, height: info.height })}`, deduplicate: false });
+      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, job: job.id, index, ...meta, width, height })}`, deduplicate: false });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;
       }
       storedIds.push(created.value.id);
-      files.push({ id: created.value.id, width: info.width, height: info.height, ...meta });
+      files.push({ id: created.value.id, width, height, ...meta });
     }
   } catch (error) {
     fail(plainFailure(error instanceof StackPicturesError ? error : null));

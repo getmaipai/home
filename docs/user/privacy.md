@@ -34,6 +34,9 @@ Adults can mark one chat as temporary. We do not add its turns to normal history
 
 When a child's conversation seems to weigh on them, the adults get a note saying so, with the child's name only, never what was said. This notice cannot be turned off.
 
+
+Home checks every finished picture and video before showing it, to make sure it does not show a child in a sexual situation. The check runs on this computer only, with the same chat model that answers you. It looks at a small copy with no camera or location data, keeps nothing, and sends nothing anywhere. When it stops a picture or video, the owner and admins get a note that names the person and the kind, never the picture or the words.
+
 ![The Privacy page, listing connections and what information they send](../assets/screens/privacy-desktop-light.png)
 
 ## Still need help?

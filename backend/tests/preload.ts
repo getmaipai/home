@@ -86,6 +86,15 @@ __setDefaultStackClientForTests(defaultScriptedStack.client);
 // so that class of leak fails the offending test by name instead. The
 // snapshot is taken inside this call, after every assignment above.
 installTestIsolationGuard();
+// AGECHECK: a finished picture or clip is read by the local vision model before it is shown. A test that is not about
+// that check gets "nobody in it" for every image and no clip decoder (no model, no swiftc); tests/ageCheck.test.ts and
+// the safety tests install their own runner and restore this one.
+{
+  const ageCheck = await import("@/lib/pictures/ageCheck");
+  const keyframes = await import("@/lib/pictures/keyframes");
+  ageCheck.__setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
+  keyframes.__setKeyframesForTests(async () => null);
+}
 beforeEach(async () => {
   // MINOR-SEARCH-01e-5: tests that are not about the blocked-site lists run as if every enabled list had loaded.
   // Imported here, not at the top, so paths.ts reads MAIPAI_DATA_DIR after this file has set it.

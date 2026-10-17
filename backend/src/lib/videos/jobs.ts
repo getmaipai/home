@@ -10,6 +10,9 @@ import { createAttachment, getTemporaryChatImage, latestGeneratedTemporaryImage,
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
+import { allVideoAdapters } from "./adapters";
+import { checkImages, decideAgeCheck, isAdultOnlyJob, recordWithheld } from "@/lib/pictures/ageCheck";
+import { ensureKeyframeHelper, extractKeyframes } from "@/lib/pictures/keyframes";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
 export type VideoJobKind = "generate" | "animate";
@@ -255,6 +258,8 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   // One clip at a time per person: a second one waits until the first is done or stopped, so no one can fill the Stack's line.
   if (activeVideoJobsFor(input.actor) > 0) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
   const submitted = await submitVideo({ ...input.body, timeout_ms: 1 });
+  // The finished-clip check needs the keyframe helper; compile it now, while the clip renders, so it is ready when the clip is.
+  void ensureKeyframeHelper();
   const now = new Date().toISOString();
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: submitted.job,
@@ -354,6 +359,18 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     const poster = await fetchPoster(stackJob);
     if (signal.aborted) return;
     if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video engine sent a file I couldn't read. Try again.`; save(job); return; }
+    // VIDEO-GEN / IMGGEN-SAFE-01: the finished-clip check, before anything is stored or shown. First, middle and last
+    // keyframes go through the same local vision check as a picture; a Mac that cannot decode a clip checks the poster alone.
+    const adult = await isAdultOnlyJob(job.prompt, job.request.loras, async (id) => (await allVideoAdapters()).find((a) => a.id === id)?.classification);
+    const frames = (await extractKeyframes(video, clip.seconds ?? job.request.seconds)) ?? [poster];
+    const checks = await checkImages(frames, "video");
+    if (signal.aborted) return;
+    const decision = decideAgeCheck(checks, adult, "video");
+    if (decision.action === "withhold") {
+      job.state = "failed"; job.error = decision.line; job.files = []; save(job);
+      if (decision.reason === "minor_sexual") await recordWithheld({ kind: "video", personId: actor.id, jobId: job.id, prompt: job.prompt, adultOnly: adult, checks });
+      return;
+    }
     const conversationId = job.conversationId;
     if (!conversationId) throw new Error("no conversation");
     const width = clip.width ?? 832;

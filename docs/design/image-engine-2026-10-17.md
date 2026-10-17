@@ -211,11 +211,11 @@ prompt (rule 1: no wording rule decides a tool). Settings pages never render a L
 
 1. **No sexual content depicting a minor or anyone who looks like one.** Enforced at three points: the prompt passes the existing
    deterministic `detectCsam` floor in `@maipai/spec` (`spec/safety/ts/signals.ts`) before the job is queued, for everyone; the LoRA add step refuses
-   a LoRA whose card, tags or filename declare a minor-looking or child subject; and every picture made with an adult-only LoRA, or from a prompt
-   the floor flags as sexual, passes a two-pass check on the finished image by the Stack's vision role (the `screenImage` pattern the
-   2026-09-04 review kept for this day: an apparent-age question asked twice) before it is shown or stored. A failed check discards the picture and
-   says why in plain words. This image check is a learned component, so it follows `docs/RULES-AND-LEARNED-COMPONENTS.md`; it is slice
-   IMGGEN-SAFE-01 and **adult-only LoRAs do not ship until it lands**.
+   a LoRA whose card, tags or filename declare a minor-looking or child subject; and every finished picture and clip passes the finished-output check (section 15) before it is stored or shown. Owner's
+   policy, 2026-10-17: adults get adult content and adult-only styles by default; the one absolute line is nothing sexual involving a minor
+   or a minor-looking person, so the prompt floor treats bare girl, boy, woman and man as ordinary words and this second, independent check
+   on the pixels is what catches a phrasing the word list does not know. It is built (IMGGEN-SAFE-01, section 15); it is a learned
+   component under `docs/RULES-AND-LEARNED-COMPONENTS.md`.
 2. **No non-consensual imagery of a real, identifiable person.** SAFETY.md already says no feature has the purpose of generating imagery of
    identifiable real people, and MEDIA-HOST-01 puts identifiable non-members out of scope. A LoRA of a real person's likeness (CivitAI
    labels these "person" or "celebrity") is refused at the add step, for adults too. RULES.md is silent on one case, flagged as a
@@ -327,7 +327,64 @@ The Home half of the slices above is built against the Stack's real API. What ex
 
 Known limits, stated so nobody assumes more than is there:
 
-1. **The prompt line is a word list plus the model's flag.** `promptViolatesMinorLine` pairs a sexual or nudity word with a real minor marker (an age under 18, child, kid, teen, baby, toddler, little or young girl or boy, schoolgirl, loli and the like) and refuses; the bare words girl, boy, woman, man and bikini are not markers, so adult wording passes (owner's ruling, 2026-10-17; one list in `backend/src/lib/pictures/minorLine.ts`); `depicts_real_person` is the model's own statement. A phrasing neither knows reaches the Stack, whose LoRA import refuses styles of minors and real people but does not look at a prompt. There is no check on the finished picture yet (IMGGEN-SAFE-01), which is why children and teens stay locked off and why adult-only styles are the open risk.
+1. **The prompt line is a word list plus the model's flag.** `promptViolatesMinorLine` pairs a sexual or nudity word with a real minor marker (an age under 18, child, kid, teen, baby, toddler, little or young girl or boy, schoolgirl, loli and the like) and refuses; the bare words girl, boy, woman, man and bikini are not markers, so adult wording passes (owner's ruling, 2026-10-17; one list in `backend/src/lib/pictures/minorLine.ts`); `depicts_real_person` is the model's own statement. A phrasing neither knows reaches the Stack, whose LoRA import refuses styles of minors and real people but does not look at a prompt. The second, independent check on the finished picture (section 15) is built; it is what covers a phrasing the list does not know.
 2. **Uploaded photos.** A Comment on a photo the person did not generate here refuses requests that undress or sexualize it (`asksToUndress`), also a word list. Ordinary changes ("change her sweater to blue") go through.
 3. **Likeness styles.** Home asks for a tick that a style is not a likeness of a real person and the Stack refuses what its metadata names. Neither can see a face in the weights. A consenting household member's own likeness stays refused until the owner rules (section 10).
-4. **Children and teens.** The settings page shows them locked off; no key turns them on. They need the finished-picture check first.
+4. **Children and teens.** The settings page shows them locked off; no key turns them on. The finished-picture check now exists (section 15), but turning pictures on for a minor is the owner's decision, not part of that slice.
+
+## 15. The finished-output check (IMGGEN-SAFE-01, built 2026-10-17)
+
+The absolute line (RULES.md rule 0, SAFETY.md): nothing sexual involving a minor or a minor-looking person, for anyone, with no setting
+that reaches it. Because the prompt floor is a word list, every finished picture and every finished clip also passes a second check on the
+pixels before Home stores or shows it. The whole policy is one module, `backend/src/lib/pictures/ageCheck.ts`, tested in
+`backend/tests/ageCheck.test.ts`.
+
+- **When it runs.** On every finished picture and every clip, because the vision answer itself says "nobody is in it" (`label: none`) for a
+  landscape or an animal, which is safer than a keyword guess about the prompt. A job is **adult-only** when the prompt carries a sexual or
+  nudity word (`minorLine.ts`), or any style used is adult-only, or a style is no longer in the library.
+- **Where it runs.** The resident chat model reads the picture through its projector (the Stack's `/v1/chat/completions` on this computer,
+  model `chat`; the role must be ready and declare `imageInput`). Zero outbound: no cloud service. The check is a chat request, so it does not
+  take the generation lock; the generation worker has exited by the time the Stack answers "done". It waits up to 4 s while
+  `/stack/v1/hardware/budget` says `pressure: critical`, and then counts as "could not run". Checks run one at a time in Home.
+- **What is sent.** A copy at most 768 px on the long side, re-encoded as JPEG with no EXIF or any other metadata, flattened on white.
+  Temperature 0, thinking off, `max_tokens` 160, a JSON schema, a 20 s deadline. The system prompt asks only for a classification and
+  forbids describing or naming anyone.
+- **The verdict.** `people_count`, `apparent_min_age_estimate`, `label` (`adult`, `possibly_minor`, `child`, `none`; it describes the youngest
+  depicted person), `is_nude_or_sexual`, `confidence`. An answer that contradicts itself (`none` with people counted, `adult` with nobody) is
+  not a verdict. An `adult` label beside an estimated age under 18 is read as the younger answer.
+- **The decision** (`decideAgeCheck`, pure). Any depicted person possibly a minor or a child AND (the image is nude or sexual OR the job is
+  adult-only): **withhold**. A check that could not run (no vision model, memory critical, a timeout, an unreadable answer) on an adult-only
+  job: **withhold** (fails closed). On an ordinary job a failed check **passes** (fails open, so a busy model never blocks an ordinary
+  picture). Everything else passes: an adult, nobody, or a possible minor in an ordinary picture that is not sexual (a cartoon child with
+  a balloon). Withholding applies to the whole job.
+- **What a withhold does.** The picture is never stored in Home (the check runs before storage), the Stack's copy is deleted, and the job
+  ends with the fixed line: "I can't show that picture. It may show a child in a sexual situation, and that is never allowed." (or "video").
+  A check that could not run on an adult-only job ends with "I couldn't check that picture, so I can't show it. Try again in a minute."
+  A minor finding writes one log line (the verdict and a SHA-256 prefix of the prompt, never the image or the prompt text) and sends the
+  admins the `safety.picture_withheld` notification (rule S6: Notifications; names the person and the kind, no image), at most once every
+  ten minutes per person. Home has no per-person strike counter today; a repeated prompt hash in the log is where a pattern shows.
+- **Clips.** Three keyframes (first, middle, last) are taken by Apple's decoder through a 60-line Swift helper (`keyframes.swift`, compiled
+  once with `swiftc`, about 2 s on a quiet Mac, started when the clip is submitted so it is ready when the clip is; `ffmpeg` on the PATH is the
+  second choice) and each goes through the same check; one bad frame withholds the clip. A Mac with neither checks the Stack's poster
+  (frame 0) alone. The Stack serves only that poster, so the middle and last frames need the helper.
+
+**Calibration (2026-10-17, the live Stack's resident Muse Glimmer 30B, scratch Home, innocuous pictures only).**
+`backend/scripts/agecheck-calibrate.ts` makes eight pictures from fixed innocuous prompts on the live image engine, then runs the real check.
+No explicit imagery was made, opened or needed, and no prompt involves a minor in a sexual context.
+
+| Picture (prompt) | Result |
+|---|---|
+| middle-aged man, studio portrait | adult, 55, nobody under 18, passes |
+| elderly woman reading by a window | adult, 70, passes |
+| woman in her late twenties laughing in a park | adult, 25, passes |
+| chef plating a dish (3 people) | adult, 30, passes |
+| cartoon girl about 8 with a balloon | child, estimated 6; passes as ordinary, **withheld if the job were adult-only** |
+| cartoon boy about 7 flying a kite | child, estimated 5, 2 people; same |
+| red fox in the snow; mountain landscape | none, 0 people, passes |
+
+8 of 8 labeled as expected; 2.8 to 3.4 s per picture on the live Stack (an earlier run on the llama.cpp build took about 8 s, so the target
+of 10 s holds on both). Three keyframes of a synthetic clip: 3 frames in 0.26 s with the compiled helper, none under 18, no people.
+The decision rows (child and sexual withholds; adult and sexual passes; possibly minor and not sexual passes; failure and adult-only withholds;
+failure and ordinary passes) are unit tests on scripted verdicts. **Not measured here, on purpose:** the false-negative rate on real adult
+content with a minor-looking subject, because no explicit or sexual image was made or looked at. A person with a youthful look who is an adult
+may be labeled `possibly_minor`; on an ordinary job that costs nothing, on an adult-only job it is withheld, which is the safe side.

@@ -1,0 +1,94 @@
+// AGECHECK: three keyframes (first, middle, last) of a finished clip, for the finished-video safety check
+// (ageCheck.ts). On this Mac the frames come from Apple's decoder through a tiny Swift helper (`keyframes.swift`,
+// compiled once with `swiftc` when the command line tools are there, the same pattern as the Stack's
+// foreground helper); `ffmpeg` on the PATH is the second choice. When neither exists the caller checks the
+// Stack's poster (frame 0) alone and says so. Everything is local: the clip goes to a temporary folder on this
+// computer, three JPEGs come back, the folder is removed.
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+const HELPER_SOURCE = join(import.meta.dir, "keyframes.swift");
+const FRAME_SIDE = 768;
+const HELPER_DEADLINE_MS = 20_000;
+const COMPILE_DEADLINE_MS = 120_000;
+
+function workRoot(): string {
+  const dir = join(tmpdir(), "maipai-agecheck");
+  mkdirSync(dir, { recursive: true, mode: 0o700 });
+  return dir;
+}
+
+let helperPromise: Promise<string | null> | null = null;
+/** Compiles the helper once per process (and once per boot: the folder is temporary). Null when the Mac has no `swiftc`. */
+export function ensureKeyframeHelper(): Promise<string | null> {
+  if (forTests || process.platform !== "darwin") return Promise.resolve(null);
+  helperPromise ??= compileHelper().catch(() => null);
+  return helperPromise;
+}
+
+async function compileHelper(): Promise<string | null> {
+  const target = join(workRoot(), "keyframes");
+  if (existsSync(target)) return target;
+  const swiftc = Bun.which("swiftc");
+  if (!swiftc || !existsSync(HELPER_SOURCE)) return null;
+  const cache = join(workRoot(), "swift-cache");
+  mkdirSync(cache, { recursive: true });
+  const child = Bun.spawn([swiftc, "-O", HELPER_SOURCE, "-o", target], { stdout: "ignore", stderr: "ignore", env: { ...process.env, CLANG_MODULE_CACHE_PATH: cache } });
+  const timer = setTimeout(() => child.kill(), COMPILE_DEADLINE_MS);
+  const code = await child.exited;
+  clearTimeout(timer);
+  if (code !== 0) { rmSync(target, { force: true }); return null; }
+  chmodSync(target, 0o755);
+  return target;
+}
+
+/** Test seam: replaces the whole extraction. */
+let forTests: ((mp4: Uint8Array, seconds: number | null) => Promise<Uint8Array[] | null>) | null = null;
+export function __setKeyframesForTests(fn: typeof forTests): void { forTests = fn; }
+export function __resetKeyframeHelperForTests(): void { helperPromise = null; }
+
+async function run(cmd: string[], deadlineMs: number): Promise<number> {
+  const child = Bun.spawn(cmd, { stdout: "ignore", stderr: "ignore" });
+  const timer = setTimeout(() => child.kill(), deadlineMs);
+  const code = await child.exited;
+  clearTimeout(timer);
+  return code;
+}
+
+/** First, middle and last frames as JPEG bytes (at most 768 px a side), or null when this Mac cannot decode a clip. */
+export async function extractKeyframes(mp4: Uint8Array, seconds: number | null): Promise<Uint8Array[] | null> {
+  if (forTests) return forTests(mp4, seconds);
+  const dir = mkdtempSync(join(workRoot(), "clip-"));
+  try {
+    const clip = join(dir, "clip.mp4");
+    writeFileSync(clip, mp4, { mode: 0o600 });
+    const helper = await ensureKeyframeHelper();
+    if (helper) {
+      if (await run([helper, clip, dir, String(FRAME_SIDE)], HELPER_DEADLINE_MS) === 0) return readFrames(dir, 3);
+      return null;
+    }
+    const ffmpeg = Bun.which("ffmpeg");
+    if (!ffmpeg || !seconds || seconds <= 0) return null;
+    const stamps = [0, seconds / 2, Math.max(0, seconds - 0.15)];
+    for (let i = 0; i < stamps.length; i += 1) {
+      const code = await run([ffmpeg, "-loglevel", "error", "-y", "-ss", String(stamps[i]), "-i", clip, "-frames:v", "1", "-vf", `scale='min(${FRAME_SIDE},iw)':-2`, "-map_metadata", "-1", join(dir, `${i}.jpg`)], HELPER_DEADLINE_MS);
+      if (code !== 0) return null;
+    }
+    return readFrames(dir, 3);
+  } catch {
+    return null;
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+function readFrames(dir: string, count: number): Uint8Array[] | null {
+  const frames: Uint8Array[] = [];
+  for (let i = 0; i < count; i += 1) {
+    const file = join(dir, `${i}.jpg`);
+    if (!existsSync(file)) return null;
+    frames.push(new Uint8Array(readFileSync(file)));
+  }
+  return frames;
+}

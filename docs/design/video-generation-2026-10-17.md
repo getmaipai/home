@@ -192,6 +192,12 @@ acknowledgement). No adult LoRA was downloaded or tested in this session.
   restricted by default, unrestricted generation unlocked per-user by an adult, never inherited).
 - Adult video through chat passes the adult acknowledgment already required for unrestricted mode. A spoken turn, a shared screen, a guest and an
   unidentified speaker never get video output the adult-only rules would block.
+- **The finished-clip check (IMGGEN-SAFE-01, built 2026-10-17).** Before a clip is stored or shown, three keyframes (first, middle, last) go through the
+  same local vision check as a picture, with the same decision (`backend/src/lib/pictures/ageCheck.ts`; the policy and calibration are in
+  `image-engine-2026-10-17.md` section 15). A possible minor in a sexual frame, or in any frame of an adult-only clip, withholds the clip: it is never
+  stored in Home, the Stack's copy is deleted, and the job ends with "I can't show that video. It may show a child in a sexual situation, and that is
+  never allowed." A check that cannot run fails closed for an adult-only clip and passes an ordinary one. Frames come from a Swift/AVFoundation helper
+  (`keyframes.swift`); a Mac without `swiftc` or `ffmpeg` checks the poster (frame 0) alone.
 - Privacy: nothing leaves the home. The pins download on install; the tokenizer pin removes the one runtime fetch; the worker runs offline. No
   prompt, image or clip is logged (rule 6a); the worker reports phase, size and milliseconds only.
 - Rule 11: only a Stack-installed, pinned, tested component runs the model. Rule 8: nothing gated on a model id; the status route reports capability.

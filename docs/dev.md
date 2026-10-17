@@ -37399,7 +37399,7 @@ a rollback restores a database the older release can read.
   upload starts; Home takes request bodies up to 128 MiB), each with a licence tick, an all-ages answer (default adult-only) and a
   not-a-likeness tick, then a confirm step that shows the SHA-256.
 - **Limits stated on purpose** (design note section 14): the prompt line is a word list plus the model's own `depicts_real_person` flag;
-  there is no check on the finished picture yet (IMGGEN-SAFE-01 follow-up), so children and teens stay locked off with no key that turns them on; a household member's own likeness stays refused until the owner rules; adult-only styles are the open risk.
+  the finished-picture and finished-clip check is built (IMGGEN-SAFE-01, `lib/pictures/ageCheck.ts`, design note section 15): the local vision model reads every finished output before it is stored, and an adult-only job it cannot check is withheld; children and teens stay locked off with no key that turns them on (the owner's decision); a household member's own likeness stays refused until the owner rules.
 
 ### The editor (IMGTOOLS-03 to 05, IMGGEN-EDITOR-01)
 

@@ -35,7 +35,7 @@ Home only animates pictures it made itself. It never animates a photo you upload
 
 Adults can, on their own screen, in a written chat. Children and teens cannot, and no setting changes that. Spoken answers, the TV and other shared screens never make videos. A guest cannot.
 
-Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a video of a real person who has not agreed to it. If you ask, Home says it will not make that and what to change.
+Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a video of a real person who has not agreed to it. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
 
 ## Choose how it works (owner and admin)
 

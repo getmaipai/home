@@ -99,6 +99,18 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     defaultChannels: ["in_app", "telegram"],
     toast: true,
   },
+  // AGECHECK: the finished-picture and finished-video safety check withheld something that may show a child in a sexual
+  // situation. Non-configurable like the other child protections. The body names the person and the kind, never the
+  // prompt, the image or the verdict; the details are one log line with a hash of the prompt.
+  {
+    id: "safety.picture_withheld",
+    level: "immediate",
+    audience: "adults",
+    template: "The safety check stopped a {kind} that {personName} asked for. Nothing was shown and nothing was kept.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: true,
+  },
   // The owner's decision on 2026-09-14: on by default, with no switch per
   // child or per household. The body never carries the child's words, the
   // topic, the reply or a transcript link; the record keeps the child id,
