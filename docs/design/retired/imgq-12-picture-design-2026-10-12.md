@@ -1,3 +1,5 @@
+> **Retired 2026-10-17.** Why: its four arms (12a, 12b, 12d, 14) were benched and none reached the bar; IMGQ-16 closed the plan with the setup that runs now. Replaced by [IMGQ-16, the final picture setup](../../plans/imgq-16-final-picture-setup-2026-10-13.md); the bench results stay in docs/plans.
+
 # IMGQ-12: breaking the loop on answer pictures (design note, 2026-10-12)
 
 A written design, no code. Asked for after four IMGQ cycles (IMGQ-03, 08, 09, 10) of metadata veto rules in

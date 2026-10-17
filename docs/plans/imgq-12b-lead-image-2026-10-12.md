@@ -1,6 +1,6 @@
 # IMGQ-12b: lead-image similarity bench, dev results (2026-10-12)
 
-Result of item IMGQ-12b (arm 2.2 of `imgq-12-picture-design-2026-10-12.md`). Dev numbers only. The sealed IMGQ-11 set was not opened.
+Result of item IMGQ-12b (arm 2.2 of `../design/retired/imgq-12-picture-design-2026-10-12.md`). Dev numbers only. The sealed IMGQ-11 set was not opened.
 Verdict in plain words: this arm does not reach the bar. Used alone it is no better than the text arm of IMGQ-12a. Combined with the
 text score by requiring both to agree, it catches most wrong tiles, but only by also dropping about half of the right ones, and on
 the tuning questions a wrong tile still remains on 10 to 13 in 100 questions, against the bar of 1 in 40.

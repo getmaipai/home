@@ -1,3 +1,5 @@
+> **Retired 2026-10-17.** Why: a distinct image-search tool was dropped on 2026-10-02 by RULES.md chat rule 7 (search gives the model pages); answer pictures took the IMGQ path instead. Replaced by [RULES.md rule 7](../RULES.md#chat-turn) and [IMGQ-16, the final picture setup](../../plans/imgq-16-final-picture-setup-2026-10-13.md).
+
 # IMAGE-SEARCH-01: a distinct image-search tool (design note, 2026-09-24)
 
 Session B, per the coordinator's own instruction (`docs/BACKLOG.md`'s

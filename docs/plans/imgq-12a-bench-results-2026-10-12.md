@@ -1,6 +1,6 @@
 # IMGQ-12a: offline picture-check bench, dev results (2026-10-12)
 
-Result of item IMGQ-12a in `imgq-12-picture-design-2026-10-12.md`. Dev numbers only. The sealed IMGQ-11 set was not opened.
+Result of item IMGQ-12a in `../design/retired/imgq-12-picture-design-2026-10-12.md`. Dev numbers only. The sealed IMGQ-11 set was not opened.
 Verdict: no model tried meets the marks. At a 2 percent right-tile false drop, every model catches only 10 to 41 percent of
 wrong tiles. At a 70 percent catch, every model drops 17 to 40 percent of right tiles. The note's hope (zero-shot CLIP-family
 scoring of a tile against the subject name) is not supported on this data.

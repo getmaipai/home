@@ -1215,7 +1215,7 @@ The research findings are in the Perceived length section. This table says which
 | Checklist | kit `List` primitive and `Button` | none |
 | Settings pages | kit `SettingsShell` and the generic renderer | none |
 
-**Precondition for KIT-ALERT-01 and KIT-CAROUSEL-01.** Rule 9b sends every kit addition through `docs/design/UI-DECISIONS.md`, and that file does not exist in Home yet; `docs/design/` holds only `RULES.md`, `ELEMENTS-DECISIONS.md` and `home-pages-2026-09-20.md`. Its first commit creates the file with two rows, one for `carousel` and one for `alert`. Each row says what is added, from which registry, who decided it, and why no existing kit part does the job. Neither kit row may be dispatched before that commit lands.
+**Precondition for KIT-ALERT-01 and KIT-CAROUSEL-01.** Rule 9b sends every kit addition through `docs/design/UI-DECISIONS.md`, and that file does not exist in Home yet; `docs/design/` holds only `RULES.md`, `ELEMENTS-DECISIONS.md` and `retired/home-pages-2026-09-20.md`. Its first commit creates the file with two rows, one for `carousel` and one for `alert`. Each row says what is added, from which registry, who decided it, and why no existing kit part does the job. Neither kit row may be dispatched before that commit lands.
 
 ## What the old wizard did right and wrong
 

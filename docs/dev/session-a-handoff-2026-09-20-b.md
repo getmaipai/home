@@ -41,7 +41,7 @@ both verified serving 200).
 
 1. **HOME-UI-03 (M): Settings and Privacy to the section.** The
    "Settings (`/settings`) and Privacy (`/privacy`)" paragraph of
-   [docs/design/home-pages-2026-09-20.md](../design/home-pages-2026-09-20.md):
+   [docs/design/home-pages-2026-09-20.md](../design/retired/home-pages-2026-09-20.md):
    Settings is the settings workspace this spec already describes
    elsewhere (its own "Settings workspace reference" section) - the
    section list on the left, the form on the right rendered from the

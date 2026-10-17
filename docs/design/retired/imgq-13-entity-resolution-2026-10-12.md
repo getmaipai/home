@@ -1,3 +1,5 @@
+> **Retired 2026-10-17.** Why: built as IMGQ-13a and reverted on 2026-10-13 after the sealed-set pass (IMGQ-15) showed the resolver lost. Replaced by [IMGQ-16, the final picture setup](../../plans/imgq-16-final-picture-setup-2026-10-13.md).
+
 # IMGQ-13: picking the right Wikidata entity for an answer picture (design note, 2026-10-12)
 
 A written design, no code changed. Follows IMGQ-11, where 2 of the 8 questions that still showed a wrong tile (Statue of Liberty and tacos) were not a tile problem: the resolver had picked the wrong thing before any picture was

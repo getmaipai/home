@@ -91,7 +91,7 @@ The candidate inventory includes all current `src/blocks/` implementation and te
 
 | Exact path | Required cutover action |
 | --- | --- |
-| `docs/design/home-pages-2026-09-20.md` | Add a superseded marker at the top and point to the SHELL-09 program record; retain the historical document. |
+| `docs/design/retired/home-pages-2026-09-20.md` | Add a superseded marker at the top and point to the SHELL-09 program record; retain the historical document. |
 | `docs/user/settings.md` | Remove the “New shell (preview)” setting bullet and revise nearby text that still describes preview/old-look pages. |
 | `docs/dev.md` | Close the shell section with the landed cutover hash and point to the final implementation/capture record. |
 
@@ -117,7 +117,7 @@ I opened representative Home, Chat, Settings, Privacy, and Conversations capture
 
 The docs currently reference 13 screenshots. The cutover acceptance additionally requires every page at widths 1440 and 390 in both looks and themes; this embedded-doc list is not that complete capture matrix. Keep captures for routes that are not migrated until their new route exists and is judged.
 
-**SHELL-09 acceptance for this phase:** supersede `docs/design/home-pages-2026-09-20.md`, regenerate `docs/user/*` screenshots from the new pages, remove the settings preview bullet, and close the shell section in `docs/dev.md` with the cutover hash. Overall capture acceptance: every page at 1440 and 390 in both modes regenerated and judged; old-shell-only `ui.look` values migrate on read.
+**SHELL-09 acceptance for this phase:** supersede `docs/design/retired/home-pages-2026-09-20.md`, regenerate `docs/user/*` screenshots from the new pages, remove the settings preview bullet, and close the shell section in `docs/dev.md` with the cutover hash. Overall capture acceptance: every page at 1440 and 390 in both modes regenerated and judged; old-shell-only `ui.look` values migrate on read.
 
 ## Count summary for cutover planning
 

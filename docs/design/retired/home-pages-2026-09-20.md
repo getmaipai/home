@@ -1,4 +1,6 @@
-> **Superseded:** this was the preview-shell design record. The SHELL-09 cutover began at home commit [`6bed798c`](https://github.com/getmaipai/home/commit/6bed798c) on 2026-09-27/28 and made the migrated pages the root-mounted app. The final cutover range remains open while Phase 2–5 finishes; see [`docs/BACKLOG.md`](../BACKLOG.md#shell-09-the-cutover-then-the-old-interface-is-deleted) for its status.
+> **Retired 2026-10-17.** Why: the preview-shell record; SHELL-09 cut over to the root-mounted app, and the rail, header, Calm and Studio looks and phone tab bar it specifies are replaced by the App shell rules. Replaced by [RULES.md, App shell S1 to S5](../RULES.md#app-shell) and [the Home page design](../home-page-2026-10-17.md).
+
+> **Superseded:** this was the preview-shell design record. The SHELL-09 cutover began at home commit [`6bed798c`](https://github.com/getmaipai/home/commit/6bed798c) on 2026-09-27/28 and made the migrated pages the root-mounted app. The final cutover range remains open while Phase 2–5 finishes; see [`docs/BACKLOG.md`](../../BACKLOG.md#shell-09-the-cutover-then-the-old-interface-is-deleted) for its status.
 
 ## Home's pages under the kit (added 2026-09-20)
 

@@ -269,7 +269,7 @@ Rule 5:
 - `docs/dev.md`: SEARCH-SHAPE-01 landed: bound the searched reply, do not format it (2026-09-26)
 - `docs/plans/chat-architecture-review-2026-09-16.md`: whole document
 - `docs/plans/conversation-competencies-2026-09-13.md`: D. Sounding like someone
-- `docs/plans/issue-168-search-shape-2026-09-26.md`: whole document
+- `docs/plans/issue-168-search-shape-2026-09-26.md` (retired to `docs/design/retired/`): whole document
 - `docs/plans/simple-turn-pipeline-2026-09-22.md`: 1. What stays in code
 - `docs/plans/simple-turn-pipeline-2026-09-22.md`: 7. The build units
 - `docs/plans/simple-turn-pipeline-2026-09-22.md`: 10. End-state inventory
@@ -296,7 +296,7 @@ Rule 7:
 - `docs/dev.md`: READ-PAGE-01: measured, shipped (2026-09-24)
 - `docs/dev.md`: SEARCH-ROWS-01 landed: infobox answers reach the model, and an empty-snippet searc...
 - `docs/dev/session-d.md`: Step 7: the lookups
-- `docs/plans/issue-168-search-shape-2026-09-26.md`: whole document
+- `docs/plans/issue-168-search-shape-2026-09-26.md` (retired to `docs/design/retired/`): whole document
 
 Rule 8:
 - `docs/dev.md`: ARCH-MEASURE-01: the per-model budget verdict (2026-09-22)

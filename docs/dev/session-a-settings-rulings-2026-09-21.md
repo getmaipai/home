@@ -13,7 +13,7 @@ other half: what a page composed from the template's own form layouts
 still needs to satisfy, so the rulings below aren't lost with the code.
 
 The full owner ruling is already recorded in
-[docs/design/home-pages-2026-09-20.md](../design/home-pages-2026-09-20.md)
+[docs/design/home-pages-2026-09-20.md](../design/retired/home-pages-2026-09-20.md)
 under "Settings, corrected (owner finding 2026-09-20 17:43)" - this
 note doesn't repeat it, only the page-structure decisions and defaults
 this session worked out on top of it before being stopped.

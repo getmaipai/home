@@ -20242,7 +20242,7 @@ Three of the five states had no existing dedicated capture (only "empty thread" 
 ## Home's shell and dashboard under the kit (HOME-UI-01, ui-v0.3.0, 2026-09-20)
 
 The owner's ruling on "Home's pages under the kit"
-([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md),
+([docs/design/retired/home-pages-2026-09-20.md](design/retired/home-pages-2026-09-20.md),
 landed verbatim from COORDINATOR's scratchpad): Home follows the Stack
 console spec's look and feel exactly (the shell, the colors, the icon
 tiles, the panel headers, the header, the footer, the type, the
@@ -20452,7 +20452,7 @@ than duplicated here).
 ## The Apps page as a real things table (HOME-UI-02, ui-v0.3.2, 2026-09-20)
 
 The "Apps" paragraph of the owner's ruling
-([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)):
+([docs/design/retired/home-pages-2026-09-20.md](design/retired/home-pages-2026-09-20.md)):
 "Everything installed on this hub" as the kit's own things-page pattern
 - a filter column (kind, category, state), a things table with icon
 tiles/type badges/status pills, a details pane with Install and Remove
@@ -20649,7 +20649,7 @@ confirmed clean (`git status --short`) before and after the run.
 
 The owner placed Home beside the reference and judged it "nice, not a
 match" - his ruling, "Two looks, one setting"
-([docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)):
+([docs/design/retired/home-pages-2026-09-20.md](design/retired/home-pages-2026-09-20.md)):
 keep what shipped as one look, **Calm**, and build a second, **Studio**,
 that matches the reference exactly; a person picks the look in Settings
 > Me > Appearance ("Look": Calm or Studio, per person, remembered), the
@@ -20783,7 +20783,7 @@ reading-level, and the standards core all green.
 
 Three owner rounds landed in one item: the original work order ("Phone
 density, and conversations inside Chat," "Navigation, corrected," "The
-phone composition," all [docs/design/home-pages-2026-09-20.md](design/home-pages-2026-09-20.md)),
+phone composition," all [docs/design/retired/home-pages-2026-09-20.md](design/retired/home-pages-2026-09-20.md)),
 then "The rail geometry, exactly" (17:40, rough estimates read off the
 reference beside the live page), then "The Studio look, the numbers"
 (18:15, an owner-supplied exact CSS/hex spec from a page built outside
@@ -27940,7 +27940,7 @@ directly rather than assume.
 shipped nine (`git diff` shows only the reversion, the manifest
 description improvement kept - real, harmless while unreached, and
 worth keeping for whenever this is revisited). `docs/plans/
-image-search-01-2026-09-24.md`'s own gap (no shipped kit Element
+image-search-01-2026-09-24.md` (retired to `docs/design/retired/`)'s own gap (no shipped kit Element
 composes a thumbnail with a title and a link) and this same "the 8B
 picks badly among many tools" pattern (`#150`, PHRASE-02) are both
 folded into the coordinator's own newer knowledge-sources design
