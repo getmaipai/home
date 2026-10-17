@@ -1448,7 +1448,7 @@ async function searxngSearchUncached(args: unknown, opts: SearchOptions & { safe
     } else {
       await recordSearchHealth({
         kind: "down",
-        detail: `${err instanceof Error ? err.message : String(err)} Check the SearXNG URL in Settings -> AI & connections -> Integrations.`,
+        detail: `${err instanceof Error ? err.message : String(err)} Check the SearXNG address in Settings, Search, Web search.`,
       });
       void recordServiceOutcome("searxng", { ok: false, error: err });
     }

@@ -5,12 +5,11 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Field, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { api, ApiError } from "@/lib/api";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
-import { SEARCH_RESULT_ICON, SEARCH_RESULT_VARIANT, SEARCH_ROW_STATE_WORD, type SearchTestResultData } from "@/shell/components/searchTestResult";
+import { SEARCH_RESULT_VARIANT, type SearchTestResultData } from "@/shell/components/searchTestResult";
+import { SearchResultIcon, SearchTestResultBody } from "@/shell/components/SearchTestResultBody";
 
 const ErrorIcon = getIcon("circle-alert");
 
-const RESULT_ICONS = { pass: getIcon(SEARCH_RESULT_ICON.pass), warn: getIcon(SEARCH_RESULT_ICON.warn), fail: getIcon(SEARCH_RESULT_ICON.fail) };
 const SKIP_FAILED = "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings.";
 
 /** The failure as one sentence: what went wrong, then the next step. */
@@ -40,7 +39,6 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
   const [address, setAddress] = useState(candidate ?? "");
   const [busy, setBusy] = useState<"test" | "save" | "skip" | null>(null);
   const [result, setResult] = useState<SearchTestResultData | null>(null);
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const skipFailed = useRef(false);
 
@@ -89,27 +87,7 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
         <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={address} onChange={(event) => { setAddress(event.target.value); setError(null); }} />
       </Field>
       {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
-      {result && !changedAfterTest ? (() => {
-        const Icon = RESULT_ICONS[result.level];
-        return (
-          <Alert variant={SEARCH_RESULT_VARIANT[result.level]} role="status" data-level={result.level}>
-            <Icon aria-hidden="true" />
-            <AlertDescription>
-              <p className="text-base font-medium text-foreground">{result.headline}</p>
-              <p>{result.verdict}</p>
-              <p className="font-medium text-foreground">{result.recommendation}</p>
-              <Collapsible open={detailsOpen} onOpenChange={setDetailsOpen}>
-                <CollapsibleTrigger asChild><Button type="button" variant="link" size="sm">{detailsOpen ? "Hide details" : "Details"}</Button></CollapsibleTrigger>
-                <CollapsibleContent>
-                  <ul className="mt-2 flex flex-col gap-1">
-                    {result.details.map((row) => <li key={row.id}><span className="font-medium text-foreground">{row.title}: {SEARCH_ROW_STATE_WORD[row.state]}.</span> {row.detail}{row.fix ? ` ${row.fix}` : ""}</li>)}
-                  </ul>
-                </CollapsibleContent>
-              </Collapsible>
-            </AlertDescription>
-          </Alert>
-        );
-      })() : null}
+      {result && !changedAfterTest ? <Alert variant={SEARCH_RESULT_VARIANT[result.level]} role="status" data-level={result.level}><SearchResultIcon level={result.level} /><AlertDescription><SearchTestResultBody result={result} /></AlertDescription></Alert> : null}
       {changedAfterTest ? <p role="status" className="text-base text-muted-foreground md:text-lg">You changed the address. Test it again, or clear it to skip.</p> : null}
       {!result && !empty && !error ? <p className="text-base text-muted-foreground md:text-lg">Press Test to check this address. Continue turns on once it works.</p> : null}
       <div className="flex flex-wrap gap-2">

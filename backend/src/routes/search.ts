@@ -9,6 +9,9 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth, requireRole } from "@/middleware/auth";
 import { SEARCH_PROVIDERS } from "@/lib/search/providers";
 import { getHouseholdSettingValue } from "@/lib/settings";
+import { clearSearchAddress, testOrSaveSearchAddress } from "@/lib/searchAddressSave";
+import { webSourcesPicked } from "@/lib/retrieval/webSources";
+import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
 import { SearchTestSummarySchema, summarizeSearchStatus } from "@/lib/searchTestSummary";
 import { buildSearchInstanceSnippet, checkSearchInstance, SearchInstanceRefreshCooldownError } from "@/lib/searchInstanceCheck";
 import { getStackClient } from "@/lib/stackEngine";
@@ -203,4 +206,71 @@ searchRoutes.openapi(revertRoute, async (c) => {
     const failure = classifyStackError(error);
     return c.json(failure.body, failure.status);
   }
+});
+
+// SEARXNG-SET-05: Settings > Home > Search > Web search. Owner and admin only (the address and the sources are household
+// operational information; a person at any age band who is not an owner or admin gets 403).
+const webSettingsRoute = createRoute({
+  method: "get",
+  path: "/web",
+  tags: ["Search"],
+  summary: "What web search uses right now",
+  middleware: [requireRole("owner", "admin")] as const,
+  responses: {
+    200: { content: { "application/json": { schema: z.object({
+      address: z.string(),
+      /** Whether the address answered at the last check; null when there is no address or no check could run. */
+      works: z.boolean().nullable(),
+      /** Home runs its own search service and no address is set. */
+      stackOwned: z.boolean(),
+      sources: z.array(z.enum(["searxng", "ddgs"])),
+      ddgsReady: z.boolean(),
+    }) } }, description: "The saved address, whether it works, the picked sources and whether DuckDuckGo is set up." },
+    ...errorResponses({ 403: "Only the owner or an admin may see web search settings" }),
+  },
+});
+searchRoutes.openapi(webSettingsRoute, async (c) => {
+  const address = String(getHouseholdSettingValue("search.searxng_url") ?? "").trim();
+  let works: boolean | null = null;
+  let stackOwned = false;
+  try {
+    const status = await checkSearchInstance();
+    stackOwned = status.mode === "stack" && address === "";
+    if (address && status.mode === "owner") {
+      // "Works" is whether it answers; a paced or unfinished check says nothing either way.
+      const reach = status.checks.find((check) => check.id === "reachability")?.state;
+      works = reach === "pass" ? true : reach === "fail" ? false : null;
+    }
+  } catch { /* an unreadable check leaves works unknown; the page says so in words */ }
+  return c.json({ address, works, stackOwned, sources: webSourcesPicked(), ddgsReady: ddgsConfigured() }, 200);
+});
+
+const webAddressRoute = createRoute({
+  method: "post",
+  path: "/address",
+  tags: ["Search"],
+  summary: "Test, save or remove the SearXNG address",
+  description: "Owner/admin only. dry_run tests without saving. An empty url removes SearXNG. Same host rules and checks as the setup screen.",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ url: z.string(), dry_run: z.boolean().optional() }).strict() } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ saved: z.boolean(), cleared: z.boolean().optional(), result: SearchTestSummarySchema.optional() }) } }, description: "A Test answers with result and saved false; a Save answers saved true; an empty url removes SearXNG (cleared true)." },
+    400: { content: { "application/json": { schema: z.object({ error: z.string(), next: z.string().optional() }) } }, description: "The address is not allowed, or a Save found the service not usable." },
+    ...errorResponses({ 403: "Only the owner or an admin may change web search" }),
+  },
+});
+searchRoutes.openapi(webAddressRoute, async (c) => {
+  const { url, dry_run: dryRun } = c.req.valid("json");
+  if (url.trim() === "") {
+    if (dryRun) return c.json({ error: "Type the SearXNG address first, then press Test." }, 400);
+    const cleared = clearSearchAddress();
+    if (!cleared.ok) return c.json({ error: cleared.error }, 400);
+    await checkSearchInstance({ force: true }).catch(() => undefined);
+    return c.json({ saved: true, cleared: true }, 200);
+  }
+  const outcome = await testOrSaveSearchAddress(url, dryRun === true);
+  if (outcome.kind === "refused") return c.json({ error: outcome.error, ...(outcome.next ? { next: outcome.next } : {}) }, 400);
+  if (outcome.kind === "tested") return c.json({ saved: false, result: outcome.result }, 200);
+  await checkSearchInstance({ force: true }).catch(() => undefined);
+  return c.json({ saved: true }, 200);
 });

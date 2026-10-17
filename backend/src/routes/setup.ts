@@ -141,10 +141,6 @@ const useSearchCandidateRoute = createRoute({
   }).strict() } } } },
   responses: { 200: { content: { "application/json": { schema: z.object({ saved: z.boolean(), result: SearchTestSummarySchema.optional() }) } }, description: "A Test answers 200 with result (pass, warn or fail in plain words) and saved false; a Save answers 200 with saved true once it, or the skip choice, was saved." }, 400: { content: { "application/json": { schema: allowTailnetErrorSchema } }, description: "The address is not allowed, or a Save found the service not usable." } },
 });
-// The checker paces repeat probes of one address, so Test then Save would fail the second check. A pass from Test
-// stands for the same address for a few minutes; Save then skips the second probe.
-let searchTestPassed: { url: string; at: number } | null = null;
-const SEARCH_TEST_VALID_MS = 5 * 60_000;
 setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
   if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead." }, 400);
   const { url, dry_run: dryRun, ddgs_default: ddgsDefault } = c.req.valid("json");
@@ -154,27 +150,10 @@ setupRoutes.openapi(useSearchCandidateRoute, async (c) => {
     const picked = setHouseholdSettingValue("search.web_sources", ["searxng", "ddgs"]);
     return picked.ok ? c.json({ saved: true }, 200) : c.json({ error: picked.error }, 400);
   }
-  const { parseSearchAddress } = await import("@/lib/setupSearchAddress");
-  const parsed = parseSearchAddress(url);
-  if (!parsed.ok) return c.json({ error: parsed.error }, 400);
-  const address = parsed.url.toString().replace(/\/$/, "");
-  const alreadyPassed = !dryRun && searchTestPassed?.url === address && Date.now() - searchTestPassed.at < SEARCH_TEST_VALID_MS;
-  if (!alreadyPassed) {
-    const { checkSearchInstance } = await import("@/lib/searchInstanceCheck");
-    const { summarizeSearchStatus } = await import("@/lib/searchTestSummary");
-    const status = await checkSearchInstance({ candidateBaseUrl: address });
-    const result = summarizeSearchStatus(status, address);
-    if (!result.canUse) {
-      searchTestPassed = null;
-      // A Test that ran always answers 200 with the result, so the screen can show it; a Save is refused.
-      if (dryRun) return c.json({ saved: false, result }, 200);
-      return c.json({ error: `${result.headline} ${result.verdict}`, next: result.recommendation }, 400);
-    }
-    if (dryRun) { searchTestPassed = { url: address, at: Date.now() }; return c.json({ saved: false, result }, 200); }
-  }
-  searchTestPassed = null;
-  const saved = setHouseholdSettingValue("search.searxng_url", address);
-  return saved.ok ? c.json({ saved: true }, 200) : c.json({ error: saved.error }, 400);
+  const { testOrSaveSearchAddress } = await import("@/lib/searchAddressSave");
+  const outcome = await testOrSaveSearchAddress(url, dryRun === true);
+  if (outcome.kind === "refused") return c.json({ error: outcome.error, ...(outcome.next ? { next: outcome.next } : {}) }, 400);
+  return outcome.kind === "tested" ? c.json({ saved: false, result: outcome.result }, 200) : c.json({ saved: true }, 200);
 });
 
 const allowTailnetRoute = createRoute({

@@ -14,6 +14,12 @@ import { SettingsView, type SettingsViewProps } from "@/shell/pages/settings/set
 import { scopeValueFor, type KitSettingsKey } from "@/shell/pages/settings/settingsViewer";
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 import { Button } from "@maipai/ui/src/ui/button";
+import { WebSearchSettings } from "@/shell/pages/settings/WebSearchSettings";
+
+/** SEARXNG-SET-05: the keys the Web search block above the Search cards draws itself, so the cards never repeat them. */
+const WEB_SEARCH_BLOCK_KEYS = ["search.searxng_url", "search.web_sources", "search.ddgs_for_minors"];
+const MINOR_DDGS_ONLY = ["search.ddgs_for_minors"];
+const MINOR_DDGS_TITLE = { "household.search": "Teens and children" };
 
 const ChevronDown = getIcon("chevron-down");
 
@@ -76,13 +82,14 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
   const scope = card.scope!;
   const title = card.label;
   const allowed = minorVisibleSettingKeys(viewer.band);
+  const ownsWebSearch = props.section.id === "search" && group === "household.search";
   const rendererProps = {
     scope,
     scopeValue: scopeValueFor(scope, props.person.id),
     honouredBy: "home",
     only: [group],
-    includeKeys: allowed ? [...allowed] : undefined,
-    titleOverrides: { [group]: title },
+    includeKeys: ownsWebSearch ? props.registry.filter((k) => k.lives_in === group && !WEB_SEARCH_BLOCK_KEYS.includes(k.key)).map((k) => k.key) : allowed ? [...allowed] : undefined,
+    titleOverrides: { [group]: ownsWebSearch ? "Web search rules" : title },
     beforeChange: beforeSettingChange,
     focusKey: props.focusKey,
     matrix: card.matrix,
@@ -116,8 +123,10 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const returnPath = `${location.pathname}${location.search}${location.hash}`;
   const viewProps = { person, onPersonChange };
   if (section.kind === "view") return <>{section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
+  const webSearchBlock = section.id === "search" && (viewer.role === "owner" || viewer.role === "admin");
   return (
     <div className="flex min-w-0 flex-col gap-14">
+      {webSearchBlock ? <WebSearchSettings minorsControl={<SettingsRenderer scope="household" scopeValue={scopeValueFor("household", props.person.id)} honouredBy="home" only={["household.search"]} includeKeys={MINOR_DDGS_ONLY} titleOverrides={MINOR_DDGS_TITLE} beforeChange={beforeSettingChange} focusKey={props.focusKey} />} /> : null}
       {section.lead_view ? <SettingsView view={section.lead_view} {...viewProps} /> : null}
       {visibleCards(section, viewer, registry, "home").map((card) => {
         // Until APP-SET-05 re-points the face card onto the kit renderer, the

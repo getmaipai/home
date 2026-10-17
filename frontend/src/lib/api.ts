@@ -109,6 +109,7 @@ export interface ReferenceBookView {
   snapshot_date: string | null; licence: string; article_count: number;
 }
 export interface ReferenceSuggestion { title: string; book: string; path: string }
+export interface WebSearchState { address: string; works: boolean | null; stackOwned: boolean; sources: ("searxng" | "ddgs")[]; ddgsReady: boolean }
 export interface ReferenceSearchHit { title: string; snippet: string; book: string; path: string }
 export type ReferenceInline = string | { type: "text" | "emphasis" | "strong"; text: string } | { type: "link"; text: string; href?: string; book?: string; path?: string };
 export type ReferenceBlock =
@@ -737,6 +738,9 @@ export const api = {
   /** Wizard web search screen: `dryRun` tests the address and saves nothing. */
   setupUseSearchCandidate: (url: string, dryRun = false) => request<{ saved: boolean; result?: import("@/shell/components/searchTestResult").SearchTestResultData }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify(dryRun ? { url, dry_run: true } : { url }) }),
   /** Wizard web search screen, skipped: SearXNG stays unset and DuckDuckGo (adults only) is turned on. */
+  // SEARXNG-SET-05: Settings > Search > Web search (owner and admin).
+  searchWeb: () => request<WebSearchState>("/api/search/web"),
+  searchAddress: (url: string, dryRun = false) => request<{ saved: boolean; cleared?: boolean; result?: import("@/shell/components/searchTestResult").SearchTestResultData }>("/api/search/address", { method: "POST", body: JSON.stringify(dryRun ? { url, dry_run: true } : { url }) }),
   setupSkipSearch: () => request<{ saved: boolean }>("/api/setup/search/use-candidate", { method: "POST", body: JSON.stringify({ ddgs_default: true }) }),
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
