@@ -7,6 +7,22 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.17] - 2026-10-17
+
+Detailed videos with sound, media you can keep on a device for offline play, and a smaller default install.
+
+### Pictures and videos
+- **Detailed videos, with sound and speech.** Videos now come in two kinds, the same two words as pictures. Quick is the short silent clip (5 seconds, about two minutes, can start from a picture) and stays the default. Detailed makes a sound track with spoken words in the same pass, up to 10 seconds, in about a minute or two, from your words, with many more styles to add. Ask chat for talking or sound ("make a video where the hero says come with me"), or a length past 5 seconds, and it picks Detailed. Each card offers **Make it Detailed** or **Make it Quick**, and **Settings**, **Pictures and videos** has a Video quality choice and **Get Detailed videos** (74 GB) which shows the maker's licence in plain points for an owner or admin to accept once. Detailed videos need a Mac with 128 GB, are never in the first-run plan, and stay off until someone gets them. Finished videos of either kind are still checked before they are shown, with five frames for a long one, and the sound is stored untouched.
+
+### Media library
+- A paired device can keep media for offline play when a grown-up allows it. The permission starts off for every device, a removed device or a changed password ends it, tokens are left out of backups, and Chrome and Edge keep the copies in the browser (iPhone and iPad use Go). Files that need conversion are not supported yet.
+
+### Storage
+- The chat AI is always llama.cpp unless an admin chooses otherwise. The faster oMLX chat engine (about 20 percent quicker to answer, less reliable with tools in our tests) is an optional install, never fetched on its own. The Recommended plan needs about 61 GB free instead of 85 GB.
+
+### Reliability
+- The Stack is updated to the build that adds Detailed video and keeps llama.cpp as the default chat engine.
+
 ## [0.2.16] - 2026-10-17
 
 Stronger protection for children and teens in pictures and videos, a Videos app, a Trash for deleted media, and health checks that restart a stuck engine.
@@ -44,7 +60,6 @@ Chat looks things up for live-status questions, and pictures can be edited in wo
 - The Stack is updated to the build that repairs tool names the chat engine mangles and carries the media service and the music engine (no page uses them yet).
 
 ### Media library
-- A paired device can keep media for offline play when a grown-up allows it. The permission starts off for every device, a removed device or a changed password ends it, tokens are left out of backups, and Chrome and Edge keep the copies in the browser (iPhone and iPad use Go). Files that need conversion are not supported yet.
 - Home can scan library folders on this computer or on a mounted network share and list what is in them: videos, shows, films, music, books and audiobooks, with posters, covers, chapters and tags. An owner or admin adds a folder and can rescan it; children see only the titles cleared for a child. No page uses it yet.
 - Home remembers where each person stopped in a video, episode, podcast, audiobook or book, on every screen. The newest place wins, a finished title stays finished, and a child's place is saved only from the child's own screen. Liked, watch later and up next exist for everyone, and playlists, watchlists and pins can be made. The "Pick up where you left off" data now includes unfinished titles beside chats.
 
@@ -60,7 +75,6 @@ Conversation mode speaks a real answer again. Pictures and videos can look like 
 - When the AI engine stops by itself, it now restarts itself, with a short wait between tries and a stop after repeated crashes. Admins get one notification when that happens, and the Status page counts it.
 
 ### Pictures and videos
-- **Detailed videos, with sound and speech.** Videos now come in two kinds, the same two words as pictures. Quick is the short silent clip (5 seconds, about two minutes, can start from a picture) and stays the default. Detailed makes a sound track with spoken words in the same pass, up to 10 seconds, in about a minute or two, from your words, with many more styles to add. Ask chat for talking or sound ("make a video where the hero says come with me"), or a length past 5 seconds, and it picks Detailed. Each card offers **Make it Detailed** or **Make it Quick**, and **Settings**, **Pictures and videos** has a Video quality choice and **Get Detailed videos** (74 GB) which shows the maker's licence in plain points for an owner or admin to accept once. Detailed videos need a Mac with 128 GB, are never in the first-run plan, and stay off until someone gets them. Finished videos of either kind are still checked before they are shown, with five frames for a long one, and the sound is stored untouched.
 - A style, a picture or a video can look like an adult in the household, only when that adult turned on both likeness switches for themselves. Both switches are off for everyone until then. A child, teen or guest cannot turn them on, and a person who leaves the household or leaves the adult age band stops being usable. A photo you attach must show exactly one adult and nobody who looks under 18.
 - Settings, Pictures can add a style from a file path on this computer, because most community styles are larger than the upload form allows.
 - Z-Image Turbo stays an optional picture maker you choose by name; FLUX.2 Klein is the default on every computer.
