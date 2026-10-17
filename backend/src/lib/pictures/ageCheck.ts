@@ -11,9 +11,9 @@
 // test needs, makes or looks at an explicit image.
 import { createHash } from "node:crypto";
 import sharp from "sharp";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { notificationDeliveries, people } from "@/db/schema";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { toWireMessage, type LlmMessage } from "@/lib/llm";
@@ -369,8 +369,20 @@ export async function screenInputImage(bytes: Uint8Array, prompt: string, viewer
 // ---------------------------------------------------------------- the safety event
 
 const NOTIFY_EVERY_MS = 10 * 60 * 1000;
-const lastNotified = new Map<string, number>();
-export function __resetAgeCheckEventsForTests(): void { lastNotified.clear(); }
+/** One quiet period for the whole household (five children are one notice, not five). The time of the last notice is also read back from the stored notifications, so a restart does not forget it. */
+let lastNotifiedAt: number | null = null;
+export function __resetAgeCheckEventsForTests(): void { lastNotifiedAt = null; }
+
+function lastStoredNoticeAt(): number | null {
+  try {
+    const row = db.select({ at: notificationDeliveries.createdAt }).from(notificationDeliveries)
+      .where(eq(notificationDeliveries.typeId, "safety.picture_withheld")).orderBy(desc(notificationDeliveries.createdAt)).limit(1).get();
+    const t = row ? Date.parse(row.at) : NaN;
+    return Number.isFinite(t) ? t : null;
+  } catch {
+    return null;
+  }
+}
 
 export function promptHash(prompt: string): string {
   return createHash("sha256").update(prompt.normalize("NFKC").trim().toLowerCase()).digest("hex").slice(0, 16);
@@ -404,18 +416,19 @@ export async function recordWithheld(event: WithheldEvent): Promise<void> {
   await notifyAdmins(event.kind, event.personId);
 }
 
-/** The admin notification with no image and no words, at most once every ten minutes for one person. Only a notification that went out starts the quiet period. */
+/** The admin notification with no image and no words, at most once every ten minutes for the whole household. Only a notification that went out starts the quiet period. */
 async function notifyAdmins(kind: CheckedKind, personId: string): Promise<void> {
   const now = Date.now();
-  const last = lastNotified.get(personId);
-  if (last !== undefined && now - last < NOTIFY_EVERY_MS) return;
+  const last = Math.max(lastNotifiedAt ?? 0, lastStoredNoticeAt() ?? 0);
+  if (last > 0 && now - last < NOTIFY_EVERY_MS) return;
   // The quiet period starts now, so two refusals in the same instant send one notification; a failed send gives it back.
-  lastNotified.set(personId, now);
+  const before = lastNotifiedAt;
+  lastNotifiedAt = now;
   try {
     const row = db.select({ name: people.displayName }).from(people).where(eq(people.id, personId)).get();
     await trigger("safety.picture_withheld", { kind, personName: row?.name ?? "Someone" });
   } catch (error) {
-    lastNotified.delete(personId);
+    lastNotifiedAt = before;
     console.error(`[age-check] the admin notification failed: ${(error as Error).message}`);
   }
 }

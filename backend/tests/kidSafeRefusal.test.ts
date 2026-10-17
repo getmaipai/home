@@ -33,4 +33,16 @@ describe("the line a refused prompt gets", () => {
   test("a real-person refusal keeps its own line for everyone", () => {
     expect(promptRefusalLineFor("real_person", "picture", people.child, "child", "x", PROMPT_REFUSAL_LINE.real_person)).toBe(PROMPT_REFUSAL_LINE.real_person);
   });
+  test("the quiet period is the household's, and a restart does not forget it", async () => {
+    const other = people.owner; // presents as a teen on this turn
+    promptRefusalLineFor("minor_sexual", "picture", people.child, "child", "x", PROMPT_REFUSAL_LINE.minor_sexual);
+    await Promise.resolve();
+    promptRefusalLineFor("minor_sexual", "picture", other, "teen", "y", PROMPT_REFUSAL_LINE.minor_sexual);
+    await Promise.resolve();
+    expect(withheld()).toHaveLength(1);
+    __resetAgeCheckEventsForTests(); // a restart: the memory is gone, the stored notice is not
+    promptRefusalLineFor("minor_sexual", "picture", other, "teen", "z", PROMPT_REFUSAL_LINE.minor_sexual);
+    await Promise.resolve();
+    expect(withheld()).toHaveLength(1);
+  });
 });
