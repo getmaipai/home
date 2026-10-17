@@ -396,12 +396,14 @@ if [ "$SCOPE" != "docs" ]; then
   UI_TAG="ui-v0.5.233"
   SPEC_TAG="spec-v0.1.152"
   SHARED_REPO="${MAIPAI_COMMONS_DIR:-../commons}"
-  MAIPAI_COMMONS_DIR="$SHARED_REPO"
   if [ ! -d "$SHARED_REPO" ]; then
     echo "getmaipai/commons is missing at $SHARED_REPO (set MAIPAI_COMMONS_DIR); backend and frontend import @maipai/core, @maipai/ui and @maipai/spec from its workspaces."
     exit 1
   fi
   SHARED_REPO="$(cd "$SHARED_REPO" && pwd)"
+  # Absolute on purpose: later stages `cd backend` before passing it on, so the
+  # relative default would resolve to home/commons, which does not exist.
+  MAIPAI_COMMONS_DIR="$SHARED_REPO"
 
   # Resolves one workspace's pin to its tag worktree (creating it via
   # ensure-tag.sh if no consumer has asked for that tag yet, reusing it
