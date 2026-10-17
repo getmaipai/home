@@ -176,3 +176,17 @@ describe("Muse Glimmer 30B (STACK-MUSE-01)", () => {
     expect(laptop[0]?.model.id).toBe("qwen3-8b-instruct-q4-k-m");
   });
 });
+
+describe("Muse Glimmer 30B reads pictures (VISION-03a)", () => {
+  test("both Muse records mirror the Stack's projector pin", () => {
+    for (const id of ["muse-glimmer-30b-q4-k-xl", "muse-glimmer-30b-q4-k-m"]) {
+      const record = CATALOG.find((model) => model.id === id)!;
+      expect(record.tags).toContain("reads-pictures");
+      expect(record.image_input?.projector).toMatchObject({
+        file: "mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+        download: { sha256: "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6", approx_bytes: 1_400_328_928 },
+      });
+      expect(record.image_input?.projector.download.url).toContain(record.download!.url.split("/resolve/")[1]!.split("/")[0]!);
+    }
+  });
+});

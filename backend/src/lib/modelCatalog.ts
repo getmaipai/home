@@ -126,13 +126,26 @@ export const CATALOG: ModelCapabilities[] = [
     engine: "llama-server",
     implemented: true,
     quality_tier: "high",
-    tags: ["recommended"],
-    pros: ["Stronger reasoning and tool use than the 8B", "131k context"],
+    tags: ["recommended", "reads-pictures"],
+    pros: ["Stronger reasoning and tool use than the 8B", "131k context", "Reads the pictures you send"],
     cons: ["Needs a machine with more than 24 GB of memory", "Reasons on every turn, so replies start later"],
     // Muse's template reasons on every turn and has no off switch: the
     // Stack launches it at reasoning_strength "low" (STACK-MUSE-01) and
     // the per-request enable_thinking kwarg Home sends is ignored.
     thinking_mode: "always",
+    // VISION-03a: Meta's own projector for this model, loaded beside it in
+    // the one chat process (the Stack's pin, same revision, sha256 and
+    // bytes), so the model reads the pictures a person sends.
+    image_input: {
+      projector: {
+        file: "mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+        download: {
+          url: "https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/70bf1b61ac09f91b24d39038091b41c582bc5d7a/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+          sha256: "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6",
+          approx_bytes: 1_400_328_928,
+        },
+      },
+    },
     // Meta's own GGUF repo, pinned to one revision; sha256 is the file's
     // git-lfs oid, the same value the Stack verifies on download.
     download: {
@@ -187,13 +200,26 @@ export const CATALOG: ModelCapabilities[] = [
     engine: "llama-server",
     implemented: true,
     quality_tier: "high",
-    tags: ["recommended"],
-    pros: ["Stronger reasoning and tool use than the 8B", "131k context"],
+    tags: ["recommended", "reads-pictures"],
+    pros: ["Stronger reasoning and tool use than the 8B", "131k context", "Reads the pictures you send"],
     cons: ["Needs a machine with more than 24 GB of memory", "Reasons on every turn, so replies start later"],
     // Muse's template reasons on every turn and has no off switch: the
     // Stack launches it at reasoning_strength "low" (STACK-MUSE-01) and
     // the per-request enable_thinking kwarg Home sends is ignored.
     thinking_mode: "always",
+    // VISION-03a: Meta's own projector for this model, loaded beside it in
+    // the one chat process (the Stack's pin, same revision, sha256 and
+    // bytes), so the model reads the pictures a person sends.
+    image_input: {
+      projector: {
+        file: "mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+        download: {
+          url: "https://huggingface.co/meta-models/Muse-Glimmer-30B-GGUF/resolve/70bf1b61ac09f91b24d39038091b41c582bc5d7a/mmproj-Muse-Glimmer-30B-Q4_K_M.gguf",
+          sha256: "f48b452316f9b213758e8659444029b961a24a07f99a1abb2a9f88b06f7c00c6",
+          approx_bytes: 1_400_328_928,
+        },
+      },
+    },
     // Meta's own GGUF repo, pinned to one revision; sha256 is the file's
     // git-lfs oid, the same value the Stack verifies on download.
     download: {
