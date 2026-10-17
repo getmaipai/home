@@ -5,7 +5,7 @@
 import "./runTemp";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { plugin } from "bun";
-import { afterEach, expect } from "bun:test";
+import { afterEach, expect, mock } from "bun:test";
 import * as matchers from "@testing-library/jest-dom/matchers";
 
 // happy-dom's own ReadableStream/WritableStream/TransformStream are
@@ -58,3 +58,9 @@ const { cleanup } = await import("@testing-library/react");
 afterEach(() => {
   cleanup();
 });
+
+// MEDIA-POLISH-01: the kit Player now draws on Home's media pages in tests (the watch page, the docked mini bar). Media Chrome's
+// custom elements build CSS happy-dom cannot parse, so the run swaps them for the kit's own stub, as the kit's test run does
+// (@maipai/ui tests/mediaChromeStub.tsx). Media Chrome's drawing is checked in a real browser.
+const { mediaChromeStub } = await import("@maipai/ui/tests/mediaChromeStub");
+mock.module("media-chrome/react", () => mediaChromeStub);

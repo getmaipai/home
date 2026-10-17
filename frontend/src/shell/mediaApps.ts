@@ -34,3 +34,8 @@ export function mediaAppOfPath(pathname: string): string | null {
   const match = /^\/apps\/([a-z][a-z0-9-]*)(?:\/|$)/.exec(pathname);
   return match && isMediaApp(match[1]!) ? match[1]! : null;
 }
+
+/** MEDIA-POLISH-01: the page of `app` that plays one item (`watch` for Videos), or null for an app that is not a media app. */
+export function playPageOf(app: string): string | null {
+  return Object.values(MEDIA_APP_FOR_KIND).find((target) => target.app === app)?.page ?? null;
+}

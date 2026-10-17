@@ -1,8 +1,8 @@
-// MEDIA-VIDEOS-01: hands the kit Player's media element to the shell's audio session (AUDIO-SESSION-01) for as long as a media app's
-// play page shows it, so one thing plays at a time across media and chat voice, the person's video speed applies, the sleep timer
-// reaches it and the Media Session shows its title. The Player is drawn by the page document; this only finds its element by the
-// kit's own `data-slot="player-media"` and registers it. It draws nothing.
-import { useEffect, useMemo, useState } from "react";
+// MEDIA-VIDEOS-01: hands a media app's playing element to the shell's audio session (AUDIO-SESSION-01), so one thing plays at a time
+// across media and chat voice, the person's video speed applies, the sleep timer reaches it and the Media Session shows its title.
+// MEDIA-POLISH-01: the element is the media host's own (mediaHost.tsx), registered for as long as the host holds the item, on the
+// watch page, in the docked mini bar and while the person is in another app. It draws nothing.
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 import { useAudioRegistration } from "@/shell/audioSessionContext";
@@ -23,8 +23,7 @@ export function chaptersWithEnds(chapters: PlayedItem["chapters"], durationS: nu
   return sorted.map((chapter, index) => ({ start_s: chapter.start_s, end_s: sorted[index + 1]?.start_s ?? durationS ?? chapter.start_s, title: chapter.title }));
 }
 
-export function MediaPlayerRegistration({ appId, mediaId, container }: { appId: string; mediaId: string | null; container: HTMLElement | null }) {
-  const [element, setElement] = useState<HTMLMediaElement | null>(null);
+export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: string; mediaId: string | null; element: HTMLMediaElement | null }) {
   const item = useQuery({
     queryKey: ["media-registration", appId, mediaId],
     queryFn: async () => {
@@ -34,15 +33,6 @@ export function MediaPlayerRegistration({ appId, mediaId, container }: { appId: 
     enabled: mediaId !== null,
     staleTime: 60_000,
   });
-
-  useEffect(() => {
-    if (!container) return;
-    const find = () => setElement((container.querySelector('[data-slot="player-media"]') as HTMLMediaElement | null) ?? null);
-    find();
-    const observer = new MutationObserver(find);
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, [container, mediaId]);
 
   const played = item.data ?? null;
   const audioItem = useMemo<AudioItem>(

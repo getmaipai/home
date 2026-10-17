@@ -3,14 +3,16 @@
 // Player's element is registered with the audio session while the play page shows it.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
-import { MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
+import type { ReactNode } from "react";
+import { Link, MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { TooltipProvider } from "@maipai/ui/src/ui/tooltip";
 import { createQueryClient } from "@maipai/ui/src/queryClient";
 import { Routes } from "@/shell/Routes";
 import { mockHome, makePerson, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import { chaptersWithEnds, MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
-import { mediaAppOfPath, playRoute } from "@/shell/mediaApps";
+import { mediaAppOfPath, playPageOf, playRoute } from "@/shell/mediaApps";
+import { createMediaStore } from "@/shell/mediaHost";
 import type { AppRow } from "@/lib/api";
 
 const row: AppRow = {
@@ -56,13 +58,14 @@ afterEach(() => {
   home.restore();
 });
 
-function open(path: string) {
+function open(path: string, extra: ReactNode = null) {
   const client = createQueryClient();
   return render(
     <QueryClientProvider client={client}>
       <TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
           <RouterRoutes><Route path="/*" element={<Routes person={makePerson("owner")} onSignedIn={() => {}} />} /></RouterRoutes>
+          {extra}
         </MemoryRouter>
       </TooltipProvider>
     </QueryClientProvider>,
@@ -85,18 +88,16 @@ describe("a media app in the shell", () => {
     expect(itemBodies.every((body) => JSON.parse(body).id === "media-aaaaaa")).toBe(true);
   });
 
-  test("the Player's media element is registered with the audio session while the watch page shows it", async () => {
-    // happy-dom cannot draw Media Chrome's time range, so a stand-in element carries the kit's own data-slot.
+  test("the host's media element is registered with the audio session", async () => {
     const container = document.createElement("div");
     const video = document.createElement("video");
-    video.setAttribute("data-slot", "player-media");
     container.appendChild(video);
     document.body.appendChild(container);
     const { audioSession } = await import("@/shell/audioSession");
     const client = createQueryClient();
     render(
       <QueryClientProvider client={client}>
-        <MediaPlayerRegistration appId="videos" mediaId="media-aaaaaa" container={container} />
+        <MediaPlayerRegistration appId="videos" mediaId="media-aaaaaa" element={video} />
       </QueryClientProvider>,
     );
     await waitFor(() => expect(itemBodies.length).toBeGreaterThan(0));
@@ -118,12 +119,63 @@ describe("a media app in the shell", () => {
   });
 });
 
+describe("MEDIA-POLISH-01 the docked mini bar", () => {
+  test("the watch page plays in the host's element, has no app header, and the shell unloads it when it goes", async () => {
+    const view = open("/apps/videos/watch?id=media-aaaaaa");
+    await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"] video')).not.toBeNull());
+    const video = document.querySelector('[data-slot="player"][data-layout="video"] video') as HTMLVideoElement;
+    expect(video.getAttribute("src")).toBe("/api/media/items/media-aaaaaa/content");
+    // The play page has no app header: the picture starts the page.
+    expect(view.queryByRole("tab", { name: "Home" })).toBeNull();
+    expect(document.querySelector('[data-layout="mini"]')).toBeNull();
+    cleanup();
+    expect(video.isConnected).toBe(false);
+  });
+
+  test("leaving the watch page by its tab keeps the element playing in the dock, which opens the player again", async () => {
+    const view = open("/apps/videos/watch?id=media-aaaaaa", <><Link to="/apps/videos">Go to Videos</Link><Link to="/apps/weather">Go to Weather</Link></>);
+    await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"] video')).not.toBeNull());
+    const video = document.querySelector('[data-slot="player"][data-layout="video"] video') as HTMLVideoElement;
+    video.dispatchEvent(new Event("play"));
+    fireEvent.click(view.getByRole("link", { name: "Go to Weather" }));
+    // Another app's area draws no bar (RULES S2); the element waits, still in the document, in the kit's parking spot.
+    await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="video"]')).toBeNull());
+    expect(document.querySelector('[data-layout="mini"]')).toBeNull();
+    expect(video.isConnected).toBe(true);
+    fireEvent.click(view.getByRole("link", { name: "Go to Videos" }));
+    await waitFor(() => expect(document.querySelector('[data-slot="player"][data-layout="mini"]')).not.toBeNull());
+    const dock = document.querySelector('[data-slot="player"][data-layout="mini"]')!;
+    expect(dock.getAttribute("data-placement")).toBe("dock");
+    expect(dock.querySelector("video")).toBe(video);
+    expect(await view.findByRole("button", { name: "Open the player: Building a birdhouse" })).toBeTruthy();
+    fireEvent.click(view.getByRole("button", { name: "Close the player: Building a birdhouse" }));
+    await waitFor(() => expect(document.querySelector('[data-layout="mini"]')).toBeNull());
+    // Three page loads through the whole shell: slower than the default 5 s on a loaded machine.
+  }, 30_000);
+
+  test("the host keeps one element per item and unloads the old one for a new item", () => {
+    const store = createMediaStore();
+    const a = store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "videos");
+    expect(store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "videos")).toBe(a);
+    expect(a.isConnected).toBe(true);
+    const b = store.elementFor({ id: "m2", src: "/b", kind: "video", title: "B" }, "videos");
+    expect(b).not.toBe(a);
+    expect(a.getAttribute("src")).toBeNull();
+    expect(a.isConnected).toBe(false);
+    expect(store.get()).toMatchObject({ id: "m2", appId: "videos", started: false });
+    store.clear();
+    expect(store.get()).toBeNull();
+  });
+});
+
 describe("media app helpers", () => {
   test("playRoute names the owning app's play page, and a kind no app plays has none", () => {
     expect(playRoute("video", "media-a b")).toBe("/apps/videos/watch?id=media-a%20b");
     expect(playRoute("episode", "media-x")).toBe("/apps/shows/watch?id=media-x");
     expect(playRoute("track", "media-x")).toBe("/apps/music/play?id=media-x");
     expect(playRoute("mystery", "media-x")).toBeNull();
+    expect(playPageOf("videos")).toBe("watch");
+    expect(playPageOf("weather")).toBeNull();
   });
 
   test("mediaAppOfPath finds a media app's area and nothing else", () => {

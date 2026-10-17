@@ -266,6 +266,10 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/account"} replace />} />
           ))}
           <Route path="customize" element={<CustomizeRedirect person={person} />} />
+          {/* APP-KIND-04: every installed package app, with no rebuild. Static routes win over this splat.
+              MEDIA-POLISH-01 (RULES S2): an app draws its own header, so app pages sit outside PageHeaderLayout, whose
+              title bar had no entry for them and drew an empty 52 px strip above every app. */}
+          <Route path="apps/*" element={<PackageAppPage person={person} />} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
             <Route path="people" element={<FamilyPage person={person} />} />
@@ -284,9 +288,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="users" element={<UsersPage person={person} />} />
             <Route path="files" element={<FilesPage person={person} />} />
             <Route path="reference/*" element={<ReferencePage />} />
-            {/* APP-KIND-04: every installed package app, with no rebuild. Static routes above win over this splat. */}
             <Route path="all-apps" element={<AllAppsPage person={person} />} />
-            <Route path="apps/*" element={<PackageAppPage person={person} />} />
             {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
             <Route path="media/:id" element={<MediaLinkRedirect />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />

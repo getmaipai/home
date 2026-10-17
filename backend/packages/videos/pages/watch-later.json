@@ -2,10 +2,10 @@
   "type": "page",
   "id": "watch-later",
   "title": "Watch later",
+  "tone": "cinema",
   "body": [
     {
       "type": "media_shelf",
-      "heading": "Watch later",
       "bind": {
         "source": "package",
         "path": "watch-later"
@@ -18,6 +18,8 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
       "on_select": {
         "play": {
           "media_id": "{id}"

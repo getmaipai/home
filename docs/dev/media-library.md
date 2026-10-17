@@ -141,17 +141,21 @@ only library roots and sources an adult named for them (`visible_to` lists them)
 `MediaHostProvider` supplies the kit `MediaHostContext` next to the `AudioSessionProvider`; `onPlay(mediaId, row)` opens
 `/apps/<app>/<page>?id=<id>` with the id as router state, and `/media/<id>` (the Pick up link) resolves to the same route.
 `PackageAppPage` reads the query of a media app's page into the page state (the kit reads state from router state only), so a reload or a
-shared link works; the first tab of a media app is named Home. `MediaPlayerRegistration` finds the kit Player's element (`data-slot="player-media"`)
-and registers it with the audio session (`useAudioRegistration`, kind `video`): one playing thing, the person's video speed, the sleep
-timer and the Media Session title.
+shared link works; the first tab of a media app is named Home.
 
-**Not built, and why (kit gaps).**
+**Playback beyond the page (MEDIA-POLISH-01).** The provider also implements the kit's `MediaHost.mediaFor`: on a media app's route the
+`player` node plays in an element the host creates (`createMediaStore`, one item at a time; a new item unloads the old one). The kit
+Player adopts it while mounted and parks it in the kit's hidden `player-parking` node when it unmounts, never out of the document, so it
+keeps playing. `PackageAppPage` draws the kit Player's `mini` layout with `placement="dock"` and that element once the person has started
+it, on any page of a media app except the one playing it; Close unloads it. Other apps draw nothing (RULES S2, S6). `MediaPlayerRegistration`
+registers the host's element with the audio session (`useAudioRegistration`, kind `video`) for as long as the host holds it: one playing
+thing, the person's video speed, the sleep timer and the Media Session title. The dock reports progress to `/api/plugins/<app>/progress`.
 
-- The docked mini bar. The kit `Player` owns its media element in every layout, so a bar bound to `useMiniBar()` cannot control an element
-  that lives in another Player. Videos stop when the person leaves the Watch page (their place is saved), so nothing needs a bar yet. A
-  hoistable Player (a `mediaElement` prop, or one Player instance the shell keeps) is the kit prop Music and Podcasts need first.
-- Like and Watch later on the Watch page. The kit `list` node ignores page state in its binding params, so a list bound to the item cannot
-  know which item; the `player` node has no actions slot. The `like` route and the `item_actions` data id are in place for the row toggle
-  when `list` passes page state. Until then Watch later is on the Home billboard (a press toggles it), and a finished video leaves Watch later.
-- Two-column Watch (player left, Up next right). `split_view` is not an allowed node on a package page; Up next is a shelf under the player.
+**Look (MEDIA-POLISH-01).** Every Videos page sets `tone: "cinema"` (the kit token set, dark in both themes); shelves are `variant:
+"plain"` with `hide_when_empty` and `see_all`; Watch is a `split_view` (`main`: the player with `details` and the Like and Watch later
+`actions` toggles on the item's `liked` and `watch_later`; `aside`: Up next as a vertical shelf). A media app's header is the app's
+name with icon buttons and chip tabs (`TabsList variant="pill"`); its play page has none. App pages sit outside `PageHeaderLayout`.
+
+**Not built, and why.**
+
 - Captions: the item's `subtitles` are file ids with no serving route yet, so `captions` is empty.

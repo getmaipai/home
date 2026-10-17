@@ -2,6 +2,7 @@
   "type": "page",
   "id": "index",
   "title": "Videos",
+  "tone": "cinema",
   "body": [
     {
       "type": "billboard",
@@ -10,10 +11,11 @@
         "path": "featured"
       },
       "label": "Featured videos",
+      "size": "banner",
       "item_key_field": "id",
       "item_title_field": "title",
       "item_subtitle_field": "{summary}",
-      "item_eyebrow_field": "{channel}",
+      "item_eyebrow_field": "New from {channel}",
       "item_art_field": "backdrop",
       "primary": {
         "label": "Play",
@@ -38,11 +40,7 @@
           }
         }
       ],
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Nothing featured right now."
-      }
+      "hide_when_empty": true
     },
     {
       "type": "media_shelf",
@@ -59,15 +57,20 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/history"
+          }
+        }
+      },
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Nothing to continue yet."
       }
     },
     {
@@ -85,15 +88,20 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/library"
+          }
+        }
+      },
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Nothing new right now."
       }
     },
     {
@@ -111,15 +119,20 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/library"
+          }
+        }
+      },
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Nothing was added lately."
       }
     },
     {
@@ -137,15 +150,20 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/library"
+          }
+        }
+      },
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Watch a few videos and more from the same place shows up here."
       }
     },
     {
@@ -163,15 +181,20 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "hide_when_empty": true,
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/history"
+          }
+        }
+      },
       "on_select": {
         "play": {
           "media_id": "{id}"
         }
-      },
-      "empty_state": {
-        "type": "empty_state",
-        "icon": "film",
-        "text": "Videos you finish show up here."
       }
     },
     {
@@ -189,6 +212,15 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "see_all": {
+        "label": "See all",
+        "action": {
+          "navigate": {
+            "to": "/apps/videos/library"
+          }
+        }
+      },
       "on_select": {
         "play": {
           "media_id": "{id}"

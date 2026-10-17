@@ -2,6 +2,7 @@
   "type": "page",
   "id": "library",
   "title": "Library",
+  "tone": "cinema",
   "body": [
     {
       "type": "picker",
@@ -33,6 +34,8 @@
       "item_badge_field": "copy_label",
       "item_meta_field": "duration_s",
       "aspect": "wide",
+      "variant": "plain",
+      "orientation": "vertical",
       "on_select": {
         "play": {
           "media_id": "{id}"

@@ -7,7 +7,7 @@ The **Videos** app plays the videos that are saved on your hub. It works like Yo
 
 ## Open it
 
-Open **Videos** from the apps list or from your favorites. At the top you see four tabs: **Home**, **Library**, **Watch later** and **History**.
+Open **Videos** from the apps list or from your favorites. At the top you see the app's name and four tabs: **Home**, **Library**, **Watch later** and **History**. Videos stays dark, even when the rest of Home is light, so pictures look their best.
 
 ## Home
 
@@ -16,6 +16,8 @@ Open **Videos** from the apps list or from your favorites. At the top you see fo
 - **Recently added** shows the newest videos. **More from your most watched** shows other videos from the place you watch most.
 - **Watch again** shows videos you finished.
 - **Everything in your library** lists all your videos.
+
+A row with nothing in it does not show. **See all** beside a row opens the full list.
 
 A badge on a picture says **Saved** when the video is stored on your hub.
 
@@ -30,7 +32,11 @@ Press a picture. The video opens with its title. Press the big play button.
 
 When you leave a video and come back, it starts where you stopped. For two seconds it says "Resumed from" and the time, with **Start over** beside it.
 
-Under the video, **Up next** shows what plays after. When a video ends, the next one starts after a short countdown. You can stop the countdown.
+Under the video you see its title and channel, with **Like** and **Watch later**. Press one again to undo it. **Up next** shows what plays after: beside the video on a wide screen, under it on a phone. When a video ends, the next one starts after a short countdown. You can stop the countdown.
+
+## Keep watching while you look around
+
+Leave the video while it plays, and it keeps playing in a small bar at the bottom of Videos. Press the bar to go back to the video. Press the pause button to pause it, or **Close** (the X) to stop it. In other apps you do not see the bar, but the sound keeps playing.
 
 ## Library
 
