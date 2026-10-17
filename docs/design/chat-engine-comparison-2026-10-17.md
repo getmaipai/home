@@ -236,5 +236,5 @@ not scored here. `chat-ab-01.ts` also refuses to start beside any `bun test` or 
 here bypassed that guard with a local edit that is not committed.
 
 Verdict so far: `auto` must not select oMLX; llama-server is the default on every tier and oMLX is opt-in through
-`stack.engines.chat.engine` until the pending rows are in and a release carries `cf356e8`. Re-run `media-tool-choice-01.ts` (committed with
+`stack.engines.chat.engine` until the pending rows are in and a release carries `cf356e8`. Re-run `media-tool-choice-01.ts` (kept in the session scratchpad `mlxquality`, to be committed with
 this note) on any later oMLX, mlx-lm or weight change before flipping the default back.
