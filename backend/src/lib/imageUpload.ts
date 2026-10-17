@@ -1,8 +1,40 @@
 import sharp, { type Metadata } from "sharp";
 import { fileTypeFromBuffer } from "file-type";
+import { execFile } from "node:child_process";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { promisify } from "node:util";
 import { MAX_CHAT_IMAGE_BYTES, CHAT_IMAGE_REFUSAL } from "@/wire";
 
+const run = promisify(execFile);
+
 export const MAX_CHAT_IMAGE_PIXELS = 40_000_000;
+/** The longest edge a stored picture keeps. The Stack bounds one picture
+ * at 2,560 tokens (about a 2,000 pixel photo, measured: VISION-03), so a
+ * larger photo only costs upload bytes and storage. Smaller pictures are
+ * never enlarged. */
+export const MAX_CHAT_IMAGE_EDGE = 2000;
+const HEIC_MIMES = ["image/heic", "image/heif"];
+
+/** HEIC (an iPhone's default) is not in the bundled image library's
+ * decoder, so on a Mac it is converted by the system's own `sips` (local,
+ * built in). Anywhere else the person gets a plain next step. */
+async function heicToJpeg(input: Uint8Array): Promise<Uint8Array> {
+  if (process.platform !== "darwin") throw new Error("This computer cannot open HEIC pictures. Save it as a JPEG or PNG and add it again.");
+  const dir = await mkdtemp(join(tmpdir(), "maipai-heic-"));
+  try {
+    const source = join(dir, "in.heic");
+    const target = join(dir, "out.jpg");
+    await writeFile(source, input, { mode: 0o600 });
+    await run("/usr/bin/sips", ["-s", "format", "jpeg", source, "--out", target], { timeout: 20_000 });
+    return new Uint8Array(await readFile(target));
+  } catch {
+    throw new Error("That HEIC picture could not be read. Save it as a JPEG or PNG and add it again.");
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
 
 export interface CleanedChatImage {
   bytes: Uint8Array;
@@ -11,12 +43,14 @@ export interface CleanedChatImage {
   height: number;
 }
 
-export async function cleanChatImage(input: Uint8Array): Promise<CleanedChatImage> {
-  if (input.byteLength > MAX_CHAT_IMAGE_BYTES) throw new Error(CHAT_IMAGE_REFUSAL);
-  const detected = await fileTypeFromBuffer(input);
-  if (!detected || !["image/jpeg", "image/png", "image/webp", "image/gif", "image/heic", "image/heif"].includes(detected.mime)) {
+export async function cleanChatImage(original: Uint8Array): Promise<CleanedChatImage> {
+  if (original.byteLength > MAX_CHAT_IMAGE_BYTES) throw new Error(CHAT_IMAGE_REFUSAL);
+  const detected = await fileTypeFromBuffer(original);
+  if (!detected || !["image/jpeg", "image/png", "image/webp", "image/gif", ...HEIC_MIMES].includes(detected.mime)) {
     throw new Error("That file is not a supported picture.");
   }
+  // sips keeps the EXIF orientation in the JPEG it writes, so the rotate below still applies it.
+  const input = HEIC_MIMES.includes(detected.mime) ? await heicToJpeg(original) : original;
   const pipeline = sharp(input, { limitInputPixels: MAX_CHAT_IMAGE_PIXELS, failOn: "error" });
   let metadata: Metadata;
   try {
@@ -28,7 +62,8 @@ export async function cleanChatImage(input: Uint8Array): Promise<CleanedChatImag
   if (!metadata.width || !metadata.height || metadata.width * metadata.height > MAX_CHAT_IMAGE_PIXELS) {
     throw new Error("That picture is too large to process.");
   }
-  const { data, info } = await pipeline.rotate().jpeg({ quality: 88, mozjpeg: true }).toBuffer({ resolveWithObject: true });
+  // EXIF orientation is applied, then every tag (GPS, camera, time) is dropped: sharp writes none unless asked.
+  const { data, info } = await pipeline.rotate().resize({ width: MAX_CHAT_IMAGE_EDGE, height: MAX_CHAT_IMAGE_EDGE, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 88, mozjpeg: true }).toBuffer({ resolveWithObject: true });
   return { bytes: new Uint8Array(data), mediaType: "image/jpeg", width: info.width, height: info.height };
 }
 

@@ -49,8 +49,15 @@ function newLocalAttachmentId(): string {
   return `att-${Array.from(bytes, (byte) => byte.toString(36).padStart(2, "0")).join("")}`;
 }
 
+/** An iPhone's HEIC picture: Chrome and Windows often give it no type at
+ * all, so the file name decides. The hub converts it (imageUpload.ts). */
+const HEIC_NAME = /\.(heic|heif)$/i;
+function isPicture(file: File): boolean {
+  return file.type.toLowerCase().startsWith("image/") || HEIC_NAME.test(file.name);
+}
+
 function validateImage(file: File): void {
-  if (!file.type.toLowerCase().startsWith("image/")) {
+  if (!isPicture(file)) {
     throw new Error("MaiPai can only add image files here.");
   }
   if (file.size > MAX_IMAGE_BYTES) {
@@ -74,7 +81,7 @@ function validateImage(file: File): void {
 export function createLocalImageAttachmentAdapter(options: LocalImageAttachmentAdapterOptions = {}): AttachmentAdapter {
   return {
     get accept() {
-      return options.enabled?.() !== false ? "image/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp";
+      return options.enabled?.() !== false ? "image/*,.heic,.heif,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp" : ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp";
     },
 
     async add({ file }): Promise<PendingAttachment> {

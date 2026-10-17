@@ -92,4 +92,11 @@ describe("local image attachment adapter", () => {
     await expect(adapter.add({ file: new File(["x"], "x.bin", { type: "application/octet-stream" }) })).rejects.toThrow("image files");
     await expect(adapter.add({ file: new File([new Uint8Array(50 * 1024 * 1024 + 1)], "large.pdf", { type: "application/pdf" }) })).rejects.toThrow("under 50 MB");
   });
+
+  test("takes an iPhone HEIC picture by its name when the browser gives it no type, and lists it in the picker", async () => {
+    const adapter = createLocalImageAttachmentAdapter();
+    expect(adapter.accept).toContain(".heic");
+    const pending = await adapter.add({ file: new File(["x"], "IMG_0001.HEIC", { type: "" }) }) as PendingAttachment;
+    expect(pending.type).toBe("image");
+  });
 });
