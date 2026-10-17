@@ -1,0 +1,1144 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MaiPai Media Apps</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="icon" href="data:,">
+<meta name="description" content="Design preview of the MaiPai Home media apps (Videos, Shows and Films, Music, Podcasts, Books): a clickable mockup at phone, desktop and TV sizes, a kid-mode variant, and a plain summary. Placeholder titles only.">
+<style>
+/* Layout concept: a design bar on top, then one app frame that is the hub's shell (56 px rail from 640 px, a drawer below it)
+   with the media screens inside. The frame is a CSS container, so the same markup draws the phone, desktop and TV layouts.
+   Tokens: hex values copied by hand from commons/ui/src/tokens.css (Home's dark set). The cinema tone is the dark page tone
+   pushed one step darker; kid values follow docs/design/kid-mode-app-voice-2026-10-17.md section 4. Placeholder content only. */
+:root {
+  color-scheme: dark;
+  --background: #07111f; --cinema: #040a14; --card: #102238; --card-2: #0b1a2c; --foreground: #f4f8ff;
+  --muted: #142a43; --muted-foreground: #a9bed7; --border: #294563; --scrim: rgba(4, 10, 20, 0.86);
+  --primary: #21a6ff; --primary-foreground: #07111f;
+  --hue-violet: #a434ff; --hue-violet-deep: #7a1fd6; --hue-teal: #00e3ae; --hue-orange: #ff8a35; --hue-pink: #ff3e9a;
+  --hue-red: #ff4b62; --hue-green: #22c55e; --hue-yellow: #facc15;
+  --radius-card: 16px; --radius-control: 10px; --radius-pill: 999px;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --target: 48px; --fs-body: 16px; --fs-title: 28px; --fs-small: 13px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--cinema); color: var(--foreground); font-family: var(--font-sans); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible, select:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+svg.i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.fill { fill: currentColor; stroke: none; }
+h1, h2, h3 { text-wrap: balance; }
+
+/* ---------- design bar (outside the app) ---------- */
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 50; background: color-mix(in srgb, var(--cinema) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--muted);
+  padding-block: 10px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+.bar .name { font-weight: 800; letter-spacing: -0.01em; display: flex; align-items: center; gap: 8px; margin-right: auto; }
+.bar .name .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--primary), var(--hue-violet)); }
+.bar .name small { color: var(--muted-foreground); font-weight: 600; }
+.seg { display: inline-flex; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-pill); padding: 3px; gap: 2px; }
+.seg button { padding: 6px 12px; border-radius: var(--radius-pill); font-weight: 650; font-size: 13px; color: var(--muted-foreground); min-height: 32px; }
+.seg button[aria-pressed="true"] { background: var(--foreground); color: var(--cinema); }
+.ctl { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ctl label { font-size: 12px; font-weight: 700; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: 0.06em; }
+.ctl select { background: var(--card-2); color: var(--foreground); border: 1px solid var(--muted); border-radius: var(--radius-pill); padding: 7px 12px; font: inherit; font-size: 13px; font-weight: 650; min-height: 34px; max-width: 220px; }
+.toggle { display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: var(--radius-pill); background: var(--card-2); border: 1px solid var(--muted); font-size: 13px; font-weight: 650; min-height: 34px; }
+.toggle .sw { width: 30px; height: 18px; border-radius: 99px; background: var(--muted); position: relative; transition: background .15s; }
+.toggle .sw::after { content: ""; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--muted-foreground); transition: transform .15s; }
+.toggle[aria-pressed="true"] .sw { background: var(--primary); }
+.toggle[aria-pressed="true"] .sw::after { transform: translateX(12px); background: var(--primary-foreground); }
+.toggle.kid[aria-pressed="true"] .sw { background: #ffc94d; }
+@media (max-width: 700px) {
+  .bar { position: static; gap: 8px; padding-block: 8px; }
+  .bar .name small { display: none; }
+  .ctl { width: 100%; gap: 6px; }
+  .ctl select { max-width: none; flex: 1 1 120px; min-width: 0; }
+  .seg button { padding: 6px 10px; }
+  .bar [data-size="phone"] { display: none; }
+  .ctl label { display: none; }
+  .caption .tag { display: none; }
+  .caption p { font-size: 14px; }
+}
+
+/* ---------- try view ---------- */
+.try { padding-block: 14px 32px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.caption { max-width: 860px; margin: 0 auto 12px; display: flex; gap: 12px; align-items: flex-start; }
+.caption .tag { flex: none; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary-foreground); background: var(--primary); border-radius: var(--radius-pill); padding: 3px 9px; margin-top: 2px; }
+.caption p { margin: 0; color: var(--muted-foreground); font-size: 15px; min-width: 0; }
+.caption p b { color: var(--foreground); }
+.stage { display: flex; justify-content: center; min-width: 0; }
+.fitbox { position: relative; flex: none; }
+.frame { container: app / inline-size; position: relative; overflow: hidden; background: var(--background); border-radius: 22px; border: 1px solid var(--muted); box-shadow: 0 30px 80px -30px rgba(0,0,0,.8); transform-origin: top left; }
+body[data-size="fit"] .try { padding-left: 0; padding-right: 0; padding-top: 0; }
+body[data-size="fit"] .caption { padding: 12px max(16px, env(safe-area-inset-left, 0px)) 0; }
+body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0; }
+
+/* ---------- the app (inside the frame) ---------- */
+.app { position: absolute; inset: 0; font-size: var(--fs-body); background: var(--background); font-family: var(--font-sans); --rail-w: 0px; }
+.app[data-mode="child"] { --cinema: #141c2b; --background: #1a2333; --card: #26324c; --card-2: #1f2a40; --muted: #2c3a55; --border: #3d4e6e; --muted-foreground: #d3ddeb;
+  --primary: #ffc94d; --primary-foreground: #1d1503; --radius-card: 24px; --radius-control: 16px; --target: 76px; --fs-body: 18px; --fs-title: 32px; --fs-small: 15px;
+  --font-sans: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", system-ui, sans-serif; }
+@container app (min-width: 640px) { .app { --rail-w: 56px; } }
+.app[data-tv="1"] { --rail-w: 0px; --fs-body: 18px; }
+.rail { position: absolute; left: 0; top: 0; bottom: 0; width: 56px; background: var(--cinema); border-right: 1px solid var(--muted); display: none; flex-direction: column; align-items: center; gap: 4px; padding: 10px 0; z-index: 20; }
+@container app (min-width: 640px) { .rail { display: flex; } }
+.app[data-tv="1"] .rail { display: none; }
+.rail .brand { width: 30px; height: 30px; border-radius: 9px; background: linear-gradient(135deg, var(--primary), var(--hue-violet)); margin-bottom: 8px; }
+.rail button { width: 44px; height: 44px; border-radius: 12px; display: grid; place-items: center; color: var(--muted-foreground); position: relative; }
+.rail button:hover { background: var(--muted); color: var(--foreground); }
+.rail button[aria-current="page"] { background: var(--muted); color: var(--foreground); }
+.rail button[aria-current="page"]::before { content: ""; position: absolute; left: -6px; top: 12px; bottom: 12px; width: 3px; border-radius: 3px; background: var(--primary); }
+.rail .sep { width: 24px; height: 1px; background: var(--muted); margin: 6px 0; }
+.rail .grow { flex: 1; }
+.avatar { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 13px; color: var(--primary-foreground); background: var(--hue-teal); }
+.app[data-mode="child"] .avatar { background: var(--hue-pink); color: #fff; }
+
+.menubtn { position: absolute; top: 12px; left: 12px; z-index: 25; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--scrim); border: 1px solid var(--muted); backdrop-filter: blur(10px); }
+@container app (min-width: 640px) { .menubtn { display: none; } }
+.app[data-tv="1"] .menubtn, .app[data-immersive="1"] .menubtn { display: none; }
+
+.scroller { position: absolute; top: 0; bottom: 0; right: 0; left: var(--rail-w); overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
+.screen { min-height: 100%; padding-bottom: 24px; }
+.screen[hidden] { display: none; }
+.pad { padding-left: 16px; padding-right: 16px; }
+@container app (min-width: 640px) { .pad { padding-left: 28px; padding-right: 28px; } }
+@container app (min-width: 1100px) { .pad { padding-left: 40px; padding-right: 40px; } }
+
+/* app header */
+.ahead { display: flex; align-items: center; gap: 8px; padding-top: 14px; min-height: 68px; }
+.ahead h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.02em; margin: 0 auto 0 52px; }
+@container app (min-width: 640px) { .ahead h1 { margin-left: 0; font-size: var(--fs-title); } }
+.app[data-tv="1"] .ahead h1 { margin-left: 0; }
+.ibtn { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--foreground); flex: none; }
+.ibtn:hover { background: var(--muted); }
+.ibtn.solid { background: var(--scrim); border: 1px solid var(--muted); backdrop-filter: blur(8px); }
+.tabs { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-block: 4px 12px; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { flex: none; padding: 7px 14px; border-radius: var(--radius-pill); font-weight: 650; font-size: 14px; color: var(--muted-foreground); background: transparent; border: 1px solid var(--muted); min-height: 36px; }
+.tab[aria-selected="true"] { background: var(--foreground); color: var(--cinema); border-color: var(--foreground); }
+.tabs.under .tab { border: 0; border-radius: 0; padding: 8px 2px; margin-right: 16px; border-bottom: 2px solid transparent; }
+.tabs.under .tab[aria-selected="true"] { background: none; color: var(--foreground); border-bottom-color: var(--primary); }
+
+/* banners */
+.net { display: none; align-items: center; gap: 10px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-control); padding: 10px 12px; margin-bottom: 14px; font-size: 14px; }
+.net svg { color: var(--hue-orange); }
+.app[data-net="off"] .net { display: flex; }
+.app[data-net="off"] .needs-net { display: none !important; }
+.app[data-net="off"] .stream-only { opacity: .55; }
+
+/* artwork: gradients from the hue tokens stand in for pictures */
+.art { position: relative; overflow: hidden; background: linear-gradient(160deg, var(--c1), var(--c2)); isolation: isolate; }
+.art::before { content: ""; position: absolute; width: 46%; aspect-ratio: 1; border-radius: 50%; left: var(--sx, 62%); top: var(--sy, 14%); background: radial-gradient(circle, color-mix(in srgb, var(--c3, #fff) 70%, transparent), transparent 68%); z-index: -1; }
+.art::after { content: ""; position: absolute; inset: auto 0 0 0; height: 46%; background: color-mix(in srgb, var(--cinema) 55%, var(--c2)); clip-path: polygon(0 55%, 18% 30%, 34% 48%, 52% 18%, 70% 44%, 86% 26%, 100% 40%, 100% 100%, 0 100%); z-index: -1; opacity: .85; }
+.a0 { --c1: var(--hue-violet); --c2: #0d2a55; --c3: var(--primary); }
+.a1 { --c1: var(--hue-teal); --c2: #06345a; --c3: #e8fff9; --sx: 12%; }
+.a2 { --c1: var(--hue-orange); --c2: #5a1236; --c3: var(--hue-yellow); --sy: 30%; }
+.a3 { --c1: var(--hue-pink); --c2: #2a0f5c; --c3: #ffd1e8; --sx: 20%; }
+.a4 { --c1: #1f5488; --c2: #050c18; --c3: #ffb36b; --sx: 70%; --sy: 6%; }
+.a5 { --c1: #33d6c2; --c2: #0f4d6b; --c3: var(--hue-yellow); --sx: 8%; --sy: 4%; }
+.a6 { --c1: var(--hue-yellow); --c2: #a2440c; --c3: #fff6d6; --sx: 40%; }
+.a7 { --c1: var(--primary); --c2: #0a1d3a; --c3: #ffffff; --sx: 74%; --sy: 26%; }
+.a8 { --c1: var(--hue-red); --c2: #3b0d4a; --c3: var(--hue-orange); --sx: 30%; --sy: 22%; }
+.a9 { --c1: var(--hue-green); --c2: #0b3b3a; --c3: #eaffd6; --sx: 66%; }
+.posterart::after { height: 34%; }
+
+/* shelves and tiles */
+.shelf-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 22px 0 10px; }
+.shelf-h h2 { font-size: 19px; font-weight: 800; letter-spacing: -0.01em; margin: 0; }
+.shelf-h a, .shelf-h .more { color: var(--muted-foreground); font-size: 14px; font-weight: 650; }
+.shelf { display: grid; grid-auto-flow: column; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; padding: 4px 16px 6px; margin: 0 -16px; grid-auto-columns: 72%; scroll-padding-inline: 16px; }
+.shelf::-webkit-scrollbar { display: none; }
+.shelf > * { scroll-snap-align: start; }
+@container app (min-width: 640px) { .shelf { grid-auto-columns: calc((100% - 36px) / 3.2); margin: 0 -28px; padding: 4px 28px 6px; scroll-padding-inline: 28px; } }
+@container app (min-width: 1100px) { .shelf { grid-auto-columns: calc((100% - 48px) / 4.3); margin: 0 -40px; padding: 4px 40px 6px; scroll-padding-inline: 40px; } }
+.shelf.posters { grid-auto-columns: 38%; }
+@container app (min-width: 640px) { .shelf.posters { grid-auto-columns: calc((100% - 60px) / 5.4); } }
+@container app (min-width: 1100px) { .shelf.posters { grid-auto-columns: calc((100% - 84px) / 7.4); } }
+.shelf.squares { grid-auto-columns: 44%; }
+@container app (min-width: 640px) { .shelf.squares { grid-auto-columns: calc((100% - 48px) / 4.4); } }
+@container app (min-width: 1100px) { .shelf.squares { grid-auto-columns: calc((100% - 72px) / 6.4); } }
+
+.tile { text-align: left; display: flex; flex-direction: column; gap: 8px; min-width: 0; border-radius: var(--radius-control); transition: transform .15s ease; }
+.tile .art { aspect-ratio: 16 / 9; border-radius: var(--radius-control); width: 100%; }
+.tile.poster .art { aspect-ratio: 2 / 3; }
+.tile.square .art { aspect-ratio: 1; }
+.tile:hover .art { box-shadow: 0 0 0 2px var(--foreground); }
+.dur { position: absolute; right: 6px; bottom: 6px; background: rgba(0,0,0,.78); color: #fff; font-size: 12px; font-weight: 700; padding: 1px 6px; border-radius: 6px; font-variant-numeric: tabular-nums; }
+.prog { position: absolute; left: 0; right: 0; bottom: 0; height: 4px; background: rgba(255,255,255,.25); }
+.prog i { display: block; height: 100%; background: var(--hue-red); }
+.app[data-mode="child"] .prog i { background: var(--primary); }
+.badge { position: absolute; left: 6px; top: 6px; display: inline-flex; align-items: center; gap: 4px; background: rgba(0,0,0,.72); color: #fff; font-size: 11px; font-weight: 750; padding: 3px 7px 3px 5px; border-radius: 999px; }
+.badge svg.i { width: 13px; height: 13px; stroke-width: 2.6; }
+.badge.dev { background: var(--primary); color: var(--primary-foreground); }
+.badge.new { background: var(--hue-red); color: #fff; padding-left: 7px; }
+.tmeta { display: flex; gap: 10px; min-width: 0; }
+.chav { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff; }
+.ttl { font-weight: 700; font-size: 15px; line-height: 1.3; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sub { color: var(--muted-foreground); font-size: var(--fs-small); margin: 2px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ptitle { position: absolute; inset: auto 8px 10px 8px; font-weight: 900; font-size: clamp(13px, 3.5cqi, 20px); line-height: 1.05; letter-spacing: -0.01em; text-shadow: 0 2px 10px rgba(0,0,0,.5); text-transform: uppercase; }
+.tile.poster .ptitle { font-size: 15px; }
+
+/* billboard (videos) */
+.bill { position: relative; border-radius: var(--radius-card); overflow: hidden; aspect-ratio: 4 / 3; display: flex; align-items: flex-end; }
+@container app (min-width: 640px) { .bill { aspect-ratio: auto; height: 340px; } }
+.bill .art { position: absolute; inset: 0; z-index: 0; }
+.bill .scrim { position: absolute; inset: 0; background: linear-gradient(0deg, rgba(4,10,20,.92) 0%, rgba(4,10,20,.35) 55%, transparent 80%); }
+.bill .copy { position: relative; padding: 18px; display: flex; flex-direction: column; gap: 8px; max-width: 560px; }
+.kick { font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--primary); }
+.bill h2 { font-size: 26px; line-height: 1.1; margin: 0; letter-spacing: -0.02em; }
+.bill p { margin: 0; color: #d8e4f3; font-size: 15px; }
+.row-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--target); padding: 0 18px; border-radius: var(--radius-control); font-weight: 750; font-size: 15px; background: var(--muted); color: var(--foreground); }
+.btn.primary { background: var(--foreground); color: var(--cinema); }
+.btn.accent { background: var(--primary); color: var(--primary-foreground); }
+.btn.ghost { background: rgba(255,255,255,.14); backdrop-filter: blur(6px); }
+.btn.sm { min-height: 36px; padding: 0 12px; font-size: 13px; border-radius: var(--radius-pill); }
+.dots { position: absolute; right: 16px; bottom: 18px; display: flex; gap: 6px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: rgba(255,255,255,.4); }
+.dots i.on { background: #fff; width: 20px; border-radius: 4px; }
+
+/* netflix hero */
+.nhero { position: relative; min-height: 520px; display: flex; align-items: flex-end; }
+@container app (min-width: 640px) { .nhero { min-height: 560px; } }
+.nhero > .art { position: absolute; inset: 0; }
+.nhero .scrim { position: absolute; inset: 0; background: linear-gradient(0deg, var(--background) 2%, rgba(7,17,31,.55) 40%, rgba(7,17,31,.1) 70%, rgba(7,17,31,.6) 100%), linear-gradient(90deg, rgba(7,17,31,.75), transparent 60%); }
+.nhero .copy { position: relative; padding-bottom: 26px; display: flex; flex-direction: column; gap: 10px; max-width: 620px; }
+.logo-type { font-size: clamp(40px, 9cqi, 76px); font-weight: 900; line-height: .92; letter-spacing: -0.03em; text-transform: uppercase; margin: 0; text-shadow: 0 6px 30px rgba(0,0,0,.45); }
+.meta-line { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; color: #d8e4f3; font-size: 14px; font-weight: 600; }
+.rating { border: 1px solid rgba(255,255,255,.5); padding: 0 6px; border-radius: 4px; font-size: 12px; }
+.over { position: absolute; top: 0; left: 0; right: 0; z-index: 3; background: linear-gradient(180deg, rgba(4,10,20,.75), transparent); }
+
+/* lists */
+.list { display: flex; flex-direction: column; }
+.rowi { display: flex; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--muted); align-items: flex-start; min-width: 0; text-align: left; width: 100%; }
+.rowi:last-child { border-bottom: 0; }
+.rowi .thumb { width: 132px; flex: none; aspect-ratio: 16/9; border-radius: 8px; }
+.rowi .sq { width: 64px; aspect-ratio: 1; border-radius: 10px; flex: none; }
+.rowi .body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 3px; }
+.rowi .desc { color: var(--muted-foreground); font-size: 14px; margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 6px; }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 999px; background: var(--muted); color: var(--foreground); min-height: 26px; }
+.chip svg.i { width: 14px; height: 14px; }
+.chip.ok { background: color-mix(in srgb, var(--hue-teal) 18%, transparent); color: #7ff2d3; }
+.chip.dev { background: color-mix(in srgb, var(--primary) 20%, transparent); color: #9bd5ff; }
+.chip.warn { background: color-mix(in srgb, var(--hue-orange) 18%, transparent); color: #ffc08f; }
+.chip.btnlike { background: transparent; border: 1px solid var(--border); }
+.pbtn { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--foreground); color: var(--cinema); flex: none; }
+.pbtn svg.i { width: 16px; height: 16px; }
+
+/* watch page */
+.watch { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 28px; }
+@container app (min-width: 1000px) { .watch { grid-template-columns: minmax(0, 1fr) 360px; padding: 20px 28px 0; } }
+.player { position: relative; aspect-ratio: 16 / 9; background: #000; overflow: hidden; user-select: none; }
+@container app (min-width: 1000px) { .player { border-radius: var(--radius-card); } }
+.player > .art { position: absolute; inset: 0; transition: filter .3s; }
+.player.paused > .art { filter: brightness(.7); }
+.player .tapzone { position: absolute; top: 0; bottom: 56px; width: 38%; z-index: 2; }
+.player .tapzone.l { left: 0; } .player .tapzone.r { right: 0; }
+.player .big { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 64px; height: 64px; border-radius: 50%; background: rgba(0,0,0,.55); display: grid; place-items: center; z-index: 3; color: #fff; }
+.player .big svg.i { width: 28px; height: 28px; }
+.player:not(.paused) .big { opacity: 0; pointer-events: none; }
+.player .ripple { position: absolute; top: 50%; transform: translateY(-50%); z-index: 4; background: rgba(255,255,255,.18); color: #fff; font-weight: 800; font-size: 14px; padding: 10px 16px; border-radius: 999px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+.player .ripple.show { opacity: 1; }
+.player .ripple.l { left: 10%; } .player .ripple.r { right: 10%; }
+.player .skipchip { position: absolute; right: 12px; bottom: 64px; z-index: 4; background: rgba(0,0,0,.72); color: #fff; border: 1px solid rgba(255,255,255,.3); padding: 8px 14px; border-radius: 999px; font-weight: 750; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.player .closebtn { position: absolute; left: 10px; top: 10px; z-index: 5; color: #fff; }
+.controls { position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; padding: 18px 10px 6px; background: linear-gradient(0deg, rgba(0,0,0,.85), transparent); color: #fff; }
+.scrub { position: relative; height: 18px; display: flex; align-items: center; cursor: pointer; }
+.scrub .track { position: absolute; left: 0; right: 0; height: 4px; border-radius: 4px; background: rgba(255,255,255,.3); }
+.scrub .fill { position: absolute; left: 0; height: 4px; border-radius: 4px; background: var(--hue-red); }
+.app[data-mode="child"] .scrub .fill { background: var(--primary); }
+.scrub .knob { position: absolute; width: 14px; height: 14px; border-radius: 50%; background: var(--hue-red); transform: translateX(-50%); }
+.app[data-mode="child"] .scrub .knob { background: var(--primary); width: 22px; height: 22px; }
+.scrub .tick { position: absolute; width: 3px; height: 4px; background: rgba(0,0,0,.9); }
+.scrub .seg-sp { position: absolute; height: 4px; background: var(--hue-yellow); opacity: .85; }
+.cbar { display: flex; align-items: center; gap: 2px; }
+.cbar .ibtn { color: #fff; width: 40px; height: 40px; }
+.cbar .time { font-size: 13px; font-weight: 650; font-variant-numeric: tabular-nums; margin: 0 8px; white-space: nowrap; }
+.cbar .spacer { flex: 1; }
+@container app (max-width: 480px) { .cbar .ibtn { width: 34px; } .cbar .hide-sm { display: none; } .cbar .time { margin: 0 4px; font-size: 12px; } }
+.cbar .rate { font-weight: 800; font-size: 13px; min-width: 44px; height: 32px; border-radius: 999px; border: 1px solid rgba(255,255,255,.4); padding: 0 8px; }
+.winfo { padding-top: 14px; }
+.winfo h1 { font-size: 20px; line-height: 1.25; margin: 0 0 10px; letter-spacing: -0.01em; }
+.chanrow { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.chanrow .who { min-width: 0; flex: 1; }
+.chanrow .who b { display: block; }
+.actrow { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; }
+.actrow::-webkit-scrollbar { display: none; }
+.actrow .btn { flex: none; }
+.panel { background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); padding: 12px 14px; margin-top: 14px; }
+.panel h3 { margin: 0 0 6px; font-size: 15px; }
+.chap { display: flex; gap: 10px; align-items: center; padding: 8px 0; width: 100%; text-align: left; border-top: 1px solid var(--muted); }
+.chap:first-of-type { border-top: 0; }
+.chap .ts { font-variant-numeric: tabular-nums; color: var(--primary); font-weight: 750; font-size: 13px; width: 46px; flex: none; }
+.chap.on { color: var(--primary); }
+.upnext h2 { font-size: 17px; margin: 18px 0 4px; display: flex; justify-content: space-between; align-items: center; }
+.upnext h2 small { color: var(--muted-foreground); font-weight: 600; font-size: 13px; }
+@container app (min-width: 1000px) { .upnext h2 { margin-top: 0; } }
+.upnext .rowi .thumb { width: 150px; }
+
+/* mini bar */
+.mini { position: sticky; bottom: 0; z-index: 15; margin-top: 8px; background: color-mix(in srgb, var(--card) 94%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--border); display: none; }
+.app[data-mini="1"] .mini { display: block; }
+.mini .mprog { height: 3px; background: var(--muted); }
+.mini .mprog i { display: block; height: 100%; background: var(--primary); }
+.mini .in { display: flex; align-items: center; gap: 12px; padding: 8px 12px; }
+.mini .mart { width: 46px; height: 46px; border-radius: 8px; flex: none; }
+.mini .mt { min-width: 0; flex: 1; text-align: left; }
+.mini .mt b { display: block; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini .mc { display: none; align-items: center; gap: 4px; }
+.mini .mcenter { display: flex; align-items: center; gap: 6px; }
+.mini .mright { display: none; justify-content: flex-end; }
+@container app (min-width: 900px) { .mini .in { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); padding: 10px 24px; } .mini .mc, .mini .mright { display: flex; } .mini .mart { width: 54px; height: 54px; }
+  .mini .mcenter .play1 { background: var(--foreground); color: var(--cinema); width: 40px; height: 40px; } }
+
+/* now playing */
+.np { min-height: 100%; position: relative; display: flex; flex-direction: column; background: radial-gradient(120% 70% at 50% 0%, color-mix(in srgb, var(--hue-orange) 38%, var(--background)), var(--background) 70%); }
+.np .top { display: flex; align-items: center; justify-content: space-between; padding: 12px 12px 0; }
+.np .top .lbl { text-align: center; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted-foreground); font-weight: 700; }
+.np .top .lbl b { display: block; color: var(--foreground); text-transform: none; letter-spacing: 0; font-size: 14px; }
+.npgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; padding: 16px 24px 28px; flex: 1; align-content: start; }
+@container app (min-width: 900px) { .npgrid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); padding: 24px 48px; gap: 48px; align-content: center; } }
+.cover { width: 100%; max-width: 420px; aspect-ratio: 1; border-radius: 14px; margin: 0 auto; box-shadow: 0 30px 60px -20px rgba(0,0,0,.7); }
+.cover.book { aspect-ratio: 1; max-width: 300px; }
+.np h1 { margin: 0; font-size: 24px; letter-spacing: -0.01em; }
+.np .artist { color: var(--muted-foreground); margin: 2px 0 0; font-size: 16px; }
+.np .titlerow { display: flex; align-items: center; gap: 12px; }
+.np .titlerow > div { flex: 1; min-width: 0; }
+.bigscrub .times { display: flex; justify-content: space-between; color: var(--muted-foreground); font-size: 12px; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.bigscrub .scrub .fill, .bigscrub .scrub .knob { background: var(--foreground); }
+.trans { display: flex; align-items: center; justify-content: space-between; max-width: 380px; margin: 4px auto 0; width: 100%; }
+.trans .ibtn svg.i { width: 26px; height: 26px; }
+.trans .play { width: 68px; height: 68px; border-radius: 50%; background: var(--foreground); color: var(--cinema); display: grid; place-items: center; }
+.trans .play svg.i { width: 28px; height: 28px; }
+.trans .lab { font-size: 11px; font-weight: 800; position: relative; }
+.np .foot { display: flex; justify-content: space-between; align-items: center; color: var(--muted-foreground); font-size: 13px; gap: 10px; flex-wrap: wrap; }
+.np .foot button { display: inline-flex; gap: 6px; align-items: center; color: var(--primary); font-weight: 700; min-height: 40px; }
+.npcol { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.queue { display: none; }
+@container app (min-width: 900px) { .queue { display: block; } }
+.sleepchip { align-self: center; }
+
+/* sheet and toast */
+.sheet-wrap { position: absolute; inset: 0; z-index: 40; background: rgba(0,0,0,.5); display: flex; align-items: flex-end; justify-content: center; }
+.sheet-wrap[hidden] { display: none; }
+.sheet { width: 100%; max-width: 520px; background: var(--card); border: 1px solid var(--border); border-radius: 22px 22px 0 0; padding: 10px 16px 18px; max-height: 80%; overflow-y: auto; }
+@container app (min-width: 640px) { .sheet-wrap { align-items: center; } .sheet { border-radius: 20px; } }
+.sheet .grab { width: 40px; height: 5px; border-radius: 3px; background: var(--border); margin: 0 auto 10px; }
+.sheet h3 { margin: 4px 0 4px; font-size: 18px; }
+.sheet p { margin: 0 0 8px; color: var(--muted-foreground); font-size: 14px; }
+.opt { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: var(--target); padding: 0 6px; border-bottom: 1px solid var(--muted); font-weight: 650; text-align: left; gap: 10px; }
+.opt:last-child { border-bottom: 0; }
+.opt small { color: var(--muted-foreground); font-weight: 600; }
+.opt.on { color: var(--primary); }
+.toast { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%) translateY(10px); z-index: 45; background: var(--foreground); color: var(--cinema); font-weight: 700; font-size: 14px; padding: 10px 16px; border-radius: 12px; opacity: 0; transition: .2s; pointer-events: none; max-width: calc(100% - 32px); text-align: center; }
+.toast.show { opacity: 1; transform: translateX(-50%); }
+
+/* drawer (phone) */
+.drawer-wrap { position: absolute; inset: 0; z-index: 35; background: rgba(0,0,0,.55); }
+.drawer-wrap[hidden] { display: none; }
+.drawer { position: absolute; top: 0; bottom: 0; left: 0; width: min(300px, 84%); background: var(--cinema); border-right: 1px solid var(--muted); padding: 14px 10px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+.drawer .dhead { display: flex; align-items: center; gap: 10px; padding: 4px 8px 12px; font-weight: 800; }
+.drawer .dhead .brand { width: 28px; height: 28px; border-radius: 8px; background: linear-gradient(135deg, var(--primary), var(--hue-violet)); }
+.drawer .search { display: flex; align-items: center; gap: 8px; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-control); padding: 0 10px; min-height: 44px; color: var(--muted-foreground); margin: 0 4px 10px; }
+.drawer .item { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 10px; border-radius: 12px; font-weight: 650; text-align: left; width: 100%; }
+.drawer .item[aria-current="page"] { background: var(--muted); }
+.drawer .lbl { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); padding: 14px 10px 4px; }
+.drawer .item.secn { padding-left: 42px; color: var(--muted-foreground); min-height: 40px; font-size: 15px; }
+.drawer .item.secn.on { color: var(--foreground); }
+.drawer .foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 12px 8px 0; border-top: 1px solid var(--muted); }
+
+/* home page */
+.phone-gap { height: 52px; }
+@container app (min-width: 640px) { .phone-gap { display: none; } }
+.app[data-tv="1"] .phone-gap { display: none; }
+.greet { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+.greet-sub { color: var(--muted-foreground); margin: 4px 0 0; }
+.pick { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; }
+@container app (min-width: 640px) { .pick { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container app (min-width: 1100px) { .pick { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.pcard { display: flex; gap: 12px; align-items: center; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 10px; text-align: left; min-width: 0; }
+.pcard .art, .pcard .icobox { width: 72px; height: 72px; border-radius: 12px; flex: none; }
+.pcard .icobox { display: grid; place-items: center; background: var(--muted); color: var(--primary); }
+.pcard .body { min-width: 0; flex: 1; }
+.pcard .k { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--muted-foreground); display: flex; gap: 6px; align-items: center; }
+.pcard .k svg.i { width: 13px; height: 13px; }
+.pcard b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+.mbar { height: 4px; border-radius: 4px; background: var(--muted); margin-top: 8px; overflow: hidden; }
+.mbar i { display: block; height: 100%; background: var(--primary); }
+.handoff { display: flex; gap: 12px; align-items: center; background: linear-gradient(100deg, color-mix(in srgb, var(--primary) 22%, var(--card)), var(--card)); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 12px 14px; margin-top: 14px; flex-wrap: wrap; }
+.handoff .body { flex: 1; min-width: 180px; }
+.handoff .body b { display: block; }
+.handoff .body span { color: var(--muted-foreground); font-size: 14px; }
+.apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; }
+.appt { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); padding: 14px; text-align: left; min-height: 104px; }
+.appt .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: #fff; }
+.appt b { font-size: 15px; }
+.appt span { color: var(--muted-foreground); font-size: 13px; margin-top: -8px; }
+
+/* podcasts */
+.pshow { display: flex; gap: 14px; align-items: center; }
+.pshow .art { width: 96px; height: 96px; border-radius: 14px; flex: none; }
+.ep .when { font-size: 12px; font-weight: 750; color: var(--muted-foreground); text-transform: uppercase; letter-spacing: .05em; }
+.ep b { font-size: 16px; line-height: 1.3; }
+.ep .ctl { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.ep .left { font-size: 13px; font-weight: 700; color: var(--muted-foreground); }
+.legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 6px; }
+
+/* books */
+.bcover { aspect-ratio: 2 / 3; border-radius: 6px 12px 12px 6px; box-shadow: inset 6px 0 0 rgba(0,0,0,.25), 0 14px 30px -14px rgba(0,0,0,.8); }
+.tile.book .art { aspect-ratio: 2 / 3; border-radius: 4px 10px 10px 4px; }
+.tile.book .ptitle { text-transform: none; font-size: 15px; font-weight: 800; inset: 12px 10px auto 10px; }
+.ab { min-height: 100%; display: flex; flex-direction: column; background: radial-gradient(120% 60% at 50% 0%, color-mix(in srgb, var(--hue-violet) 30%, var(--background)), var(--background) 70%); }
+.chline { text-align: center; }
+.chline b { display: block; font-size: 15px; }
+.chline span { color: var(--muted-foreground); font-size: 13px; }
+.toolrow { display: flex; justify-content: space-around; max-width: 420px; width: 100%; margin: 0 auto; }
+.toolrow button { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px; font-weight: 700; color: var(--muted-foreground); min-width: 64px; min-height: 52px; }
+.toolrow button.on { color: var(--primary); }
+
+/* downloads */
+.meter { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 14px; }
+.meter .bar2 { display: flex; height: 12px; border-radius: 6px; overflow: hidden; background: var(--muted); margin: 10px 0 8px; }
+.meter .bar2 i { display: block; height: 100%; }
+.meter .keys { display: flex; flex-wrap: wrap; gap: 12px; font-size: 13px; color: var(--muted-foreground); }
+.meter .keys span::before { content: ""; display: inline-block; width: 9px; height: 9px; border-radius: 3px; background: var(--k); margin-right: 6px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0 32px; }
+@container app (min-width: 1000px) { .grid2 { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); } }
+.dl .state { font-size: 13px; font-weight: 700; color: var(--muted-foreground); display: flex; align-items: center; gap: 6px; }
+.dl .state.ok { color: #7ff2d3; }
+.dl .state.run { color: #9bd5ff; }
+.dl .pp { height: 4px; border-radius: 3px; background: var(--muted); margin-top: 6px; overflow: hidden; }
+.dl .pp i { display: block; height: 100%; background: var(--primary); }
+.rule { display: flex; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--muted); }
+.rule .body { flex: 1; min-width: 0; }
+.rule .body span { display: block; color: var(--muted-foreground); font-size: 13px; }
+.note { display: flex; gap: 12px; align-items: flex-start; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); padding: 12px 14px; margin-top: 14px; font-size: 14px; color: var(--muted-foreground); }
+.note b { color: var(--foreground); }
+.sw2 { width: 44px; height: 26px; border-radius: 99px; background: var(--primary); position: relative; flex: none; }
+.sw2::after { content: ""; position: absolute; right: 3px; top: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--primary-foreground); }
+.sw2.off { background: var(--muted); }
+.sw2.off::after { right: auto; left: 3px; background: var(--muted-foreground); }
+
+/* kid mode */
+.kidtop { display: flex; align-items: center; gap: 12px; padding-top: 16px; flex-wrap: wrap; }
+.kidtop h1 { font-size: var(--fs-title); margin: 0 auto 0 56px; letter-spacing: -0.01em; }
+@container app (min-width: 640px) { .kidtop h1 { margin-left: 0; } }
+.timechip { display: inline-flex; align-items: center; gap: 8px; background: var(--card); border: 2px solid var(--primary); color: var(--foreground); border-radius: 999px; padding: 8px 16px; font-weight: 800; font-size: 16px; }
+.timechip svg.i { color: var(--primary); width: 22px; height: 22px; }
+.kgrid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+@container app (min-width: 640px) { .kgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.ktile { display: flex; flex-direction: column; gap: 10px; text-align: left; transition: transform .15s; }
+.ktile:active { transform: scale(.97); }
+.ktile .art { aspect-ratio: 16/9; border-radius: var(--radius-card); width: 100%; }
+.ktile b { font-size: 20px; }
+.kapps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+@container app (min-width: 640px) { .kapps { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.kapp { min-height: 120px; border-radius: var(--radius-card); display: flex; flex-direction: column; justify-content: space-between; padding: 16px; text-align: left; color: #1d1503; font-weight: 800; font-size: 20px; }
+.kapp svg.i { width: 34px; height: 34px; stroke-width: 2.5; }
+.locked { display: flex; gap: 14px; align-items: center; background: var(--card); border: 2px dashed var(--border); border-radius: var(--radius-card); padding: 14px; text-align: left; width: 100%; }
+.locked .art { width: 120px; aspect-ratio: 16/9; border-radius: 14px; flex: none; filter: grayscale(.8) brightness(.6); }
+.locked b { display: block; font-size: 18px; }
+.locked span { color: var(--muted-foreground); }
+.kplayer .cbar .ibtn { width: 56px; height: 56px; }
+.kplayer .cbar .ibtn svg.i { width: 30px; height: 30px; stroke-width: 2.5; }
+.kback { display: inline-flex; align-items: center; gap: 8px; min-height: var(--target); padding: 0 22px; border-radius: 999px; background: var(--card); border: 1px solid var(--border); font-weight: 800; font-size: 18px; }
+.timesup { position: absolute; inset: 0; z-index: 6; background: color-mix(in srgb, var(--background) 96%, transparent); display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 12px; padding: 20px; }
+.timesup[hidden] { display: none; }
+.timesup .moon { width: 64px; height: 64px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); display: grid; place-items: center; }
+.timesup .moon svg.i { width: 34px; height: 34px; }
+.timesup h2 { margin: 0; font-size: clamp(22px, 5cqi, 34px); }
+.timesup p { margin: 0; color: var(--muted-foreground); font-size: 18px; }
+.timesup .row-btns { flex-direction: column; width: 100%; max-width: 340px; margin-top: 8px; }
+
+/* TV input mode */
+.app[data-tv="1"] .tile:focus, .app[data-tv="1"] .btn:focus { outline: 3px solid var(--foreground); outline-offset: 3px; transform: scale(1.05); z-index: 2; }
+.app[data-tv="1"] .tile:hover .art { box-shadow: none; }
+.tvhint { display: none; position: absolute; right: 16px; bottom: 14px; z-index: 30; background: var(--scrim); border: 1px solid var(--muted); color: var(--muted-foreground); font-size: 13px; font-weight: 650; padding: 8px 12px; border-radius: 999px; }
+.app[data-tv="1"] .tvhint { display: block; }
+.app[data-tv="1"] .mini { display: none; }
+
+/* how-it-works view */
+.how { padding-block: 28px 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.how .wrap { max-width: 760px; margin: 0 auto; }
+.how h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.05; letter-spacing: -0.03em; margin: 0 0 10px; }
+.how .lede { font-size: 19px; color: var(--muted-foreground); margin: 0 0 8px; max-width: 62ch; }
+.how h2 { font-size: 24px; letter-spacing: -0.02em; margin: 40px 0 12px; }
+.how p, .how li { font-size: 17px; line-height: 1.6; max-width: 66ch; }
+.how ul, .how ol { padding-left: 22px; margin: 8px 0; }
+.how li { margin: 4px 0; }
+.how .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-top: 12px; }
+.how .card { background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); padding: 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.how .card .ic { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; color: #fff; }
+.how .card h3 { margin: 4px 0 0; font-size: 18px; }
+.how .card .like { font-size: 12px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; color: var(--primary); }
+.how .card p { font-size: 15px; margin: 0; color: var(--muted-foreground); line-height: 1.5; }
+.how .card .see { margin-top: auto; padding-top: 6px; color: var(--foreground); font-weight: 700; font-size: 14px; text-align: left; display: inline-flex; gap: 6px; align-items: center; }
+.how .layers { display: grid; gap: 10px; margin-top: 10px; }
+.how .layer { display: flex; gap: 14px; align-items: flex-start; background: var(--card-2); border: 1px solid var(--muted); border-radius: var(--radius-card); padding: 14px 16px; }
+.how .layer .n { width: 32px; height: 32px; border-radius: 50%; background: var(--primary); color: var(--primary-foreground); font-weight: 900; display: grid; place-items: center; flex: none; }
+.how .layer b { display: block; font-size: 17px; }
+.how .layer span { color: var(--muted-foreground); font-size: 15px; }
+.how .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-top: 10px; }
+.how .from { border-radius: var(--radius-card); padding: 16px; border: 1px solid var(--muted); background: var(--card-2); }
+.how .from h3 { margin: 0 0 6px; font-size: 17px; }
+.how .from ul { margin: 0; }
+.how .from li { font-size: 15px; }
+.how .decide { border-left: 3px solid var(--hue-orange); padding: 2px 0 2px 14px; margin: 10px 0; }
+.how .decide b { display: block; }
+.how .decide span { color: var(--muted-foreground); }
+.how .cta { display: inline-flex; align-items: center; gap: 8px; margin-top: 18px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body data-size="fit">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12Z"/></symbol>
+  <symbol id="i-videos" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="3"/><path d="m10 9 5 3-5 3Z"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4M3 12h18"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></symbol>
+  <symbol id="i-podcast" viewBox="0 0 24 24"><circle cx="12" cy="11" r="3"/><path d="M12 14v7"/><path d="M5.6 16.4a9 9 0 1 1 12.8 0"/><path d="M8.5 13.5a5 5 0 1 1 7 0"/></symbol>
+  <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/></symbol>
+  <symbol id="i-headphones" viewBox="0 0 24 24"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1v-6h3ZM3 19a2 2 0 0 0 2 2h1v-6H3Z"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></symbol>
+  <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 4v16l13-8Z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16" rx="1"/><rect x="14" y="4" width="4" height="16" rx="1"/></symbol>
+  <symbol id="i-back15" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></symbol>
+  <symbol id="i-fwd15" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></symbol>
+  <symbol id="i-prev" viewBox="0 0 24 24"><path d="M19 20 9 12l10-8Z"/><path d="M5 19V5"/></symbol>
+  <symbol id="i-next" viewBox="0 0 24 24"><path d="m5 4 10 8-10 8Z"/><path d="M19 5v14"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 0 1 9.5 4 8 8 0 1 0 20 14.5Z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></symbol>
+  <symbol id="i-down" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+  <symbol id="i-cast" viewBox="0 0 24 24"><path d="M2 8V6a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-6"/><path d="M2 12a9 9 0 0 1 8 8M2 16a5 5 0 0 1 4 4M2 20h.01"/></symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24"><path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7Z"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-wifioff" viewBox="0 0 24 24"><path d="M2 2l20 20"/><path d="M8.5 16.5a5 5 0 0 1 7 0M5 13a10 10 0 0 1 5.2-2.8M19 13a10 10 0 0 0-2-1.4M2 8.8a15 15 0 0 1 4.2-2.6M22 8.8A15 15 0 0 0 11 5M12 20h.01"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></symbol>
+  <symbol id="i-phone" viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="2"/><path d="M12 18h.01"/></symbol>
+  <symbol id="i-hub" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="8" rx="2"/><rect x="2" y="13" width="20" height="8" rx="2"/><path d="M6 7h.01M6 17h.01"/></symbol>
+  <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="m17 2-5 5-5-5"/></symbol>
+  <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M16 3h5v5M4 20 21 3M21 16v5h-5M15 15l6 6M4 4l5 5"/></symbol>
+  <symbol id="i-cc" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 15h4M15 15h2M7 11h2M13 11h4"/></symbol>
+  <symbol id="i-max" viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15"/></symbol>
+  <symbol id="i-bookmark" viewBox="0 0 24 24"><path d="M6 3h12v18l-6-4-6 4Z"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></symbol>
+  <symbol id="i-speaker" viewBox="0 0 24 24"><rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="14" r="4"/><path d="M12 6h.01"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 16v-5M12 8h.01"/></symbol>
+  <symbol id="i-hand" viewBox="0 0 24 24"><path d="M18 11V6a2 2 0 0 0-4 0M14 10V4a2 2 0 0 0-4 0v2M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.4l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15"/></symbol>
+</svg>
+
+<header class="bar" role="banner">
+  <div class="name"><span class="dot" aria-hidden="true"></span>Media apps <small>design preview</small></div>
+  <div class="seg" role="group" aria-label="View">
+    <button id="v-try" aria-pressed="true" data-view="try">Try it</button>
+    <button id="v-how" aria-pressed="false" data-view="how">How it works</button>
+  </div>
+  <div class="ctl" id="tryctl">
+    <label for="screenpick">Screen</label>
+    <select id="screenpick" aria-label="Jump to a screen"></select>
+    <div class="seg" role="group" aria-label="Size">
+      <button data-size="fit" aria-pressed="true">Fit</button>
+      <button data-size="phone" aria-pressed="false">Phone</button>
+      <button data-size="desktop" aria-pressed="false">Desktop</button>
+      <button data-size="tv" aria-pressed="false">TV</button>
+    </div>
+    <button class="toggle kid" id="kidtoggle" aria-pressed="false"><span class="sw" aria-hidden="true"></span>Kid mode</button>
+    <button class="toggle" id="nettoggle" aria-pressed="false"><span class="sw" aria-hidden="true"></span>Internet off</button>
+  </div>
+</header>
+
+<main class="try" id="try">
+  <div class="caption"><span class="tag" id="captag">Screen</span><p id="captext"></p></div>
+  <div class="stage" id="stage">
+    <div class="fitbox" id="fitbox">
+      <div class="frame" id="frame">
+        <div class="app" id="app" data-mode="adult" data-net="on" data-mini="0">
+          <nav class="rail" id="rail" aria-label="Apps"></nav>
+          <button class="menubtn" id="menubtn" aria-label="Open the menu"><svg class="i"><use href="#i-menu"/></svg></button>
+          <div class="scroller" id="scroller">
+            <div id="screens"></div>
+            <div class="mini" id="mini"></div>
+          </div>
+          <div class="drawer-wrap" id="drawer" hidden></div>
+          <div class="sheet-wrap" id="sheet" hidden></div>
+          <div class="toast" id="toast" role="status" aria-live="polite"></div>
+          <div class="tvhint">Arrows move. Enter plays. Esc goes back.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<article class="how" id="how" hidden>
+  <div class="wrap">
+    <h1>Media apps in MaiPai Home</h1>
+    <p class="lede">Five apps for watching, listening and reading. Everything lives on the home's own hub, so it keeps playing when the internet is down.</p>
+
+    <h2>The short version</h2>
+    <ul>
+      <li>Five apps: <b>Videos</b>, <b>Shows and Films</b>, <b>Music</b>, <b>Podcasts</b> and <b>Books</b>.</li>
+      <li>Each one looks and works like the app people already know: YouTube, Netflix, Spotify, Apple Podcasts and Apple Books.</li>
+      <li>Everything is saved on the hub. With the internet off, saved things still play.</li>
+      <li>Stop on one screen and pick up on another, right where you left off.</li>
+      <li>Kids see only what a grown-up allowed, with bigger buttons and a daily time limit.</li>
+    </ul>
+
+    <h2>The five apps</h2>
+    <div class="cards">
+      <div class="card"><span class="ic" style="background:var(--hue-red)"><svg class="i"><use href="#i-videos"/></svg></span><span class="like">Feels like YouTube</span><h3>Videos</h3><p>Videos from channels you follow, links you save, and home videos from the hub's folders. A big picture on top, then rows you swipe.</p><button class="see" data-goto="videos">See it <svg class="i"><use href="#i-right"/></svg></button></div>
+      <div class="card"><span class="ic" style="background:var(--hue-violet)"><svg class="i"><use href="#i-film"/></svg></span><span class="like">Feels like Netflix</span><h3>Shows and Films</h3><p>The home's own show and movie files. Posters, seasons, episodes, and Skip intro when the file marks it.</p><button class="see" data-goto="shows">See it <svg class="i"><use href="#i-right"/></svg></button></div>
+      <div class="card"><span class="ic" style="background:var(--hue-green)"><svg class="i"><use href="#i-music"/></svg></span><span class="like">Feels like Spotify</span><h3>Music</h3><p>Albums, artists, songs, playlists and liked songs. Radio is made from the home's own music only.</p><button class="see" data-goto="music">See it <svg class="i"><use href="#i-right"/></svg></button></div>
+      <div class="card"><span class="ic" style="background:var(--hue-pink)"><svg class="i"><use href="#i-podcast"/></svg></span><span class="like">Feels like Apple Podcasts</span><h3>Podcasts</h3><p>Follow shows. New episodes play right away. Save the ones to keep, or let the app save the newest few.</p><button class="see" data-goto="podcasts">See it <svg class="i"><use href="#i-right"/></svg></button></div>
+      <div class="card"><span class="ic" style="background:var(--hue-orange)"><svg class="i"><use href="#i-book"/></svg></span><span class="like">Feels like Apple Books</span><h3>Books</h3><p>Read e-books and PDFs, or listen to audiobooks with chapters and a sleep timer. A book can read itself aloud in the home's own voice.</p><button class="see" data-goto="books">See it <svg class="i"><use href="#i-right"/></svg></button></div>
+    </div>
+
+    <h2>How browsing feels</h2>
+    <ul>
+      <li>A dark, cinema look. Big pictures and rows you swipe sideways.</li>
+      <li><b>Phone:</b> one column. A small player stays docked at the bottom while you look around.</li>
+      <li><b>Computer:</b> the app icons on the left, 3 to 5 tiles across, the player on the left and Up next on the right.</li>
+      <li><b>TV:</b> move with the remote, one row in focus at a time, and everything plays full screen.</li>
+      <li>The one Search box finds titles in all five apps.</li>
+    </ul>
+
+    <h2>How playing feels</h2>
+    <ul>
+      <li>It opens where you stopped, with a short line: "Resume from 12:40" or "Start over".</li>
+      <li>Only one thing plays at a time in the whole app.</li>
+      <li>Hold for 2x speed. Double-tap the left or right side to jump 15 seconds. Chapters, captions and speed are one tap away.</li>
+      <li>Sleep timer: 15, 30, 45 or 60 minutes, or the end of the chapter or episode.</li>
+      <li>Lock screen and headphone buttons work.</li>
+      <li><b>Continue here:</b> something playing on the TV can move to your phone. <b>Play on another screen</b> sends it the other way.</li>
+    </ul>
+
+    <h2>Downloads and offline</h2>
+    <p>There are three layers. Each one is a fallback for the one above it.</p>
+    <div class="layers">
+      <div class="layer"><span class="n">1</span><div><b>The hub</b><span>Everything saved on the hub plays with the internet off. Things that are not saved show "Not saved" and a Save button, never an error.</span></div></div>
+      <div class="layer"><span class="n">2</span><div><b>A computer or Android phone</b><span>In Chrome or Edge, "Keep on this device" puts a copy in the browser, for a plane or a long drive.</span></div></div>
+      <div class="layer"><span class="n">3</span><div><b>iPhone, iPad and Apple TV</b><span>The MaiPai Go app keeps the copies. Safari cannot do it reliably, so the button says so.</span></div></div>
+    </div>
+    <p>The Downloads page shows what is on this device, how much room is left, and the rules the hub follows by itself, like "keep the 3 newest episodes of each show".</p>
+
+    <h2>Where things come from</h2>
+    <ul>
+      <li><b>Folders on the hub</b> for shows, films, music, books and audiobooks. The hub checks them every so often.</li>
+      <li><b>A link you save</b>, from the chat box or your phone's Share button, or <b>a channel you follow</b>. The hub fetches slowly, a little at a time, the way a person would.</li>
+      <li><b>Podcast feeds</b> the home follows.</li>
+      <li>Nothing from the web streams through the hub. A saved copy is stored once and shared with the family.</li>
+    </ul>
+
+    <h2>What comes from where</h2>
+    <div class="two">
+      <div class="from"><h3>From Loki Doki</h3><ul><li>The look: big billboard, poster rows, cinema colors</li><li>Podcast details: chapters, transcripts, per-show speed</li><li>Skipping sponsor parts of a saved video</li><li>Save once, share with the family</li><li>Kid rules: approved only, daily time, hidden explicit songs</li></ul></div>
+      <div class="from"><h3>From FileTube</h3><ul><li>Offline downloads that sync progress back</li><li>Player gestures and the docked mini player</li><li>The home rows: Continue, New, Recently added</li><li>Careful folder scanning that never deletes by mistake</li><li>Saving from channels, the book reader, read-aloud</li></ul></div>
+      <div class="from"><h3>New</h3><ul><li>Audiobooks with chapters</li><li>One sleep timer, speed and Continue row for the whole home</li><li>A kid look for every media screen</li></ul></div>
+      <div class="from"><h3>Left behind</h3><ul><li>Plex and the movie lookup sites</li><li>Streaming the web through the hub</li><li>Live TV channels and karaoke</li></ul></div>
+    </div>
+
+    <h2>What a kid sees</h2>
+    <ul>
+      <li>Only things a grown-up allowed.</li>
+      <li>Warmer colors, bigger text and buttons, and a rounder font.</li>
+      <li>"Keep watching" instead of "Continue watching". The next video does not start by itself.</li>
+      <li>A daily time limit. When time is up the video pauses, and a grown-up can add more from their own phone.</li>
+      <li>Explicit songs show no title, and kid radio skips them.</li>
+      <li>Tapping something not allowed says "Not for you yet. Tap to ask a grown-up."</li>
+      <li>On a shared TV, a grown-up's rows never show on a kid's profile.</li>
+    </ul>
+    <button class="btn accent cta" data-goto="kidhome">See the kid screens <svg class="i"><use href="#i-right"/></svg></button>
+
+    <h2>How FileTube joins the home</h2>
+    <p>FileTube's author moves his best logic into the hub's own code, one step at a time. Each step lands on its own and leaves the app working.</p>
+    <ol>
+      <li>Folder scanning. It is the most hard-won part, and it has no screens yet.</li>
+      <li>Progress and resume.</li>
+      <li>The Videos app.</li>
+      <li>Saving from channels and links.</li>
+      <li>Offline on devices.</li>
+      <li>Podcasts, Music, Books, and Shows and Films.</li>
+      <li>The iPhone and Apple TV app (MaiPai Go), with his offline code.</li>
+    </ol>
+    <p>Same records, same tests, one hub. Nothing runs as a second app beside it.</p>
+
+    <h2>Still to decide</h2>
+    <div class="decide"><b>A. His iPhone app</b><span>Becomes the iPhone half of MaiPai Go (the plan today), or stays his own app pointed at the hub for now.</span></div>
+    <div class="decide"><b>B. Live web video</b><span>Browsing and playing web video the way YouTube works is its own proposal, waiting for approval. Until then nothing contacts a video service, and this mockup shows saved copies only.</span></div>
+    <div class="decide"><b>C. Video quality for saved copies</b><span>1080p by default (the plan today), with 4K only when a grown-up raises it.</span></div>
+    <p style="color:var(--muted-foreground);font-size:14px;margin-top:28px">Design only. Titles, channels and people in the mockup are made up. Full design: docs/design/media-apps-blend-2026-10-17.md.</p>
+  </div>
+</article>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const ic = (n, cls = "") => `<svg class="i ${cls}"><use href="#i-${n}"/></svg>`;
+  const art = (n, extra = "") => `<div class="art a${n} ${extra}"></div>`;
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const fmt = (s) => { s = Math.max(0, Math.round(s)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60; return h ? `${h}:${pad2(m)}:${pad2(x)}` : `${m}:${pad2(x)}`; };
+
+  // ---------- placeholder data (made-up titles; people from the org persona roster) ----------
+  const CH = { "Ember Workshop": ["E", "var(--hue-orange)"], "Atlas Explains": ["A", "var(--hue-teal)"], "Daisy Bakes": ["D", "var(--hue-yellow)"], "Rivet Garage": ["R", "var(--primary)"], "Nova Skywatch": ["N", "var(--hue-violet)"], "Family videos": ["F", "var(--hue-green)"], "Sprout Lab": ["S", "var(--hue-pink)"] };
+  const V = [
+    { id: "v1", t: "Building a backyard pizza oven, part 3", ch: "Ember Workshop", d: 1122, a: 2, p: .6, ago: "3 days ago", dev: 1 },
+    { id: "v2", t: "How tides really work", ch: "Atlas Explains", d: 725, a: 1, ago: "1 week ago" },
+    { id: "v3", t: "Ten-minute bread, no mixer", ch: "Daisy Bakes", d: 631, a: 6, p: .22, ago: "2 weeks ago" },
+    { id: "v4", t: "Bike tune-up for beginners", ch: "Rivet Garage", d: 1277, a: 7, ago: "5 days ago", p: .08 },
+    { id: "v5", t: "The night sky this month", ch: "Nova Skywatch", d: 534, a: 4, ago: "Yesterday", isnew: 1 },
+    { id: "v6", t: "Beach day, summer 2025", ch: "Family videos", d: 252, a: 5, ago: "Folder on the hub", dev: 1 },
+    { id: "v7", t: "Volcano in a jar", ch: "Sprout Lab", d: 400, a: 8, ago: "Yesterday", isnew: 1 },
+    { id: "v8", t: "Fixing a squeaky door in five minutes", ch: "Rivet Garage", d: 302, a: 9, ago: "3 weeks ago" },
+    { id: "v9", t: "Sourdough starter, day one", ch: "Daisy Bakes", d: 488, a: 3, ago: "1 month ago" },
+    { id: "v10", t: "Why the moon looks bigger near the ground", ch: "Atlas Explains", d: 611, a: 0, ago: "2 days ago", isnew: 1 },
+  ];
+  const vid = (id) => V.find((v) => v.id === id);
+  const SHOWS = [
+    { t: "The Quiet Harbor", a: 4, kind: "Show" }, { t: "Marsh Light", a: 1, kind: "Show" }, { t: "Paper Kites", a: 6, kind: "Film" },
+    { t: "Raven Hill", a: 8, kind: "Show" }, { t: "Velvet Hour", a: 3, kind: "Film" }, { t: "Cosmo and the Long Road", a: 7, kind: "Film" },
+    { t: "North of Juniper", a: 9, kind: "Show" }, { t: "The Lantern Keepers", a: 0, kind: "Film" }, { t: "Salt and Signal", a: 5, kind: "Show" },
+  ];
+  const EPS = [
+    { n: 1, t: "The Fog Bell", m: 52, d: "A storm knocks out the harbor light and an old logbook washes up.", p: 1, dev: 1 },
+    { n: 2, t: "Low Water", m: 48, d: "Marlow finds a second name on the keeper's roster.", p: 1, dev: 1 },
+    { n: 3, t: "Ropes and Knots", m: 50, d: "The town meeting turns into a vote nobody expected.", p: 1 },
+    { n: 4, t: "The Keeper's Log", m: 49, d: "Iris reads the last page aloud, and the lights go out again.", p: .74 },
+    { n: 5, t: "Slack Tide", m: 47, d: "A boat comes back to the harbor with no one on board.", p: 0 },
+    { n: 6, t: "Lamp Room", m: 55, d: "The season ends at the top of the lighthouse stairs.", p: 0 },
+  ];
+  const ALBUMS = [
+    { t: "Low Tide Radio", by: "Iris Vale", a: 2 }, { t: "Paper Planets", by: "The Marlows", a: 0 }, { t: "Night Bus", by: "Quill and Riff", a: 7 },
+    { t: "Greenhouse", by: "Juniper Lane Band", a: 9 }, { t: "Velvet Static", by: "Serena Moon", a: 3 }, { t: "Kettle Songs", by: "Bramble", a: 6 }, { t: "Satellites", by: "Nova Pine", a: 4 },
+  ];
+  const TRACKS = [
+    { t: "Lanterns", by: "Iris Vale", d: 214, a: 2 }, { t: "Harbor Street", by: "Iris Vale", d: 187, a: 2 }, { t: "Orbit Waltz", by: "The Marlows", d: 241, a: 0 },
+    { t: "Last Stop", by: "Quill and Riff", d: 199, a: 7 }, { t: "Seedlings", by: "Juniper Lane Band", d: 226, a: 9 },
+  ];
+  const PODS = [
+    { show: "The Workbench Hour", a: 2, when: "Today", t: "Sharpening every tool in the shed", d: "Chisels, planes and a kitchen knife, start to finish, with no fancy jigs.", m: 58, st: "saved", left: 0 },
+    { show: "Small Planet Science", a: 1, when: "Yesterday", t: "Where does the wind come from?", d: "A slow look at pressure, heat and the spin of the planet.", m: 34, st: "device", left: 21 },
+    { show: "Story Kitchen", a: 6, when: "Tue", t: "Grandma's soup and the snowed-in winter", d: "A listener's family recipe and the story that came with it.", m: 41, st: "stream", left: 0 },
+    { show: "The Workbench Hour", a: 2, when: "Oct 10", t: "Glue-ups that do not slip", d: "Clamps, cauls and the one trick that saves a tabletop.", m: 52, st: "device", left: 0, played: 1 },
+    { show: "Night Owls Radio", a: 4, when: "Oct 9", t: "The quiet hours: lighthouse keepers", d: "Stories from people who kept the lights on through the night.", m: 47, st: "stream", left: 0 },
+  ];
+  const BOOKS = [
+    { t: "The Lantern Road", by: "Lucia Marsh", a: 0, kind: "book", p: .34 }, { t: "Willow and the Winter Sea", by: "Serena Quill", a: 1, kind: "audio", p: .48 },
+    { t: "Small Engines, Big Ideas", by: "Rivet Hale", a: 7, kind: "book" }, { t: "The Garden Atlas", by: "Clover Banks", a: 9, kind: "book" },
+    { t: "Ember Island", by: "Marlow Reyes", a: 2, kind: "audio" }, { t: "A House of Kites", by: "Pippa Lane", a: 3, kind: "audio" },
+  ];
+  const CHAPTERS = ["Opening credits", "The Harbor in Winter", "A Letter from the North", "Ice on the Rigging", "The Lighthouse Keeper", "Willow Alone", "The Lighthouse Stairs", "Northern Lights", "What the Sea Kept", "Home Again"];
+  const VCH = [{ s: 0, t: "Where we left off" }, { s: 74, t: "Sponsor" }, { s: 132, t: "Laying the firebrick" }, { s: 418, t: "Mixing the mortar" }, { s: 690, t: "The dome, course by course" }, { s: 980, t: "First fire" }];
+
+  // ---------- state ----------
+  const S = { screen: "home", kid: false, net: true, size: "fit", tv: false, playing: false, cur: { kind: "music", i: 0 }, pos: 68, vpos: 673, vplaying: false, rate: 1, sleep: null, season: 2, kidpos: 95, kidplaying: false, abpos: 1180, abplaying: false };
+  const SCREENS = [
+    ["home", "Home page", "The Home page. Videos, episodes and books join <b>Pick up where you left off</b>, next to chats. Each card resumes right where you stopped, on any screen."],
+    ["videos", "Videos", "Videos works like YouTube, in a dark cinema look. Everything here is saved on the hub, so it plays with the internet off. <b>Tap a video.</b>"],
+    ["watch", "Videos: player", "Watching. <b>Tap play.</b> Double-tap the left or right side to jump 15 seconds. Tap 1x for speed. Sponsor parts can be skipped. Leave the page and it keeps playing in the small bar."],
+    ["shows", "Shows and Films", "Shows and Films works like Netflix: a big picture on top, rows of posters. These are the home's own files. <b>Tap More info.</b>"],
+    ["show", "Shows: detail", "A show's page. Resume where you stopped, pick a season, and keep episodes on this device for a trip."],
+    ["music", "Music: library", "Music works like Spotify. The bar at the bottom keeps playing while you look around. <b>Tap the bar</b> to open Now playing."],
+    ["nowplaying", "Music: now playing", "Now playing. One thing plays at a time in the whole app. <b>Tap Playing on this phone</b> to move the music to another speaker or screen."],
+    ["podcasts", "Podcasts", "Podcasts works like Apple Podcasts. New episodes play right away. Badges show what is <b>saved on the hub</b> and what is <b>on this phone</b>. Try <b>Internet off</b>."],
+    ["books", "Books", "Books holds e-books and audiobooks. Reading and listening both pick up where you stopped. <b>Tap the audiobook.</b>"],
+    ["audiobook", "Books: audiobook", "The audiobook player: chapters, speed and the sleep timer. <b>Tap the moon</b> to set a sleep timer."],
+    ["downloads", "Downloads", "Downloads: what is kept on this device, how much room is left, and what the hub saves by itself."],
+    ["kidhome", "Kid: Home", "A kid's Home. Warmer colors, bigger buttons, only what a grown-up allowed, and a daily time limit. <b>Tap the grey tile.</b>"],
+    ["kidplayer", "Kid: player", "A kid's player. Big buttons, nothing starts by itself, no links out. <b>Tap Show time's up</b> to see the daily limit."],
+  ];
+  const IMMERSIVE = new Set(["watch", "show", "nowplaying", "audiobook", "downloads", "kidplayer"]);
+  const MEDIA = new Set(["videos", "shows", "show", "music", "podcasts", "books", "downloads"]);
+  const APPOF = { home: "home", videos: "videos", watch: "videos", shows: "shows", show: "shows", music: "music", nowplaying: "music", podcasts: "podcasts", books: "books", audiobook: "books", downloads: "videos", kidhome: "home", kidplayer: "videos" };
+  const APPS = [
+    ["home", "Home", "home"], ["chat", "Chat", "chat"], ["videos", "Videos", "videos"], ["shows", "Shows and Films", "film"],
+    ["music", "Music", "music"], ["podcasts", "Podcasts", "podcast"], ["books", "Books", "book"],
+  ];
+  const SECTIONS = { videos: ["Home", "Library", "Subscriptions", "Watch later", "History"], shows: ["Home", "Shows", "Films", "My list"], music: ["Listen now", "Albums", "Artists", "Songs", "Playlists"], podcasts: ["Listen now", "Shows", "Episodes", "Queue", "Saved"], books: ["Reading now", "Books", "Audiobooks", "Series"] };
+
+  const app = $("#app"), scroller = $("#scroller"), screensEl = $("#screens");
+
+  // ---------- pieces ----------
+  const netBanner = () => `<div class="net">${ic("wifioff")}<span>The internet is down. Everything saved on the hub still plays.</span></div>`;
+  const tabs = (key, under = false) => `<div class="tabs ${under ? "under" : ""}" role="tablist">${SECTIONS[key].map((s, i) => `<button class="tab" role="tab" aria-selected="${i === 0}" data-undrawn="${s}">${s}</button>`).join("")}</div>`;
+  const head = (title, actions = "") => `<div class="ahead pad"><h1>${title}</h1>${actions}</div>`;
+  const hbtn = (icon, label, attrs = "") => `<button class="ibtn" aria-label="${label}" title="${label}" ${attrs}>${ic(icon)}</button>`;
+  const vtile = (v) => `<button class="tile" data-play-video="${v.id}"><div class="art a${v.a}">${v.isnew ? `<span class="badge new">New</span>` : v.dev ? `<span class="badge dev">${ic("phone")}On this phone</span>` : `<span class="badge">${ic("check")}Saved</span>`}<span class="dur">${fmt(v.d)}</span>${v.p ? `<span class="prog"><i style="width:${v.p * 100}%"></i></span>` : ""}</div>
+    <div class="tmeta"><span class="chav" style="background:${CH[v.ch][1]}">${CH[v.ch][0]}</span><div style="min-width:0"><p class="ttl">${v.t}</p><p class="sub">${v.ch} · ${v.ago}</p></div></div></button>`;
+  const poster = (s, extra = "") => `<button class="tile poster" ${extra}><div class="art a${s.a} posterart"><span class="ptitle">${s.t}</span></div></button>`;
+
+  // ---------- screens ----------
+  const R = {};
+  R.home = () => `<section class="screen pad" style="padding-top:16px">
+    <div class="phone-gap"></div>
+    <p class="greet">Good evening, Nadia</p><p class="greet-sub">Thursday, October 17</p>
+    ${netBanner().replace('class="net"', 'class="net" style="margin-top:14px"')}
+    <div class="shelf-h"><h2>Pick up where you left off</h2></div>
+    <div class="pick">
+      <button class="pcard" data-go="watch"><div class="art a2"></div><div class="body"><span class="k">${ic("videos")}Videos</span><b>Building a backyard pizza oven, part 3</b><span class="sub">7 min left</span><div class="mbar"><i style="width:60%"></i></div></div></button>
+      <button class="pcard" data-go="show"><div class="art a4"></div><div class="body"><span class="k">${ic("film")}Shows</span><b>The Quiet Harbor, S2 E4</b><span class="sub">13 min left</span><div class="mbar"><i style="width:74%"></i></div></div></button>
+      <button class="pcard" data-go="audiobook"><div class="art a1"></div><div class="body"><span class="k">${ic("headphones")}Audiobook</span><b>Willow and the Winter Sea</b><span class="sub">Chapter 7 · 5 h 10 min left</span><div class="mbar"><i style="width:48%"></i></div></div></button>
+      <button class="pcard" data-undrawn="Chat"><span class="icobox">${ic("chat")}</span><div class="body"><span class="k">${ic("chat")}Chat</span><b>Spring garden plan</b><span class="sub">2 hours ago</span></div></button>
+    </div>
+    <div class="handoff needs-net"><span class="ibtn solid">${ic("tv")}</span><div class="body"><b>Playing on Living room TV</b><span>The Quiet Harbor, S2 E4 · 36:10</span></div><button class="btn sm accent" data-toast="Moved here. It picks up at 36:10.">Continue here</button></div>
+    <div class="shelf-h"><h2>Your apps</h2></div>
+    <div class="apps">
+      ${[["videos", "Videos", "videos", "var(--hue-red)", "2 new"], ["shows", "Shows and Films", "film", "var(--hue-violet)", "S2 E4 next"], ["music", "Music", "music", "var(--hue-green)", "Playing"], ["podcasts", "Podcasts", "podcast", "var(--hue-pink)", "3 new episodes"], ["books", "Books", "book", "var(--hue-orange)", "48% listened"]].map(([g, n, i, c, s]) => `<button class="appt" data-go="${g}"><span class="ic" style="background:${c}">${ic(i)}</span><b>${n}</b><span>${s}</span></button>`).join("")}
+    </div>
+  </section>`;
+
+  R.videos = () => `<section class="screen">
+    ${head("Videos", hbtn("search", "Search videos") + hbtn("link", "Save a link", 'data-sheet="savelink"') + hbtn("download", "Downloads", 'data-go="downloads"'))}
+    <div class="pad">${tabs("videos")}${netBanner()}
+      <div class="bill"> ${art(4)}<div class="scrim"></div>
+        <div class="copy"><span class="kick needs-net">New from Nova Skywatch</span><span class="kick" style="display:none" data-offonly>Saved on the hub</span><h2>The night sky this month</h2><p>Two planets meet low in the west. Where to look, and when.</p>
+          <div class="row-btns"><button class="btn primary" data-play-video="v5">${ic("play", "fill")}Play</button><button class="btn ghost" data-toast="Added to Watch later">${ic("plus")}Watch later</button></div></div>
+        <div class="dots" aria-hidden="true"><i class="on"></i><i></i><i></i></div></div>
+      <div class="shelf-h"><h2>Continue watching</h2><span class="more">See all</span></div>
+      <div class="shelf">${["v1", "v3", "v4"].map((i) => vtile(vid(i))).join("")}</div>
+      <div class="shelf-h needs-net"><h2>New from your subscriptions</h2><span class="more">See all</span></div>
+      <div class="shelf needs-net">${["v5", "v10", "v7", "v2"].map((i) => vtile(vid(i))).join("")}</div>
+      <div class="shelf-h"><h2>From the hub's folders</h2><span class="more">Family videos</span></div>
+      <div class="shelf">${["v6", "v8", "v9", "v2"].map((i) => vtile(vid(i))).join("")}</div>
+    </div></section>`;
+
+  const vscrub = (pos, dur, chapters = true) => `<div class="scrub" data-scrub><span class="track"></span>${chapters ? `<span class="seg-sp" style="left:${(74 / dur) * 100}%;width:${(58 / dur) * 100}%"></span>` : ""}<span class="fill" style="width:${(pos / dur) * 100}%"></span>${chapters ? VCH.slice(1).map((c) => `<span class="tick" style="left:${(c.s / dur) * 100}%"></span>`).join("") : ""}<span class="knob" style="left:${(pos / dur) * 100}%"></span></div>`;
+  R.watch = () => { const v = vid(S.wid || "v1"); const d = v.d; return `<section class="screen"><div class="watch">
+    <div><div class="player ${S.vplaying ? "" : "paused"}" id="vplayer">${art(v.a)}
+      <button class="ibtn closebtn" data-back aria-label="Back to Videos">${ic("down")}</button>
+      <div class="tapzone l" data-dbl="-15"></div><div class="tapzone r" data-dbl="15"></div>
+      <span class="ripple l">-15 s</span><span class="ripple r">+15 s</span>
+      <button class="big" data-vplay aria-label="Play">${ic(S.vplaying ? "pause" : "play", "fill")}</button>
+      <button class="skipchip" data-skipsp ${v.id === "v1" && S.vpos >= 60 && S.vpos < 132 ? "" : "hidden"}>${ic("fwd15")}Skip sponsor</button>
+      <div class="controls">${vscrub(S.vpos, d, v.id === "v1")}
+        <div class="cbar"><button class="ibtn" data-vplay aria-label="Play or pause">${ic(S.vplaying ? "pause" : "play", "fill")}</button><button class="ibtn" data-seek="-15" aria-label="Back 15 seconds">${ic("back15")}</button><button class="ibtn" data-seek="15" aria-label="Forward 15 seconds">${ic("fwd15")}</button>
+          <span class="time" id="vtime">${fmt(S.vpos)} / ${fmt(d)}</span><span class="spacer"></span>
+          <button class="rate" data-rate>${S.rate}x</button><button class="ibtn hide-sm" aria-label="Captions" data-toast="Captions on">${ic("cc")}</button><button class="ibtn" aria-label="Play on another screen" data-sheet="cast">${ic("cast")}</button><button class="ibtn" aria-label="Full screen" data-toast="Full screen">${ic("max")}</button></div></div></div>
+      <div class="winfo pad" style="padding-left:16px;padding-right:16px">
+        <h1>${v.t}</h1>
+        <div class="chanrow"><span class="chav" style="background:${CH[v.ch][1]}">${CH[v.ch][0]}</span><div class="who"><b>${v.ch}</b><span class="sub">Saved on the hub · ${v.ago}</span></div><button class="btn sm primary">Following</button></div>
+        <div class="actrow"><button class="btn sm" data-toast="Liked">${ic("heart")}Like</button><button class="btn sm" data-toast="Added to Watch later">${ic("clock")}Watch later</button><button class="btn sm" data-keep="${v.dev ? "1" : ""}">${ic(v.dev ? "check" : "download")}${v.dev ? "On this phone" : "Keep on this phone"}</button><button class="btn sm" data-sheet="cast">${ic("cast")}Play on TV</button></div>
+        ${v.id === "v1" ? `<div class="panel"><h3>Chapters</h3>${VCH.map((c, i) => `<button class="chap" data-chap="${c.s}"><span class="ts">${fmt(c.s)}</span>${c.t}${i === 1 ? ' <span class="chip warn" style="margin-left:auto">Skipped for you</span>' : ""}</button>`).join("")}</div>` : ""}
+      </div></div>
+    <aside class="upnext pad" style="padding-left:16px;padding-right:16px"><h2>Up next <small>Autoplay on</small></h2><div class="list">
+      ${["v2", "v4", "v8", "v9"].map((i) => { const u = vid(i); return `<button class="rowi" data-play-video="${u.id}"><div class="thumb art a${u.a}"><span class="dur">${fmt(u.d)}</span></div><div class="body"><p class="ttl" style="font-size:14px">${u.t}</p><span class="sub">${u.ch}</span></div></button>`; }).join("")}
+    </div></aside></div></section>`; };
+
+  R.shows = () => `<section class="screen">
+    <div class="nhero">${art(4)}<div class="scrim"></div>
+      <div class="over">${head("Shows and Films", hbtn("search", "Search shows and films") + hbtn("download", "Downloads", 'data-go="downloads"'))}<div class="pad">${tabs("shows")}</div></div>
+      <div class="copy pad"><span class="kick" style="color:#fff;opacity:.85">Show · Season 2 on the hub</span><h2 class="logo-type">The Quiet Harbor</h2>
+        <div class="meta-line"><span>2025</span><span class="rating">Teen</span><span>2 seasons</span><span>From the Shows folder</span></div>
+        <p style="margin:0;color:#d8e4f3;max-width:52ch">A coastal town has kept one secret for forty years. The new lighthouse keeper finds the logbook.</p>
+        <div class="row-btns"><button class="btn primary" data-go="show" data-resume>${ic("play", "fill")}Resume S2 E4</button><button class="btn ghost" data-go="show">${ic("info")}More info</button></div></div></div>
+    <div class="pad">${netBanner()}
+      <div class="shelf-h" style="margin-top:6px"><h2>Continue watching</h2></div>
+      <div class="shelf">${[[4, "The Quiet Harbor", "S2 E4 · 13 min left", .74], [6, "Paper Kites", "41 min left", .55], [1, "Marsh Light", "S1 E2 · 30 min left", .3]].map(([a, t, s, p]) => `<button class="tile" data-go="show"><div class="art a${a}"><span class="ptitle">${t}</span><span class="prog"><i style="width:${p * 100}%"></i></span></div><p class="sub" style="margin:0">${s}</p></button>`).join("")}</div>
+      <div class="shelf-h"><h2>Recently added</h2></div>
+      <div class="shelf posters">${SHOWS.map((s) => poster(s, 'data-go="show"')).join("")}</div>
+      <div class="shelf-h"><h2>Films</h2></div>
+      <div class="shelf posters">${SHOWS.filter((s) => s.kind === "Film").concat(SHOWS.slice(0, 3)).map((s) => poster(s, 'data-go="show"')).join("")}</div>
+      <div class="shelf-h"><h2>Mysteries</h2></div>
+      <div class="shelf posters">${SHOWS.slice(3).concat(SHOWS.slice(0, 3)).map((s) => poster(s, 'data-go="show"')).join("")}</div>
+    </div></section>`;
+
+  R.show = () => `<section class="screen">
+    <div class="nhero" style="min-height:440px">${art(4)}<div class="scrim"></div>
+      <div class="over"><div class="ahead pad"><button class="ibtn solid" data-back aria-label="Back">${ic("left")}</button><span style="flex:1"></span><button class="ibtn solid" data-sheet="cast" aria-label="Play on another screen">${ic("cast")}</button></div></div>
+      <div class="copy pad"><h2 class="logo-type" style="font-size:clamp(36px,7cqi,64px)">The Quiet Harbor</h2>
+        <div class="meta-line"><span>2025</span><span class="rating">Teen</span><span>2 seasons</span><span>4K saved as 1080p</span></div></div></div>
+    <div class="pad" style="max-width:1100px">${netBanner()}
+      <div class="row-btns" style="margin-top:4px"><button class="btn primary" data-toast="Resume from 36:10, or Start over">${ic("play", "fill")}Resume S2 E4 · 13 min left</button><button class="btn" data-toast="Added to My list">${ic("plus")}My list</button><button class="btn" data-keep>${ic("download")}Keep season on this phone</button></div>
+      <p style="color:var(--muted-foreground);max-width:70ch">A coastal town has kept one secret for forty years. The new lighthouse keeper finds the logbook, and the harbor light starts failing on the same nights the old entries describe.</p>
+      <div class="tabs" role="tablist" style="margin-top:8px">${[1, 2].map((n) => `<button class="tab" role="tab" aria-selected="${S.season === n}" data-season="${n}">Season ${n}</button>`).join("")}</div>
+      <div class="list">${EPS.map((e) => { const p = S.season === 1 ? 1 : e.p; return `<div class="rowi"><button class="thumb art a${(e.n + 3) % 10}" data-toast="Playing S${S.season} E${e.n}" aria-label="Play episode ${e.n}" style="width:150px">${p ? `<span class="prog"><i style="width:${p * 100}%"></i></span>` : ""}</button><div class="body"><b>${e.n}. ${e.t}</b><span class="sub">${e.m} min${p === 1 ? " · Watched" : p ? ` · ${Math.round(e.m * (1 - p))} min left` : ""}</span><p class="desc">${e.d}</p></div>${e.dev && S.season === 2 ? `<span class="chip dev" title="On this phone">${ic("phone")}</span>` : `<button class="ibtn" aria-label="Keep on this phone" data-keep>${ic("download")}</button>`}</div>`; }).join("")}</div>
+      <div class="note">${ic("info")}<span><b>Skip intro</b> shows up when the file marks where the intro ends. Nothing is looked up on the internet: the poster and the words come from the file and its folder.</span></div>
+    </div></section>`;
+
+  R.music = () => `<section class="screen">
+    ${head("Music", hbtn("search", "Search music") + hbtn("download", "Downloads", 'data-go="downloads"'))}
+    <div class="pad">${tabs("music")}${netBanner()}
+      <div class="shelf-h" style="margin-top:6px"><h2>Recently played</h2></div>
+      <div class="shelf squares">${ALBUMS.map((a, i) => `<button class="tile square" data-play-music="${i % TRACKS.length}"><div class="art a${a.a}"></div><div><p class="ttl">${a.t}</p><p class="sub">${a.by}</p></div></button>`).join("")}</div>
+      <div class="shelf-h"><h2>Radio from your music</h2><span class="more">Your library only</span></div>
+      <div class="shelf squares">${["Iris Vale", "The Marlows", "Quill and Riff", "Serena Moon", "Juniper Lane Band", "Bramble"].map((n, i) => `<button class="tile square" data-play-music="${i % TRACKS.length}"><div class="art a${(i * 3) % 10}" style="border-radius:50%"></div><div style="text-align:center"><p class="ttl">${n} radio</p></div></button>`).join("")}</div>
+      <div class="shelf-h"><h2>Liked songs</h2><span class="more">142 songs</span></div>
+      <div class="list" style="max-width:820px">${TRACKS.map((t, i) => `<button class="rowi" data-play-music="${i}" style="align-items:center"><div class="sq art a${t.a}" style="width:48px"></div><div class="body"><b style="font-size:15px">${t.t}</b><span class="sub">${t.by}</span></div><span class="sub" style="margin:0">${fmt(t.d)}</span>${i < 3 ? `<span class="chip dev" title="On this phone">${ic("phone")}</span>` : `<span style="width:34px"></span>`}</button>`).join("")}</div>
+    </div></section>`;
+
+  R.nowplaying = () => { const t = TRACKS[S.cur.i] || TRACKS[0]; return `<section class="screen np" style="padding-bottom:0">
+    <div class="top"><button class="ibtn" data-back aria-label="Close Now playing">${ic("down")}</button><div class="lbl">Playing from<b>${ALBUMS.find((a) => a.by === t.by)?.t || "Liked songs"}</b></div><button class="ibtn" aria-label="More" data-toast="Add to playlist, Go to album, Share with the family">${ic("more")}</button></div>
+    <div class="npgrid"><div class="art a${t.a} cover"></div>
+      <div class="npcol">
+        <div class="titlerow"><div><h1>${t.t}</h1><p class="artist">${t.by}</p></div><button class="ibtn" aria-label="Like" data-toast="Added to Liked songs">${ic("heart")}</button></div>
+        <div class="bigscrub">${`<div class="scrub" data-scrub><span class="track"></span><span class="fill" style="width:${(S.pos / t.d) * 100}%"></span><span class="knob" style="left:${(S.pos / t.d) * 100}%"></span></div>`}<div class="times"><span id="mtime">${fmt(S.pos)}</span><span>-${fmt(t.d - S.pos)}</span></div></div>
+        <div class="trans"><button class="ibtn" aria-label="Shuffle" data-toast="Shuffle on">${ic("shuffle")}</button><button class="ibtn" aria-label="Previous" data-mnext="-1">${ic("prev", "fill")}</button><button class="play" data-mplay aria-label="Play or pause">${ic(S.playing ? "pause" : "play", "fill")}</button><button class="ibtn" aria-label="Next" data-mnext="1">${ic("next", "fill")}</button><button class="ibtn" aria-label="Sleep timer" data-sheet="sleep">${ic("moon")}</button></div>
+        ${S.sleep ? `<span class="chip sleepchip">${ic("moon")}Sleeps in ${S.sleep}</span>` : ""}
+        <div class="foot"><button data-sheet="cast">${ic("speaker")}Playing on this phone</button><button data-toast="Up next: 4 songs">${ic("list")}Up next</button></div>
+        <div class="queue panel"><h3>Up next</h3>${TRACKS.filter((_, i) => i !== S.cur.i).map((q) => `<div class="rowi" style="align-items:center;padding:8px 0"><div class="sq art a${q.a}" style="width:40px"></div><div class="body"><b style="font-size:14px">${q.t}</b><span class="sub">${q.by}</span></div><span class="sub">${fmt(q.d)}</span></div>`).join("")}</div>
+      </div></div></section>`; };
+
+  const podStatus = (e) => e.st === "saved" ? `<span class="chip ok">${ic("hub")}Saved on the hub</span>` : e.st === "device" ? `<span class="chip dev">${ic("phone")}On this phone</span>` : `<span class="chip stream-only">${ic("videos")}Not saved</span><button class="chip btnlike" data-toast="Saving to the hub" >${ic("download")}Save</button>`;
+  R.podcasts = () => `<section class="screen">
+    ${head("Podcasts", hbtn("search", "Search podcasts") + hbtn("download", "Downloads", 'data-go="downloads"'))}
+    <div class="pad">${tabs("podcasts")}${netBanner()}
+      <div class="grid2"><div>
+        <div class="shelf-h" style="margin-top:6px"><h2>Up next</h2><span class="more">Queue · 3</span></div>
+        <div class="legend"><span class="chip ok">${ic("hub")}Saved on the hub</span><span class="chip dev">${ic("phone")}On this phone</span><span class="chip">${ic("videos")}Not saved: plays from the web</span></div>
+        <div class="list">${PODS.map((e, i) => `<div class="rowi ep ${e.st === "stream" ? "stream-only-row" : ""}"><div class="sq art a${e.a}" style="width:72px"></div><div class="body"><span class="when">${e.when} · ${e.show}</span><b>${e.t}</b><p class="desc">${e.d}</p>
+          <div class="ctl"><button class="pbtn ${e.st === "stream" ? "stream-only" : ""}" data-play-pod="${i}" aria-label="Play">${ic("play", "fill")}</button><span class="left">${e.played ? "Played" : e.left ? `${e.left} min left` : `${e.m} min`}</span>${podStatus(e)}</div></div></div>`).join("")}</div>
+      </div><div>
+        <div class="shelf-h"><h2>Your shows</h2><span class="more">5 followed</span></div>
+        <div class="list">${[["The Workbench Hour", 2, "Keeps the newest 3 · Speed 1.2x"], ["Small Planet Science", 1, "Keeps the newest 3"], ["Story Kitchen", 6, "Streams only"], ["Night Owls Radio", 4, "Streams only · Skips first 30 s"]].map(([n, a, s]) => `<div class="rowi" style="align-items:center"><div class="sq art a${a}"></div><div class="body"><b>${n}</b><span class="sub">${s}</span></div>${hbtn("sliders", "Show settings", 'data-sheet="podrule"')}</div>`).join("")}</div>
+        <div class="note">${ic("info")}<span><b>Episodes play right away</b> from the show's own feed. Saved ones stay on the hub for everyone in the home, and they play with the internet off.</span></div>
+      </div></div>
+    </div></section>`;
+
+  R.books = () => `<section class="screen">
+    ${head("Books", hbtn("search", "Search books") + hbtn("download", "Downloads", 'data-go="downloads"'))}
+    <div class="pad">${tabs("books")}${netBanner()}
+      <div class="shelf-h" style="margin-top:6px"><h2>Continue</h2></div>
+      <div class="pick" style="grid-template-columns:repeat(auto-fill,minmax(260px,1fr))">
+        <button class="pcard" data-undrawn="The reader"><div class="art a0" style="width:64px;height:96px;border-radius:4px 10px 10px 4px"></div><div class="body"><span class="k">${ic("book")}Reading</span><b>The Lantern Road</b><span class="sub">Lucia Marsh · 34%</span><div class="mbar"><i style="width:34%"></i></div></div></button>
+        <button class="pcard" data-go="audiobook"><div class="art a1" style="width:64px;height:96px;border-radius:4px 10px 10px 4px"></div><div class="body"><span class="k">${ic("headphones")}Listening</span><b>Willow and the Winter Sea</b><span class="sub">Chapter 7 · 5 h 10 min left</span><div class="mbar"><i style="width:48%"></i></div><span class="chip" style="margin-top:8px">${ic("book")}Also an e-book: read along</span></div></button>
+      </div>
+      <div class="shelf-h"><h2>Books</h2><span class="more">EPUB and PDF</span></div>
+      <div class="shelf posters">${BOOKS.filter((b) => b.kind === "book").concat(BOOKS.filter((b) => b.kind === "book")).map((b) => `<button class="tile book" data-undrawn="The reader"><div class="art a${b.a}"><span class="ptitle">${b.t}</span></div><div><p class="ttl" style="font-size:14px">${b.t}</p><p class="sub">${b.by}</p></div></button>`).join("")}</div>
+      <div class="shelf-h"><h2>Audiobooks</h2><span class="more">m4b and mp3 folders</span></div>
+      <div class="shelf squares">${BOOKS.filter((b) => b.kind === "audio").concat(BOOKS.filter((b) => b.kind === "audio")).map((b) => `<button class="tile square" data-go="audiobook"><div class="art a${b.a}"><span class="ptitle" style="text-transform:none">${b.t}</span></div><div><p class="ttl" style="font-size:14px">${b.t}</p><p class="sub">${b.by}</p></div></button>`).join("")}</div>
+    </div></section>`;
+
+  R.audiobook = () => { const chLen = 2400; const p = S.abpos; return `<section class="screen ab" style="padding-bottom:0">
+    <div class="np" style="background:none;min-height:auto"><div class="top"><button class="ibtn" data-back aria-label="Close the player">${ic("down")}</button><div class="lbl">Audiobook<b>Willow and the Winter Sea</b></div><button class="ibtn" aria-label="Bookmark" data-toast="Bookmark added at ${fmt(p)}">${ic("bookmark")}</button></div></div>
+    <div class="npgrid" style="padding-top:8px"><div class="art a1 cover book"><span class="ptitle" style="text-transform:none;font-size:22px">Willow and the Winter Sea</span></div>
+      <div class="npcol np" style="background:none;min-height:auto">
+        <div class="chline"><b>Chapter 7: The Lighthouse Stairs</b><span>Serena Quill · read by Vincent Ray</span></div>
+        <div class="bigscrub"><div class="scrub" data-scrub><span class="track"></span><span class="fill" style="width:${(p / chLen) * 100}%"></span><span class="knob" style="left:${(p / chLen) * 100}%"></span></div><div class="times"><span id="abtime">${fmt(p)}</span><span>${fmt(chLen - p)} left in chapter</span></div></div>
+        <div class="trans"><button class="ibtn" aria-label="Previous chapter" data-toast="Chapter 6">${ic("prev", "fill")}</button><button class="ibtn" aria-label="Back 15 seconds" data-abseek="-15">${ic("back15")}</button><button class="play" data-abplay aria-label="Play or pause">${ic(S.abplaying ? "pause" : "play", "fill")}</button><button class="ibtn" aria-label="Forward 30 seconds" data-abseek="30">${ic("fwd15")}</button><button class="ibtn" aria-label="Next chapter" data-toast="Chapter 8">${ic("next", "fill")}</button></div>
+        <div class="toolrow"><button data-rate>${'<span style="font-size:17px;font-weight:900">' + S.rate + "x</span>"}Speed</button><button data-sheet="sleep" class="${S.sleep ? "on" : ""}">${ic("moon")}${S.sleep ? S.sleep : "Sleep"}</button><button data-sheet="chapters">${ic("list")}Chapters</button><button data-undrawn="Read along">${ic("book")}Read along</button><button data-sheet="cast">${ic("speaker")}Speaker</button></div>
+        <p class="sub" style="text-align:center;white-space:normal">Book: 48% · 5 h 10 min left at ${S.rate}x · <span class="chip dev" style="vertical-align:middle">${ic("phone")}On this phone</span></p>
+      </div></div></section>`; };
+
+  R.downloads = () => `<section class="screen">
+    <div class="ahead pad"><button class="ibtn" data-back aria-label="Back">${ic("left")}</button><h1 style="margin-left:4px">Downloads</h1></div>
+    <div class="pad">${netBanner()}<div class="tabs" role="tablist"><button class="tab" role="tab" aria-selected="true">On this phone</button><button class="tab" role="tab" aria-selected="false" data-undrawn="Saved on the hub">Saved on the hub</button><button class="tab" role="tab" aria-selected="false" data-undrawn="Automatic">Automatic</button></div>
+      <div class="grid2"><div>
+        <div class="meter"><b>This phone</b><span class="sub" style="display:inline;margin-left:6px">Chrome on Android</span>
+          <div class="bar2" role="img" aria-label="3.1 GB used by MaiPai, 9.4 GB free"><i style="width:9%;background:var(--hue-red)"></i><i style="width:6%;background:var(--hue-violet)"></i><i style="width:4%;background:var(--hue-green)"></i><i style="width:3%;background:var(--hue-pink)"></i><i style="width:2%;background:var(--hue-orange)"></i></div>
+          <div class="keys"><span style="--k:var(--hue-red)">Videos 1.2 GB</span><span style="--k:var(--hue-violet)">Shows 0.9 GB</span><span style="--k:var(--hue-green)">Music 0.5 GB</span><span style="--k:var(--hue-pink)">Podcasts 0.3 GB</span><span style="--k:var(--hue-orange)">Books 0.2 GB</span><span style="--k:var(--border)">9.4 GB free</span></div></div>
+        <div class="list dl" style="margin-top:8px">
+          ${[[4, "The Quiet Harbor, S2 E5", "Shows · 1.1 GB", "run", 64], [4, "The Quiet Harbor, S2 E6", "Shows · 1.2 GB", "wait", 0], [2, "Building a backyard pizza oven, part 3", "Videos · 410 MB", "ok"], [5, "Beach day, summer 2025", "Videos · 96 MB", "ok"], [1, "Where does the wind come from?", "Podcasts · 32 MB", "ok"], [1, "Willow and the Winter Sea", "Books · 210 MB", "ok"], [2, "Low Tide Radio", "Music · 12 songs · 96 MB", "ok"]].map(([a, t, s, st, pc]) => `<div class="rowi" style="align-items:center"><div class="sq art a${a}" style="width:56px"></div><div class="body"><b style="font-size:15px">${t}</b><span class="sub">${s}</span>${st === "ok" ? `<span class="state ok">${ic("check")}Ready offline</span>` : st === "run" ? `<span class="state run">Downloading · ${pc}%</span><div class="pp"><i style="width:${pc}%"></i></div>` : `<span class="state">${ic("clock")}Waiting for Wi-Fi</span>`}</div><button class="ibtn" aria-label="Remove from this phone" data-toast="Removed from this phone. Still saved on the hub.">${ic("trash")}</button></div>`).join("")}
+        </div></div>
+        <div>
+          <div class="shelf-h" style="margin-top:14px"><h2>Saved on the hub</h2></div>
+          <div class="meter"><b>Your saved copies</b><div class="bar2"><i style="width:19%;background:var(--primary)"></i></div><div class="keys"><span style="--k:var(--primary)">38 GB of your 200 GB</span></div><p class="sub" style="white-space:normal;margin-top:8px">Saved copies live on the hub and play on every screen in the home, even with the internet off.</p></div>
+          <div class="shelf-h"><h2>The hub saves by itself</h2></div>
+          <div>${[["Podcasts: newest 3 of each show", "Older ones you saved yourself stay", 1], ["Ember Workshop: new videos", "Keeps 5, removes ones you watched", 1], ["This phone: next 2 episodes of shows you watch", "Only on Wi-Fi", 1], ["This phone: Liked songs", "About 1.1 GB", 0]].map(([t, s, on]) => `<div class="rule"><div class="body"><b>${t}</b><span>${s}</span></div><span class="sw2 ${on ? "" : "off"}" role="img" aria-label="${on ? "On" : "Off"}"></span></div>`).join("")}</div>
+          <div class="note">${ic("phone")}<span><b>On iPhone or iPad?</b> Use the MaiPai Go app to keep things on your phone. Safari cannot hold them reliably, so the button there says so.</span></div>
+        </div></div>
+    </div></section>`;
+
+  R.kidhome = () => `<section class="screen pad">
+    <div class="kidtop"><h1>Hi Pippa</h1><span class="timechip">${ic("clock")}35 minutes left today</span></div>
+    <div class="shelf-h"><h2 style="font-size:24px">Keep watching</h2></div>
+    <div class="kgrid">
+      <button class="ktile" data-go="kidplayer"><div class="art a8"><span class="prog"><i style="width:24%"></i></span></div><b>Volcano in a jar</b></button>
+      <button class="ktile" data-go="kidplayer"><div class="art a6"><span class="prog"><i style="width:60%"></i></span></div><b>Bramble and Bruno: The Big Puddle</b></button>
+    </div>
+    <div class="shelf-h"><h2 style="font-size:24px">Pick an app</h2></div>
+    <div class="kapps">
+      <button class="kapp" style="background:#ffc94d" data-go="kidplayer">${ic("videos")}Videos</button>
+      <button class="kapp" style="background:#7fe0c8" data-toast="Shows for Pippa">${ic("film")}Shows</button>
+      <button class="kapp" style="background:#ff9fc8" data-toast="Music for Pippa">${ic("music")}Music</button>
+      <button class="kapp" style="background:#b9a4ff" data-toast="Stories for Pippa">${ic("headphones")}Stories</button>
+    </div>
+    <div class="shelf-h"><h2 style="font-size:24px">Found by name</h2></div>
+    <button class="locked" data-toast="Sent to Nadia. They'll say yes or no.">${art(4)}<div><b>Raven Hill</b><span>Not for you yet. Tap to ask a grown-up.</span></div>${ic("lock")}</button>
+  </section>`;
+
+  R.kidplayer = () => `<section class="screen kplayer" style="position:relative">
+    <div class="ahead pad" style="gap:12px"><button class="kback" data-back>${ic("left")}Back</button><span style="flex:1"></span><span class="timechip">${ic("clock")}35 min left</span></div>
+    <div class="pad" style="max-width:1000px;margin:0 auto">
+      <div class="player ${S.kidplaying ? "" : "paused"}" id="kplayer" style="border-radius:var(--radius-card)">${art(8)}
+        <button class="big" data-kplay aria-label="Play" style="width:96px;height:96px">${ic(S.kidplaying ? "pause" : "play", "fill")}</button>
+        <div class="controls">${vscrub(S.kidpos, 400, false)}<div class="cbar"><button class="ibtn" data-kplay aria-label="Play or pause">${ic(S.kidplaying ? "pause" : "play", "fill")}</button><button class="ibtn" data-kseek="-10" aria-label="Back a little">${ic("back15")}</button><span class="time" id="ktime" style="font-size:16px">${fmt(S.kidpos)} / 6:40</span><span class="spacer"></span><button class="ibtn" aria-label="Big screen" data-toast="Full screen">${ic("max")}</button></div></div>
+      </div>
+      <h1 style="font-size:26px;margin:16px 0 4px">Volcano in a jar</h1><p class="sub" style="font-size:16px;margin:0 0 14px">From Sprout Lab</p>
+      <div class="row-btns"><button class="btn accent" data-timesup>${ic("clock")}Show time's up</button><button class="btn" data-toast="Liked">${ic("heart")}I like it</button></div>
+      <div class="note" style="font-size:16px">${ic("info")}<span>No Up next, no comments and no links out. The next video waits for a tap.</span></div>
+    </div>
+    <div class="timesup" id="timesup" hidden><span class="moon">${ic("moon")}</span><h2>Screen time is done for today.</h2><p>Ask a grown-up for more.</p><div class="row-btns" style="justify-content:center"><button class="btn accent" data-toast="Sent to Nadia. They'll say yes or no.">${ic("hand")}Ask for 15 more minutes</button><button class="btn" data-go="kidhome">Go Home</button></div></div>
+    </section>`;
+
+  // ---------- shell ----------
+  function renderRail() {
+    const list = S.kid ? APPS.filter(([k]) => k !== "podcasts") : APPS;
+    const cur = APPOF[S.screen];
+    $("#rail").innerHTML = `<span class="brand" aria-hidden="true"></span>${`<button aria-label="Search everywhere" title="Search everywhere" data-undrawn="Search">${ic("search")}</button>`}<span class="sep"></span>
+      ${list.map(([k, n, i]) => `<button aria-label="${n}" title="${n}" ${cur === k ? 'aria-current="page"' : ""} data-app="${k}">${ic(i)}</button>`).join("")}
+      <span class="grow"></span><button aria-label="More" title="More" data-undrawn="More">${ic("more")}</button><button aria-label="Profile" title="Profile" data-undrawn="Profile menu"><span class="avatar">${S.kid ? "P" : "N"}</span></button>`;
+  }
+  function renderDrawer() {
+    const list = S.kid ? APPS.filter(([k]) => k !== "podcasts") : APPS;
+    const cur = APPOF[S.screen];
+    const secs = !S.kid && SECTIONS[cur] ? `<div class="lbl">${list.find(([k]) => k === cur)[1]}</div>${SECTIONS[cur].map((s, i) => `<button class="item secn ${i === 0 ? "on" : ""}" data-undrawn="${s}">${s}</button>`).join("")}` : "";
+    $("#drawer").innerHTML = `<nav class="drawer" aria-label="Apps"><div class="dhead"><span class="brand" aria-hidden="true"></span>MaiPai Home</div><div class="search">${ic("search")}${S.kid ? "Find something" : "Search everywhere"}</div>
+      ${list.map(([k, n, i]) => `<button class="item" ${cur === k ? 'aria-current="page"' : ""} data-app="${k}">${ic(i)}${n}</button>`).join("")}${secs}
+      <div class="foot"><span class="avatar">${S.kid ? "P" : "N"}</span><b style="flex:1">${S.kid ? "Pippa" : "Nadia"}</b>${S.kid ? "" : hbtn("sliders", "This app's settings", 'data-undrawn="Settings"')}</div></nav>`;
+  }
+  function renderMini() {
+    const show = MEDIA.has(S.screen) && !S.kid;
+    app.dataset.mini = show ? "1" : "0";
+    if (!show) return;
+    let t, sub, a, pct;
+    if (S.cur.kind === "video") { const v = vid(S.wid); t = v.t; sub = v.ch; a = v.a; pct = S.vpos / v.d; }
+    else if (S.cur.kind === "pod") { const e = PODS[S.cur.i]; t = e.t; sub = e.show; a = e.a; pct = .3; }
+    else { const tr = TRACKS[S.cur.i]; t = tr.t; sub = tr.by; a = tr.a; pct = S.pos / tr.d; }
+    const isPlaying = S.cur.kind === "video" ? S.vplaying : S.playing;
+    $("#mini").innerHTML = `<div class="mprog"><i style="width:${Math.min(100, pct * 100)}%"></i></div><div class="in"><button class="mt" style="display:flex;gap:12px;align-items:center;flex:1;min-width:0" data-open-cur><span class="art a${a} mart"></span><span style="min-width:0"><b>${t}</b><span class="sub" style="display:block">${sub}</span></span></button>
+      <div class="mcenter"><span class="mc">${hbtn("prev", "Previous", 'data-mnext="-1"')}</span><button class="ibtn play1" data-mplay-any aria-label="Play or pause">${ic(isPlaying ? "pause" : "play", "fill")}</button><span class="mc">${hbtn("next", "Next", 'data-mnext="1"')}</span></div><div class="mright">${hbtn("cast", "Play on another screen", 'data-sheet="cast"')}</div></div>`;
+  }
+  function render() {
+    if (S.kid && !S.screen.startsWith("kid")) S.screen = "kidhome";
+    if (!S.kid && S.screen.startsWith("kid")) S.screen = "home";
+    screensEl.innerHTML = R[S.screen]();
+    app.dataset.immersive = IMMERSIVE.has(S.screen) ? "1" : "0";
+    app.dataset.mode = S.kid ? "child" : "adult";
+    renderRail(); renderMini();
+    const meta = SCREENS.find(([k]) => k === S.screen);
+    $("#captag").textContent = meta[1]; $("#captext").innerHTML = meta[2];
+    $("#screenpick").value = S.screen;
+    if (S.tv) setTimeout(() => { const f = screensEl.querySelector(".btn.primary, .tile, .pcard"); f && f.focus({ preventScroll: true }); }, 30);
+    // the offline-only kicker swap on the billboard
+    $$("[data-offonly]", screensEl).forEach((e) => e.style.display = S.net ? "none" : "");
+    if (S.size === "fit" && !$("#try").hidden) layout();
+  }
+  function go(screen, push = true) {
+    if (push && S.screen !== screen) (S.hist = S.hist || []).push(S.screen);
+    S.screen = screen; scroller.scrollTop = 0; closeAll(); render();
+  }
+  function back() { const h = S.hist || []; let p = h.pop(); if (!p) p = S.kid ? "kidhome" : (APPOF[S.screen] === S.screen ? "home" : APPOF[S.screen]); if (p === S.screen) p = "home"; S.screen = p; scroller.scrollTop = 0; render(); }
+  let toastT;
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 2200); }
+  function closeAll() { $("#drawer").hidden = true; $("#sheet").hidden = true; }
+
+  const SHEETS = {
+    sleep: () => `<h3>Sleep timer</h3><p>Fades out and pauses whatever is playing, in any app.</p>${["Off", "15 minutes", "30 minutes", "45 minutes", "60 minutes", "End of chapter"].map((o) => `<button class="opt ${(S.sleep || "Off") === sleepLabel(o) ? "on" : ""}" data-sleep="${o}">${o}${(S.sleep || "Off") === sleepLabel(o) ? ic("check") : ""}</button>`).join("")}`,
+    chapters: () => `<h3>Chapters</h3><p>Willow and the Winter Sea · 10 chapters</p>${CHAPTERS.map((c, i) => `<button class="opt ${i === 6 ? "on" : ""}" data-toast="Chapter ${i + 1}: ${c}"><span>${i + 1}. ${c}</span><small>${i < 6 ? "Done" : i === 6 ? "Now" : fmt(1500 + i * 97)}</small></button>`).join("")}`,
+    cast: () => `<h3>Play on</h3><p>Moves what is playing. It picks up at the same spot.</p>${[["phone", "This phone", "Playing"], ["tv", "Living room TV", "MaiPai Go"], ["speaker", "Kitchen speaker", "Robot"], ["hub", "Studio desktop", "Chrome"]].map(([i, n, s], k) => `<button class="opt ${k === 0 ? "on" : ""}" data-toast="Now playing on ${n}"><span style="display:flex;gap:10px;align-items:center">${ic(i)}${n}</span><small>${s}</small></button>`).join("")}`,
+    savelink: () => `<h3>Save a link</h3><p>Paste a video link. The hub saves one copy for the home and it shows up in Library.</p><div class="search" style="display:flex;align-items:center;gap:8px;background:var(--card-2);border:1px solid var(--border);border-radius:var(--radius-control);padding:0 12px;min-height:48px;color:var(--muted-foreground);margin:6px 0 10px">${ic("link")}https://video.example.com/watch?v=abc123</div>${[["Video", "Best up to 1080p"], ["Audio only", "For listening"]].map(([n, s], k) => `<button class="opt ${k === 0 ? "on" : ""}">${n}<small>${s}</small></button>`).join("")}<div class="row-btns" style="margin-top:12px"><button class="btn accent" data-toast="Saving. It shows up in Library when it is ready.">Save to the hub</button></div>`,
+    podrule: () => `<h3>The Workbench Hour</h3><p>Settings for this show only.</p>${[["Save new episodes", "Newest 3"], ["Speed", "1.2x"], ["Skip the first", "30 seconds"], ["Skip the last", "Off"], ["Remove after played", "On"]].map(([n, s]) => `<button class="opt">${n}<small>${s}</small></button>`).join("")}`,
+  };
+  const sleepLabel = (o) => o === "Off" ? "Off" : o === "End of chapter" ? "End of chapter" : o.replace(" minutes", ":00");
+  function sheet(name) { $("#sheet").innerHTML = `<div class="sheet" role="dialog" aria-modal="true"><div class="grab"></div>${SHEETS[name]()}</div>`; $("#sheet").hidden = false; }
+
+  // ---------- playback ticking ----------
+  setInterval(() => {
+    let dirty = false;
+    if (S.vplaying && S.screen === "watch") { const d = vid(S.wid).d; S.vpos = Math.min(d, S.vpos + S.rate); updWatch(); }
+    else if (S.vplaying) S.vpos += S.rate;
+    if (S.playing) { S.pos += 1; if (S.pos >= TRACKS[S.cur.i].d) { S.pos = 0; S.cur.i = (S.cur.i + 1) % TRACKS.length; dirty = true; } if (S.screen === "nowplaying") updNow(); }
+    if (S.abplaying) { S.abpos += S.rate; if (S.screen === "audiobook") updAb(); }
+    if (S.kidplaying) { S.kidpos = Math.min(400, S.kidpos + 1); if (S.screen === "kidplayer") updKid(); }
+    if (dirty) render(); else if (app.dataset.mini === "1") { const i = $("#mini .mprog i"); if (i) { const pct = S.cur.kind === "video" ? S.vpos / vid(S.wid).d : S.cur.kind === "music" ? S.pos / TRACKS[S.cur.i].d : .3; i.style.width = Math.min(100, pct * 100) + "%"; } }
+  }, 1000);
+  function setScrub(root, pct) { const f = $(".fill", root), k = $(".knob", root); if (f) f.style.width = pct * 100 + "%"; if (k) k.style.left = pct * 100 + "%"; }
+  function updWatch() { const d = vid(S.wid).d; const sk = $("#vplayer .skipchip"); if (sk) sk.hidden = !(S.wid === "v1" && S.vpos >= 60 && S.vpos < 132); const t = $("#vtime"); if (t) t.textContent = `${fmt(S.vpos)} / ${fmt(d)}`; const sc = $("#vplayer [data-scrub]"); sc && setScrub(sc, S.vpos / d); }
+  function updNow() { const t = TRACKS[S.cur.i]; const m = $("#mtime"); if (m) m.textContent = fmt(S.pos); const sc = $(".np [data-scrub]"); sc && setScrub(sc, S.pos / t.d); }
+  function updAb() { const m = $("#abtime"); if (m) m.textContent = fmt(S.abpos); const sc = $(".ab [data-scrub]"); sc && setScrub(sc, Math.min(1, S.abpos / 2400)); }
+  function updKid() { const m = $("#ktime"); if (m) m.textContent = `${fmt(S.kidpos)} / 6:40`; const sc = $("#kplayer [data-scrub]"); sc && setScrub(sc, S.kidpos / 400); }
+  function ripple(side) { const r = $(`#vplayer .ripple.${side}`); if (!r) return; r.classList.add("show"); setTimeout(() => r.classList.remove("show"), 500); }
+
+  // ---------- events ----------
+  app.addEventListener("click", (e) => {
+    const t = e.target.closest("button, [data-dbl], [data-scrub]"); if (!t) { if (e.target.id === "drawer" || e.target.id === "sheet") closeAll(); return; }
+    const d = t.dataset;
+    if (t.id === "menubtn") { renderDrawer(); $("#drawer").hidden = false; return; }
+    if (d.app) { if (d.app === "chat") { closeAll(); return toast("Chat is not part of this mockup"); } return go(S.kid ? (d.app === "home" ? "kidhome" : d.app === "videos" ? "kidplayer" : "kidhome") : d.app); }
+    if (d.go) { if (d.resume !== undefined) toast("Resume from 36:10, or Start over"); return go(d.go); }
+    if (d.back !== undefined) return back();
+    if (d.undrawn) { closeAll(); return toast(`${d.undrawn} is not drawn in this mockup`); }
+    if (d.toast) { closeAll(); return toast(d.toast); }
+    if (d.sheet) return sheet(d.sheet);
+    if (d.keep !== undefined) { return toast(d.keep ? "Already on this phone" : "Keeping on this phone. Downloads shows the progress."); }
+    if (d.playVideo) { S.wid = d.playVideo; S.vpos = d.playVideo === "v1" ? 673 : Math.round((vid(d.playVideo).p || 0) * vid(d.playVideo).d); S.vplaying = true; S.playing = false; S.cur = { kind: "video" }; if (S.vpos > 0) setTimeout(() => toast(`Resume from ${fmt(S.vpos)}, or Start over`), 50); return go("watch"); }
+    if (d.playMusic !== undefined) { S.cur = { kind: "music", i: +d.playMusic }; S.pos = 0; S.playing = true; S.vplaying = false; S.abplaying = false; return go("nowplaying"); }
+    if (d.playPod !== undefined) { const ep = PODS[+d.playPod]; if (!S.net && ep.st === "stream") return toast("Not saved, and the internet is down. Save it when the internet is back."); S.cur = { kind: "pod", i: +d.playPod }; S.playing = true; S.vplaying = false; S.abplaying = false; renderMini(); return toast(ep.st === "stream" ? "Playing from the show's feed" : "Playing the saved copy"); }
+    if (d.openCur !== undefined) { return go(S.cur.kind === "video" ? "watch" : S.cur.kind === "music" ? "nowplaying" : "podcasts"); }
+    if (d.mplay !== undefined || d.mplayAny !== undefined) { if (S.cur.kind === "video") S.vplaying = !S.vplaying; else { S.playing = !S.playing; S.abplaying = false; } return render(); }
+    if (d.mnext) { if (S.cur.kind !== "music") S.cur = { kind: "music", i: 0 }; S.cur.i = (S.cur.i + (+d.mnext) + TRACKS.length) % TRACKS.length; S.pos = 0; return render(); }
+    if (d.vplay !== undefined) { S.vplaying = !S.vplaying; S.cur = { kind: "video" }; if (S.vplaying) { S.playing = false; S.abplaying = false; } return render(); }
+    if (d.seek) { S.vpos = Math.max(0, S.vpos + (+d.seek)); ripple(+d.seek < 0 ? "l" : "r"); return updWatch(); }
+    if (d.skipsp !== undefined) { S.vpos = 132; updWatch(); return toast("Skipped the sponsor part"); }
+    if (d.chap) { S.vpos = +d.chap; updWatch(); scroller.scrollTo({ top: 0 }); return; }
+    if (d.rate !== undefined) { const r = [1, 1.25, 1.5, 2, 0.75]; S.rate = r[(r.indexOf(S.rate) + 1) % r.length]; toast(`Speed ${S.rate}x. Saved for ${S.screen === "audiobook" ? "audiobooks" : "videos"}.`); return render(); }
+    if (d.season) { S.season = +d.season; return render(); }
+    if (d.sleep) { S.sleep = d.sleep === "Off" ? null : sleepLabel(d.sleep); closeAll(); toast(S.sleep ? `Sleep timer: ${d.sleep.toLowerCase()}` : "Sleep timer off"); return render(); }
+    if (d.abplay !== undefined) { S.abplaying = !S.abplaying; if (S.abplaying) { S.playing = false; S.vplaying = false; } return render(); }
+    if (d.abseek) { S.abpos = Math.max(0, S.abpos + (+d.abseek)); return updAb(); }
+    if (d.kplay !== undefined) { S.kidplaying = !S.kidplaying; $("#timesup") && ($("#timesup").hidden = true); return render(); }
+    if (d.kseek) { S.kidpos = Math.max(0, S.kidpos + (+d.kseek)); return updKid(); }
+    if (d.timesup !== undefined) { S.kidplaying = false; render(); $("#timesup").hidden = false; return; }
+  });
+  // double-tap to skip on the video player
+  app.addEventListener("dblclick", (e) => { const z = e.target.closest("[data-dbl]"); if (!z) return; const n = +z.dataset.dbl; S.vpos = Math.max(0, S.vpos + n); ripple(n < 0 ? "l" : "r"); updWatch(); });
+  // TV: arrow keys move focus by geometry
+  app.addEventListener("keydown", (e) => {
+    if (!S.tv) return;
+    if (e.key === "Escape" || e.key === "Backspace") { e.preventDefault(); return back(); }
+    const dirs = { ArrowRight: [1, 0], ArrowLeft: [-1, 0], ArrowDown: [0, 1], ArrowUp: [0, -1] }; const dv = dirs[e.key]; if (!dv) return;
+    e.preventDefault();
+    const cur = document.activeElement; const items = $$("#screens .tile, #screens .btn, #screens .pcard, #screens .appt, #screens .rowi");
+    if (!items.length) return; if (!items.includes(cur)) return items[0].focus();
+    const a = cur.getBoundingClientRect(); const ax = a.left + a.width / 2, ay = a.top + a.height / 2; let best = null, bs = 1e9;
+    for (const el of items) { if (el === cur) continue; const b = el.getBoundingClientRect(); const bx = b.left + b.width / 2, by = b.top + b.height / 2; const dx = bx - ax, dy = by - ay;
+      if (dv[0] && Math.sign(dx) !== dv[0]) continue; if (dv[1] && Math.sign(dy) !== dv[1]) continue; if (dv[0] && Math.abs(dy) > a.height) continue;
+      const s = dv[0] ? Math.abs(dx) + Math.abs(dy) * 3 : Math.abs(dy) + Math.abs(dx) * 0.6; if (s < bs) { bs = s; best = el; } }
+    if (best) { best.focus({ preventScroll: true }); best.scrollIntoView({ block: "nearest", inline: "nearest" }); }
+  });
+
+  // ---------- design bar ----------
+  const SIZES = { phone: [390, 844], desktop: [1280, 800], tv: [1280, 720] };
+  function layout() {
+    const frame = $("#frame"), box = $("#fitbox"), stage = $("#stage");
+    document.body.dataset.size = S.size;
+    if (S.size === "fit") { const top = stage.getBoundingClientRect().top + window.scrollY; frame.style.cssText = `width:100%;height:${Math.max(560, window.innerHeight - Math.min(top, 220))}px`; box.style.cssText = "width:100%"; return; }
+    const [w, h] = SIZES[S.size]; const k = Math.min(1, (stage.clientWidth) / w);
+    frame.style.cssText = `width:${w}px;height:${h}px;transform:scale(${k})`; box.style.cssText = `width:${w * k}px;height:${h * k}px`;
+  }
+  $("#screenpick").innerHTML = SCREENS.map(([k, n]) => `<option value="${k}">${n}</option>`).join("");
+  $("#screenpick").addEventListener("change", (e) => { const v = e.target.value; setKid(v.startsWith("kid")); go(v); });
+  function setKid(on) { S.kid = on; $("#kidtoggle").setAttribute("aria-pressed", on); }
+  $("#kidtoggle").addEventListener("click", () => { setKid(!S.kid); S.hist = []; go(S.kid ? "kidhome" : "home", false); });
+  $("#nettoggle").addEventListener("click", () => { S.net = !S.net; $("#nettoggle").setAttribute("aria-pressed", !S.net); app.dataset.net = S.net ? "on" : "off"; render(); });
+  $$(".bar [data-size]").forEach((b) => b.addEventListener("click", () => { S.size = b.dataset.size; S.tv = S.size === "tv"; app.dataset.tv = S.tv ? "1" : "0"; $$(".bar [data-size]").forEach((x) => x.setAttribute("aria-pressed", x === b)); layout(); render(); }));
+  function view(v) { $("#try").hidden = v !== "try"; $("#how").hidden = v !== "how"; $("#tryctl").style.display = v === "try" ? "" : "none"; $("#v-try").setAttribute("aria-pressed", v === "try"); $("#v-how").setAttribute("aria-pressed", v === "how"); if (v === "try") layout(); window.scrollTo(0, 0); }
+  $$(".bar [data-view]").forEach((b) => b.addEventListener("click", () => view(b.dataset.view)));
+  $$("#how [data-goto]").forEach((b) => b.addEventListener("click", () => { const g = b.dataset.goto; setKid(g.startsWith("kid")); view("try"); go(g); }));
+  window.addEventListener("resize", layout);
+  // a bare #token picks the view or a screen (artifact links allow only plain anchors)
+  const h = location.hash.slice(1);
+  if (h === "how") view("how"); else { if (SCREENS.some(([k]) => k === h)) { setKid(h.startsWith("kid")); S.screen = h; } }
+  if (h === "phone" || h === "desktop" || h === "tv") $(`.bar [data-size="${h}"]`).click();
+  layout(); render();
+  window.__mp = { go, S, setKid, layout, render };
+})();
+</script>
+</body>
+</html>

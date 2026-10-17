@@ -5,6 +5,8 @@ offline behaviour, blended with FileTube's code, features and mobile-first, offl
 join, co-code, and merge FileTube into MaiPai Home cleanly. Covers video, TV shows, music, podcasts, books and audiobooks.
 Evidence (what each project really has, read from both codebases today) is in
 [media-apps-blend-2026-10-17-sources.md](media-apps-blend-2026-10-17-sources.md); the verdicts here cite it.
+Plain-words overview and clickable mockup (phone, desktop, TV, kid mode): [media-apps-overview-2026-10-17.md](media-apps-overview-2026-10-17.md),
+[assets/media-apps-2026-10-17/index.html](assets/media-apps-2026-10-17/index.html).
 
 Companion records this note builds on and does not redesign: the package `app` kind
 ([app-kind-2026-10-16.md](../plans/app-kind-2026-10-16.md), landed as APP-KIND-01 to 04 on spec-v0.1.153; the Weather app and
