@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { JobProgress } from "@maipai/ui/src/elements/job-progress";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
@@ -22,7 +22,9 @@ export function installTitle(status: Pick<InstallStatusView, "state" | "stageLab
 /** One line of install progress: the AI engine installing, then the AI models downloading in the
  * background. It hides itself when nothing is installing or everything
  * has landed. Polls fast while moving, slowly otherwise. */
-export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.installStatus, retry = api.installRetry, compact = false }: {
+export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.installStatus, retry = api.installRetry, compact = false, frame }: {
+  /** Wraps the compact line in a container that exists only while there is something to show (no empty box when idle). */
+  frame?: (line: ReactNode) => ReactNode;
   /** One line (what is installing, percent, a thin bar) for the wizard, instead of the full panel. */
   compact?: boolean;
   /** Where "Details" goes; null hides the link (setup, before anyone can sign in; or the page it points at). */
@@ -66,7 +68,7 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
   if (compact) {
     const failed = downloadState === "failed";
     const showPercent = !engineStep && !failed && status.totalBytes > 0;
-    return (
+    const line = (
       <div data-testid="install-strip" className="flex flex-col gap-1 text-sm text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate">{failed ? (problem ?? title) : title}</span>
@@ -77,6 +79,7 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
         {retryError ? <p role="alert">{retryError}</p> : null}
       </div>
     );
+    return <>{frame ? frame(line) : line}</>;
   }
   return (
     <>

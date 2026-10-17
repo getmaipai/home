@@ -121,9 +121,15 @@ function ShellInstallStrip({ person }: { person: Roster }) {
   const { pathname } = useLocation();
   if (!meetsMinRole(person.role, "admin") || pathname.startsWith("/settings/home/ai")) return null;
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-2">
-      <div className="pointer-events-auto w-full max-w-md rounded-md border bg-background/95 px-3 py-2 shadow-sm"><InstallStrip compact detailsHref={null} /></div>
-    </div>
+    <InstallStrip
+      compact
+      detailsHref={null}
+      frame={(line) => (
+        <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-2">
+          <div className="pointer-events-auto w-full max-w-md rounded-md border bg-background/95 px-3 py-2 shadow-sm">{line}</div>
+        </div>
+      )}
+    />
   );
 }
 

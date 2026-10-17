@@ -46,6 +46,19 @@ describe("InstallStrip", () => {
     }
   });
 
+  test("the framed (bottom strip) form renders no empty container while idle, and the frame only with an install", async () => {
+    const frame = (line: React.ReactNode) => <div data-testid="frame" className="border">{line}</div>;
+    for (const state of ["none", "ready"] as const) {
+      const view = render(<MemoryRouter><InstallStrip compact frame={frame} read={async () => status({ state })} /></MemoryRouter>);
+      await new Promise((r) => setTimeout(r, 20));
+      expect(view.container.innerHTML).toBe("");
+      cleanup();
+    }
+    const busy = render(<MemoryRouter><InstallStrip compact frame={frame} read={async () => status({})} /></MemoryRouter>);
+    await busy.findByTestId("frame");
+    busy.getByTestId("install-strip");
+  });
+
   test("Details is a link by default and hidden where it would dead-end", async () => {
     const withLink = show(status({}));
     await withLink.findByRole("link", { name: "Details" });
