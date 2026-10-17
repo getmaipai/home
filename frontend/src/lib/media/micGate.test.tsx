@@ -56,7 +56,8 @@ describe("micHelp", () => {
   test("no microphone and busy get their own line, no steps", () => {
     expect(micHelp("not_found").title).toBe("No microphone found");
     expect(micHelp("in_use").cause).toMatch(/Another app/);
-    expect(micHelp("not_found").steps).toEqual([]);
+    expect(micHelp("not_found").cause).toMatch(/no microphone/);
+    expect(micHelp("not_found", "Mozilla/5.0 Version/27 Safari/605").steps.join(" ")).toMatch(/Sound > Input/);
   });
   test("chrome steps", () => expect(micFixSteps("chrome")[0]).toMatch(/address bar/));
 });

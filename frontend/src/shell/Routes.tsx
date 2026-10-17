@@ -25,6 +25,7 @@ import { RepairsPage } from "@/shell/pages/RepairsPage";
 import { SetupReviewPage } from "@/apps/setup/SetupReviewPage";
 import { StatusPage } from "@/shell/pages/StatusPage";
 import { UiShowcasePage } from "@/shell/pages/UiShowcasePage";
+import { MicTestPage } from "@/shell/pages/MicTestPage";
 import { BackupsPage } from "@/shell/pages/BackupsPage";
 import { CommandsPage } from "@/shell/pages/CommandsPage";
 import { meetsMinRole } from "@/apps/people/roles";
@@ -282,6 +283,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             <Route path="apps/*" element={<PackageAppPage person={person} />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
+            <Route path="mic-test" element={<MicTestPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Route>
         </Route>

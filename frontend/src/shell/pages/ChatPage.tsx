@@ -53,6 +53,7 @@ import { WakeWordController } from "@/apps/chat/WakeWordController";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
 import { micHelp, useMicGate } from "@/lib/media/micGate";
+import { copyMicDetails, lastMicFailure, micFailureLine } from "@/lib/voice/micDiagnostics";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
@@ -1354,10 +1355,16 @@ export function ChatPage({ person }: { person: Roster }) {
     onOpenChange: closeAwareSetVoiceOpen,
     installationNotice: chatAvailability === "unavailable" && composerNotice?.text.startsWith("The AI is still installing.") === true,
     onProblem: (kind: VoiceFailureKind) => {
-      const line = () => toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" });
+      const minor = person.age_band !== "adult";
+      // Adults also see which step failed and the browser's own error, with a button that copies the details.
+      const failure = lastMicFailure();
+      const detail = !minor && kind.startsWith("microphone_") && failure
+        ? { description: micFailureLine(failure), duration: 20_000, action: { label: "Copy details", onClick: () => void copyMicDetails(failure).then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead.")) } }
+        : {};
+      const line = () => toast.error(voiceFailureLine(kind, { minor, canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem", ...detail });
       if (kind !== "microphone_blocked") return line();
       // Diagnose only: the browser allows the mic here, so the failure is something else; say so once, never reopen.
-      void micGate.diagnose().then((ok) => { if (ok) toast.error(voiceFailureLine("microphone_setup", { minor: person.age_band !== "adult", canOpenRepairs: false }), { id: "voice-problem" }); });
+      void micGate.diagnose().then((ok) => { if (ok) toast.error(voiceFailureLine("microphone_setup", { minor, canOpenRepairs: false }), { id: "voice-problem", ...detail }); });
     },
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,
@@ -1500,7 +1507,9 @@ export function ChatPage({ person }: { person: Roster }) {
                     <DialogDescription>{help.cause}</DialogDescription>
                   </DialogHeader>
                   {help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}
+                  {micGate.problem !== "insecure" && lastMicFailure() ? <p className="break-words text-xs text-muted-foreground">{micFailureLine(lastMicFailure()!)}</p> : null}
                   <DialogFooter>
+                    {micGate.problem !== "insecure" && lastMicFailure() ? <Button variant="ghost" onClick={() => void copyMicDetails().then((ok) => toast(ok ? "Details copied." : "Could not copy. Select the text instead."))}>Copy details</Button> : null}
                     <Button variant="outline" onClick={micGate.dismiss}>Close</Button>
                     <Button onClick={() => void micGate.request()}>Try again</Button>
                   </DialogFooter>

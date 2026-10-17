@@ -4,6 +4,9 @@
 // never shows a prompt, getUserMedia just rejects, which used to flash
 // the call overlay open and shut), then asks the browser exactly once.
 // Pure functions here; the React hook is useMicGate (micGate.tsx).
+import { recordMicFailure } from "@/lib/voice/micDiagnostics";
+import { primeMicAudio, releasePrimedAudio } from "@/lib/voice/mic-capture";
+
 export type MicPermission = "prompt" | "granted" | "denied" | "unknown";
 export type MicProblem = "denied" | "not_found" | "in_use" | "insecure" | "error";
 export type MicProbeResult = { ok: true } | { ok: false; problem: MicProblem };
@@ -14,6 +17,11 @@ export interface MicProbeDeps {
   /** Permissions API; absent or throwing on Safari/Firefox for "microphone". */
   query?: () => Promise<MicPermission>;
   getUserMedia?: (constraints: MediaStreamConstraints) => Promise<MediaStream>;
+  /** Audio inputs present? Defaults to enumerateDevices(). */
+  hasInput?: () => Promise<boolean | null>;
+  /** Test seams for the audio context started inside the tap. */
+  prime?: () => void;
+  release?: () => void;
 }
 
 export async function queryMicPermission(): Promise<MicPermission> {
@@ -22,6 +30,17 @@ export async function queryMicPermission(): Promise<MicPermission> {
     return status.state === "granted" || status.state === "denied" || status.state === "prompt" ? status.state : "unknown";
   } catch {
     return "unknown";
+  }
+}
+
+/** true/false when the browser lists audio inputs, null when it cannot say. */
+export async function hasAudioInput(): Promise<boolean | null> {
+  try {
+    if (!navigator.mediaDevices?.enumerateDevices) return null;
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    return devices.some((d) => d.kind === "audioinput");
+  } catch {
+    return null;
   }
 }
 
@@ -37,14 +56,40 @@ export async function probeMic(deps: MicProbeDeps = {}): Promise<MicProbeResult>
   const secure = deps.isSecureContext ?? (typeof window !== "undefined" ? window.isSecureContext : true);
   const getUserMedia = deps.getUserMedia ?? (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia ? navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices) : undefined);
   if (!secure || !getUserMedia) return { ok: false, problem: "insecure" };
-  const state = await (deps.query ?? queryMicPermission)();
-  if (state === "denied") return { ok: false, problem: "denied" };
+  // Safari only honours a microphone request or an audio start that begins
+  // inside the tap itself: nothing above this line may await. The request
+  // and the audio context start now; the Permissions API query runs beside
+  // them and only decides which message a failure gets.
+  (deps.prime ?? primeMicAudio)();
+  let media: Promise<MediaStream>;
   try {
-    const stream = await getUserMedia({ audio: true });
+    media = getUserMedia({ audio: true });
+  } catch (err) {
+    (deps.release ?? releasePrimedAudio)();
+    recordMicFailure("microphone request", classifyMicError(err), err);
+    return { ok: false, problem: classifyMicError(err) };
+  }
+  media.catch(() => {});
+  const inputs = (deps.hasInput ?? hasAudioInput)();
+  const state = await (deps.query ?? queryMicPermission)();
+  try {
+    const stream = await media;
     for (const track of stream.getTracks()) track.stop();
+    if (state === "denied") {
+      (deps.release ?? releasePrimedAudio)();
+      return { ok: false, problem: "denied" };
+    }
     return { ok: true };
   } catch (err) {
-    return { ok: false, problem: classifyMicError(err) };
+    (deps.release ?? releasePrimedAudio)();
+    recordMicFailure("microphone request", classifyMicError(err), err);
+    const problem = state === "denied" ? "denied" : classifyMicError(err);
+    // A list with no audio input at all means no microphone, whatever error the browser chose.
+    if (problem !== "denied" && (await inputs) === false) {
+      recordMicFailure("microphone request", "not_found", err);
+      return { ok: false, problem: "not_found" };
+    }
+    return { ok: false, problem };
   }
 }
 

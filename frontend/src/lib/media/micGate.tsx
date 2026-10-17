@@ -80,11 +80,21 @@ const TITLES: Record<MicProblem, string> = {
 
 const CAUSES: Record<MicProblem, string> = {
   denied: "This browser is not allowing Home to use the microphone.",
-  not_found: "Plug in or turn on a microphone, then try again.",
+  not_found: "This computer has no microphone. Plug in a microphone, or a display or headset with one, then try again.",
   in_use: "Another app is using the microphone. Close it, then try again.",
   insecure: "Browsers only allow the microphone on https or localhost. Open Home at its https address.",
-  error: "Reload the page and try again.",
+  error: "Reload the page and try again. If you never saw a permission prompt, macOS may be blocking this browser.",
 };
+
+const MAC_MIC = "On a Mac open System Settings > Privacy & Security > Microphone and switch on this browser.";
+
+/** Where to pick the input once a microphone is attached. */
+export function micDeviceSteps(browser: BrowserFamily): string[] {
+  const pick = browser === "safari" ? "In Safari > Settings > Websites > Microphone, make sure this site is set to Ask or Allow."
+    : browser === "chrome" ? "Click the settings icon left of the address bar and choose the microphone under Microphone."
+    : "Check the browser's site settings for the microphone choice.";
+  return ["Attach a microphone, or a display or headset that has one.", "On a Mac choose it in System Settings > Sound > Input.", pick];
+}
 
 export function micFixSteps(browser: BrowserFamily): string[] {
   const mac = "On a Mac also open System Settings > Privacy & Security > Microphone and switch on this browser.";
@@ -103,5 +113,5 @@ export function micFixSteps(browser: BrowserFamily): string[] {
 /** Copy for the help dialog ChatPage renders with the kit Dialog directly. */
 export function micHelp(problem: MicProblem, userAgent?: string) {
   const browser = detectBrowser(userAgent ?? (typeof navigator === "undefined" ? "" : navigator.userAgent));
-  return { title: TITLES[problem], cause: CAUSES[problem], steps: problem === "denied" ? micFixSteps(browser) : [] };
+  return { title: TITLES[problem], cause: CAUSES[problem], steps: problem === "denied" ? micFixSteps(browser) : problem === "not_found" ? micDeviceSteps(browser) : problem === "error" ? [MAC_MIC] : [] };
 }

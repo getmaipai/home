@@ -13,10 +13,13 @@ import type { LevelMeter } from "@/lib/voice/audioLevelMeter";
 // covered instead by a live browser check per that file's own note).
 class FakeAudioWorkletNode {
   port: { onmessage: ((e: MessageEvent) => void) | null } = { onmessage: null };
+  connect() {}
   disconnect() {}
 }
 class FakeAudioContext {
   sampleRate = 16_000;
+  state = "running";
+  destination = {};
   audioWorklet = { addModule: async () => {} };
   createMediaStreamSource() {
     return { connect() {}, disconnect() {} };
@@ -29,7 +32,7 @@ class FakeAudioContext {
   // by anything these tests assert on, only present so the constructor
   // doesn't throw.
   createGain() {
-    return { connect: () => {} };
+    return { gain: { value: 1 }, connect: () => {}, disconnect: () => {} };
   }
   createAnalyser() {
     return { fftSize: 0, smoothingTimeConstant: 0, frequencyBinCount: 128, connect: () => {}, disconnect: () => {}, getByteTimeDomainData: (data: Uint8Array) => data.fill(128) };

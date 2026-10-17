@@ -37,7 +37,7 @@ export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onProblem?: (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup") => void;
+  onProblem?: (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup" | "microphone_missing" | "microphone_busy") => void;
   /** Optional quiet timeout for wake-opened sessions; null keeps a
    * person-opened voice session active until they end it. */
   idleCloseMs?: number | null;
@@ -192,7 +192,7 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
               .catch((error: unknown) => {
                 if (!cancelled) {
                   const kind = error instanceof MicCaptureError ? error.kind : "setup";
-                  onProblem?.(kind === "denied" ? "microphone_blocked" : kind === "insecure" ? "microphone_insecure" : "microphone_setup");
+                  onProblem?.(kind === "denied" ? "microphone_blocked" : kind === "insecure" ? "microphone_insecure" : kind === "not_found" ? "microphone_missing" : kind === "in_use" ? "microphone_busy" : "microphone_setup");
                   onOpenChange(false);
                 }
               });

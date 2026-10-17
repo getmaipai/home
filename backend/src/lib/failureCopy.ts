@@ -2,7 +2,7 @@
 // may read it. Kinds and the classifier live in generationFailure.ts.
 export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
 
-export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup";
+export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup" | "microphone_missing" | "microphone_busy";
 export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adultNoRepairs: string; minor: string }> = {
   listening_lost: {
     adult: "Voice listening stopped because the connection to your hub dropped. Check that the hub is on, then tap the waveform to start again.",
@@ -20,8 +20,8 @@ export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adult
     minor: "I can't talk right now, but you can read my answer.",
   },
   microphone_blocked: {
-    adult: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again.",
-    adultNoRepairs: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again.",
+    adult: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again. If you never saw a permission prompt, open System Settings > Privacy & Security > Microphone and switch on this browser.",
+    adultNoRepairs: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again. If you never saw a permission prompt, open System Settings > Privacy & Security > Microphone and switch on this browser.",
     minor: "I can't use the microphone. Please tell a grown-up.",
   },
   microphone_insecure: {
@@ -30,8 +30,18 @@ export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adult
     minor: "I can't use the microphone here. Please tell a grown-up.",
   },
   microphone_setup: {
-    adult: "Your browser could not start the microphone. Try again, or use Chrome.",
-    adultNoRepairs: "Your browser could not start the microphone. Try again, or use Chrome.",
+    adult: "Your browser could not start the microphone. Tap the waveform to try again, or copy the details below.",
+    adultNoRepairs: "Your browser could not start the microphone. Tap the waveform to try again, or copy the details below.",
+    minor: "I can't use the microphone right now. Please tell a grown-up.",
+  },
+  microphone_missing: {
+    adult: "This computer has no microphone. Plug in a microphone, or a display or headset with one, then tap the waveform again.",
+    adultNoRepairs: "This computer has no microphone. Plug in a microphone, or a display or headset with one, then tap the waveform again.",
+    minor: "I can't hear you because there is no microphone. Please tell a grown-up.",
+  },
+  microphone_busy: {
+    adult: "Another app is using the microphone. Close it, then tap the waveform again.",
+    adultNoRepairs: "Another app is using the microphone. Close it, then tap the waveform again.",
     minor: "I can't use the microphone right now. Please tell a grown-up.",
   },
 };

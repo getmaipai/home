@@ -12,13 +12,19 @@ afterEach(cleanup);
 // granted" success path rather than always hitting the catch block.
 class FakeAudioWorkletNode {
   port: { onmessage: ((e: MessageEvent) => void) | null } = { onmessage: null };
+  connect() {}
   disconnect() {}
 }
 class FakeAudioContext {
   sampleRate = 16_000;
+  state = "running";
+  destination = {};
   audioWorklet = { addModule: async () => {} };
   createMediaStreamSource() {
     return { connect() {}, disconnect() {} };
+  }
+  createGain() {
+    return { gain: { value: 1 }, connect: () => {}, disconnect: () => {} };
   }
   close() {
     return Promise.resolve();

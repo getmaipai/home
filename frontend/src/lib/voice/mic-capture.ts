@@ -5,10 +5,11 @@
 // legacy-specific: this is the first thing anywhere in `home` that
 // captures microphone audio at all.
 //
-// Opens a 16 kHz mono AudioContext over getUserMedia, runs the stream
-// through an AudioWorkletNode that downsamples (if the browser refused
-// 16 kHz) and posts Float32 frames to the main thread. The worklet is
-// inlined as a Blob URL so no separate static asset is needed.
+// Opens a default AudioContext over getUserMedia, runs the stream through an
+// AudioWorkletNode (public/mic-worklet.js, a real same-origin file: the page
+// CSP blocks a blob: module in Safari) or, when the worklet cannot load, a
+// ScriptProcessorNode, and resamples to 16 kHz on the main thread. Every
+// step is named so a failure reports where it stopped (micDiagnostics.ts).
 //
 // AEC/NS/AGC constraints are explicit and load-bearing: without them,
 // this hub's own spoken replies (streamingWavPlayer.ts's playback)
@@ -17,43 +18,111 @@
 // legacy pod's XVF3800 mic array did for real.
 
 import { StreamResampler } from "@/lib/voice/resampler";
+import { beginMicAttempt, errMessage, errName, noteMicDegraded, recordMicFailure, type MicStep } from "@/lib/voice/micDiagnostics";
 
 const TARGET_RATE = 16_000;
+export const WORKLET_NAME = "wake-word-mic-processor";
 
-export type MicCaptureErrorKind = "insecure" | "denied" | "setup";
+export type MicCaptureErrorKind = "insecure" | "denied" | "setup" | "not_found" | "in_use";
 
 /** Why capture could not start. `kind` picks the message the person sees;
- * `cause` is the underlying error, logged for diagnosis. */
+ * `step` and `cause` say where it stopped and why (logged and shown). */
 export class MicCaptureError extends Error {
-  constructor(readonly kind: MicCaptureErrorKind, readonly cause: unknown) {
-    super(`mic capture ${kind}: ${errName(cause)}: ${errMessage(cause)}`);
+  constructor(readonly kind: MicCaptureErrorKind, readonly cause: unknown, readonly step: MicStep = "microphone request", audioContext?: string) {
+    super(`mic capture ${kind} at ${step}: ${errName(cause)}: ${errMessage(cause)}`);
     this.name = "MicCaptureError";
-    console.warn(`[mic] capture failed (${kind}): ${errName(cause)}: ${errMessage(cause)}`);
+    recordMicFailure(step, kind, cause, audioContext);
+    console.warn(`[mic] capture failed (${kind}) at step "${step}": ${errName(cause)}: ${errMessage(cause)}`);
   }
 }
 
-function errName(err: unknown): string {
-  return typeof err === "object" && err !== null && "name" in err ? String((err as { name: unknown }).name) : "Error";
-}
-function errMessage(err: unknown): string {
-  return typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message) : String(err);
+/** The worklet file. Same origin, so script-src 'self' allows it. */
+export function micWorkletUrl(): string {
+  const base = (import.meta as unknown as { env?: { BASE_URL?: string } }).env?.BASE_URL ?? "/";
+  return `${base.endsWith("/") ? base : `${base}/`}mic-worklet.js`;
 }
 
-const WORKLET_NAME = "wake-word-mic-processor";
+export function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | "timeout"> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => resolve("timeout"), ms);
+    promise.then((value) => { clearTimeout(timer); resolve(value); }, (err) => { clearTimeout(timer); reject(err); });
+  });
+}
 
-const WORKLET_SOURCE = `
-class WakeWordMicProcessor extends AudioWorkletProcessor {
-  process(inputs) {
-    const input = inputs[0];
-    if (!input || input.length === 0) return true;
-    const channel = input[0];
-    if (!channel || channel.length === 0) return true;
-    this.port.postMessage(channel.slice(0));
-    return true;
+type AudioContextCtor = typeof AudioContext;
+function audioContextCtor(): AudioContextCtor | undefined {
+  if (typeof window === "undefined") return undefined;
+  return (window.AudioContext ?? (window as unknown as { webkitAudioContext?: AudioContextCtor }).webkitAudioContext) as AudioContextCtor | undefined;
+}
+
+/** A default AudioContext (no sampleRate or latencyHint options: WebKit and
+ * Firefox reject some of them). */
+export function createAudioContext(options?: AudioContextOptions): AudioContext {
+  const Ctor = audioContextCtor();
+  if (!Ctor) throw new DOMException("AudioContext is not available in this browser", "NotSupportedError");
+  return options ? new Ctor(options) : new Ctor();
+}
+
+// Safari only lets a context start from a user gesture. The tap handler
+// calls primeMicAudio() before its first await; startMicCapture() takes
+// that context (already resumed) instead of creating one later, outside
+// the gesture. An unused one closes itself after a short wait.
+let primed: { context: AudioContext; timer: ReturnType<typeof setTimeout> } | null = null;
+const PRIME_TTL_MS = 30_000;
+
+export function primeMicAudio(): void {
+  try {
+    releasePrimedAudio();
+    const context = createAudioContext();
+    void context.resume().catch(() => {});
+    primed = { context, timer: setTimeout(releasePrimedAudio, PRIME_TTL_MS) };
+  } catch {
+    /* no AudioContext: startMicCapture reports it at its own step */
   }
 }
-registerProcessor(${JSON.stringify(WORKLET_NAME)}, WakeWordMicProcessor);
-`;
+
+export function releasePrimedAudio(): void {
+  if (!primed) return;
+  clearTimeout(primed.timer);
+  const { context } = primed;
+  primed = null;
+  void context.close().catch(() => {});
+}
+
+function takePrimedAudio(): AudioContext | undefined {
+  if (!primed) return undefined;
+  clearTimeout(primed.timer);
+  const { context } = primed;
+  primed = null;
+  return context.state === "closed" ? undefined : context;
+}
+
+function isConstraintFailure(err: unknown): boolean {
+  const name = errName(err);
+  return name === "OverconstrainedError" || name === "TypeError" || name === "NotSupportedError" || name === "ConstraintNotSatisfiedError";
+}
+
+/** getUserMedia with processing flags as `ideal` only (they can never fail
+ * the call), and a plain `{ audio: true }` retry when the browser rejects
+ * the constraint set. A chosen device stays `exact` and fails loudly. */
+export async function openMicStream(deviceId?: string): Promise<MediaStream> {
+  const gum = (constraints: MediaStreamConstraints) => navigator.mediaDevices.getUserMedia(constraints);
+  const audio = {
+    echoCancellation: { ideal: true },
+    noiseSuppression: { ideal: true },
+    autoGainControl: { ideal: true },
+    // Chrome 115+ voice isolation; unknown constraint names are ignored.
+    voiceIsolation: { ideal: true },
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+  } as MediaTrackConstraints;
+  try {
+    return await gum({ audio });
+  } catch (err) {
+    if (deviceId || !isConstraintFailure(err)) throw err;
+    noteMicDegraded("microphone request", err, "retried with plain audio");
+    return gum({ audio: true });
+  }
+}
 
 export interface MicCaptureHandle {
   stop: () => void;
@@ -65,117 +134,135 @@ export interface MicCaptureOptions {
   getStream?: () => Promise<MediaStream>;
   /** VOICE-LIVE-03: the household member's remembered device (a per-
    * browser preference, `micDevicePreference.ts`), never required -
-   * omitted, this stays the browser's own default input, same as
-   * before this option existed. `{ exact: deviceId }` rather than an
-   * `ideal` constraint: a stale id (the device was unplugged since the
-   * preference was written) should fail loudly as a real getUserMedia
-   * error, never silently fall back to a different microphone than the
-   * one the household member actually chose. */
+   * omitted, this stays the browser's own default input. `{ exact:
+   * deviceId }` rather than `ideal`: a stale id (the device was unplugged
+   * since the preference was written) should fail loudly as a real
+   * getUserMedia error, never silently pick a different microphone than
+   * the one the household member chose. */
   deviceId?: string;
   /** VOICE-LIVE-02: called once, synchronously, right after the mic's own
-   * `MediaStreamAudioSourceNode` connects to the capture worklet - lets a
-   * caller tap the identical stream for its own purposes (an
-   * AnalyserNode-based level meter, `audioLevelMeter.ts`) without a
-   * second `getUserMedia` call or a second `AudioContext`: a Web Audio
-   * node only ever connects within the context that created it, and this
-   * function creates its own. */
+   * `MediaStreamAudioSourceNode` is created and wired - lets a caller tap
+   * the identical stream for an AnalyserNode-based level meter
+   * (`audioLevelMeter.ts`) without a second `getUserMedia` call or a
+   * second `AudioContext`. */
   onSource?: (context: AudioContext, source: MediaStreamAudioSourceNode) => void;
 }
 
-export async function startMicCapture(options: MicCaptureOptions): Promise<MicCaptureHandle> {
-  const getStream =
-    options.getStream ??
-    (() =>
-      navigator.mediaDevices.getUserMedia({
-        audio: {
-          channelCount: 1,
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-          // Chrome 115+'s own voice-isolation constraint (distinct from
-          // noiseSuppression: it specifically isolates the primary
-          // speaker from background voices/talk, not just steady-state
-          // noise) - not in the legacy hub this file was ported from
-          // (checked: absent from its full git history, and from
-          // bot-legacy's and loki-doki's too), added here because it
-          // helps exactly this use case. An unrecognized constraint name
-          // is ignored per spec, not a hard failure, so this degrades
-          // safely on browsers that don't support it - same posture the
-          // three constraints above it already have.
-          voiceIsolation: true,
-          ...(options.deviceId ? { deviceId: { exact: options.deviceId } } : {}),
-        } as MediaTrackConstraints,
-      }));
-  if (!options.getStream && (window.isSecureContext === false || !navigator.mediaDevices?.getUserMedia)) {
-    throw new MicCaptureError("insecure", new Error("not a secure context or mediaDevices missing"));
+/** Loads the worklet module into `context`. Throws the browser's own error. */
+export async function loadMicWorklet(context: AudioContext): Promise<void> {
+  if (!context.audioWorklet || typeof AudioWorkletNode === "undefined") {
+    throw new DOMException("AudioWorklet is not available in this browser", "NotSupportedError");
   }
+  await context.audioWorklet.addModule(micWorkletUrl());
+}
+
+export async function startMicCapture(options: MicCaptureOptions): Promise<MicCaptureHandle> {
+  beginMicAttempt();
+  let step: MicStep = "secure check";
+  if (!options.getStream && (window.isSecureContext === false || !navigator.mediaDevices?.getUserMedia)) {
+    releasePrimedAudio();
+    throw new MicCaptureError("insecure", new Error("not a secure context or mediaDevices missing"), step);
+  }
+  step = "microphone request";
   let stream: MediaStream;
   try {
-    stream = await getStream();
+    stream = await (options.getStream ?? (() => openMicStream(options.deviceId)))();
   } catch (err) {
+    releasePrimedAudio();
     const name = errName(err);
-    const kind: MicCaptureErrorKind = name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError" ? "denied" : "setup";
-    throw new MicCaptureError(kind, err);
+    const kind: MicCaptureErrorKind =
+      name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError" ? "denied"
+      : name === "NotFoundError" || name === "DevicesNotFoundError" || (name === "OverconstrainedError" && !options.deviceId) ? "not_found"
+      : name === "NotReadableError" || name === "TrackStartError" ? "in_use"
+      : "setup";
+    throw new MicCaptureError(kind, err, step);
   }
 
-  // Capture runs at the device's own rate and is resampled to 16 kHz here.
-  // Asking for a 16 kHz context over a 44.1/48 kHz microphone throws in
-  // Firefox ("different sample-rate") and is unreliable in Safari.
-  const AudioContextCtor = (window.AudioContext ??
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
-  let context: AudioContext | undefined;
+  // Capture runs at the context's own rate and is resampled to 16 kHz here.
+  let context: AudioContext | undefined = takePrimedAudio();
   let source: MediaStreamAudioSourceNode | undefined;
   let node: { disconnect: () => void } | undefined;
   try {
-    context = new AudioContextCtor();
-    // Safari starts a context suspended unless resumed; harmless elsewhere.
-    if (context.state === "suspended") await context.resume().catch(() => {});
-    source = context.createMediaStreamSource(stream);
-    const resampler = new StreamResampler(context.sampleRate, TARGET_RATE);
+    step = "audio context";
+    context ??= createAudioContext();
+    step = "audio resume";
+    // resume() can hang outside a gesture in Safari: never wait on it for long.
+    if (context.state !== "running") await withTimeout(context.resume(), 1500).catch(() => {});
+    step = "audio source";
+    try {
+      source = context.createMediaStreamSource(stream);
+    } catch (err) {
+      // A context whose rate differs from the microphone's can be refused: retry at the stream's own rate.
+      const rate = stream.getAudioTracks?.()[0]?.getSettings?.().sampleRate;
+      if (!rate || rate === context.sampleRate) throw err;
+      noteMicDegraded("audio source", err, `recreated the context at ${rate} Hz`);
+      void context.close().catch(() => {});
+      context = createAudioContext({ sampleRate: rate });
+      void context.resume().catch(() => {});
+      source = context.createMediaStreamSource(stream);
+    }
+    const ctx = context;
+    const src = source;
+    const resampler = new StreamResampler(ctx.sampleRate, TARGET_RATE);
     const emit = (frame: Float32Array) => {
       const out = resampler.process(frame);
       if (out.length) options.onFrame(out);
     };
-    if (context.audioWorklet && typeof AudioWorkletNode !== "undefined") {
-      const blobUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "application/javascript" }));
-      try {
-        await context.audioWorklet.addModule(blobUrl);
-      } finally {
-        URL.revokeObjectURL(blobUrl);
-      }
-      const worklet = new AudioWorkletNode(context, WORKLET_NAME, {
+    let worklet: AudioWorkletNode | undefined;
+    try {
+      step = "worklet load";
+      await loadMicWorklet(ctx);
+      step = "worklet node";
+      // One silent output into a zero-gain node: WebKit does not always run a
+      // node that has no path to the destination.
+      worklet = new AudioWorkletNode(ctx, WORKLET_NAME, {
         numberOfInputs: 1,
-        numberOfOutputs: 0,
+        numberOfOutputs: 1,
+        outputChannelCount: [1],
         channelCount: 1,
         channelCountMode: "explicit",
         channelInterpretation: "speakers",
       });
-      worklet.port.onmessage = (event: MessageEvent<Float32Array>) => emit(event.data);
-      source.connect(worklet);
-      node = { disconnect: () => { worklet.port.onmessage = null; worklet.disconnect(); } };
+    } catch (err) {
+      noteMicDegraded(step, err, "using ScriptProcessor");
+      worklet = undefined;
+    }
+    if (worklet) {
+      const w = worklet;
+      const silent = ctx.createGain();
+      silent.gain.value = 0;
+      w.port.onmessage = (event: MessageEvent<Float32Array>) => emit(event.data);
+      src.connect(w);
+      w.connect(silent);
+      silent.connect(ctx.destination);
+      node = { disconnect: () => { w.port.onmessage = null; w.disconnect(); silent.disconnect(); } };
     } else {
-      // Old Safari without AudioWorklet.
-      const processor = context.createScriptProcessor(4096, 1, 1);
+      step = "script processor";
+      const processor = ctx.createScriptProcessor(4096, 1, 1);
       processor.onaudioprocess = (event) => emit(event.inputBuffer.getChannelData(0).slice(0));
-      source.connect(processor);
-      processor.connect(context.destination);
+      src.connect(processor);
+      processor.connect(ctx.destination);
       node = { disconnect: () => { processor.onaudioprocess = null; processor.disconnect(); } };
     }
   } catch (err) {
     try { source?.disconnect(); } catch { /* ignore */ }
     stream.getTracks().forEach((track) => { try { track.stop(); } catch { /* ignore */ } });
+    const state = context ? `state ${context.state}, ${context.sampleRate} Hz` : undefined;
     void context?.close().catch(() => {});
-    throw new MicCaptureError("setup", err);
+    throw new MicCaptureError("setup", err, step, state);
   }
   const ctx = context;
   const src = source;
-  const worklet = node;
+  const connected = node;
 
   options.onSource?.(ctx, src);
 
+  let stopped = false;
   const stop = () => {
+    if (stopped) return;
+    stopped = true;
     try {
-      worklet.disconnect();
+      connected.disconnect();
     } catch {
       /* ignore */
     }

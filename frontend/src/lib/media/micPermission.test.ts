@@ -17,11 +17,31 @@ describe("probeMic", () => {
   test("granted starts", async () => {
     expect(await probeMic({ isSecureContext: true, query: async () => "granted", getUserMedia: async () => stream() })).toEqual({ ok: true });
   });
-  test("denied never calls getUserMedia", async () => {
-    let calls = 0;
-    const r = await probeMic({ isSecureContext: true, query: async () => "denied", getUserMedia: async () => { calls++; return stream(); } });
+  test("denied site: reports denied and leaves no stream open", async () => {
+    stopped = 0;
+    const r = await probeMic({ isSecureContext: true, query: async () => "denied", getUserMedia: async () => stream() });
     expect(r).toEqual({ ok: false, problem: "denied" });
-    expect(calls).toBe(0);
+    expect(stopped).toBe(1);
+  });
+  test("Safari: the audio context and getUserMedia start before any await (inside the tap)", async () => {
+    const order: string[] = [];
+    const pending = probeMic({
+      isSecureContext: true,
+      prime: () => order.push("prime"),
+      getUserMedia: async () => { order.push("getUserMedia"); return stream(); },
+      query: async () => { order.push("query"); return "prompt"; },
+    });
+    expect(order).toEqual(["prime", "getUserMedia", "query"]); // all ran synchronously, before the first await resumed
+    expect(await pending).toEqual({ ok: true });
+  });
+  test("a failed probe releases the primed audio context", async () => {
+    let released = 0;
+    await probeMic({ isSecureContext: true, query: async () => "prompt", prime: () => {}, release: () => { released++; }, getUserMedia: reject("NotAllowedError") });
+    expect(released).toBe(1);
+  });
+  test("getUserMedia throwing synchronously is classified, not thrown", async () => {
+    const r = await probeMic({ isSecureContext: true, prime: () => {}, release: () => {}, query: async () => "prompt", getUserMedia: () => { throw Object.assign(new Error("x"), { name: "TypeError" }); } });
+    expect(r).toEqual({ ok: false, problem: "error" });
   });
   test("unsupported Permissions API still asks", async () => {
     expect(await probeMic({ isSecureContext: true, query: async () => "unknown", getUserMedia: async () => stream() })).toEqual({ ok: true });
@@ -44,5 +64,16 @@ describe("helpers", () => {
     expect(detectBrowser("Mozilla/5.0 Firefox/130.0")).toBe("firefox");
     expect(detectBrowser("Mozilla/5.0 (Macintosh) AppleWebKit Version/17 Safari/605")).toBe("safari");
     expect(detectBrowser("Mozilla/5.0 Chrome/130 Safari/537 Edg/130")).toBe("chrome");
+  });
+});
+
+describe("no microphone attached (a Mac Studio has none)", () => {
+  test("an empty device list turns any failure into not_found", async () => {
+    const r = await probeMic({ isSecureContext: true, prime: () => {}, release: () => {}, query: async () => "prompt", hasInput: async () => false, getUserMedia: reject("AbortError") });
+    expect(r).toEqual({ ok: false, problem: "not_found" });
+  });
+  test("a device list with an input leaves the browser's own classification", async () => {
+    const r = await probeMic({ isSecureContext: true, prime: () => {}, release: () => {}, query: async () => "prompt", hasInput: async () => true, getUserMedia: reject("NotReadableError") });
+    expect(r).toEqual({ ok: false, problem: "in_use" });
   });
 });
