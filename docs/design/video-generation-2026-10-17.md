@@ -1,0 +1,214 @@
+# Video generation: the model, the runtime, the policy (2026-10-17)
+
+Owner approval, 2026-10-17: "make your owner decisions, you have all approvals from me. Determine what video gen we should use and add it
+to the app and chat. Fast generation with high quality. Ideally LoRA support from the community." Correction the same night: adults get
+adult-only LoRAs; only the absolute lines no setting can lift stay (section 7). This note is part 1 of the pipeline (research, bench,
+decision, rows). No product code is written yet. Every number was measured on the Studio (Apple M5 Max, 128 GB, macOS 27) while the
+live Stack ran (about 28 GB resident) and another agent benchmarked image generation on the same GPU under the shared lock, so times
+are upper bounds. Scripts, logs, clips and keyframe sheets are in the author's scratchpad (`scratchpad/videogen`, paths in section 6).
+
+## 1. The pick
+
+| | Pick | Licence | Why |
+|---|---|---|---|
+| Default (p64, p128) | **Wan2.2 TI2V-5B, FastWan DMD 3-step distillation, MLX** (`lBroth/FastWan2.2-TI2V-5B-MLX` weights) | Apache-2.0 (base `Wan-AI/Wan2.2-TI2V-5B` Apache-2.0; FastWan `FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers` Apache-2.0) | A 5 s, 121 frame, 24 fps clip at 832 x 480 in **about 130 to 140 s end to end** (3 denoise steps, 10 to 16 s), text-to-video and image-to-video in one model, the largest community LoRA base of any permissive model, no safety filter in the weights or the runtime |
+| Runtime | **mlx-video** (MIT, Blaizzy/mlx-video, commit `87db56a`), Wan2.2 path, run by a Stack-managed Python 3.12 worker | MIT | Native MLX (Apple GPU), `--lora` loading built in, image conditioning built in, no server to expose, no network calls at generate time except one tokenizer lookup the pin removes (section 3) |
+| Sound | None from this model. Music and voice already exist as Stack roles (`music`, `tts`); the assembler lays them in | n/a | Wan has no audio. The one permissive model with audio (Kandinsky 6.0) is the fallback below |
+| Fallback / second pin, not default | **Kandinsky 6.0 Video Lite distill (3B, MIT)**: text and image to video **with synchronized 44 kHz audio**, 10 steps | MIT on the card | Measured on this Mac through PyTorch MPS: 22.7 s per step, **227 s denoise alone**, and the untiled decode died at a 194 GB peak. Fails the speed bar today; revisit when an MLX port exists. See section 2 |
+| Smaller tiers (p16, p32) | **Off.** `video` stays "not available" | | Peak 44 GB at 121 frames. A smaller-frame, quantized path was not measured; claiming it would be a guess. Row VIDEO-GEN-09 measures a 480p, 61 frame q8 profile for p32 before any promise |
+
+The bar was "5 s at 480p to 720p in under about 3 minutes warm". 480p meets it (129 to 141 s). 720p is in section 4.
+
+## 2. Candidates and why each lost (licence texts read; numbers are measured unless marked)
+
+| Candidate | Licence (read) | Result |
+|---|---|---|
+| **LTX-2.3 and LTX-2.5** (Lightricks, 22B, audio, distilled 8-step, big LoRA scene: 119 adapters on the 2.3 card, 57 on LTX-2) | `LICENSE-2_x`, dated 2026-08-11: "Entities with annual revenues of at least $10,000,000" must buy a paid licence for any commercial use, with a back-fee clause; an Acceptable Use Policy with 20-odd listed uses; New York arbitration. LTX-2.3 sits under the January licence with the same $10M rule | **Rejected on the brief's own bar (no revenue exclusions).** Not benchmarked: a model we cannot ship to a household product that grows past the threshold is not a candidate. No clause bans adult or NSFW output (item 2 bans exploiting or harming minors; item 5 asks that machine-made content be disclosed; item 7 bans deepfakes without consent). Revisit only if the owner accepts a revenue-tiered licence |
+| **Wan2.2 TI2V-5B, 40-step reference** | Apache-2.0 | Same weights as the pick, the undistilled sampler. Not run: 40 steps with guidance is 2 forward passes per step, about 13x the denoise cost of the 3-step FastWan run (10 s), no quality gain that justified the wait |
+| **Wan2.2 A14B (T2V, I2V), 14B dual-model** | Apache-2.0 | Best quality and the largest LoRA base (331 adapters on I2V-A14B, 52 on T2V-A14B), but two 14B experts: tens of minutes on this chip and about 2x the memory. Kept as a later quality profile (VIDEO-GEN-10), not the default |
+| **Wan 2.5, 2.6, 2.7** | API only | No open weights exist (the Wan-AI organisation stops at 2.2). Claims of an open "2.7" come from SEO pages and the Hugging Face model search finds nothing |
+| **HunyuanVideo 1.5** | Tencent Hunyuan Community Licence: "DOES NOT APPLY IN THE EUROPEAN UNION, UNITED KINGDOM AND SOUTH KOREA", use and output outside the Territory is unlicensed | **Rejected on licence (territory exclusion).** Not benchmarked |
+| **MiniMax H3 and FreeVideo** | H3 licence excludes the US, EU, UK, South Korea; FreeVideo is Nvidia-first | **Rejected, not run** (as instructed) |
+| **Kandinsky 6.0 Lite distill (3B)** | MIT on the model card, no LICENSE file in the repo (verify against the GitHub repo before shipping; a row asks) | **Real contender, second pin.** Quality not judged (no complete clip: the run died in the decode). Speed: 22.7 s per step times 10 steps on MPS. LoRA: none for 6.0 yet; 8 camera-motion LoRAs for 5.0 only. The pipeline has no LoRA mixin and no safety checker. Dependencies to clear: an audio VAE and vocoder whose weight provenance the card does not state (`sample_audio=False` avoids them), a Qwen2.5-VL 7B text encoder (Apache-2.0), CLIP (MIT) |
+| **CogVideoX-5B and 1.5** | Custom CogVideoX licence ("other") | Not benchmarked: custom licence plus older, 480p-class quality |
+| **Mochi-1** | Apache-2.0 | Not benchmarked: 10B, 480p only, no Mac path found, no audio |
+| **LongCat-Video** (13.6B) | MIT | Not benchmarked: 13.6B, 15 fps native, no MLX port; revisit if one appears |
+| **SANA-Video 2B** | Apache-2.0 | Not benchmarked: text to video only in the layout note; no Mac path found |
+| **mlx-serve** (ddalcu, MIT, Zig, LTX-Video 2.5 default) | MIT code; LTX weights carry the LTX licence | Rejected as the runtime: LTX is the licence problem above, LoRA support for video is not documented, and it is a second server to supervise. Wan runs through mlx-video with no server |
+
+## 3. Runtime: how the Stack runs it
+
+- **Engine**: a managed Python 3.12 environment `video-gen` (mlx, mlx-video pinned by commit `87db56a`, hashed requirements, the same
+  uv builder as the voice engines and the image tools worker). One worker process speaks JSON lines on stdin and stdout (no port),
+  starts on the first video job, stays alive for the keep-warm window, then exits and returns its memory. mlx-video's PyTorch need is
+  conversion only and the converted MLX weights are pinned, so the environment carries no torch.
+- **Two local changes to pin** (kept as a patch file in the Stack, upstreamed if accepted): (a) the **DMD sampler**: mlx-video's Wan path
+  has the unipc, dpm++ and euler solvers only, FastWan needs "predict x0, then renoise to the next sigma" over sigmas
+  `[1.0, 0.757, 0.522, 0.0]` (a 20-line scheduler, run as `--scheduler dmd --steps 3 --guide-scale 1`); (b) **the tokenizer**: the
+  generate script calls `AutoTokenizer.from_pretrained("google/umt5-xxl")` at run time, an outbound fetch. The Stack pins the tokenizer
+  files (about 12 MB, Apache-2.0) in the model store and the patch loads them from the local path, so the worker runs with
+  `HF_HUB_OFFLINE=1` and the privacy test sees zero requests.
+- **Source read**: every `requests`, `urllib`, `snapshot_download` and `from_pretrained` in mlx-video was read before running. Network use is
+  Hugging Face downloads in the converter and the helper in `utils.py`, plus the one tokenizer call above. No telemetry.
+- **Pins (download, never vendor)**: `lBroth/FastWan2.2-TI2V-5B-MLX` revision `de2998ac446581895089ae363f4dcc0c02ca9ea2`, three files:
+  `model.safetensors` 10.0 GB bf16, `t5_encoder.safetensors` 11.4 GB, `vae.safetensors` 2.8 GB (24.2 GB total), plus `config.json` and the
+  tokenizer files. Sha256 and bytes recorded by the Stack as for every pin; a conversion script and its provenance are recorded because the
+  MLX repo is a community conversion of two Apache-2.0 sources (VIDEO-GEN-01 re-derives it from the Apache-2.0 originals when the Stack can
+  run the converter once, so the pin is not one person's upload).
+- **Decode is the slow part.** Denoising takes 10 to 16 s; the MLX Wan2.2 VAE decode takes **112 to 170 s** whatever the tiling (section 4).
+  A tiny Wan2.2 decoder (TAEW2.2 class) would cut this to seconds at some quality cost; unmeasured, row VIDEO-GEN-11.
+
+## 4. Measurements (121 frames, 24 fps, 832 x 480, seed 1, 3 DMD steps, no guidance)
+
+`peak` is macOS `peak memory footprint` from `/usr/bin/time -l` for the whole process. Time is wall clock for the process.
+
+| Run | Denoise | VAE decode | Total | Peak |
+|---|---:|---:|---:|---:|
+| Dog on beach, first run (weights cold from disk), tiling auto | 16.4 s | 117.1 s | 141 s | **112.6 GB** |
+| Same, tiling aggressive (256 px spatial, 32 frame temporal) | 10.4 s | 140.2 s | 157 s | **44.1 GB** |
+| Same, tiling default (512 px, 64 f) | 10.4 s | 170.5 s | 188 s | 112.3 GB |
+| Same, temporal only | 10.4 s | 131.3 s | 148 s | 111.4 GB |
+| Same, spatial only | 10.3 s | 112.8 s | 137 s | 112.2 GB |
+| Cartoon robot (aggressive) | 10.4 s | 115.7 s | 132 s | 44.1 GB |
+| Clouds over a city (aggressive) | 10.4 s | 115.1 s | 130 s | 44.1 GB |
+| Coffee pour (aggressive) | 10.4 s | 116.9 s | 134 s | 44.1 GB |
+| Paper boat in rain (aggressive) | 10.5 s | 115.9 s | 131 s | 44.1 GB |
+
+Finding that sets policy: **only aggressive tiling keeps the peak near 44 GB.** Every other mode reports about 112 GB, which is more than the
+machine's unified memory in use at once (macOS compresses and pages it), and would starve the live chat. The job always passes `--tiling
+aggressive`, and the governor admits a video job only against the 44 GB figure (50 GB budget minus headroom). Warm versus cold: model load is
+2.4 s (text encoder) plus 0.8 s (transformer) once the files are in the page cache, so a repeat process is the "warm" number; a keep-warm
+worker saves those 3 s and the 11 GB text-encoder read on a first job, not the decode.
+
+**Time target.** About 130 to 160 s at 480p, inside the 3 minute bar and inside Jesse's earlier "minutes, not tens of minutes".
+**720p (1280 x 704): measurement in progress, recorded in the next commit of this note.**
+
+## 5. Quality, judged by opening keyframes
+
+Five keyframes per clip (first, quarter, half, three quarters, last) were read for each. The look is the DMD look: strong contrast and
+saturation, a little glossy.
+
+- **Golden retriever on a beach**: one dog throughout, anatomy holds, legs move, spray and waves move, no identity drift across 5 s. Over-saturated gold.
+- **Cartoon robot waving**: same robot in every frame (head, headphones, chest vent, colours stable), the hand waves with a believable
+  motion, the smile changes. The strongest result.
+- **Clouds over a city at sunset**: sharp, stable skyline and sun, but the cloud motion is slow for "time-lapse"; prompt adherence on speed is weak.
+- **Coffee pour (fictional, no face)**: pot tilts, a continuous stream, steam rises, the cup fills; no hand artefacts because the hand stays out of frame.
+- **Paper boat in rain**: the boat holds its shape across the clip, ripples and falling drops appear; the first frames flash and the boat renders blue
+  where the prompt said white (colour adherence is weak under DMD).
+- **Image to video, and the LoRA test**: in progress, recorded in the next commit of this note.
+
+## 6. Samples (author's scratchpad, `scratchpad/videogen/out`)
+
+`wan_dog_480_cold.mp4`, `wan_dog_480_tileagg.mp4`, `wan_robot.mp4`, `wan_clouds.mp4`, `wan_coffee.mp4`, each with a `.jpg` keyframe sheet and a
+`.log` with the timings; logs of the other tiling modes beside them. Kandinsky: `kd_dog_480.log` (denoise 22.7 s per step, then the untiled decode failure).
+Bench scripts: `locked.sh`, `wan.sh`, `kd.py`, `frames.py`.
+
+## 7. LoRA policy (mirrors the image rules; owner correction 2026-10-17)
+
+**What loads.** Standard Wan2.2 5B LoRAs (`.safetensors`, rank up to 64 tested) through `--lora PATH STRENGTH`, applied to the single TI2V model.
+Wan2.2 5B has a smaller LoRA base than the 14B models: 33 adapters declare the 5B as their base on Hugging Face, plus the larger Civitai
+catalogue (not queried: it needs an account and is not machine-readable without one). A 14B LoRA does not fit a 5B model and is refused with
+"this LoRA was made for a different model".
+
+**The household library.** LoRAs live in the household library (one record each: file hash, size, source URL, licence, base model, strength
+default, trigger words, who added it, when). The licence is read at import: Apache-2.0, MIT and CC0 import freely; a non-commercial or unknown
+licence imports only with the adder's explicit acknowledgement shown on the card (the household is a person, not a business, but the record
+stays honest); a LoRA's licence never changes the base model's.
+
+**Classification: all-ages or adult-only.** Each LoRA carries one flag, set at import from its metadata and tags and who added it. Uncertain
+means adult-only. A parent or admin can reclassify a LoRA to adult-only; only an adult can reclassify one to all-ages, and an all-ages flag
+never overrides the metadata when the metadata says adult.
+
+**Who can use what.**
+- Adult-only LoRAs are **available and usable by adults by default** (owner's ruling, 2026-10-17). An owner or admin may restrict them
+  household-wide with one optional setting, default allowed.
+- A minor never reaches an adult-only LoRA, an adult-only render or its output, whatever any setting says. The age band and surface gates
+  outrank everything (RULES.md rule 0, SAFETY.md): a spoken surface, a shared glance screen, a guest or an unidentified speaker gets no
+  adult-only output, and the job is refused before it starts.
+- The community path is the point: a LoRA the household downloads works the same as one we list. Nothing is bundled.
+
+**Absolute lines (no setting, role or flag lifts them):** no sexual content depicting a minor or anyone who looks like a minor, and no
+non-consensual imagery of a real, identifiable person. SAFETY.md already states "no feature is built whose purpose is generating imagery of identifiable
+real people"; the video pipeline inherits it as written. **Design question for Jesse (RULES.md is silent on it):** whether an adult may make a
+video of a real family member with that person's consent. Until he answers, an image-to-video job that starts from a stored picture of a
+household member is refused for everyone, and a text-only prompt naming a household member passes the household-name gate the chat already uses.
+
+**How the lines are enforced without a filter in the model.** The Wan weights and mlx-video carry no safety filter (checked in source: no
+checker, no classifier, no word list). Enforcement lives in Home, where the person is known: the age and surface gate before the job exists, the
+household-name gate on the prompt, the LoRA flag at admission, and for a minor the video role is off (below). No learned classifier decides a
+subject (RULES-AND-LEARNED-COMPONENTS). A post-render check of the output for the absolute lines is a named open gap, VIDEO-GEN-12, because
+nothing in the Stack decides it today and a guess is worse than a stated gap.
+
+**Licence clauses on adult generation, checked per candidate.** Wan2.2 and FastWan (Apache-2.0): the model-card paragraph says the user is
+accountable for use that "violates applicable laws, causes harm to individuals or groups, disseminates personal information intended for harm,
+spreads misinformation, or targets vulnerable populations"; it is a restatement of law, not a bar on adult content, and it is not in the licence
+text. LTX-2.x: item 2 of the use list bars exploiting or harming minors, nothing bars adult content. Kandinsky 6.0 (MIT): no clause. HunyuanVideo 1.5
+and MiniMax H3: territory exclusions, rejected before this question mattered.
+
+**First tested LoRA.** in progress, recorded in the next commit of this note.
+
+## 8. Memory, keep-warm and jobs
+
+- **Load on demand, unload after idle.** The worker starts at the first job and exits after **10 idle minutes** (a person makes several
+  clips in a row; the cost of a cold start is 3 s plus reading 11 GB, and holding 24 GB resident is not free). Never resident at boot.
+- **Governor admission.** A job holds one pinned admission of **44 GB** for the whole run (denoise and decode). Refused with a plain 503
+  ("Not enough free memory for video right now. Close other big jobs, or try again in a few minutes.") when the machine cannot grant it, and while a picture job holds the image admission the
+  video job queues behind it (one generator at a time; the image and video roles share the GPU politely and never overlap). Chat is never evicted
+  for a video; a kernel-pressure warning cancels the job, not the chat.
+- **Jobs are long-running.** `POST` returns a job id; progress is reported by phase (queued, loading, rendering, decoding, encoding, ready) with
+  a percentage inside rendering and decoding; **cancel** stops the worker and frees its memory; a job past its deadline answers `202` with the
+  id, as the image and tool routes do. Results are held in memory about 10 minutes (the six newest) and Home stores the file as a new
+  attachment; nothing is logged with a prompt (rule 6a).
+- **Caps per tier.** p128: up to 121 frames (5 s) at 832 x 480, 720p after the 720p result is recorded. p64: the same at 480p only. p16 and p32: off.
+  Hard ceilings in the Stack, not settings: 121 frames, 24 fps, the pixel area of 1280 x 704.
+
+## 9. Stack API (additive; contract number unchanged)
+
+- `POST /v1/videos/generations` JSON: `prompt`, `image` (base64 or attachment id resolved by Home, optional), `width`, `height` (multiples of 32, within the cap), `frames` (4n+1, at most 121), `seed`, `loras` ([{`id`, `strength`}], hashes resolved by Home), `timeout_ms`.
+  Answers `200 { created, job, data:[{ video_b64 or url, poster_b64, width, height, frames, fps, seed, model, ms }] }` or `202 { job }` past the deadline.
+  Errors carry `error` (what happened and what to do) and `code`: 413 too large, 422 cannot be done (bad size, frames, LoRA for the wrong model), 503 not installed or no free memory, 500 failed.
+- `GET /v1/videos/generations/{job}`: status (`phase`, `progress`) and, when ready, the file. `DELETE` cancels.
+- `GET /stack/v1/video`: `{ state, phase, model, limits, loras_supported, audio: false }` for Home to enable the control.
+- Home owns the person-facing routes, calls the Stack through its client, applies the gates (section 7 and 10), and stores the result.
+- **Output**: MP4, H.264 (yuv420p, 24 fps), optional AAC audio track added by the assembler from the `music` or `tts` roles (the model makes none), a JPEG
+  poster frame from frame 0, and the seed and model recorded as provenance. The file is written once, by `imageio-ffmpeg`'s bundled ffmpeg that mlx-video already depends on.
+
+## 10. Safety posture and rules check
+
+- **Age and surface gates are unchanged and outrank this note (rule 0).** Video generation is **off for children and teens**: RULES.md and SAFETY.md
+  name no video allowance for a minor, and the hub-on-Apple plan lists child-safety evaluation as an open item (MEDIA-HOST-01). A parent's
+  per-child switch can be a later row; it is not designed here and the default for every minor is off. This is consistent with SAFETY.md (child profiles
+  restricted by default, unrestricted generation unlocked per-user by an adult, never inherited).
+- Adult video through chat passes the adult acknowledgment already required for unrestricted mode. A spoken turn, a shared screen, a guest and an
+  unidentified speaker never get video output the adult-only rules would block.
+- Privacy: nothing leaves the home. The pins download on install; the tokenizer pin removes the one runtime fetch; the worker runs offline. No
+  prompt, image or clip is logged (rule 6a); the worker reports phase, size and milliseconds only.
+- Rule 11: only a Stack-installed, pinned, tested component runs the model. Rule 8: nothing gated on a model id; the status route reports capability.
+- Rules 1 to 7, 10, 12 to 14 govern the chat turn and do not change. **Conflict check against RULES.md: none found.** Rule 1's budget: a video tool is
+  a conditional tool offered only on the turn that earns it, with its own bench row (VIDEO-GEN-07). Rule 9 and 9b: the player and the progress are kit
+  Elements and shadcn primitives with no overrides; the chat wire already names assistant-ui's `image-generation` and a video Element is a named gap to be
+  recorded in `elements-adoption.json` before code (VIDEO-GEN-06).
+- Architect verdict: the `architect` agent was not available to this session; self-review against RULES.md above found no conflict. Verdict owed on the first row that touches `packageHost.ts` (VIDEO-GEN-05).
+
+## 11. Slices (rows are in `docs/BACKLOG.md`)
+
+| Row | What |
+|---|---|
+| VIDEO-GEN-01 | Stack: `video-gen` engine, worker, pins (weights, tokenizer, the DMD patch), install plan, status route |
+| VIDEO-GEN-02 | Stack: `/v1/videos/generations` job API, progress, cancel, 202, governor admission 44 GB, tests |
+| VIDEO-GEN-03 | Stack and Home: LoRA library records, import, hash and licence, adult-only flag, base-model check |
+| VIDEO-GEN-04 | Home: settings (`video.enabled`, `video.adult_loras`, caps) and the age and surface gate |
+| VIDEO-GEN-05 | Home: package and chat tool (conditional tool, `packageHost` method, attachment store, `checkStorageCap` preflight) |
+| VIDEO-GEN-06 | Chat UI: player, progress and cancel; elements-adoption entry first |
+| VIDEO-GEN-07 | Chat tool bench row and the safety review (rule 1 budget, age and surface cases) |
+| VIDEO-GEN-08 | Verify on the Studio end to end with real clips; privacy check zero outbound |
+| VIDEO-GEN-09 | Measure a 480p, 61 frame q8 profile for p32 (the community `Anes1032/Wan2.2-TI2V-5B-mlx-q8` weights) |
+| VIDEO-GEN-10 | Later: Wan2.2 A14B quality profile; Kandinsky 6.0 Lite as the sound-capable second pin |
+| VIDEO-GEN-11 | Measure a tiny Wan2.2 decoder to cut the 115 s decode |
+| VIDEO-GEN-12 | Post-render check for the two absolute lines (design first; a gap today) |
+
+## Supersedes
+
+- `hub-on-apple-silicon-2026-09-17.md`'s video table: the animated path is Wan2.2 TI2V-5B FastWan on MLX, not LTX-2 (licence), and the
+  quality path is the same model undistilled or the A14B later, not ComfyUI on MPS.
+- MEDIA-HOST-02's ComfyUI route for video: the Stack runs the MLX worker directly. Nothing in `RULES.md` changes.
