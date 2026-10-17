@@ -67,3 +67,12 @@ Every scope but docs first takes the machine-wide full-gate lock from
 and waits its turn behind any other repo's gate on this machine; `bash
 ../.github/standards/bin/gate-lock.sh status` shows who holds it and who
 is queued. Never hand-roll a wait for another gate: run `check.sh`.
+
+## Bumping `STACK_TAG` also copies the disk plan table
+
+`shared/diskPlan.json` is a verbatim copy of the Stack's `docs/disk-plan.json` (every install's size per component and tier, from the
+Stack's pins and its measured table). The installer reads it before any Stack exists, and the setup checks, the plan step and the storage
+step read it until the Stack answers with its own. When a release moves `STACK_TAG` in `scripts/install.sh`, copy the file from the Stack
+checkout at that commit (`git -C ../stack show <STACK_TAG>:docs/disk-plan.json > shared/diskPlan.json`) in the same commit.
+`backend/tests/diskPlanTable.test.ts` compares the two (set `MAIPAI_STACK_DIR` when the Stack checkout is not `../stack`) and fails when the copy is out of date.
+After a pin's byte count changes in the Stack, run `bun run measure:disk-plan` and `bun run gen:disk-plan` there first; its own test fails until you do.

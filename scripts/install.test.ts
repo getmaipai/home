@@ -946,7 +946,8 @@ describe("main() step order (Mac Studio install audit, 2026-10-16)", () => {
       require_root() { t require_root; }
       check_required_tools() { t check_required_tools; }
       check_console_session() { t check_console_session; }
-      check_disk_space() { t "check_disk_space $2"; }
+      disk_plan_file_for() { echo /plan.json; }
+      check_plan_disk() { t "check_plan_disk $2 $3"; }
       snapshot_data() { t "snapshot_data $2"; }
       clear_quarantine_and_sign() { t clear_quarantine_and_sign; }
       install_log_rotation() { t install_log_rotation; }
@@ -979,7 +980,7 @@ main ${args.join(" ")}`]);
       expect(lines).toEqual([
         "require_root",
         "check_required_tools",
-        "check_disk_space 3",
+        "check_plan_disk recommended full",
         "record_setup_plan",
         "fetch_release_source v0.1.0",
         "find_free_port",
@@ -1006,7 +1007,7 @@ main ${args.join(" ")}`]);
     try {
       const { result, lines } = runMain(root);
       expect(result.exitCode).toBe(0);
-      expect(lines).toContain("check_disk_space 3");
+      expect(lines).toContain("check_plan_disk recommended home");
       expect(lines).not.toContain("setup_stack");
       expect(lines).not.toContain("check_console_session");
       expect(lines.indexOf("launchctl bootout")).toBeGreaterThanOrEqual(0);
@@ -1091,7 +1092,7 @@ main ${args.join(" ")}`]);
         t() { echo "$*" >> "${trace}"; }
         detect_os() { echo darwin; }
         detect_arch() { echo arm64; }
-        require_root() { :; }; check_required_tools() { :; }; check_console_session() { :; }; check_disk_space() { :; }
+        require_root() { :; }; check_required_tools() { :; }; check_console_session() { :; }; disk_plan_file_for() { echo /plan.json; }; check_plan_disk() { :; }
         record_setup_plan() { :; }; launchctl() { :; }; rsync() { :; }
         fetch_release_source() { t "fetch $1"; mkdir -p "$2/backend"; }
         snapshot_data() { t snapshot_data; }
@@ -1137,7 +1138,7 @@ main ${args.join(" ")}`]);
       const { result, lines } = runMain(root);
       expect(result.exitCode).toBe(0);
       expect(result.stdout.toString()).toContain("did not finish - continuing");
-      expect(lines).toContain("check_disk_space 3");
+      expect(lines).toContain("check_plan_disk recommended home");
       expect(lines.some((line) => line.startsWith("snapshot_data"))).toBe(false);
     } finally { rmSync(root, { recursive: true, force: true }); }
   });
@@ -1209,22 +1210,131 @@ describe("macOS install checks (Mac Studio audit, 2026-10-16)", () => {
     expect(out).toContain("launchctl asuser 501 sudo -u marlow env HOME=/Users/marlow STACK_DATA_DIR=/d /bin/x install-service");
   });
 
-  test("the Home bring-up needs 3 GB and the AI engine step 6 GB, not the plan's models", () => {
-    expect(bash("echo $HOME_REQUIRED_GB $STACK_REQUIRED_GB").stdout.toString().trim()).toBe("3 6");
-  });
-
-  test("too little free disk stops with the amount and what to do", () => {
+  test("check_disk_space (the plain floor) still stops with the amount and what to do", () => {
     const result = bash('free_gb_at() { echo 2; }; check_disk_space /usr/local/maipai-home 3 Home || true; echo "problem=$DISK_PROBLEM"');
     const out = result.stdout.toString() + result.stderr.toString();
     expect(out).toContain("2 GB free");
     expect(out).toContain("Home needs 3 GB");
-    expect(out).toContain("problem=This computer has 2 GB free");
     expect(bash("free_gb_at() { echo 2; }; check_disk_space /x 3 Home").exitCode).toBe(1);
+    expect(bash("free_gb_at() { echo 30; }; check_disk_space /x 3 Home").exitCode).toBe(0);
   });
 
-  test("enough free disk passes", () => {
-    expect(bash("free_gb_at() { echo 30; }; check_disk_space /x 3 Home").exitCode).toBe(0);
-    expect(bash("free_gb_at() { echo 3; }; check_disk_space /x 3 Home").exitCode).toBe(0);
+  // INSTALL-DISK-01: the installer sizes the disk from shared/diskPlan.json, never from numbers in the script.
+  const TABLE = join(import.meta.dir, "..", "shared", "diskPlan.json");
+  const table = JSON.parse(readFileSync(TABLE, "utf8")) as { installer: Record<string, number>; headroom_warn_bytes: number };
+  const GIB = 1_073_741_824;
+
+  test("the script holds no disk sizes of its own: no HOME_REQUIRED_GB or STACK_REQUIRED_GB", () => {
+    const text = readFileSync(INSTALL_SH, "utf8");
+    expect(text).not.toContain("HOME_REQUIRED_GB");
+    expect(text).not.toContain("STACK_REQUIRED_GB");
+    expect(bash("echo $DATA_RESERVE_BYTES").stdout.toString().trim()).toBe("2147483648");
+    expect(readFileSync(join(import.meta.dir, "..", "shared", "diskPlanMath.ts"), "utf8")).toContain("DATA_RESERVE_BYTES = 2 * GIB");
+  });
+
+  test("disk_plan_value reads every figure of the installer block the way the table says", () => {
+    for (const [key, value] of Object.entries(table.installer)) expect(bash(`disk_plan_value "${TABLE}" ${key}`).stdout.toString().trim()).toBe(String(value));
+    expect(bash(`disk_plan_value "${TABLE}" headroom_warn_bytes`).stdout.toString().trim()).toBe(String(table.headroom_warn_bytes));
+    expect(bash(`disk_plan_value "${TABLE}" p99.required_free_bytes`).stdout.toString().trim()).toBe("");
+  });
+
+  test("the tier is the level capped by the computer's memory", () => {
+    const out = (script: string) => bash(script).stdout.toString().trim();
+    expect(out("tier_for_memory_gb 128; tier_for_memory_gb 96; tier_for_memory_gb 64; tier_for_memory_gb 48; tier_for_memory_gb 32; tier_for_memory_gb 24; tier_for_memory_gb 8; tier_for_memory_gb")).toBe("p128\np64\np64\np32\np32\np16\np16\np16");
+    expect(out("tier_for_level recommended p64; tier_for_level recommended p128; tier_for_level moderate p128; tier_for_level minimal p128; tier_for_level moderate p16")).toBe("p64\np128\np32\np16\np16");
+  });
+
+  test("gb_text rounds a need up and free space down, one decimal under 10 GB", () => {
+    expect(bash(`gb_text ${Math.floor(58.1 * GIB)} up; echo; gb_text ${Math.floor(58.9 * GIB)} down; echo; gb_text ${Math.floor(2.01 * GIB)} up; echo; gb_text ${Math.floor(2.09 * GIB)} down`).stdout.toString().trim()).toBe("59\n58\n2.1\n2.0");
+  });
+
+  // Stubs a computer: its memory, and a map of folder -> (disk id, free bytes).
+  const disks = (memoryGb: number, map: Record<string, [string, number]>) => `
+    machine_memory_gb() { echo ${memoryGb}; }
+    volume_id_at() { case "$1" in ${Object.entries(map).map(([path, [id]]) => `${path}) echo "${id}";;`).join(" ")} esac; }
+    free_bytes_at() { case "$1" in ${Object.entries(map).map(([path, [, free]]) => `${path}) echo ${free};;`).join(" ")} esac; }`;
+  const check = (level: string, scope: string, memoryGb: number, map: Record<string, [string, number]>, env = "") => {
+    const result = bash(`${disks(memoryGb, map)}\n${env}\nrc=0; check_plan_disk "${TABLE}" ${level} ${scope} darwin /r || rc=$?; echo "rc=$rc"; echo "problem=$DISK_PROBLEM"`);
+    return { out: result.stdout.toString() + result.stderr.toString(), rc: Number(/rc=(\d+)/.exec(result.stdout.toString())?.[1]) };
+  };
+  const one = (free: number): Record<string, [string, number]> => ({ "/r": ["d1", free], "/r/data": ["d1", free], "/r/stack/data": ["d1", free] });
+
+  test("a shortfall stops with the need, the free space, the smaller-plan flags and nothing hard-coded", () => {
+    const need = table.installer["p64.required_free_bytes"]! + 2 * GIB;
+    const { out, rc } = check("recommended", "full", 64, one(61 * GIB));
+    expect(rc).toBe(1);
+    expect(out).toMatch(/This computer needs about \d+ GB free for the recommended setup; it has 61 GB\./);
+    expect(out).toContain(`about ${Math.ceil(need / GIB)} GB free`);
+    expect(out).toContain("--plan moderate or --plan minimal");
+  });
+
+  test("the requirement is exact: one byte short stops, the requirement plus the headroom passes quietly", () => {
+    const need = table.installer["p64.required_free_bytes"]! + 2 * GIB;
+    expect(check("recommended", "full", 64, one(need - 1)).rc).toBe(1);
+    const tight = check("recommended", "full", 64, one(need));
+    expect(tight.rc).toBe(0);
+    expect(tight.out).toContain("Warning: disk space is tight");
+    const fine = check("recommended", "full", 64, one(need + table.headroom_warn_bytes));
+    expect(fine.rc).toBe(0);
+    expect(fine.out).toContain("Disk space:");
+    expect(fine.out).not.toContain("tight");
+  });
+
+  test("the plan level sets the size: minimal passes where recommended stops, and a small computer is held to its own plan", () => {
+    expect(check("recommended", "full", 64, one(40 * GIB)).rc).toBe(1);
+    expect(check("minimal", "full", 64, one(40 * GIB)).rc).toBe(0);
+    // A 32 GB Mac asking for Recommended is the p32 plan.
+    expect(check("recommended", "full", 32, one(table.installer["p32.required_free_bytes"]! + 2 * GIB + table.headroom_warn_bytes)).out).toContain("(the p32 plan)");
+  });
+
+  test("a data folder on another disk is judged by that disk, and folders on one disk add up", () => {
+    const split = { "/r": ["d1", 500 * GIB], "/r/data": ["d2", 1 * GIB], "/r/stack/data": ["d1", 500 * GIB] } as Record<string, [string, number]>;
+    const result = check("recommended", "full", 64, split);
+    expect(result.rc).toBe(1);
+    expect(result.out).toMatch(/needs about 2\.0 GB free.*it has 1\.0 GB/);
+    // The AI on its own big disk, Home and its data on a small one that holds them but not the AI.
+    const ai = table.installer["p64.ai_required_free_bytes"]!;
+    const home = table.installer["p64.home_required_free_bytes"]!;
+    const separate = { "/r": ["d1", home + 2 * GIB + table.headroom_warn_bytes], "/r/data": ["d1", home + 2 * GIB + table.headroom_warn_bytes], "/r/stack/data": ["d2", ai + table.headroom_warn_bytes] } as Record<string, [string, number]>;
+    expect(check("recommended", "full", 64, separate).rc).toBe(0);
+    expect(check("recommended", "full", 64, one(ai)).rc).toBe(1);
+  });
+
+  test("an upgrade or the engine step checks only Home and the AI program, not the models", () => {
+    const home = table.installer["p64.home_required_free_bytes"]!;
+    const result = check("recommended", "home", 64, one(home + table.headroom_warn_bytes));
+    expect(result.rc).toBe(0);
+    expect(result.out).toContain("Home and the AI engine");
+    expect(check("recommended", "home", 64, one(home - 1)).rc).toBe(1);
+  });
+
+  test("an unreadable disk continues with a note instead of blocking", () => {
+    const result = bash(`machine_memory_gb() { echo 64; }; volume_id_at() { :; }; free_bytes_at() { :; }; rc=0; check_plan_disk "${TABLE}" recommended full darwin /r || rc=$?; echo "rc=$rc"`);
+    expect(result.stdout.toString()).toContain("rc=0");
+    expect(result.stdout.toString()).toContain("Could not read the free disk space");
+  });
+
+  test("fetch_disk_plan uses a local copy when named, tries the release tag, then main, then gives up quietly", () => {
+    expect(bash(`MAIPAI_DISK_PLAN_FILE="${TABLE}" fetch_disk_plan v9`).stdout.toString().trim()).toBe(TABLE);
+    const log = join(tmpdir(), `maipai-curl-${process.pid}.log`);
+    const urls = bash(`curl() { echo "$*" >> "${log}"; case "$*" in *v9*) return 22;; *) echo '{}' > "$6"; return 0;; esac; }; REPO=o/r; f=$(fetch_disk_plan v9); [ -f "$f" ] && echo got`);
+    expect(urls.stdout.toString()).toContain("got");
+    const seen = readFileSync(log, "utf8");
+    rmSync(log, { force: true });
+    expect(seen).toContain("o/r/v9/shared/diskPlan.json");
+    expect(seen).toContain("o/r/main/shared/diskPlan.json");
+    expect(bash(`curl() { return 22; }; fetch_disk_plan v9; echo "[$?]"`).stdout.toString().trim()).toBe("[0]");
+  });
+
+  test("disk_check_level takes --plan, then the saved plan, then recommended", () => {
+    const root = mkdtempSync(join(tmpdir(), "maipai-level-"));
+    try {
+      expect(bash(`disk_check_level moderate ${root}`).stdout.toString().trim()).toBe("moderate");
+      expect(bash(`disk_check_level "" ${root}`).stdout.toString().trim()).toBe("recommended");
+      mkdirSync(join(root, "data"));
+      writeFileSync(join(root, "data", "setup-plan"), "minimal\n");
+      expect(bash(`disk_check_level "" ${root}`).stdout.toString().trim()).toBe("minimal");
+    } finally { rmSync(root, { recursive: true, force: true }); }
   });
 
   test("free_gb_at reads the nearest folder that exists", () => {

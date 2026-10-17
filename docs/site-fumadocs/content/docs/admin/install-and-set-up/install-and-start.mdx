@@ -82,7 +82,7 @@ sudo bash /Users/example/Developer/home/scripts/install.sh
 ### What it checks first
 
 - Required tools (`curl`, `tar`, `rsync`, `unzip`, `shasum`). On a Mac a miss points at `xcode-select --install`. Homebrew is never used, and Python is not needed.
-- Free disk space: 3 GB for Home. The Stack step checks 6 GB more, and the wizard plan checks the models.
+- Free disk space, sized from one table (`shared/diskPlan.json`, built from the pins' byte counts and measured install sizes): the plan's installed size, 20 percent more, the room an install uses while it runs, and 2 GB for Home's records. A fresh install checks the whole plan (`--plan`, default Recommended, capped by the computer's memory) on each disk that will hold Home, its data folder and the AI. An upgrade checks Home and the AI engine program. Too little room stops before any change, with the figures and the smaller-plan flags; close to the limit warns.
 - For the Stack step only: a logged-in desktop session on macOS. Home itself needs none.
 - The Bun runtime and the install checks, after the build and before any service starts.
 

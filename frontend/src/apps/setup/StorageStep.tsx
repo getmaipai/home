@@ -4,6 +4,7 @@ import { Button } from "@maipai/ui/src/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/ui/alert";
 import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/components/ui/card";
 import { FolderPicker, type FolderPickerCopy } from "@maipai/ui/src/primitives/FolderPicker";
+import { needGb } from "../../../../shared/diskPlanMath";
 import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
 
 const ErrorIcon = getIcon("circle-alert");
@@ -15,7 +16,7 @@ type FolderClass = "models" | "records";
 
 const PICKER_ERROR = "Home couldn't open that folder. Go up a level or pick another folder, then try again.";
 const COPY: Record<FolderClass, { title: string; about: string; pickerTitle: string }> = {
-  models: { title: "AI models", about: "Home saves your pick, but for now downloads the AI models to its default folder. Plan for about 200 GB there.", pickerTitle: "Choose the AI models folder" },
+  models: { title: "AI models", about: "Home saves your pick, but for now downloads the AI models to its default folder.", pickerTitle: "Choose the AI models folder" },
   records: { title: "Home's data", about: "Your family's chats, people and memories. Small, usually well under 5 GB.", pickerTitle: "Choose Home's data folder" },
 };
 const PICKER_COPY = (title: string): FolderPickerCopy => ({
@@ -61,7 +62,7 @@ export function StorageStep({ split, value, onChange }: {
   const [rows, setRows] = useState<SetupPlacementRow[] | null>(null);
   const [checking, setChecking] = useState(false);
   const [checkError, setCheckError] = useState<string | null>(null);
-  const [defaults, setDefaults] = useState<{ records: string; models: string } | null>(null);
+  const [defaults, setDefaults] = useState<{ records: string; models: string; models_need_bytes?: number } | null>(null);
   // A choice already saved on the server (after a reload, or coming Back) is shown again.
   useEffect(() => {
     api.setupStorageDefaults().then((result) => {
@@ -155,7 +156,7 @@ export function StorageStep({ split, value, onChange }: {
           <Card key={which} state={state}>
             <CardHeader>
               <h2 className="text-2xl font-semibold md:text-3xl">{copy.title}</h2>
-              <p className="text-base text-muted-foreground md:text-lg">{copy.about}</p>
+              <p className="text-base text-muted-foreground md:text-lg">{copy.about}{which === "models" && defaults?.models_need_bytes ? ` Plan for about ${needGb(defaults.models_need_bytes)} GB free there.` : ""}</p>
             </CardHeader>
             <CardContent>
               <p className="break-all text-base md:text-lg">{path ?? defaults?.[which] ?? "Default folder"}</p>

@@ -85,7 +85,7 @@ setupRoutes.openapi(installStatusRoute, async (c) => c.json(await getInstallStat
 const SetupErrorSchemaForInstall = z.object({ error: z.string(), next: z.string().optional() });
 const PlanWordingSchema = z.object({
   level: z.enum(["recommended", "moderate", "minimal", "below_minimum", "unknown"]), headline: z.string(), detail: z.string(),
-  gets: z.array(z.string()), needsMemoryAnswer: z.boolean(), sizeLine: z.string().nullable(), diskLine: z.string().nullable(),
+  gets: z.array(z.string()), needsMemoryAnswer: z.boolean(), sizeLine: z.string().nullable(), diskLine: z.string().nullable(), disk: z.unknown().nullable(),
 });
 const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).optional() });
 const planRoute = createRoute({
@@ -100,17 +100,17 @@ setupRoutes.openapi(planRoute, async (c) => {
 
 const installStartRoute = createRoute({
   method: "post", path: "/install", tags: ["Setup"], summary: "Install the plan: start the downloads and go on",
-  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional() }).strict() } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional(), components: z.array(z.string()).optional().openapi({ description: "The disk plan rows to install (ids from the plan's disk.plan.rows). Required rows are always installed; omitted means the plan's defaults." }) }).strict() } } } },
   responses: {
     202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number() }) } }, description: "The downloads started in the background." },
-    409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "There is nothing the AI can install on this computer." },
+    409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "There is nothing the AI can install on this computer, or not enough free disk space for the rows chosen." },
   },
 });
 setupRoutes.openapi(installStartRoute, async (c) => {
   // This router is open on the local network until Home has an owner.
   if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "Change the AI under Home settings." }, 409);
-  const { vram_gb: vramGb } = c.req.valid("json");
-  const result = await beginInstall(vramGb, true);
+  const { vram_gb: vramGb, components } = c.req.valid("json");
+  const result = await beginInstall(vramGb, true, components);
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   return c.json({ started: true as const, models: result.models }, 202);
 });

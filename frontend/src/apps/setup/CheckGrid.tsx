@@ -8,11 +8,13 @@ const OkIcon = getIcon("check");
 const WarnIcon = getIcon("alert-triangle");
 const BadIcon = getIcon("x");
 
-// Rows that cost the person nothing to skip: the storage page already covers disks, and web search is chosen on the plan page.
+// Rows that cost the person nothing to skip: the storage page already covers disks and web search is chosen on the plan page. A disk row
+// that is not green is shown, with the same words the installer and the plan page use (INSTALL-DISK-01).
 const HIDDEN = new Set(["model-disk", "hub-disk", "web-search"]);
+const SHOWN_WHEN_NOT_GREEN = new Set(["model-disk"]);
 const AI_SERVER = new Set(["engine", "memory", "graphics-driver", "engine-link", "clock", "tailnet-allow", "tailnet-peer", "tailnet-route", "tailnet-latency"]);
 
-export const visibleCheckRows = <T extends CheckGridRow>(rows: readonly T[]): T[] => rows.filter((row) => row.state !== "idle" && !HIDDEN.has(row.id));
+export const visibleCheckRows = <T extends CheckGridRow>(rows: readonly T[]): T[] => rows.filter((row) => row.state !== "idle" && (!HIDDEN.has(row.id) || (SHOWN_WHEN_NOT_GREEN.has(row.id) && row.state !== "green")));
 
 // One tile per check: a big green check, amber warning or red cross, the name, and words only when something needs a look.
 export function CheckGrid<T extends CheckGridRow>({ rows, split, renderAction }: { rows: readonly T[]; split: boolean; renderAction?: (row: T) => ReactNode }) {

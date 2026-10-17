@@ -6,6 +6,7 @@ import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { api, ApiError, type InstallStatusView, type PlanWording } from "@/lib/api";
+import { liveVerdict, PlanDiskList } from "./PlanDiskList";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
 const ErrorIcon = getIcon("circle-alert");
@@ -21,7 +22,7 @@ export interface PlanStepProps {
   onReady?: (ready: boolean) => void;
   /** Wizard uses the setup routes; Home settings uses the signed-in ones. */
   readPlan?: (vramGb?: number) => Promise<{ wording: PlanWording }>;
-  start?: (vramGb?: number) => Promise<unknown>;
+  start?: (vramGb?: number, components?: string[]) => Promise<unknown>;
   /** What the AI engine install is doing; the plan waits on it when this computer is installing the engine. */
   readInstall?: () => Promise<InstallStatusView>;
   /** Try the AI engine install again after it failed. */
@@ -39,11 +40,13 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [engine, setEngine] = useState<InstallStatusView | null>(null);
+  // The disk plan's rows left turned on (INSTALL-DISK-01): starts at the plan's defaults, changes with each checkbox, and the total and the disk check follow.
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
 
   useEffect(() => {
     let active = true;
     setFailed(false);
-    readPlan(vram).then((result) => { if (active) setWording(result.wording); }).catch(() => { if (active) setFailed(true); });
+    readPlan(vram).then((result) => { if (active) { setWording(result.wording); setSelected(new Set(result.wording.disk?.plan.default_selected ?? [])); } }).catch(() => { if (active) setFailed(true); });
     return () => { active = false; };
   }, [vram, attempt, readPlan]);
 
@@ -68,8 +71,12 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   // "Check again" belongs wherever the answer can change without the person
   // choosing anything: the engine was not answering, or the disk was short
   // and they have since freed space. Memory questions re-read on their own.
-  const canRecheck = !!wording && !wording.needsMemoryAnswer && (wording.level === "unknown" || !!wording.diskLine);
-  const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !wording.diskLine;
+  const disk = wording?.disk ?? null;
+  // With a disk plan, the check follows the person's choice: turning off an extra can make a red check pass.
+  const verdict = disk ? liveVerdict(disk, selected) : null;
+  const diskShort = disk ? verdict!.state === "red" : !!wording?.diskLine;
+  const canRecheck = !!wording && !wording.needsMemoryAnswer && (wording.level === "unknown" || diskShort || verdict?.state === "amber");
+  const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !diskShort;
   // Continue stays blocked while the plan is still being read and while the
   // Install button is the way forward; it opens only when Home cannot
   // install from here (engine unreachable, below minimal, disk short), so
@@ -80,7 +87,7 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
 
   async function install() {
     setBusy(true); setError(null);
-    try { await start(vram); onInstalled(); }
+    try { await (disk ? start(vram, [...selected]) : start(vram)); onInstalled(); }
     catch (reason) {
       const next = reason instanceof ApiError ? reason.next : undefined;
       setError(reason instanceof Error ? [reason.message, next].filter(Boolean).join(" ") : "Home couldn't start the download. Press Install again.");
@@ -106,8 +113,12 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
           </RadioGroup>
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
-        {wording.sizeLine ? <p>{wording.sizeLine}</p> : null}
-        {wording.diskLine ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{wording.diskLine}</AlertDescription></Alert> : null}
+        {disk ? <PlanDiskList disk={disk} selected={selected} onToggle={(id, on) => setSelected((current) => { const next = new Set(current); if (on) next.add(id); else next.delete(id); return next; })} /> : (
+          <>
+            {wording.sizeLine ? <p>{wording.sizeLine}</p> : null}
+            {wording.diskLine ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{wording.diskLine}</AlertDescription></Alert> : null}
+          </>
+        )}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
         {canInstall ? <Button type="button" size="lg" disabled={busy} onClick={() => void install()}>{actionLabel}</Button> : null}

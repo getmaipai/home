@@ -699,9 +699,17 @@ export interface TailscaleStatus { state: "not_installed" | "stopped" | "running
 export interface SetupFolderListing { path: string; parent: string | null; freeBytes: number | null; writable: boolean; folders: Array<{ name: string; path: string; writable: boolean }> }
 export interface SetupPlacementRow { class: string; kind: "refusal" | "warning" | "unknown"; id: string; text: string; fix: string }
 
+/** The plan step's disk list: every install with its size, where the files land and the room each place has (the shared arithmetic totals a choice). */
+export interface PlanDiskView {
+  source: "stack" | "shipped";
+  plan: import("../../../shared/diskPlanMath").DiskPlan;
+  volumes: import("../../../shared/diskPlanMath").DiskVolume[];
+  verdict: { state: "green" | "amber" | "red"; text: string; fix: string; requiredBytes: number; freeBytes: number | null };
+}
 export interface PlanWording {
   level: "recommended" | "moderate" | "minimal" | "below_minimum" | "unknown";
   headline: string; detail: string; gets: string[]; needsMemoryAnswer: boolean; sizeLine: string | null; diskLine: string | null;
+  disk?: PlanDiskView | null;
 }
 export interface InstallStatusView {
   state: "none" | "installing_engine" | "engine_failed" | "downloading" | "starter_ready" | "stalled" | "out_of_space" | "failed" | "ready";
@@ -731,7 +739,7 @@ export const api = {
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),
   repairsChecks: () => request<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>>("/api/repairs/checks", { method: "POST" }),
   setupPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/setup/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
-  setupInstall: (vramGb?: number) => request<{ started: true; models: number }>("/api/setup/install", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
+  setupInstall: (vramGb?: number, components?: string[]) => request<{ started: true; models: number }>("/api/setup/install", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}) }) }),
   /** Wizard (before an owner): start or restart the AI engine install on this computer. */
   setupEngineInstall: () => request<{ started: true }>("/api/setup/engine-install", { method: "POST" }),
   setupHostTune: () => request<HostTuneView>("/api/setup/host-tune"),
@@ -739,7 +747,7 @@ export const api = {
   setupHostTuneRevert: (id: string) => request<{ item: HostTuneItem }>("/api/setup/host-tune/revert", { method: "POST", body: JSON.stringify({ id }) }),
   setupInstallStatus: () => request<InstallStatusView>("/api/setup/install"),
   installPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording }>(`/api/install/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
-  installStart: (vramGb?: number) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify(vramGb ? { vram_gb: vramGb } : {}) }),
+  installStart: (vramGb?: number, components?: string[]) => request<{ started: true; models: number }>("/api/install/start", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}) }) }),
   installStatus: () => request<InstallStatusView>("/api/install"),
   installRetry: () => request<{ started: true }>("/api/install/retry", { method: "POST" }),
   /** Wizard web search screen: `dryRun` tests the address and saves nothing. */
@@ -752,7 +760,7 @@ export const api = {
   setupAllowEngineTailnet: () => request<{ enabled: true }>("/api/setup/checks/allow-tailnet", { method: "POST" }),
   pullStackModel: (body: Record<string, unknown>) => request<Record<string, unknown>>("/api/engines/models/pull", { method: "POST", body: JSON.stringify(body) }),
   setupFolders: (path?: string) => request<SetupFolderListing>(`/api/setup/folders${path === undefined ? "" : `?path=${encodeURIComponent(path)}`}`),
-  setupStorageDefaults: () => request<{ records: string; models: string; chosen?: { records?: string; models?: string } }>("/api/setup/storage/defaults"),
+  setupStorageDefaults: () => request<{ records: string; models: string; models_need_bytes?: number; chosen?: { records?: string; models?: string } }>("/api/setup/storage/defaults"),
   setupCreateFolder: (parent: string, name: string) => request<{ name: string; path: string; writable: boolean }>("/api/setup/folders", { method: "POST", body: JSON.stringify({ parent, name }) }),
   setupNativeFolder: (folder: "records" | "models") => request<{ status: "chosen"; path: string } | { status: "cancelled" } | { status: "unavailable" } | { status: "refused"; error: string }>("/api/setup/folders/native", { method: "POST", body: JSON.stringify({ folder }) }),
   setupStorageCheck: (layout: { models?: string; records?: string; split?: boolean }) => request<{ rows: SetupPlacementRow[] }>("/api/setup/storage/check", { method: "POST", body: JSON.stringify(layout) }),

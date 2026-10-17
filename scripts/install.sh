@@ -275,12 +275,21 @@ open_setup_page() {
   return 0
 }
 
-# Free disk the installer needs, in GB. Home alone is small (its source, Bun
-# and the frontend build). The Stack's build and engines need more, and are
-# checked when the setup wizard asks for the Stack (--stack-only), not here.
-# The AI models are sized by the Stack's own plan, which the wizard shows.
-HOME_REQUIRED_GB=3
-STACK_REQUIRED_GB=6
+# Free disk the installer needs (INSTALL-DISK-01). One table holds every size:
+# shared/diskPlan.json, a copy of the Stack's docs/disk-plan.json, built from
+# the pins' byte counts and measured install sizes. Its "installer" block has
+# one line per figure, so this script reads it without a JSON tool:
+#   "p64.required_free_bytes": N   Home, the AI engine and its models for the
+#                                  plan's default setup: the installed size,
+#                                  20 percent more, and the space an install
+#                                  needs while it runs.
+#   "p64.home_required_free_bytes", "p64.ai_required_free_bytes": the two parts.
+# The tier is the plan level (--plan, default recommended) capped by what this
+# computer's memory can run. Each folder is checked on its own disk, so a data
+# folder on another disk is judged by that disk, and folders that share a disk
+# add up. Low headroom warns; a shortfall stops the install before any change.
+DATA_RESERVE_BYTES=2147483648   # Home's own records; mirrors DATA_RESERVE_BYTES in shared/diskPlanMath.ts
+GIB_BYTES=1073741824
 
 nearest_existing_dir() {
   local p="$1"
@@ -290,6 +299,22 @@ nearest_existing_dir() {
 
 free_gb_at() {
   df -Pk "$(nearest_existing_dir "$1")" 2>/dev/null | awk 'NR==2 {printf "%d", $4/1048576}'
+}
+
+free_bytes_at() {
+  df -Pk "$(nearest_existing_dir "$1")" 2>/dev/null | awk 'NR==2 {printf "%.0f", $4*1024}'
+}
+
+# The disk a folder is on: the filesystem and where it is mounted.
+volume_id_at() {
+  df -Pk "$(nearest_existing_dir "$1")" 2>/dev/null | awk 'NR==2 {print $1 "|" $6}'
+}
+
+# A byte count as the figure a person reads: whole GB from 10 up, one decimal
+# below. "up" rounds a need up and "down" rounds free space down, so the
+# sentence never promises room that is not there.
+gb_text() {
+  awk -v b="$1" -v mode="$2" 'BEGIN { g = b / 1073741824; if (g >= 10) { v = (mode == "up") ? int(g) + (g > int(g)) : int(g); printf "%d", v } else { t = g * 10; v = (mode == "up") ? int(t) + (t > int(t)) : int(t); printf "%.1f", v / 10 } }'
 }
 
 check_disk_space() {
@@ -302,6 +327,166 @@ check_disk_space() {
     return 1
   fi
   log "Disk space: ${free} GB free, ${need} GB needed for ${what}."
+}
+
+# Whole GiB of memory the AI can use: a Mac's total (its memory is shared with
+# the graphics), otherwise an NVIDIA card's. Empty when it cannot be read.
+machine_memory_gb() {
+  local os="$1" bytes mib
+  if [ "$os" = "darwin" ]; then
+    bytes=$(sysctl -n hw.memsize 2>/dev/null || true)
+    [ -n "$bytes" ] && echo $(( (bytes + GIB_BYTES / 2) / GIB_BYTES ))
+  elif command -v nvidia-smi >/dev/null 2>&1; then
+    mib=$(nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits 2>/dev/null | awk '{s += $1} END {if (s > 0) printf "%d", s}')
+    [ -n "$mib" ] && echo $(( (mib + 512) / 1024 ))
+  fi
+  return 0
+}
+
+# The tier a computer with this much memory reaches; the smallest when it is
+# below it or unknown (the setup wizard says whether the AI can run at all).
+tier_for_memory_gb() {
+  local gb="${1:-0}"
+  if [ "$gb" -ge 128 ]; then echo p128
+  elif [ "$gb" -ge 64 ]; then echo p64
+  elif [ "$gb" -ge 32 ]; then echo p32
+  else echo p16
+  fi
+}
+
+# The tier a plan level installs: the level's own tier, never more than the
+# computer can run (Recommended on a 64 GB Mac is the p64 plan).
+tier_for_level() {
+  local level="$1" machine="$2" cap rank_cap rank_machine
+  case "$level" in minimal) cap=p16 ;; moderate) cap=p32 ;; *) cap=p128 ;; esac
+  case "$cap" in p16) rank_cap=1 ;; p32) rank_cap=2 ;; p64) rank_cap=3 ;; *) rank_cap=4 ;; esac
+  case "$machine" in p16) rank_machine=1 ;; p32) rank_machine=2 ;; p64) rank_machine=3 ;; *) rank_machine=4 ;; esac
+  if [ "$rank_cap" -lt "$rank_machine" ]; then echo "$cap"; else echo "$machine"; fi
+}
+
+# One figure from the table's installer block, or nothing.
+disk_plan_value() {
+  local file="$1" key="$2" escaped
+  escaped=$(printf '%s' "$key" | sed 's/\./\\./g')
+  sed -n "s/.*\"${escaped}\": *\([0-9][0-9]*\).*/\1/p" "$file" | head -1
+}
+
+# Puts the table for a release in a file and prints its path. The release tag
+# is tried first, then main (a release cut before the table existed has none);
+# MAIPAI_DISK_PLAN_FILE names a local copy (tests, an offline install).
+fetch_disk_plan() {
+  local tag="$1" dest
+  if [ -n "${MAIPAI_DISK_PLAN_FILE:-}" ]; then
+    [ -r "$MAIPAI_DISK_PLAN_FILE" ] && echo "$MAIPAI_DISK_PLAN_FILE"
+    return 0
+  fi
+  dest=$(mktemp "${TMPDIR:-/tmp}/maipai-disk-plan.XXXXXX") || return 0
+  if curl -fsSL --max-time 20 "https://raw.githubusercontent.com/${REPO}/${tag}/shared/diskPlan.json" -o "$dest" 2>/dev/null \
+    || curl -fsSL --max-time 20 "https://raw.githubusercontent.com/${REPO}/main/shared/diskPlan.json" -o "$dest" 2>/dev/null; then
+    echo "$dest"
+  else
+    rm -f "$dest"
+  fi
+  return 0
+}
+
+# Checks the disks against the plan. scope "full": Home, the AI engine and its
+# models for the plan level (a fresh install). scope "home": Home and the AI
+# engine program only (an upgrade, or the wizard's engine step), because the
+# models are already there or the wizard sizes them itself. Sets DISK_PROBLEM
+# and returns 1 on a shortfall; warns and returns 0 when headroom is low.
+check_plan_disk() {
+  local plan_file="$1" level="$2" scope="$3" os="$4" root="$5"
+  local memory tier machine_tier headroom what
+  memory=$(machine_memory_gb "$os")
+  machine_tier=$(tier_for_memory_gb "$memory")
+  tier=$(tier_for_level "$level" "$machine_tier")
+  headroom=$(disk_plan_value "$plan_file" "headroom_warn_bytes")
+  : "${headroom:=5368709120}"
+  local home_need ai_need total_need
+  home_need=$(disk_plan_value "$plan_file" "${tier}.home_required_free_bytes")
+  ai_need=$(disk_plan_value "$plan_file" "${tier}.ai_required_free_bytes")
+  total_need=$(disk_plan_value "$plan_file" "${tier}.required_free_bytes")
+  if [ -z "$home_need" ] || [ -z "$ai_need" ] || [ -z "$total_need" ]; then
+    log "Could not read the disk sizes for the ${tier} plan; the setup wizard checks the disk again before it downloads."
+    return 0
+  fi
+  if [ "$scope" = "home" ]; then what="Home and the AI engine"; else what="the ${level} setup"; fi
+
+  # The folders and the disk each is on. Folders on one disk are asked for the sum.
+  local data_dir="${MAIPAI_DATA_DIR:-${root}/data}" ai_dir="${STACK_DATA_DIR:-${root}/stack/data}"
+  local slots=0 i sid skinds sfree
+  local kind path vid vfree
+  for kind in home data ai; do
+    case "$kind" in home) path="$root" ;; data) path="$data_dir" ;; *) path="$ai_dir" ;; esac
+    [ "$scope" = "home" ] && [ "$kind" != "home" ] && continue
+    vid=$(volume_id_at "$path"); vfree=$(free_bytes_at "$path")
+    [ -n "$vid" ] && [ -n "$vfree" ] || { log "Could not read the free disk space for ${path}; continuing."; continue; }
+    i=1; local merged="no"
+    while [ "$i" -le "$slots" ]; do
+      eval "sid=\$SLOT${i}_ID"
+      if [ "$sid" = "$vid" ]; then
+        eval "SLOT${i}_KINDS=\"\$SLOT${i}_KINDS ${kind}\""
+        eval "sfree=\$SLOT${i}_FREE"
+        [ "$vfree" -lt "$sfree" ] && eval "SLOT${i}_FREE=$vfree"
+        merged="yes"; break
+      fi
+      i=$((i + 1))
+    done
+    if [ "$merged" = "no" ]; then
+      slots=$((slots + 1))
+      eval "SLOT${slots}_ID=\"$vid\"; SLOT${slots}_FREE=$vfree; SLOT${slots}_KINDS=\"$kind\""
+    fi
+  done
+
+  local state="green" worst_need=0 worst_free=0 need
+  i=1
+  while [ "$i" -le "$slots" ]; do
+    eval "skinds=\$SLOT${i}_KINDS; sfree=\$SLOT${i}_FREE"
+    need=0
+    case " $skinds " in
+      *" home "*"ai "*|*" ai "*" home "*) need=$total_need ;;
+      *" home "*) need=$home_need ;;
+      *" ai "*) need=$ai_need ;;
+    esac
+    case " $skinds " in *" data "*) need=$((need + DATA_RESERVE_BYTES)) ;; esac
+    if [ "$sfree" -lt "$need" ]; then
+      state="red"; worst_need=$need; worst_free=$sfree; break
+    elif [ "$sfree" -lt $((need + headroom)) ] && [ "$state" = "green" ]; then
+      state="amber"; worst_need=$need; worst_free=$sfree
+    fi
+    if [ "$state" = "green" ]; then worst_need=$need; worst_free=$sfree; fi
+    i=$((i + 1))
+  done
+  [ "$slots" -gt 0 ] || return 0
+
+  if [ "$state" = "red" ]; then
+    DISK_PROBLEM="This computer needs about $(gb_text "$worst_need" up) GB free for ${what}; it has $(gb_text "$worst_free" down) GB. Free up space (empty the Trash, remove large files), or choose a smaller plan with --plan moderate or --plan minimal. Then run the installer again."
+    log "error: not enough free disk space: ${DISK_PROBLEM}"
+    return 1
+  fi
+  if [ "$state" = "amber" ]; then
+    log "Warning: disk space is tight. ${what} needs about $(gb_text "$worst_need" up) GB and this computer has $(gb_text "$worst_free" down) GB free. Your chats, pictures and updates need room too."
+  else
+    log "Disk space: $(gb_text "$worst_free" down) GB free, about $(gb_text "$worst_need" up) GB needed for ${what} (the ${tier} plan)."
+  fi
+  return 0
+}
+
+# The plan level the disk check uses: --plan or MAIPAI_PLAN, else the one an
+# earlier run saved, else Recommended (the installer's default).
+disk_check_level() {
+  local requested="$1" root="$2" saved
+  if [ -n "$requested" ]; then echo "$requested"; return 0; fi
+  saved=$(cat "${root}/data/setup-plan" 2>/dev/null || true)
+  if valid_plan "$saved"; then echo "$saved"; else echo recommended; fi
+}
+
+# The table for a disk check: the copy in an installed Home when it has one,
+# otherwise the release's (fetch_disk_plan).
+disk_plan_file_for() {
+  local root="$1" tag="$2"
+  if [ -r "${root}/shared/diskPlan.json" ]; then echo "${root}/shared/diskPlan.json"; else fetch_disk_plan "$tag"; fi
 }
 
 # macOS only. A downloaded binary carries the quarantine flag and an
@@ -1279,7 +1464,7 @@ stack_main() {
 
   if [ "$dry_run" = "yes" ]; then
     log "[dry-run] MaiPai Stack install plan for ${os}/${arch} at ${install_root}"
-    log "[dry-run] checks before any change: required tools, a logged-in desktop session (macOS), ${STACK_REQUIRED_GB} GB free disk for the build"
+    log "[dry-run] checks before any change: required tools, a logged-in desktop session (macOS), free disk for the AI engine program (sized by the disk plan table, shared/diskPlan.json)"
     log "[dry-run] Stack port ${STACK_PORT_BASE} (or the next free one)"
     log "[dry-run] STACK_TAG=${STACK_TAG}"
     setup_stack "$install_root" "$bun_bin" "$os" "$arch" "yes"
@@ -1298,7 +1483,13 @@ stack_main() {
   STACK_PROBLEM=""
   CONSOLE_FIX_HINT="press Try again in the setup wizard, or run: sudo bash ${install_root}/scripts/install.sh --stack-only"
   if ! check_console_session "$os"; then STACK_PROBLEM="$CONSOLE_PROBLEM"; return 1; fi
-  if ! check_disk_space "$install_root" "$STACK_REQUIRED_GB" "the AI engine"; then STACK_PROBLEM="$DISK_PROBLEM"; return 1; fi
+  local engine_plan_file
+  engine_plan_file=$(disk_plan_file_for "$install_root" "$STACK_TAG")
+  if [ -n "$engine_plan_file" ]; then
+    if ! check_plan_disk "$engine_plan_file" "$(disk_check_level "" "$install_root")" home "$os" "$install_root"; then STACK_PROBLEM="$DISK_PROBLEM"; return 1; fi
+  else
+    log "Could not read the disk sizes for this release; continuing. The setup wizard checks the disk again before it downloads."
+  fi
 
   # Bun is part of Home's own install; this only fills a gap.
   [ -x "$bun_bin" ] || { STACK_PROBLEM="Home's Bun runtime is missing at ${bun_bin}. Run the installer again, then press Try again."; return 1; }
@@ -1375,6 +1566,7 @@ main() {
         log "With no option this brings up MaiPai Home only. The setup wizard then installs the AI engine (the MaiPai Stack) if this computer should run it."
         log "--stack-only installs just the AI engine on a computer that already runs Home. The setup wizard runs it for you; run it by hand only if the wizard says to."
         log "You can also set MAIPAI_PLAN to recommended, moderate, or minimal. The setup wizard still runs its checks before downloads."
+        log "Free disk: the installer checks the plan against the disks that will hold Home, its data and the AI (the installed size, 20 percent more, and the space an install uses while it runs). A smaller plan needs less: --plan moderate or --plan minimal. The setup wizard shows each part with its size."
         log "--version installs a specific release instead of the latest. --rollback goes back to the previous release and the data copy taken before the last upgrade."
         log "MAIPAI_PORT (default 3000) and MAIPAI_STACK_PORT (default 8770) change the ports."
         exit 0 ;;
@@ -1429,7 +1621,12 @@ main() {
     local install_root
     [ "$os" = "linux" ] && install_root="$INSTALL_ROOT_LINUX" || install_root="$INSTALL_ROOT_DARWIN"
     log "[dry-run] MaiPai Home install plan for ${os}/${arch} at ${install_root}"
-    log "[dry-run] checks before any change: required tools, ${HOME_REQUIRED_GB} GB free disk"
+    log "[dry-run] checks before any change: required tools, free disk for the plan (sized by the disk plan table, shared/diskPlan.json: Home, the AI engine, its models, plus 20 percent and install space)"
+    local dry_plan_file
+    dry_plan_file=$(fetch_disk_plan main)
+    if [ -n "$dry_plan_file" ]; then
+      check_plan_disk "$dry_plan_file" "$(disk_check_level "$requested_plan" "$install_root")" full "$os" "$install_root" || log "[dry-run] a real run would stop here: ${DISK_PROBLEM}"
+    fi
     log "[dry-run] Home port ${APP_PORT} (or the next free one)"
     ensure_deno "$install_root" "$os" "$arch" yes
     record_setup_plan "${install_root}/data" "$requested_plan" yes
@@ -1471,13 +1668,23 @@ main() {
   # An earlier install that already has a Stack rebuilds it in this run (an
   # upgrade, a rollback or a resume), so it needs the desktop session and the
   # room for the build. A fresh install has neither: Home only.
-  local has_stack="no" disk_need="$HOME_REQUIRED_GB"
+  local has_stack="no"
   if [ -f "${install_root}/stack/.user" ]; then
     has_stack="yes"
-    disk_need=$((HOME_REQUIRED_GB + STACK_REQUIRED_GB))
     check_console_session "$os" || exit 1
   fi
-  check_disk_space "$install_root" "$disk_need" "$( [ "$has_stack" = yes ] && echo 'Home and the AI engine' || echo Home )" || exit 1
+  # Free disk, sized by the disk plan table (INSTALL-DISK-01): a fresh install
+  # for the whole plan (Home, the AI engine, its models, plus 20 percent and
+  # the space an install needs while it runs); an upgrade, a resume or a
+  # rollback for Home and the AI engine program only.
+  local disk_scope="home" plan_file
+  [ "$kind" = "fresh" ] && disk_scope="full"
+  plan_file=$(disk_plan_file_for "$install_root" "$tag")
+  if [ -n "$plan_file" ]; then
+    check_plan_disk "$plan_file" "$(disk_check_level "$requested_plan" "$install_root")" "$disk_scope" "$os" "$install_root" || exit 1
+  else
+    log "Could not read the disk sizes for ${tag}; continuing. The setup wizard checks the disk again before it downloads."
+  fi
 
   record_setup_plan "${install_root}/data" "$requested_plan" no
 

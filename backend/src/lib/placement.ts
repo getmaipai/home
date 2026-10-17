@@ -1,10 +1,11 @@
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readdirSync, statSync } from "node:fs";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { probeExec, probeHardlink, probeLargeFile, probePermissions, probeSymlink, probeWrite } from "@maipai/core/src/probes";
 import { diskFacts as readDiskFacts, type DiskFacts } from "@maipai/core/src/diskFacts";
 import { readFolderMarker } from "@maipai/core/src/dataLocation";
 import { DATA_CLASSES } from "./dataClasses";
-import { classDir, PACKAGES_DIR } from "./paths";
+import { classDir } from "./paths";
+import { aiRequiredBytes, recordedLevel, shippedPlanForLevel } from "./diskPlan";
 
 export type PlacementRow = { class: string; kind: "refusal" | "warning" | "unknown"; id: string; text: string; fix: string };
 export interface PlacementOptions {
@@ -12,6 +13,8 @@ export interface PlacementOptions {
   householdFolderId?: string;
   reference?: readonly { sizeBytes?: number; approx_bytes?: number }[];
   models?: readonly string[];
+  /** The free space the models folder needs, when the caller knows it from the Stack's own plan. */
+  modelsRequiredBytes?: number;
   growthBytesLast30Days?: Record<string, number>;
   runAs?: string;
   facts?: (path: string) => Promise<DiskFacts>;
@@ -20,33 +23,21 @@ export interface PlacementOptions {
 
 const GB = 1_000_000_000;
 const MB = 1_000_000;
-const CATALOG_MODEL_INDEX = resolve(PACKAGES_DIR, "../../../catalog/models/index.json");
 const IRREPLACEABLE = ["records", "keys", "people-files", "cloned-voices", "projects", "packages"];
 
 function row(cls: string, check: string, kind: PlacementRow["kind"], text: string, fix: string): PlacementRow {
   return { class: cls, kind, id: `${check}:${cls}`, text, fix };
 }
 
+/** The free space the AI's models and engines ask of their disk: the disk plan for the recorded plan level on this computer (their installed
+ * size, 20 percent more, and the space an install needs while it runs). The same number the installer, the setup checks and the plan step use. */
 export function defaultModelBytes(opts: PlacementOptions = {}): number {
-  try {
-    const index = JSON.parse(readFileSync(CATALOG_MODEL_INDEX, "utf8")) as { models?: Array<{ id: string; profile?: string; download?: { approx_bytes?: number } }> };
-    const chosen = opts.models?.length ? new Set(opts.models) : null;
-    return (index.models ?? []).filter((m) => {
-      if (chosen) return chosen.has(m.id);
-      if (m.profile !== "p16") return false;
-      const role = (m as { role?: string }).role;
-      if (role === "chat") return process.platform === "darwin" ? m.id.includes("mlx") : !m.id.includes("mlx");
-      return role === "stt" || role === "tts";
-    })
-      .reduce((sum, m) => sum + (m.download?.approx_bytes ?? 0), 0);
-  } catch {
-    return 0;
-  }
+  return opts.modelsRequiredBytes ?? aiRequiredBytes(shippedPlanForLevel(recordedLevel()));
 }
 
 export function minimum(id: string, opts: PlacementOptions = {}): number {
   if (id === "records") return 2 * GB;
-  if (id === "models") return Math.ceil(defaultModelBytes(opts) * 1.1);
+  if (id === "models") return defaultModelBytes(opts);
   if (id === "reference") return opts.reference?.length ? opts.reference.reduce((n, item) => n + (item.sizeBytes ?? item.approx_bytes ?? 0), 0) : GB;
   if (id === "backups") return Math.max(2 * GB, 5 * databaseBytes());
   return 200 * MB;

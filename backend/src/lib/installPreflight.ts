@@ -1,8 +1,10 @@
 import { readFileSync } from "node:fs";
-import { homedir, freemem, totalmem } from "node:os";
+import { freemem, totalmem } from "node:os";
 import { createConnection } from "node:net";
 import { hubLockPath } from "./instanceLock";
 import { homePort } from "./ports";
+import { defaultDiskPaths, planVolumes, recordedLevel, setupDiskVerdict, shippedPlanForLevel, type DiskIo, type DiskLevel, type DiskPaths } from "./diskPlan";
+import { needGb } from "../../../shared/diskPlanMath";
 
 export type PreflightSeverity = "critical" | "error" | "warning";
 export type InstallPreflightRow = {
@@ -23,7 +25,16 @@ export type InstallPreflightOptions = {
   releaseHost?: string;
   lockPath?: string;
   port?: number;
-  freeBytes?: () => number | null;
+  /** Free bytes on the disk that holds a folder (the real reading is statfs of the nearest folder that exists). */
+  freeBytes?: (path: string) => number | null;
+  /** The disk a folder is on, to tell which folders share one. */
+  device?: DiskIo["device"];
+  /** The plan level whose size is checked; defaults to the level the installer recorded, then Recommended. */
+  level?: DiskLevel;
+  /** Where the program, Home's data and the AI's files will be; defaults to this install. */
+  paths?: DiskPaths;
+  /** Memory in bytes and platform, to pick the plan the computer can run. */
+  machine?: { platform?: string; totalMemoryBytes?: number; graphicsGb?: () => number | null };
   memoryBytes?: () => { free: number; total: number };
   systemVersion?: () => string;
   lockInfo?: () => { pid: number; port?: number } | null;
@@ -45,13 +56,18 @@ function row(opts: InstallPreflightOptions, code: string, severity: PreflightSev
   return { id: `install.${code}`, code: `install.${code}`, severity, message: text, title, text, since: since(opts), cause, ...(severity ? { fix: { label: fix, action: "retry_download" as const } } : {}) };
 }
 
-function defaultFreeBytes(): number | null {
-  try {
-    const output = Bun.spawnSync(["df", "-Pk", homedir()], { stdout: "pipe", stderr: "ignore" });
-    const lines = output.stdout.toString().trim().split(/\r?\n/);
-    const fields = lines.at(-1)?.trim().split(/\s+/);
-    return fields?.[3] ? Number(fields[3]) * 1024 : null;
-  } catch { return null; }
+/** The disk row: what the chosen plan level needs (its installed size, 20 percent more, and the peak temporary space), against the
+ * free space of every disk that holds Home's program, Home's data folder or the AI's files. */
+function diskRow(opts: InstallPreflightOptions): InstallPreflightRow {
+  const level = opts.level ?? recordedLevel();
+  const plan = shippedPlanForLevel(level, opts.machine);
+  const volumes = planVolumes(opts.paths ?? defaultDiskPaths(), { freeBytes: opts.freeBytes, device: opts.device });
+  const verdict = setupDiskVerdict(plan, plan.default_selected, volumes);
+  const cause = `The ${level} plan on this computer is the ${plan.tier} plan: ${needGb(verdict.requiredBytes)} GB asked for (installed size, 20 percent more, and the space an install needs while it runs); ${verdict.freeBytes === null ? "free space unknown" : `${needGb(verdict.freeBytes)} GB free`}.`;
+  if (volumes.every((volume) => volume.freeBytes === null)) return row(opts, "disk.unknown", "warning", "Free disk space is unknown", verdict.text, cause, "Check storage in system settings.");
+  if (verdict.state === "red") return row(opts, "disk.low", "error", "This computer is low on disk space", verdict.text, cause, `${verdict.fix}. To install less, run the installer with --plan moderate or --plan minimal.`);
+  if (verdict.state === "amber") return row(opts, "disk.tight", "warning", "Disk space is tight", verdict.text, cause, verdict.fix);
+  return row(opts, "disk.ok", null, "Disk space", verdict.text, cause, "");
 }
 
 function defaultLockInfo(path: string): { pid: number; port?: number } | null {
@@ -92,13 +108,8 @@ export async function checkInstallPreflight(opts: InstallPreflightOptions = {}):
     (opts.portBusy ?? tcpBusy)(port),
     (opts.reachReleaseHost ?? plainHostReach)(releaseHost),
   ]);
-  const disk = (opts.freeBytes ?? defaultFreeBytes)();
   return [
-    disk === null
-      ? row(opts, "disk.unknown", "warning", "Free disk space is unknown", "Home could not read the free space on this computer.", "The operating system did not report free disk space.", "Check storage in system settings.")
-      : disk < 2 * GB
-        ? row(opts, "disk.low", "error", "This computer is low on disk space", "Free at least 2 GB before installing Home.", `Only ${(disk / GB).toFixed(1)} GB is free.`, "Free at least 2 GB, then try again.")
-        : row(opts, "disk.ok", null, "Disk space", `${(disk / GB).toFixed(1)} GB is free; this check passed.`, "The home volume has at least 2 GB free.", ""),
+    diskRow(opts),
     mem.total < 4 * GB
       ? row(opts, "memory.low", "error", "This computer has too little memory", "Home needs at least 4 GB of memory to install.", `${(mem.total / GB).toFixed(1)} GB of memory is available in total.`, "Use a computer with at least 4 GB of memory.")
       : mem.free < 512 * 1024 * 1024

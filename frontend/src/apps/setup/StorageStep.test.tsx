@@ -13,7 +13,7 @@ function setup(rows: unknown[] = [], native: unknown = { status: "unavailable" }
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     calls.push(`${init?.method ?? "GET"} ${url}${init?.body ? ` ${String(init.body)}` : ""}`);
-    if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/Users/me/maipai/data", models: "/Users/me/maipai/data/models", chosen }), { status: 200 });
+    if (url.includes("/api/setup/storage/defaults")) return new Response(JSON.stringify({ records: "/Users/me/maipai/data", models: "/Users/me/maipai/data/models", models_need_bytes: 89 * 1024 ** 3, chosen }), { status: 200 });
     if (url.includes("/api/setup/folders/native")) return new Response(JSON.stringify(native), { status: 200 });
     if (url.includes("/api/setup/storage/check")) return new Response(JSON.stringify({ rows }), { status: 200 });
     if (url.includes("/api/setup/folders") && init?.method === "POST") return new Response(JSON.stringify({ name: "Models", path: "/Disks/Models", writable: true }), { status: 200 });
@@ -32,6 +32,15 @@ function Host({ split = false, report }: { split?: boolean; report: (value: Stor
 }
 
 describe("StorageStep", () => {
+  test("the models card says how much room the plan needs, from the server's figure and not a fixed number", async () => {
+    const h = setup();
+    try {
+      const view = render(<Host report={() => {}} />);
+      await waitFor(() => expect(view.container.textContent).toContain("Plan for about 89 GB free there."));
+      expect(view.container.textContent).not.toContain("200 GB");
+    } finally { h.restore(); }
+  });
+
   test("one computer shows both folders with the default kept, and nothing blocks Continue", async () => {
     const h = setup();
     try {

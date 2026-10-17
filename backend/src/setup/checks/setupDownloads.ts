@@ -1,5 +1,5 @@
 import { getStackClient } from "@/lib/stackEngine";
-import { getSetupState, resolveMemoryGb } from "@/lib/setupState";
+import { getInstallSelection, getSetupState, resolveMemoryGb } from "@/lib/setupState";
 import type { StackInstallPlan } from "@/lib/stack/client";
 
 type DownloadPin = { id: string; role: string; repo?: string; license?: string; licence?: string; revision: string; engine?: string; component?: string; download?: { url: string; sha256: string; approx_bytes?: number; archive?: boolean; hub_file?: string } };
@@ -27,14 +27,30 @@ function planRoles(): string[] {
 
 type PullBody = Parameters<SetupDownloadClient["pullModel"]>[0];
 
+/** The pull bodies of the plan's rows the person kept on (the disk plan's row ids): the first-run models of those rows and the
+ * picture and video files of those rows. A model no row names is kept, so a Stack newer than this Home never loses a file. */
+export function selectedPulls(plan: StackInstallPlan, selected?: readonly string[]): StackInstallPlan["models"] {
+  const rows = plan.disk?.rows ?? [];
+  const chosen = new Set(selected ?? []);
+  const keep = (id: string) => {
+    if (!selected || rows.length === 0) return true;
+    const row = rows.find((candidate) => candidate.model_ids.includes(id));
+    return !row || chosen.has(row.id);
+  };
+  const first = plan.models.filter((model) => !model.installed && keep(model.id));
+  // The picture and video rows only when the person turned them on (they are not part of the first-run set).
+  const extra = selected ? (plan.optional_models ?? []).filter((model) => !model.installed && rows.some((row) => chosen.has(row.id) && row.model_ids.includes(model.id))) : [];
+  return [...first, ...extra];
+}
+
 /** The Stack's plan wins: it knows the hardware level and the pinned model
  * for each role. A Stack without a plan route falls back to the role list. */
-async function plannedPulls(client: SetupDownloadClient, vramGb?: number): Promise<PullBody[]> {
+async function plannedPulls(client: SetupDownloadClient, vramGb?: number, rowIds?: readonly string[]): Promise<PullBody[]> {
   if (client.installPlan) {
     try {
       const plan = await client.installPlan(vramGb ? { vramGb } : undefined);
       if (plan.level) {
-        return plan.models.filter((model) => !model.installed).map(({ starter: _starter, installed: _installed, ...body }) => body as PullBody);
+        return selectedPulls(plan, rowIds).map(({ starter: _starter, installed: _installed, ...body }) => body as PullBody);
       }
     } catch { /* An older Stack has no plan route; use the role list below. */ }
   }
@@ -46,12 +62,15 @@ async function plannedPulls(client: SetupDownloadClient, vramGb?: number): Promi
   return selected.map((pin) => ({ id: pin.id, role: pin.role, ...(pin.repo ? { repo: pin.repo } : {}), url: pin.download!.url, sha256: pin.download!.sha256, ...(pin.download!.approx_bytes !== undefined ? { approx_bytes: pin.download!.approx_bytes } : {}), licence: pin.license ?? pin.licence ?? "", revision: pin.revision, ...(pin.engine ? { engine: pin.engine } : {}), ...(pin.download!.archive ? { archive: true } : {}), ...(pin.download!.hub_file ? { hub_file: pin.download!.hub_file } : {}), ...(pin.component ? { component: pin.component } : {}) }) as PullBody);
 }
 
-export async function startSetupDownloads(client: SetupDownloadClient = getStackClient(), options: { vramGb?: number } = {}): Promise<number> {
+/** `selected`: the disk plan's row ids to install. Without it, the choice saved at the plan step; without that, the first-run set. */
+export async function startSetupDownloads(client: SetupDownloadClient = getStackClient(), options: { vramGb?: number; selected?: readonly string[] } = {}): Promise<number> {
   // No number given: use the memory answer saved when the plan was chosen.
-  const pulls = await plannedPulls(client, resolveMemoryGb(options.vramGb));
+  const pulls = await plannedPulls(client, resolveMemoryGb(options.vramGb), options.selected ?? getInstallSelection());
   // Models are useless without the engine build that runs them: the Stack
-  // never fetches one on its own, so install each named engine first.
-  const engines = [...new Set(pulls.map((pull) => pull.engine).filter((name): name is string => Boolean(name)))];
+  // never fetches one on its own, so install each named engine first. The
+  // picture engine (mflux) has no download of its own: the Stack builds it
+  // when the first picture is made.
+  const engines = [...new Set(pulls.map((pull) => pull.engine).filter((name): name is string => Boolean(name) && name !== "mflux"))];
   if (client.engineAction) {
     for (const name of engines) {
       try { await client.engineAction(name, "install"); }

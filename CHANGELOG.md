@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Install
+- The installer and the setup wizard size the disk from one table (`shared/diskPlan.json`, from the AI engine's pins and measured install sizes) instead of "3 GB". A fresh install checks the whole plan (`--plan`, default Recommended, capped by the computer's memory), each disk that holds Home, its data folder or the AI on its own, with 20 percent more and the room an install uses while it runs. Too little room stops before any change with the figures and `--plan moderate` or `--plan minimal`; low headroom warns.
+- The wizard's plan screen lists every install with its size (Make videos, Make pictures, Chatterbox voice, the chat AI and the rest), the total, the free space and a green, amber or red check. Turning an extra off lowers the total and the files it would download. The storage step and the checks screen use the same numbers.
+
 ## [0.2.12] - 2026-10-17
 
 Chat moves to a faster engine, and the picture card looks better while a picture is made.

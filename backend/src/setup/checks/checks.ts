@@ -4,9 +4,9 @@ import { checkInstallPreflight, isSupportedInstallPlatform } from "@/lib/install
 import { getStackClient, isRemoteStackSelected } from "@/lib/stackEngine";
 import { getEngineLinkState } from "@/lib/stack/link";
 import { classDir } from "@/lib/paths";
-import { checkModelDisk, checkHubDisk } from "./placementDiskChecks";
+import { checkHubDisk } from "./placementDiskChecks";
 import { checkNvidiaSysmemFallback, type NvidiaSysmemFallbackReader } from "./nvidiaSysmemFallback";
-import { minimum, defaultModelBytes } from "@/lib/placement";
+import { planDiskCheck } from "./planDisk";
 import { getTailscaleStatus } from "@/lib/tailscale";
 import { REMOTE_ENGINE_HOST_KEY, REMOTE_ALLOW_TAILNET_KEY } from "@/lib/remoteStackSettings";
 import { getEngineLink } from "@/lib/stack/link";
@@ -126,14 +126,14 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
     rows.push(makeRow("memory", "Computer", enough ? "green" : "red", enough ? "This computer can run Home's AI." : !supported ? "This computer isn't supported for MaiPai Home's AI." : "This computer has less than the 4 GB of memory Home needs.", !supported ? "The platform is not supported." : "Total memory is under 4 GB.", "Use a supported computer", now));
   } else rows.push(makeRow("memory", "Computer", !engineOk || !supported || !level ? "red" : "green", !engineOk ? "Home can't check this until the AI engine is answering. Start it, then press Try again." : !supported || !level ? "This computer is below the Minimal level MaiPai Home needs." : `This computer meets the ${level} level.`, !supported ? "The Stack platform is not supported." : level ? `The Stack proposed ${level}.` : "The Stack did not propose a supported level.", "Use a supported computer", now));
 
-  let modelDisk: Awaited<ReturnType<NonNullable<CheckDeps["modelDisk"]>>> = { status: "red", message: "Choose a disk for AI models before continuing." };
+  let modelDisk: Awaited<ReturnType<NonNullable<CheckDeps["modelDisk"]>>>;
   if (deps.modelDisk) modelDisk = await deps.modelDisk();
-  else if (typeof hw?.freeDiskBytes === "number") {
-    const enough = hw.freeDiskBytes >= minimum("models", { models: await selectedModelIds(deps) });
-    modelDisk = { status: enough ? "green" : "red", message: enough ? "There is enough free space for the Minimal plan." : "There isn't room for the AI models on that disk.", fix: enough ? undefined : "Choose a disk with more free space." };
+  else {
+    let stackPlan = null;
+    if (!beforeInstall) { try { stackPlan = await getStackClient().installPlan(); } catch { /* an older or unreachable Stack: the table shipped with Home answers */ } }
+    modelDisk = planDiskCheck({ stackPlan, aiElsewhere: remote, ...(typeof hw?.freeDiskBytes === "number" ? { aiFreeBytes: hw.freeDiskBytes } : {}) });
   }
-  else if (!remote) modelDisk = await checkModelDisk(classDir("models"));
-  rows.push(makeRow("model-disk", "Free disk for models", modelDisk.status, modelDisk.message ?? "There is enough free space for the AI models.", modelDisk.message ?? "The model disk meets placement requirements.", modelDisk.fix, now));
+  rows.push(makeRow("model-disk", "Free disk space", modelDisk.status, modelDisk.message ?? "There is enough free space for the AI models.", modelDisk.message ?? "The model disk meets placement requirements.", modelDisk.fix, now));
 
   const nvidiaResult = remote && !deps.nvidia ? { status: "idle" as const, message: "Checked when downloads start." } : await checkNvidiaSysmemFallback(deps.nvidia ?? { hasNvidiaGpu: async () => false, isSysmemFallbackEnabled: async () => false });
   rows.push(makeRow("graphics-driver", "Graphics driver", nvidiaResult.status === "idle" ? "idle" : nvidiaResult.status, nvidiaResult.message ?? (nvidiaResult.status === "idle" ? "Not checked on this computer." : "The NVIDIA driver is ready."), nvidiaResult.message ?? "NVIDIA fallback policy check.", undefined, now));
@@ -188,14 +188,6 @@ export async function runSetupChecks(deps: CheckDeps = {}): Promise<SetupCheck[]
   }
   rows.push(...await searchRows(deps, now));
   return rows;
-}
-
-async function selectedModelIds(deps: CheckDeps): Promise<string[]> {
-  try {
-    const catalog = await (deps.catalog ?? (() => getStackClient().modelCatalog()))();
-    const models = Array.isArray(catalog.models) ? catalog.models as Array<Record<string, unknown>> : [];
-    return models.filter((model) => typeof model.id === "string").map((model) => String(model.id));
-  } catch { return []; }
 }
 
 export function healthItems(rows: readonly SetupCheck[]) {

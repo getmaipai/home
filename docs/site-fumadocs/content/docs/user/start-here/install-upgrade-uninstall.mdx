@@ -8,16 +8,20 @@ description: Put MaiPai Home on a Mac, update it, go back a version, remove it, 
 Use the Mac itself. You need three things:
 
 - A Mac with Apple silicon or Intel, and an internet connection.
-- 3 GB of free disk space for Home. The installer checks this first.
+- Free disk space for the plan you choose. The installer checks it first, with the table below.
 - An account that can use `sudo` (an administrator).
 
-The AI engine is a separate step that Home does for you later, inside the setup wizard, and only if this computer runs the AI. It needs 6 GB more to build, plus room for the AI models.
+The installer and the setup wizard size the disk from one table. It adds up what each part takes once installed, 20 percent more, and the room an install uses while it runs (downloads being unpacked, Python tools being built), plus 2 GB for Home's own records. The installer checks the disk that holds Home, the disk that holds Home's data folder and the disk that holds the AI, so a data folder on another disk is judged by that disk. If there is not enough room it stops before it changes anything and says how much it needs and how much you have. If the room is enough but close, it warns and goes on.
 
-| Plan | Free space needed for the models |
-|---|---|
-| Recommended | 26 GB |
-| Moderate | 19 GB |
-| Minimal | 14 GB |
+| Plan | For a Mac with | Free space needed |
+|---|---|---|
+| Recommended | 64 GB of memory or more | 85 GB |
+| Moderate | 32 GB | 34 GB |
+| Minimal | 16 or 24 GB | 16 GB |
+
+A Mac with 128 GB of memory can also add two optional extras on the wizard's plan screen: more picture styles (Z-Image Turbo) and making videos. Adding both brings the Recommended plan to about 151 GB. The plan screen shows each part with its size, the total, and the free space on this computer. It turns the check green, amber or red as you turn parts on and off. Choose a smaller plan with `--plan moderate` or `--plan minimal` if the installer says there is not enough room.
+
+Home itself, with the AI engine program that runs the models, takes about 1.5 GB. The rest is the AI models and the tools they run on. The wizard installs the AI engine later, only if this computer runs the AI.
 
 You do not need Homebrew. You do not need to install anything else first.
 

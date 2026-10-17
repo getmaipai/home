@@ -5,7 +5,11 @@ const fixed = (patch: Partial<InstallPreflightOptions> = {}): InstallPreflightOp
   platform: "linux",
   releaseHost: "github.com",
   port: 3000,
-  freeBytes: () => 8_000_000_000,
+  freeBytes: () => 100_000_000_000,
+  device: () => 1,
+  level: "minimal",
+  machine: { platform: "linux", graphicsGb: () => 16 },
+  paths: { program: "/opt/home", data: "/opt/home/data", ai: "/opt/home/stack/data" },
   memoryBytes: () => ({ free: 4_000_000_000, total: 16_000_000_000 }),
   systemVersion: () => "Linux test",
   lockInfo: () => null,
@@ -39,8 +43,9 @@ describe("checkInstallPreflight", () => {
   });
 
   test.each([
-    ["disk", { freeBytes: () => 8_000_000_000 }, null],
-    ["disk", { freeBytes: () => 1_000_000_000 }, "error"],
+    ["disk", { freeBytes: () => 100_000_000_000 }, null],
+    ["disk", { freeBytes: () => 8_000_000_000 }, "error"],
+    ["disk", { freeBytes: () => 19_000_000_000 }, "warning"],
     ["disk", { freeBytes: () => null }, "warning"],
     ["memory", { memoryBytes: () => ({ free: 4_000_000_000, total: 16_000_000_000 }) }, null],
     ["memory", { memoryBytes: () => ({ free: 4_000_000_000, total: 2_000_000_000 }) }, "error"],

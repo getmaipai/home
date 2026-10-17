@@ -76,7 +76,7 @@ const planRoute = createRoute({
   middleware: [requireAuth] as const, request: { query: planQuery },
   responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: z.object({
     level: z.enum(["recommended", "moderate", "minimal", "below_minimum", "unknown"]), headline: z.string(), detail: z.string(),
-    gets: z.array(z.string()), needsMemoryAnswer: z.boolean(), sizeLine: z.string().nullable(), diskLine: z.string().nullable(),
+    gets: z.array(z.string()), needsMemoryAnswer: z.boolean(), sizeLine: z.string().nullable(), diskLine: z.string().nullable(), disk: z.unknown().nullable(),
   }) }) } }, description: "The Stack's plan and Home's words for it." } },
 });
 installRoutes.openapi(planRoute, async (c) => c.json(await previewPlan(c.req.valid("query").vram_gb), 200));
@@ -84,7 +84,7 @@ installRoutes.openapi(planRoute, async (c) => c.json(await previewPlan(c.req.val
 const startRoute = createRoute({
   method: "post", path: "/start", tags: ["Install"], summary: "Download the plan's AI models (change or add the AI)",
   middleware: [requireAuth] as const,
-  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional() }).strict() } } } },
+  request: { body: { content: { "application/json": { schema: z.object({ vram_gb: z.number().int().min(1).max(512).optional(), components: z.array(z.string()).optional().openapi({ description: "The disk plan rows to install; omitted means the plan's defaults." }) }).strict() } } } },
   responses: {
     202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number() }) } }, description: "The downloads started in the background." },
     ...errorResponses({ 403: "Only an owner or admin may do this", 409: "There is nothing the AI can install on this computer" }),
@@ -92,7 +92,8 @@ const startRoute = createRoute({
 });
 installRoutes.openapi(startRoute, async (c) => {
   if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "Only an owner or admin can change the AI." }, 403);
-  const result = await beginInstall(c.req.valid("json").vram_gb, false);
+  const body = c.req.valid("json");
+  const result = await beginInstall(body.vram_gb, false, body.components);
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   return c.json({ started: true as const, models: result.models }, 202);
 });

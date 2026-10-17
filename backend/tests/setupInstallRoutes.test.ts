@@ -55,9 +55,11 @@ describe("setup install routes", () => {
   });
 
   test("POST /api/setup/install refuses when the disk is too small", async () => {
-    __setStackClientForTests(stack(async () => plan({ fits_disk: false })));
+    __setStackClientForTests(stack(async () => plan({ free_disk_bytes: 5 * 1024 ** 3 })));
     const client = new TestClient();
-    expect((await client.post("/api/setup/install", {})).status).toBe(409);
+    const response = await client.post("/api/setup/install", {});
+    expect(response.status).toBe(409);
+    expect((await response.json() as { error: string }).error).toMatch(/^This computer needs about \d+ GB free for the minimal setup; it has 5\.0 GB\. Free up space, or choose a smaller plan\.$/);
   });
 
   test("POST /api/setup/install is closed once Home has an owner", async () => {

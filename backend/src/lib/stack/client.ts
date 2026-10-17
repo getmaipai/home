@@ -9,6 +9,7 @@ import { hostLabel, type EngineIdentity } from "../engineIdentity";
 import { StackError, type StackErrorKind } from "./errors";
 import { defaultStackBaseUrl } from "../ports";
 import { StackVoiceSchema } from "./types";
+import type { DiskPlan } from "../../../../shared/diskPlanMath";
 import type { TokenCountRequest, TokenCountResponse } from "@maipai/spec/stack/ts/token-count.js";
 import type {
   RoleRequest,
@@ -57,6 +58,10 @@ export interface StackInstallPlan {
   remaining_bytes: number;
   free_disk_bytes: number | null;
   fits_disk: boolean | null;
+  /** What each install costs on disk, per component (the Stack's disk plan); absent on a Stack older than the disk plan. */
+  disk?: DiskPlan | null;
+  /** The pinned files of the picture and video rows, shaped as pull bodies; not in `models`. */
+  optional_models?: StackInstallModel[];
 }
 
 /** The shape of GET /stack/v1/search `ddgs`: `url` is set only while `state` is "ready". */

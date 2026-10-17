@@ -14,28 +14,27 @@ import { createFolder, listFolder, validateProposedPath } from "@/lib/folderBrow
 import { checkPlacement } from "@/lib/placement";
 import { classDir } from "@/lib/paths";
 import { chooseNativeFolder } from "@/lib/nativeFolderDialog";
-import { statfsSync, existsSync } from "node:fs";
-import { dirname } from "node:path";
+import { aiRequiredBytes, defaultDiskPaths, planVolumes, recordedLevel, shippedPlanForLevel, type DiskIo, type DiskPaths } from "@/lib/diskPlan";
+import { diskVerdict, freeGb, needGb, LEVEL_WORD } from "../../../shared/diskPlanMath";
 
-const GB = 1_000_000_000;
-/** What the wizard asks of a drive: Home's data is small; the AI models are about 200 GB. */
-const NEEDED = { records: { bytes: 2 * GB, name: "Home's data" }, models: { bytes: 200 * GB, name: "The AI models" } } as const;
-
-function freeBytesAt(path: string): number | null {
-  let at = path;
-  while (!existsSync(at) && dirname(at) !== at) at = dirname(at);
-  try { const s = statfsSync(at); return Number(s.bavail) * Number(s.bsize); } catch { return null; }
-}
-
-/** One plain refusal per folder, chosen or default, whose drive is too small. */
-function spaceRows(layout: { models?: string; records?: string }, split: boolean) {
+/** One plain refusal per folder, chosen or default, whose drive is too small for what will land on it: the disk plan for this
+ * computer's plan level (Home's files, the AI's models and engines, Home's records), counted per drive, so two folders on one
+ * drive are asked for the sum. The same numbers as the installer and the plan step. */
+export function spaceRows(layout: { models?: string; records?: string }, split: boolean, io: DiskIo = {}) {
   const rows: Array<{ class: string; kind: "refusal"; id: string; text: string; fix: string }> = [];
-  for (const id of (split ? ["records"] : ["records", "models"]) as Array<keyof typeof NEEDED>) {
-    const free = freeBytesAt(layout[id] ?? classDir(id));
-    if (free === null || free >= NEEDED[id].bytes) continue;
-    const need = Math.round(NEEDED[id].bytes / GB);
-    const have = Math.floor(free / GB);
-    rows.push({ class: id, kind: "refusal", id: `space-wizard:${id}`, text: `${NEEDED[id].name} needs about ${need} GB, and this drive has ${have} GB free. Choose a folder on a drive with more room.`, fix: "Choose a folder on a drive with more free space." });
+  const plan = shippedPlanForLevel(recordedLevel());
+  const paths: DiskPaths = { ...defaultDiskPaths(), data: layout.records ?? classDir("records"), ai: layout.models ?? classDir("models") };
+  const word = LEVEL_WORD[plan.level];
+  for (const volume of planVolumes(paths, io, { aiOnAnotherComputer: split })) {
+    // The AI on another computer is checked there, not here.
+    const needs = split ? volume.needs.filter((need) => need !== "ai") : volume.needs;
+    if (!needs.length) continue;
+    const verdict = diskVerdict(plan, plan.default_selected, [{ ...volume, needs }]);
+    if (verdict.state !== "red" || verdict.freeBytes === null) continue;
+    const classes = [...new Set(needs.map((need) => (need === "ai" ? "models" : "records")))];
+    for (const id of classes) {
+      rows.push({ class: id, kind: "refusal", id: `space-wizard:${id}`, text: `The ${word} setup needs about ${needGb(verdict.requiredBytes)} GB free on this drive, and it has ${freeGb(verdict.freeBytes)} GB. Choose a folder on a drive with more room.`, fix: "Choose a folder on a drive with more free space." });
+    }
   }
   return rows;
 }
@@ -147,10 +146,10 @@ setupFolderRoutes.openapi(checkRoute, async (c) => {
 
 const defaultsRoute = createRoute({
   method: "get", path: "/storage/defaults", tags: ["Setup"], summary: "The folders Home uses when none is chosen",
-  responses: { 200: { content: { "application/json": { schema: z.object({ records: z.string(), models: z.string(), chosen: z.object({ records: z.string().optional(), models: z.string().optional() }) }) } }, description: "Absolute paths, and the folders already chosen on this setup (empty when none)." }, ...errs },
+  responses: { 200: { content: { "application/json": { schema: z.object({ records: z.string(), models: z.string(), models_need_bytes: z.number().int(), chosen: z.object({ records: z.string().optional(), models: z.string().optional() }) }) } }, description: "Absolute paths, and the folders already chosen on this setup (empty when none)." }, ...errs },
 });
 setupFolderRoutes.openapi(defaultsRoute, (c) => {
   const refusal = accessRefusal(c);
   if (refusal) return refusal as never;
-  return c.json({ records: classDir("records"), models: classDir("models"), chosen: getStorageChoice() ?? {} }, 200);
+  return c.json({ records: classDir("records"), models: classDir("models"), models_need_bytes: aiRequiredBytes(shippedPlanForLevel(recordedLevel())), chosen: getStorageChoice() ?? {} }, 200);
 });
