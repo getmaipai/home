@@ -32,6 +32,7 @@ const ROLE_OPTIONS: NewPersonRole[] = ["owner", "adult", "teen", "child", "guest
 const NAME_ERROR = "Type a name for this person.";
 const SECRET_EMPTY_ERROR = "Type a PIN or password for this person so they can sign in.";
 const SECRET_LENGTH_ERROR = "Use 4 to 128 characters for the PIN or password.";
+const CONFIRM_ERROR = "The two passcodes are different. Type the same passcode in both boxes.";
 function secretProblem(value: string): string | null {
   if (value.length === 0) return SECRET_EMPTY_ERROR;
   return value.length < 4 || value.length > 128 ? SECRET_LENGTH_ERROR : null;
@@ -42,6 +43,8 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
   const [admin, setAdmin] = useState(false);
   const [displayName, setDisplayName] = useState("");
   const [secret, setSecret] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [confirmError, setConfirmError] = useState(false);
   const [nameError, setNameError] = useState(false);
   const [secretError, setSecretError] = useState<string | null>(null);
   const mayCreateAdmin = creatableRoles(actorRole).includes("admin");
@@ -59,11 +62,15 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
     const nameOk = validateName();
     const problem = checkSecret && secretRequired ? secretProblem(secret) : null;
     setSecretError(problem);
-    if (!nameOk || problem) return;
+    const mismatch = secretRequired && confirm !== secret;
+    setConfirmError(mismatch);
+    if (!nameOk || problem || mismatch) return;
     try {
       await onSubmit({ displayName, role: roleAdminToServerRole({ role, admin }), ...(secretRequired ? { secret } : {}) });
       setDisplayName("");
       setSecret("");
+      setConfirm("");
+      setConfirmError(false);
       setAdmin(false);
       setRole(fixedRole ?? (choices.includes("adult") ? "adult" : choices[0] ?? "adult"));
       setNameError(false);
@@ -102,9 +109,17 @@ export function NewPersonForm({ actorRole, fixedRole, onSubmit, submitLabel, bus
           <Input id="new-person-secret" type="password" placeholder="Enter a PIN or password" value={secret} disabled={busy}
             aria-label="PIN or password" required={!checkSecret}
             aria-invalid={secretError !== null} aria-describedby={secretError ? "new-person-secret-error" : undefined}
-            onChange={(event) => { setSecret(event.target.value); if (secretError) setSecretError(secretProblem(event.target.value)); }} />
+            onChange={(event) => { setSecret(event.target.value); if (secretError) setSecretError(secretProblem(event.target.value)); if (confirmError) setConfirmError(confirm !== event.target.value); }} />
           {secretError ? <FieldError id="new-person-secret-error">{secretError}</FieldError> : null}
           <FieldDescription>This person will use it to sign in.</FieldDescription>
+        </Field> : null}
+        {secretRequired ? <Field>
+          <FieldLabel htmlFor="new-person-confirm">Confirm passcode</FieldLabel>
+          <Input id="new-person-confirm" type="password" placeholder="Type it again" value={confirm} disabled={busy}
+            autoComplete="new-password" aria-invalid={confirmError} aria-describedby={confirmError ? "new-person-confirm-error" : undefined}
+            onChange={(event) => { setConfirm(event.target.value); if (confirmError) setConfirmError(event.target.value !== secret); }}
+            onBlur={() => { if (confirm.length > 0) setConfirmError(confirm !== secret); }} />
+          {confirmError ? <FieldError id="new-person-confirm-error">{CONFIRM_ERROR}</FieldError> : null}
         </Field> : null}
         {error ? <FieldError>{error}</FieldError> : null}
         {extra}

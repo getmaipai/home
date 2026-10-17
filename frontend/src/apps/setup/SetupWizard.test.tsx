@@ -186,6 +186,7 @@ describe("SetupWizard", () => {
       expect(rendered.container.textContent).toContain("Your AI");
       fireEvent.change(rendered.getByLabelText("Name"), { target: { value: "Sage" } });
       fireEvent.change(rendered.getByLabelText("PIN or password"), { target: { value: "2468" } });
+      fireEvent.change(rendered.getByLabelText("Confirm passcode"), { target: { value: "2468" } });
       await advanceTo(rendered, "Create owner account", "Let Home greet you");
       await advanceTo(rendered, "Do this later", "Hello");
       await advanceTo(rendered, "Continue", "Save your backup key");

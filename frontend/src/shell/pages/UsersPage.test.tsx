@@ -87,6 +87,7 @@ describe("UsersPage", () => {
 
       const secret = view.getByLabelText("PIN or password");
       fireEvent.change(secret, { target: { value: "123456" } });
+      fireEvent.change(view.getByLabelText("Confirm passcode"), { target: { value: "123456" } });
       fireEvent.submit(view.getByPlaceholderText("Name").closest("form")!);
       await waitFor(() => expect(createBodies[1]).toEqual({ displayName: "Avery", role: "adult", secret: "123456" }));
     } finally {

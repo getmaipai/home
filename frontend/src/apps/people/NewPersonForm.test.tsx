@@ -63,4 +63,32 @@ describe("NewPersonForm", () => {
   });
 
   test("UsersSection imports NewPersonForm for its add form", () => expect(readFileSync(new URL("../settings/UsersSection.tsx", import.meta.url), "utf8")).toContain('import { NewPersonForm, type NewPersonValues } from "@/apps/people/NewPersonForm"'));
+  test("mismatched confirm passcode blocks submit and shows the fix; a match submits", () => {
+    const view = render(<NewPersonForm actorRole="owner" fixedRole="owner" onSubmit={mock(() => {})} submitLabel="Add" busy={false} error={null} checkSecret />);
+    const onSubmit = mock(() => {});
+    view.rerender(<NewPersonForm actorRole="owner" fixedRole="owner" onSubmit={onSubmit} submitLabel="Add" busy={false} error={null} checkSecret />);
+    const form = view.getByLabelText("Name").closest("form")!;
+    fireEvent.change(view.getByLabelText("Name"), { target: { value: "Sage" } });
+    fireEvent.change(view.getByLabelText("PIN or password"), { target: { value: "2468" } });
+    fireEvent.change(view.getByLabelText("Confirm passcode"), { target: { value: "2469" } });
+    fireEvent.submit(form);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(view.container.textContent).toContain("The two passcodes are different. Type the same passcode in both boxes.");
+    fireEvent.change(view.getByLabelText("Confirm passcode"), { target: { value: "2468" } });
+    expect(view.container.textContent).not.toContain("The two passcodes are different.");
+    fireEvent.submit(form);
+    expect(onSubmit).toHaveBeenCalledWith({ displayName: "Sage", role: "owner", secret: "2468" });
+  });
+  test("an empty confirm blocks submit when a passcode is typed; roles without a secret show no confirm box", () => {
+    const view = renderForm("owner");
+    fireEvent.change(view.getByLabelText("Name"), { target: { value: "Sage" } });
+    fireEvent.change(view.getByLabelText("PIN or password"), { target: { value: "2468" } });
+    fireEvent.submit(view.getByLabelText("Name").closest("form")!);
+    expect(view.onSubmit).not.toHaveBeenCalled();
+    fireEvent.click(view.getByRole("combobox", { name: "Role" }));
+    fireEvent.click(view.getByRole("option", { name: "Child" }));
+    expect(view.queryByLabelText("Confirm passcode")).toBeNull();
+    fireEvent.submit(view.getByLabelText("Name").closest("form")!);
+    expect(view.onSubmit).toHaveBeenCalledWith({ displayName: "Sage", role: "child" });
+  });
 });
