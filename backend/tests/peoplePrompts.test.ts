@@ -10,6 +10,7 @@ import { people as peopleTable } from "@/db/schema";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
+import { __setAgeCheckRunnerForTests } from "@/lib/pictures/ageCheck";
 import { runGenerateImage } from "@/lib/pictures/tool";
 import { runGenerateVideo } from "@/lib/videos/tool";
 import { getPictureJob } from "@/lib/pictures/jobs";
@@ -48,6 +49,7 @@ beforeEach(() => {
   __setStackTrustForTests({ ok: true });
   __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
   __resetAttestationsForTests();
+  __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
 });
 afterEach(() => { removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); __setStackClientForTests(null); __resetStackEngineForTests(); setHouseholdSettingValue("generation.people_prompts", false); });
 

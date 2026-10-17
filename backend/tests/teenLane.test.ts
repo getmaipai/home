@@ -50,6 +50,7 @@ beforeEach(() => {
   __setStackTrustForTests({ ok: true });
   __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
   __resetAttestationsForTests();
+  __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
 });
 afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); setHouseholdSettingValue("generation.kids", true); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); setHouseholdSettingValue("generation.people_prompts", false); });
 

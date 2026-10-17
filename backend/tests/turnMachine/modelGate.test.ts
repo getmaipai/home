@@ -125,6 +125,8 @@ describe("runTurnNext: the model gate on the wire", () => {
   });
 
   test("a child's turn on an unrecorded model offers no tools and no thinking", async () => {
+    // A child may make cartoon pictures now (KIDS-CREATE-01), so the picture tool is offered when a picture engine is ready: this turn has none.
+    (await import("@/lib/pictures/ready")).__setPictureStatusForTests(undefined);
     const { toolCount, thinking } = await seen(people.child, "hi", { thinking: true });
     expect(toolCount).toBe(0);
     expect(thinking).toBe(false);

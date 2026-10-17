@@ -53,6 +53,7 @@ beforeEach(() => {
   __setStackTrustForTests({ ok: true });
   __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
   __resetAttestationsForTests();
+  __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
   __resetKidLedgerForTests();
   __setChildSafetyRunnerForTests(safeRunner());
 });
