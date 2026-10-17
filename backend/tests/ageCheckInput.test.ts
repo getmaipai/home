@@ -1,12 +1,12 @@
 // The input-side floor (ageCheck.screenInputImage): an image this home did not make, screened before it is used to edit, animate or refer to.
 // Scripted verdicts only; no explicit image exists in this test.
-import { afterEach, describe, expect, test } from "bun:test";
+import { describe, expect, test } from "bun:test";
 import { __setAgeCheckRunnerForTests, screenInputImage, type AgeVerdict, type ImageCheck } from "@/lib/pictures/ageCheck";
 
 const v = (over: Partial<AgeVerdict> = {}): ImageCheck => ({ ok: true, verdict: { people_count: 1, apparent_min_age_estimate: 35, label: "adult", is_nude_or_sexual: false, confidence: 0.9, ...over } });
 const run = (check: ImageCheck) => __setAgeCheckRunnerForTests(async (images) => images.map(() => check));
 const bytes = new Uint8Array([1]);
-afterEach(() => __setAgeCheckRunnerForTests(null));
+// the suite preload restores the default runner after every test
 
 describe("screenInputImage", () => {
   test("words about a child with an input image refuse, whatever the photo shows, and need no model", async () => {

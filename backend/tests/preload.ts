@@ -92,8 +92,16 @@ installTestIsolationGuard();
 {
   const ageCheck = await import("@/lib/pictures/ageCheck");
   const keyframes = await import("@/lib/pictures/keyframes");
-  ageCheck.__setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
-  keyframes.__setKeyframesForTests(async () => null);
+  const nobody = async (images: readonly Uint8Array[]) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }));
+  const restoreAgeCheckDefaults = (): void => {
+    ageCheck.__resetAgeCheckForTests(nobody);
+    keyframes.__setKeyframesForTests(async () => null);
+  };
+  restoreAgeCheckDefaults();
+  // After EVERY test in every file: a test that installed its own runner or vision seam (or set null, which would send the next file to the real
+  // model and fail it for the wrong reason: ageCheckInput.test.ts did, and likenessUse.test.ts then read "could not check" instead of its
+  // adult-content refusal) leaves nothing behind. tests/ageCheckStateReset.test.ts proves it.
+  afterEach(restoreAgeCheckDefaults);
 }
 beforeEach(async () => {
   // MINOR-SEARCH-01e-5: tests that are not about the blocked-site lists run as if every enabled list had loaded.

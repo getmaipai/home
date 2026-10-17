@@ -237,6 +237,24 @@ type RunChecks = (images: readonly Uint8Array[], kind: CheckedKind) => Promise<I
 let runForTests: RunChecks | null = null;
 export function __setAgeCheckRunnerForTests(fn: RunChecks | null): void { runForTests = fn; }
 
+/**
+ * Test seam: puts EVERY piece of module state back to its starting point in one call (the runner seam, the vision seam, the
+ * deadline, the notification quiet period, the one-at-a-time chain). `defaultRunner` is what the suite installs for tests that
+ * are not about the check (tests/preload.ts). The preload calls this after every test, so no file can leak state into another.
+ */
+export function __resetAgeCheckForTests(defaultRunner: RunChecks | null = null): void {
+  runForTests = defaultRunner;
+  visionForTests = null;
+  CHECK_DEADLINE_MS = 20_000;
+  lastNotifiedAt = null;
+  chain = Promise.resolve();
+}
+
+/** Test seam: which pieces of state are set (for the guard test that proves the reset). */
+export function __ageCheckStateForTests(): { runner: boolean; vision: boolean; deadlineMs: number; notified: boolean } {
+  return { runner: runForTests !== null, vision: visionForTests !== null, deadlineMs: CHECK_DEADLINE_MS, notified: lastNotifiedAt !== null };
+}
+
 function sleep(ms: number): Promise<void> { return new Promise((resolve) => setTimeout(resolve, ms)); }
 
 /** Whether the resident chat model is up and declares picture input. This is the model's own capability; the per-picture token bound that chat turns need for window accounting is not needed for a single small image. Any failure to read the Stack reads as "no". */
