@@ -111,6 +111,13 @@ const SEXUAL = [
   "orgasm", "masturbat", "fellatio", "blowjob", "cumshot", "intercourse", "molest", "rape", "bondage", "kinky", "xxx", "r18", "uncensored", "spread legs", "legs spread",
 ];
 
+// Plain ways to say a person has no clothes on without any of the words above ("two kids playing, no clothes"). Beside a
+// minor or minor-looking term they cross the same line; alone they are ordinary (a shirtless man at the beach passes).
+const UNCLOTHED = [
+  "unclothed", "shirtless", "no clothes", "no clothing", "without clothes", "without clothing", "without a shirt", "clothes off", "clothing off", "stripped", "skinny dipping", "skinny dip",
+  "bare chested", "bare skin", "bare bottom", "bare butt", "birthday suit", "au naturel", "wearing nothing", "not wearing anything", "not wearing any clothes",
+];
+
 // "14yo", "15 y o", "16-year-old", "12 years old": any age below 18 written with digits.
 const MINOR_AGE_DIGITS = /\b(?:[1-9]|1[0-7])\s?(?:yo|y o|yr|yrs|year|years|yr old|yrs old)\b/;
 
@@ -128,7 +135,7 @@ function hasWord(haystack: string, term: string): boolean {
 export function promptViolatesMinorLine(prompt: string): boolean {
   if (detectCsam(prompt).matched.length > 0) return true;
   const text = normalise(prompt);
-  const sexual = SEXUAL.some((term) => hasWord(text, term));
+  const sexual = SEXUAL.some((term) => hasWord(text, term)) || UNCLOTHED.some((term) => hasWord(text, term));
   if (!sexual) return false;
   return MINOR_LOOKING.some((term) => hasWord(text, term)) || MINOR_AGE_DIGITS.test(text);
 }
