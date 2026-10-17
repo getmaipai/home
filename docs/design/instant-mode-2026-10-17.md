@@ -73,12 +73,12 @@ and keeps today's control, so Instant there is the existing toggle. A separate 1
 ## 4. Recommendation
 
 Ship (a) now, build (b) in four small slices, drop (c). Voice is the decision only Jesse makes: "nothing here changes how a spoken
-turn is shaped" (rule 0), and moving voice turns to a 4B changes the voice. Recommended: leave voice on Muse until a spoken-turn
-repetition measurement exists, then decide.
+turn is shaped" (rule 0), and moving voice turns to a 4B changes the voice. Decided by Jesse, 2026-10-17: voice turns do NOT use Instant yet; they stay on Muse until INSTANT-05
+is decided after a spoken-turn repetition measurement exists.
 
 ## 5. Backlog rows
 
-INSTANT-01 (this slice, built), INSTANT-02 (Stack route to the resident judge for an Instant chat request, measure contention),
+INSTANT-01 (this slice, built), INSTANT-02 (built in the Stack 2026-10-17, `90dfab5`: the existing `judge` role is the target, no new route; contention measured, first text 0.03 to 0.13 s beside a background generation),
 INSTANT-03 (catalog record and bench for Qwen3 4B as the Instant chat model, rules 3 and 8), INSTANT-04 (the adult Instant
 toggle on an `always` model, routes the turn, falls back to Muse, label states the tradeoff), INSTANT-05 (voice decision).
 
