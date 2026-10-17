@@ -53,7 +53,7 @@ import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings"
 import { complete, type LlmMessage, completeBackground } from "@/lib/llm";
 import { countTokens } from "@/lib/tokenCount";
 import { evaluateReply } from "@/lib/safety";
-import { ensureProvisionalTitle } from "@/lib/conversationTitle";
+import { ensureProvisionalTitle, refreshProvisionalTitle } from "@/lib/conversationTitle";
 import { resolveTurnBudgetWithStack } from "@/lib/turnMachine/budget";
 import { activeTurnCount } from "@/lib/turnActivity";
 import { loadManifestOnly } from "@/lib/plugins";
@@ -660,7 +660,7 @@ export function logTurn(
   if (branchFrom) value.continued_from_turn_id = branchFrom;
   // CHAT-TITLE-02: a stored chat is never left untitled; the first message names it until the model does.
   // Failed turns count (the person still sent a message); a title problem never costs the turn.
-  try { ensureProvisionalTitle(value.conversation_id); } catch (err) { console.error(`[turn] provisional title failed: ${(err as Error).message}`); }
+  try { if (supersedes) refreshProvisionalTitle(value.conversation_id); else ensureProvisionalTitle(value.conversation_id); } catch (err) { console.error(`[turn] provisional title failed: ${(err as Error).message}`); }
   // A failed turn is not something the household said and heard: it
   // records no episode and retires nothing it might have superseded.
   if (opts.status === "failed") return storedRow;

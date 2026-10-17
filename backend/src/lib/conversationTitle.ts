@@ -59,7 +59,7 @@ export function ensureProvisionalTitle(conversationId: string): string | null {
   const turns = db
     .select()
     .from(conversationTurns)
-    .where(and(eq(conversationTurns.conversationId, conversationId), inArray(conversationTurns.status, ["done", "failed"]), isNull(conversationTurns.supersedes)))
+    .where(and(eq(conversationTurns.conversationId, conversationId), inArray(conversationTurns.status, ["done", "failed"]), sql`${conversationTurns.id} NOT IN (SELECT supersedes FROM conversation_turns WHERE conversation_id = ${conversationId} AND supersedes IS NOT NULL)`))
     .orderBy(asc(conversationTurns.createdAt))
     .limit(20)
     .all();
@@ -82,6 +82,19 @@ export function ensureProvisionalTitle(conversationId: string): string | null {
     .returning({ id: conversations.id })
     .all();
   return written.length > 0 ? title : null;
+}
+
+/** An edited message replaces what the provisional title named: a title still on its provisional state
+ * (never a person's rename, never a model title) is cleared and derived again from the turns that stand,
+ * so the replaced text neither shows in the sidebar nor answers a search. */
+export function refreshProvisionalTitle(conversationId: string): string | null {
+  const cleared = db
+    .update(conversations)
+    .set({ title: null, titleSource: null, hlc: nextHlc() })
+    .where(and(eq(conversations.id, conversationId), eq(conversations.titleSource, PROVISIONAL)))
+    .returning({ id: conversations.id })
+    .all();
+  return cleared.length > 0 ? ensureProvisionalTitle(conversationId) : null;
 }
 
 /** Eligible for a model title: stored, not deleted, and either undecided or still on its provisional title. */
