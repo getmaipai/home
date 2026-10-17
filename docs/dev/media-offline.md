@@ -17,6 +17,21 @@ A paired device keeps a media item for use when the hub is out of reach. Everyth
 - Backups: `snapshotWorker.ts` empties `device_tokens` in the snapshot copy and vacuums it, so tokens are not in a backup. After
   a restore a device pairs again.
 
+## Household device-token rule
+
+Every device token, of any kind (a TV included), is revoked after 180 days unused and the device pairs again. Redeeming a token
+now also refuses a disabled, deleted or memorialized person and a device that no longer belongs to the token's person. The
+rule is in `resolveDeviceToken` and is not specific to media.
+
+## Who may keep media
+
+- A robot, TV or pod never holds `media.offline` (a shared surface would read one person's library for the room). The PATCH
+  route answers 400, the middleware refuses even a forced row, and Settings, Devices shows no switch on them.
+- A child's or teen's keep permission is guardian-only: an owner or admin sets it per device. A minor cannot PATCH their own
+  device, and a minor's plain browser session (no device) cannot keep media at all (`guardian_grant_required`).
+- `last_seen_at` is written at most once a minute per token. Subtitles are served only for caption types, always as `text/vtt`
+  with `Content-Security-Policy: sandbox`. An `If-Range` date must equal `Last-Modified` to the second.
+
 ## Routes (`/api/media/offline`)
 
 - `GET /manifest?id=` an `OfflineManifest` (spec) with hub paths only, fingerprint, ready, playable, reason, chapters,
@@ -32,6 +47,11 @@ A paired device keeps a media item for use when the hub is out of reach. Everyth
 
 ## Browser
 
+Copies are per person: the bucket is `maipai-media-v1:<personId>` and the page tells the worker which one is active by message
+(`setMediaOwner`, called from `App.tsx`; stored in the `maipai-media-owner` cache so a restarted worker knows). Signed out or
+expired, nothing is announced and the worker serves no copy; another person signing in gets only their own bucket. At app start
+and when the browser is online again `reconcileKept()` posts `/status` and deletes copies the hub reports gone or changed.
+
 `frontend/src/sw.ts` has no fetch handler on Firefox or WebKit. On Chromium one cache-first route serves
 `/api/media/offline/file/*` from the `maipai-media-v1` bucket (Range is sliced from the full copy; `?download=1` bypasses it).
 `frontend/src/lib/offlineMedia.ts` has `keepOnDevice`, `removeFromDevice`, `listKept`. WebKit gets `useGo`. An explicit sign-out (`/api/auth/logout`)
@@ -41,4 +61,5 @@ Tested in `frontend/src/lib/offlineWipe.test.ts`.
 
 ## Open
 
+"Remove all devices" (one revoke-everything action; today only a password change revokes all device tokens).
 Transcode-on-save (needs the Stack's `media.transcode`), generic manifests (KEEP-OFFLINE-01), `offline.records` routes.

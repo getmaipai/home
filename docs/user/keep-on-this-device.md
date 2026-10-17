@@ -12,4 +12,8 @@ Things to know:
 - Files that need conversion are not ready to keep yet. Home says "not ready".
 - If a device is removed, or its permission is turned off, it cannot get new copies.
 - Signing out of a browser removes the copies in it. Signing in again after your session ran out keeps them. Settings, Devices has "Remove all offline copies".
-- Kids only get what a grown-up allows for them.
+- Kids and teens can keep media only on a device a grown-up turned it on for. They cannot turn it on themselves.
+- Robots, TVs and pods cannot keep media.
+- Copies belong to the person who is signed in. Someone else signing in on the same browser does not see them.
+- Home checks your copies when the app opens and when you are back online, and removes any that were deleted or changed.
+- A device you have not used for six months has to be paired again.
