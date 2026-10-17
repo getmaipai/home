@@ -52,10 +52,11 @@ describe("Quick Connect end to end", () => {
       lastSeenAt: string | null;
       createdAt: string;
       capabilities: string[];
+      offlineScope: string[];
       state: DeviceState | null;
     }>;
     expect(devices).toEqual([
-      { id: expect.any(String), name: "Living room TV", kind: "tv", area: null, lastSeenAt: expect.any(String), createdAt: expect.any(String), capabilities: [], state: null },
+      { id: expect.any(String), name: "Living room TV", kind: "tv", area: null, lastSeenAt: expect.any(String), createdAt: expect.any(String), capabilities: [], offlineScope: [], state: null },
     ]);
   });
 
