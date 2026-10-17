@@ -1,5 +1,7 @@
 # Instant mode on a model that always thinks (2026-10-17)
 
+Status: INSTANT-01 built (a model that always thinks shows a static Thinking badge, no dead mode selector) and INSTANT-02 built in the Stack (the judge role serves an Instant request, Stack `90dfab5`). INSTANT-03 (bench), INSTANT-04 (the adult toggle) and INSTANT-05 (voice) are open; owner ruled 2026-10-17 that spoken turns stay on Muse.
+
 Jesse, live on the Mac Studio, 2026-10-17: "is Glimmer a thinking-only model? I can't change to Instant." Yes. This note
 says what the control does today, what an honest Instant mode is, and the order to build it. It extends STACK-MUSE-01 (owner's
 rule 2026-10-16: Muse Glimmer 30B is the chat model above 24 GB) and does not reverse it. Rules in

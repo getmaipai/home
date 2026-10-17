@@ -56,7 +56,7 @@ Scratch env only (uv, Python 3.11); the live Stack was not touched. Quality was 
 - 350M parameters: holds (model card). Tags: card names [cough] [laugh] [chuckle] "and more"; I did not verify [sigh] by ear.
 - Native streaming: false for upstream; true for the MLX port and the fork (original model only). Streaming is chunk-level.
 - 150 to 300 ms first byte and RTF 0.5 on an RTX 4090: not reproduced; on the M5 Max MLX port 450 ms and 0.27. Fork quotes 0.47 s on a 4090.
-- Distilled one-step decoder: upstream describes a streamlined 350M design for low-latency agents; not checked in code.
+- Distilled one-step decoder: upstream describes a lean 350M design for low-latency agents; not checked in code.
 - Zero-shot cloning needs a reference clip: holds (Turbo requires `audio_prompt_path`).
 - Watermark: upstream always applies Resemble's PerTh watermark in `generate` (no flag). The MLX port contains no watermark code (grep). Inaudible
   by design; for a private hub it is harmless, but removing it means the MLX route, not a patch.

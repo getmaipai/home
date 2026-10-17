@@ -1,5 +1,7 @@
 # Image understanding in chat: the pictures a person sends (2026-10-17)
 
+Status: slice 1 built and proven on the Studio 2026-10-17. VISION-03a (Stack: the projector loads beside Muse), VISION-03b (Home: Muse records declare their projector, so image attach is on at p32, p64 and p128), VISION-03f (an installed record takes on its pin's projector declaration) and VISION-04 (pictures shrink to 2000 px, HEIC converts, the picture smoke script) are built. VISION-03c, 03d and 03e are open.
+
 Jesse, live first run on the Mac Studio (M5 Max, 128 GB), 2026-10-17: the chat + menu will not let him pick image files. He chose
 to design image understanding into the setup so image attach works. Design note plus the first slice; the architect verdict is at
 the end.

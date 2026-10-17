@@ -1,5 +1,7 @@
 # Setup: voice and web search
 
+Update 2026-10-17: built. SETUP-VOICE-01 (the plan line names voice) and SETUP-SEARCH-02 (the conditional Web search screen; Continue turns on only for an empty field or a passed Test of the exact text) landed, and the owner ruled that ddgs is on by default for adults when SearXNG cannot be set up. SETUP-SEARCH-03 (the plan installs Home's own SearXNG) is open. User page: `docs/user/getting-started.md`.
+
 Proposed 2026-10-17 after Jesse's live first run on the Mac Studio ("no voice setup? no search setup? ... think about where it
 best belongs"). Not accepted until the architect rules and Jesse answers the one open question below. It narrows
 [install-wizard-2026-10-13.md](install-wizard-2026-10-13.md) and adds no screen to the happy path.

@@ -1,5 +1,7 @@
 # Weather card in chat, then the Weather app (2026-10-16)
 
+Status 2026-10-17: built. The `weather_card` Element shipped (compact and wide variants, ui-v0.5.232 to 240), chat returns it, and the Weather app is the bundled `weather` package (WEATHER-APP-01 slice 1, Settings gear, `weather.unit`). Open items are listed on the WEATHER-APP-01 row in `docs/BACKLOG.md`. User page: `docs/user/weather.md`.
+
 Owner's ask 2026-10-16: the chat weather answer should be a gradient card with an 8-day strip (like Claude's), and Weather should be a
 dedicated app for the current location plus saved places, with animated conditions as the old hub had.
 

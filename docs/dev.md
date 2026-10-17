@@ -37214,3 +37214,149 @@ Bug found live on a real install: the sign-in screen auto-submitted at exactly 4
 Policy found: the hub accepts any secret of 4 to 128 characters for every role (`lib/validation.ts` `validateSecret`); there is no 6-digit minimum and no separate child rule. Owner, admin and adult roles require a credential (`shared/personCredentialRoles`); the length is the person's choice.
 
 Fix: `person_credentials.secret_digits` (migration 0103) holds a non-secret length class written wherever a secret is set (`/api/auth/setup`, `/api/auth/change-secret`, `POST /api/people`): the digit count (4 to 10) for an all-digit secret, 0 for a password, NULL for a row written before the column existed. `GET /api/auth/profiles` and `/api/auth/me` add `pinDigits` (that count, else null; additive). A NULL row is classified by its next successful `/verify-secret`, the one moment the plaintext is in hand, so no failed attempt is ever needed to learn it. `usePinAutoSubmit` takes `pinDigits` and fires only when the secret is all digits of exactly that length; null never auto-submits. `SignInPage` shows that many keypad slots, or the password field with a Sign in button when `pinDigits` is null. The session lock screen passes the same hint. The server enforces nothing new.
+
+## 2026-10-17 reference: what the first Studio install changed (documentation pass 1)
+
+The first full install ran on the Mac Studio on 2026-10-17 and a day of live fixes followed (v0.2.0 to v0.2.5, plus the commits after
+the v0.2.5 tag). This section is the reference for how those parts fit; the dated sections above and the design notes hold the
+reasoning. User pages that describe the same behavior: `docs/user/getting-started.md`, `sign-in.md`, `voice.md`, `weather.md`,
+`home.md`, `web-search.md`.
+
+### The installer (`scripts/install.sh`)
+
+- **Home first, the Stack from the wizard** (INSTALL-SPLIT-01, above). A fresh install builds Home only. `--stack-only` is the engine step.
+- **Pre-checks** before any change: required tools, a desktop session (Stack step on macOS only), 3 GB free for Home. The install
+  preflight (`lib/installPreflight.ts`) also refuses while another Home holds the instance lock (`hubLockPath()`): "Home is already
+  running ... Stop that Home instance, then try again". A developer `bun start` on the same data blocks an install.
+- **`STACK_TAG` is the lesson of the day.** The installer fetches the Stack at the commit named by `STACK_TAG` (here and in
+  `scripts/engine-computer/maipai-engine`), never `main`. A Stack fix does not exist on an install until a Home commit moves the pin
+  (`STACK_TAG to Stack main <sha>` commits: projector pin, keep-warm, Instant judge, Chatterbox Turbo, ddgs sidecar, VISION-03f). Land
+  the Stack commit first, then bump the pin in Home, then release. The Commons tags the Stack names are fetched as GitHub archives and
+  checked against digests pinned in the installer (`PINNING.md`); a tag without a digest stops the install.
+- **Bun stands in for Node.** `ssh2`'s install script wants `node`, which a stock Mac lacks. The installer links a temporary `node`
+  and `bun` shim directory onto `PATH` for `bun install` and the frontend build, then deletes it. Bun is also on the service `PATH`
+  (`<root>/.bun/bin`) for package scripts.
+- **Deno is installed by the installer.** `DENO_VERSION="2.9.7"`, SHA-256 per platform zip, into `<root>/.deno/bin` (on the service
+  `PATH`); the cache (`DENO_DIR=<root>/data/deno`) is filled once at install. A failed download leaves the Deno-backed data packages
+  off and does not fail the install. Tests that need a real Deno skip on a machine without one (TEST-RED-01).
+- **The URL opens.** After Home answers, the installer runs `open <url>` as the console user (`xdg-open` on Linux) and ends its output
+  with the address.
+- **Upgrade** is staged: stop, copy `data/` to `upgrade-backups/<time>-from-<tag>/` (last two kept), swap the program files, rebuild,
+  start, health-check, write `.installed-tag`; `--rollback` restores `.previous-tag`. See `docs/user/install-upgrade-uninstall.md`.
+
+### Setup wizard (`frontend/src/apps/setup/SetupWizard.tsx`)
+
+Screens in order (`SCREEN_IDS`): welcome, before_start, engine_location, storage, host_tune, checks, plan, web_search, owner, backup,
+done. `face`, `profile`, `hello` and `away` are `RETIRED_STEPS` (older installs may have recorded them; no screen shows them).
+
+- **Checks** never auto-advances and has no "Continue anyway"; the summary line is `checksSummary()`; the title is plural only with two
+  computers (`checksTitle`).
+- **Install line:** `InstallStrip compact` renders one line below the form from the storage screen on, and for owners and admins at the
+  bottom of every page until the install ends (6e9a24c5). The strip frame exists only while something is installing (902e7410).
+- **Owner and person forms** have Confirm passcode; mismatch blocks submit (`Input valid` prop from ui-v0.5.236: green with
+  "Passcodes match", red with the fix).
+- **Backup key** is download-only; Continue unlocks after the download starts.
+- **Tune this computer** (`HostTuneStep.tsx`, SETUP-TUNE-REVAMP-01): one `Apply recommended` for changes Home can make itself, per-item
+  Apply and Revert, a closed "things to do yourself" list, `Skip this step`.
+- **Web search** (`WebSearchStep.tsx`, SETUP-SEARCH-02): shown only when the checks say the Stack could not set up search
+  (`searchCandidate`). No Save or Skip buttons. Continue is enabled for an empty field, or for a Test that passed on the exact text; it
+  saves the address (or, when empty, turns on ddgs for adults). The Test result is one `Alert` with a headline naming `host:port`, a
+  verdict, a Recommended line and a Details disclosure. A warning still counts as usable.
+- **Plan:** the plan line names voice (SETUP-VOICE-01); voice roles are pinned in all three tiers.
+
+### The Stack: roles, engines, warm-up
+
+Home addresses the Stack by role (`chat`, `judge`, `embed`, `stt`, `tts`, `vision` ...). Facts that changed on 2026-10-17:
+
+- **Chat model above 24 GB is Muse Glimmer 30B** (STACK-MUSE-01, section above). It reasons on every turn (`thinking_mode: "always"`),
+  so the composer shows a static Thinking badge, not a mode picker (INSTANT-01). An honest Instant mode would route an adult's written
+  turn to the resident Qwen3 4B `judge` role (INSTANT-02 is built in the Stack; INSTANT-03 to 05 are open;
+  `design/instant-mode-2026-10-17.md`). Spoken turns stay on Muse by the owner's ruling.
+- **Pictures:** Muse reads pictures through a projector (mmproj) that the Stack loads beside it. Home's catalog record declares it, so
+  image attach is on at p32, p64 and p128; p16 (Qwen3 8B) has no projector and the + menu says why pictures are off. Uploads are
+  downscaled to 2000 px on the long edge, HEIC converts through the system converter and is accepted by name, tags stay dropped
+  (VISION-04). VISION-03f makes an installed record take on its pin's projector declaration and restarts chat when the projector arrives.
+- **Keep-warm** (STACK-WARM-01): Home asks the Stack to warm at boot and when setup finishes (`lib/llmSupervisor.ts`, `GET/POST
+  /stack/v1/warmup`). The Stack loads and primes chat, embed and judge, and idle unload spares them. Chat holds Send with "Getting
+  ready, one moment" while a warm-up is in flight, even before the role flips to loaded; health polls every 2 s while starting.
+- **Voice engines:** `stack.voice.engine` (tier default) selects Pocket TTS or Chatterbox Turbo (MLX, via `mlx-audio` in a uv-managed
+  environment). Chatterbox is the default on p64 and p128 with Pocket TTS as the fallback. The Stack serves the verified tag list as
+  `tts.tags` on the role and each voice (laugh, chuckle, cough, sigh, clear throat, gasp). Python environments are built from a
+  hashed requirements file written to disk before `uv sync`.
+- **Search service:** the Stack builds and supervises the ddgs sidecar (managed Python 3.12, `ddgs==9.16.0`, loopback only). Home reads
+  `GET /stack/v1/search` (`state`: building, starting, ready, failed). `POST /stack/v1/search/retry` restarts a failed build. Only the
+  Stack's own docs describe the sidecar's internals.
+- **Chat titles** use the fast `judge` role: a provisional title from the first message, the model title replaces it, a startup sweep
+  repairs chats without one, and greeting-only chats keep "New chat" (CHAT-TITLE-02).
+
+### Voice cues (REG-02)
+
+`voice.hesitations` (`backend/src/settings/voiceKeys.ts`): household scope, `off | light | natural`, default `light`. `lib/voiceCues.ts`
+is pure (state in, state out) and inserts only at sentence boundaries, never inside numbers, names, steps, safety or alarms, and never
+for a child or teen (chat rule 0). Tags come from `tts.tags`; `KNOWN_CUE_TAGS` is the ear-verified list and an unknown tag is never placed
+(an unknown tag would be read aloud as a word). An engine that advertises no tags (Pocket TTS) gets only the spoken filler "Hmm," as plain
+text, and `fallback_reason` means "no tags". `routes/tts.ts` applies it to the spoken rendering only; the written reply never carries a cue.
+
+### Search sources
+
+- Effective source (`lib/retrieval/webSources.ts`): a stored pick wins; with none and no SearXNG address the household reads as
+  SearXNG plus ddgs. ddgs is on by default for adults when SearXNG cannot be set up (owner, 2026-10-17); adults only otherwise.
+- `search.ddgs_for_minors` (`settings/minorDdgsKeys.ts`): off by default; an owner or admin sets `teens` or `teens and children`. Even
+  then ddgs is a second source beside SearXNG, never the only one, never on a spoken turn, never for a guest; the band's web switch,
+  blocklists, page cleaning and output gate all still apply. The Settings block says plainly that DuckDuckGo's filter is not guaranteed.
+  A safety-relevant write like this should raise a household event (SETTINGS-AUDIT-01, open).
+- Settings > Home settings > Search > Web search (SEARXNG-SET-05) is owner and admin only: address with Test and Save, source
+  switches, the teen choice. `SearchTestResultBody` is shared with the wizard step.
+- A lookup that misses never ends in an empty reply (SEARCH-DOWN-EMPTY-01): one more model attempt, then a plain line naming what is
+  missing and the fix. Only the web search waits on a "searching" status phrase (STATUS-PHRASES-02).
+
+### Settings registry and the spec-first rule
+
+Keys come from `@maipai/spec` (`spec/settings/keys.json`) and Home generates its registry from its own declarations; `scripts/check.sh
+--pre` fails when the two disagree. The rule is spec first, then Home. Three keys were declared in Home before a spec tag carried
+them, as the rule's recorded exception: `ui.reasoning_open`, `voice.hesitations` (the `aheadOfSpec` set in `scripts/check.sh`: may be
+absent from the pinned tag, never different from it) and `search.ddgs_for_minors`. Delete each from the set when a spec tag carries it
+(SPEC-MINOR-DDGS-KEYS-01). A package's own keys (`weather.places`, `weather.default_place`, `weather.unit`) live in the manifest `config[]`,
+not in the registry.
+
+### Chat UI behavior
+
+Reasoning is collapsed by default (`ui.reasoning_open` remembers the person's choice); while it runs the label rotates plain words (8 s hold,
+10 to 14 s per word, `Thinking` only under reduced motion) and ends as "Thought for Ns" with a polite announce region (ui-v0.5.234).
+The header menu matches the history row menu (Rename, Pin or Unpin, Archive, Delete, then Read replies aloud). The + menu opens above
+the plus; dropping files anywhere on the page uses the same `addAttachment` path. The composer takes focus on arriving at Chat and when
+its menus close; the Home ask box focuses on arrival. The empty chat rotates ten chat-only illustrations (shuffled per browser, never
+the same twice, morning and night lean). Microphone: `lib/media/micGate.tsx` and `micPermission.ts` read the Permissions API, ask once,
+and open Conversation mode only when allowed; otherwise a Dialog gives per-browser help for denied, no mic, busy and insecure, with
+Try again on permission change and window focus. `lib/voice/mic-capture.ts` runs a device-rate `AudioContext` plus a 16 kHz resampler
+(Safari and Firefox) and throws a typed `MicCaptureError` (`insecure | denied | setup`) so each failure shows its own message.
+
+### Sign-in lockout
+
+`lib/credentialLockout.ts` keeps one counter per person across PIN, password and passkey: 5 failures lock the account for 30 s, then 2 min,
+10 min and 1 h on each further failure; a success clears it. The sign-in and session lock screens use the kit `PasscodeInput`: one masked
+box per digit, a wrong code shakes red and clears, a network error keeps the typed code, and the lockout countdown disables the boxes.
+`pinDigits` (migration 0103, `person_credentials.secret_digits`, section above) tells the screen how many boxes to draw.
+
+### Apps (the `app` kind) and Weather
+
+`lib/apps.ts` and the app routes: `GET /api/apps` (the list, with `settings_area` when the role clears it), `GET /api/plugins/:id/pages/:pageId`,
+`POST /api/plugins/:id/data/:dataId`; `appVisibleTo` gates by role, enabled, capabilities, platform and Incognito, and an app the person
+cannot see is a 404. Install validates pages against the schema and the package-scope guard (`spec/ui/app-check.ts`). The shell has one
+`apps/*` route (`PackageAppPage`) and `useAppCatalog()` merges the built-in catalog with `GET /api/apps` into favorites, header and search,
+so install and uninstall need no rebuild. The standard for package authors is `.github/docs/PACKAGES.md`, "Writing an app package".
+
+The Weather app is `backend/packages/weather` (0.3.0): `pages/index.json` (picker, hero `weather_card`), `contributes.data` (`places`,
+`forecast`), a declared `settings_area` opened from the toolbar gear. The host resolves the place (Current location first, then the
+household home, then saved places), rounds coordinates (two decimals; one for a child), injects the `weather.unit` input, and the
+recipe calls Open-Meteo only. The bundled copy is refreshed from the catalog with `refresh-bundled-packages`, which overwrites hand
+edits: port any edit to `catalog/plugins/utilities/weather` first. The household home is chosen on the Home page (`HomePlaceAsk`): `GET
+/api/places/nearest` and `/api/places/local-search` use an offline city gazetteer (no outbound geocoding, no IP lookup); coordinates are
+rounded before they are stored and an owner or admin gate is enforced in `createEntity`.
+
+### The Home page
+
+`shell/pages/DashboardPage.tsx`: `Greeting`, an admin strip (Updates, Repairs), `AskBox` (kit `InputGroup`, three starters, hands off to
+Chat with `?ask=` so the text arrives unsent), `GettingStarted` (up to three open checklist items, owners and admins only), `HomePlaceAsk`
+and `TodaySection` (cards from package widgets, filtered by the server on role and age). The stat cards and the activity log were
+removed. HOME-PAGE-01 to 04 (widget placement fields, per-person ordering, three breakpoints, hide a card) are open.

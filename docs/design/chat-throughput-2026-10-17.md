@@ -1,5 +1,7 @@
 # Chat throughput on the Mac Studio (2026-10-17)
 
+Status: research done 2026-10-17; no flag was changed. CHAT-TPS-02 (DFlash draft) is measured and waits for the owner's approval of the record change; CHAT-TPS-01, 03 and 04 are open.
+
 Jesse's question: chat on the Mac Studio (Apple M5 Max, 40 GPU cores, 128 GB) generates about 25 tokens per second, and people
 online report much more. Research and design note, no code. Nothing was changed on the running install.
 
