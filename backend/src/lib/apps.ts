@@ -286,7 +286,9 @@ export function appIndexFloorOk(person: PersonRow, packageId: string): boolean |
 export function appRunAllowed(person: PersonRow, packageId: string): boolean {
   const app = loadApp(packageId);
   if (!app) return true;
-  return (app.contributes.pages ?? []).every((entry) => pageVisibleTo(person, app.manifest, entry));
+  // NEWS-03: a child may use News (kid-safe sources), but its My Mix page is teen and up. The News recipe's My Mix data answers a child
+  // nothing (lib/news/data.ts returns null for a child band or a guest), so that one page does not close the whole run to a child.
+  return (app.contributes.pages ?? []).every((entry) => (app.manifest.id === "news" && entry.id === "mix" && person.role === "child") || pageVisibleTo(person, app.manifest, entry));
 }
 
 /** NEWS-00 review: the manifest as one viewer may read it from `GET /api/plugins`: a package app's `contributes.pages` and `contributes.data`

@@ -86,7 +86,7 @@ describe("settings guard agreement metadata", () => {
 
       const expectedDefaults = {
         child: key.key === "media.allowlist_only" ? true : key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "child")
-          : key.key === "chat.photo_uploads" || key.key === "reference.images" || key.key === "person.robot.may_address" || key.key === "person.robot.follow_up" ? false
+          : key.key === "chat.photo_uploads" || key.key === "reference.images" || key.key === "person.robot.may_address" || key.key === "person.robot.follow_up" ? false : key.key.startsWith("news.") ? key.band_default?.child
           : key.key === "search.page_text_cleaning" ? true : key.default,
         teen: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "teen")
           : key.key === "search.page_text_cleaning" ? true : key.default,

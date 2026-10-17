@@ -634,6 +634,8 @@ export const ROBOT_MAY_ADDRESS_KEY = "person.robot.may_address";
  * rule: the registry help says a parent turns them on for a child, so a child never writes them for themselves. */
 export const ROBOT_FOLLOW_UP_KEY = "person.robot.follow_up";
 export const VISION_WATCH_KEY = "person.vision.watch";
+// NEWS-03: every news.* person key the News package declares guardian-set for a child (My Mix, reader_open, digest...) is held to the same
+// guard by its declared `control`, so a new News key cannot drift from its text.
 const PARENT_GATED_ROBOT_KEYS: ReadonlySet<string> = new Set([ROBOT_MAY_ADDRESS_KEY, ROBOT_FOLLOW_UP_KEY, VISION_WATCH_KEY, "generation.kid_enabled"]);
 function assertCanSetRobotMayAddress(actor: PersonRow, targetId: string): SettingsOpResult<true> {
   // The band, not the role alone: a birthdate under 13 makes an adult-role person a child here too (speakerAgeBand is role-floored).
@@ -721,7 +723,7 @@ export function setValue(
           ? assertCanSetAnswerPictures(actor, parsed.id!)
         : key === "search.page_text_cleaning" && parsed.kind === "person"
           ? assertCanSetPageTextCleaning(actor, parsed.id!)
-        : PARENT_GATED_ROBOT_KEYS.has(key) && parsed.kind === "person"
+        : (PARENT_GATED_ROBOT_KEYS.has(key) || (key.startsWith("news.") && keyDef.control?.child === "guardian")) && parsed.kind === "person"
           ? assertCanSetRobotMayAddress(actor, parsed.id!)
         : key.startsWith("topics.") && parsed.kind === "person"
           ? assertCanSetChildTopic(actor, parsed.id!)
