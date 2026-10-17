@@ -371,9 +371,9 @@ apps (music, podcasts, audiobooks) share the same tile and player; the audiobook
 
 ### 9.5 News
 
-The news note decides the sources, the story record and whether a child gets the News app at all: until Jesse accepts
-decision 1 of [news-app-2026-10-17.md](news-app-2026-10-17.md), every News page carries `min_role: teen` and this section
-waits. If he accepts, on Child controls the app shows "Today's news for you" as one column of story cards (picture, headline,
+The news note decides the sources and the story record. Jesse decided on 2026-10-17 (decision 1 of
+[news-app-2026-10-17.md](news-app-2026-10-17.md)) that a child may open the News app on kid-safe sources only: the child pages
+(Today, Following, Channel, Story, Saved) carry `min_role: child` and My Mix `min_role: teen`. On Child controls the app shows "Today's news for you" as one column of story cards (picture, headline,
 "From {source}") from the Kids' lists only, no live ticker, no breaking banner, no comments, no outbound link. Read-aloud
 follows section 4.3: the page header's speaker reads the page's catalog copy; a card's speaker reads only the card's
 speakable text, which the hub builds from the headline and source line after each passed the child output gate (news note,
@@ -461,7 +461,7 @@ Spec and kit first, shell second, copy third, then one slice per app, each small
    migration.
 6. KID-MODE-06a to 06k (home, S each): one slice per app in section 9, each with its section 6 refusal tests and its
    captures; a slice with an Ask adds its summary kind to the one `Ask` record and waits for BRAKES-02b (section 7); 06j retires the hand-written
-   voice line. Media and News slices wait for their own notes' first slices; News waits for the news note's decision 1.
+   voice line. Media and News slices wait for their own notes' first slices; News is unblocked by the news note's decision 1 (accepted 2026-10-17) and builds with NEWS-03.
 7. KID-MODE-07 (home, S): the screenshot matrix per mode and the judged captures in the docs, plus a user page "What your
    kid sees" in `docs/user/` (grade 6).
 

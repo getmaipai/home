@@ -26,7 +26,7 @@ Home checks all of this at install time and refuses a package that breaks a rule
 ## ✅ Checks to carry
 
 - The `index` page and each section validate against `spec/ui/schema.json`.
-- A child, a teen and an adult each see, or do not see, the app as `min_role` says.
+- A child, a teen and an adult each see, or do not see, the app as `min_role` says. A page may carry its own `min_role` to raise that floor (never lower it; Home refuses a package that tries). A person below a page's floor does not see the page in the app's sections and gets a 404 from its page route, and the data ids and actions only that page uses are closed to them too.
 - A data call with no network shows the plain empty state.
 - Fixtures use `192.0.2.x` and `example.com`.
 
