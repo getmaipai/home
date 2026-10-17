@@ -1,3 +1,5 @@
+import { Button } from "@maipai/ui/src/ui/button";
+import { Input } from "@maipai/ui/src/ui/input";
 import { afterEach, describe, expect, test } from "bun:test";
 import { useState } from "react";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
@@ -16,8 +18,8 @@ function Harness({ children }: { children?: React.ReactNode }) {
   const runtime = useLocalRuntime(NOOP, { initialMessages: [] });
   return (
     <MemoryRouter><AssistantRuntimeProvider runtime={runtime}>
-      <button type="button" data-testid="rail-chat">Chat</button>
-      <input data-testid="rename" />
+      <Button type="button" data-testid="rail-chat">Chat</Button>
+      <Input data-testid="rename" />
       {children}
       <ChatThread focusKey={focusKey} />
     </AssistantRuntimeProvider></MemoryRouter>

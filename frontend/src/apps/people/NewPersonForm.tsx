@@ -1,4 +1,4 @@
-import { CheckIcon } from "lucide-react";
+import { getIcon } from "@maipai/ui/src/icons";
 import { useState, type FormEvent, type ReactNode, type Ref } from "react";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Checkbox } from "@maipai/ui/src/ui/checkbox";
@@ -7,6 +7,8 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Select } from "@maipai/ui/src/primitives/Select";
 import { ROLE_LABELS, creatableRoles, requiresSecret, roleAdminToServerRole, serverRoleToRoleAdmin, type NewPersonRole } from "@/apps/people/roles";
 import type { Role } from "@/lib/api";
+
+const CheckIcon = getIcon("check");
 
 export interface NewPersonValues {
   displayName: string;
