@@ -13,6 +13,7 @@
 // request's shape (a batch of plain strings) have nothing in common, so
 // forcing embed through validate()'s chat-shaped checks would be the
 // wrong kind of code reuse, not real sharing.
+import { ChatTemplateTokenFilter, stripChatTemplateTokens } from "@/lib/chatTemplateTokens";
 import { foldLateSystemMessages } from "@/lib/systemFold";
 import { getChatClient, reportChatBackendUnreachable } from "@/lib/llmSupervisor";
 import { tryConsume } from "@/lib/rateLimiter";
@@ -456,7 +457,7 @@ export function neutralizeThinkTags(text: string): string {
 /** THIN-5A: the one place a blocking completion's `reasoning_content`
  * becomes `LlmCompleteValue.reasoning`; dropped here for a minor. */
 function reasoningField(reasoning: string | null | undefined, opts: LlmCompleteOptions): { reasoning?: string } {
-  return reasoning && opts.returnReasoning === true && !opts.dropReasoning ? { reasoning } : {};
+  return reasoning && opts.returnReasoning === true && !opts.dropReasoning ? { reasoning: stripChatTemplateTokens(reasoning) } : {};
 }
 
 /** HOME-STACK-02b: role="chat" for every real caller today (the retired turn engine's
@@ -497,7 +498,7 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
     const choice = data.choices?.[0];
     if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: choice.message.content, ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
 }
 
 export async function complete(
@@ -543,7 +544,7 @@ export async function complete(
     // offered on this call at all," never conflated with "offered, and
     // declined."
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: choice.message.content, ...reasoningField(choice.message.reasoning_content, opts), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), ...reasoningField(choice.message.reasoning_content, opts), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     recoverFromDeadBackend(err);
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;
@@ -628,11 +629,23 @@ async function* stackChatPieces(
   // tag is synthesized; a minor's request drops reasoning here, so it
   // never reaches a caller to be stored.
   const reader = stream.getReader();
+  // Chat-template control tokens (`<|message|>`) are removed here, once, for text and reasoning alike.
+  const textFilter = new ChatTemplateTokenFilter();
+  const reasoningFilter = new ChatTemplateTokenFilter();
+  const flushed = (): LlmStreamPiece[] => {
+    const out: LlmStreamPiece[] = [];
+    const reasoningRest = reasoningFilter.flush();
+    if (reasoningRest && !dropReasoning) out.push({ channel: "reasoning", text: reasoningRest });
+    const textRest = textFilter.flush();
+    if (textRest) out.push({ channel: "text", text: textRest });
+    return out;
+  };
   for await (const line of readTextLines(reader)) {
     if (!line.startsWith("data:")) continue;
     const data = line.slice("data:".length).trim();
     if (data === "[DONE]") {
       reader.cancel().catch(() => {});
+      for (const piece of flushed()) yield piece;
       return assembleToolCalls();
     }
     if (!data) continue;
@@ -648,9 +661,15 @@ async function* stackChatPieces(
     if (finishReason) stats.stopReason = finishReason;
     const delta = chunk.choices?.[0]?.delta;
     const reasoning = delta?.reasoning_content;
-    if (reasoning && !dropReasoning) yield { channel: "reasoning", text: reasoning };
+    if (reasoning) {
+      const clean = reasoningFilter.push(reasoning);
+      if (clean && !dropReasoning) yield { channel: "reasoning", text: clean };
+    }
     const content = delta?.content;
-    if (content) yield { channel: "text", text: content };
+    if (content) {
+      const clean = textFilter.push(content);
+      if (clean) yield { channel: "text", text: clean };
+    }
     for (const fragment of delta?.tool_calls ?? []) {
       const existing = toolCallsByIndex.get(fragment.index) ?? { id: "", name: "", args: "" };
       if (fragment.id) existing.id = fragment.id;
@@ -663,6 +682,7 @@ async function* stackChatPieces(
   // finish reason was cut off (an engine that died mid-reply closes its
   // socket, and the reader sees a plain end), never a finished reply.
   if (!stats.stopReason) throw new Error("the chat stream ended before the engine finished the reply");
+  for (const piece of flushed()) yield piece;
   return assembleToolCalls();
 }
 
