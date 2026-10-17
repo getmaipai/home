@@ -46,6 +46,7 @@ const ItemSchema = z.object({
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 
 function phaseLabel(job: VideoJob): string {
+  if (job.phase === "paused: low memory") return "Paused: low memory";
   if (job.state === "queued" || job.phase === "queued" || job.phase === "waiting for memory") return busyLine(job.position);
   if (job.phase === "setting up") return "Setting up the video model for the first time";
   if (job.phase === "starting" || job.phase === "loading") return "Getting the video model ready";

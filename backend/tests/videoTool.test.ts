@@ -177,6 +177,16 @@ describe("VIDEO-GEN-05: the call, the job and the stored clip", () => {
     });
   });
 
+  test("a clip the Stack's memory watchdog stopped is a failed card that says paused, not a silent cancel", async () => {
+    fake.pausedForMemory = true;
+    await withStub(script(BOAT, "I started it for you."), async () => {
+      const { value } = await streamValue(people.owner, "make a short video of a paper boat");
+      expect(value.reply.text).toBe("I started it for you.");
+      await until(() => getVideoJobFor(people.owner, value.video!.id)?.state === "failed");
+      expect(getVideoJobFor(people.owner, value.video!.id)!.error).toContain("Paused: this computer is low on memory");
+    });
+  });
+
   test("a failed job never fails the answer: the reply stands and the card holds the honest line", async () => {
     fake.failWith = { code: "failed", error: "The video model stopped. Try again." };
     await withStub(script(BOAT, "I started it for you."), async () => {

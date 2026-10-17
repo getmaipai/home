@@ -103,6 +103,8 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
       if (stopped(job)) return;
       if (status.state === "done") { await finish(job, actor, status.data); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(500, status.code ?? "failed", status.error ?? "")); saveJob(job); return; }
+      // The Stack's memory watchdog stopped it (code no_memory): that is a pause the person should hear about, not a cancel they asked for.
+      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainFailure(new StackPicturesError(503, "no_memory", status.error ?? "")); saveJob(job); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; saveJob(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));

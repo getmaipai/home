@@ -12,6 +12,8 @@ export interface FakeVideoStack {
   submitted: Array<Record<string, unknown>>;
   pollsToFinish: number;
   failWith: { code: string; error: string } | null;
+  /** The Stack's memory watchdog stopped the job: cancelled, code no_memory, phase "paused: low memory". */
+  pausedForMemory: boolean;
   refuseSubmit: { status: number; code: string; error: string } | null;
   loras: StackVideoLora[];
   restore(): void;
@@ -40,7 +42,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, refuseSubmit: null, loras: [...TEST_VIDEO_LORAS],
+    jobs: [], submitted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, loras: [...TEST_VIDEO_LORAS],
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
@@ -67,6 +69,7 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       if (jobMatch[2] === "poster.jpg") return new Response(testJpeg(), { status: 200, headers: { "content-type": "image/jpeg" } });
       job.polls += 1;
       if (job.state === "cancelled") return json({ job: job.id, state: "cancelled", phase: null, progress: 0, phase_progress: null, position: null, error: null, code: null, data: [] });
+      if (fake.pausedForMemory) { job.state = "cancelled"; return json({ job: job.id, state: "cancelled", phase: "paused: low memory", progress: 0, phase_progress: null, position: null, error: "Paused: this computer is low on memory.", code: "no_memory", data: [] }); }
       if (fake.failWith) { job.state = "failed"; return json({ job: job.id, state: "failed", phase: null, progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: fake.failWith.code, data: [] }); }
       if (job.polls >= fake.pollsToFinish) {
         job.state = "done";

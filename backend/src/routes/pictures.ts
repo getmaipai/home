@@ -39,6 +39,7 @@ export function routeAudience(actor: PersonRow): PictureAudience {
 function phaseLabel(job: PictureJob): string {
   if (job.state === "queued") return job.position && job.position > 1 ? `Waiting in line, number ${job.position}` : "Waiting for the picture engine";
   if (job.phase === "waiting for memory") return "Waiting for memory to free up";
+  if (job.phase === "paused: low memory") return "Paused: low memory";
   if (job.phase === "starting" || job.phase === "setting up" || job.phase === "loading") return "Getting the picture model ready";
   if (job.phase === "decoding") return "Finishing the picture";
   return "Drawing";

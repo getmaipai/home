@@ -74,7 +74,7 @@ export function plainVideoFailure(error: unknown): string {
     switch (error.code) {
       case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
-      case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} This computer doesn't have enough free memory for a video right now. Try again in a few minutes.`;
+      case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} Paused: this computer is low on memory. Close big apps, or try again in a few minutes.`;
       case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.`;
       case "not_available_on_this_computer": case "unsupported": return `${VIDEO_FAILED_PREFIX} This computer can't make videos. Videos need a Mac with 128 GB of memory.`;
       case "unreachable": case "no_stack": return `${VIDEO_FAILED_PREFIX} The video engine isn't answering. Check that the engine is running, then try again.`;
@@ -303,6 +303,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
       if (controller.signal.aborted) return;
       if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); save(job); return; }
+      if (status.state === "cancelled" && status.code === "no_memory") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(503, "no_memory", status.error ?? "")); save(job); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; save(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
       job.percent = Math.max(0, Math.min(99, Math.round(status.progress)));
