@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { getIcon } from "@maipai/ui/src/icons";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
@@ -6,6 +8,8 @@ import { Field, FieldContent, FieldLabel } from "@maipai/ui/src/dashboard/compon
 import { api, ApiError, type InstallStatusView, type PlanWording } from "@/lib/api";
 
 /** Total graphics memory choices when Home cannot read it (GB). */
+const ErrorIcon = getIcon("circle-alert");
+
 export const VRAM_CHOICES = [8, 12, 16, 24, 32, 48, 64, 96, 128] as const;
 
 export interface PlanStepProps {
@@ -84,8 +88,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   }
 
   if (failed && engine?.state === "installing_engine") return <><Card><CardContent><p>Home is setting up the AI engine on this computer. Now: {engine.stageLabel ?? "starting"}. This page continues by itself when it is ready.</p></CardContent></Card></>;
-  if (failed && engine?.state === "engine_failed") return <><Card><CardContent><p role="alert">{engine.problem ?? "Setting up the AI engine stopped."}</p><Button type="button" variant="secondary" onClick={() => { void retryEngine().catch(() => {}).then(() => setAttempt((n) => n + 1)); }}>Try again</Button></CardContent></Card></>;
-  if (failed) return <><Card><CardContent><p role="alert">Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again.</p><Button type="button" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>Check again</Button></CardContent></Card></>;
+  if (failed && engine?.state === "engine_failed") return <><Card><CardContent><Alert variant="destructive"><ErrorIcon /><AlertDescription>{engine.problem ?? "Setting up the AI engine stopped."}</AlertDescription></Alert><Button type="button" variant="secondary" onClick={() => { void retryEngine().catch(() => {}).then(() => setAttempt((n) => n + 1)); }}>Try again</Button></CardContent></Card></>;
+  if (failed) return <><Card><CardContent><Alert variant="destructive"><ErrorIcon /><AlertDescription>Home couldn't reach the AI engine to build a plan. Wait a minute, then press Check again.</AlertDescription></Alert><Button type="button" variant="secondary" onClick={() => setAttempt((n) => n + 1)}>Check again</Button></CardContent></Card></>;
   if (!wording) return <><Card><CardContent><p>Looking at this computer…</p></CardContent></Card></>;
 
   return (
@@ -103,8 +107,8 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
         ) : null}
         {wording.gets.length ? <ul className="list-disc space-y-1 pl-5">{wording.gets.map((line) => <li key={line}>{line}</li>)}</ul> : null}
         {wording.sizeLine ? <p>{wording.sizeLine}</p> : null}
-        {wording.diskLine ? <p role="alert">{wording.diskLine}</p> : null}
-        {error ? <p role="alert">{error}</p> : null}
+        {wording.diskLine ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{wording.diskLine}</AlertDescription></Alert> : null}
+        {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}
         {canInstall ? <Button type="button" size="lg" disabled={busy} onClick={() => void install()}>{actionLabel}</Button> : null}
         </div>

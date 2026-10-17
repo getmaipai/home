@@ -39,6 +39,10 @@ describe("WebSearchStep", () => {
     type(rendered, "http://example.com");
     await press(rendered, "Test");
     await waitFor(() => expect(rendered.getByRole("alert").textContent).toBe("Use a search service on your home network. Type an address like http://searx.local:8888."));
+    const alert = rendered.getByRole("alert");
+    expect(alert.getAttribute("data-slot")).toBe("alert");
+    expect(alert.className).toContain("text-destructive");
+    expect(alert.querySelector("svg")).not.toBeNull();
     expect(done).not.toHaveBeenCalled();
   });
 

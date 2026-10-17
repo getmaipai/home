@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/componen
 import { FolderPicker, type FolderPickerCopy } from "@maipai/ui/src/primitives/FolderPicker";
 import { api, ApiError, type SetupFolderListing, type SetupPlacementRow } from "@/lib/api";
 
+const ErrorIcon = getIcon("circle-alert");
+
 const CheckIcon = getIcon("check");
 
 export interface StorageChoice { models?: string; records?: string }
@@ -179,7 +181,7 @@ export function StorageStep({ split, value, onChange }: {
                 </div>
               )}
               {nativeRefusal?.which === which ? <div className="pt-3"><Alert variant="destructive"><AlertDescription>{nativeRefusal.text}</AlertDescription></Alert></div> : null}
-              {picking === which && pickerError ? <p role="alert">{pickerError}</p> : null}
+              {picking === which && pickerError ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{pickerError}</AlertDescription></Alert> : null}
               {picking === which && listing && !listing.writable ? <p className="text-base text-muted-foreground md:text-lg">Home can't save files in this folder. Go up and pick a folder you own, or make a new one here.</p> : null}
               {picking === which && windowOpen !== which ? <Button type="button" variant="ghost" size="lg" onClick={() => setPicking(null)}>Cancel</Button> : null}
               {picking !== which ? own.map((row) => (

@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
+import { getIcon } from "@maipai/ui/src/icons";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@maipai/ui/src/dashboard/components/ui/card";
 import { api, ApiError } from "@/lib/api";
 import { renderSetupReviewScreen } from "./SetupWizard";
+
+const ErrorIcon = getIcon("circle-alert");
 
 const REVIEW_SCREENS = ["engine_location", "storage", "checks", "plan"] as const;
 type ReviewScreen = (typeof REVIEW_SCREENS)[number];
@@ -52,7 +56,7 @@ export function SetupReviewPage() {
       <CardContent>
         <p>Review your computers, files, checks, and plan.</p>
         {renderSetupReviewScreen({ screen, engine, onEngineChange: setEngine, readOnly: screen === "storage", checkRows: rows, checkError, onRetryChecks: () => void refreshChecks() })}
-        {error ? <p role="alert">{error}</p> : null}
+        {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="secondary" disabled={screenIndex === 0 || busy} onClick={() => setScreenIndex((index) => index - 1)}>Back</Button>
           {screenIndex < REVIEW_SCREENS.length - 1 ? <Button type="button" disabled={busy} onClick={() => setScreenIndex((index) => index + 1)}>Continue</Button> : <Button type="button" disabled={busy} onClick={() => void finish()}>{busy ? "Saving" : "Done"}</Button>}

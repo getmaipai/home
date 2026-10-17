@@ -1,8 +1,12 @@
 import { useEffect, useRef, useState, type MutableRefObject } from "react";
+import { getIcon } from "@maipai/ui/src/icons";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Input } from "@maipai/ui/src/ui/input";
 import { Field, FieldLabel } from "@maipai/ui/src/dashboard/components/ui/field";
 import { api, ApiError } from "@/lib/api";
+
+const ErrorIcon = getIcon("circle-alert");
 
 const SKIP_FAILED = "Home couldn't turn on DuckDuckGo search. Press Skip for now again to go on, or set up web search later in Settings.";
 
@@ -65,7 +69,7 @@ export function WebSearchStep({ candidate = null, onFinished, continueRef, test 
         <FieldLabel htmlFor="searxng-address">SearXNG address{candidate && address === candidate ? " (found on this computer)" : ""}</FieldLabel>
         <Input id="searxng-address" type="url" inputMode="url" autoComplete="off" placeholder="http://searx.local:8888" value={address} onChange={(event) => { setAddress(event.target.value); setPassed(false); setError(null); }} />
       </Field>
-      {error ? <p role="alert">{error}</p> : null}
+      {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
       {passed ? <p role="status" className="text-base text-muted-foreground md:text-lg">That works. Press Save to use it.</p> : null}
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="secondary" size="lg" disabled={empty || busy !== null} onClick={() => void runTest()}>Test</Button>
