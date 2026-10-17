@@ -15,6 +15,7 @@ import type { PersonRow } from "@/types";
 import { TestClient } from "./client";
 import { child, owner, teen } from "./support/testAuth";
 import { resetDb } from "./reset-db";
+import { ADULT_HOST, installNewsApp, putItem, removeNewsApp, resetNewsState, seedFeeds } from "./support/newsFixture";
 
 beforeEach(() => resetDb());
 afterEach(() => { rmSync(installedPackageVersionDir("list-view", "9.9.9"), { recursive: true, force: true }); __resetPackageCachesForTests(); __resetAppCachesForTests(); });
@@ -187,5 +188,30 @@ describe("a raised page cannot be reached by a child or a guest", () => {
     expect(appPackageProblems(manifest, dir).join(" ")).toContain("a page may only raise the floor");
     const { o } = await who();
     expect(await fixtureApps(o)).toEqual([]);
+  });
+});
+
+// NEWS-02a: the News routes against the floors. My Mix (teen) owns `mix` and `reset_mix`; the shared-screen id belongs to no page and so needs
+// every page's floor; a guest is below the package. A child and a guest get 404 on every route a raised page owns, and the picture route
+// answers only for an item in the asker's released set.
+describe("the News routes honour the page floors", () => {
+  afterEach(() => removeNewsApp());
+  test("a child and a guest are closed out of My Mix's data, its action, the unowned shared-screen id and the app's data and actions respectively", async () => {
+    resetNewsState();
+    installNewsApp();
+    const feeds = seedFeeds();
+    const item = putItem(feeds.household, ADULT_HOST);
+    const { c, g, t } = await who();
+    const post = (client: TestClient, path: string, body: unknown = {}) => client.post(`/api/plugins/news/${path}`, body);
+    for (const path of ["data/mix", "data/household-today", "actions/reset_mix", "actions/summarize", "data/nothing"]) expect((await post(c, path)).status, `child ${path}`).toBe(404);
+    for (const path of ["data/today", "data/mix", "data/topics", "data/story", "data/household-today", "actions/follow", "actions/save", "actions/reset_mix"]) expect((await post(g, path, { id: item.id })).status, `guest ${path}`).toBe(404);
+    expect((await g.get(`/api/plugins/news/images/${item.id}?w=480`)).status).toBe(404);
+    // The item is an adult-list item: the child may reach the route but it is not in their released set.
+    expect((await c.get(`/api/plugins/news/images/${item.id}?w=480`)).status).toBe(404);
+    expect((await post(t, "data/mix")).status).toBe(200);
+    expect((await post(t, "actions/reset_mix")).status).toBe(200);
+    expect(appRouteAllowed({ role: "child" } as PersonRow, "news", "actions", "reset_mix")).toBe(false);
+    expect(appRouteAllowed({ role: "child" } as PersonRow, "news", "data", "today")).toBe(true);
+    expect(appRouteAllowed({ role: "guest" } as PersonRow, "news", "data", "today")).toBe(false);
   });
 });

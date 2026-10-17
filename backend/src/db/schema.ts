@@ -2078,6 +2078,8 @@ export const mediaCollections = sqliteTable(
     // One liked, one watch later and one queue per person exist by construction.
     uniqueIndex("media_collections_singleton_idx").on(table.personId, table.kind).where(sql`${table.kind} IN ('liked', 'watch_later', 'queue')`),
   ],
+);
+
 // NEWS-02 (docs/design/news-app-2026-10-17.md section 7): the three person-scope News records. Each row belongs to one
 // person, is shown to that person only (never to another person or an admin page, RULES 6a), carries the spec's id,
 // provenance and clock stamp, and goes with the person when they are forgotten (lib/personLifecycle.ts).

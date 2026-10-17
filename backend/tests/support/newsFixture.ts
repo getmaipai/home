@@ -136,7 +136,7 @@ export async function startPublisher(pages: Record<string, string> = {}): Promis
   });
   const fetchFromServer = (original: URL, init?: RequestInit) => fetch(`http://127.0.0.1:${server.port}${original.pathname}${original.search}`, { ...init, headers: { ...(init?.headers as Record<string, string> | undefined), "x-original-host": original.hostname } });
   return {
-    port: server.port, requests, hosts,
+    port: server.port ?? 0, requests, hosts,
     stop: () => server.stop(true),
     attach() {
       __setNewsPictureDepsForTests({

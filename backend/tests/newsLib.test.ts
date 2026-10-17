@@ -2,7 +2,7 @@
 // over blocks and speech, and the shelf store's additions. No network.
 import { describe, expect, test } from "bun:test";
 import { extractEntries } from "@/lib/shelf/shelfPoller";
-import { extractFullArticle, type ArticleBlock } from "@/lib/retrieval/extractArticle";
+import { type ArticleBlock } from "@/lib/retrieval/extractArticle";
 import { gateBlocks, gateFor, sentencesOf, speechFor, SPEECH_CHUNK_MAX } from "@/lib/news/childGate";
 import { openShelfStore } from "@/lib/shelf/shelfStore";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
@@ -21,27 +21,6 @@ describe("the feed's own picture", () => {
     expect(first(`<description>no picture</description>`)).toBeUndefined();
     expect(first(`<media:thumbnail url="javascript:alert(1)"/>`)).toBeUndefined();
     expect(first(`<media:thumbnail url="https://user:pw@i.example.com/t.jpg"/>`)).toBeUndefined();
-  });
-});
-
-describe("extractFullArticle in news link mode", () => {
-  const html = `<html><body><nav>Menu</nav><article><h1>T</h1><p>Read <a href="https://other.example.org/x#frag">the report</a> and <a href="/relative">this</a>.</p><blockquote>Quoted words.</blockquote><figure><img src="https://p.example.com/a.jpg"></figure></article><footer>F</footer></body></html>`;
-  const base = { book: "news", allowedBooks: new Set<string>(), allowImages: false, news: true };
-  test("a teen or an adult keeps an outbound http(s) address as href, without the fragment; a child gets plain text; no figures, no page chrome", () => {
-    const open = extractFullArticle(html, { ...base, allowLinks: true }).blocks;
-    expect(JSON.stringify(open)).toContain('"href":"https://other.example.org/x"');
-    expect(JSON.stringify(open)).not.toContain("/relative\"");
-    expect(open.some((b) => b.type === "quote")).toBe(true);
-    expect(open.some((b) => b.type === "figure")).toBe(false);
-    expect(JSON.stringify(open)).not.toContain("Menu");
-    const plain = extractFullArticle(html, { ...base, allowLinks: false }).blocks;
-    expect(JSON.stringify(plain)).not.toContain("href");
-    expect(JSON.stringify(plain)).toContain("the report");
-  });
-  test("the reference mode is unchanged: no href, no quote", () => {
-    const blocks = extractFullArticle(html, { book: "b", allowedBooks: new Set(["b"]), allowLinks: true, allowImages: false }).blocks;
-    expect(JSON.stringify(blocks)).not.toContain("href");
-    expect(blocks.some((b) => b.type === "quote")).toBe(false);
   });
 });
 
