@@ -42109,6 +42109,18 @@
                         "allowed",
                         "restricted"
                       ]
+                    },
+                    "quality": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "detailed"
+                      ],
+                      "description": "The household's Picture quality setting."
+                    },
+                    "detailed_ready": {
+                      "type": "boolean",
+                      "description": "Whether Detailed pictures can be made now (the model is installed and this computer can run it)."
                     }
                   },
                   "required": [
@@ -42116,7 +42128,9 @@
                     "engine",
                     "adapters",
                     "bands",
-                    "adult_adapters"
+                    "adult_adapters",
+                    "quality",
+                    "detailed_ready"
                   ]
                 }
               }
@@ -43480,6 +43494,24 @@
                     "can_vary": {
                       "type": "boolean"
                     },
+                    "quality": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "detailed"
+                      ],
+                      "description": "Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."
+                    },
+                    "switch_to": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "quick",
+                        "detailed",
+                        null
+                      ],
+                      "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                    },
                     "size": {
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
@@ -43508,6 +43540,8 @@
                     "error",
                     "files",
                     "can_vary",
+                    "quality",
+                    "switch_to",
                     "size",
                     "stop_id"
                   ]
@@ -43793,6 +43827,24 @@
                     "can_vary": {
                       "type": "boolean"
                     },
+                    "quality": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "detailed"
+                      ],
+                      "description": "Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."
+                    },
+                    "switch_to": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "quick",
+                        "detailed",
+                        null
+                      ],
+                      "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                    },
                     "size": {
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
@@ -43821,6 +43873,8 @@
                     "error",
                     "files",
                     "can_vary",
+                    "quality",
+                    "switch_to",
                     "size",
                     "stop_id"
                   ]
@@ -43919,6 +43973,26 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quality": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "detailed"
+                    ],
+                    "description": "Make it again as this kind. Left out, the picture keeps its own kind."
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "A new job in the same chat.",
@@ -44054,6 +44128,24 @@
                     "can_vary": {
                       "type": "boolean"
                     },
+                    "quality": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "detailed"
+                      ],
+                      "description": "Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."
+                    },
+                    "switch_to": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "quick",
+                        "detailed",
+                        null
+                      ],
+                      "description": "The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                    },
                     "size": {
                       "type": "string",
                       "description": "The size being made, like 1024x1024."
@@ -44082,6 +44174,8 @@
                     "error",
                     "files",
                     "can_vary",
+                    "quality",
+                    "switch_to",
                     "size",
                     "stop_id"
                   ]

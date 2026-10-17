@@ -32,6 +32,8 @@ export interface PictureRequest {
   /** A variation or an edit starts from this file in the same conversation. */
   source_file_id: string | null;
   audience: "all-ages" | "adult";
+  /** IMGGEN-QUALITY-01: which maker made it (absent on a job stored before the choice existed: Quick). */
+  quality?: "quick" | "detailed";
   /** LIKENESS-01: set when the picture looks like a household adult. Checked again on every poll while the job waits. */
   likeness?: JobLikeness | null;
 }

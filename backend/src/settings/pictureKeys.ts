@@ -36,4 +36,25 @@ export const PICTURE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.pictures",
     honoured_by: ["home"],
   }),
+  // IMGGEN-QUALITY-01 (owner ruling 2026-10-17): one plain choice. Quick is the default and stays fast; Detailed is the slower,
+  // richer maker. The model names live only under Details on the Pictures page.
+  SettingsKey.parse({
+    key: "generation.picture_quality",
+    scope: "household",
+    selector: "select",
+    range: { options: ["quick", "detailed"] },
+    default: "quick",
+    label: "Picture quality",
+    help: "Quick makes a picture in a few seconds. Detailed takes longer and has more looks to choose from. Anyone can ask chat for the other one for a single picture.",
+    level: "basic",
+    copy: {
+      does: "Decides how chat makes a picture when nobody asks for a kind.",
+      options: {
+        quick: "A few seconds a picture. Best for most requests.",
+        detailed: "About 15 to 30 seconds a picture, with finer detail and many more styles.",
+      },
+    },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
 ];

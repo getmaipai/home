@@ -9,6 +9,7 @@ import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIA
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
+import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/quality";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { prepareStylesUse } from "@/lib/likeness/apply";
 import { recordLikenessUse } from "@/lib/likeness/uses";
@@ -36,6 +37,8 @@ const JobSchema = z.object({
   error: z.string().nullable(),
   files: z.array(FileSchema),
   can_vary: z.boolean(),
+  quality: z.enum(["quick", "detailed"]).describe("Which maker made it: Quick (a few seconds) or Detailed (slower, finer, more styles)."),
+  switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this picture can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
   size: z.string().describe("The size being made, like 1024x1024."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
@@ -54,10 +57,18 @@ function phaseLabel(job: PictureJob): string {
   return "Drawing";
 }
 
+/** IMGGEN-QUALITY-01: the card's kind and the other kind it can be made again as. A picture made with a style is bound to the style's maker, so it offers no switch. */
+function qualityFields(job: PictureJob, detailedReadyNow: boolean, can: boolean): { quality: "quick" | "detailed"; switch_to: "quick" | "detailed" | null } {
+  const quality = job.request.quality ?? "quick";
+  if (!can || job.request.loras.length > 0) return { quality, switch_to: null };
+  if (quality === "detailed") return { quality, switch_to: "quick" };
+  return { quality, switch_to: detailedReadyNow ? "detailed" : null };
+}
+
 /** The card for a job: the first picture and every variation made from it are one card. While any of them is
  * being made the card shows that one's progress; the pictures finished so far stay in view. `job` is the id to
  * stop (the one being made), or the card's own id when nothing is. */
-export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean) {
+export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, detailedReadyNow = false) {
   const group = root.turnId ? pictureJobsForTurn(actor, root.turnId).filter((j) => j.kind !== "edit") : [root];
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.find((j) => j.state === "queued" || j.state === "running") ?? null;
@@ -72,6 +83,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean) {
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
     can_vary: canVary && !active && files.length > 0 && files.length < 12,
+    ...qualityFields(last, detailedReadyNow, canVary && !active),
   };
 }
 
@@ -103,11 +115,11 @@ const getRoute = createRoute({
   request: { params: idParams },
   responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "The job as its owner sees it." }, ...refusals },
 });
-picturesRoutes.openapi(getRoute, (c) => {
+picturesRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person");
   const job = getPictureJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That picture isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null), 200);
+  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null, detailedReady(await pictureEngineStatus())), 200);
 });
 
 const previewRoute = createRoute({
@@ -132,12 +144,12 @@ picturesRoutes.openapi(cancelRoute, async (c) => {
   const actor = c.get("person");
   const job = await cancelPictureJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That picture isn't available any more." }, 404) as never;
-  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null), 200);
+  return c.json(cardView(actor, job, pictureDenial(routeAudience(actor)) === null, detailedReady(await pictureEngineStatus())), 200);
 });
 
 const variationRoute = createRoute({
   method: "post", path: "/jobs/{id}/variation", tags: ["Pictures"], summary: "Make another version of a picture with a new seed, or try a failed or stopped one again", middleware: [requireAuth] as const,
-  request: { params: idParams },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the picture keeps its own kind.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: JobSchema } }, description: "A new job in the same chat." }, ...refusals },
 });
 picturesRoutes.openapi(variationRoute, async (c) => {
@@ -159,16 +171,19 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   // LIKENESS-01: another picture in a style of a household adult is decided again, now: their agreement may have been taken back since.
   const prep = await prepareStylesUse({ medium: "picture", audience: routeAudience(actor), styles: used, text: `${prompt} ${used.map((a) => a.name).join(" ")}`, source: "chat" });
   if (prep.kind === "refused") return c.json({ error: prep.line || PROMPT_REFUSAL_LINE.real_person, code: "likeness" }, 403) as never;
+  // IMGGEN-QUALITY-01: Quick or Detailed again. Left out, the picture keeps its own kind; a style made for one maker decides.
+  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
+  const choice = chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default, ...(prep.kind === "likeness" && prep.proofs.has(a.id) ? { likeness_proof: prep.proofs.get(a.id)! } : {}) }));
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
-      body: { prompt, size: source.request.size, n: 1, audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
+      body: { prompt, size: source.request.size, n: 1, ...(choice.model ? { model: choice.model } : {}), audience: adultAdaptersAllowed() ? "adult" : "all-ages", ...(loras.length ? { loras } : {}), ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}) }, sourceFileId: source.files[0]?.id ?? null,
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
     if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     void job;
-    return c.json(cardView(actor, source, true), 200);
+    return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);
   } catch (error) {
     const status = error instanceof StackPicturesError && (error.status === 422 || error.status === 409) ? error.status : 503;
     return c.json({ error: plainFailure(error), code: error instanceof StackPicturesError ? error.code : "failed" }, status) as never;

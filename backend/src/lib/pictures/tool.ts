@@ -11,6 +11,7 @@ import { adaptersFor, matchAdapter, withTriggerWords } from "./adapters";
 import { startPictureJob, plainFailure } from "./jobs";
 import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience, type PictureDenial, type PromptRefusal } from "./policy";
 import { pictureEngineStatus } from "./ready";
+import { chooseQuality, isPictureQuality, QUALITY_NOTE_LINE } from "./quality";
 import { StackPicturesError } from "./stack";
 import { prepareStyleUse } from "@/lib/likeness/apply";
 import { recordLikenessUse } from "@/lib/likeness/uses";
@@ -101,6 +102,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const sentPrompt = withTriggerWords(prompt, adapter);
   const second = refusePrompt(`${sentPrompt} ${adapter?.name ?? ""}`);
   if (second) return refused(callId, args, { kind: "prompt", why: second, line: PROMPT_REFUSAL_LINE[second] });
+  // IMGGEN-QUALITY-01: Quick or Detailed. A style made for one maker decides; else what was asked for, else the household's setting.
+  const choice = chooseQuality({ requested: isPictureQuality(args.quality) ? args.quality : undefined, style: adapter, engine });
+  const qualityNote = choice.note ? ` ${QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed picture, which takes longer than a Quick one; say so in one short sentence." : "";
   const styleNote = named && !adapter ? " The style they named is not in the library, so the picture was made without it; say so briefly." : "";
   // LIKENESS-01: a style of a household adult is made only if they agreed; a real person with no such style is refused.
   const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
@@ -119,6 +123,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
         prompt: sentPrompt,
         size,
         n: count,
+        ...(choice.model ? { model: choice.model } : {}),
         audience: adultAdaptersAllowed() ? "adult" : "all-ages",
         ...(adapter ? { loras: [{ id: adapter.id, scale: adapter.strength_default, ...(prep.kind === "likeness" ? { likeness_proof: prep.proof } : {}) }] } : {}),
         ...(prep.kind === "likeness" && prep.negativePrompt ? { negative_prompt: prep.negativePrompt } : {}),
@@ -130,7 +135,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}` },
+        reply: { text: `${many} being made from this description: ${prompt}. It appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way.${styleNote}${qualityNote}` },
         data: { pictureJobId: job.id },
         actions: [],
       },

@@ -13,6 +13,9 @@ Weather says why it has nothing to show, place search reads on one line, and eve
 - **Add a place** results are one line each (town, then the state or region in grey), in a wider list with a clear highlight, a Searching state and "No places match". The Weather default place row stacks so nothing runs behind the list.
 - **All apps** (the grid button on the left rail) is now a full page with a search box, Favorites first, apps grouped by topic, and a star on each app. Pins: spec-v0.1.161, ui-v0.5.254. Weather 0.3.1.
 
+### Pictures
+- Two kinds of picture, in plain words. **Quick** (a few seconds) stays the default; **Detailed** (15 to 30 seconds, finer detail, many more styles) is the choice for people who want it. Chat uses Detailed when you ask for the best quality, photoreal or a custom look and says so; a style made for Detailed uses it on its own; a **Make it Detailed** or **Make it Quick** button on each picture makes it again the other way. Settings, Pictures and videos has a **Picture quality** row, a **What is the difference?** comparison and **Get Detailed pictures** when it is not installed. Model names appear only under **Details**.
+
 ## [0.2.13] - 2026-10-17
 
 Chat answers while the faster engine downloads, and Home can pause chat and show what is installing.

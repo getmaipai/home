@@ -481,3 +481,32 @@ that, and what a LoRA made for it selects.
 - **Unverified**: Z-Image-Turbo end to end through the Stack (the live Studio had its weights uninstalled during this session); a 4-bit/8-bit p64
   run; any Chroma or SDXL speed on this Mac beyond section 3.3; real Civitai LoRA headers; the uncensored behaviour (by design nothing explicit was generated).
 
+## 17. Quick or Detailed: the person-facing choice (2026-10-17)
+
+Owner ask (Jesse): Klein stays the fast default; Z-Image-Turbo becomes an advanced choice "users can choose on the fly in chat and in settings. It
+needs not to scare them and be simple and easy to understand." Decided on merit (no design-resolver agent type was available).
+
+**One concept, two plain words.** **Quick** (a few seconds, clean, text that reads, edits) and **Detailed** (15 to 30 seconds, finer detail, many more
+styles). A person never sees "Klein", "Z-Image" or "LoRA"; the model names live under a **Details** disclosure on the admin page only. One word per kind,
+used everywhere: the setting, the chat line, the card button, the docs.
+
+| Where | What the person sees | How it works |
+|---|---|---|
+| Settings, Pictures and videos | One row, **Picture quality: Quick or Detailed** (default Quick), with a one-sentence help line; below it **Quick and Detailed pictures** (what is on this computer), **What is the difference?** (time, look, styles, editing) and **Details** | Spec key `generation.picture_quality`, a select declared in Home (`settings/pictureKeys.ts`), read through `householdPictureQuality()`. The row is the existing settings row; the comparison is a kit Collapsible and Table |
+| Detailed not installed | **Get Detailed pictures (32.8 GB)** on the Detailed row; if Detailed is chosen anyway, a plain Alert says chat makes Quick pictures until it is on this computer | The existing install route and job (`installModel("z-image-turbo")`), shown by the existing progress strip (rule S6: no new surface) |
+| Chat, by words | "As detailed as you can", "photoreal", a custom look: the model sets `quality: "detailed"` and says so in one line | Tool argument `quality` on `generate_image`; Home, not the model, maps it to a Stack model (`pictures/quality.ts`). Detailed that is not installed makes a Quick picture and the tool result tells the model how an admin gets it |
+| Chat, by a style | A style made for the detailed maker makes the picture Detailed on its own, with a one-line note; a style made for the quick maker stays Quick | `chooseQuality`: the style's base model decides; the person never picks a model for a style |
+| On each picture | **Make it Detailed** (Slower, with finer detail) under a Quick picture; **Make it Quick** (Faster, a few seconds) under a Detailed one. None on a picture made with a style | Card fields `quality` and `switch_to`; `POST /api/pictures/jobs/{id}/variation` takes `{ quality }`. The button is the kit `ImageGallery` `actions` prop (ui-v0.5.255), no Home wrapper (rule 9) |
+
+**Why not a composer toggle.** The composer already carries the model and thinking controls; a third switch for one tool would add a persistent
+decision to every message. The two moments a person cares (before, in words; after, "make it better") are covered without it.
+
+**Why the setting is household and not per person.** The cost is the computer's (30 s of the one GPU and 34 GB of memory), so the admin sets the default;
+anyone still gets Detailed for one picture by asking or pressing the button.
+
+**Rules held.** Age and surface gates and the two absolute lines run first and unchanged (rule 0); Edit always uses Quick (only Klein edits); a failed
+tool never fails the answer (rule 6); status reaches the person through the install job and strip, the Pictures settings view and the card (S6).
+
+**Unverified.** A real Detailed picture end to end through Home on the live Studio (no render was made without the bench lock; the Stack was a stub in the
+screenshots); whether the model passes `quality: "detailed"` at the right moments (no bench row yet); **Get Detailed pictures** against the real Stack install job.
+

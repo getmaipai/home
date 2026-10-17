@@ -15,6 +15,8 @@ const overview = (over: Partial<AdminOverview> = {}): AdminOverview => ({
   adapters: [style(), style({ id: "lora-b", name: "Boudoir Film", classification: "adult-only", licence: "No licence stated", licence_known: false })],
   bands: [{ band: "children", label: "Children", on: false, locked: true, note: "Children cannot make pictures." }, { band: "teens", label: "Teens", on: false, locked: true, note: "Teens cannot make pictures." }, { band: "adults", label: "Adults", on: true, locked: false, note: "Adults can ask chat for pictures on their own screen." }],
   adult_adapters: "allowed",
+  quality: "quick",
+  detailed_ready: false,
   ...over,
 });
 function mount(data: AdminOverview) {
@@ -32,7 +34,8 @@ function mount(data: AdminOverview) {
 describe("Pictures and videos settings view", () => {
   test("shows the model, the three ages with children and teens locked off, and each style with its age badge and licence", async () => {
     const v = mount(overview());
-    await waitFor(() => expect(v.getByText("FLUX.2 Klein 4B")).toBeTruthy());
+    await waitFor(() => expect(v.getByText("Quick")).toBeTruthy());
+    expect(v.queryByText("FLUX.2 Klein 4B")).toBeNull();
     expect(v.getByLabelText("Children can make pictures")).toBeDisabled();
     expect(v.getByLabelText("Teens can make pictures")).toBeDisabled();
     expect(v.getByLabelText("Adults can make pictures").getAttribute("aria-checked")).toBe("true");
@@ -40,6 +43,32 @@ describe("Pictures and videos settings view", () => {
     expect(v.getByText("Adults only")).toBeTruthy();
     expect(v.getByText("All ages")).toBeTruthy();
     expect(v.getAllByText(/No licence stated/).length).toBeGreaterThan(0);
+    v.restore();
+  });
+
+  test("IMGGEN-QUALITY-01: Quick and Detailed in plain words, the difference and the model names only when opened, and Get Detailed pictures with its size", async () => {
+    const detailed = { id: "z-image-turbo", label: "Z-Image-Turbo", installed: false, available: true, licence: "Apache-2.0", edit: false, peak_gb: 34, remaining_bytes: 32_800_000_000 };
+    const base = overview();
+    const v = mount(overview({ engine: { ...base.engine, models: [...base.engine.models, detailed] }, quality: "detailed", detailed_ready: false }));
+    await waitFor(() => expect(v.getByText("Detailed")).toBeTruthy());
+    expect(v.queryByText(/Z-Image/)).toBeNull();
+    expect(v.getByText("Detailed is chosen, but it is not ready")).toBeTruthy();
+    fireEvent.click(v.getByRole("button", { name: "What is the difference?" }));
+    await waitFor(() => expect(v.getByRole("table", { name: "Quick compared with Detailed" })).toBeTruthy());
+    expect(v.getByText("About 15 to 30 seconds")).toBeTruthy();
+    fireEvent.click(v.getByRole("button", { name: "Details" }));
+    await waitFor(() => expect(v.getByText("FLUX.2 Klein 4B")).toBeTruthy());
+    fireEvent.click(v.getByRole("button", { name: "Get Detailed pictures (32.8 GB)" }));
+    await waitFor(() => expect(picturesAdminApi.installModel).toHaveBeenCalledWith("z-image-turbo"));
+    v.restore();
+  });
+
+  test("Detailed already on this computer shows no download button and no warning", async () => {
+    const base = overview();
+    const v = mount(overview({ engine: { ...base.engine, models: [...base.engine.models, { id: "z-image-turbo", label: "Z-Image-Turbo", installed: true, available: true, licence: "Apache-2.0", edit: false, peak_gb: 34, remaining_bytes: 0 }] }, detailed_ready: true }));
+    await waitFor(() => expect(v.getByText("Detailed")).toBeTruthy());
+    expect(v.queryByRole("button", { name: /Get Detailed pictures/ })).toBeNull();
+    expect(v.queryByText("Detailed is chosen, but it is not ready")).toBeNull();
     v.restore();
   });
 

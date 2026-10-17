@@ -24,6 +24,7 @@ import { mentionsSexualWord, minorSexualMatch, normalise } from "@/lib/pictures/
 
 export const GENERATION_ADULTS_KEY = "generation.adults";
 export const GENERATION_ADULT_ADAPTERS_KEY = "generation.adult_adapters";
+export const GENERATION_PICTURE_QUALITY_KEY = "generation.picture_quality";
 
 export type PictureDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off" | "temporary_unsupported";
 
@@ -77,6 +78,15 @@ export function adultAdaptersAllowed(): boolean {
     return getHouseholdSettingValue(GENERATION_ADULT_ADAPTERS_KEY) !== "restricted";
   } catch {
     return true;
+  }
+}
+
+/** `generation.picture_quality`: "quick" (default) or "detailed". Read failures read as quick, the fast one. */
+export function householdPictureQuality(): "quick" | "detailed" {
+  try {
+    return getHouseholdSettingValue(GENERATION_PICTURE_QUALITY_KEY) === "detailed" ? "detailed" : "quick";
+  } catch {
+    return "quick";
   }
 }
 

@@ -10,7 +10,7 @@ import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 
 afterEach(cleanup);
 
-const card = (over: Partial<PictureCard> = {}): PictureCard => ({ id: "pic-1", state: "running", percent: 40, label: "Drawing", position: null, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 3_000, prompt: "a red fox", kind: "generate", conversation_id: "conv-1", error: null, files: [], can_vary: false, size: "1024x1024", stop_id: "pic-1", ...over });
+const card = (over: Partial<PictureCard> = {}): PictureCard => ({ id: "pic-1", state: "running", percent: 40, label: "Drawing", position: null, stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null, elapsed_ms: 3_000, prompt: "a red fox", kind: "generate", conversation_id: "conv-1", error: null, files: [], can_vary: false, quality: "quick", switch_to: null, size: "1024x1024", stop_id: "pic-1", ...over });
 const FILE = { id: "file-1", url: "https://example.test/api/image-edit/pictures/file-1?conversation_id=conv-1", width: 1024, height: 1024, seed: 7, model: "flux2-klein-4b", steps: 4, ms: 3900, alt: "a red fox" };
 const props = { toolCallId: "t", toolName: "picture", args: {}, argsText: "{}", result: { id: "pic-1" }, isError: false, status: { type: "complete" }, addResult: () => undefined, resume: () => undefined } as unknown as ComponentProps<typeof PictureToolRender>;
 
@@ -65,6 +65,28 @@ describe("the picture card", () => {
     fireEvent.click(v.getByRole("button", { name: "Edit picture" }));
     expect(onEdit).toHaveBeenCalledWith({ id: "file-1", name: "a red fox", src: FILE.url });
     restore();
+  });
+
+  test("IMGGEN-QUALITY-01: a Quick picture offers 'Make it Detailed' with a plain hint; pressing it asks for the Detailed version; a Detailed picture offers Quick; a styled one offers nothing", async () => {
+    const restore = stub(card({ state: "done", percent: 100, files: [FILE], can_vary: true, quality: "quick", switch_to: "detailed" }));
+    const v = renderWithQueryClient(<PictureToolRender {...props} />);
+    await waitFor(() => expect(v.getByRole("button", { name: "Make it Detailed" })).toBeTruthy());
+    expect(v.getByText("Slower, with finer detail")).toBeTruthy();
+    expect(v.container.textContent).not.toMatch(/z-image|klein/i);
+    fireEvent.click(v.getByRole("button", { name: "Make it Detailed" }));
+    await waitFor(() => expect(picturesApi.again).toHaveBeenCalledWith("pic-1", "detailed"));
+    restore();
+    cleanup();
+    const restoreQuick = stub(card({ state: "done", percent: 100, files: [FILE], can_vary: true, quality: "detailed", switch_to: "quick" }));
+    const d = renderWithQueryClient(<PictureToolRender {...props} />);
+    await waitFor(() => expect(d.getByRole("button", { name: "Make it Quick" })).toBeTruthy());
+    restoreQuick();
+    cleanup();
+    const restoreStyled = stub(card({ state: "done", percent: 100, files: [FILE], can_vary: true, quality: "quick", switch_to: null }));
+    const none = renderWithQueryClient(<PictureToolRender {...props} />);
+    await waitFor(() => expect(none.container.querySelector('[data-slot="image-gallery"]')).toBeTruthy());
+    expect(none.queryByRole("button", { name: /Make it/ })).toBeNull();
+    restoreStyled();
   });
 
   test("the progress part draws nothing once the picture is done, and the picture part draws nothing while it is made", async () => {

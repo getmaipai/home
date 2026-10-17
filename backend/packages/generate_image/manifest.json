@@ -1,6 +1,6 @@
 {
   "id": "generate_image",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Picture",
@@ -62,6 +62,15 @@
         "maxLength": 80,
         "grounded": false,
         "description": "Optional. The name of one of the household's saved styles, only when the person names it, for example \"my pixel style\" gives \"pixel\". Leave it out otherwise; never invent one."
+      },
+      "quality": {
+        "type": "string",
+        "enum": [
+          "quick",
+          "detailed"
+        ],
+        "grounded": false,
+        "description": "Optional. Leave it out for almost every request: Home then uses the household's setting. Use detailed only when the person asks for the best quality, the finest detail, a photoreal or lifelike picture, or a custom look; it takes about 15 to 30 seconds instead of a few. Use quick only when they ask for a fast or rough one. When you choose detailed, say so in one short sentence."
       },
       "depicts_real_person": {
         "type": "boolean",

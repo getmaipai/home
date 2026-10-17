@@ -2,6 +2,12 @@
 
 All notable changes to the Make a Picture package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.1.2] - 2026-10-17
+
+### Added
+
+- IMGGEN-QUALITY-01: an optional `quality` argument, `quick` or `detailed`. Left out, Home uses the household's Picture quality setting (Quick by default). The model sets `detailed` only when the person asks for the best quality, fine detail, a photoreal picture or a custom look, and says so in one line. A style made for the detailed maker makes the picture Detailed on its own.
+
 ## [0.1.1] - 2026-10-17
 
 ### Changed

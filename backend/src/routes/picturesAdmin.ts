@@ -8,7 +8,8 @@ import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { allAdapters, dropAdapterCache, forgetAdapterPref, setAdapterEnabled } from "@/lib/pictures/adapters";
 import { addLoraFile, addLoraUrl, getStackJob, imageStatus, installPictureModel, patchLora, removeLora, StackPicturesError } from "@/lib/pictures/stack";
-import { adultAdaptersAllowed, householdAllowsAdults } from "@/lib/pictures/policy";
+import { adultAdaptersAllowed, householdAllowsAdults, householdPictureQuality } from "@/lib/pictures/policy";
+import { detailedReady } from "@/lib/pictures/quality";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { db } from "@/db";
 import { pictureAdapterPrefs, people } from "@/db/schema";
@@ -34,6 +35,8 @@ const OverviewSchema = z.object({
   adapters: z.array(AdapterSchema),
   bands: z.array(z.object({ band: z.enum(["children", "teens", "adults"]), label: z.string(), on: z.boolean(), locked: z.boolean(), note: z.string() })),
   adult_adapters: z.enum(["allowed", "restricted"]),
+  quality: z.enum(["quick", "detailed"]).describe("The household's Picture quality setting."),
+  detailed_ready: z.boolean().describe("Whether Detailed pictures can be made now (the model is installed and this computer can run it)."),
 });
 const refusals = errorResponses({ 400: "Bad request", 401: "Not signed in", 403: "Admins only", 404: "No such style or job", 409: "Already added", 413: "Too big", 422: "That cannot be added", 502: "The picture engine refused it", 503: "The picture engine is not available" });
 
@@ -102,6 +105,8 @@ picturesAdminRoutes.openapi(overviewRoute, async (c) => {
       { band: "adults" as const, label: "Adults", on: adultsOn, locked: false, note: adultsOn ? BAND_NOTES.adultsOn : BAND_NOTES.adultsOff },
     ],
     adult_adapters: adultAdaptersAllowed() ? "allowed" as const : "restricted" as const,
+    quality: householdPictureQuality(),
+    detailed_ready: detailedReady(status),
   }, 200);
 });
 

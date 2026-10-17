@@ -22,6 +22,9 @@ export interface PictureCard {
   error: string | null;
   files: PictureFile[];
   can_vary: boolean;
+  /** IMGGEN-QUALITY-01: which maker made it, and the other kind it can be made again as (null: a style binds it, or the other kind is not on this computer). */
+  quality: "quick" | "detailed";
+  switch_to: "quick" | "detailed" | null;
   size: string;
   stop_id: string;
 }
@@ -38,7 +41,7 @@ export const picturesApi = {
   status: () => send<PictureStatus>("/api/pictures/status"),
   card: (id: string, signal?: AbortSignal) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
-  again: (id: string) => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST" }),
+  again: (id: string, quality?: "quick" | "detailed") => send<PictureCard>(`/api/pictures/jobs/${encodeURIComponent(id)}/variation`, { method: "POST", ...(quality ? { headers: { "Content-Type": "application/json" }, body: JSON.stringify({ quality }) } : {}) }),
 };
 
 // IMGGEN-SET-01: the admin side (/api/pictures/admin), for the Pictures and videos settings view.
@@ -57,6 +60,9 @@ export interface AdminOverview {
   adapters: AdminAdapter[];
   bands: Array<{ band: "children" | "teens" | "adults"; label: string; on: boolean; locked: boolean; note: string }>;
   adult_adapters: "allowed" | "restricted";
+  /** IMGGEN-QUALITY-01: the household's Picture quality setting, and whether Detailed can be made now. */
+  quality: "quick" | "detailed";
+  detailed_ready: boolean;
 }
 export interface AdminJob { state: "running" | "done" | "failed"; percent: number; label: string; error: string | null; code: string | null; adapter: AdminAdapter | null }
 

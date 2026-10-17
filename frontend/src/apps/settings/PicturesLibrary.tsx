@@ -12,6 +12,8 @@ import { Input } from "@maipai/ui/src/ui/input";
 import { Label } from "@maipai/ui/src/ui/label";
 import { Progress } from "@maipai/ui/src/dashboard/components/ui/progress";
 import { Switch } from "@maipai/ui/src/ui/switch";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@maipai/ui/src/ui/collapsible";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
 import { RadioGroup, RadioGroupItem } from "@maipai/ui/src/dashboard/components/ui/radio-group";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup, ItemTitle } from "@maipai/ui/src/dashboard/components/ui/item";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
@@ -39,35 +41,89 @@ function useJob(jobId: string | null, onDone: () => void) {
   return query.data ?? null;
 }
 
+/** IMGGEN-QUALITY-01 (owner ruling 2026-10-17): two plain kinds of picture. The choice itself is the Picture quality row in the keys
+ * card above this view; this section says what each kind is, whether it is on this computer, and gets Detailed (the install job and
+ * the progress strip are the existing ones, rule S6). Model names appear only under Details. */
+const QUICK_MODEL_ID = "flux2-klein-4b";
+const DETAILED_MODEL_ID = "z-image-turbo";
+const kindOfModel = (id: string) => (id === DETAILED_MODEL_ID ? "Detailed pictures" : id === QUICK_MODEL_ID ? "Quick pictures" : id);
+
 function PictureModelSection({ overview, refresh }: { overview: AdminOverview; refresh: () => void }) {
   const [job, setJob] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const progress = useJob(job, () => { setJob(null); refresh(); });
+  const [family, setFamily] = useState<string | undefined>(undefined);
+  const progress = useJob(job, () => { setJob(null); setFamily(undefined); refresh(); });
   const engine = overview.engine;
   const installed = engine.models.filter((m) => m.installed);
+  const detailed = engine.models.find((m) => m.id === DETAILED_MODEL_ID);
   const installing = job !== null && progress?.state !== "failed";
-  async function install() {
+  async function install(which?: string) {
     setError(null);
-    try { setJob((await picturesAdminApi.installModel()).job); }
-    catch (e) { setError(messageOf(e, "The picture engine could not start the install. Check that the engine is running, then try again.")); }
+    setFamily(which);
+    try { setJob((await picturesAdminApi.installModel(which)).job); }
+    catch (e) { setFamily(undefined); setError(messageOf(e, "The picture engine could not start the install. Check that the engine is running, then try again.")); }
   }
   return (
-    <section aria-label="Picture model" className="flex flex-col gap-3">
-      <h2 className="text-sm font-medium">Picture model</h2>
+    <section aria-label="Picture quality" className="flex flex-col gap-3">
+      <h2 className="text-sm font-medium">Quick and Detailed pictures</h2>
       {overview.stack === "unreachable" ? (
         <Alert><AlertTitle>The picture engine isn't answering</AlertTitle><AlertDescription>Check that the engine is running, then reload this page.</AlertDescription></Alert>
       ) : installed.length > 0 ? (
-        <ItemGroup variant="card" aria-label="Installed picture models">
-          {installed.map((m) => (
-            <Item key={m.id}>
+        <>
+          <p className="text-sm text-muted-foreground">Pick which one chat uses in the Picture quality setting above. Anyone can still ask chat for the other kind for one picture.</p>
+          <ItemGroup variant="card" aria-label="Kinds of picture">
+            <Item>
               <ItemContent>
-                <ItemTitle>{m.label}</ItemTitle>
-                <ItemDescription clamp={false}>{m.licence ? `${m.licence} licence. ` : ""}{m.edit ? "Also changes pictures you describe changes to. " : ""}{m.id === engine.default_model ? "Used for new pictures." : ""}</ItemDescription>
+                <ItemTitle>Quick</ItemTitle>
+                <ItemDescription clamp={false}>A picture in a few seconds. It also changes pictures you already have.</ItemDescription>
               </ItemContent>
-              <ItemActions><Badge variant="secondary">Installed</Badge></ItemActions>
+              <ItemActions><Badge variant="secondary">On this computer</Badge></ItemActions>
             </Item>
-          ))}
-        </ItemGroup>
+            <Item>
+              <ItemContent>
+                <ItemTitle>Detailed</ItemTitle>
+                <ItemDescription clamp={false}>Takes 15 to 30 seconds. Finer detail, and many more styles to add.{detailed && !detailed.installed && !detailed.available ? " This computer does not have the memory for it." : ""}</ItemDescription>
+              </ItemContent>
+              <ItemActions>
+                {detailed?.installed ? <Badge variant="secondary">On this computer</Badge>
+                  : detailed?.available ? <Button type="button" onClick={() => void install(DETAILED_MODEL_ID)} disabled={installing}>{installing && family === DETAILED_MODEL_ID ? "Getting Detailed pictures…" : `Get Detailed pictures (${size(detailed.remaining_bytes)})`}</Button>
+                  : null}
+              </ItemActions>
+            </Item>
+          </ItemGroup>
+          {overview.quality === "detailed" && !overview.detailed_ready ? (
+            <Alert><AlertTitle>Detailed is chosen, but it is not ready</AlertTitle><AlertDescription>Chat makes Quick pictures until Detailed pictures are on this computer.</AlertDescription></Alert>
+          ) : null}
+          <Collapsible>
+            <CollapsibleTrigger asChild><Button type="button" variant="link">What is the difference?</Button></CollapsibleTrigger>
+            <CollapsibleContent>
+              <Table aria-label="Quick compared with Detailed">
+                <TableHeader><TableRow><TableHead /><TableHead>Quick</TableHead><TableHead>Detailed</TableHead></TableRow></TableHeader>
+                <TableBody>
+                  <TableRow><TableHead scope="row">Time</TableHead><TableCell>A few seconds</TableCell><TableCell>About 15 to 30 seconds</TableCell></TableRow>
+                  <TableRow><TableHead scope="row">Look</TableHead><TableCell>Clean and sharp. Good for most pictures and for words in a picture.</TableCell><TableCell>Finer detail, skin and fur that look real.</TableCell></TableRow>
+                  <TableRow><TableHead scope="row">Styles</TableHead><TableCell>A few to choose from.</TableCell><TableCell>Many more, including most styles shared online.</TableCell></TableRow>
+                  <TableRow><TableHead scope="row">Changing a picture</TableHead><TableCell>Yes (Edit)</TableCell><TableCell>No. Edit always uses Quick.</TableCell></TableRow>
+                </TableBody>
+              </Table>
+            </CollapsibleContent>
+          </Collapsible>
+          <Collapsible>
+            <CollapsibleTrigger asChild><Button type="button" variant="link">Details</Button></CollapsibleTrigger>
+            <CollapsibleContent>
+              <ItemGroup variant="card" aria-label="Installed picture models">
+                {installed.map((m) => (
+                  <Item key={m.id}>
+                    <ItemContent>
+                      <ItemTitle>{m.label}</ItemTitle>
+                      <ItemDescription clamp={false}>{kindOfModel(m.id)}. {m.licence ? `${m.licence} licence. ` : ""}{m.peak_gb ? `Uses up to ${m.peak_gb} GB of memory while it draws. ` : ""}{m.edit ? "Also changes pictures. " : ""}</ItemDescription>
+                    </ItemContent>
+                  </Item>
+                ))}
+              </ItemGroup>
+            </CollapsibleContent>
+          </Collapsible>
+        </>
       ) : (
         <Item variant="outline">
           <ItemContent>
@@ -127,7 +183,7 @@ function StyleRow({ a, refresh, setError }: { a: AdminAdapter; refresh: () => vo
         <ItemContent>
           <ItemTitle>{a.name} <Badge variant={a.classification === "adult-only" ? "destructive" : "secondary"}>{a.classification === "adult-only" ? "Adults only" : "All ages"}</Badge></ItemTitle>
           <ItemDescription clamp={false}>
-            {a.licence} · {size(a.bytes)} · made for {a.base_model}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}{a.looks_like ? ` · looks like ${a.looks_like.name}` : ""}
+            {a.licence} · {size(a.bytes)} · made for {kindOfModel(a.base_model).toLowerCase()}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}{a.looks_like ? ` · looks like ${a.looks_like.name}` : ""}
           </ItemDescription>
           {a.needs_confirmation ? (
             <Alert>

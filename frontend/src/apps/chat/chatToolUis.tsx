@@ -487,6 +487,14 @@ export const PictureToolRender: ToolCallMessagePartComponent<Record<string, neve
         maxVisible={4}
         size="large"
         {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: (image: { id: string; src: string; alt: string }) => (edit.canEdit ? edit.canEdit(target(image)) : true), editLabel: edit.label ?? "Edit picture" } : {})}
+        /* IMGGEN-QUALITY-01: the on-the-fly choice. A Quick picture offers Detailed (slower, finer); a Detailed one offers Quick. No model names. */
+        {...(card.switch_to && card.can_vary ? { actions: [{
+          id: "switch-quality",
+          label: card.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick",
+          hint: card.switch_to === "detailed" ? "Slower, with finer detail" : "Faster, a few seconds",
+          disabled: retrying,
+          onSelect: () => { setRetrying(true); void picturesApi.again(card.id, card.switch_to!).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); },
+        }] } : {})}
       />
     );
   }
