@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { resetDb } from "./reset-db";
 import { db } from "@/db";
-import { people as peopleTable } from "@/db/schema";
+import { kidUsage, people as peopleTable, pictureJobs } from "@/db/schema";
 import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { createBenchPeople, type BenchPeople } from "../scripts/bench/conversationRunner";
 import { removeTemporaryChatImages, storeTemporaryChatImage } from "@/lib/attachments";
@@ -15,7 +15,7 @@ import { runGenerateVideo } from "@/lib/videos/tool";
 import { getPictureJob } from "@/lib/pictures/jobs";
 import { saveJob } from "@/lib/pictures/jobStore";
 import { __setAgeCheckRunnerForTests, MINOR_VIEWER_LINE } from "@/lib/pictures/ageCheck";
-import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_PROMPT_PREFIX, CHILD_VIDEO_LIMIT_LINE, __resetKidLedgerForTests, childPromptUnsafe, laneOf } from "@/lib/pictures/lane";
+import { CHILD_CONTENT_LINE, CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_PROMPT_PREFIX, CHILD_VIDEO_LIMIT_LINE, childPromptUnsafe, laneOf, picturesMadeToday, videosMadeToday } from "@/lib/pictures/lane";
 import { __setChildSafetyRunnerForTests, type ChildSafetyCheck } from "@/lib/pictures/laneGate";
 import { adapterAudiencesFor } from "@/lib/pictures/policy";
 import { editToolsStatus, loadSource, startComment } from "@/lib/imageEdit";
@@ -54,7 +54,6 @@ beforeEach(() => {
   __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "yes" }));
   __resetAttestationsForTests();
   __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
-  __resetKidLedgerForTests();
   __setChildSafetyRunnerForTests(safeRunner());
 });
 afterEach(() => { __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }))); removeTemporaryChatImages("conv-1"); image.restore(); video.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); __setChildSafetyRunnerForTests(null); setHouseholdSettingValue("generation.kids", true); setHouseholdSettingValue("generation.people_prompts", false); });
@@ -243,16 +242,100 @@ describe("what the children made, for the admins", () => {
     const base = { personId: child.id, conversationId: null, turnId: null, kind: "generate" as const, stackJob: null, percent: 100, phase: "ready", position: null, request: { size: "1024x1024", n: 1, seed: null, loras: [], source_file_id: null, audience: "all-ages" as const }, files: [], temporary: false, createdAt: now, updatedAt: now };
     saveJob({ ...base, id: "pj-1", state: "done", prompt: "a friendly dragon", error: null });
     saveJob({ ...base, id: "pj-2", state: "failed", prompt: "a friendly turtle", error: CHILD_CONTENT_LINE });
+    db.insert(kidUsage).values([
+      { id: "ku-1", personId: child.id, day: "2026-10-17", kind: "edit", units: 1, prompt: "make the dragon green", outcome: "asked", createdAt: now },
+      { id: "ku-2", personId: child.id, day: "2026-10-17", kind: "edit", units: 1, prompt: "make the dragon scary", outcome: "withheld", createdAt: now },
+      { id: "ku-3", personId: child.id, day: "2026-10-17", kind: "picture", units: 1, prompt: "a friendly dragon", outcome: "asked", createdAt: now },
+    ]).run();
     const res = await client.get("/api/pictures/admin/kids-activity");
     expect(res.status).toBe(200);
     const body = await res.json() as { items: Array<{ person: { name: string }; prompt: string; withheld: boolean; kind: string }>; daily_pictures: number; daily_videos: number };
     expect(body).toMatchObject({ daily_pictures: 20, daily_videos: 5 });
-    expect(body.items.map((i) => [i.person.name, i.prompt, i.withheld]).sort()).toEqual([["Pippa", "a friendly dragon", false], ["Pippa", "a friendly turtle", true]]);
+    expect(body.items.map((i) => [i.person.name, i.prompt, i.withheld]).sort()).toEqual([["Pippa", "a friendly dragon", false], ["Pippa", "a friendly turtle", true], ["Pippa", "make the dragon green", false], ["Pippa", "make the dragon scary", true]]);
     expect(JSON.stringify(body)).not.toContain("b64");
     // A child cannot read it.
     db.update(peopleTable).set({ role: "child" }).where(eq(peopleTable.displayName, "Sage")).run();
     const { invalidateSessionCacheForPerson } = await import("@/middleware/auth");
     invalidateSessionCacheForPerson(db.select().from(peopleTable).where(eq(peopleTable.displayName, "Sage")).get()!.id);
     expect((await client.get("/api/pictures/admin/kids-activity")).status).toBe(403);
+  });
+});
+
+// Lane safety review, 2026-10-17: edits count against the daily picture limit and are in the admin log; the limit is stored, counts every ask, and
+// two asks at once cannot both pass.
+describe("a child's edits count against the daily picture limit", () => {
+  test("chat edits and editor edits take pictures from the same allowance and show in the admin log", async () => {
+    setHouseholdSettingValue("generation.kids_daily_pictures", 3);
+    await put(kid, "toon-1", true);
+    const made = await pic(kid, { prompt: "a friendly dragon" });
+    expect(made.status).toBe("succeeded");
+    await finish(kid, made);
+    const chatEdit = await pic(kid, { prompt: "make the dragon green", change: "latest" });
+    expect(chatEdit.status).toBe("succeeded");
+    await finish(kid, chatEdit);
+    const editor = await startComment(kid, "conv-1", "toon-1", { prompt: "make it blue" });
+    expect(editor.state).toBe("running");
+    // Three used: one new, one chat edit, one editor edit.
+    expect(picturesMadeToday(kid)).toBe(3);
+    expect(text(await pic(kid, { prompt: "make the dragon red", change: "latest" }))).toContain(CHILD_LIMIT_LINE);
+    await expect(startComment(kid, "conv-1", "toon-1", { prompt: "make it purple" })).rejects.toMatchObject({ status: 422, code: "daily_limit" });
+    expect(text(await pic(kid, { prompt: "a friendly turtle" }))).toContain(CHILD_LIMIT_LINE);
+    // A refused edit (a person, a photo) took nothing.
+    expect(picturesMadeToday(kid)).toBe(3);
+    // The admin log lists both edits with the words.
+    const rows = db.select().from(kidUsage).where(eq(kidUsage.personId, kid.id)).all();
+    expect(rows.filter((r) => r.kind === "edit").map((r) => r.prompt).sort()).toEqual(["make it blue", "make the dragon green"]);
+  });
+
+  test("an edit that was refused before it started gives the picture back", async () => {
+    setHouseholdSettingValue("generation.kids_daily_pictures", 2);
+    await put(kid, "toon-1", true);
+    expect(text(await pic(kid, { prompt: "take off the dragon's clothes", change: "latest" }))).toContain(CHILD_CONTENT_LINE);
+    expect(picturesMadeToday(kid)).toBe(0);
+  });
+});
+
+describe("the daily limit is stored and atomic", () => {
+  test("a failed ask, a deleted job and a restart give nothing back", async () => {
+    setHouseholdSettingValue("generation.kids_daily_pictures", 2);
+    const first = await pic(kid, { prompt: "a friendly dragon", count: 2 });
+    expect(first.status).toBe("succeeded");
+    await finish(kid, first);
+    // Deleting the chat's jobs does not return the limit.
+    db.delete(pictureJobs).run();
+    expect(picturesMadeToday(kid)).toBe(2);
+    expect(text(await pic(kid, { prompt: "a friendly turtle" }))).toContain(CHILD_LIMIT_LINE);
+    // The count lives in the database, not in memory: a fresh read (as after a restart) sees it, and it belongs to today only.
+    expect(picturesMadeToday(kid, new Date(Date.now() + 36 * 60 * 60 * 1000))).toBe(0);
+  });
+
+  test("a failed job still counts", async () => {
+    setHouseholdSettingValue("generation.kids_daily_pictures", 1);
+    image.failWith = { code: "failed", error: "The engine stopped." };
+    const o = await pic(kid, { prompt: "a friendly dragon" });
+    await finish(kid, o).catch(() => undefined);
+    expect(picturesMadeToday(kid)).toBe(1);
+    expect(text(await pic(kid, { prompt: "a friendly turtle" }))).toContain(CHILD_LIMIT_LINE);
+  });
+
+  test("two asks at once cannot both pass the last picture, for pictures and for videos", async () => {
+    setHouseholdSettingValue("generation.kids_daily_pictures", 1);
+    const both = await Promise.all([pic(kid, { prompt: "a friendly dragon" }), pic(kid, { prompt: "a friendly turtle" })]);
+    expect(both.filter((o) => text(o).includes(CHILD_LIMIT_LINE))).toHaveLength(1);
+    expect(image.submitted).toHaveLength(1);
+    expect(picturesMadeToday(kid)).toBe(1);
+    setHouseholdSettingValue("generation.kids_daily_videos", 1);
+    const clips = await Promise.all([vid(kid, { prompt: "a friendly dragon waving" }), vid(kid, { prompt: "a friendly turtle waving" })]);
+    expect(clips.filter((o) => text(o).includes(CHILD_VIDEO_LIMIT_LINE))).toHaveLength(1);
+    expect(video.submitted).toHaveLength(1);
+    expect(videosMadeToday(kid)).toBe(1);
+  });
+
+  test("a start that fails gives the allowance back", async () => {
+    setHouseholdSettingValue("generation.kids_daily_pictures", 1);
+    image.refuseSubmit = { status: 503, code: "no_memory", error: "Not enough memory." };
+    const o = await pic(kid, { prompt: "a friendly dragon" });
+    expect(o.status).not.toBe("succeeded");
+    expect(picturesMadeToday(kid)).toBe(0);
   });
 });

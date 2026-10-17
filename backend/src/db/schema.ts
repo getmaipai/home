@@ -1785,6 +1785,30 @@ export const pictureJobs = sqliteTable(
   (table) => [index("picture_jobs_person_id_idx").on(table.personId), index("picture_jobs_turn_id_idx").on(table.turnId)],
 );
 
+// KIDS-CREATE-01 (lane review 2026-10-17): what a child asked Home to make, one row per ask, the daily limit counted from it. A row stays when the
+// job fails or the finished item is held back, so deleting a chat or restarting Home never gives the limit back. Hub-internal, never synced.
+export const kidUsage = sqliteTable(
+  "kid_usage",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id")
+      .notNull()
+      .references(() => people.id),
+    /** The local day (YYYY-MM-DD) the ask was made. */
+    day: text("day").notNull(),
+    /** picture, video or edit (an edit of their own cartoon counts against the picture limit). */
+    kind: text("kind").notNull(),
+    units: integer("units").notNull().default(1),
+    prompt: text("prompt").notNull().default(""),
+    /** asked, made or withheld. */
+    outcome: text("outcome").notNull().default("asked"),
+    /** The picture job or engine job this ask became, so a withheld result can be marked on the row. */
+    ref: text("ref"),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("kid_usage_person_day_idx").on(table.personId, table.day)],
+);
+
 // IMGGEN-SET-01: the household's switch on one adapter (LoRA) in the Stack's
 // library. The Stack owns the file and its metadata; Home owns whether the
 // household lets chat use it. A missing row reads as enabled.

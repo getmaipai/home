@@ -14,7 +14,7 @@ import { chooseQuality, detailedReady, isPictureQuality } from "@/lib/pictures/q
 import { StackPicturesError } from "@/lib/pictures/stack";
 import { prepareStylesUse } from "@/lib/likeness/apply";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
-import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, noteKidPictures, picturesMadeToday } from "@/lib/pictures/lane";
+import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { getLive, liveCardFields } from "@/lib/genLive";
 import type { PersonRow } from "@/types";
@@ -195,6 +195,8 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
   const choice = kid ? { quality: "quick" as const, model: "flux2-klein-4b", note: null, announce: false } : chooseQuality({ requested: isPictureQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, engine: await pictureEngineStatus() });
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default, ...(prep.kind === "likeness" && prep.proofs.has(a.id) ? { likeness_proof: prep.proofs.get(a.id)! } : {}) }));
+  const slot = kid ? reserveKid(actor, "picture", 1, source.prompt) : null;
+  if (kid && !slot) return c.json({ error: CHILD_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const job = await startPictureJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: group.some((j) => j.state === "done") ? "variation" : "generate", prompt: source.prompt,
@@ -203,9 +205,9 @@ picturesRoutes.openapi(variationRoute, async (c) => {
     });
     if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
     void job;
-    if (kid) noteKidPictures(actor, 1);
     return c.json(cardView(actor, source, true, detailedReady(await pictureEngineStatus())), 200);
   } catch (error) {
+    releaseKid(slot);
     const status = error instanceof StackPicturesError && (error.status === 422 || error.status === 409) ? error.status : 503;
     return c.json({ error: plainFailure(error), code: error instanceof StackPicturesError ? error.code : "failed" }, status) as never;
   }

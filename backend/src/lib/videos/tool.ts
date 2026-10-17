@@ -20,7 +20,7 @@ import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import { createHash } from "node:crypto";
 import { peopleGuidanceSuffix, peoplePromptsOn } from "@/lib/pictures/policy";
-import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, noteKidVideo, videosMadeToday } from "@/lib/pictures/lane";
+import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videosMadeToday } from "@/lib/pictures/lane";
 
 const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
@@ -181,6 +181,8 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   if (stylePrep.kind === "likeness" && stylePrep.negativePrompt) negativePrompt = stylePrep.negativePrompt;
   const subjectForLog = stylePrep.kind === "likeness" ? stylePrep : photoLikeness;
 
+  const slot = kid ? reserveKid(actor, "video", 1, prompt) : null;
+  if (kid && !slot) return refused(callId, args, { kind: "likeness", why: "likeness", line: CHILD_VIDEO_LIMIT_LINE });
   try {
     const job = await startVideoJob({
       actor,
@@ -201,7 +203,6 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       },
       ...(likeness ? { likeness } : {}),
     });
-    if (kid) noteKidVideo(actor);
     if (subjectForLog) await recordLikenessUse({ subjectPersonId: subjectForLog.subjectId, requesterPersonId: actor.id, medium: "video", way: photoLikeness ? "photo" : "style", adultContent: likeness?.adult_content ?? false, source: "chat" });
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
@@ -212,6 +213,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       },
     });
   } catch (error) {
+    releaseKid(slot);
     if (error instanceof StackVideoError && error.code === "already_making") {
       return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No new video was started. Say this to the person in your own words and keep its meaning: ${error.message}` }, data: { refused: "already_making" }, actions: [] } });
     }

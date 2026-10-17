@@ -11,7 +11,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { getStackClient } from "@/lib/stackEngine";
 import { toWireMessage, type LlmMessage } from "@/lib/llm";
-import { CHILD_CONTENT_LINE, laneOf, type Lane } from "./lane";
+import { CHILD_CONTENT_LINE, laneOf, markKidWithheld, type Lane } from "./lane";
 
 // ---------------------------------------------------------------- the child-safety question
 
@@ -183,6 +183,7 @@ export async function gateFinished(input: FinishedGateInput): Promise<AgeDecisio
   const lane = laneOfPerson(input.actor);
   const childChecks = lane === "child" ? await checkChildSafety(input.images) : undefined;
   const decision = decideForLane({ lane, checks: input.checks, adultOnly: input.adultOnly, kind: input.kind, ...(childChecks ? { childChecks } : {}) });
+  if (decision.action === "withhold" && lane === "child") markKidWithheld(input.jobId);
   if (decision.action === "withhold" && (lane !== "adult" || decision.reason === "minor_sexual")) {
     await recordWithheld({ kind: input.kind, personId: input.actor.id, jobId: input.jobId, adultOnly: input.adultOnly, checks: input.checks, ...(input.prompt !== undefined ? { prompt: input.prompt } : {}), ...(input.promptHash !== undefined ? { promptHash: input.promptHash } : {}) });
   }

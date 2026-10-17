@@ -36,7 +36,7 @@ import { photoUploadsAllowed } from "@/lib/chatPictures";
 import { getStackClient, isStackConfigured } from "@/lib/stackEngine";
 import { promptRefusalLineFor, checkImages, promptHash } from "@/lib/pictures/ageCheck";
 import { gateFinished, laneOfPerson } from "@/lib/pictures/laneGate";
-import { CHILD_NO_PHOTOS_LINE, kidLaneOn, laneOf } from "@/lib/pictures/lane";
+import { CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, attachKid, kidLaneOn, laneOf, releaseKid, reserveKid } from "@/lib/pictures/lane";
 import { mentionsSexualWord } from "@/lib/pictures/minorLine";
 import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
@@ -505,13 +505,18 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   if (household) form.append("audience", "adult");
   // timeout_ms is how long the Stack holds this request for a finished picture before it answers 202 with the job id: 1 asks for the id at once, and Home polls.
   form.append("timeout_ms", "1");
+  // A child's edit of their own cartoon counts against the same daily allowance as a new picture: taken now, in one step with the check, and given back only if nothing started.
+  const kidSlot = laneOf(editorAudience(actor)) === "child" ? reserveKid(actor, "edit", 1, prompt) : null;
+  if (laneOf(editorAudience(actor)) === "child" && !kidSlot) throw new ImageEditError(422, CHILD_LIMIT_LINE, "daily_limit");
   try {
     const { job } = await submitEditSource(form, imageSource, generated);
     sweep();
+    attachKid(kidSlot, job);
     jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true, adultOnly: mentionsSexualWord(prompt), promptHash: promptHash(prompt), ...(likenessAll ? { likeness: likenessAll } : {}) });
     for (const subjectId of new Set([subjectForLog, reference?.prepared.subjectId ?? null])) if (subjectId) await recordLikenessUse({ subjectPersonId: subjectId, requesterPersonId: actor.id, medium: "picture", way: "photo", adultContent: false, source: "editor" });
     return { state: "running", job, percent: null, label: OP_LABEL.comment };
   } catch (error) {
+    releaseKid(kidSlot);
     throw commentErrorFrom(error);
   }
 }

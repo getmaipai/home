@@ -14,8 +14,8 @@ import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { detailedReady } from "@/lib/pictures/quality";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { db } from "@/db";
-import { pictureAdapterPrefs, people, pictureJobs, videoJobs } from "@/db/schema";
-import { and, eq, gte } from "drizzle-orm";
+import { kidUsage, pictureAdapterPrefs, people, pictureJobs, videoJobs } from "@/db/schema";
+import { and, eq, gte, ne } from "drizzle-orm";
 import { declareStyleSubject, forgetStyleSubject, getStyleSubject } from "@/lib/likeness/adapters";
 import { checkStyleSubject, LOOKS_LIKE_REQUIRED_LINE, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
 
@@ -274,7 +274,7 @@ picturesAdminRoutes.openapi(removeRoute, async (c) => {
 const KidsActivitySchema = z.object({
   items: z.array(z.object({
     person: z.object({ id: z.string(), name: z.string() }),
-    kind: z.enum(["picture", "video"]),
+    kind: z.enum(["picture", "video", "edit"]),
     prompt: z.string(),
     state: z.string(),
     created_at: z.string(),
@@ -292,8 +292,12 @@ picturesAdminRoutes.openapi(kidsActivityRoute, (c) => {
   const kids = db.select().from(people).all().filter((person) => laneOfPerson(person as never) === "child");
   const items: z.infer<typeof KidsActivitySchema>["items"] = [];
   for (const kid of kids) {
-    for (const row of db.select({ prompt: pictureJobs.prompt, state: pictureJobs.state, createdAt: pictureJobs.createdAt, error: pictureJobs.error }).from(pictureJobs).where(and(eq(pictureJobs.personId, kid.id), gte(pictureJobs.createdAt, since))).all()) {
+    for (const row of db.select({ prompt: pictureJobs.prompt, state: pictureJobs.state, createdAt: pictureJobs.createdAt, error: pictureJobs.error }).from(pictureJobs).where(and(eq(pictureJobs.personId, kid.id), gte(pictureJobs.createdAt, since), ne(pictureJobs.kind, "edit"))).all()) {
       items.push({ person: { id: kid.id, name: kid.displayName }, kind: "picture", prompt: row.prompt, state: row.state, created_at: row.createdAt, withheld: row.state === "failed" && row.error === CHILD_CONTENT_LINE });
+    }
+    // Edits of their own cartoons (in chat or in the editor) come from the ledger, which is where the daily limit counts them.
+    for (const row of db.select({ prompt: kidUsage.prompt, outcome: kidUsage.outcome, createdAt: kidUsage.createdAt }).from(kidUsage).where(and(eq(kidUsage.personId, kid.id), eq(kidUsage.kind, "edit"), gte(kidUsage.createdAt, since))).all()) {
+      items.push({ person: { id: kid.id, name: kid.displayName }, kind: "edit", prompt: row.prompt, state: row.outcome === "withheld" ? "failed" : "done", created_at: row.createdAt, withheld: row.outcome === "withheld" });
     }
     for (const row of db.select({ prompt: videoJobs.prompt, state: videoJobs.state, createdAt: videoJobs.createdAt, error: videoJobs.error }).from(videoJobs).where(and(eq(videoJobs.personId, kid.id), gte(videoJobs.createdAt, since))).all()) {
       items.push({ person: { id: kid.id, name: kid.displayName }, kind: "video", prompt: row.prompt, state: row.state, created_at: row.createdAt, withheld: row.state === "failed" && row.error === CHILD_CONTENT_LINE });

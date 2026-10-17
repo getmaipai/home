@@ -40,6 +40,7 @@ import {
   shares,
   attachments,
   pictureJobs,
+  kidUsage,
   pictureAdapterPrefs,
   videoJobs,
   likenessConsentEvents,
@@ -178,6 +179,7 @@ export function resetDb(): void {
   db.delete(projects).run(); // PROJECT-RUN-01: references people
   db.delete(shares).run(); // STORE-SHARE-01: references attachments (the file table), deleted first
   db.delete(attachments).run();
+  db.delete(kidUsage).run(); // KIDS-CREATE-01: references people
   db.delete(pictureJobs).run(); // IMGGEN-HOME-01: references people
   db.delete(pictureAdapterPrefs).run();
   db.delete(videoJobs).run(); // VIDEO-GEN-05: references people

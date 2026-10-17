@@ -10,7 +10,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
-import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, noteKidVideo, videosMadeToday } from "@/lib/pictures/lane";
+import { CHILD_NEGATIVE_PROMPT, CHILD_NO_PHOTOS_LINE, CHILD_VIDEO_LIMIT_LINE, forceCartoon, kidsDailyVideos, laneOf, releaseKid, reserveKid, videosMadeToday } from "@/lib/pictures/lane";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import { getLive, liveCardFields } from "@/lib/genLive";
@@ -241,6 +241,8 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     prior: source.request.likeness ?? null, adapters, styleIds: source.request.loras,
   });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, prep.code === "likeness" ? 403 : 422) as never;
+  const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, source.prompt) : null;
+  if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
@@ -252,10 +254,10 @@ videosRoutes.openapi(anotherRoute, async (c) => {
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
-    if (laneOf(audience) === "child") noteKidVideo(actor);
     if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
     return c.json(videoCardView(actor, started, true), 200);
   } catch (error) {
+    releaseKid(slot);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
     return c.json({ error: plainVideoFailure(error), code: error instanceof StackVideoError ? error.code : "failed" }, status) as never;
   }
@@ -286,6 +288,8 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, declaredSubjectId: body.photo_subject_id ?? null, adapters, styleIds: [] });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, prep.code === "likeness" ? 403 : 422) as never;
   const size = prep.width && prep.height && prep.height > prep.width ? VIDEO_SIZES.portrait! : VIDEO_SIZES.landscape!;
+  const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, prompt) : null;
+  if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
     const job = await startVideoJob({
       actor, conversationId: body.conversation_id, turnId: body.turn_id, temporary: false, kind: "animate", prompt, sourceFileId: fileId,
@@ -295,10 +299,10 @@ videosRoutes.openapi(animateRoute, async (c) => {
       },
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
-    if (laneOf(audience) === "child") noteKidVideo(actor);
     if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
     return c.json(videoCardView(actor, job, true), 200);
   } catch (error) {
+    releaseKid(slot);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
     return c.json({ error: plainVideoFailure(error), code: error instanceof StackVideoError ? error.code : "failed" }, status) as never;
   }

@@ -26,7 +26,7 @@ import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
 import sharp from "sharp";
 import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, inverseMask, maskCoverage, peopleMask, peopleMaskWithCount, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
-import { CHILD_NO_PHOTOS_LINE, laneOf, type Lane } from "./lane";
+import { attachKid, CHILD_LIMIT_LINE, CHILD_NO_PHOTOS_LINE, laneOf, releaseKid, reserveKid, type Lane } from "./lane";
 import { asksToUndress, peopleGuidanceSuffix, peoplePromptsOn, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
@@ -85,7 +85,21 @@ function load(input: RunEditInput, word: unknown): SourcePicture | null {
   }
 }
 
+/** A child's edit of their own cartoon takes one of the day's pictures (taken in one step with the check, given back if nothing started). */
 export async function runEditPicture(input: RunEditInput): Promise<ToolExecutionOutcome> {
+  if (laneOf(input.audience) !== "child") return runEditPictureUnmetered(input);
+  const actor = input.state.actor as PersonRow;
+  const instruction = typeof input.args.prompt === "string" ? input.args.prompt : "";
+  const slot = reserveKid(actor, "edit", 1, instruction);
+  if (!slot) return line(input.callId, input.args, CHILD_LIMIT_LINE, { refused: "daily_limit" });
+  let outcome: ToolExecutionOutcome | null = null;
+  try { outcome = await runEditPictureUnmetered(input); return outcome; } finally {
+    const started = (outcome?.result?.data as { pictureJobId?: string } | undefined)?.pictureJobId;
+    if (started) attachKid(slot, started); else releaseKid(slot);
+  }
+}
+
+async function runEditPictureUnmetered(input: RunEditInput): Promise<ToolExecutionOutcome> {
   const { state, args, callId, audience } = input;
   const actor = state.actor as PersonRow;
   const instruction = typeof args.prompt === "string" ? args.prompt.trim() : "";

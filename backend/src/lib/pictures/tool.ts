@@ -18,7 +18,7 @@ import { prepareStyleUse } from "@/lib/likeness/apply";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 
 import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
-import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, noteKidPictures, picturesMadeToday } from "./lane";
+import { CHILD_LIMIT_LINE, CHILD_NEGATIVE_PROMPT, forceCartoon, kidsDailyPictures, laneOf, picturesMadeToday, releaseKid, reserveKid } from "./lane";
 
 const KID_MAX_COUNT = 2;
 export { GENERATE_IMAGE_TOOL_ID };
@@ -123,6 +123,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const prep = await prepareStyleUse({ medium: "picture", audience, style: adapter, text: `${sentPrompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true, source: "chat" });
   if (prep.kind === "refused") return refused(callId, args, prep.why === "real_person" ? { kind: "prompt", why: "real_person", line: PROMPT_REFUSAL_LINE.real_person } : { kind: "likeness", why: "likeness", line: prep.line });
 
+  // The allowance is taken now, in one step with the check, so two asks at once cannot both pass; it goes back only if nothing started.
+  const slot = kid ? reserveKid(state.actor as PersonRow, "picture", Math.min(count, KID_MAX_COUNT), prompt) : null;
+  if (kid && !slot) return refused(callId, args, { kind: "prompt", why: "child_content", line: CHILD_LIMIT_LINE });
   try {
     const temporary = state.temporary === true || state.ephemeral === true;
     const job = await startPictureJob({
@@ -145,7 +148,6 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       ...(prep.kind === "likeness" ? { likeness: prep.job } : {}),
     });
     if (prep.kind === "likeness") await recordLikenessUse({ subjectPersonId: prep.subjectId, requesterPersonId: state.actor.id, medium: "picture", way: "style", adultContent: prep.adultContent, source: "chat" });
-    if (kid) noteKidPictures(state.actor as PersonRow, Math.min(count, KID_MAX_COUNT));
     const many = count > 1 ? ` ${count} pictures are` : " The picture is";
     return outcomeOf({
       callId, packageId: GENERATE_IMAGE_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
@@ -156,6 +158,7 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
       },
     });
   } catch (error) {
+    releaseKid(slot);
     if (error instanceof StackPicturesError && (error.code === "unreachable" || error.code === "no_stack" || error.code === "not_installed" || error.code === "unsupported" || error.code === "no_memory" || error.code === "queue_full")) {
       return failed(callId, args, error.code, "unavailable", plainFailure(error));
     }

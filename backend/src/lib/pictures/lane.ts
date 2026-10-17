@@ -13,8 +13,8 @@
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { db } from "@/db";
-import { pictureJobs, videoJobs } from "@/db/schema";
-import { and, eq, gte } from "drizzle-orm";
+import { kidUsage } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { hasWord, mentionsSexualWord, normalise, UNCLOTHED_PHRASES } from "./minorLine";
 import type { PictureAudience } from "./policy";
 import type { PersonRow } from "@/types";
@@ -111,38 +111,41 @@ export function forceCartoon(prompt: string): string {
 
 // ---------------------------------------------------------------- the daily limit
 
-/** Every day is the local day of this computer. */
-function startOfToday(now = new Date()): string {
-  const d = new Date(now); d.setHours(0, 0, 0, 0); return d.toISOString();
+/** Every day is the local day of this computer, written YYYY-MM-DD. */
+function dayOf(now = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
 }
 
-/** Pictures this person asked for today. Stored jobs plus a memory ledger, so deleting a chat does not give the limit back while Home is running. */
-const ledger = new Map<string, { day: string; pictures: number; videos: number }>();
-export function __resetKidLedgerForTests(): void { ledger.clear(); }
+export type KidKind = "picture" | "video" | "edit";
+export type KidOutcome = "asked" | "made" | "withheld";
 
-function entry(personId: string, now = new Date()) {
-  const day = startOfToday(now);
-  const found = ledger.get(personId);
-  if (found && found.day === day) return found;
-  const fresh = { day, pictures: 0, videos: 0 };
-  ledger.set(personId, fresh);
-  return fresh;
+/** What a child asked for today, from the stored ledger (`kid_usage`): every ask counts, failed and held-back ones too, and a deleted chat or a restart gives nothing back. */
+function usedToday(personId: string, kinds: readonly KidKind[], now: Date): number {
+  const rows = db.select({ units: kidUsage.units, kind: kidUsage.kind }).from(kidUsage).where(and(eq(kidUsage.personId, personId), eq(kidUsage.day, dayOf(now)))).all();
+  return rows.filter((row) => (kinds as readonly string[]).includes(row.kind)).reduce((sum, row) => sum + row.units, 0);
 }
+export function picturesMadeToday(actor: PersonRow, now = new Date()): number { return usedToday(actor.id, ["picture", "edit"], now); }
+export function videosMadeToday(actor: PersonRow, now = new Date()): number { return usedToday(actor.id, ["video"], now); }
 
-export function picturesMadeToday(actor: PersonRow, now = new Date()): number {
-  const stored = db.select({ request: pictureJobs.request, kind: pictureJobs.kind, state: pictureJobs.state }).from(pictureJobs)
-    .where(and(eq(pictureJobs.personId, actor.id), gte(pictureJobs.createdAt, startOfToday(now)))).all();
-  let count = 0;
-  for (const row of stored) {
-    if (row.state === "failed" || row.state === "cancelled") continue;
-    try { count += Math.max(1, Number((JSON.parse(row.request) as { n?: number }).n ?? 1)); } catch { count += 1; }
-  }
-  return Math.max(count, entry(actor.id, now).pictures);
+/**
+ * Takes `units` of today's allowance, or nothing. The check and the write are one synchronous step (SQLite in this process), so two requests
+ * that arrive together cannot both pass. Pictures and edits share one allowance; videos have their own. Returns the ledger row's id, or null
+ * when the day's allowance is used up. Call `releaseKid` when the work did not start after all.
+ */
+export function reserveKid(actor: PersonRow, kind: KidKind, units: number, prompt: string, now = new Date()): string | null {
+  return db.transaction((tx) => {
+    const limit = kind === "video" ? kidsDailyVideos() : kidsDailyPictures();
+    const used = tx.select({ units: kidUsage.units, kind: kidUsage.kind }).from(kidUsage).where(and(eq(kidUsage.personId, actor.id), eq(kidUsage.day, dayOf(now)))).all()
+      .filter((row) => (kind === "video" ? row.kind === "video" : row.kind !== "video")).reduce((sum, row) => sum + row.units, 0);
+    if (used + units > limit) return null;
+    const id = `ku-${crypto.randomUUID().replace(/-/g, "").slice(0, 16)}`;
+    tx.insert(kidUsage).values({ id, personId: actor.id, day: dayOf(now), kind, units, prompt: prompt.slice(0, 500), outcome: "asked", createdAt: now.toISOString() }).run();
+    return id;
+  });
 }
-export function noteKidPictures(actor: PersonRow, n: number, now = new Date()): void { entry(actor.id, now).pictures += n; }
-export function noteKidVideo(actor: PersonRow, now = new Date()): void { entry(actor.id, now).videos += 1; }
-export function videosMadeToday(actor: PersonRow, now = new Date()): number {
-  const stored = db.select({ state: videoJobs.state }).from(videoJobs).where(and(eq(videoJobs.personId, actor.id), gte(videoJobs.createdAt, startOfToday(now)))).all()
-    .filter((row) => row.state !== "failed" && row.state !== "cancelled").length;
-  return Math.max(stored, entry(actor.id, now).videos);
-}
+export function releaseKid(id: string | null): void { if (id) db.delete(kidUsage).where(eq(kidUsage.id, id)).run(); }
+/** Remembers which job a ledger row became. */
+export function attachKid(id: string | null, ref: string): void { if (id) db.update(kidUsage).set({ ref }).where(eq(kidUsage.id, id)).run(); }
+/** Marks the ledger row of a job whose finished item was held back (the admins' activity list reads it). */
+export function markKidWithheld(ref: string): void { db.update(kidUsage).set({ outcome: "withheld" }).where(eq(kidUsage.ref, ref)).run(); }
