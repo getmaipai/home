@@ -1323,6 +1323,56 @@ describe("Home service files carry both ports", () => {
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
+  test("dry-run names the pinned Deno download, its digest and where it lands", () => {
+    const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; ensure_deno /opt/maipai-home darwin arm64 yes`]);
+    const out = result.stdout.toString();
+    expect(result.exitCode).toBe(0);
+    expect(out).toContain("[dry-run] would install Deno 2.9.7 (sha256 5cd46d6268f6f78f5d88bdc7159d20bd44cdaa4b3303474839f87ec6fe7ae25c)");
+    expect(out).toContain("https://github.com/denoland/deno/releases/download/v2.9.7/deno-aarch64-apple-darwin.zip into /opt/maipai-home/.deno/bin/deno");
+  });
+
+  test("a Deno of the pinned version already in place is left alone", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-deno-have-"));
+    try {
+      mkdirSync(join(dir, ".deno/bin"), { recursive: true });
+      writeFileSync(join(dir, ".deno/bin/deno"), '#!/bin/bash\necho "deno 2.9.7 (stable, release, test)"\n', { mode: 0o755 });
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { echo called >> "${dir}/curl-calls"; return 1; }; ensure_deno "${dir}" darwin arm64`]);
+      expect(result.exitCode).toBe(0);
+      expect(existsSync(join(dir, "curl-calls"))).toBe(false);
+      expect(result.stdout.toString()).not.toContain("Installing Deno");
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a failed Deno download is not fatal and says what to do", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-deno-fail-"));
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { return 22; }; ensure_deno "${dir}" linux x64`]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toContain("Could not install Deno 2.9.7");
+      expect(result.stdout.toString()).toContain("run the installer again");
+      expect(existsSync(join(dir, ".deno/bin/deno"))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("a download whose checksum does not match is rejected", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-deno-bad-"));
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; curl() { while [ $# -gt 0 ]; do [ "$1" = -o ] && echo junk > "$2"; shift; done; }; ensure_deno "${dir}" linux arm64`]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString()).toContain("Could not install Deno");
+      expect(existsSync(join(dir, ".deno/bin/deno"))).toBe(false);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("the service units put the install's own Deno on PATH", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-deno-path-"));
+    try {
+      const plist = join(dir, "p.plist");
+      Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; launchctl() { :; }; install_launchd_daemon "${dir}/app" /bun/bin/bun 3000`], { env: { ...process.env, HOME_PLIST: plist } });
+      expect(readFileSync(plist, "utf8")).toContain(`${dir}/app/.deno/bin:/usr/local/bin`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
   test("without a Stack port argument the default is used", () => {
     const dir = mkdtempSync(join(tmpdir(), "maipai-plist-"));
     try {

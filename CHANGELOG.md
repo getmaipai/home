@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Changed
+- Installer: installs Deno 2.9.7 itself (checksum-verified, into the install folder's `.deno/bin`), so the built-in data packages work without installing Deno by hand. A failed Deno download no longer matters to the rest of the install; run the installer again to retry.
+
 ## [0.2.3] - 2026-10-17
 
 The installer now works on a Mac that has Bun but no Node, and Home starts without Deno.

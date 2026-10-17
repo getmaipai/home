@@ -464,6 +464,62 @@ ensure_bun_system_wide() {
   [ -n "$bun_version" ] || die "Bun at ${bun_bin} returned an empty version"
 }
 
+# Deno runs the built-in data packages (music, news, sports, the almanac set). Pinned like
+# Commons: one release, one SHA-256 per platform, checked before anything is unpacked. To
+# bump it, change DENO_VERSION and the four digests (the .zip files on the release page).
+DENO_VERSION="2.9.7"
+
+deno_target() {
+  case "${1}/${2}" in
+    darwin/arm64) echo "aarch64-apple-darwin" ;;
+    darwin/x64) echo "x86_64-apple-darwin" ;;
+    linux/arm64) echo "aarch64-unknown-linux-gnu" ;;
+    linux/x64) echo "x86_64-unknown-linux-gnu" ;;
+    *) return 1 ;;
+  esac
+}
+
+deno_zip_sha256() {
+  case "$1" in
+    aarch64-apple-darwin) echo "5cd46d6268f6f78f5d88bdc7159d20bd44cdaa4b3303474839f87ec6fe7ae25c" ;;
+    x86_64-apple-darwin) echo "95daaff11c116a52ad54785e7914c8e9c9cdcaba793c5ed929c74ca2d8e6259a" ;;
+    aarch64-unknown-linux-gnu) echo "c832298b1ad4422481334855f6003e0f54145762c5a134f20a489511d2f65bbf" ;;
+    x86_64-unknown-linux-gnu) echo "c6527f24f4b16031d3ae4fa9f658d5f11534c8d84ce7dc8502420280919c3490" ;;
+    *) return 1 ;;
+  esac
+}
+
+# Installs the pinned Deno into <install_root>/.deno/bin/deno. Never fatal: Home runs without
+# Deno, with the Deno-backed packages off, and prime_deno_cache says what to do. Re-running
+# with the pinned version already there changes nothing.
+ensure_deno() {
+  local install_root="$1" os="$2" arch="$3" dry_run="${4:-no}"
+  local deno_home="${install_root}/.deno" deno_bin="${install_root}/.deno/bin/deno" target expected actual tmp
+  target=$(deno_target "$os" "$arch") || { log "There is no Deno build for ${os}/${arch}, so the built-in data packages stay off."; return 0; }
+  if [ "$dry_run" = "yes" ]; then
+    log "[dry-run] would install Deno ${DENO_VERSION} (sha256 $(deno_zip_sha256 "$target")) from https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${target}.zip into ${deno_bin}"
+    return 0
+  fi
+  if [ -x "$deno_bin" ] && "$deno_bin" --version 2>/dev/null | head -n 1 | grep -q "^deno ${DENO_VERSION} "; then
+    return 0
+  fi
+  log "Installing Deno ${DENO_VERSION} to ${deno_bin}..."
+  tmp=$(mktemp -d) || { log "Could not create a temporary folder for Deno, so the built-in data packages stay off. Check that the temp folder is writable, then run the installer again."; return 0; }
+  expected=$(deno_zip_sha256 "$target")
+  if curl -fsSL "https://github.com/denoland/deno/releases/download/v${DENO_VERSION}/deno-${target}.zip" -o "${tmp}/deno.zip" \
+    && actual=$(sha256_file "${tmp}/deno.zip") && [ "$actual" = "$expected" ] \
+    && unzip -qo "${tmp}/deno.zip" deno -d "${tmp}/out" \
+    && mkdir -p "${deno_home}/bin" && cp "${tmp}/out/deno" "${deno_bin}.new" && chmod 755 "${deno_bin}.new" \
+    && mv -f "${deno_bin}.new" "$deno_bin" \
+    && "$deno_bin" --version >/dev/null 2>&1; then
+    rm -rf "$tmp"
+    return 0
+  fi
+  rm -rf "$tmp" "${deno_bin}.new"
+  log "Could not install Deno ${DENO_VERSION} (the download, its checksum or the unpacking failed), so the built-in data packages (music, news, sports and the almanac set) stay off. Check the internet connection, then run the installer again."
+  return 0
+}
+
 fetch_release_source() {
   local tag="$1" dest="$2"
   log "Fetching ${REPO}@${tag}..."
@@ -549,9 +605,9 @@ build_app() {
 # A missing Deno is not fatal: those packages stay off and Home says so.
 prime_deno_cache() {
   local dir="$1" deno_bin cache="$1/data/deno" entry failed=0 n=0
-  deno_bin=$(command -v deno 2>/dev/null || true)
+  if [ -x "$1/.deno/bin/deno" ]; then deno_bin="$1/.deno/bin/deno"; else deno_bin=$(command -v deno 2>/dev/null || true); fi
   if [ -z "$deno_bin" ]; then
-    log "Deno is not installed, so the built-in data packages (music, news, sports and the almanac set) will stay off until it is. Install Deno from https://deno.com, then run the installer again."
+    log "Deno is not installed, so the built-in data packages (music, news, sports and the almanac set) will stay off until it is. The installer could not fetch it; check the internet connection, then run the installer again."
     return 0
   fi
   log "Fetching the pinned Deno dependencies for the built-in packages (one time)..."
@@ -618,7 +674,7 @@ After=network.target
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=${dir}/backend
-Environment=PATH=$(dirname "$bun_bin"):/usr/local/bin:/usr/bin:/bin
+Environment=PATH=$(dirname "$bun_bin"):${dir}/.deno/bin:/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
 Environment=PORT=${port}
 Environment=MAIPAI_STACK_PORT=${stack_port}
@@ -677,7 +733,7 @@ install_launchd_daemon() {
   <key>WorkingDirectory</key><string>${dir}/backend</string>
   <key>EnvironmentVariables</key>
   <dict>
-    <key>PATH</key><string>$(dirname "$bun_bin"):/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    <key>PATH</key><string>$(dirname "$bun_bin"):${dir}/.deno/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>NODE_ENV</key><string>production</string>
     <key>PORT</key><string>${port}</string>
     <key>MAIPAI_STACK_PORT</key><string>${stack_port}</string>
@@ -1352,6 +1408,7 @@ main() {
     log "[dry-run] MaiPai Home install plan for ${os}/${arch} at ${install_root}"
     log "[dry-run] checks before any change: required tools, ${HOME_REQUIRED_GB} GB free disk"
     log "[dry-run] Home port ${APP_PORT} (or the next free one)"
+    ensure_deno "$install_root" "$os" "$arch" yes
     record_setup_plan "${install_root}/data" "$requested_plan" yes
     log "[dry-run] the MaiPai Stack (the AI engine) is not installed now: the setup wizard installs it if you choose to run the AI on this computer"
     log "[dry-run] would wait for Home at http://127.0.0.1:${APP_PORT}/ and print the address to open"
@@ -1482,6 +1539,7 @@ main() {
   fi
 
   ensure_bun_system_wide "$bun_home"
+  ensure_deno "$install_root" "$os" "$arch"
   local bun_bin="${bun_home}/bin/bun"
   clear_quarantine_and_sign "$os" "$install_root" "$bun_bin"
   build_app "$install_root" "$bun_bin"

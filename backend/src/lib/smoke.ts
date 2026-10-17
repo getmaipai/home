@@ -287,9 +287,9 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
     if (!denoLookup()) {
       if (!denoMissingLogged) {
         denoMissingLogged = true;
-        console.warn("[smoke] Deno is not installed, so the built-in data packages (music, news, sports, almanac) stay off. Install Deno, then restart the hub to turn them on.");
+        console.warn("[smoke] Deno is not installed, so the built-in data packages (music, news, sports, almanac) stay off. Run the installer again to fetch Deno, then restart the hub to turn them on.");
       }
-      return recordSkipped(id, "Deno is not installed; this package stays off until it is. Install Deno and restart.");
+      return recordSkipped(id, "Deno is not installed; this package stays off until it is. Run the installer again to fetch Deno, then restart.");
     }
     return recordResult(id, await runDenoTestSmoke(resolvePackageDir(id)));
   }
