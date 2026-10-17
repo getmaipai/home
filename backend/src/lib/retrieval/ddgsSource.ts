@@ -1,6 +1,6 @@
 // SEARCH-DDGS-01: the optional ddgs web search source (owner's ruling 2026-10-11,
 // .github/docs/THIRD-PARTY-SERVICES.md). Home never talks to DuckDuckGo itself: the maintained
-// `ddgs` library runs in a small sidecar on this computer (scripts/ddgs-sidecar) which owns the one
+// `ddgs` library runs in a small sidecar on this computer (the Stack, backend/src/search) which owns the one
 // fixed browser identity (no rotation, no proxies). This file is the ONLY caller of that sidecar and
 // is its single choke point: a person's pace through the shared limiter, and quiet mode on the
 // first block (no request at all for a growing window), so a block is never retried through.
@@ -12,7 +12,8 @@
 import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { tryConsume } from "@/lib/rateLimiter";
 import { minorDdgsAllowed } from "@/lib/retrieval/sourceMode";
-import { ddgsBaseUrl } from "@/lib/retrieval/ddgsConfig";
+import { ddgsBaseUrl, ddgsSetupNote } from "@/lib/retrieval/ddgsConfig";
+import { refreshDdgsFromStack } from "@/lib/retrieval/ddgsStackSync";
 import { MINOR_QUERY_PERSONAL_NOTE, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
@@ -71,8 +72,9 @@ export async function ddgsSearch(ctx: WebSearchContext): Promise<WebRows> {
   // A minor's turn must be affirmed as not spoken by the caller (the turn's own surface, packageHost.ts); the `spoken` arg is a second signal.
   const spoken = ctx.spoken !== false || wantsSpoken(ctx.args as { spoken?: unknown } | undefined);
   if (ctx.role === "guest" || (minor && (spoken || !minorDdgsAllowed(ctx.band)))) throw new HostError("permission_denied", "DuckDuckGo search is not allowed for this profile.");
-  const base = ddgsBaseUrl();
-  if (!base) throw new HostError("search_unavailable", "DuckDuckGo search is not set up. Start the ddgs sidecar and set MAIPAI_DDGS_URL, or pick another web search source.");
+  // The Stack may have just finished building the service: ask once, now, before calling it unavailable.
+  const base = ddgsBaseUrl() ?? (await refreshDdgsFromStack(), ddgsBaseUrl());
+  if (!base) throw new HostError("search_unavailable", ddgsSetupNote() ?? "DuckDuckGo search is not set up. The Stack sets it up by itself; if it stays off, open Repairs. Otherwise pick another web search source.");
   const query = (ctx.args as { query?: unknown } | undefined)?.query;
   if (typeof query !== "string" || query.length === 0) throw new HostError("invalid_input", `ddgs search needs a string "query" argument`);
   // The same query refusal SearXNG's leg gets (MINOR-SEARCH-01f): a minor's words with a closed personal detail never leave the house.

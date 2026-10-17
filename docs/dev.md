@@ -344,9 +344,8 @@ SEARCH-DDGS-01 (below). Images, videos, hosted search and page reads are outside
 **SEARCH-SOURCES-01b (2026-10-12): blend follow-ups.** `runWebSources` gives each source 8 s (`SOURCE_TIMEOUT_MS`) before going on without it; the blend key is `normalizeUrlKey(url)` (host lowercased, `www.`, fragment, trailing slash, default port and `utm_*`/`fbclid`/`gclid` dropped, http and https equal) while the shown row keeps its own url; `textOf` clips title and snippet to 300 characters like the SearXNG-only text. The single-source default path is unchanged.
 
 **SEARCH-DDGS-01 (2026-10-12): the ddgs source.** `src/lib/retrieval/ddgsSource.ts` fills the ddgs slot. The
-maintained `ddgs` library runs in a local sidecar (`scripts/ddgs-sidecar/server.py`, pinned in its
-`requirements.txt`, binds 127.0.0.1) that owns the one fixed browser identity: no proxy, no rotation. Home
-reaches it only when `MAIPAI_DDGS_URL` names a loopback address; unset, ddgs stays unbuilt and nothing changes.
+maintained `ddgs` library runs in a local sidecar (`backend/src/search/ddgs_sidecar.py` in the Stack repo, `ddgs==9.16.0` pinned in its hashed requirements, binds 127.0.0.1) that owns the one fixed browser identity: no proxy, no rotation. Home
+reaches it at the loopback address the Stack reports on `GET /stack/v1/search` once the sidecar is healthy (STACK-DDGS-01, `lib/retrieval/ddgsStackSync.ts` keeps `ddgsConfig.ts` current), or at `MAIPAI_DDGS_URL` when a household sets its own; with neither, ddgs stays unbuilt and nothing changes. A household with no stored `search.web_sources` and no SearXNG address reads as `[searxng, ddgs]` (owner ruling 2026-10-17); an explicit pick or a configured SearXNG keeps the stored list.
 It is adults only unless an owner or admin sets `search.ddgs_for_minors` (default `off`, SEARCH-DDGS-TEEN-01):
 `ModeSource "ddgs"` is closed for a child and teen unless `minorDdgsAllowed(band)`, and then only beside a picked
 SearXNG, never on a spoken turn; a guest is filtered in `packageHost.ts`, and `ddgsSearch` refuses a minor the
@@ -355,7 +354,7 @@ one token per 10 s). The first 429 from the sidecar opens quiet mode: no request
 on repeat blocks, reset by one normal answer; a refused connection or timeout is "not answering", not a block.
 Rows join the blend before `attachSearchPages`, so the adult always-block list and the page budget apply as for
 SearXNG rows. Results are not cached. The `platform:ddgs-search` privacy row shows while the sidecar is set up
-and DuckDuckGo is picked. Quiet-mode state is in memory, so a hub restart clears it (SEARCH-DDGS-01c would persist it). Stack installing and supervising the sidecar is STACK-DDGS-01 (hub first).
+and DuckDuckGo is picked. Quiet-mode state is in memory, so a hub restart clears it (SEARCH-DDGS-01c would persist it). The Stack builds and supervises the sidecar (STACK-DDGS-01, built 2026-10-17).
 
 **DDGS-LIVE-01 (2026-10-12): wiring it on a source checkout.** The hub has no env file; `scripts/app.sh` starts it with the caller's environment, so on the machine that runs the sidecar start the hub as `MAIPAI_DDGS_URL=http://127.0.0.1:8793 bun restart` (and the sidecar from `scripts/ddgs-sidecar` with its `.venv`). Do not put the variable in `backend/.env`, which is not git-ignored. Pick the source with the household value `search.web_sources` set to `["searxng","ddgs"]` (Settings, Search; or `setHouseholdSettingValue` from a script when no session is at hand). The value is household-only (WEBSOURCES-HOUSEHOLD-01): only an admin sets it, there is no per-person override, and `changeWebSources` and the `webSourcesFor` person argument are gone. Old `person:<id>` rows for the key are ignored. Live check on 2026-10-12: one query returned 8 SearXNG rows and 7 ddgs rows, blended to 15, with the sidecar answering in about 1 s.
 

@@ -59,6 +59,16 @@ export interface StackInstallPlan {
   fits_disk: boolean | null;
 }
 
+/** The shape of GET /stack/v1/search `ddgs`: `url` is set only while `state` is "ready". */
+export interface StackSearchServiceStatus {
+  state: "unsupported" | "disabled" | "building" | "starting" | "ready" | "failed";
+  url: string | null;
+  phase: string | null;
+  reason: string | null;
+  restarts: number;
+  library: { name: "ddgs"; version: string };
+}
+
 export interface StackClient {
   /** POST /v1/chat/completions. For `stream: true` the Response body reader
    * and its headers come back, not parsed data. */
@@ -120,6 +130,8 @@ export interface StackClient {
   runCheck(opts?: { signal?: AbortSignal }): Promise<StackCheckRun>;
   /** POST /stack/v1/warmup (STACK-WARM-01): load and prime the roles a first chat needs; the Stack also does this on its own at start and after each model install. */
   warmup(opts?: { signal?: AbortSignal }): Promise<{ state: "idle" | "warming" | "ready"; trigger: string | null }>;
+  /** GET /stack/v1/search (STACK-DDGS-01): where the Stack's DuckDuckGo search service listens and whether it is healthy. */
+  searchService(opts?: { signal?: AbortSignal }): Promise<{ ddgs: StackSearchServiceStatus }>;
   /** GET /healthz. `version` is the Stack's own release ("0.1.0"); `contract` is the wire contract number Home compares to STACK_CONTRACT_MIN/MAX. */
   healthz(opts?: { signal?: AbortSignal }): Promise<{ ok: boolean; version: string; contract?: number; uptimeSeconds: number }>;
 }
@@ -404,6 +416,7 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
     sweepStorage: (opts) => call("/stack/v1/storage/sweep", { method: "POST" }, json<StackStorageSweepResult>, opts),
     warmup: (opts) => call("/stack/v1/warmup", { method: "POST" }, json<{ state: "idle" | "warming" | "ready"; trigger: string | null }>, opts),
     runCheck: (opts) => call("/stack/v1/check", { method: "POST" }, json<StackCheckRun>, opts),
+    searchService: (opts) => call("/stack/v1/search", { method: "GET" }, json<{ ddgs: StackSearchServiceStatus }>, opts),
     healthz: (opts) => call("/healthz", { method: "GET" }, json<{ ok: boolean; version: string; contract?: number; uptimeSeconds: number }>, opts),
   };
 }

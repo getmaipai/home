@@ -75,6 +75,7 @@ import { fetchCacheForRead, ttlSecondsFor } from "@/lib/retrieval/fetchCache";
 import { fetchCacheKey } from "@/lib/retrieval/fetchCache";
 import { waybackCopy } from "@/lib/retrieval/wayback";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
+import { ddgsSetupNote } from "@/lib/retrieval/ddgsConfig";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
@@ -669,7 +670,8 @@ export async function homeAssistantGetState(args: unknown): Promise<unknown> {
 function requireSearxngSettings(): { baseUrl: string } {
   const baseUrl = getHouseholdSettingValue("search.searxng_url") as string | undefined;
   if (!baseUrl) {
-    throw new HostError("invalid_input", "Web search isn't set up yet. An owner or admin can turn it on in Settings, under Web search.");
+    // STACK-DDGS-01: while the Stack is still building the DuckDuckGo search service, say so instead of "not set up".
+    throw new HostError("invalid_input", ddgsSetupNote() ?? "Web search isn't set up yet. An owner or admin can turn it on in Settings, under Web search.");
   }
   return { baseUrl };
 }

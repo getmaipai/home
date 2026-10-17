@@ -40,11 +40,10 @@ The line at the top of the Web search block says what web search uses right now,
 
 ## Add DuckDuckGo as a second source (optional)
 
-SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, **Home settings**, **Search**. It only works once its small search service is running, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
+SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, **Home settings**, **Search**. MaiPai sets up its small search service by itself, which can take a few minutes after install, and only adults use it unless you allow it for teens or children (below). Guests always use SearXNG alone.
 
-1. Start the small search service that comes with MaiPai. In the `scripts/ddgs-sidecar` folder, create its environment with `python3 -m venv .venv`, install with `.venv/bin/pip install -r requirements.txt`, then run `.venv/bin/python server.py`.
-2. Tell MaiPai where it is by setting `MAIPAI_DDGS_URL` to `http://127.0.0.1:8793` and restarting MaiPai.
-3. Open **Settings**, **Home settings**, **Search**, and turn on **DuckDuckGo** under the address box. The switch appears once the helper runs.
+1. Wait for the small search service to finish setting itself up. Until it does, a web question answers "Web search is still being set up on this computer." If it cannot, **Repairs** says why and has a **Try again** button.
+2. Open **Settings**, **Home settings**, **Search**, and check that **DuckDuckGo** is on under the address box. The switch appears once the helper runs, and it is on for you when SearXNG is not set up.
 
 What it sends: the words searched and your home's internet address go to DuckDuckGo, from the service on your computer. Nothing else anyone in the house said or saved. It asks at a person's pace. If DuckDuckGo pushes back, MaiPai stops asking for an hour or more and answers from your other source meanwhile.
 

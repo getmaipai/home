@@ -12,7 +12,7 @@
 // dedupe are one step. A source that fails contributes nothing; only when every
 // picked source fails does the first one's error stand (rule 6).
 import type { AgeBand } from "@/lib/ageBand";
-import { getHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingSource, getHouseholdSettingValue } from "@/lib/settings";
 import { effectiveMode, minorDdgsAllowed, type ModeSource } from "@/lib/retrieval/sourceMode";
 import { reciprocalRankFusion } from "@/lib/retrieval/rrf";
 import { ddgsConfigured } from "@/lib/retrieval/ddgsConfig";
@@ -36,7 +36,7 @@ export interface WebRows {
 export type WebSourceSearch = () => Promise<WebRows>;
 
 /** The source registry. A source that is not `built` is listed in the setting but cannot answer: ddgs
- * until the household runs the sidecar and names it (`MAIPAI_DDGS_URL`, ddgsSource.ts). */
+ * until the Stack reports its sidecar healthy (or the household names its own, `MAIPAI_DDGS_URL`; ddgsConfig.ts). */
 const REGISTRY: { id: WebSourceId; built: () => boolean }[] = [
   { id: "searxng", built: () => true },
   { id: "ddgs", built: () => ddgsConfigured() },
@@ -78,7 +78,7 @@ export function __setWebSourceForTests(id: WebSourceId, search: ((ctx: WebSearch
 export const WEB_SOURCE_IDS: readonly WebSourceId[] = REGISTRY.map((source) => source.id);
 
 export const NO_SOURCE_NOTE = "Pick at least one web search source. To turn web search off, set Web searches to Library only.";
-export const UNBUILT_ONLY_NOTE = "DuckDuckGo search is not set up on this computer yet. Keep SearXNG selected, or start the ddgs search service described in Set up web search.";
+export const UNBUILT_ONLY_NOTE = "DuckDuckGo search is not ready on this computer yet. The Stack sets it up by itself, which can take a few minutes after install; keep SearXNG selected until then.";
 
 /** The stored list, in the household's order; an unset, malformed or empty value is the default. */
 function knownSources(raw: unknown): WebSourceId[] {
@@ -96,7 +96,27 @@ function storedSources(): WebSourceId[] {
     raw = undefined;
   }
   const list = knownSources(raw);
-  return list.length > 0 ? list : [...DEFAULT_WEB_SOURCES];
+  if (list.length === 0) return [...DEFAULT_WEB_SOURCES];
+  // Owner ruling 2026-10-17: DuckDuckGo is on by default for adults when SearXNG is not set up. A household that never
+  // chose a list (no stored row) and has no SearXNG address reads as SearXNG plus DuckDuckGo, so web search works the
+  // moment the Stack reports DuckDuckGo healthy. An explicit pick, or a configured SearXNG, is left as it is.
+  return explicitlyPicked() || searxngConfigured() ? list : [...DEFAULT_WITHOUT_SEARXNG];
+}
+const DEFAULT_WITHOUT_SEARXNG: readonly WebSourceId[] = ["searxng", "ddgs"];
+function explicitlyPicked(): boolean {
+  try {
+    return getHouseholdSettingSource(WEB_SOURCES_KEY) !== undefined;
+  } catch {
+    return true;
+  }
+}
+function searxngConfigured(): boolean {
+  try {
+    const url = getHouseholdSettingValue("search.searxng_url");
+    return typeof url === "string" && url.trim() !== "";
+  } catch {
+    return true;
+  }
 }
 
 /** The household's stored picks, whether or not they can answer now (the privacy page asks this). */

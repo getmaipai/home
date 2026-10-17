@@ -11,6 +11,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { resetDb } from "./reset-db";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { getRegistryKey } from "@/lib/settingsRegistry";
+import { ddgsConfigured, ddgsSetupNote, setDdgsStackReport } from "@/lib/retrieval/ddgsConfig";
 import { effectiveMode } from "@/lib/retrieval/sourceMode";
 import {
   NO_SOURCE_NOTE,
@@ -69,6 +70,35 @@ describe("validateWebSources", () => {
     const result = setHouseholdSettingValue(WEB_SOURCES_KEY, "searxng");
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toBe("Pick one or more of: SearXNG, DuckDuckGo.");
+  });
+});
+
+describe("STACK-DDGS-01: the Stack's DuckDuckGo search service", () => {
+  afterEach(() => setDdgsStackReport(null));
+  test("a household with no SearXNG and no pick reads as searxng plus ddgs, and ddgs answers the moment the Stack reports it ready", () => {
+    setDdgsStackReport({ state: "starting", url: null, reason: null });
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
+    expect(ddgsSetupNote()).toContain("still being set up");
+    setDdgsStackReport({ state: "ready", url: "http://127.0.0.1:59206/", reason: null });
+    expect(ddgsConfigured()).toBe(true);
+    expect(webSourcesFor("adult")).toEqual(["searxng", "ddgs"]);
+    expect(webSourcesFor("child")).toEqual(["searxng"]);
+    expect(webSourcesFor("teen")).toEqual(["searxng"]);
+    expect(ddgsSetupNote()).toBeNull();
+  });
+  test("a configured SearXNG or an explicit pick keeps the stored list", () => {
+    setDdgsStackReport({ state: "ready", url: "http://127.0.0.1:59206/", reason: null });
+    setHouseholdSettingValue(WEB_SOURCES_KEY, ["searxng"]);
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
+    resetDb();
+    setHouseholdSettingValue("search.searxng_url", "http://127.0.0.1:8888");
+    expect(webSourcesFor("adult")).toEqual(["searxng"]);
+  });
+  test("a Stack address that is not loopback is never used, and a failed service says what to do", () => {
+    setDdgsStackReport({ state: "ready", url: "http://192.0.2.9:8793/", reason: null });
+    expect(ddgsConfigured()).toBe(false);
+    setDdgsStackReport({ state: "failed", url: null, reason: "uv exited 2." });
+    expect(ddgsSetupNote()).toContain("Repairs");
   });
 });
 

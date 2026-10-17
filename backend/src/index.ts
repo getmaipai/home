@@ -47,6 +47,7 @@ import { startConfiguredEngineLinkIfSelected, stopConfiguredEngineLink } from "@
 import { ensureSetupState } from "@/lib/setupState";
 import { restoreWasApplied } from "@/db";
 import { syncTailscaleRenewalSetting } from "@/lib/tailscale";
+import { startDdgsStackSync } from "@/lib/retrieval/ddgsStackSync";
 
 const configuredPort = configuredHubPort();
 purgeLegacyHubLogs();
@@ -249,6 +250,8 @@ await initCrashBootHold();
 // that pass runs; startSidecar() is idempotent, so the two racing is
 // harmless either way.
 void startKiwixSidecar();
+// STACK-DDGS-01: learn the Stack's DuckDuckGo search service address and health (never throws, never blocks boot).
+startDdgsStackSync();
 void startAllSidecars();
 resumeReferenceJobsOnBoot();
 // Warm Home-owned chat when the Stack does not serve it.
