@@ -81,8 +81,10 @@ async function who() {
   const t = await teen(o);
   const { client: c } = await child(o);
   const guest = await o.post("/api/people", { displayName: "Gus", role: "guest" });
-  let g: TestClient | null = null;
-  if (guest.status === 201) { const { id } = (await guest.json()) as { id: string }; g = new TestClient(); await g.post("/api/auth/select", { personId: id }); }
+  if (guest.status !== 201) throw new Error(`guest create ${guest.status}`);
+  const { id } = (await guest.json()) as { id: string };
+  const g = new TestClient();
+  await g.post("/api/auth/select", { personId: id });
   return { o, t, c, g };
 }
 
