@@ -8,7 +8,9 @@
 set -euo pipefail
 
 export WT_INSTALL_DIRS="backend frontend"
-export WT_T2_GLOBS="docs/design/RULES.md docs/plans/* backend/src/auth/* backend/src/credentials* backend/src/consent* backend/src/people/*child* backend/src/people/*teen* backend/src/db/migrations/* scripts/check.sh package.json bun.lock backend/package.json frontend/package.json backend/src/wire.ts backend/src/turn* backend/src/llm/* backend/src/composer/* backend/src/websearch/* backend/src/shell/* backend/src/settings/* frontend/src/*chat* spec/*"
+# T2 (full gate, review, architect) is the safety and auth surface only (GATE-FAST-01, 2026-10-16):
+# everything else, pins and the turn pipeline included, is T1 (preflight plus the tests beside the change).
+export WT_T2_GLOBS="docs/design/RULES.md backend/src/auth/* backend/src/credentials* backend/src/consent* backend/src/people/*child* backend/src/people/*teen* backend/src/db/migrations/*"
 export WT_TEST_WORKSPACES="backend frontend scripts"
 export WT_PIN_REMINDER="a pin changed; run bun install --force in backend and frontend, then bun restart, in the main checkout to make it live."
 common="$(git rev-parse --git-common-dir)"

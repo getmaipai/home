@@ -135,25 +135,18 @@ once() {
       commits=("$origin_main")
     fi
   fi
-  if [[ -z "$base" ]]; then
-    echo "main-gate: no last-green recorded; no automatic revert (note only)" >&2
-  elif (( ${#commits[@]} == 1 )); then
-    git -C "$WT" -c core.hooksPath=/dev/null revert --no-edit "${commits[0]}"
-    if ! git -C "$WT" push origin HEAD:refs/heads/main; then
-      git -C "$WT" fetch origin main
-      echo "main-gate: push rejected; fetched origin/main and left failure note at $STATE/$origin_main.md" >&2
-      rm -f "$output" "$status_file"
-      return 1
-    fi
-  else
-    echo "main-gate: $(( ${#commits[@]} )) commits since last green; no automatic revert" >&2
-  fi
+  # GATE-FAST-01 (2026-10-16): report only. The automatic revert reverted
+  # seven good commits on false reds between 10-09 and 10-16 (each then
+  # "restored"); a red note names the commits since last green instead, and
+  # a person decides. launchd runs `once` daily (com.maipai.main-gate,
+  # StartCalendarInterval 04:00), never a loop.
+  echo "main-gate: red at $origin_main; ${#commits[@]} commit(s) since last green, no automatic revert; note at $STATE/$origin_main.md" >&2
   rm -f "$output" "$status_file"
   return 1
 }
 
 case "${1:-once}" in
   once) once ;;
-  loop) while :; do once || true; sleep 60; done ;;
-  *) echo "usage: main-gate.sh [once|loop]" >&2; exit 2 ;;
+  loop) echo "main-gate: the loop mode was retired on 2026-10-16 (GATE-FAST-01); run 'once' from launchd daily or by hand." >&2; exit 2 ;;
+  *) echo "usage: main-gate.sh [once]" >&2; exit 2 ;;
 esac

@@ -33,13 +33,37 @@ GATE_STATS_OUTPUT="${MAIPAI_GATE_STATS_OUTPUT:-$GATE_HOME_ROOT/data-scratch/gate
 FULL_FORCED=0
 DOCS_REQUESTED=0
 PRE_ONLY=0
+BENCH_ONLY=0
 for arg in "$@"; do
   case "$arg" in
     --full) FULL_FORCED=1 ;;
     --docs) DOCS_REQUESTED=1 ;;
     --pre) PRE_ONLY=1 ;;
+    --bench) BENCH_ONLY=1 ;;
   esac
 done
+
+# GATE-FAST-01 (2026-10-16): the bench lane runs only the tests the flake
+# ledger (scripts/gate/flakes.json "bench") keeps out of the gate: real
+# network, wall-clock timing. On demand, no lock, one shard per workspace,
+# MAIPAI_BENCH=1 so budget assertions written with test.skipIf run here.
+if [ "$BENCH_ONLY" = 1 ]; then
+  rc=0
+  echo "== bench lane: backend"
+  MAIPAI_BENCH=1 bun scripts/gate/shardTests.ts --dir backend --root tests --shards 1 --lane bench || rc=1
+  echo "== bench lane: frontend"
+  MAIPAI_BENCH=1 bun scripts/gate/shardTests.ts --dir frontend --root . --shards 1 --lane bench || rc=1
+  # Gate files that keep a bench-only assertion (test.skipIf(!process.env.MAIPAI_BENCH)) run here too.
+  for ws in backend frontend; do
+    budget_files="$(grep -rlF --include='*.test.ts' --include='*.test.tsx' 'skipIf(!process.env.MAIPAI_BENCH)' "$ws" --exclude-dir=node_modules 2>/dev/null | sed "s#^$ws/##" || true)"
+    [ -n "$budget_files" ] || continue
+    echo "== bench lane: $ws bench-only assertions in gate files"
+    # shellcheck disable=SC2086
+    (cd "$ws" && MAIPAI_BENCH=1 bun test $budget_files) || rc=1
+  done
+  [ "$rc" = 0 ] && echo "== bench lane passed" || echo "== bench lane FAILED (see above); these tests are not gate tests, fix or rewrite them offline"
+  exit "$rc"
+fi
 
 GATE_START_EPOCH=$(date +%s)
 GATE_STARTED_AT=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -556,7 +580,7 @@ run_backend_suite() {
   stage "scripts: bun test"
   tests_start scripts scripts . 1
   tests_finish scripts
-  tests_start backend backend tests ""
+  tests_start backend backend tests "${MAIPAI_GATE_BACKEND_SHARDS:-2}"
   stage "backend: settings registry, regenerate and check for drift"
   # $SPEC_DIR is a per-tag worktree shared by every consumer pinning
   # spec-v0.1.2 (home, bot, and any other session's check.sh run) - a
@@ -630,7 +654,7 @@ if [ "$SCOPE" = "full" ] && [ -d backend/src ] && [ -d frontend/src ]; then
   ( export GATE_CHILD_DONE="$GATE_LEG_DONE_DIR/backend.done"; trap child_exit EXIT; run_backend_suite; stage_end ) > "$BACKEND_LOG" 2>&1 &
   BACKEND_PID=$!
   ( export GATE_CHILD_DONE="$GATE_LEG_DONE_DIR/frontend.done"; trap child_exit EXIT
-    tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-3}"
+    tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-2}"
     stage "frontend: ui rules (same script as the pre-commit hook; MAIPAI_SKIP_UI_RULES is ignored here)"
     (cd frontend && env -u MAIPAI_SKIP_UI_RULES bun run lint:ui-rules >/dev/null)
 
@@ -713,7 +737,7 @@ else
   fi
 
   if { [ "$SCOPE" = "frontend" ] || [ "$SCOPE" = "full" ]; } && [ -d frontend/src ]; then
-    tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-3}"
+    tests_start frontend frontend . "${MAIPAI_GATE_FRONTEND_SHARDS:-2}"
 
     stage "frontend: eslint"
     (cd frontend && bunx eslint . --cache --cache-location .eslintcache)

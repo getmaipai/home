@@ -37079,3 +37079,57 @@ HOME-STACK-01's order of work: `install.sh` no longer builds the Stack up front.
 ### Not verified off the Mac Studio
 
 The `launchctl asuser` flow with a real console, a real Stack build, the Linux unit and sudoers on a real host, and `AbandonProcessGroup` on a live LaunchDaemon.
+
+## GATE-FAST-01: the gate for fast iteration (2026-10-16)
+
+Owner's ruling after one week of the tiered workflow (`DECISIONS.md` 2026-10-15 in `.github`): the gate was the bottleneck. Four
+decisions, all taken 2026-10-16 in the AskUserQuestion wizard.
+
+### Measured (data-scratch/gate-stats/runs.jsonl, 2026-10-09 to 10-16)
+
+| What | Number |
+|---|---|
+| Gate runs | 1527, 56 h wall, 10 h waiting for the machine lock |
+| Full gates | 914 red, 191 green (83% red); green median 236 s, p90 376 s |
+| Reds that passed unchanged on a rerun | 149 of 474 heads (31%) |
+| `main-gate` loop | 151 runs, 149 red, 12 reverts, 7 of them of a good commit on a false red |
+| Full gates started within 15 min of the previous in the same worktree | 868 of 962 |
+| Full-gate triggers | `backend/package.json` 438, no changed files 180, cross-package 112, `scripts/screenshot.ts` 103, `bun.lock` 70 |
+| Literal sleeps in tests | 573 s across 87 calls; 22 files assert a wall-clock budget |
+
+Top flaky tests (fails / fails at a head that later passed): `discoverRobots()` 222/36, `maybeRefreshConversationSummary` 56/32,
+`NotificationBell` 52/16, `/api/engines` 50/50, `turnNext` SEARCH-ROWS-01 36/25, `ComposerVoiceControls` 29/23, crisis overlay 21/12
+(a safety test; it stays in the gate).
+
+### Decided
+
+1. **`main-gate` reports, never reverts, once a day.** `scripts/main-gate.sh once` from launchd (`com.maipai.main-gate`,
+   `StartCalendarInterval` 04:00, no `KeepAlive`, no `RunAtLoad`); `loop` exits 2. A red writes the note with the commits since last
+   green and a person decides. The plist is machine config, not in the repo.
+2. **Bench lane.** `scripts/gate/flakes.json` gains `bench.{backend,frontend}` (file plus reason). The gate never runs those files;
+   `bash scripts/check.sh --bench` runs only them, one shard per workspace, no lock, with `MAIPAI_BENCH=1` so budget assertions
+   written as `test.skipIf(!process.env.MAIPAI_BENCH)` run there (first one: GATE-01's 50 ms decide budget). Listed: backend
+   `tests/mdns.test.ts`, `tests/robotDiscovery.mdns.test.ts`, `tests/turnMachine/summaryRefresh.test.ts`; frontend
+   `src/shell/NotificationBell.test.tsx`, `src/apps/chat/composerVoiceControls.test.tsx`. `discoverRobots()` takes an injectable
+   browser host (`deps.createHost`) so `tests/robotDiscovery.test.ts` proves the browse, TXT reading, fqdn dedupe and the never-throws
+   posture offline in the gate; the real multicast round trip moved to the bench file unchanged.
+3. **T2 is the safety and auth surface only:** `docs/design/RULES.md`, `backend/src/auth/*`, `backend/src/credentials*`,
+   `backend/src/consent*`, `backend/src/people/*child*`, `backend/src/people/*teen*`, `backend/src/db/migrations/*`, plus the gate
+   itself (`scripts/check.sh`, `scripts/wt.sh`, shared `wt.sh`). Pins, lockfiles, plans, the turn pipeline, wire shapes, spec records
+   and `frontend/src/*chat*` are T1 (preflight plus the tests beside the change). In `scripts/gateScope.ts` only the gate's own files
+   force the full scope; any other `scripts/` file is backend scope, where the scripts workspace's tests already run.
+4. **Stamps count for 4 hours** (`MAIPAI_WT_STAMP_MAX_AGE` default 14400, the commit and review hooks agree; plugin 0.11.0), and
+   `wt.sh land` re-gates after a rebase only when the rebase moved a pin or a file this branch also changed.
+5. **Shards cap at 2** per workspace (`MAIPAI_GATE_BACKEND_SHARDS`, `MAIPAI_GATE_FRONTEND_SHARDS`) so two sessions' gates fit the
+   14-core, 24 GB machine without the load 31 that made timing tests red.
+
+### How to iterate now
+
+`bash scripts/wt.sh check` (T1 on almost every change, about 2 min), commit by file name, `bash scripts/wt.sh land`. Run the full
+gate only on a T2 path or by choice (`bash scripts/check.sh`), the bench lane when touching network or timing code. A flaky test is
+not "run it again": it moves to `bench` with a reason, or it is rewritten offline, the same session.
+
+### Not verified
+
+The 04:00 launchd run itself (the job is loaded and `launchctl print` shows the calendar trigger); a bench run on a machine without
+multicast.

@@ -67,8 +67,16 @@ export function classifyScope(files: string[], frontendImportedBackendPaths: str
     if (FULL_BUCKET_EXACT.has(f)) {
       return { scope: "full", why: `a workspace package.json or lockfile changed (${f})` };
     }
+    if (f === "scripts/check.sh" || f === "scripts/wt.sh" || f === "scripts/gateScope.ts" || f.startsWith("scripts/gate/")) {
+      return { scope: "full", why: `the gate itself changed (${f})` };
+    }
     if (f.startsWith("scripts/")) {
-      return { scope: "full", why: `scripts/ changed (${f}) - it holds the pin tags every workspace resolves from` };
+      // GATE-FAST-01 (2026-10-16): the scripts workspace's own tests run
+      // in the backend leg (`scripts: bun test` opens run_backend_suite),
+      // so a helper script is a backend-scope change, not a full gate.
+      hasBackend = true;
+      backendChanged.push(f);
+      continue;
     }
     if (f.startsWith("spec/")) {
       return { scope: "full", why: `a spec workspace path changed (${f})` };

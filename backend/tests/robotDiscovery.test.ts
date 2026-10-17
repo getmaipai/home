@@ -1,76 +1,74 @@
 import { describe, expect, test } from "bun:test";
-import { randomUUID } from "node:crypto";
-import { Bonjour } from "bonjour-service";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
-import { discoverRobots } from "@/lib/robotDiscovery";
+import { discoverRobots, type AdvertisedService, type RobotBrowserHost } from "@/lib/robotDiscovery";
 
-// Same posture as tests/mdns.test.ts: a real mDNS advertise/browse round
-// trip on loopback, the only way to actually prove discoverRobots() reads
-// the daemon's own TXT fields rather than the shape of a mocked object.
-//
-// The published *name* must never be a real daemon's own default
-// ("reachy_mini"): bonjour-service probes for name collisions before
-// publishing and silently refuses a duplicate, and a real simulator
-// happened to be running on this exact machine under that exact name
-// while this test was first written, which made every fixture here
-// find nothing at all. `port` alone is unique per test and is what the
-// assertions key on; the TXT payload can still claim `robot_name:
-// "reachy_mini"` (real daemons all do) without a service-name collision.
-async function advertiseFakeRobot(
-  uniqueServiceName: string,
-  port: number,
-  txt: Record<string, string>,
-): Promise<Bonjour> {
-  const bonjour = new Bonjour();
-  bonjour.publish({ host: `maipai-test-${randomUUID().slice(0, 8)}.local`, name: uniqueServiceName, type: "reachy-mini", port, txt });
-  return bonjour;
+// Gate lane: discoverRobots() against a fake browser host, so the gate proves
+// the browse window, TXT reading and the never-throws posture without the
+// machine's network. The real multicast round trip is the bench test
+// tests/robotDiscovery.mdns.test.ts (GATE-FAST-01, 2026-10-16).
+function fakeHost(services: AdvertisedService[], opts: { failFind?: boolean } = {}) {
+  const calls = { stop: 0, destroy: 0, type: "" };
+  const host: RobotBrowserHost = {
+    find({ type }) {
+      calls.type = type;
+      if (opts.failFind) throw new Error("multicast filtered");
+      return {
+        on(_event, handler) {
+          for (const s of services) setTimeout(() => handler(s), 5);
+          return this;
+        },
+        stop() {
+          calls.stop += 1;
+        },
+      };
+    },
+    destroy() {
+      calls.destroy += 1;
+    },
+  };
+  return { host, calls };
 }
 
+const advertised = (port: number, txt: Record<string, string>): AdvertisedService => ({
+  fqdn: `fixture-${port}._reachy-mini._tcp.local`,
+  name: `reachy-mini-test-fixture-${port}`,
+  host: "reachy-mini.local",
+  port,
+  addresses: ["192.0.2.10"],
+  txt,
+});
+
 describe("discoverRobots()", () => {
-  test("finds a real advertised robot with its TXT fields", async () => {
-    const bonjour = await advertiseFakeRobot("reachy-mini-test-fixture-1", 48793, {
-      version: "1.11.0",
-      robot_name: "reachy_mini",
-      ws_path: "/ws/sdk",
-      model: "wireless",
-      manufacturer: "Pollen Robotics",
-      unit_id: "test-unit-1",
-    });
-    try {
-      const robots = await discoverRobots(3000);
-      const found = robots.find((r) => r.port === 48793);
-      expect(found).toBeDefined();
-      expect(found!.name).toBe("reachy_mini");
-      expect(found!.model).toBe("wireless");
-      expect(found!.daemonVersion).toBe("1.11.0");
-      expect(found!.unitId).toBe("test-unit-1");
-    } finally {
-      await new Promise<void>((resolve) => bonjour.unpublishAll(() => resolve()));
-      bonjour.destroy();
-    }
-  }, 10_000);
+  test("browses _reachy-mini._tcp and reads the daemon's TXT fields", async () => {
+    const { host, calls } = fakeHost([
+      advertised(48793, { version: "1.11.0", robot_name: "reachy_mini", model: "wireless", unit_id: "test-unit-1" }),
+    ]);
+    const robots = await discoverRobots(50, { createHost: () => host });
+    expect(calls.type).toBe("reachy-mini");
+    expect(robots).toHaveLength(1);
+    expect(robots[0]).toMatchObject({ name: "reachy_mini", host: "reachy-mini.local", port: 48793, addresses: ["192.0.2.10"], model: "wireless", daemonVersion: "1.11.0", unitId: "test-unit-1" });
+    expect(calls.stop).toBe(1);
+    expect(calls.destroy).toBe(1);
+  });
 
-  test("an absent unit_id (the simulator's own case) reads as null, not a crash", async () => {
-    const bonjour = await advertiseFakeRobot("reachy-mini-test-fixture-2", 48794, {
-      version: "1.11.0",
-      robot_name: "reachy_mini",
-      model: "wireless",
-    });
-    try {
-      const robots = await discoverRobots(3000);
-      const found = robots.find((r) => r.port === 48794);
-      expect(found).toBeDefined();
-      expect(found!.unitId).toBeNull();
-    } finally {
-      await new Promise<void>((resolve) => bonjour.unpublishAll(() => resolve()));
-      bonjour.destroy();
-    }
-  }, 10_000);
+  test("an absent unit_id (the simulator's own case) reads as null, and the name falls back to the service name", async () => {
+    const { host } = fakeHost([advertised(48794, { version: "1.11.0", model: "wireless" })]);
+    const robots = await discoverRobots(50, { createHost: () => host });
+    expect(robots[0]!.unitId).toBeNull();
+    expect(robots[0]!.name).toBe("reachy-mini-test-fixture-48794");
+  });
 
-  test("no robot on the network is an empty list, never an error", async () => {
-    const robots = await discoverRobots(200);
-    expect(Array.isArray(robots)).toBe(true);
+  test("the same robot announced twice is one row (keyed by fqdn)", async () => {
+    const twice = advertised(48795, { robot_name: "reachy_mini" });
+    const { host } = fakeHost([twice, twice]);
+    expect(await discoverRobots(50, { createHost: () => host })).toHaveLength(1);
+  });
+
+  test("a browser failure is an empty list, never an error, and the host is still destroyed", async () => {
+    const { host, calls } = fakeHost([], { failFind: true });
+    expect(await discoverRobots(50, { createHost: () => host })).toEqual([]);
+    expect(calls.destroy).toBe(1);
   });
 });
 

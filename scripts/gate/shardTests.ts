@@ -14,6 +14,7 @@ import "../runTemp";
 //
 // Usage: bun scripts/gate/shardTests.ts --dir backend [--root tests]
 //          [--shards N] [--record] [-- extra bun test args]
+//   --lane L     gate (default: everything but the ledger's bench files) or bench (only them)
 //   --shards N   requested ceiling; the engine/OS memory budget and CPU cap
 //                still apply (chooseShardCount)
 //   --record     rewrites scripts/gate/test-timings.json for this workspace
@@ -28,13 +29,21 @@ export type Timings = Record<string, number>;
 
 const TEST_GLOB = "**/*{.test,_test,.spec,_spec}.{ts,tsx,js,jsx,mjs,cjs,mts,cts}";
 export type FlakeEntry = { workspace: string; file: string; test: string; owner: string; date_added: string; deadline: string; cause: string; log: string; issue: number };
-export type FlakeLedger = { version: 2; flakes: FlakeEntry[]; serial: Record<string, { file: string; reason: string }[]>; skipped: { workspace: string; file: string }[] };
+export type FlakeLedger = { version: 2; flakes: FlakeEntry[]; serial: Record<string, { file: string; reason: string }[]>; skipped: { workspace: string; file: string }[]; bench?: Record<string, { file: string; reason: string }[]> };
+// GATE-FAST-01 (2026-10-16): the bench lane holds tests that need the real
+// network or wall-clock timing. The gate (lane "gate") never runs them;
+// `check.sh --bench` (lane "bench") runs only them, on demand, one shard.
+export type Lane = "gate" | "bench";
 
 export function validateLedger(value: unknown, today = new Date().toISOString().slice(0, 10)): FlakeLedger {
   if (!value || typeof value !== "object") throw new Error("flake ledger must be an object");
   const ledger = value as FlakeLedger;
   if (ledger.version !== 2 || !Array.isArray(ledger.flakes) || !ledger.serial || !Array.isArray(ledger.skipped)) throw new Error("flake ledger must use schema version 2 with flakes, serial, and skipped");
   if (ledger.skipped.length !== 0) throw new Error("flake ledger skipped must stay empty");
+  for (const [workspace, entries] of Object.entries(ledger.bench ?? {})) {
+    if (!Array.isArray(entries)) throw new Error(`flake ledger bench.${workspace} must be a list`);
+    for (const entry of entries) if (!entry.file || !entry.reason) throw new Error(`bench entry needs file and reason: ${workspace} ${JSON.stringify(entry)}`);
+  }
   const causes = new Set(["clock", "port", "network", "shared-state", "load-timeout", "order", "random", "unknown"]);
   const live = ledger.flakes.filter((entry) => entry.deadline >= today);
   if (live.length > 8) throw new Error(`flake ledger has ${live.length} live entries; maximum is 8`);
@@ -325,6 +334,8 @@ export interface RunOptions {
   extraArgs?: string[];
   timingsPath?: string;
   ledger?: FlakeLedger;
+  /** "gate" (default) excludes the ledger's bench files; "bench" runs only them. */
+  lane?: Lane;
   failureLog?: string;
   changedFiles?: string[];
   resourceProbe?: () => ResourceSnapshot | Promise<ResourceSnapshot>;
@@ -342,10 +353,14 @@ export async function run(opts: RunOptions): Promise<number> {
   const allTimings: Record<string, Timings> = existsSync(timingsPath) ? JSON.parse(readFileSync(timingsPath, "utf8")) : {};
   const discovered = discoverTests(dir, opts.root ?? ".");
   const ledger = validateLedger(opts.ledger ?? flakes);
-  const serial = SERIAL_FILES[label] ?? [];
+  const lane: Lane = opts.lane ?? "gate";
+  const bench = (ledger.bench?.[label] ?? []).map(({ file }) => file);
+  const serial = lane === "bench" ? [] : (SERIAL_FILES[label] ?? []);
   const skipped = SKIPPED_FILES[label] ?? [];
-  const files = discovered.filter((f) => !serial.includes(f) && !skipped.includes(f));
-  const serialFiles = discovered.filter((f) => serial.includes(f));
+  const inLane = (f: string) => (lane === "bench" ? bench.includes(f) : !bench.includes(f));
+  const files = discovered.filter((f) => inLane(f) && !serial.includes(f) && !skipped.includes(f));
+  const serialFiles = discovered.filter((f) => inLane(f) && serial.includes(f));
+  if (lane === "bench") console.log(`shard: ${label}: bench lane, ${files.length} of ${bench.length} listed bench files found`);
   if (files.length === 0 && serialFiles.length === 0) {
     console.log(`shard: no test files under ${dir}`);
     return 0;
@@ -714,11 +729,13 @@ if (import.meta.main) {
   };
   const dir = get("--dir");
   if (!dir) {
-    console.error("usage: bun scripts/gate/shardTests.ts --dir <workspace> [--root tests] [--shards N] [--record] [-- bun test args]");
+    console.error("usage: bun scripts/gate/shardTests.ts --dir <workspace> [--root tests] [--shards N] [--lane gate|bench] [--record] [-- bun test args]");
     process.exit(2);
   }
   const shards = get("--shards") ? Number(get("--shards")) : undefined;
-  const code = await run({ dir, root: get("--root"), shards, record: own.includes("--record"), extraArgs, workerSlotsDir: process.env.MAIPAI_GATE_WORKER_SLOTS_DIR });
+  const laneArg = get("--lane") ?? "gate";
+  if (laneArg !== "gate" && laneArg !== "bench") { console.error(`unknown lane "${laneArg}"; use gate or bench`); process.exit(2); }
+  const code = await run({ dir, root: get("--root"), shards, lane: laneArg, record: own.includes("--record"), extraArgs, workerSlotsDir: process.env.MAIPAI_GATE_WORKER_SLOTS_DIR });
   console.log(`shard: exit ${code}`);
   process.exit(code);
 }

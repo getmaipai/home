@@ -52,11 +52,24 @@ function toDiscoveredRobot(service: {
  * whatever answered. Best-effort: a network that filters multicast, or
  * any browser failure, returns an empty list, never throws.
  */
-export async function discoverRobots(windowMs = 2000): Promise<DiscoveredRobot[]> {
+export interface RobotBrowserHost {
+  find(opts: { type: string }): { on(event: "up", handler: (service: AdvertisedService) => void): unknown; stop(): void };
+  destroy(): void;
+}
+
+export type AdvertisedService = Parameters<typeof toDiscoveredRobot>[0] & { fqdn: string };
+
+/**
+ * `deps.createHost` exists for tests: the gate proves the browse and TXT
+ * reading against a fake host (tests/robotDiscovery.test.ts), and the real
+ * multicast round trip lives in the bench lane
+ * (tests/robotDiscovery.mdns.test.ts), never in the gate (GATE-FAST-01).
+ */
+export async function discoverRobots(windowMs = 2000, deps: { createHost?: () => RobotBrowserHost } = {}): Promise<DiscoveredRobot[]> {
   const found = new Map<string, DiscoveredRobot>();
-  let bonjour: Bonjour | null = null;
+  let bonjour: RobotBrowserHost | null = null;
   try {
-    bonjour = new Bonjour();
+    bonjour = deps.createHost ? deps.createHost() : new Bonjour();
     const browser = bonjour.find({ type: SERVICE_TYPE });
     browser.on("up", (service) => {
       found.set(service.fqdn, toDiscoveredRobot(service));

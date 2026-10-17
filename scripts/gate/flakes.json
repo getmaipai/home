@@ -14,17 +14,9 @@
       {
         "file": "tests/turnMachine/turnNext.test.ts",
         "reason": "Installs temporary Stack clients in a process-global slot used by other test files."
-      },
-      {
-        "file": "tests/mdns.test.ts",
-        "reason": "Uses real multicast discovery and shared machine network state."
       }
     ],
     "frontend": [
-      {
-        "file": "src/shell/NotificationBell.test.tsx",
-        "reason": "Its notification polling and toast assertions use process-global fetch, which other UI test files replace."
-      },
       {
         "file": "src/shell/pages/status/StatusComponents.test.tsx",
         "reason": "Its service restart fetch mock is process-global and can be replaced before the async status query resolves."
@@ -39,5 +31,31 @@
       }
     ]
   },
-  "skipped": []
+  "skipped": [],
+  "bench": {
+    "backend": [
+      {
+        "file": "tests/mdns.test.ts",
+        "reason": "Real multicast advertise and browse on the machine's network; 222 gate reds in 8 days. Offline rule: not a gate test."
+      },
+      {
+        "file": "tests/robotDiscovery.mdns.test.ts",
+        "reason": "Real mDNS round trip for discoverRobots(); the gate runs the offline fake in tests/robotDiscovery.test.ts instead."
+      },
+      {
+        "file": "tests/turnMachine/summaryRefresh.test.ts",
+        "reason": "Wall-clock delays (setTimeout multiples of DELAY_MS) that miss under gate load; 56 reds, 32 at heads that later passed."
+      }
+    ],
+    "frontend": [
+      {
+        "file": "src/shell/NotificationBell.test.tsx",
+        "reason": "Polling timers and toasts on process-global fetch; still flaked while serial (52 reds)."
+      },
+      {
+        "file": "src/apps/chat/composerVoiceControls.test.tsx",
+        "reason": "Microphone and engine-route timing under load; 29 reds, 23 at heads that later passed."
+      }
+    ]
+  }
 }

@@ -184,8 +184,8 @@ describe("wt.sh land gate stamp", () => {
     refused(s.sh(["land"]), "need tier T1", `${next} T1`);
 
     writeFileSync(s.stampPath, good);
-    s.edit((j) => { j.created = new Date(Date.now() - 31 * 60 * 1000).toISOString(); });
-    refused(s.sh(["land"]), "only 30 minutes counts", next);
+    s.edit((j) => { j.created = new Date(Date.now() - 241 * 60 * 1000).toISOString(); });
+    refused(s.sh(["land"]), "only 4 hours counts", next);
 
     writeFileSync(s.stampPath, good);
     writeFileSync(join(s.path, "tools/stamped.ts"), "changed after the check\n");

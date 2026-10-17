@@ -53,8 +53,12 @@ describe("classifyScope", () => {
     expect(classifyScope(["backend/package.json"]).scope).toBe("full");
   });
 
-  test("a root scripts/ change forces full, but backend/scripts or frontend/scripts do not", () => {
-    expect(classifyScope(["scripts/screenshot.ts"]).scope).toBe("full");
+  test("the gate's own scripts force full; any other root scripts/ file is backend scope (its tests run in that leg)", () => {
+    expect(classifyScope(["scripts/check.sh"]).scope).toBe("full");
+    expect(classifyScope(["scripts/gate/shardTests.ts"]).scope).toBe("full");
+    expect(classifyScope(["scripts/gateScope.ts"]).scope).toBe("full");
+    expect(classifyScope(["scripts/screenshot.ts"]).scope).toBe("backend");
+    expect(classifyScope(["scripts/screenshot.ts", "frontend/src/main.tsx"]).scope).toBe("full");
     expect(classifyScope(["backend/scripts/bench/query-rewrite.ts"]).scope).toBe("backend");
     expect(classifyScope(["frontend/scripts/generate-icons.ts"]).scope).toBe("frontend");
   });

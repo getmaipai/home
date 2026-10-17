@@ -89,13 +89,15 @@ describe("main-gate", () => {
     expect(JSON.parse(rows.at(-1)!)).toMatchObject({ sha, result: "green" });
   });
 
-  test("red with one commit reverts and pushes to origin", () => {
+  // GATE-FAST-01 (2026-10-16): a red never reverts, even a single commit; the note names it and a person decides.
+  test("red with one commit writes the note and leaves origin/main alone", () => {
     const sha = commit("bad landing");
     const result = invoke("echo '== backend: bun test'; echo 'failure details'; exit 1");
     expect(result.status, result.stderr + result.stdout).toBe(1);
     expect(result.stderr + result.stdout).toContain("wrote failure note");
-    expect(git(["rev-parse", "origin/main"], wt)).not.toBe(sha);
-    expect(git(["show", "-s", "--format=%s", "origin/main"], wt)).toContain("Revert");
+    expect(result.stderr + result.stdout).toContain("no automatic revert");
+    expect(git(["rev-parse", "origin/main"], wt)).toBe(sha);
+    expect(git(["show", "-s", "--format=%s", "origin/main"], wt)).not.toContain("Revert");
     const note = readNote(join(repo, "data-scratch", "main-gate", `${sha}.md`), result);
     expect(note).toContain("Failing stage: backend: bun test");
     expect(note).toContain("bad landing");
