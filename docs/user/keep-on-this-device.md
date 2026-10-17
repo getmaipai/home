@@ -11,5 +11,5 @@ Things to know:
 - If the device is full, Home says so. Remove some copies and try again.
 - Files that need conversion are not ready to keep yet. Home says "not ready".
 - If a device is removed, or its permission is turned off, it cannot get new copies.
-- Signing in or out on a browser removes the copies in it. Settings, Devices has "Remove all offline copies".
+- Signing out of a browser removes the copies in it. Signing in again after your session ran out keeps them. Settings, Devices has "Remove all offline copies".
 - Kids only get what a grown-up allows for them.

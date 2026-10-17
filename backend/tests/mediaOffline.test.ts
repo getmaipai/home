@@ -67,6 +67,17 @@ describe("offline admission", () => {
     expect((await s.owner.get(`${base}/manifest?id=${s.id}`)).status).toBe(200);
     expect((await s.client.get(`${base}/manifest?id=${s.id}`)).status).toBe(401);
   });
+  test("only a revoked device carries the device_revoked code; a missing scope or an expired session does not", async () => {
+    const s = await setup();
+    const code = async (res: Response) => (await res.json() as { code?: string }).code;
+    expect(await code(await s.get(`/manifest?id=${s.id}`))).toBe("offline_scope_missing");
+    s.allow();
+    expect(deleteDevice(s.issued.deviceId, s.actor.id)).toBe(true);
+    const gone = await s.get(`/manifest?id=${s.id}`);
+    expect(gone.status).toBe(403); expect(await code(gone)).toBe("device_revoked");
+    const expired = await s.client.get(`${base}/manifest?id=${s.id}`);
+    expect(expired.status).toBe(401); expect(await code(expired)).toBeUndefined();
+  });
   test("scoped device bearer stays denied outside the offline router, and cannot grant itself scope", async () => {
     const s = await setup(); s.allow();
     expect((await s.get(`/manifest?id=${s.id}`)).status).toBe(200);

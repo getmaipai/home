@@ -1,4 +1,4 @@
-import { removeAllOfflineMedia } from "@/lib/offlineMedia";
+import { isDeviceRevoked, removeAllOfflineMedia } from "@/lib/offlineMedia";
 import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -543,8 +543,8 @@ function isAbortError(err: unknown): boolean {
 // the interpreter needs the same request plumbing (credentials,
 // timeout, error shape) directly rather than duplicating it.
 export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
-  // A shared browser must discard the previous person's copies before any sign-in or sign-out.
-  if (path.startsWith("/api/auth/") && init?.method && init.method !== "GET") await removeAllOfflineMedia();
+  // An explicit sign-out discards the copies (a shared browser). An expired session never does.
+  if (path === "/api/auth/logout") await removeAllOfflineMedia();
   const { timeoutMs, ...rest } = init ?? {};
   const { signal, clear } = withTimeout(timeoutMs);
   try {
@@ -564,7 +564,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      if (res.status === 401) await removeAllOfflineMedia();
+      if (isDeviceRevoked(res.status, body)) await removeAllOfflineMedia();
       throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined);
     }
     return body as T;

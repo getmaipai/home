@@ -366,8 +366,10 @@ export function requireDeviceScope(scope: "media.offline" | "offline.records") {
       const match = /^Bearer ([^ ]+)$/i.exec(authorization);
       const identity = match ? resolveDeviceToken(match[1]!) : null;
       const device = identity ? getDeviceById(identity.deviceId) : null;
-      if (!identity || !device || !device.offlineScope.includes(scope)) {
-        return c.json({ error: "This device cannot keep these files. Sign in to Home and check its offline permission, or pair it again." }, 403);
+      // `device_revoked` is the one code the browser treats as "wipe kept copies"; a missing scope is not a revocation.
+      if (!identity || !device) return c.json({ error: "This device is no longer paired with Home. Pair it again to keep files.", code: "device_revoked" }, 403);
+      if (!device.offlineScope.includes(scope)) {
+        return c.json({ error: "This device cannot keep these files. Sign in to Home and check its offline permission, or pair it again.", code: "offline_scope_missing" }, 403);
       }
       c.set("person", identity.person);
       c.set("deviceId", device.id);

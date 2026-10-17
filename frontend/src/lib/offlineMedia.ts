@@ -20,6 +20,8 @@ export const offlineMessages: Record<OfflineCode, string> = {
   network: "The copy could not be kept. Check your connection to Home, then try again.",
   useGo: USE_GO,
 };
+/** Only a revoked device (403 `device_revoked`) wipes copies; an expired session (401) never does. */
+export const isDeviceRevoked = (status: number, body: unknown): boolean => status === 403 && (body as { code?: unknown } | null)?.code === "device_revoked";
 const failure = (code: OfflineCode): OfflineResult => ({ ok: false, code, message: offlineMessages[code] });
 export const isWebKit = (ua: string): boolean => /AppleWebKit\//.test(ua) && (!/\b(?:Chrome|Chromium|Edg)\//.test(ua) || /iPhone|iPad|iPod/.test(ua));
 export const isChromium = (ua: string): boolean => /\b(?:Chrome|Chromium|Edg)\//.test(ua) && !isWebKit(ua);
@@ -38,7 +40,10 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
     const estimate = await navigator.storage.estimate();
     const response = await fetch(`/api/media/offline/manifest?id=${encodeURIComponent(item.id)}`, { credentials: "same-origin", cache: "no-store", redirect: "error" });
     checkCurrent();
-    if (!response.ok) return failure(codeFor(response.status));
+    if (!response.ok) {
+      if (isDeviceRevoked(response.status, await response.clone().json().catch(() => null))) await removeAllOfflineMedia();
+      return failure(codeFor(response.status));
+    }
     const manifest = OfflineManifest.parse(await response.json());
     checkCurrent();
     if (manifest.kind !== "media" || manifest.id !== item.id) return failure("network");
