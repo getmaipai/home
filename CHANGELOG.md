@@ -7,6 +7,20 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-10-17
+
+Chat moves to a faster engine, and the picture card looks better while a picture is made.
+
+### Chat engine
+- On a Mac with Apple silicon and 64 GB or more, chat now runs on oMLX, about a quarter faster than before. After this update the AI engine downloads the faster model (about 19 GB) and builds its environment in the background. Chat keeps working on the old engine until the new one is ready, then switches in a few seconds.
+- If the new engine fails to start twice, chat goes back to the old engine and a warning appears in Repairs. To go back by hand, set the chat engine to llama-server in the engine settings.
+- The install plan and the disk plan show the extra space before anything downloads.
+- Settings lists every component the engine can install, with sizes and whether it fits on the disk.
+
+### Pictures
+- While a picture is made, the chat shows a card with the prompt, a progress bar and a stop button.
+- Signed likeness proofs let an adult use a household photo for a picture, only with the person's consent.
+
 ## [0.2.11] - 2026-10-17
 
 The microphone works again, and apps show in the left column.
