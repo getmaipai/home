@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState, type ComponentProps, type ComponentType } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes as RouterRoutes, Route, Navigate } from "react-router-dom";
 import { I18nProvider } from "@lingui/react";
@@ -7,6 +7,7 @@ import { createQueryClient } from "@/lib/queryClient";
 import { AliasRedirect } from "@/shell/AliasRedirect";
 import { useHouseholdLocale } from "@/shell/useHouseholdLocale";
 import { Progress } from "@maipai/ui/src/primitives/Progress";
+import { lazyNamed } from "@/shell/lazyNamed";
 import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { ErrorBoundary } from "@maipai/ui/src/primitives/ErrorBoundary";
 import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
@@ -16,23 +17,14 @@ import { SessionLockGate } from "@/shell/sessionLockContext";
 import { PreviewRuntime } from "@/apps/setup/preview/PreviewRuntime";
 import { ThemeProvider } from "@maipai/ui/src/dashboard/context/shadcntheme/ThemeContext";
 
-// A failed chunk fetch uses the shared stale-chunk retry wired in
-// main.tsx; lazy routes do not need a separate reload path.
-function lazyNamed<P extends object = Record<string, never>>(
-  loader: () => Promise<Record<string, unknown>>,
-  name: string,
-) {
-  return lazy(() => loader().then((m) => ({ default: m[name] as ComponentType<P> })));
-}
-
 // Setup remains a separate first-run route. The migrated application
 // shell owns every other route from the root, while the preview bookmark prefix remains a
 // compatibility route for bookmarks and links made during preview.
-const SetupWizard = lazyNamed<ComponentProps<typeof import("@/apps/setup/SetupWizard")["SetupWizard"]>>(
+const SetupWizard = lazyNamed(
   () => import("@/apps/setup/SetupWizard"),
   "SetupWizard",
 );
-const AwayFromHome = lazyNamed<ComponentProps<typeof import("@/apps/setup/AwayFromHome")["AwayFromHome"]>>(
+const AwayFromHome = lazyNamed(
   () => import("@/apps/setup/AwayFromHome"),
   "AwayFromHome",
 );
@@ -42,11 +34,11 @@ const AwayFromHome = lazyNamed<ComponentProps<typeof import("@/apps/setup/AwayFr
 // it), so it's registered directly here rather than as a Routes
 // child even though its entry point lives on the (Routes-hosted)
 // profile page.
-const FaceEnrollmentPage = lazyNamed<ComponentProps<typeof import("@/apps/people/FaceEnrollmentPage")["FaceEnrollmentPage"]>>(
+const FaceEnrollmentPage = lazyNamed(
   () => import("@/apps/people/FaceEnrollmentPage"),
   "FaceEnrollmentPage",
 );
-const Routes = lazyNamed<ComponentProps<typeof import("@/shell/Routes")["Routes"]>>(
+const Routes = lazyNamed(
   () => import("@/shell/Routes"),
   "Routes",
 );

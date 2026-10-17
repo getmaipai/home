@@ -6,9 +6,6 @@ import { useAppCatalog } from "@/shell/useAppCatalog";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useTabItem } from "@/shell/tabIdentity";
 
-/** The route of the page. The rail's grid button opens it; it is the one place that lists every app. */
-export const ALL_APPS_PATH = "/all-apps";
-
 /** APPS-DIRECTORY-01: every installed app, with search, Favorites first and a star on each. Favorites are the person's
  * pins (`ui.pinned_apps`): the same list the rail draws and the app page's own star edits, so there is one list and
  * one place that saves it. The built-in apps open from here too and are always in the rail. */

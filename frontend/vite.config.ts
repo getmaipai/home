@@ -192,7 +192,11 @@ export default defineConfig({
         // into the shell, requiring a 3 MiB ceiling. The chat quote
         // Elements bring Routes just over 3 MiB, so raise the ceiling
         // to 4 MiB until route-level code splitting removes the route
-        // bundle from the precache.
+        // bundle from the precache. BUNDLE-SPLIT-01 (2026-10-17): the Routes
+        // chunk had grown to 3.84 MB, within 8% of this ceiling, so most
+        // pages now load on first visit (Routes.tsx) and `to-words` loads one
+        // locale (alias below): Routes is 2.35 MB. The ceiling stays as is;
+        // bundle.test.ts fails a build whose largest chunk passes 3 MiB.
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         // The onnxruntime-web runtime (copy-ort.mjs's public/ort/ files,
         // ~40 MB, plus its own bundled JS loader emitted as a hashed
@@ -265,7 +269,13 @@ export default defineConfig({
     // future Home-authored `@/components/*` import with no path to
     // resolve at all, worse than today's real behavior (Home's own
     // `src/components/*`).
-    alias: [{ find: /^@\/(?!kit\/|elements\/|primitives\/|ui\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` }],
+    alias: [
+      // BUNDLE-SPLIT-01: `@maipai/spec`'s normalizeForSpeech imports `{ ToWords }` from the package root, which bundles
+      // all 135 locales (621 KB of the shell chunk) for a function that only ever speaks en-US. The en-US entry point is
+      // the same class and API with one locale. Home-side until commons imports `to-words/en-US` itself.
+      { find: /^to-words$/, replacement: "to-words/en-US" },
+      { find: /^@\/(?!kit\/|elements\/|primitives\/|ui\/)/, replacement: `${fileURLToPath(new URL("./src", import.meta.url))}/` },
+    ],
     // `@maipai/ui`'s files resolve outside `frontend/`'s own tree (via
     // `kitAliasPlugin` above, and via the plain `node_modules/@maipai/ui`
     // symlink for its non-`@/kit` imports too) - a real react-in-a-lazy-

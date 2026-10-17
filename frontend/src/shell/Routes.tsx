@@ -12,30 +12,9 @@ import { useAppearance } from "@/shell/useAppearance";
 import { PageHeaderTitle } from "@/shell/pageHeaderTitle";
 import { DashboardPage } from "@/shell/pages/DashboardPage";
 import { ChatPage } from "@/shell/pages/ChatPage";
-import { PackageAppPage } from "@/shell/pages/PackageAppPage";
-import { ALL_APPS_PATH, AllAppsPage } from "@/shell/pages/AllAppsPage";
-import { ProjectsPage } from "@/shell/pages/ProjectsPage";
-import { FamilyPage } from "@/shell/pages/FamilyPage";
-import { SettingsAreaPage } from "@/shell/pages/settings/SettingsAreaPage";
+import { ALL_APPS_PATH } from "@/shell/allAppsPath";
 import { CustomizeRedirect, SettingsEntryRedirect } from "@/shell/pages/settings/SettingsEntryRedirect";
-import { StoragePage } from "@/shell/pages/StoragePage";
-import { PerformancePage } from "@/shell/pages/PerformancePage";
-import { TurnTracePage } from "@/shell/pages/TurnTracePage";
-import { UpdatesPage } from "@/shell/pages/UpdatesPage";
-import { RepairsPage } from "@/shell/pages/RepairsPage";
-import { SetupReviewPage } from "@/apps/setup/SetupReviewPage";
-import { StatusPage } from "@/shell/pages/StatusPage";
-import { UiShowcasePage } from "@/shell/pages/UiShowcasePage";
-import { MicTestPage } from "@/shell/pages/MicTestPage";
-import { BackupsPage } from "@/shell/pages/BackupsPage";
-import { CommandsPage } from "@/shell/pages/CommandsPage";
 import { meetsMinRole } from "@/apps/people/roles";
-import { DevicesPage } from "@/shell/pages/DevicesPage";
-import { PrivacyPage } from "@/shell/pages/PrivacyPage";
-import { UsersPage } from "@/shell/pages/UsersPage";
-import { FilesPage } from "@/shell/pages/FilesPage";
-import { ReferencePage } from "@/shell/pages/ReferencePage";
-import { PersonProfilePage } from "@/shell/pages/PersonProfilePage";
 import { SignInPage } from "@/shell/pages/SignInPage";
 import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
@@ -57,8 +36,36 @@ import { useSessionLocked } from "@/shell/sessionLockContext";
 import { packageAreaApps, usePackageAreas } from "@/shell/pages/settings/packageAreas";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
 import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
+import { lazyNamed } from "@/shell/lazyNamed";
+import { RouteSkeleton } from "@maipai/ui/src/primitives/RouteSkeleton";
 import { Tour } from "@maipai/ui/src/primitives/Tour";
 import { useTourRunner } from "@/shell/useTourRunner";
+
+// BUNDLE-SPLIT-01 (2026-10-17): every page but the two a person lands on (Home and Chat) loads on first visit, not
+// with the shell. The shell chunk had grown to 3.84 MB against the 4 MiB PWA precache ceiling; the pages below hold
+// charts, the media player, the settings libraries and the profile editors, which most visits never open.
+const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPage");
+const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
+const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
+const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
+const PerformancePage = lazyNamed(() => import("@/shell/pages/PerformancePage"), "PerformancePage");
+const TurnTracePage = lazyNamed(() => import("@/shell/pages/TurnTracePage"), "TurnTracePage");
+const UpdatesPage = lazyNamed(() => import("@/shell/pages/UpdatesPage"), "UpdatesPage");
+const RepairsPage = lazyNamed(() => import("@/shell/pages/RepairsPage"), "RepairsPage");
+const StatusPage = lazyNamed(() => import("@/shell/pages/StatusPage"), "StatusPage");
+const UiShowcasePage = lazyNamed(() => import("@/shell/pages/UiShowcasePage"), "UiShowcasePage");
+const BackupsPage = lazyNamed(() => import("@/shell/pages/BackupsPage"), "BackupsPage");
+const CommandsPage = lazyNamed(() => import("@/shell/pages/CommandsPage"), "CommandsPage");
+const DevicesPage = lazyNamed(() => import("@/shell/pages/DevicesPage"), "DevicesPage");
+const PrivacyPage = lazyNamed(() => import("@/shell/pages/PrivacyPage"), "PrivacyPage");
+const UsersPage = lazyNamed(() => import("@/shell/pages/UsersPage"), "UsersPage");
+const FilesPage = lazyNamed(() => import("@/shell/pages/FilesPage"), "FilesPage");
+const ReferencePage = lazyNamed(() => import("@/shell/pages/ReferencePage"), "ReferencePage");
+const PackageAppPage = lazyNamed(() => import("@/shell/pages/PackageAppPage"), "PackageAppPage");
+const AllAppsPage = lazyNamed(() => import("@/shell/pages/AllAppsPage"), "AllAppsPage");
+const MicTestPage = lazyNamed(() => import("@/shell/pages/MicTestPage"), "MicTestPage");
+const SettingsAreaPage = lazyNamed(() => import("@/shell/pages/settings/SettingsAreaPage"), "SettingsAreaPage");
+const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), "SetupReviewPage");
 
 // NOTIF-ROUTE-01: the thirty-day history page, reached from the bell's
 // "View history" link and the phone header's bell. Lazy so it stays out
@@ -117,7 +124,7 @@ function PageHeaderLayout() {
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}
-      <Outlet />
+      <Suspense fallback={<RouteSkeleton />}><Outlet /></Suspense>
     </>
   );
 }
@@ -248,7 +255,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
               PageHeaderLayout. `/settings` and every old `?tab=` link
               replace to the page that holds them now; `/customize` is gone. */}
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
-          <Route path="settings/:area/:section?" element={<SettingsAreaPage person={person} onPersonChange={onPersonChange} />} />
+          <Route path="settings/:area/:section?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
           {/* ENGINES-AI-01: the Manage pages that moved into Home settings are links that land on their section. */}
           {["voices", "engines", "models"].map((path) => (
             <Route key={path} path={path} element={<Navigate to={retiredManagePageTarget(`/${path}`, { canManageHousehold: meetsMinRole(person.role, "admin") }) ?? "/settings/account"} replace />} />
