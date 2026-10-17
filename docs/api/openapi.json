@@ -42703,6 +42703,10 @@
                     "can_vary": {
                       "type": "boolean"
                     },
+                    "size": {
+                      "type": "string",
+                      "description": "The size being made, like 1024x1024."
+                    },
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
@@ -42721,6 +42725,7 @@
                     "error",
                     "files",
                     "can_vary",
+                    "size",
                     "stop_id"
                   ]
                 }
@@ -42925,6 +42930,10 @@
                     "can_vary": {
                       "type": "boolean"
                     },
+                    "size": {
+                      "type": "string",
+                      "description": "The size being made, like 1024x1024."
+                    },
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
@@ -42943,6 +42952,7 @@
                     "error",
                     "files",
                     "can_vary",
+                    "size",
                     "stop_id"
                   ]
                 }
@@ -43147,6 +43157,10 @@
                     "can_vary": {
                       "type": "boolean"
                     },
+                    "size": {
+                      "type": "string",
+                      "description": "The size being made, like 1024x1024."
+                    },
                     "stop_id": {
                       "type": "string",
                       "description": "The id to POST to /jobs/{id}/cancel to stop what is being made now."
@@ -43165,6 +43179,7 @@
                     "error",
                     "files",
                     "can_vary",
+                    "size",
                     "stop_id"
                   ]
                 }

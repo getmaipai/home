@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-10-17T14:31:07.748Z",
-  "kitTag": "ui-v0.5.248",
+  "generatedAt": "2026-10-17T14:35:24.435Z",
+  "kitTag": "ui-v0.5.249",
   "items": [
     {
       "file": "ActivityCardsShowcase.tsx",
@@ -596,7 +596,7 @@
       "group": "canvas/artifacts",
       "verdict": "later",
       "verdictReason": "Deferred until IMAGE-01.",
-      "implemented": false
+      "implemented": true
     },
     {
       "file": "image.tsx",

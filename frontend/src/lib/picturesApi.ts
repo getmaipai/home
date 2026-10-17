@@ -15,6 +15,7 @@ export interface PictureCard {
   error: string | null;
   files: PictureFile[];
   can_vary: boolean;
+  size: string;
   stop_id: string;
 }
 export interface PictureStatus { can_make: boolean; reason: string | null; engine_ready: boolean; adult_styles: boolean; styles: Array<{ id: string; name: string }> }

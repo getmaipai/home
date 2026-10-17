@@ -10,6 +10,7 @@ import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
 import { JobProgress, type JobStage } from "@maipai/ui/src/elements/job-progress";
+import { ImageGeneration } from "@maipai/ui/src/elements/image-generation";
 import { ErrorState } from "@maipai/ui/src/elements/error-state";
 import { ImageGallery } from "@maipai/ui/src/elements/image-gallery";
 import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
@@ -411,7 +412,7 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
 
 // IMGGEN-UI-01: a picture the person asked for. The turn names the job (`TurnValue.picture`); the card polls Home
 // for it. Two tool-call parts share one query, each drawing one shipped Element: "picture_progress" is the kit's
-// JobProgress while a picture is being made (elapsed time and a Stop control), "picture" is the finished pictures
+// ImageGeneration while a picture is being made (the prompt's shimmer card, elapsed time, a bar and a Stop control), "picture" is the finished pictures
 // through the same image gallery every answer uses (so Edit opens the editor) or, when nothing came, the kit's
 // ErrorState with a Try again.
 const PICTURE_POLL_MS = 700;
@@ -450,15 +451,16 @@ export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<stri
   if (!result || !card || !active) return null;
   const elapsedSeconds = Math.max(0, Math.round((card.elapsed_ms + Math.max(0, tick - fetchedAt)) / 1000));
   return (
-    <JobProgress
-      variant="compact"
-      title="Making your picture"
-      stages={[{ name: card.label, weight: 1 }]}
-      stageIndex={0}
-      stageProgress={Math.max(0.02, card.percent / 100)}
-      eta={`${elapsedSeconds}s`}
-      cancelLabel="Stop"
-      onCancel={() => { void picturesApi.stop(card.stop_id).then(() => query.refetch()).catch(() => query.refetch()); }}
+    <ImageGeneration
+      prompt={card.prompt}
+      generating
+      size="large"
+      progress={Math.max(2, card.percent)}
+      statusLabel={card.label || "Making your picture"}
+      elapsedLabel={`${elapsedSeconds}s`}
+      sizeLabel={card.size.replace("x", " × ")}
+      stopLabel="Stop"
+      onStop={() => { void picturesApi.stop(card.stop_id).then(() => query.refetch()).catch(() => query.refetch()); }}
     />
   );
 };

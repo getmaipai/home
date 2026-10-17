@@ -28,6 +28,7 @@ const JobSchema = z.object({
   error: z.string().nullable(),
   files: z.array(FileSchema),
   can_vary: z.boolean(),
+  size: z.string().describe("The size being made, like 1024x1024."),
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
 
@@ -60,7 +61,7 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean) {
   return {
     id: root.id, state, percent: active ? active.percent : state === "done" ? 100 : last.percent, label: active ? phaseLabel(active) : "", position: active ? active.position : null,
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
-    error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, stop_id: (active ?? root).id,
+    error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
     can_vary: canVary && !active && files.length > 0 && files.length < 12,
   };
 }
