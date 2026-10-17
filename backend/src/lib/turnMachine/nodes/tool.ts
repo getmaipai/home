@@ -64,6 +64,14 @@ export function modelFacingArgs(tool: string, args: Record<string, unknown>): Re
   return Object.fromEntries(Object.entries(args).filter(([k]) => !stripKeys.has(k)));
 }
 
+/** STATUS-PHRASES-02 (live, 2026-10-17): the waiting line while a tool runs
+ * was always a "searching" phrase, so a weather, timer, math or remember
+ * call read "Running a search…" or "Checking the web…". Only the web search
+ * is a search; every other tool gets the "checking" set. */
+export function toolStatusMoment(tool: string): "searching" | "checking" {
+  return tool === "websearch" ? "searching" : "checking";
+}
+
 /** R2 (rule 6, tools design T5): a failed run's kind, from its fixed code only. */
 function failureKindOf(code: string | undefined): FailureKind {
   if (code === "bad_arguments") return "bad_arguments";
@@ -158,7 +166,7 @@ export const toolNode: Node<ToolInput, ToolOutput> = async (state, input, signal
     // phrase today; the seam is here so a real label wins the moment
     // one exists, with no further change at this call site.
     state.status?.emit({ type: "tool_start", package_id: tool });
-    state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, "searching", state.persona), stage: "tool" });
+    state.status?.emit({ type: "status", text: pickStatusPhrase(state.conversationId, toolStatusMoment(tool), state.persona), stage: "tool" });
 
     // PROJECT-START-01: start_project never goes through runPlugin() -
     // tool.ts's own header explains why (no recipe op for "start a
