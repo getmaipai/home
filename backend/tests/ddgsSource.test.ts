@@ -34,7 +34,7 @@ afterEach(() => {
   delete process.env[DDGS_URL_ENV];
 });
 
-const ctx = (band: "adult" | "teen" | "child" = "adult") => ({ args: { query: "herons" }, band });
+const ctx = (band: "adult" | "teen" | "child" = "adult") => ({ args: { query: "herons" }, band, spoken: false });
 
 describe("configuration", () => {
   test("unset means unbuilt: ddgs is inert and a ddgs-only list is refused, as before", () => {
@@ -132,7 +132,7 @@ describe("through the host", () => {
 
 describe("review fixes", () => {
   test("a guest role is refused even with an adult band", async () => {
-    await expect(ddgsSearch({ args: { query: "herons" }, band: "adult", role: "guest" })).rejects.toThrow();
+    await expect(ddgsSearch({ args: { query: "herons" }, band: "adult", role: "guest", spoken: false })).rejects.toThrow();
     expect(hits).toEqual([]);
   });
   test("after a block only one probe runs at a time", async () => {

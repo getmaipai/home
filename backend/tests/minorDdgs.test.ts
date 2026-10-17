@@ -176,8 +176,8 @@ describe("the other gates still hold", () => {
     // Only an affirmed written turn gets ddgs.
     expect(await ask("teen", {}, { spoken: false })).toEqual(["https://searx.example/p", "https://duck.example/p"]);
     expect(sidecarHits).toHaveLength(1);
-    // ddgsSearch itself, called with no word on the surface, refuses a minor.
-    await expect(ddgsSearch({ args: { query: "x" }, band: "teen" })).rejects.toThrow("not allowed for this profile");
+    // ddgsSearch itself, called by an untyped caller with no word on the surface, refuses a minor.
+    await expect(ddgsSearch({ args: { query: "x" }, band: "teen" } as unknown as Parameters<typeof ddgsSearch>[0])).rejects.toThrow("not allowed for this profile");
   });
   test("an adult is not affected by the spoken flag", async () => {
     expect(await ask("adult", {}, {})).toEqual(["https://searx.example/p", "https://duck.example/p"]);

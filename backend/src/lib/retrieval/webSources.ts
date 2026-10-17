@@ -51,9 +51,9 @@ export interface WebSearchContext {
   deadlineAt?: number;
   /** The asker's role; a guest carries no age signal and never reaches ddgs. */
   role?: string;
-  /** Whether the turn is spoken (voice, Wyoming, robot), from the turn's own surface. A minor's ddgs search needs this to
-   * be `false`; unset counts as spoken (SEARCH-DDGS-TEEN-01). */
-  spoken?: boolean;
+  /** Whether the turn is not a plain written one (voice, Wyoming, robot, a shared glance screen), from the turn's own
+   * surface. Required so a caller cannot forget it: a minor's ddgs search needs `false` (SEARCH-DDGS-TEEN-01). */
+  spoken: boolean;
 }
 /** Rows-only search functions for sources other than SearXNG (whose step lives in packageHost.ts,
  * next to its tiers, cache and engine health). */

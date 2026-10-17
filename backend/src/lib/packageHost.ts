@@ -77,7 +77,7 @@ import { waybackCopy } from "@/lib/retrieval/wayback";
 import { federatedLookup, parseScope } from "@/lib/retrieval/lookup";
 import { NO_SOURCE_FOR_BAND_TEXT, webSourcesFor, webSourceSearch, runWebSources, type WebRows, type WebSourceId } from "@/lib/retrieval/webSources";
 import { MINOR_QUERY_PERSONAL_NOTE, closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
-import { minorRowAllowed } from "@/lib/retrieval/minorRowFloor";
+import { minorRowAllowed, minorRowTrips } from "@/lib/retrieval/minorRowFloor";
 import { wantsSpoken } from "@/lib/spokenArg";
 import { refuseWeb, webSideOff, wikimediaAllowedAfterK, wikimediaGate } from "@/lib/retrieval/sourceMode";
 import { scheduleJob, scheduleCoreJob } from "@/lib/scheduler";
@@ -1612,7 +1612,6 @@ function dropBlockedSites(result: SearxngSearchResult): SearxngSearchResult {
 export type MinorBand = "child" | "teen";
 
 export function floorSearchResult(result: SearxngSearchResult, band: MinorBand): SearxngSearchResult {
-  const trips = (text: string): boolean => checkSafety(text, { isMinor: true }).flagged;
   // MINOR-SEARCH-01e-5: a row or page on a blocked site is dropped; a blocked image or thumbnail address is
   // stripped from a row that is otherwise fine. Counted by list id (hostLists.ts), never by site.
   const rows = result.rows
@@ -1626,7 +1625,7 @@ export function floorSearchResult(result: SearxngSearchResult, band: MinorBand):
       if (!thumbOk) delete kept.thumbnail;
       return kept;
     });
-  const pages = result.pages?.filter((page) => !trips(`${page.title}. ${page.text}`) && urlAllowedFor(band, page.url));
+  const pages = result.pages?.filter((page) => !minorRowTrips({ title: page.title, snippet: page.text }) && urlAllowedFor(band, page.url));
   const dropped = (result.floor_dropped ?? 0) + (result.rows.length - rows.length) + ((result.pages?.length ?? 0) - (pages?.length ?? 0));
   // A minor never gets the whole-document `page` (up to 32,000 characters,
   // of which only the excerpt in `pages` is checked); only the checked
@@ -2365,7 +2364,7 @@ export function createHost(actor: PersonRow, manifest: PackageManifest, secrets:
             const searxOpts = { safeSearchLevel, signal: runtime.signal, deadlineAt: runtime.deadlineAt, speakerBand: band, ...(band === "adult" ? {} : { minorBand: band }), ...(temporary ? { bypassCache: true } : {}), ...(ctx.kMatched ? { kMatched: true, ...(wikimediaAllowedAfterK(band) ? {} : { allowWikipediaFallback: false }) } : {}), ...(ctx.timeRange ? { timeRange: ctx.timeRange } : {}) };
             // SEARCH-SOURCES-01: several picked sources run at once and blend by rank; one source (the default) is the old path unchanged.
             // SEARCH-DDGS-TEEN-01: whether this is a spoken turn comes from the turn's own surface (`runtime.spoken`, set by the
-            // tool node and the commands node from the planned surface class), never from the model-visible args alone. A caller
+            // tool node from the planned surface class), never from the model-visible args alone. A caller
             // that does not say (a direct API run) counts as spoken, so a minor stays on SearXNG there; the args flag is a second signal.
             const spokenTurn = runtime.spoken !== false || wantsSpoken(args as { spoken?: unknown } | undefined);
             const sources = input?.category === "images" || input?.category === "videos" ? (["searxng"] as WebSourceId[]) : webSourcesFor(band, temporary, spokenTurn).filter((id) => !(id === "ddgs" && actor.role === "guest")); // SEARCH-DDGS-01: a guest carries no age signal, so ddgs stays closed for them
