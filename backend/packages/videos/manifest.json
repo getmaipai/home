@@ -4,7 +4,7 @@
   "kind": "app",
   "category": "Media",
   "display": "Videos",
-  "description": "Watch the videos saved on your hub: a home with what to continue and what is new, a library by channel, watch later and history.",
+  "description": "Watch the videos saved on your hub, pick up where you stopped and keep a list to watch later.",
   "routing": {
     "examples": [
       "open my videos",
