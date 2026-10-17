@@ -510,3 +510,15 @@ tool never fails the answer (rule 6); status reaches the person through the inst
 **Unverified.** A real Detailed picture end to end through Home on the live Studio (no render was made without the bench lock; the Stack was a stub in the
 screenshots); whether the model passes `quality: "detailed"` at the right moments (no bench row yet); **Get Detailed pictures** against the real Stack install job.
 
+
+## 18. Minor-protection floors for teen and child generation (MINOR-FLOORS-01, built 2026-10-17)
+
+Built from the CSAM audit, before any teen or child lane may generate.
+
+- **One normaliser.** `spec/safety/ts/fold.ts` in commons (spec-v0.1.168) is the only place text is folded for the word floors. `detectCsam` and `pictures/minorLine.ts` both read through it and match through the same `TermSet`. It undoes invisible characters, look-alike letters, leetspeak, dotted, spaced, masked and repeated letters, and carries age and nudity words in Spanish, French, German, Italian and Portuguese plus native-script lists for Japanese, Chinese, Korean, Russian and Arabic.
+- **Non-Latin rule.** A token wholly in one script is kept and matched natively; a mixed token folds to Latin. A picture or video prompt that mixes Latin letters with another script and carries any age cue is refused (fail closed, same refusal line). A prompt wholly in a script with no list is judged only by the finished-picture check.
+- **Viewer-aware finished check.** `decideAgeCheck(checks, adultOnly, kind, viewer)`: a teen or child sees nothing nude or sexual whoever is in it, never an adult-only job, and an unchecked result is withheld. Adults are unchanged. Lane-specific extras (the child cartoon question, the lane lines) stay in the lane module and call this.
+- **Input screening.** A picture this home did not make is screened by `screenInputImage` before edit, video or reference: words about a child refuse with no model call; a possible minor beside a sexual ask, or a nude input for a teen or child, refuses; a failed check refuses for a sexual ask or a minor viewer.
+- **Kid-safe refusal.** A teen or child who trips the strict word floor (a harmless "bikini", "rooster", "chicken breast" beside a child word) reads one friendly line naming no term; admins get the existing notification, at most once in ten minutes.
+- **Settings.** `tests/safetyFloorsSettings.test.ts` flips every household setting, `generation.people_prompts` included, and asserts the floors hold.
+- **Known gaps.** Chat-vision uploads are not age-screened at input; image-search results are not pixel-screened for teen and child viewers; unlisted-script prompts as above; no measured false-negative rate on real content (no explicit image was made or viewed).
