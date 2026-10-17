@@ -51,7 +51,7 @@ const SCREEN_DESCRIPTION: Record<ScreenId, string> = {
   before_start: "Home is built to protect your family and your data. Like any AI or online tool, it works best when you know a few things.",
   engine_location: "Choose one computer, or add a bigger one for the AI.",
   storage: "Keep the defaults or pick your own.",
-  host_tune: "Optional changes that help the AI run faster here.",
+  host_tune: "Optional. Skip it any time.",
   checks: "Home is checking that everything is ready.",
   plan: "Review the steps Home will complete.",
   owner: "Create the account that manages this Home.",

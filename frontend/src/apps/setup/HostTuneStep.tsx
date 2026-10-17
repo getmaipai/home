@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader } from "@maipai/ui/src/dashboard/componen
 import { api, ApiError, type HostTuneItem } from "@/lib/api";
 
 const CheckIcon = getIcon("check");
+const TuneIcon = getIcon("sliders-horizontal");
 
 const FAILURE_NEXT = "Try again, or skip this step. Home works without it.";
 const LOAD_FAILED = "Home couldn't read this computer's tuning options. Press Try again, or skip this step. Home works without it.";
@@ -85,14 +86,17 @@ export function HostTuneStep({ onSkip }: {
 
   return (
     <div className="flex flex-col gap-4">
-      <p className="text-base text-muted-foreground md:text-lg">Every change here is optional. You can skip all of them.</p>
+      <div className="flex items-center gap-4">
+        <span aria-hidden className="flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-primary"><TuneIcon className="size-8" /></span>
+        <p className="text-base text-muted-foreground md:text-lg">A few quick changes help the AI run well. All are optional.</p>
+      </div>
       {error ? <div ref={errorRef}><Alert variant="destructive"><AlertTitle>That didn't work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert></div> : null}
 
       {auto.length > 0 ? (
         <Card>
           <CardHeader>
             <h2 className="text-2xl font-semibold md:text-3xl">Recommended</h2>
-            <p className="text-base text-muted-foreground md:text-lg">Safe changes Home can make for you.</p>
+            <p className="text-base text-muted-foreground md:text-lg">Home can do these for you.</p>
           </CardHeader>
           <CardContent>
             <ul className="flex flex-col gap-3">
@@ -129,23 +133,17 @@ export function HostTuneStep({ onSkip }: {
       ))}
 
       {advice.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <h2 className="text-2xl font-semibold md:text-3xl">Worth doing yourself</h2>
-            <p className="text-base text-muted-foreground md:text-lg">Home can't change these for you.</p>
-          </CardHeader>
-          <CardContent>
-            <ul className="flex flex-col gap-3">
-              {advice.map((item) => (
-                <li key={item.id}>
-                  <p className="text-base font-medium md:text-lg">{item.title}</p>
-                  <p className="text-base text-muted-foreground md:text-lg">{item.why}</p>
-                  {item.proposed ? <p className="text-base md:text-lg">{item.proposed}</p> : null}
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+        <details className="rounded-xl border bg-card p-4 text-card-foreground">
+          <summary className="cursor-pointer text-lg font-semibold md:text-xl">{advice.length} things to do yourself, if you like</summary>
+          <ul className="flex flex-col gap-3 pt-3">
+            {advice.map((item) => (
+              <li key={item.id}>
+                <p className="text-base font-medium md:text-lg">{item.title}</p>
+                <p className="text-base text-muted-foreground md:text-lg">{item.why} {item.proposed}</p>
+              </li>
+            ))}
+          </ul>
+        </details>
       ) : null}
 
       <div><Button type="button" variant="ghost" size="lg" disabled={busy} onClick={onSkip}>Skip this step</Button></div>

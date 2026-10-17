@@ -53,7 +53,7 @@ describe("HostTuneStep", () => {
     try {
       const view = render(<HostTuneStep onSkip={() => {}} />);
       await waitFor(() => expect(view.getByText("Recommended")).toBeTruthy());
-      expect(view.getByText("Worth doing yourself")).toBeTruthy();
+      expect(view.getByText(/things to do yourself/)).toBeTruthy();
       expect(view.getByText("Now: 75%. After: 90%.")).toBeTruthy();
       expect(view.getAllByText("Apply recommended")).toHaveLength(1);
       expect(h.calls.some((call) => call.includes("/apply"))).toBe(false);

@@ -143,29 +143,29 @@ load_item() {
         *) T_CURRENT="Could not tell. Look in System Settings, General, Sharing, Remote Login." ;;
       esac ;;
     advice-accounts)
-      T_TITLE="Keep Apple services off the hub account"; T_MODE=advice
-      T_WHY="The Mac that runs Home should not share anything with Apple or read your photos. Do this by hand once."
-      T_PROPOSED="Do not sign this account in to iCloud. In System Settings turn off Siri, Apple Intelligence and analytics sharing, and turn off Photos import." ;;
+      T_TITLE="Keep Apple out of this account"; T_MODE=advice
+      T_WHY="Home keeps your family private, and these Apple features send data to Apple."
+      T_PROPOSED="Skip iCloud sign-in. Turn off Siri, Apple Intelligence and analytics." ;;
     advice-radios)
       T_TITLE="Switch off Bluetooth and Wi-Fi you do not use"; T_MODE=advice
-      T_WHY="Fewer radios means fewer ways in. Leave one on if a robot, a keyboard or the network needs it."
-      T_PROPOSED="Turn off Bluetooth and Wi-Fi only if nothing here uses them (a wired network and a wired keyboard)." ;;
+      T_WHY="Each radio is one more way in."
+      T_PROPOSED="Only if you use a wired network and keyboard." ;;
     advice-network)
       T_TITLE="Give the Mac a fixed address and join Tailscale"; T_MODE=advice
-      T_WHY="Phones and robots find the hub at one address that never changes. Tailscale lets you reach it away from home."
-      T_PROPOSED="In your router, reserve a fixed (static DHCP) address for this Mac. In Tailscale, click Approve when it asks to join your network." ;;
+      T_WHY="Phones and robots need one address that never changes."
+      T_PROPOSED="Reserve an address for this Mac in your router. Approve Tailscale when it asks." ;;
     advice-toolchains)
       T_TITLE="Keep the Mac plain"; T_MODE=advice
-      T_WHY="Extra programs use memory and need updates. The Command Line Tools are the one thing the installer needs."
-      T_PROPOSED="Do not install Xcode, Docker or other toolchains. Do have the Command Line Tools (xcode-select --install)." ;;
+      T_WHY="Extra programs use memory and need updates."
+      T_PROPOSED="Skip Xcode and Docker. Keep the Command Line Tools." ;;
     advice-login)
       T_TITLE="Sign in automatically, FileVault off"; T_MODE=advice
-      T_WHY="After a power cut the Mac should come back and start Home with no one there. That needs automatic login, which macOS only allows with FileVault off. Anyone who can touch this Mac can read its disk, so keep it somewhere safe."
-      T_PROPOSED="In System Settings: Users and Groups, Automatic login on. Privacy and Security, FileVault off." ;;
+      T_WHY="After a power cut, Home starts again with nobody here. That needs FileVault off, so keep the Mac somewhere safe."
+      T_PROPOSED="Turn on Automatic login and turn off FileVault." ;;
     advice-screensaver)
       T_TITLE="Turn the screen saver off"; T_MODE=advice
-      T_WHY="A screen saver wakes the graphics chip for nothing. Turning the display off after 10 minutes is enough."
-      T_PROPOSED="In System Settings, Screen Saver: Never." ;;
+      T_WHY="A screen saver keeps the graphics chip busy for nothing."
+      T_PROPOSED="Set Screen Saver to Never." ;;
     *) return 1 ;;
   esac
 }

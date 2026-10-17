@@ -74,7 +74,7 @@ sudo bash /usr/local/maipai-home/scripts/studio/host-tune.sh apply power --yes
 sudo bash /usr/local/maipai-home/scripts/studio/host-tune.sh revert power --yes
 ```
 
-Some things only you can do, so the list shows them as advice: leave iCloud, Siri and Apple Intelligence off for this account, turn the screen saver off, give the Mac a fixed address in your router, approve it in Tailscale, and install nothing extra except the Command Line Tools.
+A few things only you can do, so they sit in a closed list called "things to do yourself". Each says why: keep Apple's iCloud, Siri and Apple Intelligence off because they send data to Apple; turn the screen saver off because it keeps the graphics chip busy; give the Mac a fixed address so phones and robots can always find it; and install nothing extra except the Command Line Tools.
 
 ## Upgrade
 
