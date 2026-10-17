@@ -78,4 +78,23 @@ describe("Reference reader", () => {
     expect(document.querySelector("article a")).toBeNull();
     expect(document.querySelector("article img")).toBeNull();
   });
+
+  test("NEWS-01: the article is drawn by the kit's one reader, with the table of contents ids, the source line and the licence under it", async () => {
+    const view = mount("/reference/wiki_en/A/Moon");
+    await view.findByText("A note");
+    const reader = document.querySelector('[data-slot="article-view"]');
+    expect(reader).not.toBeNull();
+    expect(reader!.querySelector("h2#history")?.textContent).toBe("History");
+    expect(reader!.textContent).toContain("Wikipedia");
+    expect(reader!.textContent).toContain("CC BY-SA 4.0");
+    expect(document.getElementById("reference-article")?.contains(reader)).toBe(true);
+  });
+
+  test("regression: a figure keeps its caption and an ordered list is numbered, not bulleted", async () => {
+    api.referenceArticle = async () => ({ ...article, toc: [], blocks: [{ type: "list", ordered: true, items: [[{ type: "text", text: "First" }]] }, { type: "figure", src: "/api/reference/media/wiki_en/m.png", alt: "M", caption: "Cap" }] });
+    const view = mount("/reference/wiki_en/A/Moon");
+    await view.findByText("First");
+    expect(document.querySelector("article ol")).not.toBeNull();
+    expect(view.getByText("Cap")).toBeTruthy();
+  });
 });

@@ -7,44 +7,35 @@ import { Card } from "@maipai/ui/src/primitives/Card";
 import { List } from "@maipai/ui/src/primitives/List";
 import { Page } from "@maipai/ui/src/primitives/Page";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@maipai/ui/src/ui/table";
-import { api, ApiError, type ReferenceArticleView, type ReferenceInline, type ReferenceSearchHit, type ReferenceSuggestion } from "@/lib/api";
+import { ArticleView, type ArticleBlockData, type ArticleInlineData, type ArticleViewData } from "@maipai/ui/src/primitives/ArticleView";
+import { api, ApiError, type ReferenceArticleView, type ReferenceBlock, type ReferenceInline, type ReferenceSearchHit, type ReferenceSuggestion } from "@/lib/api";
 import { useTabItem } from "@/shell/tabIdentity";
 
 const routeFor = (book: string, path: string) => `/reference/${encodeURIComponent(book)}/${path.split("/").map(encodeURIComponent).join("/")}`;
 const sizeLabel = (bytes: number | null) => bytes === null ? "Size unavailable" : bytes < 1_000_000_000 ? `${(bytes / 1_000_000).toFixed(0)} MB` : `${(bytes / 1_000_000_000).toFixed(1)} GB`;
 
-function InlineText({ values }: { values: ReferenceInline[] }) {
-  return <>{values.map((value, i) => {
-    if (typeof value === "string") return <span key={i}>{value}</span>;
-    if (value.type === "link") return value.book && value.path ? <Link key={i} className="underline underline-offset-2" to={routeFor(value.book, value.path)}>{value.text}</Link> : <span key={i}>{value.text}</span>;
-    if (value.type === "strong") return <strong key={i}>{value.text}</strong>;
-    if (value.type === "emphasis") return <em key={i}>{value.text}</em>;
-    return <span key={i}>{value.text}</span>;
-  })}</>;
+// NEWS-01: the article is drawn by the kit's one reader, ArticleView (the hand-drawn ArticleContent is gone, rule 12).
+// This adapter maps the Reference API's blocks onto the view's closed block model; behaviour kept from the old drawing:
+// heading ids for the table of contents, book links through the router, plain-text links for a child (the API sends none),
+// figures only when the API sent them, and the licence and snapshot line under the article.
+function asInline(value: ReferenceInline): ArticleInlineData {
+  if (typeof value === "string") return { type: "text", text: value };
+  if (value.type === "link") return value.book && value.path ? { type: "link", text: value.text, target: { book: value.book, path: value.path } } : { type: "text", text: value.text };
+  return value;
 }
 
-function ArticleContent({ article }: { article: ReferenceArticleView }) {
-  return <div className="flex min-w-0 flex-col gap-4">
-    {article.blocks.map((block, index) => {
-      switch (block.type) {
-      case "heading": {
-      const Tag = `h${Math.min(4, Math.max(2, block.level))}` as "h2" | "h3" | "h4";
-      return <Tag key={index} id={block.id} className="scroll-mt-6 font-semibold">{block.text}</Tag>;
-      }
-      case "paragraph": return <p key={index}><InlineText values={block.inlines} /></p>;
-      case "list": {
-      const Tag = block.ordered ? "ol" : "ul";
-      return <Tag className="list-inside list-disc">{block.items.map((item, i) => <li key={i}><InlineText values={item} /></li>)}</Tag>;
-      }
-      case "rows": return <Table key={index}><TableBody>{block.rows.map((row, i) => <TableRow key={i}><TableHead scope="row">{row.label}</TableHead><TableCell>{row.value}</TableCell></TableRow>)}</TableBody></Table>;
-      case "table": return <div key={index} className="max-w-full overflow-x-auto"><Table><TableHeader><TableRow>{block.headers.map((head, i) => <TableHead key={i}>{head}</TableHead>)}</TableRow></TableHeader><TableBody>{block.rows.map((row, i) => <TableRow key={i}>{row.map((cell, j) => <TableCell key={j}>{cell}</TableCell>)}</TableRow>)}</TableBody></Table></div>;
-      case "figure": return <figure key={index} className="min-w-0"><img src={block.src} alt={block.alt} className="max-w-full" />{block.caption ? <figcaption>{block.caption}</figcaption> : null}</figure>;
-      case "note": return <aside key={index}>{block.text}</aside>;
-      }
-    })}
-    <p className="border-t pt-4 text-sm text-muted-foreground">{article.licence} · Snapshot {article.snapshot_date ?? "date unavailable"}</p>
-  </div>;
+function asBlock(block: ReferenceBlock): ArticleBlockData {
+  switch (block.type) {
+    case "heading": return { ...block, level: Math.min(4, Math.max(2, block.level)) as 2 | 3 | 4 };
+    case "paragraph": return { type: "paragraph", inlines: block.inlines.map(asInline) };
+    case "list": return { type: "list", ordered: block.ordered, items: block.items.map((item) => item.map(asInline)) };
+    case "figure": return { ...block, caption: block.caption ?? "" };
+    default: return block;
+  }
+}
+
+function articleData(article: ReferenceArticleView): ArticleViewData {
+  return { title: article.title, description: article.source_label, blocks: article.blocks.map(asBlock) };
 }
 
 export function ReferencePage() {
@@ -97,11 +88,13 @@ export function ReferencePage() {
         {articleQuery.isError && !unavailable ? <p role="alert">Could not load this article.</p> : null}
         {articleQuery.data ? <div className="grid min-w-0 gap-6 md:grid-cols-4">
           {toc.length ? <nav aria-label="Table of contents" className="hidden md:block"><h2 className="mb-2 font-semibold">Contents</h2><List label="Article contents" items={formattedToc} getKey={(item) => item.id} onSelect={(item) => document.getElementById(item.id)?.scrollIntoView()} renderItem={(item) => <span className="min-w-0 break-words">{item.label}</span>} /></nav> : null}
-          <article id="reference-article" data-touch-target-exempt className="min-w-0 max-w-prose space-y-4">
-            <h2 className="text-2xl font-semibold">{articleQuery.data.title}</h2>
-            <p className="text-sm text-muted-foreground">{articleQuery.data.source_label}</p>
-            <ArticleContent article={articleQuery.data} />
-          </article>
+          <div id="reference-article" data-touch-target-exempt className="min-w-0">
+            <ArticleView
+              data={articleData(articleQuery.data)}
+              renderTargetLink={(target, text) => <Link className="underline underline-offset-2" to={routeFor(target.book, target.path)}>{text}</Link>}
+              footer={<>{articleQuery.data.licence} · Snapshot {articleQuery.data.snapshot_date ?? "date unavailable"}</>}
+            />
+          </div>
         </div> : null}
         <Sheet open={tocOpen} onOpenChange={setTocOpen}><SheetContent side="bottom"><SheetHeader><SheetTitle>Contents</SheetTitle></SheetHeader><List label="Article contents" items={formattedToc} getKey={(item) => item.id} onSelect={(item) => { setTocOpen(false); document.getElementById(item.id)?.scrollIntoView(); }} renderItem={(item) => <span>{item.title}</span>} /></SheetContent></Sheet>
       </> : null}
