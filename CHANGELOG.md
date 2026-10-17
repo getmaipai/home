@@ -7,6 +7,19 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-10-17
+
+Picture and video chat is safer and more honest.
+
+### Pictures and videos
+- A request that pairs plain no-clothes wording with a child or minor-looking term is refused, for pictures and for videos.
+- "Another one" and "one more" make a new picture instead of answering in words.
+- Earlier picture and video turns are remembered as made by the tool, so the model stops claiming a picture it never made.
+- If a picture or video has started but the reply fails, Home says it is coming instead of "Something went wrong".
+- Asking the picture tool to change an existing picture points you to the Edit button.
+- A picture you made shows large in chat, and a style file over 120 MB is refused with the reason before it uploads.
+- When Home cannot reach the AI engine it says so, instead of saying no model is installed.
+
 ## [0.2.8] - 2026-10-17
 
 Chat can make pictures and short videos, and the picture editor can edit with a comment.
