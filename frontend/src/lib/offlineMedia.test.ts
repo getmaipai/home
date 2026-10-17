@@ -35,7 +35,8 @@ beforeEach(async () => {
   } });
 });
 afterEach(() => {
-  Object.assign(globalThis, { fetch: originalFetch, caches: originalCaches });
+  Object.assign(globalThis, { fetch: originalFetch });
+  if (originalCaches) Object.assign(globalThis, { caches: originalCaches }); else Reflect.deleteProperty(globalThis, "caches");
   if (locationDescriptor) Object.defineProperty(globalThis, "location", locationDescriptor);
   if (storageDescriptor) Object.defineProperty(navigator, "storage", storageDescriptor); else Reflect.deleteProperty(navigator, "storage");
   if (uaDescriptor) Object.defineProperty(navigator, "userAgent", uaDescriptor); else Reflect.deleteProperty(navigator, "userAgent");

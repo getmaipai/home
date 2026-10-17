@@ -144,7 +144,8 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
       expect(await (await call(url))!.text()).toBe("network");
     } finally {
       (globalThis as { self?: unknown }).self = previousSelf;
-      Object.assign(globalThis, { caches: previousCaches, fetch: previousFetch });
+      Object.assign(globalThis, { fetch: previousFetch });
+      if (previousCaches) Object.assign(globalThis, { caches: previousCaches }); else Reflect.deleteProperty(globalThis, "caches");
     }
   });
 

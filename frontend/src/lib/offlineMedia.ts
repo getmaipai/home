@@ -109,7 +109,7 @@ export async function keepOnDevice(item: { id: string }): Promise<OfflineResult>
 
 export async function listKept(): Promise<OfflineManifest[]> {
   const name = bucket();
-  if (!name || !("caches" in globalThis)) return [];
+  if (!name || !globalThis.caches) return [];
   const cache = await caches.open(name);
   const manifests: OfflineManifest[] = [];
   for (const key of await cache.keys()) {
@@ -123,7 +123,7 @@ export async function listKept(): Promise<OfflineManifest[]> {
 
 export async function removeFromDevice(id: string): Promise<void> {
   const name = bucket();
-  if (!name || !("caches" in globalThis)) return;
+  if (!name || !globalThis.caches) return;
   const cache = await caches.open(name);
   const manifest = OfflineManifest.safeParse(await (await cache.match(indexUrl(id)))?.json().catch(() => null));
   if (manifest.success) {
@@ -138,7 +138,7 @@ export async function removeFromDevice(id: string): Promise<void> {
 export async function removeAllOfflineMedia(): Promise<void> {
   localGeneration++;
   try { localStorage.setItem(GENERATION_KEY, crypto.randomUUID()); } catch { /* The local counter still cancels this tab's save. */ }
-  if (!("caches" in globalThis)) return;
+  if (!globalThis.caches) return;
   const names = typeof caches.keys === "function" ? await caches.keys() : [];
   for (const name of new Set([...names.filter((n) => n === MEDIA_CACHE || n.startsWith(`${MEDIA_CACHE}:`)), MEDIA_CACHE])) await caches.delete(name);
 }

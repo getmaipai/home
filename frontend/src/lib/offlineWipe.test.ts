@@ -9,7 +9,8 @@ beforeEach(() => {
   deleted = [];
   Object.assign(globalThis, { caches: { delete: async (name: string) => { deleted.push(name); return true; } } });
 });
-afterEach(() => { Object.assign(globalThis, { fetch: originalFetch, caches: originalCaches }); });
+afterEach(() => { Object.assign(globalThis, { fetch: originalFetch });
+  if (originalCaches) Object.assign(globalThis, { caches: originalCaches }); else Reflect.deleteProperty(globalThis, "caches"); });
 const reply = (status: number, body: object) => { globalThis.fetch = (async () => Response.json(body, { status })) as unknown as typeof fetch; };
 
 test("an expired session (401) keeps the kept copies so signing in again finds them", async () => {
