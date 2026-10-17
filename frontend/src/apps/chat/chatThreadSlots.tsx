@@ -215,11 +215,12 @@ export function ComposerTrailingWithThinkingMode() {
   const capability = useContext(ThinkingModeCapabilityContext);
   return (
     <>
-      {capability === "none" || capability === "always" ? (
-        <ModelSelectorRoot
-          models={[{ id: "mode", name: capability === "always" ? "Thinking" : "Instant" }]}
-          value="mode"
-        >
+      {capability === "always" ? (
+        // INSTANT-01: a model that reasons on every turn has no Instant, so
+        // nothing here is a control or claims a choice; one plain line says
+        // what the model does. A model that never reasons (capability
+        // "none") has nothing to say, so it shows nothing at all.
+        <ModelSelectorRoot models={[{ id: "mode", name: "Thinks before every reply" }]} value="mode">
           <ModelSelectorValue showEffort={false} />
         </ModelSelectorRoot>
       ) : null}

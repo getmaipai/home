@@ -8,13 +8,13 @@ import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 const NOOP: ChatModelAdapter = { async *run() { yield { content: [] }; } };
 const realFetch = globalThis.fetch;
 
-function Harness({ band }: { band: "child" | "teen" | "adult" }) {
+function Harness({ band, capability = "switchable" }: { band: "child" | "teen" | "adult"; capability?: "switchable" | "none" | "always" }) {
   const runtime = useLocalRuntime(NOOP, { initialMessages: [] });
   return (
     <AssistantRuntimeProvider runtime={runtime}>
       <ChatAgeBandContext.Provider value={band}>
         <ThinkingModeContext.Provider value={{ mode: "instant", setMode: () => {} }}>
-          <ThinkingModeCapabilityContext.Provider value="switchable">
+          <ThinkingModeCapabilityContext.Provider value={capability}>
             <ComposerTrailingWithThinkingMode />
           </ThinkingModeCapabilityContext.Provider>
         </ThinkingModeContext.Provider>
@@ -38,5 +38,20 @@ describe("composer mode control", () => {
     expect(view.getByRole("combobox", { name: "Thinking mode" })).toBeTruthy();
     expect(view.queryByText("Private model alpha")).toBeNull();
     expect(view.queryByText("Private model beta")).toBeNull();
+  });
+
+  test("a model that always thinks shows one plain line and no choice (INSTANT-01)", () => {
+    const view = renderWithQueryClient(<Harness band="adult" capability="always" />);
+    expect(view.getByText("Thinks before every reply")).toBeTruthy();
+    expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
+    expect(view.queryByText("Instant")).toBeNull();
+  });
+
+  test("a model that never thinks shows no mode text at all (INSTANT-01)", () => {
+    const view = renderWithQueryClient(<Harness band="adult" capability="none" />);
+    expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
+    expect(view.queryByText("Instant")).toBeNull();
+    expect(view.queryByText("Thinking")).toBeNull();
+    expect(view.queryByText("Thinks before every reply")).toBeNull();
   });
 });
