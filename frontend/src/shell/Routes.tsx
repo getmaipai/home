@@ -21,6 +21,7 @@ import { discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
 import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
 import { AudioSessionProvider } from "@/shell/audioSessionContext";
+import { MediaHostProvider, MediaLinkRedirect } from "@/shell/mediaHost";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
@@ -151,9 +152,11 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
 
   return (
     <AudioSessionProvider personId={person.id}>
-      <IncognitoProvider>
-        <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} />
-      </IncognitoProvider>
+      <MediaHostProvider>
+        <IncognitoProvider>
+          <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} />
+        </IncognitoProvider>
+      </MediaHostProvider>
     </AudioSessionProvider>
   );
 }
@@ -284,6 +287,8 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
             {/* APP-KIND-04: every installed package app, with no rebuild. Static routes above win over this splat. */}
             <Route path="all-apps" element={<AllAppsPage person={person} />} />
             <Route path="apps/*" element={<PackageAppPage person={person} />} />
+            {/* MEDIA-VIDEOS-01: the Pick up shelf's `/media/<id>` link opens the item in the app that owns its kind. */}
+            <Route path="media/:id" element={<MediaLinkRedirect />} />
             <Route path="notifications" element={<Suspense fallback={null}><NotificationsPage /></Suspense>} />
             <Route path="dev/ui" element={<UiShowcasePage person={person} />} />
             <Route path="mic-test" element={<MicTestPage />} />

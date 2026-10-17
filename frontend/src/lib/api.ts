@@ -1195,6 +1195,11 @@ export const api = {
   // APP-KIND-03/04: the package apps this person may open, and one of an app's page documents
   // (a spec `page`, drawn by the kit's SchemaPage). A hidden or unknown app and page are both 404.
   apps: () => request<AppRow[]>("/api/apps"),
+  // MEDIA-VIDEOS-01: one data id of a package app (POST /api/plugins/:id/data/:dataId), and one media item's record (the owning app of a
+  // `/media/<id>` link is read from its kind).
+  appData: <T>(pkg: string, dataId: string, body: Record<string, unknown> = {}) =>
+    request<T>(`/api/plugins/${encodeURIComponent(pkg)}/data/${encodeURIComponent(dataId)}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }),
+  mediaItem: (id: string) => request<{ item: { id: string; kind: string; title: string } }>(`/api/media/items/${encodeURIComponent(id)}`),
   appPage: (pkg: string, page: string) => request<unknown>(`/api/plugins/${encodeURIComponent(pkg)}/pages/${encodeURIComponent(page)}`),
   // GET /api/repairs (backend/src/routes/repairs.ts): real and fully
   // landed (F step 1), unlike widgets/lists above - no graceful-404
