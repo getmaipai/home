@@ -10,6 +10,7 @@ import { eq } from "drizzle-orm";
 import { runPlugin, loadManifestOnly } from "@/lib/plugins";
 import { householdHomeCountryName } from "@/lib/places";
 import { __setPromptClockForBench } from "@/lib/benchSampling";
+import { HAS_DENO } from "./support/deno";
 
 const packageDir = join(import.meta.dir, "..", "packages", "almanac-holiday");
 
@@ -104,7 +105,7 @@ describe("holiday host context", () => {
     expect(holidaySource).not.toContain("__home_country: householdHomeCountryName() } : withClock");
   });
 
-  test("a place segment that is not a country stays an exact-match miss", async () => {
+  test.skipIf(!HAS_DENO)("a place segment that is not a country stays an exact-match miss", async () => {
     await setupHome("Canada Street, Springfield");
     expect(householdHomeCountryName()).toBe("Springfield");
     __setPromptClockForBench(() => new Date(2026, 6, 2));
@@ -117,7 +118,7 @@ describe("holiday host context", () => {
     }
   });
 
-  test("with no home place the host passes null and the real sandbox returns a normal reply", async () => {
+  test.skipIf(!HAS_DENO)("with no home place the host passes null and the real sandbox returns a normal reply", async () => {
     const { actor } = await setupHome();
     const loaded = loadManifestOnly("almanac-holiday");
     expect(loaded.ok).toBe(true);
@@ -128,7 +129,7 @@ describe("holiday host context", () => {
     if (result.ok) expect(result.value.reply?.text).toContain("set the home place");
   }, 20_000);
 
-  test("real sandbox calls use US and Canadian dates from the host home place", async () => {
+  test.skipIf(!HAS_DENO)("real sandbox calls use US and Canadian dates from the host home place", async () => {
     const { actor, client } = await setupHome("Paris, Texas, United States");
     expect(householdHomeCountryName()).toBe("United States");
     const loaded = loadManifestOnly("almanac-holiday");

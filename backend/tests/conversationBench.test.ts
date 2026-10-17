@@ -30,6 +30,7 @@ const scoreTurn = (conv: BenchConversation, index: number, turn: BenchTurn, obse
   scoreTurnBare(conv, index, turn, { signal: classifyTurnSignal({ text: turn.say, commandOpeners: BENCH_OPENERS, ageBand: "adult" }), ...observed });
 import type { TurnSignal } from "@maipai/spec/gen/ts/turn-signal.js";
 import type { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+import { HAS_DENO } from "./support/deno";
 
 // FLAKE-FORCED-01 (issue #137): the searxng/web-fetch token bucket
 // (packageHost.ts's own SEARXNG_RATE_LIMIT, module-global) drains
@@ -134,7 +135,7 @@ describe("the fixture", () => {
     expect(d.getMinutes()).toBe(43);
   });
 
-  test("ALM-01: the runner passes the declared clock through the almanac path", async () => {
+  test.skipIf(!HAS_DENO)("ALM-01: the runner passes the declared clock through the almanac path", async () => {
     await withStubBench({
       // The model's reply after the tool ran is the tool's own result, the way a
       // real model states it; every other turn gets a plain "Okay.".

@@ -23,6 +23,7 @@ import { getWidgetData } from "@/lib/widgets";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
 import type { PersonRow } from "@/types";
+import { HAS_DENO } from "./support/deno";
 
 const VERSION = "0.1.1";
 const SAFE_TEXT = "Sorry, I can't look that up right now.";
@@ -74,7 +75,7 @@ async function child(): Promise<{ client: TestClient; row: PersonRow }> {
 }
 
 describe("#86: a package's failure fallback meets the output boundary", () => {
-  test(
+  test.skipIf(!HAS_DENO)(
     "the direct package run returns a 502 whose fallback_reply is the refusal line, never the unsafe fallback (speech evaluated on its own)",
     async () => {
       installFixture();
@@ -88,7 +89,7 @@ describe("#86: a package's failure fallback meets the output boundary", () => {
     20_000,
   );
 
-  test(
+  test.skipIf(!HAS_DENO)(
     "the dashboard widget's degraded item carries the refusal line, never the unsafe fallback",
     async () => {
       installFixture();

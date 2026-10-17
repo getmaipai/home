@@ -11,6 +11,7 @@ import { householdHomeSkyInput } from "@/lib/places";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { callTier1Handle, __resetDenoHostForTests } from "@/lib/denoHost";
 import { eq } from "drizzle-orm";
+import { HAS_DENO } from "./support/deno";
 
 const packageDir = new URL("../packages/almanac-moon/", import.meta.url);
 const readPackageFile = (name: string) => readFileSync(new URL(name, packageDir), "utf8");
@@ -48,7 +49,7 @@ function unwrap(result: Awaited<ReturnType<typeof callTier1Handle>>) {
 }
 
 describe("almanac sky host inputs and local result", () => {
-  test("coordinates are rounded to 2 decimals before they reach the sandbox", async () => {
+  test.skipIf(!HAS_DENO)("coordinates are rounded to 2 decimals before they reach the sandbox", async () => {
     seedHome({ lat: 47.60621, lon: -122.33207, precision: "exact", area: "Private area label", from: "search" });
     expect(householdHomeSkyInput()).toEqual({ lat: 47.61, lon: -122.33 });
 
@@ -66,7 +67,7 @@ describe("almanac sky host inputs and local result", () => {
     expect(result.reply?.text).not.toContain("-122.33");
   }, 15_000);
 
-  test("with no home place or no geo the host passes null and the reply stays normal", async () => {
+  test.skipIf(!HAS_DENO)("with no home place or no geo the host passes null and the reply stays normal", async () => {
     const actor = await owner();
     const manifest = loadManifestOnly("almanac-moon");
     expect(manifest.ok).toBe(true);

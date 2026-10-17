@@ -19,6 +19,7 @@ import {
 import type { PluginResult } from "@maipai/spec/interpreters/ts/recipe-interpreter.js";
 import { cachedFetch, __resetPackageCacheForTests, __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { listIssues } from "@/lib/issues";
+import { HAS_DENO } from "./support/deno";
 
 beforeEach(() => {
   resetDb();
@@ -78,7 +79,7 @@ const SEATTLE_HEADLINE = "Seattle is a seaport city on the West Coast of the Uni
 const rssWith = (title: string) => `<rss><channel><item><title>${title}</title></item></channel></rss>`;
 
 describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
-  test("the real Deno sandbox answers end to end, from a cache-seeded response - no live network needed", async () => {
+  test.skipIf(!HAS_DENO)("the real Deno sandbox answers end to end, from a cache-seeded response - no live network needed", async () => {
     const manifest = newsManifest();
     await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith(SEATTLE_HEADLINE));
     const actor = await owner();
@@ -94,7 +95,7 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
   // in-flight-start map; this proves it by firing two calls at the
   // exact same moment and checking only one real `deno` child for this
   // package ever exists afterward.
-  test("two concurrent calls for the same cold package share one process, not two", async () => {
+  test.skipIf(!HAS_DENO)("two concurrent calls for the same cold package share one process, not two", async () => {
     const manifest = newsManifest();
     await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith(SEATTLE_HEADLINE));
     const actor = await owner();
@@ -125,7 +126,7 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
   // silently run as that first actor forever. Fixed with a per-process
   // turn lock: one caller's actor is "current" at a time, and a second
   // caller queues behind the first rather than racing it.
-  test("two concurrent callers with different actors never see each other's actor mid-flight", async () => {
+  test.skipIf(!HAS_DENO)("two concurrent callers with different actors never see each other's actor mid-flight", async () => {
     const manifest = newsManifest();
     await cachedFetch("news", manifest.cache, NEWS_FEED_URL, undefined, async () => rssWith(SEATTLE_HEADLINE));
     const { ownerRow, childRow } = await ownerAndChildRows();
@@ -181,7 +182,7 @@ describe("callTier1Handle (session-d-packages-and-store.md step 5)", () => {
   }, 30_000);
 });
 
-describe("the sandbox's own permission model (real deno run, no MCP involved)", () => {
+describe.skipIf(!HAS_DENO)("the sandbox's own permission model (real deno run, no MCP involved)", () => {
   let tempDir: string;
 
   beforeEach(() => {

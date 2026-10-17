@@ -9,6 +9,7 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { widgetCardBlock } from "@/lib/widgets";
 import type { PersonRow } from "@/types";
+import { HAS_DENO } from "./support/deno";
 
 beforeEach(() => resetDb());
 
@@ -83,7 +84,7 @@ describe("GET /api/widgets/:package/:id/data", () => {
     expect(new Date(body.as_of).toString()).not.toBe("Invalid Date");
   });
 
-  test("almanac-date's widget reuses the same handler a live chat turn would get", async () => {
+  test.skipIf(!HAS_DENO)("almanac-date's widget reuses the same handler a live chat turn would get", async () => {
     const client = await owner();
     const res = await client.get("/api/widgets/almanac-date/today/data");
     expect(res.status).toBe(200);

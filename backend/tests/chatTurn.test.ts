@@ -39,6 +39,7 @@ import type { SafetyResult } from "@maipai/spec/gen/ts/safety-result.js";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import type { ToolExecutionOutcome } from "@/lib/turnContext";
 import { ReplyPlan } from "@maipai/spec/gen/ts/reply-plan.js";
+import { HAS_DENO } from "./support/deno";
 
 beforeEach(() => {
   resetDb();
@@ -750,7 +751,7 @@ describe("CHAT-02: one output safety boundary", () => {
     });
   });
 
-  test(
+  test.skipIf(!HAS_DENO)(
     "the two outlets outside a chat turn meet the same boundary: a direct package run and a dashboard widget never return the unsafe headline",
     async () => {
       const { childRow } = await ownerAndChild();

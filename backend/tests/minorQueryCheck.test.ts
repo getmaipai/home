@@ -14,6 +14,7 @@ import { createEntity } from "@/lib/entities";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { closedFormatHit, minorQueryHit } from "@/lib/retrieval/minorQueryCheck";
 import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { HAS_DENO } from "./support/deno";
 
 let server: ReturnType<typeof Bun.serve> | null = null;
 let hits = 0;
@@ -89,7 +90,7 @@ describe("minor search path", () => {
     expect(actor.displayName).toBe("Sage");
   });
 
-  test("teen and adult book lookups return a recorded result", async () => {
+  test.skipIf(!HAS_DENO)("teen and adult book lookups return a recorded result", async () => {
     const ownerRow = await owner(); let requests = 0;
     __resetDenoHostForTests(); __resetPackageCacheForTests(); __clearPackageCacheDirForTests("book-lookup");
     __resetRateLimiterForTests(); let now = 1_000; __setRateLimiterClockForTests(() => now);
