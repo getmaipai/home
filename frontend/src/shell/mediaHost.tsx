@@ -8,7 +8,6 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
-import { parkMedia } from "@maipai/ui/src/primitives/Player";
 import { api } from "@/lib/api";
 import { mediaAppOfPath, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
@@ -56,8 +55,8 @@ export function createMediaStore() {
       if (current) drop(current);
       const el = document.createElement(ref.kind === "audio" ? "audio" : "video");
       el.setAttribute("src", ref.src);
-      // In the document from the start: the Player adopts it from here and returns it here.
-      parkMedia(el);
+      // The Player that asked for it adopts it in the same commit, and parks it in the kit's hidden spot when it goes. This file does
+      // not import the Player (it stays out of the shell's main chunk; PackageAppPage loads it on demand).
       el.addEventListener("play", () => {
         if (current?.el === el && !current.started) {
           current = { ...current, started: true };

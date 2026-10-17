@@ -157,7 +157,7 @@ describe("MEDIA-POLISH-01 the docked mini bar", () => {
     const store = createMediaStore();
     const a = store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "videos");
     expect(store.elementFor({ id: "m1", src: "/a", kind: "video", title: "A" }, "videos")).toBe(a);
-    expect(a.isConnected).toBe(true);
+    document.body.appendChild(a);
     const b = store.elementFor({ id: "m2", src: "/b", kind: "video", title: "B" }, "videos");
     expect(b).not.toBe(a);
     expect(a.getAttribute("src")).toBeNull();

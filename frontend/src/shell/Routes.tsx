@@ -72,6 +72,9 @@ const SetupReviewPage = lazyNamed(() => import("@/apps/setup/SetupReviewPage"), 
 // NOTIF-ROUTE-01: the thirty-day history page, reached from the bell's
 // "View history" link and the phone header's bell. Lazy so it stays out
 // of the first bundle, as it was before 6bed798c dropped the route.
+// MEDIA-POLISH-01: package app pages load on demand. They carry the schema interpreter, the kit Player and Media Chrome, which pushed
+// the Routes chunk past the 4 MiB service-worker precache ceiling (vite.config.ts, src/apps/setup/preview/bundle.test.ts).
+const PackageAppPage = lazy(() => import("@/shell/pages/PackageAppPage").then((m) => ({ default: m.PackageAppPage })));
 const NotificationsPage = lazy(() => import("@/apps/notifications/NotificationsPage").then((m) => ({ default: m.NotificationsPage })));
 
 /** The migrated root route tree (docs/plans/shell-on-shadcndashboard-
@@ -269,7 +272,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
           {/* APP-KIND-04: every installed package app, with no rebuild. Static routes win over this splat.
               MEDIA-POLISH-01 (RULES S2): an app draws its own header, so app pages sit outside PageHeaderLayout, whose
               title bar had no entry for them and drew an empty 52 px strip above every app. */}
-          <Route path="apps/*" element={<PackageAppPage person={person} />} />
+          <Route path="apps/*" element={<Suspense fallback={null}><PackageAppPage person={person} /></Suspense>} />
           <Route element={<PageHeaderLayout />}>
             <Route index element={<DashboardPage person={person} />} />
             <Route path="people" element={<FamilyPage person={person} />} />
