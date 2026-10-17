@@ -326,3 +326,34 @@ Open: `backend/src/lib/news/` contains quality and ranking helpers, but no exist
 and picture. No `news_story` provider or offline News reader is added. Reference pages and conversation exports need their own
 providers and app use sites too. Media remains the sole built-in provider. Backend route test execution needs the normal test preload's
 TCP fixture support; the restricted sandbox cannot reserve its port. The registry unit test also runs through the frontend harness without that fixture. No live service requests are used for these tests.
+
+## Music (MEDIA-MUSIC-01)
+
+The `music` package is a `plugin` package that contributes Music pages beside its chat artist lookup (handler, opt-in network
+permission and Deno smoke test are kept; like News, it stays off where Deno is missing). App data reads only authorized
+root-library `track` items. Albums group by `album_artist` (falling back to artist) and album; artists group by artist. No new
+tables. Album order is disc, track, title and id, with unnumbered tracks last. A minor never sees an explicit track.
+
+Pages use the shipped kit variants (ui-v0.5.263): Albums and Artists are `layout: grid` (artists `art_shape: circle`), Listen
+now's radio shelf is round art, track lists (Songs, Liked, Album, Artist, Playlist, Up next) are vertical `density: compact` rows
+with `item_meta_field` running time, `item_highlight_field: playing` (the track the person's queue points at) and, on album and
+playlist pages, `item_index_field: track_number` (a playlist numbers by its own order). Album, Artist and Playlist pages open with
+a `billboard` bound to the one `header` data id (`scope` = album, artist or playlist). The package declares 16 data ids, the cap.
+
+`POST /api/plugins/music/queue` accepts `{ id, mode, shuffle?, seed_kind? }`. Modes are track, album, artist, playlist and radio.
+A button that carries only an id may say more in it: `shuffle:<id>` shuffles, `radio:<artist|album|genre|track>:<seed>` starts
+radio. Radio candidates come only from readable library tracks and rank by same artist, album artist, genre, then decade.
+Queue changes use the person's standing collection; finishing a song advances its pointer. The shell requests audio autoplay and
+registers Music with the audio session's music kind.
+
+`POST /api/plugins/music/playlist` takes `{ op: "new" }`, `{ op: "add", media_id }` (onto the newest playlist) or
+`{ op: "remove", media_id, playlist_id }` (the person's own playlist only). A package page may not use the schema `form` node, so
+rename and reorder stay on `/api/media/collections`. A minor never sees a track whose artist, album, album artist or genre trips
+the minor floor (`bandAllows` reads them at every read), and a playlist or its header is another person's secret.
+
+Kit gaps (recorded, not faked): no shuffle or radio icon (Shuffle uses `refresh-cw`, Start radio `audio-waveform`); row actions
+sit under the caption, not trailing as in the mockup, so track lists carry none (Like lives on Now playing); compact art is 72 px
+(mockup 48); the audio Player has rewind and forward 15 s and speed where the mockup has shuffle, previous and a sleep moon, no
+full-bleed art backdrop, no "Playing from" line; tile sizes follow the kit budget (about 4.3 across at 1280, mockup 6).
+Phone rail instead of a drawer is MOBILE-RAIL-01 (shell). Explicit title masking belongs to MEDIA-KID-01; today a minor never
+sees an explicit track at all.

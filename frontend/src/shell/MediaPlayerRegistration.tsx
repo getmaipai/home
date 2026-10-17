@@ -45,7 +45,7 @@ export function MediaPlayerRegistration({ appId, mediaId, element }: { appId: st
   const played = item.data ?? null;
   const audioItem = useMemo<AudioItem>(
     () => ({
-      title: played?.title ?? (appId === "podcasts" ? "Episode" : "Video"),
+      title: played?.title ?? (appId === "podcasts" ? "Episode" : appId === "music" ? "Song" : "Video"),
       ...(played?.channel ? { artist: played.channel } : {}),
       ...(played?.poster ? { artworkUrl: played.poster } : {}),
       ...(played ? { chapters: chaptersWithEnds(played.chapters ?? [], played.duration_s) } : {}),

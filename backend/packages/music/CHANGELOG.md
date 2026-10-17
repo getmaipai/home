@@ -1,6 +1,14 @@
 # Changelog
 
-All notable changes to the Music Lookup package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+All notable changes to the Music package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+
+## [0.2.0] - 2026-10-17
+
+### Added
+
+- The Music app: Listen now, Albums, Artists, Songs, Playlists and Liked pages over the household's saved songs, with album and
+  artist pages, local radio, Play, Shuffle and Start radio. The pages use the kit's media grid, round artist art and compact
+  track rows. The artist lookup below is unchanged.
 
 ## [0.1.1] - 2026-10-14
 

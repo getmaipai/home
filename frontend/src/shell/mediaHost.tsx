@@ -8,7 +8,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Navigate, useLocation, useNavigate, useParams } from "react-router-dom";
 import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/src/schema/mediaHost";
-import { api } from "@/lib/api";
+import { api, request } from "@/lib/api";
 import { mediaAppOfPath, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
@@ -55,6 +55,7 @@ export function createMediaStore() {
       if (current) drop(current);
       const el = document.createElement(ref.kind === "audio" ? "audio" : "video");
       el.setAttribute("src", ref.src);
+      el.autoplay = appId === "music";
       // The Player that asked for it adopts it in the same commit, and parks it in the kit's hidden spot when it goes. This file does
       // not import the Player (it stays out of the shell's main chunk; PackageAppPage loads it on demand).
       el.addEventListener("play", () => {
@@ -87,6 +88,8 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [store] = useState(createMediaStore);
+  const pathRef = useRef(location.pathname);
+  pathRef.current = location.pathname;
   const appRef = useRef<string | null>(null);
   appRef.current = mediaAppOfPath(location.pathname);
   const host = useMemo<MediaHost>(
@@ -94,6 +97,10 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
       async onPlay(mediaId, item) {
         // A row from a media app carries its kind; any other caller names only the id, and the hub says what it is.
         const kind = typeof item.kind === "string" ? item.kind : (await api.mediaItem(mediaId)).item.kind;
+        if (kind === "track") {
+          const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: mediaId, mode: item.queue_mode ?? "track", shuffle: item.shuffle, seed_kind: item.seed_kind }) });
+          mediaId = queued.id;
+        }
         const to = playRoute(kind, mediaId);
         if (!to) throw new Error("This item cannot be played from here. Open it from its app.");
         navigate(to, { state: { pageState: { id: mediaId } } });
@@ -104,6 +111,31 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     [navigate, store],
   );
   const current = useSyncExternalStore(store.subscribe, store.get, store.get);
+  // The schema Player advances on Now playing. Away from that page, the host keeps the same queue moving.
+  useEffect(() => {
+    if (!current || current.appId !== "music") return;
+    let live = true;
+    const ended = async () => {
+      if (pathRef.current === "/apps/music/play") return;
+      try {
+        type NextItem = { id: string; src: string; title: string; subtitle?: string; poster?: string; up_next?: { id: string } };
+        const item = await api.appData<NextItem | []>("music", "item", { id: current.id });
+        if (Array.isArray(item) || !item.up_next || !live || store.get()?.id !== current.id) return;
+        const queued = await request<{ id: string }>("/api/plugins/music/queue", { method: "POST", body: JSON.stringify({ id: item.up_next.id }) });
+        const next = await api.appData<NextItem | []>("music", "item", { id: queued.id });
+        if (Array.isArray(next) || !live || store.get()?.id !== current.id) return;
+        const { parkMedia } = await import("@maipai/ui/src/primitives/Player");
+        if (!live) return;
+        const el = store.elementFor({ id: next.id, src: next.src, kind: "audio", title: next.title, subtitle: next.subtitle, poster: next.poster }, "music");
+        parkMedia(el);
+        await el.play();
+      } catch {
+        // Keep the last item available for Play when a queue read or browser autoplay fails.
+      }
+    };
+    current.el.addEventListener("ended", ended);
+    return () => { live = false; current.el.removeEventListener("ended", ended); };
+  }, [current, store]);
   const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear }), [current, store]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);

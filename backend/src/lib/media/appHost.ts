@@ -10,10 +10,12 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
 import { readableItem, sourceVisibleTo } from "./access";
-import { allowedBandsFor, bandAllows, mediaBandOf } from "./band";
-import { addItem, removeItemFrom, resolveCollection } from "./collections";
-import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
+import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
+import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
+import { itemFromRow, sourceFromRow, type MediaCollection, type MediaItem, type MediaSource } from "./model";
 import { correctedStamp, getProgress, getProgressMany, percentOf, recentProgress, writeProgress } from "./progress";
+
+import { albumKey, artistKey, albumOrder, groupTracks, radioTracks, shuffled } from "./music";
 
 export type MediaKind = MediaItem["kind"];
 
@@ -93,6 +95,7 @@ export function allowedSources(person: PersonRow): MediaSource[] {
 /** The person may read this item in this app (band, source, kind, allowlist). */
 export function readableIn(person: PersonRow, appId: MediaAppId, id: string): MediaItem | null {
   const item = readableItem(person, id);
+  if (item && appId === "music" && !allowedSources(person).some((source) => source.id === item.source_id && source.kind === "root")) return null;
   if (!item || !(MEDIA_APPS[appId].kinds as readonly string[]).includes(item.kind)) return null;
   if (allowlistOnly(person) && !allowedSources(person).some((source) => source.id === item.source_id)) return null;
   return item;
@@ -104,11 +107,13 @@ export interface ItemFilter {
   limit?: number;
   /** Only items from sources that are not a library folder (channels, feeds, links). */
   followedOnly?: boolean;
+  all?: boolean;
 }
 
 /** Items of the app's kinds this person may read, filtered through the band again (the floor runs for a minor), in the given order. */
 export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFilter = {}): MediaItem[] {
   let sources = allowedSources(person);
+  if (appId === "music") sources = sources.filter((source) => source.kind === "root");
   if (filter.followedOnly) sources = sources.filter((source) => source.kind !== "root");
   if (sources.length === 0) return [];
   const conditions: SQL[] = [
@@ -117,12 +122,12 @@ export function queryItems(person: PersonRow, appId: MediaAppId, filter: ItemFil
   ];
   if (filter.where) conditions.push(filter.where);
   const limit = filter.limit ?? 50;
-  const rows = db.select().from(mediaItems).where(and(...conditions)).orderBy(...(filter.order ?? [desc(mediaItems.addedAt)])).limit(limit * 2 + 2).all();
+  const rows = db.select().from(mediaItems).where(and(...conditions)).orderBy(...(filter.order ?? [desc(mediaItems.addedAt)])).limit(filter.all ? -1 : limit * 2 + 2).all();
   const items: MediaItem[] = [];
   for (const row of rows) {
     const item = itemFromRow(row);
     if (bandAllows(person, item)) items.push(item);
-    if (items.length >= limit) break;
+    if (!filter.all && items.length >= limit) break;
   }
   return items;
 }
@@ -208,6 +213,8 @@ export const collectionIds = (person: PersonRow, kind: "liked" | "watch_later" |
 
 export interface DataParams {
   id?: string;
+  /** What `id` names, for a data id that serves more than one page (Music's `header`: album, artist or playlist). */
+  scope?: string;
   channel?: string;
   limit?: number;
 }
@@ -229,6 +236,10 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
   dataId = dataId.replace(/_/g, "-"); // manifest ids use hyphens; the underscore spelling of a page written earlier still answers
   if (allowlistOnly(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
+  if (appId === "music") {
+    const music = musicData(person, dataId, params);
+    if (music !== null) return music as never;
+  }
   switch (dataId) {
     case "featured": {
       // A billboard wants pictures: the newest items that have one, else the newest.
@@ -341,7 +352,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   const base = rowOf(item, context);
   const progress = getProgress(person.id, item.id);
   // A child's screen never counts down to the next video by itself (the Player's autoplay needs `up_next`).
-  const queue = allowlistOnly(person) ? undefined : upNextItems(person, appId, item, 1)[0];
+  const queue = appId === "music" ? musicNext(person, item.id)[0] : allowlistOnly(person) ? undefined : upNextItems(person, appId, item, 1)[0];
   const seconds = progress && "seconds" in progress.position ? progress.position.seconds : undefined;
   const address = (item.location as { url?: string }).url;
   const direct = item.kind === "podcast_episode" ? address?.replace(/^http:\/\//i, "https://") : address;
@@ -385,7 +396,7 @@ export function saveProgress(person: PersonRow, appId: MediaAppId, args: Progres
   const item = typeof args.media_id === "string" ? readableIn(person, appId, args.media_id) : null;
   if (!item) return { ok: false, status: 404, error: `That ${MEDIA_APPS[appId].noun} is not in the library.` };
   const position = coerceNumber(args.position_s);
-  if (position === undefined || position < 0) return { ok: false, status: 400, error: "Where to save the place was missing. Play the video again." };
+  if (position === undefined || position < 0) return { ok: false, status: 400, error: "Where to save the place was missing. Play the item again." };
   const duration = coerceNumber(args.duration_s);
   let outroHit = false;
   let reason = typeof args.reason === "string" && (PROGRESS_REASONS as readonly string[]).includes(args.reason) ? args.reason : "interval";
@@ -402,7 +413,12 @@ export function saveProgress(person: PersonRow, appId: MediaAppId, args: Progres
   if (!outcome.ok) {
     return outcome.refusal === "other_persons_device"
       ? { ok: false, status: 403, error: "This screen belongs to someone else, so it cannot save your place. Sign in on your own screen." }
-      : { ok: false, status: 422, error: "That place could not be saved." };
+      : { ok: false, status: 422, error: "That place could not be saved. Play the item again." };
+  }
+  if (appId === "music" && reason === "ended") {
+    const queue = resolveCollection(person.id, "queue");
+    const index = queue?.items.findIndex((entry) => entry.media_id === item.id) ?? -1;
+    if (queue && index >= 0) setPointer(queue, index + 1 < queue.items.length ? index + 1 : null);
   }
   // A finished title leaves the person's later list: Watch later, or the queue for a podcast (FileTube's "remove watched").
   if (outcome.progress.completed) {
@@ -424,4 +440,183 @@ export function setListed(person: PersonRow, appId: MediaAppId, kind: "liked" | 
   if (want) addItem(collection, item.id);
   else removeItemFrom(collection, item.id);
   return { ok: true, value: { on: want, label: kind === "liked" ? (want ? "Liked" : "Not liked") : kind === "queue" ? (want ? "Queued" : "Not queued") : want ? "Saved" : "Not saved" } };
+}
+
+
+// Music uses the same read gate and collections as every other media app. No album or artist store.
+function musicLibrary(person: PersonRow): MediaItem[] {
+  // No page-sized cap before grouping: every readable track belongs to its derived album.
+  return queryItems(person, "music", { all: true, order: [sql`lower(${mediaItems.title})`] });
+}
+function musicNext(person: PersonRow, id: string): MediaItem[] {
+  const queue = resolveCollection(person.id, "queue");
+  const index = queue?.items.findIndex((entry) => entry.media_id === id) ?? -1;
+  return index < 0 ? [] : itemsInOrder(person, "music", queue!.items.slice(index + 1).map((entry) => entry.media_id), 200);
+}
+
+const artistOf = (item: MediaItem): string => item.artist ?? item.subtitle ?? "Unknown artist";
+const songCount = (count: number): string => `${count} ${count === 1 ? "song" : "songs"}`;
+
+/** The track the person's queue points at: the row the kit rings as "playing" (item_highlight_field). */
+function queueCurrent(person: PersonRow): string | null {
+  const queue = resolveCollection(person.id, "queue");
+  return queue && queue.pointer !== null ? queue.items[queue.pointer]?.media_id ?? null : null;
+}
+
+/** Track rows for the compact list: the media row plus the album track number, the playing flag and the Like label the row actions read. */
+function trackRows(person: PersonRow, items: readonly MediaItem[], extra?: (item: MediaItem) => Record<string, unknown>): Array<MediaRow & Record<string, unknown>> {
+  const base = rowsOf(person, items);
+  const liked = new Set(collectionIds(person, "liked"));
+  const current = queueCurrent(person);
+  return items.map((item, index) => ({
+    ...base[index]!, channel: artistOf(item), track_number: item.track_no, playing: item.id === current, like_label: liked.has(item.id) ? "Liked" : "Like", ...extra?.(item),
+  }));
+}
+
+/** An album or artist tile: the first track's picture, the derived id (the group key) and the page it opens. */
+function albumTile(person: PersonRow, id: string, tracks: readonly MediaItem[]): MediaRow & Record<string, unknown> {
+  const first = albumOrder(tracks)[0]!;
+  const pictured = albumOrder(tracks).find((item) => item.artwork) ?? first;
+  return { ...rowsOf(person, [pictured])[0]!, id, title: first.album ?? "Unknown album", channel: first.album_artist ?? artistOf(first), kind: "track", queue_mode: "album" };
+}
+
+function musicData(person: PersonRow, dataId: string, params: DataParams): unknown | null {
+  if (dataId === "up-next") return trackRows(person, musicNext(person, params.id ?? ""));
+  if (dataId === "songs") return trackRows(person, musicLibrary(person));
+  if (dataId === "albums") {
+    const groups = [...groupTracks(musicLibrary(person), "album")];
+    // `scope: "recent"` is Listen now's "Recently added": the newest albums first, a dozen of them.
+    if (params.scope === "recent") {
+      const added = (tracks: readonly MediaItem[]) => tracks.reduce((latest, item) => (item.added_at > latest ? item.added_at : latest), "");
+      return groups.sort((a, b) => added(b[1]).localeCompare(added(a[1])) || a[0].localeCompare(b[0])).slice(0, 12).map(([id, tracks]) => albumTile(person, id, tracks));
+    }
+    return groups.map(([id, tracks]) => albumTile(person, id, tracks)).sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (dataId === "artists") {
+    return [...groupTracks(musicLibrary(person), "artist")].map(([id, tracks]) => {
+      const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
+      return { ...rowsOf(person, [pictured])[0]!, id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist" };
+    }).sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (dataId === "header" && params.scope === "album") {
+    const tracks = albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []);
+    if (tracks.length === 0) return [];
+    const years = [...new Set(tracks.map((item) => item.year).filter((year): year is number => !!year))];
+    const tile = albumTile(person, params.id!, tracks);
+    return [{ ...tile, channel: [tile.channel, years.length === 1 ? String(years[0]) : null, songCount(tracks.length)].filter(Boolean).join(" · "), shuffle_id: `shuffle:${params.id}` }];
+  }
+  if (dataId === "header" && params.scope === "artist") {
+    const tracks = groupTracks(musicLibrary(person), "artist").get(params.id ?? "") ?? [];
+    if (tracks.length === 0) return [];
+    const pictured = tracks.find((item) => item.artwork) ?? tracks[0]!;
+    return [{ ...rowsOf(person, [pictured])[0]!, id: params.id, title: artistKey(tracks[0]!), channel: songCount(tracks.length), kind: "track", queue_mode: "artist", radio_id: `radio:artist:${params.id}` }];
+  }
+  if (dataId === "header" && params.scope === "playlist") {
+    const collection = resolveCollection(person.id, params.id ?? "");
+    if (collection?.kind !== "playlist" || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
+    return [{ ...playlistTile(person, collection), queue_mode: "playlist", shuffle_id: `shuffle:${collection.id}` }];
+  }
+  if (dataId === "album") return trackRows(person, albumOrder(groupTracks(musicLibrary(person), "album").get(params.id ?? "") ?? []));
+  if (dataId === "album-more") {
+    // The same artist's other albums, never the one open.
+    const groups = groupTracks(musicLibrary(person), "album");
+    const here = groups.get(params.id ?? "")?.[0];
+    if (!here) return [];
+    const owner = (item: MediaItem) => item.album_artist ?? artistOf(item);
+    return [...groups].filter(([id, tracks]) => id !== params.id && owner(tracks[0]!) === owner(here))
+      .map(([id, tracks]) => albumTile(person, id, tracks)).sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (dataId === "artist") return trackRows(person, albumOrder(groupTracks(musicLibrary(person), "artist").get(params.id ?? "") ?? []).sort((a, b) => (a.album ?? "").localeCompare(b.album ?? "")));
+  if (dataId === "artist-albums") {
+    const tracks = groupTracks(musicLibrary(person), "artist").get(params.id ?? "") ?? [];
+    return [...groupTracks(tracks, "album")].map(([id, group]) => albumTile(person, id, group)).sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (dataId === "radio-seeds") {
+    if (allowlistOnly(person)) return [];
+    return [...groupTracks(musicLibrary(person), "artist")].map(([, tracks]) => ({ ...rowsOf(person, [tracks.find((item) => item.artwork) ?? tracks[0]!])[0]!, id: tracks[0]!.id, title: `${artistKey(tracks[0]!)} radio`, channel: null, kind: "track", queue_mode: "radio", radio_seed: tracks[0]!.id }));
+  }
+  if (dataId === "playlists") return visiblePlaylists(person).map((collection) => playlistTile(person, collection));
+  if (dataId === "playlist-new") return [{ id: "new", title: "New playlist", channel: "Start an empty playlist", kind: "track" }];
+  if (dataId === "playlist") {
+    const collection = resolveCollection(person.id, params.id ?? "");
+    if (collection?.kind !== "playlist" || !visiblePlaylists(person).some((entry) => entry.id === collection.id)) return [];
+    const tracks = playlistTracks(person, collection);
+    // The index column is the place in this list, not the song's number on its album.
+    return trackRows(person, tracks, (item) => ({ playlist_id: collection.id, track_number: tracks.indexOf(item) + 1 }));
+  }
+  if (dataId === "liked") return trackRows(person, itemsInOrder(person, "music", [...collectionIds(person, "liked")].reverse(), Math.min(Math.max(params.limit ?? 20, 1), 200)));
+  if (dataId === "history") return trackRows(person, itemsInOrder(person, "music", recentProgress(person.id, 120).map((progress) => progress.media_id), 60));
+  return null;
+}
+
+function playlistTile(person: PersonRow, collection: MediaCollection): MediaRow & Record<string, unknown> {
+  const tracks = playlistTracks(person, collection);
+  const pictured = tracks.find((item) => item.artwork) ?? tracks[0];
+  const base = pictured ? rowsOf(person, [pictured])[0]! : { id: collection.id, title: collection.title, channel: null, summary: "", kind: "track" as const, thumbnail: null, backdrop: null, duration_s: null, copy_label: "Saved" };
+  return { ...base, id: collection.id, title: collection.title, channel: songCount(tracks.length), kind: "track" };
+}
+
+const ALL_TRACKS = 1_000_000;
+function playlistTracks(person: PersonRow, collection: MediaCollection): MediaItem[] {
+  return itemsInOrder(person, "music", collection.items.map((entry) => entry.media_id), ALL_TRACKS);
+}
+/** The person's own playlists; a minor never sees one whose name trips the floor. */
+function visiblePlaylists(person: PersonRow): MediaCollection[] {
+  return listCollections(person.id, "playlist").filter((collection) => mediaBandOf(person) === "adult" || !trips(collection.title));
+}
+
+/** The Playlists page's two buttons. "new" makes an empty playlist; "add" puts a song on the newest playlist (a first one is made if there is none). */
+export function musicPlaylistAction(person: PersonRow, args: Record<string, unknown>): ActionResult<{ id: string; title: string }> {
+  if (args.op === "new") {
+    const made = createCollection(person.id, "playlist", `Playlist ${listCollections(person.id, "playlist").length + 1}`);
+    return { ok: true, value: { id: made.id, title: made.title } };
+  }
+  if (args.op === "remove") {
+    const own = typeof args.playlist_id === "string" ? resolveCollection(person.id, args.playlist_id) : null;
+    if (own?.kind !== "playlist" || typeof args.media_id !== "string") return { ok: false, status: 404, error: "That playlist is not available. Go back to Playlists and choose another." };
+    removeItemFrom(own, args.media_id);
+    return { ok: true, value: { id: own.id, title: own.title } };
+  }
+  const item = typeof args.media_id === "string" ? readableIn(person, "music", args.media_id) : null;
+  if (!item) return { ok: false, status: 404, error: "That song is not available. Go back to the library and choose another." };
+  const playlist = visiblePlaylists(person).sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? createCollection(person.id, "playlist", "My playlist");
+  if (!playlist.items.some((entry) => entry.media_id === item.id)) addItem(playlist, item.id);
+  return { ok: true, value: { id: playlist.id, title: playlist.title } };
+}
+
+/** Replace only this person's queue. A seed and every candidate are checked before use. */
+export function startMusicQueue(person: PersonRow, args: Record<string, unknown>): ActionResult<{ id: string }> {
+  const library = musicLibrary(person);
+  let id = typeof args.id === "string" ? args.id : "";
+  let mode: unknown = args.mode;
+  let seedKind: unknown = args.seed_kind;
+  let shuffle = args.shuffle === true || args.shuffle === "true";
+  // A page button that can carry only one id says what it wants in the id: "shuffle:<album or playlist id>" or "radio:<kind>:<seed>".
+  if (id.startsWith("shuffle:")) { shuffle = true; id = id.slice("shuffle:".length); }
+  const radio = /^radio:(artist|album|genre|track):(.+)$/s.exec(id);
+  if (radio) { mode = "radio"; seedKind = radio[1]; id = radio[2]!; }
+  let tracks: MediaItem[] = [];
+  if (mode === "radio") {
+    const seed = library.find((item) => item.id === id || (seedKind === "artist" && artistKey(item) === id) || (seedKind === "album" && albumKey(item) === id) || (seedKind === "genre" && item.genre === id));
+    if (seed) tracks = radioTracks(library, seed);
+  } else if (mode === "artist") tracks = albumOrder(library.filter((item) => artistKey(item) === id)).sort((a, b) => (a.album ?? "").localeCompare(b.album ?? ""));
+  else if (mode === "album") tracks = albumOrder(library.filter((item) => albumKey(item) === id));
+  else if (mode === "playlist") {
+    const collection = resolveCollection(person.id, id);
+    if (collection?.kind === "playlist") tracks = playlistTracks(person, collection);
+  } else {
+    const item = library.find((item) => item.id === id);
+    if (item) {
+      const current = resolveCollection(person.id, "queue")!;
+      const index = current.items.findIndex((entry) => entry.media_id === id);
+      if (index >= 0) { setPointer(current, index); return { ok: true, value: { id } }; }
+      tracks = albumOrder(library.filter((candidate) => albumKey(candidate) === albumKey(item)));
+      tracks = tracks.slice(tracks.findIndex((candidate) => candidate.id === id));
+    }
+  }
+  if (shuffle) tracks = shuffled(tracks);
+  if (!tracks.length) return { ok: false, status: 404, error: "No songs are available for this queue. Choose another song or album." };
+  const now = new Date().toISOString();
+  setItems(resolveCollection(person.id, "queue")!, tracks.map((item, position) => ({ media_id: item.id, position, added_at: now, status: null })), 0);
+  return { ok: true, value: { id: tracks[0]!.id } };
 }

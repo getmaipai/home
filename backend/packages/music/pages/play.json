@@ -1,0 +1,111 @@
+{
+  "type": "page",
+  "id": "play",
+  "title": "Now playing",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "split_view",
+      "main": [
+        {
+          "type": "player",
+          "bind": {
+            "source": "package",
+            "path": "item",
+            "params": {
+              "id": "$state.id"
+            }
+          },
+          "kind": "audio",
+          "autoplay_next": true,
+          "actions": [
+            {
+              "label": "Like",
+              "icon": "heart",
+              "field": "liked",
+              "on_label": "Liked",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/music/like",
+                  "args": {
+                    "media_id": "{id}",
+                    "on": "{on}"
+                  }
+                }
+              }
+            },
+            {
+              "label": "Add to playlist",
+              "icon": "plus",
+              "action": {
+                "call": {
+                  "target": "/api/plugins/music/playlist",
+                  "args": {
+                    "op": "add",
+                    "media_id": "{id}"
+                  }
+                }
+              }
+            }
+          ],
+          "on_progress": {
+            "call": {
+              "target": "/api/plugins/music/progress",
+              "args": {
+                "media_id": "{id}",
+                "position_s": "{position_s}",
+                "duration_s": "{duration_s}",
+                "reason": "{reason}"
+              }
+            }
+          },
+          "on_next": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "film",
+            "text": "This song is not available. Go back to Music and pick another."
+          },
+          "layout": "audio"
+        }
+      ],
+      "aside": [
+        {
+          "type": "media_shelf",
+          "heading": "Up next",
+          "bind": {
+            "source": "package",
+            "path": "up-next",
+            "params": {
+              "id": "$state.id"
+            }
+          },
+          "item_key_field": "id",
+          "item_label_field": "title",
+          "item_subtitle_field": "{channel}",
+          "item_media_field": "thumbnail",
+          "aspect": "square",
+          "variant": "plain",
+          "orientation": "vertical",
+          "density": "compact",
+          "item_meta_field": "duration_s",
+          "item_highlight_field": "playing",
+          "on_select": {
+            "play": {
+              "media_id": "{id}"
+            }
+          },
+          "empty_state": {
+            "type": "empty_state",
+            "icon": "music",
+            "text": "Nothing is queued after this song."
+          }
+        }
+      ],
+      "aside_label": "Up next"
+    }
+  ]
+}

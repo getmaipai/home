@@ -1,0 +1,101 @@
+{
+  "type": "page",
+  "id": "artist",
+  "title": "Artist",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "artist"
+        }
+      },
+      "label": "Artist",
+      "size": "banner",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_art_field": "backdrop",
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{id}"
+          }
+        }
+      },
+      "secondary": [
+        {
+          "label": "Start radio",
+          "icon": "audio-waveform",
+          "action": {
+            "play": {
+              "media_id": "{radio_id}"
+            }
+          }
+        }
+      ],
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Songs",
+      "bind": {
+        "source": "package",
+        "path": "artist",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Albums",
+      "bind": {
+        "source": "package",
+        "path": "artist-albums",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "hide_when_empty": true
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "id": "albums",
+  "title": "Albums",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Albums",
+      "bind": {
+        "source": "package",
+        "path": "albums"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No music yet. Ask an admin to add a music folder in Settings, Home, Storage."
+      }
+    }
+  ]
+}

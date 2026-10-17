@@ -1,0 +1,37 @@
+{
+  "type": "page",
+  "id": "artists",
+  "title": "Artists",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Artists",
+      "bind": {
+        "source": "package",
+        "path": "artists"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "art_shape": "circle",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/artist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No music yet. Ask an admin to add a music folder in Settings, Home, Storage."
+      }
+    }
+  ]
+}

@@ -1,10 +1,10 @@
 {
   "id": "music",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "kind": "plugin",
-  "category": "Info",
-  "display": "Music Lookup",
-  "description": "Look up a music artist.",
+  "category": "Media",
+  "display": "Music",
+  "description": "Play songs from your library, browse albums and artists, make playlists and start local radio.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -14,24 +14,37 @@
       "look up the artist Adele",
       "who is the singer Prince",
       "who is the singer Adele",
-      "who is the singer in Radiohead"
+      "who is the singer in Radiohead",
+      "open my music",
+      "play my liked songs",
+      "show my albums"
     ],
-    "patterns": ["look up the artist *", "who is the singer *"]
+    "patterns": [
+      "look up the artist *",
+      "who is the singer *"
+    ]
   },
   "args": {
     "type": "object",
-    "required": ["query"],
+    "required": [
+      "query"
+    ],
     "properties": {
-      "query": { "type": "string", "minLength": 1 }
+      "query": {
+        "type": "string",
+        "minLength": 1
+      }
     }
   },
   "incognito": "unaffected",
   "requires": [],
   "optional": [],
-  "platforms": ["home"],
+  "platforms": [
+    "home"
+  ],
   "min_role": "child",
   "consequential": false,
-  "offline": "unavailable",
+  "offline": "degraded",
   "config": [],
   "data_sources": [
     {
@@ -44,19 +57,203 @@
       "retention": "unknown, see MusicBrainz's own policy"
     }
   ],
-  "permissions": ["net:musicbrainz.org"],
+  "permissions": [
+    "net:musicbrainz.org"
+  ],
   "notifications": [],
-  "cache": { "key_template": "music:artist:{query}", "ttl_s": 86400, "stale_ok_s": 604800, "max_bytes": 50000 },
+  "cache": {
+    "key_template": "music:artist:{query}",
+    "ttl_s": 86400,
+    "stale_ok_s": 604800,
+    "max_bytes": 50000
+  },
   "fallback_reply": {
     "text": "Sorry, I'm having trouble looking that up right now.",
     "speech": "Sorry, I'm having trouble looking that up right now."
   },
   "backup": "exclude",
   "background": false,
-  "contributes": {},
+  "contributes": {
+    "pages": [
+      {
+        "id": "index",
+        "label": "Music",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "index"
+      },
+      {
+        "id": "albums",
+        "label": "Albums",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "albums"
+      },
+      {
+        "id": "album",
+        "label": "Album",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "album"
+      },
+      {
+        "id": "artists",
+        "label": "Artists",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "artists"
+      },
+      {
+        "id": "artist",
+        "label": "Artist",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "artist"
+      },
+      {
+        "id": "songs",
+        "label": "Songs",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "songs"
+      },
+      {
+        "id": "playlists",
+        "label": "Playlists",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "playlists"
+      },
+      {
+        "id": "playlist",
+        "label": "Playlist",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "playlist"
+      },
+      {
+        "id": "liked",
+        "label": "Liked",
+        "icon": "music",
+        "nav": true,
+        "kind": "schema",
+        "module": "liked"
+      },
+      {
+        "id": "play",
+        "label": "Now playing",
+        "icon": "music",
+        "nav": false,
+        "kind": "schema",
+        "module": "play"
+      }
+    ],
+    "data": [
+      {
+        "id": "history",
+        "rows": "list"
+      },
+      {
+        "id": "radio-seeds",
+        "rows": "list"
+      },
+      {
+        "id": "liked",
+        "rows": "list"
+      },
+      {
+        "id": "albums",
+        "rows": "list"
+      },
+      {
+        "id": "header",
+        "rows": "list"
+      },
+      {
+        "id": "album",
+        "rows": "list"
+      },
+      {
+        "id": "album-more",
+        "rows": "list"
+      },
+      {
+        "id": "artists",
+        "rows": "list"
+      },
+      {
+        "id": "artist",
+        "rows": "list"
+      },
+      {
+        "id": "artist-albums",
+        "rows": "list"
+      },
+      {
+        "id": "songs",
+        "rows": "list"
+      },
+      {
+        "id": "playlists",
+        "rows": "list"
+      },
+      {
+        "id": "playlist",
+        "rows": "list"
+      },
+      {
+        "id": "item",
+        "rows": "list"
+      },
+      {
+        "id": "up-next",
+        "rows": "list"
+      },
+      {
+        "id": "playlist-new",
+        "rows": "list"
+      }
+    ],
+    "settings_area": {
+      "id": "music",
+      "title": "Music",
+      "app": "/apps/music",
+      "audience": {
+        "min_role": "child"
+      },
+      "groups": [
+        {
+          "label": "Music",
+          "sections": [
+            "storage"
+          ]
+        }
+      ],
+      "sections": [
+        {
+          "id": "storage",
+          "label": "Music folders",
+          "icon": "hard-drive",
+          "kind": "link",
+          "href": "/settings/home/storage",
+          "min_role": "admin"
+        }
+      ]
+    }
+  },
   "min_app": "0.1.0",
   "timeout_ms": 8000,
   "tier": 1,
   "quality_scale": "bronze",
-  "smoke": { "kind": "deno_test" }
+  "smoke": {
+    "kind": "deno_test"
+  }
 }

@@ -30,7 +30,7 @@ function floorText(item: Pick<BandInput, "title" | "description" | "also">): str
 /** The floor KS-05 uses, plus the household's one list of sexual words (lib/pictures/minorLine.ts): a library file is not a news
  * headline, and the shelf's floor alone does not catch a title like "Hardcore porn". Stricter only: a false hit makes a title
  * adult-only until an adult marks it fine. */
-function trips(text: string): boolean {
+export function trips(text: string): boolean {
   return tripsMinorFloor(text) || mentionsSexualWord(text);
 }
 
@@ -52,10 +52,10 @@ export function allowedBandsFor(actor: PersonRow): Band[] {
 }
 
 /** Whether `actor` may see this item's band: the stored value, and for a minor the floor again on the words. */
-export function bandAllows(actor: PersonRow, item: Pick<MediaItem, "band_ok" | "title" | "description" | "subtitle" | "advisory">): boolean {
+export function bandAllows(actor: PersonRow, item: Pick<MediaItem, "band_ok" | "title" | "description" | "subtitle" | "advisory"> & Partial<Pick<MediaItem, "artist" | "album" | "album_artist" | "genre">>): boolean {
   const band = mediaBandOf(actor);
   if (!bandOkAllowedFor(band).includes(item.band_ok)) return false;
   if (band === "adult") return true;
   if (item.advisory.explicit) return false;
-  return !trips(floorText({ title: item.title, description: item.description, also: [item.subtitle] }));
+  return !trips(floorText({ title: item.title, description: item.description, also: [item.subtitle, item.artist, item.album, item.album_artist, item.genre] }));
 }

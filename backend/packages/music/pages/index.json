@@ -1,0 +1,102 @@
+{
+  "type": "page",
+  "id": "index",
+  "title": "Listen now",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Recently played",
+      "bind": {
+        "source": "package",
+        "path": "history"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently added",
+      "bind": {
+        "source": "package",
+        "path": "albums",
+        "params": {
+          "scope": "recent"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/album",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No music yet. Ask an admin to add a music folder in Settings, Home, Storage."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Radio from your music",
+      "bind": {
+        "source": "package",
+        "path": "radio-seeds"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "art_shape": "circle",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Liked songs",
+      "bind": {
+        "source": "package",
+        "path": "liked"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "hide_when_empty": true
+    }
+  ]
+}

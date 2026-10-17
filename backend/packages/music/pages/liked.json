@@ -1,0 +1,36 @@
+{
+  "type": "page",
+  "id": "liked",
+  "title": "Liked",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Liked songs",
+      "bind": {
+        "source": "package",
+        "path": "liked"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No liked songs yet. Press Like on a song or on Now playing."
+      }
+    }
+  ]
+}

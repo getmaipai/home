@@ -1,0 +1,95 @@
+{
+  "type": "page",
+  "id": "playlist",
+  "title": "Playlist",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "header",
+        "params": {
+          "id": "$state.id",
+          "scope": "playlist"
+        }
+      },
+      "label": "Playlist",
+      "size": "banner",
+      "autoplay": false,
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_art_field": "backdrop",
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{id}"
+          }
+        }
+      },
+      "secondary": [
+        {
+          "label": "Shuffle",
+          "icon": "refresh-cw",
+          "action": {
+            "play": {
+              "media_id": "{shuffle_id}"
+            }
+          }
+        }
+      ],
+      "hide_when_empty": true
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Songs",
+      "bind": {
+        "source": "package",
+        "path": "playlist",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "orientation": "vertical",
+      "density": "compact",
+      "item_meta_field": "duration_s",
+      "item_highlight_field": "playing",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "row_actions": [
+        {
+          "icon": "x",
+          "label": "Remove",
+          "action": {
+            "call": {
+              "target": "/api/plugins/music/playlist",
+              "args": {
+                "op": "remove",
+                "media_id": "{id}",
+                "playlist_id": "{playlist_id}"
+              }
+            }
+          }
+        }
+      ],
+      "item_index_field": "track_number",
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "This playlist is empty. Press Add to playlist on Now playing."
+      }
+    }
+  ]
+}

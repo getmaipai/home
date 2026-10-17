@@ -1,0 +1,59 @@
+{
+  "type": "page",
+  "id": "playlists",
+  "title": "Playlists",
+  "tone": "cinema",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Start a playlist",
+      "bind": {
+        "source": "package",
+        "path": "playlist-new"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "on_select": {
+        "call": {
+          "target": "/api/plugins/music/playlist",
+          "args": {
+            "op": "new"
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "music",
+        "text": "No playlists yet. Choose New playlist, then add songs from Now playing."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Your playlists",
+      "bind": {
+        "source": "package",
+        "path": "playlists"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "aspect": "square",
+      "variant": "plain",
+      "layout": "grid",
+      "on_select": {
+        "navigate": {
+          "to": "/apps/music/playlist",
+          "state": {
+            "id": "{id}"
+          }
+        }
+      },
+      "hide_when_empty": true
+    }
+  ]
+}
