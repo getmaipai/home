@@ -37143,4 +37143,5 @@ checkout because the commons path was exported relative before it was made absol
 The first gate on this landing then ended rc=143 with every test green: the ledger rerun appends a `flaky` line to the gate's
 failure log on a pass, and `check.sh`'s two-leg wait loop treated any line there as a failure and stopped the still-running leg.
 The loop now stops the other leg only on a `fail` line, and the shard runner's tests always pass their own failure log so a test
-fixture's flaky line never lands in the log of the gate running it.
+fixture's flaky line never lands in the log of the gate running it. The next run failed a third turn test the same way (`toolRecovery.test.ts` THIN-2G,
+green alone, red only inside the full shard), so it joined the two `turnNext` entries in the ledger under #216.

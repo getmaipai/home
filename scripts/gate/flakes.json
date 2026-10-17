@@ -22,6 +22,17 @@
       "log": "data-scratch/gate-stats/runs.jsonl, failing_test_names, 2 red gates on 2026-10-16 (plugin_id undefined after a FOREIGN KEY error in logTurn); passes alone",
       "issue": 216,
       "test": "turnNext.ts: ENGINE-CONTRACT-02, an invalid websearch call falls to the builder row > a scripted engine that honours the call is unchanged"
+    },
+    {
+      "workspace": "backend",
+      "file": "tests/turnMachine/toolRecovery.test.ts",
+      "owner": "Jesse Torres",
+      "date_added": "2026-10-16",
+      "deadline": "2026-10-23",
+      "cause": "shared-state",
+      "log": "full backend suite 2026-10-16: fails only inside the 184-file shard, passes alone in 1.7 s (issue 216)",
+      "issue": 216,
+      "test": "T5 / THIN-2G: one retry round after every call in a round failed > a failing weather tool, then the model calls websearch: the reply is built from the search rows with sources, in one retry round with the identical tools block"
     }
   ],
   "serial": {
