@@ -10,7 +10,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { PENDING, videoAdaptersFor, allVideoAdapters, dropVideoAdapterCache, forgetVideoAdapterPref, setVideoAdapterEnabled } from "@/lib/videos/adapters";
 import { cancelVideoJob, clipUrl, getVideoJobFor, loadGeneratedReference, plainVideoFailure, posterUrl, readVideoFile, startVideoJob, videoJobsForTurn, busyLine, type VideoJob } from "@/lib/videos/jobs";
 import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience } from "@/lib/videos/policy";
-import { videoEngineStatus, videoStatusReady } from "@/lib/videos/ready";
+import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId, VIDEO_SIZES } from "@/lib/videos/tool";
 import { and, eq } from "drizzle-orm";
@@ -93,7 +93,7 @@ videosRoutes.openapi(statusRoute, async (c) => {
   const styles = denial ? [] : (await videoAdaptersFor(videoAdapterAudiencesFor(audience))).map((a) => ({ id: a.id, name: a.name }));
   return c.json({
     can_make: denial === null && ready,
-    reason: denial ? VIDEO_DENIAL_LINE[denial] : ready ? null : engine?.reason ?? "No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.",
+    reason: denial ? VIDEO_DENIAL_LINE[denial] : ready ? null : videoNotReadyReason(engine),
     engine_ready: ready,
     adult_styles: denial === null && adultVideoAdaptersAllowed(),
     limits: VIDEO_LIMITS_LINE,
@@ -167,7 +167,7 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
   if (denial) return { status: 403, body: { error: VIDEO_DENIAL_LINE[denial], code: denial } };
   const refused = refuseVideoPrompt(prompt);
   if (refused) return { status: 422, body: { error: VIDEO_REFUSAL_LINE[refused], code: refused } };
-  if (!videoStatusReady(await videoEngineStatus())) return { status: 503, body: { error: "No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.", code: "not_installed" } };
+  { const engine = await videoEngineStatus(); if (!videoStatusReady(engine)) return { status: 503, body: { error: videoNotReadyReason(engine), code: "not_installed" } }; }
   return null;
 }
 

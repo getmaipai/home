@@ -8,7 +8,7 @@ import { speakerAgeBand } from "@/lib/ageBand";
 import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
-import { pictureEngineStatus, pictureEngineReady } from "@/lib/pictures/ready";
+import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
 import { StackPicturesError } from "@/lib/pictures/stack";
 import type { PersonRow } from "@/types";
 
@@ -80,7 +80,7 @@ picturesRoutes.openapi(statusRoute, async (c) => {
   const engine = await pictureEngineStatus();
   return c.json({
     can_make: denial === null && ready,
-    reason: denial ? PICTURE_DENIAL_LINE[denial] : ready ? null : engine?.reason ?? "No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.",
+    reason: denial ? PICTURE_DENIAL_LINE[denial] : ready ? null : pictureNotReadyReason(engine),
     engine_ready: ready,
     adult_styles: denial === null && adultAdaptersAllowed(),
     styles,
@@ -131,7 +131,7 @@ picturesRoutes.openapi(variationRoute, async (c) => {
   const prompt = used.reduce((text, a) => withTriggerWords(text, a), source.prompt);
   const refused = refusePrompt(`${prompt} ${used.map((a) => a.name).join(" ")}`);
   if (refused) return c.json({ error: PROMPT_REFUSAL_LINE[refused], code: refused }, 422) as never;
-  if (!(await pictureEngineReady())) return c.json({ error: "No picture model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.", code: "not_installed" }, 503) as never;
+  if (!(await pictureEngineReady())) return c.json({ error: pictureNotReadyReason(await pictureEngineStatus()), code: "not_installed" }, 503) as never;
   const loras = used.map((a) => ({ id: a.id, scale: a.strength_default }));
   try {
     const job = await startPictureJob({

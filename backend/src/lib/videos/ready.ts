@@ -45,3 +45,11 @@ export function readyVideoStatusForTests(overrides: Partial<StackVideoStatus> = 
     ...overrides,
   };
 }
+
+const NO_VIDEO_MODEL = "No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.";
+const VIDEO_ENGINE_UNREACHABLE = "I can't reach the video engine on this computer right now. Check that the MaiPai Stack is running, then try again.";
+
+/** Why a video cannot be made now, in the person's terms (see pictureNotReadyReason). */
+export function videoNotReadyReason(engine: StackVideoStatus | null): string {
+  return engine?.reason ?? (engine === null ? VIDEO_ENGINE_UNREACHABLE : NO_VIDEO_MODEL);
+}
