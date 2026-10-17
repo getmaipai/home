@@ -41,7 +41,11 @@ describe("the disk plan table shipped with Home", () => {
     const shown = Bun.spawnSync(["git", "-C", stack, "show", `${tag}:docs/disk-plan.json`], { stdout: "pipe", stderr: "ignore" });
     // A Stack older than the disk plan has no table to compare with; the first pin bump past it starts the check.
     if (shown.exitCode !== 0) return;
-    expect(JSON.parse(shown.stdout.toString())).toEqual(table);
+    const pinned = JSON.parse(shown.stdout.toString()) as Record<string, unknown>;
+    // The sizes must be the pinned Stack's; the flat installer block may carry figures the pinned commit predates (a Stack newer than the pin).
+    expect(pinned.tiers).toEqual((table as unknown as { tiers: unknown }).tiers);
+    expect(pinned.margin_percent).toBe((table as unknown as { margin_percent: number }).margin_percent);
+    for (const [key, value] of Object.entries(pinned.installer as Record<string, number>)) expect((table as unknown as { installer: Record<string, number> }).installer[key]).toBe(value);
   });
 });
 
