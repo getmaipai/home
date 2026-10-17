@@ -760,6 +760,16 @@ export function projectForOutcomes(outcomes: readonly ToolExecutionOutcome[]): {
   return null;
 }
 
+/** VIDEO-GEN-06: `TurnValue.video`, the id of the video job this turn's `generate_video` call started. */
+export function videoForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
+  for (const outcome of outcomes) {
+    if (outcome.status !== "succeeded" || outcome.packageId !== "generate_video") continue;
+    const id = recordData(outcome.result?.data)?.videoJobId;
+    if (typeof id === "string") return { id };
+  }
+  return null;
+}
+
 /** IMGGEN-UI-01: `TurnValue.picture`, the id of the picture job this turn's `generate_image` call started. */
 export function pictureForOutcomes(outcomes: readonly ToolExecutionOutcome[]): { id: string } | null {
   for (const outcome of outcomes) {

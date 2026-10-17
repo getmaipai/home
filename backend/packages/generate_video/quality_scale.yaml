@@ -1,0 +1,30 @@
+package: generate_video
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: "tests/smoke.json for the recipe line; backend/tests/videoTool.test.ts and videoSafety.test.ts for the chat turn, the gates and the job"
+  routing_examples:
+    met: true
+    note: 6 examples in manifest.json's routing.examples
+  privacy_row_per_data_source:
+    met: true
+    note: no data source; every video is made on this computer and nothing leaves it
+  offline_behavior_stated:
+    met: true
+    note: "offline: full - the video engine runs on this computer"
+  smoke_test:
+    met: true
+    note: "tests/smoke.json, run through lib/smoke.ts"
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false
+    note: no auth to diagnose; a failed job shows the engine's plain reason on the card
+gold:
+  real_service_verified:
+    met: false
+    note: the live clip through chat is VIDEO-GEN-08's scratch verification

@@ -1,0 +1,17 @@
+{
+  "description": "Smoke fixture for the bundled generate_video package: the recipe answers with the fixed line the chat turn gives the model. In a chat turn the hub answers the call itself and starts the video job (backend/src/lib/videos/tool.ts); that path is covered by backend/tests/videoTool.test.ts, not this emulator.",
+  "inputs": {
+    "prompt": "a paper boat in the rain"
+  },
+  "host_setup": {},
+  "expected": {
+    "reply": {
+      "text": "A 5 second video is being made from this description: a paper boat in the rain. It appears below your reply when it is ready and takes about two minutes. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes.",
+      "speech": "A 5 second video is being made from this description: a paper boat in the rain. It appears below your reply when it is ready and takes about two minutes. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes."
+    },
+    "actions": [],
+    "scheduled_jobs": [],
+    "home_calls": [],
+    "memory_added": []
+  }
+}

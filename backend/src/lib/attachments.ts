@@ -382,9 +382,15 @@ export function listTemporaryChatImageVersions(actor: PersonRow, conversationId:
     .filter((image): image is TemporaryChatImage & { edit: NonNullable<TemporaryChatImage["edit"]> } => Boolean(image.edit) && image.conversationId === conversationId && image.edit!.root === rootId && Date.now() - image.createdAt <= 2 * 60 * 60 * 1000 && canAccessPerson(actor, image.ownerPersonId))
     .sort((a, b) => a.createdAt - b.createdAt);
 }
+/** VIDEO-GEN-05: other in-memory stores of a temporary chat's media (a generated clip) follow the pictures' lifetime. */
+export interface TemporaryMediaHooks { removeConversation(conversationId: string): void; removePerson(personId: string): void; prune(liveConversationIds: ReadonlySet<string>): void }
+const temporaryMediaHooks: TemporaryMediaHooks[] = [];
+export function registerTemporaryMedia(hooks: TemporaryMediaHooks): void { temporaryMediaHooks.push(hooks); }
+
 export function removeTemporaryChatImages(conversationId: string): void {
   dropTemporaryPictureJobs(conversationId);
   for (const [id, image] of temporaryChatImages) if (image.conversationId === conversationId) temporaryChatImages.delete(id);
+  for (const hooks of temporaryMediaHooks) hooks.removeConversation(conversationId);
 }
 
 /** Person deletion (lib/storage/personFiles.ts): a temporary chat's
@@ -393,8 +399,10 @@ export function removeTemporaryChatImages(conversationId: string): void {
 export function removeTemporaryChatImagesForPerson(personId: string): void {
   dropTemporaryPictureJobsForPerson(personId);
   for (const [id, image] of temporaryChatImages) if (image.ownerPersonId === personId) temporaryChatImages.delete(id);
+  for (const hooks of temporaryMediaHooks) hooks.removePerson(personId);
 }
 
 export function pruneTemporaryChatImages(liveConversationIds: ReadonlySet<string>): void {
   for (const [id, image] of temporaryChatImages) if (!liveConversationIds.has(image.conversationId)) temporaryChatImages.delete(id);
+  for (const hooks of temporaryMediaHooks) hooks.prune(liveConversationIds);
 }

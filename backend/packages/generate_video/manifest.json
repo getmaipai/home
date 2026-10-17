@@ -1,0 +1,142 @@
+{
+  "id": "generate_video",
+  "version": "0.1.0",
+  "kind": "plugin",
+  "category": "Media",
+  "display": "Make a Video",
+  "description": "Make a short video on this computer when someone asks for a clip or an animation.",
+  "offer": {
+    "mode": "conditional",
+    "gate": "videosAllowed",
+    "bench_row": "video-tool",
+    "reason": "offered only to an adult on their own written screen, when the household has video on and the Stack has a video model"
+  },
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "routing": {
+    "examples": [
+      "make a short video of a paper boat in the rain",
+      "can you generate a video of a dragon flying over a castle",
+      "animate this picture",
+      "make a clip of waves on a beach at sunset",
+      "turn that picture into a video",
+      "create a short animation of a robot waving hello"
+    ],
+    "patterns": []
+  },
+  "args": {
+    "type": "object",
+    "required": [
+      "prompt"
+    ],
+    "properties": {
+      "prompt": {
+        "type": "string",
+        "minLength": 3,
+        "maxLength": 1200,
+        "grounded": false,
+        "description": "What the video shows, written as a full description in plain English: the subject, what moves, the setting and the light or mood, built from what the person asked for. For a picture that moves, describe the motion. Keep their own words for names. Do not add people, objects or themes they did not ask for."
+      },
+      "from_picture": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional. Set to \"latest\" only when the person asks to animate or bring to life a picture that was made earlier in this chat. Leave it out for a video from words alone. Pictures the person uploaded cannot be animated."
+      },
+      "orientation": {
+        "type": "string",
+        "enum": [
+          "landscape",
+          "portrait"
+        ],
+        "grounded": false,
+        "description": "Optional shape of the video. landscape is the default. Use portrait only for a phone-style tall video when the person asks."
+      },
+      "seconds": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 5,
+        "grounded": false,
+        "description": "Optional length in seconds, 1 to 5. Leave it out for 5."
+      },
+      "style": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Optional. The name of one of the household's saved video styles, only when the person names it. Leave it out otherwise; never invent one."
+      },
+      "depicts_real_person": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Set true when the person asks for a video that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home does not make those. Otherwise leave it out."
+      }
+    }
+  },
+  "incognito": "ephemeral",
+  "requires": [],
+  "optional": [],
+  "platforms": [
+    "home"
+  ],
+  "min_role": "adult",
+  "consequential": false,
+  "offline": "full",
+  "config": [
+    {
+      "key": "generation.video.enabled",
+      "scope": "household",
+      "selector": "boolean",
+      "default": true,
+      "label": "Adults can make videos",
+      "help": "Adults can ask chat for short videos. Children and teens cannot, whatever this says.",
+      "level": "basic",
+      "copy": {
+        "does": "Lets adults ask chat to make short videos on this computer. Children and teens never can."
+      },
+      "lives_in": "household.pictures",
+      "honoured_by": [
+        "home"
+      ]
+    },
+    {
+      "key": "generation.video.adult_adapters",
+      "scope": "household",
+      "selector": "select",
+      "range": {
+        "options": [
+          "allowed",
+          "restricted"
+        ]
+      },
+      "default": "allowed",
+      "label": "Adult-only video styles",
+      "help": "Whether adults can use video styles marked adult-only. Children and teens never can.",
+      "level": "basic",
+      "copy": {
+        "does": "Chooses whether adults can use video styles marked adult-only.",
+        "options": {
+          "allowed": "Adults can use every video style in the library.",
+          "restricted": "Adults can use only video styles marked for all ages."
+        }
+      },
+      "lives_in": "household.pictures",
+      "honoured_by": [
+        "home"
+      ]
+    }
+  ],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {},
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": {
+    "kind": "recipe_fixture",
+    "fixture": "tests/smoke.json"
+  }
+}

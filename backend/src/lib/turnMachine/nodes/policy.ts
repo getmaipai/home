@@ -17,6 +17,7 @@ import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "
 import { speakerIsAnonymous, turnAgeBand } from "../speaker";
 import { modelFacingArgs } from "./tool";
 import { GENERATE_IMAGE_TOOL_ID, audienceOf, refusalFor } from "@/lib/pictures/tool";
+import { GENERATE_VIDEO_TOOL_ID, videoAudienceOf, videoRefusalFor } from "@/lib/videos/tool";
 import { decide } from "@/lib/gate/decide";
 import type { Role } from "@/middleware/auth";
 
@@ -323,6 +324,20 @@ export const policyNode: Node<PolicyInput, PolicyOutput> = async (state, input) 
         const reason = refusal.kind === "denied" ? "picture_not_here" as const : refusal.why === "minor_sexual" ? "picture_refused_minor" as const : "picture_refused_person" as const;
         noteRefusal(reason);
         entries.push({ proposal: pictureProposal, decision: { allow: false, reason } });
+        continue;
+      }
+    }
+
+    // VIDEO-GEN-04 / VIDEO-GEN-05: the video tool's gates run first, as the picture tool's do. A person who may not make a
+    // video here, or a prompt over one of the two absolute lines, is refused with a fixed reply before any job exists.
+    if (call.tool === GENERATE_VIDEO_TOOL_ID) {
+      const callArgs = (call.args ?? {}) as Record<string, unknown>;
+      const videoProposal: ActionProposal = { kind: "read_only", request: { tool: call.tool, args: callArgs, callId: call.id ?? call.tool } };
+      const refusal = !state.videosAllowed ? { kind: "denied" as const } : videoRefusalFor(videoAudienceOf(state, false), callArgs);
+      if (refusal) {
+        const reason = refusal.kind === "denied" ? "video_not_here" as const : refusal.why === "minor_sexual" ? "video_refused_minor" as const : "video_refused_person" as const;
+        noteRefusal(reason);
+        entries.push({ proposal: videoProposal, decision: { allow: false, reason } });
         continue;
       }
     }

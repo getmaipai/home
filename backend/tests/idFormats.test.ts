@@ -28,6 +28,7 @@ const TABLE: ReadonlyArray<readonly [string, string, number]> = [
   ["newNasMountId", "nasmount-", 10],
   ["newEpisodeId", "ep-", 10],
   ["newFileId", "file-", 10],
+  ["newVideoJobId", "vid-", 10],
   ["newShareId", "share-", 10],
   ["newArtifactId", "art-", 10],
   ["newArtifactKey", "artk-", 10],

@@ -43236,6 +43236,1603 @@
         }
       }
     },
+    "/api/videos/status": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Whether this person can make videos now, and why not",
+        "responses": {
+          "200": {
+            "description": "Additive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "can_make": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "engine_ready": {
+                      "type": "boolean"
+                    },
+                    "adult_styles": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    },
+                    "styles": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "can_make",
+                    "reason",
+                    "engine_ready",
+                    "adult_styles",
+                    "limits",
+                    "styles"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Progress, then the finished clip, of one video job",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card as its owner sees it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "percent": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "One plain line for the card: what the engine is doing now."
+                          },
+                          "position": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "started_at": {
+                            "type": "number",
+                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "animate"
+                            ]
+                          },
+                          "error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "clip": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "poster_url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seconds": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "file_id": {
+                                "type": "string"
+                              },
+                              "poster_file_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "poster_url",
+                              "width",
+                              "height",
+                              "seconds",
+                              "seed",
+                              "file_id",
+                              "poster_file_id"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "percent",
+                          "label",
+                          "position",
+                          "started_at",
+                          "prompt",
+                          "kind",
+                          "error",
+                          "clip"
+                        ]
+                      }
+                    },
+                    "can_make_another": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversation_id",
+                    "items",
+                    "can_make_another",
+                    "limits"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Videos are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The video engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/files/{fileId}": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "A finished clip or its poster, with Range support for seeking",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "fileId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file's bytes.",
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "206": {
+            "description": "A Range slice.",
+            "content": {
+              "video/mp4": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/cancel": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Stop a video that is waiting or being made",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card, with the clip stopped (a finished clip stays finished).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "percent": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "One plain line for the card: what the engine is doing now."
+                          },
+                          "position": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "started_at": {
+                            "type": "number",
+                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "animate"
+                            ]
+                          },
+                          "error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "clip": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "poster_url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seconds": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "file_id": {
+                                "type": "string"
+                              },
+                              "poster_file_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "poster_url",
+                              "width",
+                              "height",
+                              "seconds",
+                              "seed",
+                              "file_id",
+                              "poster_file_id"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "percent",
+                          "label",
+                          "position",
+                          "started_at",
+                          "prompt",
+                          "kind",
+                          "error",
+                          "clip"
+                        ]
+                      }
+                    },
+                    "can_make_another": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversation_id",
+                    "items",
+                    "can_make_another",
+                    "limits"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Videos are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The video engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/jobs/{id}/another": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Make another clip from the same words with a new seed",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The card, with a new clip queued.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "percent": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "One plain line for the card: what the engine is doing now."
+                          },
+                          "position": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "started_at": {
+                            "type": "number",
+                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "animate"
+                            ]
+                          },
+                          "error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "clip": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "poster_url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seconds": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "file_id": {
+                                "type": "string"
+                              },
+                              "poster_file_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "poster_url",
+                              "width",
+                              "height",
+                              "seconds",
+                              "seed",
+                              "file_id",
+                              "poster_file_id"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "percent",
+                          "label",
+                          "position",
+                          "started_at",
+                          "prompt",
+                          "kind",
+                          "error",
+                          "clip"
+                        ]
+                      }
+                    },
+                    "can_make_another": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversation_id",
+                    "items",
+                    "can_make_another",
+                    "limits"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Videos are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The video engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/animate": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Animate a picture this home made (a generated picture or a clip's poster)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "conversation_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "file_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "turn_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "prompt": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 1200
+                  }
+                },
+                "required": [
+                  "conversation_id",
+                  "turn_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The card for the new clip.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "conversation_id": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "running",
+                              "done",
+                              "failed",
+                              "cancelled"
+                            ]
+                          },
+                          "percent": {
+                            "type": "number"
+                          },
+                          "label": {
+                            "type": "string",
+                            "description": "One plain line for the card: what the engine is doing now."
+                          },
+                          "position": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "started_at": {
+                            "type": "number",
+                            "description": "Epoch milliseconds the job started, for the card's elapsed clock."
+                          },
+                          "prompt": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "animate"
+                            ]
+                          },
+                          "error": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "clip": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "url": {
+                                "type": "string"
+                              },
+                              "poster_url": {
+                                "type": "string"
+                              },
+                              "width": {
+                                "type": "number"
+                              },
+                              "height": {
+                                "type": "number"
+                              },
+                              "seconds": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "seed": {
+                                "type": "number",
+                                "nullable": true
+                              },
+                              "file_id": {
+                                "type": "string"
+                              },
+                              "poster_file_id": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "url",
+                              "poster_url",
+                              "width",
+                              "height",
+                              "seconds",
+                              "seed",
+                              "file_id",
+                              "poster_file_id"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "state",
+                          "percent",
+                          "label",
+                          "position",
+                          "started_at",
+                          "prompt",
+                          "kind",
+                          "error",
+                          "clip"
+                        ]
+                      }
+                    },
+                    "can_make_another": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "conversation_id",
+                    "items",
+                    "can_make_another",
+                    "limits"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Videos are off for this profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such video job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "That request is not allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "The video engine refused it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/settings": {
+      "get": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "The video role's state, the household switches and the LoRA library",
+        "responses": {
+          "200": {
+            "description": "Additive.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string"
+                    },
+                    "available": {
+                      "type": "boolean"
+                    },
+                    "reason": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "tier": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "model_installed": {
+                      "type": "boolean"
+                    },
+                    "limits": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "adult_adapters": {
+                      "type": "boolean"
+                    },
+                    "minors": {
+                      "type": "string"
+                    },
+                    "adapters": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "classification": {
+                            "type": "string",
+                            "enum": [
+                              "all-ages",
+                              "adult-only"
+                            ]
+                          },
+                          "enabled": {
+                            "type": "boolean"
+                          },
+                          "trigger_words": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "licence": {
+                            "type": "string"
+                          },
+                          "strength_default": {
+                            "type": "number"
+                          },
+                          "bytes": {
+                            "type": "number"
+                          },
+                          "source_url": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "added_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "classification",
+                          "enabled",
+                          "trigger_words",
+                          "licence",
+                          "strength_default",
+                          "bytes",
+                          "source_url",
+                          "added_at"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "state",
+                    "available",
+                    "reason",
+                    "tier",
+                    "model_installed",
+                    "limits",
+                    "enabled",
+                    "adult_adapters",
+                    "minors",
+                    "adapters"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/adapters/{id}": {
+      "patch": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Switch a video LoRA on or off for chat, or change its class",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "enabled": {
+                    "type": "boolean"
+                  },
+                  "classification": {
+                    "type": "string",
+                    "enum": [
+                      "all-ages",
+                      "adult-only"
+                    ]
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "classification": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "licence": {
+                      "type": "string"
+                    },
+                    "strength_default": {
+                      "type": "number"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    },
+                    "source_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "classification",
+                    "enabled",
+                    "trigger_words",
+                    "licence",
+                    "strength_default",
+                    "bytes",
+                    "source_url",
+                    "added_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such LoRA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That class is locked by the file's own description",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A value is out of range",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Remove a video LoRA and its file",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "ok": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such LoRA",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/videos/adapters": {
+      "post": {
+        "tags": [
+          "Videos"
+        ],
+        "summary": "Add a video LoRA file to the household library",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "licence": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "licence_acknowledged": {
+                    "type": "string",
+                    "enum": [
+                      "true",
+                      "false"
+                    ]
+                  },
+                  "source_url": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "classification": {
+                    "type": "string",
+                    "enum": [
+                      "all-ages",
+                      "adult-only"
+                    ]
+                  },
+                  "trigger_words": {
+                    "type": "string",
+                    "maxLength": 400
+                  }
+                },
+                "required": [
+                  "file",
+                  "name",
+                  "licence"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Added.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "classification": {
+                      "type": "string",
+                      "enum": [
+                        "all-ages",
+                        "adult-only"
+                      ]
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "trigger_words": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "licence": {
+                      "type": "string"
+                    },
+                    "strength_default": {
+                      "type": "number"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    },
+                    "source_url": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "added_at": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "classification",
+                    "enabled",
+                    "trigger_words",
+                    "licence",
+                    "strength_default",
+                    "bytes",
+                    "source_url",
+                    "added_at"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already in the library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too large",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The file cannot be used",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The video engine is not available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shares/{id}": {
       "delete": {
         "tags": [

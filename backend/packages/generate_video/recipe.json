@@ -1,0 +1,16 @@
+{
+  "id": "generate_video",
+  "inputs": [
+    {
+      "name": "prompt",
+      "selector": "text"
+    }
+  ],
+  "steps": [
+    {
+      "op": "format",
+      "as": "reply",
+      "text": "A 5 second video is being made from this description: {prompt}. It appears below your reply when it is ready and takes about two minutes. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes."
+    }
+  ]
+}

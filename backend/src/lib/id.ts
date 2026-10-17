@@ -204,3 +204,8 @@ export function newNewsItemId(): string {
 export function newPictureJobId(): string {
   return `pic-${randomSuffix(10)}`;
 }
+
+// VIDEO-GEN-05: a video job (hub-internal, like picture jobs and approvals).
+export function newVideoJobId(): string {
+  return `vid-${randomSuffix(10)}`;
+}

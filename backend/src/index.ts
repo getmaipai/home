@@ -3,6 +3,7 @@
 // later import (app, db, keystore) can open the database.
 import { instanceLock } from "@/lib/bootGuard";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
+import { resumeVideoJobs } from "@/lib/videos/jobs";
 import { app } from "@/app";
 import { ensureCoreJob, runDueJobs } from "@/lib/scheduler";
 import { warmHostIndex } from "@/lib/blocklists/hostLists";
@@ -200,6 +201,8 @@ registerAllPackageNotificationTypes();
 registerAllPackageProjectTypes();
 // IMGGEN-HOME-01: a picture a restart interrupted either finishes now or ends with an honest line.
 resumePictureJobs();
+// VIDEO-GEN-05: and a clip a restart interrupted.
+resumeVideoJobs();
 migratePendingAsksThroughGate();
 // KS-MODE-01: a stored search.wikipedia_fallback becomes the source-mode override, once.
 migrateWikipediaFallbackToSourceMode();

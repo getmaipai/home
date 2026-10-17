@@ -56,6 +56,7 @@ export const HLC_BEARING_TABLES = [
   "biometric_prints",
   "robot_offers",
   "picture_jobs",
+  "video_jobs",
 ] as const;
 
 /** Seeds from every hlc already on disk, across every table that stamps
