@@ -48,7 +48,12 @@ beforeEach(() => {
   __setStackTrustForTests({ ok: true });
   __setPhotoInspectorForTests(async () => ({ people: 0, faces: 0, under18: "no" }));
 });
-afterEach(() => { removeTemporaryChatImages("conv-1"); stack.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); __setPersonPickerForTests(undefined); __setStackClientForTests(null); __resetStackEngineForTests(); });
+let stubbedClient = false;
+afterEach(() => {
+  removeTemporaryChatImages("conv-1"); stack.restore(); __setStackTrustForTests(null); __setPhotoInspectorForTests(undefined); __setPersonPickerForTests(undefined);
+  // Only undo what this file set: other files in the same run may have a Stack of their own in place.
+  if (stubbedClient) { __setStackClientForTests(null); __resetStackEngineForTests(); stubbedClient = false; }
+});
 
 type Img = { id: string; name: string; width: number; height: number; media_type: string };
 async function put(owner: PersonRow, id: string, over: { generated?: true } = {}): Promise<Img> {
@@ -167,6 +172,7 @@ describe("a change in words", () => {
 
 function toolsStub(handler: (form: FormData) => Promise<unknown>): { client: StackClient; forms: FormData[] } {
   const forms: FormData[] = [];
+  stubbedClient = true;
   const client = { imageTools: async () => ({}), roles: async () => ({ roles: [] }), imageEdit: async (form: FormData) => { forms.push(form); return handler(form); } } as unknown as StackClient;
   return { client, forms };
 }

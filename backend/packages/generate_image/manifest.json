@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make or Change a Picture",
-  "description": "Make a new picture or change one the person has (remove someone, clear the sky, recolour), and call it before you say so.",
+  "description": "Make a new picture, or change one the person has, and call it before you say so.",
   "offer": {
     "mode": "conditional",
     "gate": "picturesAllowed",
