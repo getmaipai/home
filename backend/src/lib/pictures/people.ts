@@ -65,12 +65,16 @@ export async function runPictureTool(operation: "remove_background" | "upscale",
 }
 
 /** The chosen people as a mask picture (white), for the picture engine's masked edit to fill. */
-export async function peopleMask(bytes: Uint8Array, mediaType: string, ids: number[] | "all", signal?: AbortSignal): Promise<Uint8Array> {
+export async function peopleMaskWithCount(bytes: Uint8Array, mediaType: string, ids: number[] | "all", signal?: AbortSignal): Promise<{ png: Uint8Array; people: number }> {
   try {
     const reply = await getStackClient().imageEdit(form("people_mask", bytes, mediaType, { people: ids === "all" ? "all" : ids.join(",") }), { signal });
     if (reply.kind !== "done") throw new PeopleError("failed", "I couldn't finish in time. Try again.");
-    return new Uint8Array(Buffer.from(reply.item.b64_json, "base64"));
+    return { png: new Uint8Array(Buffer.from(reply.item.b64_json, "base64")), people: reply.item.people?.length ?? 0 };
   } catch (error) { throw fail(error); }
+}
+
+export async function peopleMask(bytes: Uint8Array, mediaType: string, ids: number[] | "all", signal?: AbortSignal): Promise<Uint8Array> {
+  return (await peopleMaskWithCount(bytes, mediaType, ids, signal)).png;
 }
 
 export interface ErasedPeople { png: Uint8Array; width: number; height: number; engine: string; model: string; ms: number }
@@ -139,7 +143,9 @@ export async function freezePeople(original: Uint8Array, edited: Uint8Array, mas
   const { data: before, info } = await base.removeAlpha().raw().toBuffer({ resolveWithObject: true });
   const { width, height } = info;
   const after = await sharp(edited, { failOn: "error", limitInputPixels: 64_000_000 }).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer();
-  const hard = await sharp(maskPng, { failOn: "error" }).resize(width, height, { fit: "fill", kernel: "nearest" }).greyscale().raw().toBuffer();
+  // One grey channel whatever the mask PNG carries (an alpha channel would make it two).
+  const hard = await sharp(maskPng, { failOn: "error" }).removeAlpha().greyscale().resize(width, height, { fit: "fill", kernel: "nearest" }).raw().toBuffer();
+  if (hard.length !== width * height) throw new FreezeError("The person outline could not be read.");
   const soft = await sharp(hard, { raw: { width, height, channels: 1 } }).blur(2).raw().toBuffer();
   const out = Buffer.alloc(before.length);
   let inside = 0;
@@ -158,4 +164,17 @@ export async function freezePeople(original: Uint8Array, edited: Uint8Array, mas
     if (hard[i]! > 127 && (out[i * 3] !== before[i * 3] || out[i * 3 + 1] !== before[i * 3 + 1] || out[i * 3 + 2] !== before[i * 3 + 2])) throw new FreezeError("A person's pixels changed.");
   }
   return new Uint8Array(await sharp(out, { raw: { width, height, channels: 3 } }).png().toBuffer());
+}
+
+/** The share of a mask that is white (0 to 1), one grey channel. */
+export async function maskCoverage(maskPng: Uint8Array): Promise<number> {
+  const { data } = await sharp(maskPng, { failOn: "error" }).removeAlpha().greyscale().raw().toBuffer({ resolveWithObject: true });
+  let white = 0;
+  for (const value of data) if (value > 127) white += 1;
+  return data.length === 0 ? 0 : white / data.length;
+}
+
+/** The background: white where the picture may change, black over every person (the inverse of the people mask). */
+export async function inverseMask(maskPng: Uint8Array): Promise<Uint8Array> {
+  return new Uint8Array(await sharp(maskPng, { failOn: "error" }).removeAlpha().greyscale().negate().png().toBuffer());
 }

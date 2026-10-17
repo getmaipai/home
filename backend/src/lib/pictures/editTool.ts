@@ -15,7 +15,8 @@ import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { latestTemporaryChatImage } from "@/lib/attachments";
 import { generatedPictureLikeness, isGeneratedPicture, loadSource, ImageEditError, type SourcePicture } from "@/lib/imageEdit";
-import { resolveDeclaredAdult } from "@/lib/likeness/resolve";
+import { messageAttests, resolveDeclaredAdult } from "@/lib/likeness/resolve";
+import { inspectPhoto } from "@/lib/likeness/inspector";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
 import type { JobLikeness } from "@/lib/likeness/guard";
@@ -24,7 +25,7 @@ import { outcomeOf } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
 import sharp from "sharp";
-import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, peopleMask, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
+import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, inverseMask, maskCoverage, peopleMask, peopleMaskWithCount, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
 import { asksToUndress, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
@@ -33,13 +34,14 @@ import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, sub
 export const GENERATE_IMAGE_TOOL_ID = "generate_image";
 export const EDIT_KINDS = ["remove_people", "remove_background", "upscale", "change"] as const;
 
+export const WHO_IS_IN_PHOTO_LINE = "Who is in this photo? Tell me which adult in this household it shows (say their name, or say it is you) and make sure they have agreed. I only use a photo of someone who lives here and said yes.";
 const NOT_FOUND_LINE = "I can't find that picture any more. Attach it again and ask once more.";
 const NOTHING_TO_CHANGE_LINE = "There is no picture to change yet. Attach one, or ask me to make one first.";
 const EDIT_NOT_SET_UP_LINE = "Changing a picture needs the picture model to be installed and running on this computer. An admin can check Settings, Pictures and videos.";
 const REFERENCES_MISSING_LINE = "The picture engine on this computer needs its next update before it can use a second picture. I can still change the one picture on its own.";
 
 export interface RunEditInput {
-  state: Pick<TurnState, "actor" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images">;
+  state: Pick<TurnState, "actor" | "conversationId" | "turnId" | "temporary" | "ephemeral" | "images"> & Partial<Pick<TurnState, "utterance">>;
   args: Record<string, unknown>;
   callId: string;
   audience: PictureAudience;
@@ -170,7 +172,9 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
   if (ref && ref.id === base.id) return line(callId, args, "The second picture has to be a different picture from the one you want changed.");
 
   // The person named is the one in the reference when there is one (the person to add), else the one in the picture being changed.
-  const declared = resolveDeclaredAdult(args.photo_subject, actor);
+  // The model's `photo_subject` is a proposal, never the attestation: it counts only when the person's own message names or claims that adult.
+  const proposed = resolveDeclaredAdult(args.photo_subject, actor);
+  const declared = proposed && messageAttests(state.utterance, actor, proposed) ? proposed : null;
   const named = typeof args.photo_subject === "string" && args.photo_subject.trim() !== "";
 
   const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
@@ -187,14 +191,23 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
           progress("finding people", 10);
           // The picture is read the way the tools read it (orientation applied) so the outlines and the pixels line up.
           const upright = new Uint8Array(await sharp(base.bytes, { failOn: "error", limitInputPixels: 64_000_000 }).rotate().png().toBuffer());
-          const outline = await peopleMask(upright, "image/png", "all", signal).catch((error) => {
-            // The household's model saw people but the person finder found none: the people cannot be kept safe, so nothing is changed.
-            if (error instanceof PeopleError && error.code === "none") throw new PeopleError("failed", "I can't tell where the people are in this photo, so I won't change it. Open it with Edit and paint the part you want changed.");
+          const cannotKeep = "I can't tell where every person in this photo is, so I won't change it. Open it with Edit and paint the part you want changed.";
+          const found = await peopleMaskWithCount(upright, "image/png", "all", signal).catch((error) => {
+            // The person finder found none: the people cannot be kept safe, so nothing is changed.
+            if (error instanceof PeopleError && error.code === "none") throw new PeopleError("failed", cannotKeep);
             throw error;
           });
+          // Fail closed: the finder must account for every person the household's own model counts, and its outline must not be empty.
+          const facts = await inspectPhoto(upright);
+          if (!facts || found.people === 0 || found.people < facts.people || (await maskCoverage(found.png)) === 0) throw new PeopleError("failed", cannotKeep);
+          const outline = found.png;
+          const background = await inverseMask(outline);
           const form = new FormData();
           form.append("image", new File([upright], "picture", { type: "image/png" }));
-          form.append("operation", "edit");
+          // Only the background can change: the engine is given the inverse of the people's outline as its mask, with no soft edge.
+          form.append("mask", new File([background], "mask.png", { type: "image/png" }));
+          form.append("feather", "0");
+          form.append("operation", "edit_masked");
           form.append("instruction", `${instruction}. Do not change any person: keep every person, face, hand, pose and piece of clothing exactly as it is.`);
           form.append("image_source", "uploaded");
           form.append("timeout_ms", "1");
@@ -213,6 +226,7 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
       return startFailure(callId, args, error);
     }
   }
+  if (!basePrep.ok && basePrep.code === "photo_has_person" && named && !declared) return line(callId, args, WHO_IS_IN_PHOTO_LINE, { refused: "who_is_in_photo" });
   if (!basePrep.ok) return line(callId, args, basePrep.line, { refused: basePrep.code });
   let refPrep: Awaited<ReturnType<typeof prepareEditSource>> | null = null;
   let refGenerated = false;
@@ -220,9 +234,9 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
     refGenerated = await isGeneratedPicture(actor, ref);
     const refLikeness = refGenerated ? await generatedPictureLikeness(ref) : null;
     refPrep = await prepareEditSource({ audience, bytes: ref.bytes, generated: refGenerated, rootLikeness: refLikeness, declaredSubjectId: declared?.id ?? null, text: instruction, source: "chat" });
-    if (!refPrep.ok) return line(callId, args, named && !declared ? "Tell me which adult in this household is in that photo, by name, and make sure they have agreed. I only use a photo of someone who lives here and said yes." : refPrep.line, { refused: refPrep.code });
+    if (!refPrep.ok) return line(callId, args, refPrep.code === "photo_has_person" || (named && !declared) ? WHO_IS_IN_PHOTO_LINE : refPrep.line, { refused: refPrep.code === "photo_has_person" ? "who_is_in_photo" : refPrep.code });
   } else if (named && !declared && !rootLikeness && !generated) {
-    return line(callId, args, "Tell me which adult in this household is in that photo, by name, and make sure they have agreed. I only change a photo of someone who lives here and said yes, or a photo with no one in it.", { refused: "subject_not_allowed" });
+    return line(callId, args, WHO_IS_IN_PHOTO_LINE, { refused: "who_is_in_photo" });
   }
   const subjects = [basePrep.subjectId, refPrep && refPrep.ok ? refPrep.subjectId : null].filter((id): id is string => !!id);
   if (new Set(subjects).size > 1) return line(callId, args, MANY_PEOPLE_LINE);

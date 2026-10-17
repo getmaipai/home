@@ -30,3 +30,15 @@ export function resolveDeclaredAdult(declared: unknown, requester: PersonRow): P
   const first = adults.filter((person) => norm(person.displayName).split(" ")[0] === wanted || (person.nickname && norm(person.nickname).split(" ")[0] === wanted));
   return first.length === 1 && subjectEligibility(first[0]!.id).ok ? first[0]! : null;
 }
+
+const SELF_CLAIM = /\b(?:(?:photo|picture|pic|image|selfie|portrait|shot) of (?:me|myself)|(?:it|this|that) (?:is|s) me|i (?:am|m) (?:in|the one in)|me in (?:it|this|the)|my own (?:photo|picture|pic|image|selfie|face)|my (?:photo|picture|pic|selfie|face)|of myself)\b/;
+
+/** Whether the person's own message names or claims the adult the model says is in the photo. The model's `photo_subject` is only a proposal: it can never be the attestation (a photo of a stranger plus an invented "me" is not a household photo). A self claim counts only for the speaker; anyone else counts only when the message names them (whole name, nickname or first name, as resolveDeclaredAdult matched it). */
+export function messageAttests(utterance: unknown, requester: PersonRow, declared: PersonRow | null): boolean {
+  if (!declared || typeof utterance !== "string") return false;
+  const text = norm(utterance);
+  if (!text) return false;
+  if (declared.id === requester.id) return SELF_CLAIM.test(text) || [declared.displayName, declared.nickname].some((n) => n && new RegExp(`\\b${norm(n).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
+  const candidates = [declared.displayName, declared.nickname, norm(declared.displayName).split(" ")[0], declared.nickname ? norm(declared.nickname).split(" ")[0] : null].filter((n): n is string => !!n).map(norm).filter((n) => n.length >= 2);
+  return candidates.some((n) => new RegExp(`\\b${n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(text));
+}
