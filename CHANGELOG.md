@@ -9,6 +9,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ### Media library
 - Home can scan library folders on this computer or on a mounted network share and list what is in them: videos, shows, films, music, books and audiobooks, with posters, covers, chapters and tags. An owner or admin adds a folder and can rescan it; children see only the titles cleared for a child. No page uses it yet.
+- Home remembers where each person stopped in a video, episode, podcast, audiobook or book, on every screen. The newest place wins, a finished title stays finished, and a child's place is saved only from the child's own screen. Liked, watch later and up next exist for everyone, and playlists, watchlists and pins can be made. The "Pick up where you left off" data now includes unfinished titles beside chats.
 
 ## [0.2.14] - 2026-10-17
 

@@ -1,8 +1,8 @@
 // SINGLE-INSTANCE-01 (#194): must stay the FIRST import. It refuses a stray
 // data directory and takes the data directory's one-hub lock before any
-// later import { startMediaScanner } from "@/lib/media/scan";
-import (app, db, keystore) can open the database.
+// later import (app, db, keystore) can open the database.
 import { instanceLock } from "@/lib/bootGuard";
+import { startMediaScanner } from "@/lib/media/scan";
 import { resumePictureJobs } from "@/lib/pictures/jobs";
 import { resumeVideoJobs } from "@/lib/videos/jobs";
 import { drainStyleRemovals } from "@/lib/likeness/adapters";

@@ -51750,6 +51750,3127 @@
         }
       }
     },
+    "/api/media/progress/{media_id}": {
+      "put": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Save my place in a title. The hub merges it with what is stored: the newest wins, a finished title stays finished",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "media_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "position": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "seconds": {
+                            "type": "number",
+                            "minimum": 0
+                          }
+                        },
+                        "required": [
+                          "seconds"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "properties": {
+                          "locator": {
+                            "type": "object",
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "cfi",
+                                  "page"
+                                ]
+                              },
+                              "cfi": {
+                                "type": "string",
+                                "nullable": true
+                              },
+                              "page": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 1
+                              },
+                              "spine_index": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0
+                              },
+                              "block_index": {
+                                "type": "integer",
+                                "nullable": true,
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "kind"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "percent": {
+                            "type": "number",
+                            "minimum": 0,
+                            "maximum": 100
+                          }
+                        },
+                        "required": [
+                          "locator",
+                          "percent"
+                        ],
+                        "additionalProperties": false
+                      }
+                    ]
+                  },
+                  "duration_s": {
+                    "type": "number",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "completed": {
+                    "type": "boolean",
+                    "description": "true: the person says it is done (a book). false: the person clears it."
+                  },
+                  "event": {
+                    "type": "string",
+                    "enum": [
+                      "play",
+                      "skip",
+                      "finish"
+                    ],
+                    "description": "One thing that happened: a play started, a skip, or a finish. Each adds one."
+                  },
+                  "counts": {
+                    "type": "object",
+                    "properties": {
+                      "plays": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "skips": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "finishes": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "description": "Absolute counts as the device knows them (an offline batch); the larger wins."
+                  },
+                  "marks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "at_s": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "label": {
+                          "type": "string",
+                          "nullable": true,
+                          "maxLength": 200
+                        }
+                      },
+                      "required": [
+                        "at_s"
+                      ]
+                    },
+                    "maxItems": 500
+                  },
+                  "device_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "pattern": "^device-[a-z0-9]{6,}$"
+                  },
+                  "sampled_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The device's clock when it read the position."
+                  },
+                  "client_now": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The device's clock when it sent this, so the hub can correct for a clock that is off."
+                  },
+                  "immediate": {
+                    "type": "boolean",
+                    "description": "Store now (pause, seek, unload). A playing title's 10-second ticks are coalesced into one row."
+                  }
+                },
+                "required": [
+                  "position"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The row as it now stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "progress": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^mprg-[a-z0-9]{6,}$"
+                        },
+                        "person_id": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        },
+                        "media_id": {
+                          "type": "string",
+                          "pattern": "^media-[a-z0-9]{6,}$"
+                        },
+                        "position": {
+                          "description": "Seconds for anything with a timeline, or a reader locator plus percent for a book."
+                        },
+                        "duration_s": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "completed": {
+                          "type": "boolean",
+                          "description": "A latch: video, episode and film at 90 percent, podcast episode and audiobook at 95 percent, a book by the person or at its end. A track never latches; it counts finishes."
+                        },
+                        "plays": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
+                        "skips": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
+                        "finishes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
+                        "marks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "at_s": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "label": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null
+                              }
+                            },
+                            "required": [
+                              "at_s"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "default": []
+                        },
+                        "device_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^device-[a-z0-9]{6,}$",
+                              "description": "The device that wrote the newest position, for the Continue here card."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "The device that wrote the newest position, for the Continue here card."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "The device that wrote the newest position, for the Continue here card."
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Server clock after skew correction."
+                        },
+                        "hlc": {
+                          "type": "string",
+                          "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                          "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                        },
+                        "provenance": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "person_id",
+                        "media_id",
+                        "position",
+                        "completed",
+                        "updated_at",
+                        "hlc",
+                        "provenance"
+                      ],
+                      "additionalProperties": false,
+                      "description": "MEDIA-SPEC-01 (media design sections 7 and 10). One row per person and item: where they are, whether they finished, how often they played it, and their bookmarks. Merge rule (one function, mergeProgress): newest wins by the server stamp after skew correction, a rewind applies when newer, completed is a latch only the person clears, marks union by at_s, a child's row is never written by another person's device."
+                    },
+                    "applied": {
+                      "type": "boolean",
+                      "description": "false: a newer place was already stored; only counts, marks and a finish were merged."
+                    }
+                  },
+                  "required": [
+                    "progress",
+                    "applied"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "This screen belongs to someone else",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such title, or not one I may see",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Wrong kind of position for this title",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "My place in one title",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "media_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Null when I have not started it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "progress": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "pattern": "^mprg-[a-z0-9]{6,}$"
+                        },
+                        "person_id": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        },
+                        "media_id": {
+                          "type": "string",
+                          "pattern": "^media-[a-z0-9]{6,}$"
+                        },
+                        "position": {
+                          "description": "Seconds for anything with a timeline, or a reader locator plus percent for a book."
+                        },
+                        "duration_s": {
+                          "anyOf": [
+                            {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null
+                        },
+                        "completed": {
+                          "type": "boolean",
+                          "description": "A latch: video, episode and film at 90 percent, podcast episode and audiobook at 95 percent, a book by the person or at its end. A track never latches; it counts finishes."
+                        },
+                        "plays": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
+                        "skips": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
+                        "finishes": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "default": 0
+                        },
+                        "marks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "at_s": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "label": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null
+                              }
+                            },
+                            "required": [
+                              "at_s"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "default": []
+                        },
+                        "device_id": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^device-[a-z0-9]{6,}$",
+                              "description": "The device that wrote the newest position, for the Continue here card."
+                            },
+                            {
+                              "nullable": true,
+                              "description": "The device that wrote the newest position, for the Continue here card."
+                            },
+                            {
+                              "nullable": true
+                            }
+                          ],
+                          "default": null,
+                          "description": "The device that wrote the newest position, for the Continue here card."
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "Server clock after skew correction."
+                        },
+                        "hlc": {
+                          "type": "string",
+                          "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                          "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                        },
+                        "provenance": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "person_id",
+                        "media_id",
+                        "position",
+                        "completed",
+                        "updated_at",
+                        "hlc",
+                        "provenance"
+                      ],
+                      "additionalProperties": false,
+                      "description": "MEDIA-SPEC-01 (media design sections 7 and 10). One row per person and item: where they are, whether they finished, how often they played it, and their bookmarks. Merge rule (one function, mergeProgress): newest wins by the server stamp after skew correction, a rewind applies when newer, completed is a latch only the person clears, marks union by at_s, a child's row is never written by another person's device."
+                    }
+                  },
+                  "required": [
+                    "progress"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such title",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/progress/batch": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Save many places at once, such as the ones a phone kept while it was offline. Each is merged by the same rule as a single save",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "client_now": {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  "writes": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "position": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "seconds": {
+                                  "type": "number",
+                                  "minimum": 0
+                                }
+                              },
+                              "required": [
+                                "seconds"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "locator": {
+                                  "type": "object",
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "enum": [
+                                        "cfi",
+                                        "page"
+                                      ]
+                                    },
+                                    "cfi": {
+                                      "type": "string",
+                                      "nullable": true
+                                    },
+                                    "page": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 1
+                                    },
+                                    "spine_index": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0
+                                    },
+                                    "block_index": {
+                                      "type": "integer",
+                                      "nullable": true,
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "required": [
+                                    "kind"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "percent": {
+                                  "type": "number",
+                                  "minimum": 0,
+                                  "maximum": 100
+                                }
+                              },
+                              "required": [
+                                "locator",
+                                "percent"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "duration_s": {
+                          "type": "number",
+                          "nullable": true,
+                          "minimum": 0
+                        },
+                        "completed": {
+                          "type": "boolean",
+                          "description": "true: the person says it is done (a book). false: the person clears it."
+                        },
+                        "event": {
+                          "type": "string",
+                          "enum": [
+                            "play",
+                            "skip",
+                            "finish"
+                          ],
+                          "description": "One thing that happened: a play started, a skip, or a finish. Each adds one."
+                        },
+                        "counts": {
+                          "type": "object",
+                          "properties": {
+                            "plays": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "skips": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "finishes": {
+                              "type": "integer",
+                              "minimum": 0
+                            }
+                          },
+                          "description": "Absolute counts as the device knows them (an offline batch); the larger wins."
+                        },
+                        "marks": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "at_s": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "label": {
+                                "type": "string",
+                                "nullable": true,
+                                "maxLength": 200
+                              }
+                            },
+                            "required": [
+                              "at_s"
+                            ]
+                          },
+                          "maxItems": 500
+                        },
+                        "device_id": {
+                          "type": "string",
+                          "nullable": true,
+                          "pattern": "^device-[a-z0-9]{6,}$"
+                        },
+                        "sampled_at": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The device's clock when it read the position."
+                        },
+                        "client_now": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The device's clock when it sent this, so the hub can correct for a clock that is off."
+                        },
+                        "immediate": {
+                          "type": "boolean",
+                          "description": "Store now (pause, seek, unload). A playing title's 10-second ticks are coalesced into one row."
+                        },
+                        "media_id": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "position",
+                        "media_id"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 500
+                  }
+                },
+                "required": [
+                  "writes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "One result per write, in order. `older` means a newer place was already stored.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "results": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "applied",
+                              "older",
+                              "refused",
+                              "unknown_title"
+                            ]
+                          },
+                          "reason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "progress": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string",
+                                "pattern": "^mprg-[a-z0-9]{6,}$"
+                              },
+                              "person_id": {
+                                "type": "string",
+                                "pattern": "^person-[a-z0-9]{6,}$"
+                              },
+                              "media_id": {
+                                "type": "string",
+                                "pattern": "^media-[a-z0-9]{6,}$"
+                              },
+                              "position": {
+                                "description": "Seconds for anything with a timeline, or a reader locator plus percent for a book."
+                              },
+                              "duration_s": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null
+                              },
+                              "completed": {
+                                "type": "boolean",
+                                "description": "A latch: video, episode and film at 90 percent, podcast episode and audiobook at 95 percent, a book by the person or at its end. A track never latches; it counts finishes."
+                              },
+                              "plays": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "default": 0
+                              },
+                              "skips": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "default": 0
+                              },
+                              "finishes": {
+                                "type": "integer",
+                                "minimum": 0,
+                                "default": 0
+                              },
+                              "marks": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "at_s": {
+                                      "type": "number",
+                                      "minimum": 0
+                                    },
+                                    "label": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string"
+                                        },
+                                        {
+                                          "nullable": true
+                                        }
+                                      ],
+                                      "default": null
+                                    }
+                                  },
+                                  "required": [
+                                    "at_s"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                "default": []
+                              },
+                              "device_id": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "pattern": "^device-[a-z0-9]{6,}$",
+                                    "description": "The device that wrote the newest position, for the Continue here card."
+                                  },
+                                  {
+                                    "nullable": true,
+                                    "description": "The device that wrote the newest position, for the Continue here card."
+                                  },
+                                  {
+                                    "nullable": true
+                                  }
+                                ],
+                                "default": null,
+                                "description": "The device that wrote the newest position, for the Continue here card."
+                              },
+                              "updated_at": {
+                                "type": "string",
+                                "format": "date-time",
+                                "description": "Server clock after skew correction."
+                              },
+                              "hlc": {
+                                "type": "string",
+                                "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                                "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                              },
+                              "provenance": {
+                                "type": "string",
+                                "minLength": 1
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "person_id",
+                              "media_id",
+                              "position",
+                              "completed",
+                              "updated_at",
+                              "hlc",
+                              "provenance"
+                            ],
+                            "additionalProperties": false,
+                            "description": "MEDIA-SPEC-01 (media design sections 7 and 10). One row per person and item: where they are, whether they finished, how often they played it, and their bookmarks. Merge rule (one function, mergeProgress): newest wins by the server stamp after skew correction, a rewind applies when newer, completed is a latch only the person clears, marks union by at_s, a child's row is never written by another person's device."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "status",
+                          "reason",
+                          "progress"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "results"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/progress": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "My places in several titles at once (up to 100), for the bars on a shelf",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "description": "Title ids, comma separated."
+            },
+            "required": true,
+            "description": "Title ids, comma separated.",
+            "name": "ids",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The ones I have started.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^mprg-[a-z0-9]{6,}$"
+                      },
+                      "person_id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "media_id": {
+                        "type": "string",
+                        "pattern": "^media-[a-z0-9]{6,}$"
+                      },
+                      "position": {
+                        "description": "Seconds for anything with a timeline, or a reader locator plus percent for a book."
+                      },
+                      "duration_s": {
+                        "anyOf": [
+                          {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null
+                      },
+                      "completed": {
+                        "type": "boolean",
+                        "description": "A latch: video, episode and film at 90 percent, podcast episode and audiobook at 95 percent, a book by the person or at its end. A track never latches; it counts finishes."
+                      },
+                      "plays": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "skips": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "finishes": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "default": 0
+                      },
+                      "marks": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "at_s": {
+                              "type": "number",
+                              "minimum": 0
+                            },
+                            "label": {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ],
+                              "default": null
+                            }
+                          },
+                          "required": [
+                            "at_s"
+                          ],
+                          "additionalProperties": false
+                        },
+                        "default": []
+                      },
+                      "device_id": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "pattern": "^device-[a-z0-9]{6,}$",
+                            "description": "The device that wrote the newest position, for the Continue here card."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The device that wrote the newest position, for the Continue here card."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The device that wrote the newest position, for the Continue here card."
+                      },
+                      "updated_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Server clock after skew correction."
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person_id",
+                      "media_id",
+                      "position",
+                      "completed",
+                      "updated_at",
+                      "hlc",
+                      "provenance"
+                    ],
+                    "additionalProperties": false,
+                    "description": "MEDIA-SPEC-01 (media design sections 7 and 10). One row per person and item: where they are, whether they finished, how often they played it, and their bookmarks. Merge rule (one function, mergeProgress): newest wins by the server stamp after skew correction, a rewind applies when newer, completed is a latch only the person clears, marks union by at_s, a child's row is never written by another person's device."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/collections": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "My collections: liked, watch later and up next always exist; playlists, watchlists and pins when I make them",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "liked",
+                "watch_later",
+                "queue",
+                "playlist",
+                "watchlist",
+                "pins"
+              ]
+            },
+            "required": false,
+            "name": "kind",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mine.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^mcol-[a-z0-9]{6,}$"
+                      },
+                      "person_id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "liked",
+                          "watch_later",
+                          "queue",
+                          "playlist",
+                          "watchlist",
+                          "pins"
+                        ]
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "media_id": {
+                              "type": "string",
+                              "pattern": "^media-[a-z0-9]{6,}$"
+                            },
+                            "added_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "want"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "watching"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "completed"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "enum": [
+                                    null
+                                  ]
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ],
+                              "default": null,
+                              "description": "Watchlist only."
+                            }
+                          },
+                          "required": [
+                            "media_id",
+                            "added_at",
+                            "position"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "pointer": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "The queue's current entry (an index into items)."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The queue's current entry (an index into items)."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The queue's current entry (an index into items)."
+                      },
+                      "shared_to": {
+                        "nullable": true,
+                        "description": "Null is private. A child's collections are never shared outside the household."
+                      },
+                      "rules": {
+                        "nullable": true,
+                        "description": "Reserved for smart playlists; null today."
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                      },
+                      "trash_until": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person_id",
+                      "kind",
+                      "title",
+                      "items",
+                      "created_at",
+                      "hlc",
+                      "provenance"
+                    ],
+                    "additionalProperties": false,
+                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Make a playlist, a watchlist or a set of pins",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "playlist",
+                      "watchlist",
+                      "pins"
+                    ]
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "kind",
+                  "title"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Made.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mcol-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "liked",
+                        "watch_later",
+                        "queue",
+                        "playlist",
+                        "watchlist",
+                        "pins"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-[a-z0-9]{6,}$"
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "want"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "watching"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "completed"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Watchlist only."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "position"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pointer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The queue's current entry (an index into items)."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. A child's collections are never shared outside the household."
+                    },
+                    "rules": {
+                      "nullable": true,
+                      "description": "Reserved for smart playlists; null today."
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "kind",
+                    "title",
+                    "items",
+                    "created_at",
+                    "hlc",
+                    "provenance"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/collections/shared": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Collections other people shared with me or with the household",
+        "responses": {
+          "200": {
+            "description": "Shared with me.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^mcol-[a-z0-9]{6,}$"
+                      },
+                      "person_id": {
+                        "type": "string",
+                        "pattern": "^person-[a-z0-9]{6,}$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "liked",
+                          "watch_later",
+                          "queue",
+                          "playlist",
+                          "watchlist",
+                          "pins"
+                        ]
+                      },
+                      "title": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "media_id": {
+                              "type": "string",
+                              "pattern": "^media-[a-z0-9]{6,}$"
+                            },
+                            "added_at": {
+                              "type": "string",
+                              "format": "date-time"
+                            },
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "status": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "want"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "watching"
+                                  ]
+                                },
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "completed"
+                                  ]
+                                },
+                                {
+                                  "type": "object",
+                                  "nullable": true,
+                                  "enum": [
+                                    null
+                                  ]
+                                },
+                                {
+                                  "nullable": true
+                                }
+                              ],
+                              "default": null,
+                              "description": "Watchlist only."
+                            }
+                          },
+                          "required": [
+                            "media_id",
+                            "added_at",
+                            "position"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "pointer": {
+                        "anyOf": [
+                          {
+                            "type": "integer",
+                            "minimum": 0,
+                            "description": "The queue's current entry (an index into items)."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "The queue's current entry (an index into items)."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "The queue's current entry (an index into items)."
+                      },
+                      "shared_to": {
+                        "nullable": true,
+                        "description": "Null is private. A child's collections are never shared outside the household."
+                      },
+                      "rules": {
+                        "nullable": true,
+                        "description": "Reserved for smart playlists; null today."
+                      },
+                      "deleted_at": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                      },
+                      "trash_until": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "format": "date-time",
+                            "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                          },
+                          {
+                            "nullable": true,
+                            "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                          },
+                          {
+                            "nullable": true
+                          }
+                        ],
+                        "default": null,
+                        "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                      },
+                      "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "hlc": {
+                        "type": "string",
+                        "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                        "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                      },
+                      "provenance": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "person_id",
+                      "kind",
+                      "title",
+                      "items",
+                      "created_at",
+                      "hlc",
+                      "provenance"
+                    ],
+                    "additionalProperties": false,
+                    "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/collections/{id}": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "One collection of mine, or one shared with me",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A collection id, or liked, watch_later or queue for mine."
+            },
+            "required": true,
+            "description": "A collection id, or liked, watch_later or queue for mine.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Found.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mcol-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "liked",
+                        "watch_later",
+                        "queue",
+                        "playlist",
+                        "watchlist",
+                        "pins"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-[a-z0-9]{6,}$"
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "want"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "watching"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "completed"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Watchlist only."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "position"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pointer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The queue's current entry (an index into items)."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. A child's collections are never shared outside the household."
+                    },
+                    "rules": {
+                      "nullable": true,
+                      "description": "Reserved for smart playlists; null today."
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "kind",
+                    "title",
+                    "items",
+                    "created_at",
+                    "hlc",
+                    "provenance"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Rename one of my collections, move its queue pointer, or choose who it is shared with (nobody, the household, or people)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A collection id, or liked, watch_later or queue for mine."
+            },
+            "required": true,
+            "description": "A collection id, or liked, watch_later or queue for mine.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "pointer": {
+                    "type": "integer",
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "shared_to": {
+                    "anyOf": [
+                      {
+                        "nullable": true
+                      },
+                      {
+                        "type": "string",
+                        "enum": [
+                          "household"
+                        ]
+                      },
+                      {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^person-[a-z0-9]{6,}$"
+                        }
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mcol-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "liked",
+                        "watch_later",
+                        "queue",
+                        "playlist",
+                        "watchlist",
+                        "pins"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-[a-z0-9]{6,}$"
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "want"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "watching"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "completed"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Watchlist only."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "position"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pointer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The queue's current entry (an index into items)."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. A child's collections are never shared outside the household."
+                    },
+                    "rules": {
+                      "nullable": true,
+                      "description": "Reserved for smart playlists; null today."
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "kind",
+                    "title",
+                    "items",
+                    "created_at",
+                    "hlc",
+                    "provenance"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection of mine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Delete a playlist, watchlist or pins of mine. Liked, watch later and up next stay",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A collection id, or liked, watch_later or queue for mine."
+            },
+            "required": true,
+            "description": "A collection id, or liked, watch_later or queue for mine.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection of mine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "One of the three that always exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/collections/{id}/items": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Add a title to one of my collections (a title already there only has its status updated)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A collection id, or liked, watch_later or queue for mine."
+            },
+            "required": true,
+            "description": "A collection id, or liked, watch_later or queue for mine.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "media_id": {
+                    "type": "string"
+                  },
+                  "at": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "status": {
+                    "type": "string",
+                    "nullable": true,
+                    "enum": [
+                      "want",
+                      "watching",
+                      "completed",
+                      null
+                    ]
+                  }
+                },
+                "required": [
+                  "media_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mcol-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "liked",
+                        "watch_later",
+                        "queue",
+                        "playlist",
+                        "watchlist",
+                        "pins"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-[a-z0-9]{6,}$"
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "want"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "watching"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "completed"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Watchlist only."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "position"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pointer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The queue's current entry (an index into items)."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. A child's collections are never shared outside the household."
+                    },
+                    "rules": {
+                      "nullable": true,
+                      "description": "Reserved for smart playlists; null today."
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "kind",
+                    "title",
+                    "items",
+                    "created_at",
+                    "hlc",
+                    "provenance"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection of mine, or no such title",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Put the titles of one of my collections in a new order",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A collection id, or liked, watch_later or queue for mine."
+            },
+            "required": true,
+            "description": "A collection id, or liked, watch_later or queue for mine.",
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "media_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "maxItems": 5000
+                  }
+                },
+                "required": [
+                  "media_ids"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Reordered.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mcol-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "liked",
+                        "watch_later",
+                        "queue",
+                        "playlist",
+                        "watchlist",
+                        "pins"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-[a-z0-9]{6,}$"
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "want"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "watching"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "completed"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Watchlist only."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "position"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pointer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The queue's current entry (an index into items)."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. A child's collections are never shared outside the household."
+                    },
+                    "rules": {
+                      "nullable": true,
+                      "description": "Reserved for smart playlists; null today."
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "kind",
+                    "title",
+                    "items",
+                    "created_at",
+                    "hlc",
+                    "provenance"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection of mine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/collections/{id}/items/{media_id}": {
+      "delete": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Take a title out of one of my collections",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "description": "A collection id, or liked, watch_later or queue for mine."
+            },
+            "required": true,
+            "description": "A collection id, or liked, watch_later or queue for mine.",
+            "name": "id",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "media_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Updated.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^mcol-[a-z0-9]{6,}$"
+                    },
+                    "person_id": {
+                      "type": "string",
+                      "pattern": "^person-[a-z0-9]{6,}$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "liked",
+                        "watch_later",
+                        "queue",
+                        "playlist",
+                        "watchlist",
+                        "pins"
+                      ]
+                    },
+                    "title": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-[a-z0-9]{6,}$"
+                          },
+                          "added_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "status": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "want"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "watching"
+                                ]
+                              },
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "completed"
+                                ]
+                              },
+                              {
+                                "type": "object",
+                                "nullable": true,
+                                "enum": [
+                                  null
+                                ]
+                              },
+                              {
+                                "nullable": true
+                              }
+                            ],
+                            "default": null,
+                            "description": "Watchlist only."
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "added_at",
+                          "position"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pointer": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "The queue's current entry (an index into items)."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "The queue's current entry (an index into items)."
+                    },
+                    "shared_to": {
+                      "nullable": true,
+                      "description": "Null is private. A child's collections are never shared outside the household."
+                    },
+                    "rules": {
+                      "nullable": true,
+                      "description": "Reserved for smart playlists; null today."
+                    },
+                    "deleted_at": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. Set when a person moves the record to the household trash; null while live. A trashed record is hidden everywhere and restorable until trash_until."
+                    },
+                    "trash_until": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true,
+                          "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                        },
+                        {
+                          "nullable": true
+                        }
+                      ],
+                      "default": null,
+                      "description": "TRASH-01. When the trash purges the record for good; set together with deleted_at."
+                    },
+                    "created_at": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "hlc": {
+                      "type": "string",
+                      "pattern": "^[0-9]+:[0-9]+:[a-z0-9]{6,}$",
+                      "description": "Hybrid logical clock: wall_ms:counter:node (7.3)."
+                    },
+                    "provenance": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "person_id",
+                    "kind",
+                    "title",
+                    "items",
+                    "created_at",
+                    "hlc",
+                    "provenance"
+                  ],
+                  "additionalProperties": false,
+                  "description": "MEDIA-SPEC-01 (media design section 7). A person's ordered references to media items: liked, watch later, the queue, a playlist, the watchlist, pins. One liked, one watch_later and one queue per person exist by construction. The list record stays for text lists (its items are text with a checked state; these are references with order, status and a pointer)."
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such collection of mine",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/continue": {
+      "get": {
+        "tags": [
+          "Continue"
+        ],
+        "summary": "Where I left off: my last chats and my unfinished titles, newest first, three at most",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3,
+              "default": 3
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "My rows. A guest gets none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "source": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "media"
+                            ]
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "subtitle": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "href": {
+                            "type": "string",
+                            "description": "Where the row leads. Chats: /chat?conversation=<id>. Media: /media/<item id>, which the shell resolves to the app that plays it."
+                          },
+                          "at": {
+                            "type": "string"
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "media_kind": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "artwork_url": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "source",
+                          "kind",
+                          "id",
+                          "title",
+                          "subtitle",
+                          "href",
+                          "at",
+                          "percent",
+                          "media_kind",
+                          "artwork_url"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "rows"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/shares/{id}": {
       "delete": {
         "tags": [

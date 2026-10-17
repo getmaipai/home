@@ -13,11 +13,15 @@ import { MediaItem } from "@maipai/spec/gen/ts/media-item.js";
 import { MediaSource } from "@maipai/spec/gen/ts/media-source.js";
 import { isMediaAdmin, readableItem, sourceVisibleTo } from "@/lib/media/access";
 import { findDuplicates } from "@/lib/media/duplicates";
-import { hideItem, itemDetail, listGroups, listItems, removeItem, rowById, KINDS } from "@/lib/media/items";
+import { hideItem, itemDetail, listGroups, listItems, removeItem, rowById } from "@/lib/media/items";
 import { isScanning, scanRoot, syncMediaScanner, type ScanSummary } from "@/lib/media/scan";
 import { serveItemArtwork, serveItemBytes } from "@/lib/media/serve";
 import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/lib/media/sources";
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
+import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
+import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
+import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
+import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedWith } from "@/lib/media/collections";
 
 export const mediaRoutes = apiRouter();
 
@@ -296,4 +300,274 @@ const duplicatesRoute = createRoute({
 });
 mediaRoutes.openapi(duplicatesRoute, (c) => c.json(findDuplicates(), 200));
 
-export { KINDS };
+
+// ---- progress (MEDIA-PROGRESS-01, design section 10) ----
+// A person reads and writes only their own rows. The merge is lib/media/progress.ts's `mergeProgress`: newest wins by the server stamp
+// after skew correction, a rewind applies when newer, `completed` is a latch, marks union, a minor's row is written only from their
+// own screen.
+
+const PositionSchema = z.union([
+  z.object({ seconds: z.number().min(0) }).strict(),
+  z.object({ locator: z.object({ kind: z.enum(["cfi", "page"]), cfi: z.string().nullable().optional(), page: z.number().int().min(1).nullable().optional(), spine_index: z.number().int().min(0).nullable().optional(), block_index: z.number().int().min(0).nullable().optional() }).strict(), percent: z.number().min(0).max(100) }).strict(),
+]);
+const MarkSchema = z.object({ at_s: z.number().min(0), label: z.string().max(200).nullable().optional() });
+const WriteBody = z.object({
+  position: PositionSchema,
+  duration_s: z.number().min(0).nullable().optional(),
+  completed: z.boolean().optional().describe("true: the person says it is done (a book). false: the person clears it."),
+  event: z.enum(["play", "skip", "finish"]).optional().describe("One thing that happened: a play started, a skip, or a finish. Each adds one."),
+  counts: z.object({ plays: z.number().int().min(0).optional(), skips: z.number().int().min(0).optional(), finishes: z.number().int().min(0).optional() }).optional().describe("Absolute counts as the device knows them (an offline batch); the larger wins."),
+  marks: z.array(MarkSchema).max(500).optional(),
+  device_id: z.string().regex(/^device-[a-z0-9]{6,}$/).nullable().optional(),
+  sampled_at: z.string().datetime().optional().describe("The device's clock when it read the position."),
+  client_now: z.string().datetime().optional().describe("The device's clock when it sent this, so the hub can correct for a clock that is off."),
+  immediate: z.boolean().optional().describe("Store now (pause, seek, unload). A playing title's 10-second ticks are coalesced into one row."),
+});
+type WriteBodyType = z.infer<typeof WriteBody>;
+
+function writeFrom(body: WriteBodyType, serverNow: Date): ProgressWrite {
+  return {
+    position: body.position as ProgressWrite["position"], duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
+    events: body.event ? { [body.event]: true } : undefined, device_id: body.device_id ?? null, stamp: correctedStamp({ sampledAt: body.sampled_at, clientNow: body.client_now, serverNow }),
+  };
+}
+
+const REFUSAL_LINES: Record<WriteRefusal, string> = {
+  other_persons_device: "This screen belongs to someone else, so it cannot save your place. Sign in on your own screen.",
+  no_such_title: "That title is not in the library.",
+  wrong_position_shape: "A book saves a place in the text; everything else saves seconds.",
+};
+
+const putProgressRoute = createRoute({
+  method: "put",
+  path: "/progress/{media_id}",
+  tags: ["Media"],
+  summary: "Save my place in a title. The hub merges it with what is stored: the newest wins, a finished title stays finished",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ media_id: z.string() }), body: { content: { "application/json": { schema: WriteBody } } } },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ progress: MediaProgress, applied: z.boolean().describe("false: a newer place was already stored; only counts, marks and a finish were merged.") }) } }, description: "The row as it now stands." },
+    ...errorResponses({ 401: "Not signed in", 403: "This screen belongs to someone else", 404: "No such title, or not one I may see", 422: "Wrong kind of position for this title" }),
+  },
+});
+mediaRoutes.openapi(putProgressRoute, (c) => {
+  const actor = c.get("person");
+  const body = c.req.valid("json");
+  const item = readableItem(actor, c.req.valid("param").media_id);
+  if (!item) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
+  const now = new Date();
+  const outcome = writeProgress(actor, item, writeFrom(body, now), { now, immediate: body.immediate });
+  if (!outcome.ok) return c.json({ error: REFUSAL_LINES[outcome.refusal] }, outcome.refusal === "other_persons_device" ? 403 : 422);
+  return c.json({ progress: outcome.progress, applied: outcome.positionApplied }, 200);
+});
+
+const batchRoute = createRoute({
+  method: "post",
+  path: "/progress/batch",
+  tags: ["Media"],
+  summary: "Save many places at once, such as the ones a phone kept while it was offline. Each is merged by the same rule as a single save",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ client_now: z.string().datetime().optional(), writes: z.array(WriteBody.extend({ media_id: z.string() })).min(1).max(500) }) } } } },
+  responses: {
+    200: {
+      content: { "application/json": { schema: z.object({ results: z.array(z.object({ media_id: z.string(), status: z.enum(["applied", "older", "refused", "unknown_title"]), reason: z.string().nullable(), progress: MediaProgress.nullable() })) }) } },
+      description: "One result per write, in order. `older` means a newer place was already stored.",
+    },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+mediaRoutes.openapi(batchRoute, (c) => {
+  const actor = c.get("person");
+  const { writes, client_now } = c.req.valid("json");
+  const now = new Date();
+  const results = writes.map((entry) => {
+    const item = readableItem(actor, entry.media_id);
+    if (!item) return { media_id: entry.media_id, status: "unknown_title" as const, reason: REFUSAL_LINES.no_such_title, progress: null };
+    const outcome = writeProgress(actor, item, writeFrom({ ...entry, client_now: entry.client_now ?? client_now }, now), { now, immediate: true });
+    if (!outcome.ok) return { media_id: entry.media_id, status: "refused" as const, reason: REFUSAL_LINES[outcome.refusal], progress: null };
+    return { media_id: entry.media_id, status: outcome.positionApplied ? ("applied" as const) : ("older" as const), reason: null, progress: outcome.progress };
+  });
+  return c.json({ results }, 200);
+});
+
+const getProgressRoute = createRoute({
+  method: "get",
+  path: "/progress/{media_id}",
+  tags: ["Media"],
+  summary: "My place in one title",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ media_id: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ progress: MediaProgress.nullable() }) } }, description: "Null when I have not started it." }, ...errorResponses({ 401: "Not signed in", 404: "No such title" }) },
+});
+mediaRoutes.openapi(getProgressRoute, (c) => {
+  const actor = c.get("person");
+  const item = readableItem(actor, c.req.valid("param").media_id);
+  if (!item) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
+  return c.json({ progress: getProgress(actor.id, item.id) }, 200);
+});
+
+const manyProgressRoute = createRoute({
+  method: "get",
+  path: "/progress",
+  tags: ["Media"],
+  summary: "My places in several titles at once (up to 100), for the bars on a shelf",
+  middleware: [requireAuth] as const,
+  request: { query: z.object({ ids: z.string().min(1).describe("Title ids, comma separated.") }) },
+  responses: { 200: { content: { "application/json": { schema: z.array(MediaProgress) } }, description: "The ones I have started." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+mediaRoutes.openapi(manyProgressRoute, (c) => {
+  const actor = c.get("person");
+  const ids = [...new Set(c.req.valid("query").ids.split(",").map((id) => id.trim()).filter(Boolean))].slice(0, 100);
+  const readable = ids.filter((id) => readableItem(actor, id) !== null);
+  return c.json(getProgressMany(actor.id, readable), 200);
+});
+
+// ---- collections ----
+
+const CollectionId = z.object({ id: z.string().describe("A collection id, or liked, watch_later or queue for mine.") });
+
+const listCollectionsRoute = createRoute({
+  method: "get",
+  path: "/collections",
+  tags: ["Media"],
+  summary: "My collections: liked, watch later and up next always exist; playlists, watchlists and pins when I make them",
+  middleware: [requireAuth] as const,
+  request: { query: z.object({ kind: z.enum(["liked", "watch_later", "queue", "playlist", "watchlist", "pins"]).optional() }) },
+  responses: { 200: { content: { "application/json": { schema: z.array(MediaCollection) } }, description: "Mine." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+mediaRoutes.openapi(listCollectionsRoute, (c) => c.json(listCollections(c.get("person").id, c.req.valid("query").kind).map((collection) => visibleView(c.get("person"), collection)), 200));
+
+const sharedCollectionsRoute = createRoute({
+  method: "get",
+  path: "/collections/shared",
+  tags: ["Media"],
+  summary: "Collections other people shared with me or with the household",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.array(MediaCollection) } }, description: "Shared with me." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+mediaRoutes.openapi(sharedCollectionsRoute, (c) => c.json(sharedWith(c.get("person").id).map((collection) => visibleView(c.get("person"), collection)), 200));
+
+/** A collection as this person may see it: titles they may not read (the band, a removed folder) are left out. */
+function visibleView(actor: Parameters<typeof readableItem>[0], collection: ReturnType<typeof listCollections>[number]) {
+  const items = collection.items.filter((entry) => readableItem(actor, entry.media_id) !== null);
+  return items.length === collection.items.length ? collection : { ...collection, items };
+}
+
+const makeCollectionRoute = createRoute({
+  method: "post",
+  path: "/collections",
+  tags: ["Media"],
+  summary: "Make a playlist, a watchlist or a set of pins",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: z.object({ kind: z.enum(MADE_KINDS), title: z.string().min(1).max(100) }) } } } },
+  responses: { 201: { content: { "application/json": { schema: MediaCollection } }, description: "Made." }, ...errorResponses({ 401: "Not signed in" }) },
+});
+mediaRoutes.openapi(makeCollectionRoute, (c) => {
+  const body = c.req.valid("json");
+  return c.json(createCollection(c.get("person").id, body.kind, body.title), 201);
+});
+
+const getCollectionRoute = createRoute({
+  method: "get",
+  path: "/collections/{id}",
+  tags: ["Media"],
+  summary: "One collection of mine, or one shared with me",
+  middleware: [requireAuth] as const,
+  request: { params: CollectionId },
+  responses: { 200: { content: { "application/json": { schema: MediaCollection } }, description: "Found." }, ...errorResponses({ 401: "Not signed in", 404: "No such collection" }) },
+});
+mediaRoutes.openapi(getCollectionRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const own = resolveCollection(actor.id, id);
+  const found = own ?? sharedWith(actor.id).find((collection) => collection.id === id) ?? null;
+  return found ? c.json(visibleView(actor, found), 200) : c.json({ error: "That collection is not there." }, 404);
+});
+
+const patchCollectionRoute = createRoute({
+  method: "patch",
+  path: "/collections/{id}",
+  tags: ["Media"],
+  summary: "Rename one of my collections, move its queue pointer, or choose who it is shared with (nobody, the household, or people)",
+  middleware: [requireAuth] as const,
+  request: { params: CollectionId, body: { content: { "application/json": { schema: z.object({ title: z.string().min(1).max(100).optional(), pointer: z.number().int().min(0).nullable().optional(), shared_to: z.union([z.null(), z.literal("household"), z.array(PersonId)]).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: MediaCollection } }, description: "Updated." }, ...errorResponses({ 401: "Not signed in", 404: "No such collection of mine" }) },
+});
+mediaRoutes.openapi(patchCollectionRoute, (c) => {
+  const actor = c.get("person");
+  let collection = resolveCollection(actor.id, c.req.valid("param").id);
+  if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
+  const body = c.req.valid("json");
+  if (body.title !== undefined) collection = renameCollection(collection, body.title);
+  if (body.pointer !== undefined) collection = setPointer(collection, body.pointer);
+  if (body.shared_to !== undefined) collection = setSharedTo(collection, body.shared_to);
+  return c.json(collection, 200);
+});
+
+const deleteCollectionRoute = createRoute({
+  method: "delete",
+  path: "/collections/{id}",
+  tags: ["Media"],
+  summary: "Delete a playlist, watchlist or pins of mine. Liked, watch later and up next stay",
+  middleware: [requireAuth] as const,
+  request: { params: CollectionId },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Deleted." }, ...errorResponses({ 401: "Not signed in", 404: "No such collection of mine", 409: "One of the three that always exist" }) },
+});
+mediaRoutes.openapi(deleteCollectionRoute, (c) => {
+  const actor = c.get("person");
+  const collection = resolveCollection(actor.id, c.req.valid("param").id);
+  if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
+  if (!deleteCollection(collection)) return c.json({ error: "Liked, watch later and up next are always there. Clear them instead." }, 409);
+  return c.json({ success: true as const }, 200);
+});
+
+const addToCollectionRoute = createRoute({
+  method: "post",
+  path: "/collections/{id}/items",
+  tags: ["Media"],
+  summary: "Add a title to one of my collections (a title already there only has its status updated)",
+  middleware: [requireAuth] as const,
+  request: { params: CollectionId, body: { content: { "application/json": { schema: z.object({ media_id: z.string(), at: z.number().int().min(0).optional(), status: z.enum(["want", "watching", "completed"]).nullable().optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: MediaCollection } }, description: "Updated." }, ...errorResponses({ 401: "Not signed in", 404: "No such collection of mine, or no such title" }) },
+});
+mediaRoutes.openapi(addToCollectionRoute, (c) => {
+  const actor = c.get("person");
+  const collection = resolveCollection(actor.id, c.req.valid("param").id);
+  if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
+  const body = c.req.valid("json");
+  if (!readableItem(actor, body.media_id)) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
+  return c.json(addItem(collection, body.media_id, { at: body.at, status: body.status ?? undefined }), 200);
+});
+
+const reorderRoute = createRoute({
+  method: "put",
+  path: "/collections/{id}/items",
+  tags: ["Media"],
+  summary: "Put the titles of one of my collections in a new order",
+  middleware: [requireAuth] as const,
+  request: { params: CollectionId, body: { content: { "application/json": { schema: z.object({ media_ids: z.array(z.string()).max(5000) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: MediaCollection } }, description: "Reordered." }, ...errorResponses({ 401: "Not signed in", 404: "No such collection of mine" }) },
+});
+mediaRoutes.openapi(reorderRoute, (c) => {
+  const actor = c.get("person");
+  const collection = resolveCollection(actor.id, c.req.valid("param").id);
+  if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
+  return c.json(reorderItems(collection, c.req.valid("json").media_ids), 200);
+});
+
+const removeFromCollectionRoute = createRoute({
+  method: "delete",
+  path: "/collections/{id}/items/{media_id}",
+  tags: ["Media"],
+  summary: "Take a title out of one of my collections",
+  middleware: [requireAuth] as const,
+  request: { params: CollectionId.extend({ media_id: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: MediaCollection } }, description: "Updated." }, ...errorResponses({ 401: "Not signed in", 404: "No such collection of mine" }) },
+});
+mediaRoutes.openapi(removeFromCollectionRoute, (c) => {
+  const actor = c.get("person");
+  const { id, media_id } = c.req.valid("param");
+  const collection = resolveCollection(actor.id, id);
+  if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
+  return c.json(removeItemFrom(collection, media_id), 200);
+});

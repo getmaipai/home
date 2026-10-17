@@ -50,3 +50,31 @@ Admin (owner, admin): `POST /sources`, `DELETE /sources/{id}`, `POST /sources/{i
 `DELETE /items/{id}`, `GET /duplicates`. Everyone signed in: `GET /sources`, `GET /items`, `GET /items/{id}`, `GET /items/{id}/content`
 (Range, the item's media type), `GET /items/{id}/artwork`, `GET /groups`. Every read goes through `access.ts` (source `visible_to`,
 band, not trashed, not hidden).
+
+## Progress, collections and Pick up (MEDIA-PROGRESS-01)
+
+`lib/media/progress.ts` holds `mergeProgress`, the one definition used by the online write, the offline batch, the robot and Go.
+Newest wins by the server stamp: `correctedStamp` moves the device's `sampled_at` by `server now - client_now`, never into the future,
+and a write with no clock readings is stamped on arrival. A rewind applies when newer. `completed` latches per kind (video, episode,
+film 90 percent; podcast episode, audiobook, chapter 95; a book when the person says so or at 99 percent of the text; a track never,
+it counts `finishes`) and only a newer explicit `completed: false` clears it. Marks union by `at_s`; absolute `counts` take the larger
+(so replaying a batch counts nothing twice) and `event` adds one. A write older than the row still merges its counts, marks and a
+finish, and reports `applied: false`.
+
+- Routes never take a person id: a person writes only their own rows. A minor's row (child or teen) is also refused when the write
+  names a `device_id` paired to someone else (`deviceMayWrite`): a TV signed in as a parent does not save the child's place.
+- Coalescing: plain position ticks (no event, mark, count or `completed`) from one person for one title within 2 seconds of the last
+  database write are held and replaced by the next tick; one database write follows when the window ends or on any read. A pause, a
+  seek, an unload, a finish, or `immediate: true` stores at once. The held answer is the row as it will be.
+- Collections (`collections.ts`): liked, watch later and up next are created once per person the first time they are asked for (a
+  unique index enforces it); playlist, watchlist and pins are made on request. `resolveCollection` is own-only; `shared_to` lets
+  others read (never change) a collection, with titles they may not read left out.
+- Pick up: `lib/continue/registry.ts` is the provider registry (`registerContinueProvider`), `providers.ts` registers `chat` (the
+  person's own last chats) and `media` (unfinished titles, not tracks, a folder audiobook's part shown as the book). The budget is three
+  rows across both, newest first; a guest gets none. `GET /api/continue` returns them; HOME-ALIVE-01c draws the shelf from it. A media
+  row's `href` is `/media/<item id>`; the shell resolves that to the app.
+
+Routes: `PUT /api/media/progress/{media_id}`, `GET /api/media/progress/{media_id}`, `GET /api/media/progress?ids=`,
+`POST /api/media/progress/batch`, `GET|POST /api/media/collections`, `GET /api/media/collections/shared`,
+`GET|PATCH|DELETE /api/media/collections/{id}` (`id` may be `liked`, `watch_later` or `queue`),
+`POST|PUT /api/media/collections/{id}/items`, `DELETE /api/media/collections/{id}/items/{media_id}`, `GET /api/continue`.
