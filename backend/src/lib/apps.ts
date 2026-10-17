@@ -168,7 +168,7 @@ export function appVisibleTo(
 }
 
 /** NEWS-00: a page's own floor. A page may carry `min_role` to raise the package's floor (the lint refuses a page
- * that lowers it; a role the ladder does not know falls back to the package's, so a bad value never opens a page). */
+ * that lowers it; a role the ladder does not know fails closed to owner, so a bad value never opens a page). */
 export function pageMinRole(manifest: PackageManifest, entry: AppPageEntry): string {
   const own = entry.min_role;
   if (own === undefined) return manifest.min_role;
@@ -223,21 +223,21 @@ function owningPages(app: LoadedApp, kind: "data" | "actions", id: string): AppP
 
 /** NEWS-00: may this person reach a data id (`data`) or an action (`actions`)? It names its page through the page
  * documents; the person needs the floor of at least one page that uses it, so a call cannot reach data its page
- * hides. An id no page uses keeps only the package's floor (a widget's data id, say). */
+ * hides. An id no page uses fails closed: it needs the floor of every page, so a reference this scan did not
+ * recognise can never open a raised page's data to a lower role. The NEWS-02 action route must call this with
+ * "actions" before it does anything. */
 export function appRouteAllowed(person: PersonRow, packageId: string, kind: "data" | "actions", id: string, loaded: LoadedApp | null = visibleApp(person, packageId)): boolean {
   const app = loaded;
   if (!app) return false;
   const owners = owningPages(app, kind, id);
-  return owners.length === 0 || owners.some((entry) => pageVisibleTo(person, app.manifest, entry));
+  if (owners.length > 0) return owners.some((entry) => pageVisibleTo(person, app.manifest, entry));
+  return (app.contributes.pages ?? []).every((entry) => pageVisibleTo(person, app.manifest, entry));
 }
 
-/** NEWS-00: the action and image forms have no caller until NEWS-02 adds `/actions/:action` and `/images/:item`; each of
- * those routes must call `appRouteAllowed(..., "actions", id)` and `appImageAllowed` first (the data form is wired in `getAppData`).
- * The picture route of an app. A picture belongs to the whole app, so the person needs the floor of at
- * least one of its pages. */
+/** NEWS-00: the picture route of an app (NEWS-02 calls it first). A picture belongs to the whole app: the person must
+ * see the app, which already requires its index page. The route must still check the item is in the asker's released set. */
 export function appImageAllowed(person: PersonRow, packageId: string): boolean {
-  const app = visibleApp(person, packageId);
-  return !!app && (app.contributes.pages ?? []).some((entry) => pageVisibleTo(person, app.manifest, entry));
+  return visibleApp(person, packageId) !== null;
 }
 
 function visibleApp(person: PersonRow, id: string): LoadedApp | null {

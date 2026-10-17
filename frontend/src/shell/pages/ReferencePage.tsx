@@ -30,7 +30,9 @@ function asBlock(block: ReferenceBlock): ArticleBlockData {
     case "paragraph": return { type: "paragraph", inlines: block.inlines.map(asInline) };
     case "list": return { type: "list", ordered: block.ordered, items: block.items.map((item) => item.map(asInline)) };
     case "figure": return { ...block, caption: block.caption ?? "" };
-    default: return block;
+    case "rows":
+    case "table":
+    case "note": return block;
   }
 }
 

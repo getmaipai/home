@@ -289,7 +289,7 @@ describe("a page's own min_role (NEWS-00)", () => {
     expect((await childClient.post(`/api/plugins/${ID}/data/shopping`, {})).status).toBe(404);
   });
 
-  test("an action named only by a raised page is refused below it; an unused action keeps the package floor; images need one open page", () => {
+  test("an action named only by a raised page is refused below it; an unused action fails closed; images need one open page", () => {
     const callPage = { type: "page", id: "more", title: "More", body: [{ type: "answer_blocks", bind: { source: "package", path: "shopping" }, empty_state: { type: "empty_state", icon: "inbox", text: "None.", action: { call: { target: `/api/plugins/${ID}/actions/follow` } } } }] };
     const dir = installFixtureApp({ minRole: "child", pageRoles: { more: "teen" }, pages: placesOnlyIndex });
     writeFileSync(join(dir, "pages", "more.json"), JSON.stringify(callPage));
@@ -298,7 +298,8 @@ describe("a page's own min_role (NEWS-00)", () => {
     const teenPerson = { role: "teen" } as PersonRow;
     expect(appRouteAllowed(kid, ID, "actions", "follow")).toBe(false);
     expect(appRouteAllowed(teenPerson, ID, "actions", "follow")).toBe(true);
-    expect(appRouteAllowed(kid, ID, "actions", "unused")).toBe(true);
+    expect(appRouteAllowed(kid, ID, "actions", "unused")).toBe(false); // fails closed: needs the floor of every page
+    expect(appRouteAllowed(teenPerson, ID, "actions", "unused")).toBe(true);
     expect(appImageAllowed(kid, ID)).toBe(true);
     expect(appImageAllowed({ role: "guest" } as PersonRow, ID)).toBe(false);
   });
