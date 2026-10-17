@@ -40,3 +40,14 @@ You can change the home place later in **Settings**, **Home settings**, **Genera
 ## What leaves your house
 
 Weather asks one outside service, Open-Meteo, a free public weather service. It gets the place name or the rounded spot, and your home's internet address. It does not get your name or anything you said. Once an hour Home also asks for the weather at your home place so the card is ready. See [What Home looks up for you](what-home-looks-up.md).
+
+## Something not working?
+
+| What you see | Why | What to do |
+|---|---|---|
+| "Ask a grown-up to set the home location" | The household has no home place yet | An owner or admin sets it on the Home page |
+| **Use my location** does nothing | The browser blocked location, or the address is not `localhost` or `https` | Allow location for this site, or type a city |
+| The forecast will not load | Home cannot reach Open-Meteo, or the internet is down | Check the internet, then try again. Home says what is missing |
+| Chat says it has no place | You named none and have no default | Name a place, or set a default place in the Weather settings |
+| Wrong unit | The unit is per person | Change **Temperature unit** in the Weather settings |
+| A city is not found | Home looks up cities in a built-in list. ZIP codes do not work yet | Type the city and state |

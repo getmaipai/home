@@ -276,6 +276,23 @@
         "chat"
       ]
     },
+    "user/everyday-use/make-and-edit-pictures": {
+      "areas": [
+        "chat",
+        "settings"
+      ]
+    },
+    "user/everyday-use/make-short-videos": {
+      "areas": [
+        "chat",
+        "settings"
+      ]
+    },
+    "user/everyday-use/use-the-weather-app": {
+      "areas": [
+        "chat"
+      ]
+    },
     "user/everyday-use/talk-instead-of-type": {
       "areas": [
         "voice"

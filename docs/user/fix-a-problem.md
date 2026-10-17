@@ -15,6 +15,14 @@ Owners and admins can choose **Check my computers again** to refresh the compute
 
 If your device shows a plain dark screen saying "Can't reach MaiPai right now," it isn't connected to your home network - the hub itself may be off, or you're away from home. Nothing works without that connection, since everything MaiPai does lives on your own hub. Reconnect to your home Wi-Fi, or try again once you're back in range.
 
+## If a reply says "Something went wrong"
+
+If it shows up right after an update or a restart, the AI engine was probably still starting. Wait a minute and press **Retry**. If it comes back, open Repairs.
+
+## If it says "Getting ready" or a picture waits for memory
+
+"Getting ready, one moment" means the AI is warming up. Pictures and videos wait when another big job holds the memory. Both clear by themselves. See [Pictures](pictures.md) and [Videos](videos.md).
+
 ## If MaiPai looks out of date
 
 MaiPai updates itself the next time you open it. If a page still looks old after an update, reload it once. If it still looks old, close every MaiPai tab, then open it again. You will not lose anything; your chats and settings are saved on the hub, not in the browser.

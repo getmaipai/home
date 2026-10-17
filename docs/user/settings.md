@@ -46,6 +46,14 @@ Children cannot change their own voice. An owner or admin opens **Voices**, uses
 
 If the page says "Voices are still getting ready", wait a minute. After setup the voice engine needs a short time to start. If it says "Home can't reach its voice service", open **Repairs**, then come back and press **Try again**. See [Talking to Home](voice.md) for natural speech sounds and microphone help.
 
+## Pictures and videos
+
+An owner or admin opens **Settings**, **Home settings**, **Pictures and videos**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children and teens show as off. See [Pictures](pictures.md) and [Videos](videos.md).
+
+## Web search settings
+
+An owner or admin opens **Settings**, **Home settings**, **Search**. The **Web search** block holds the SearXNG address with **Test** and **Save**, the source switches and the teen and child DuckDuckGo choice. See [Set up web search](web-search.md).
+
 ## Find a setting fast
 
 Use the **Search settings** box at the top of the page. It jumps you straight to what you're looking for.

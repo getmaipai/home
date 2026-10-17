@@ -25,3 +25,12 @@ Use the ask box, or open **Chat** in the navigation.
 ## What changed
 
 Older versions showed counts of people, updates and repairs, a chart and a list of recent activity. Those are gone. Updates and Repairs are one tap away at the top, and Settings shows the rest.
+
+## Something not working?
+
+| What you see | Why | What to do |
+|---|---|---|
+| The ask box says the AI is installing | The model is still downloading | Wait. You can still type your question |
+| No **Today** cards | No app has anything to show you yet | Install apps, or set the home place so Weather shows |
+| No **Getting started** card | You are not an owner or admin, or all steps are done | Nothing to do |
+| The starter buttons open Chat but nothing is sent | That is on purpose | Press send when you are happy with the words |

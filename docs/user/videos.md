@@ -48,6 +48,16 @@ Open **Settings**, **Home settings**, **Pictures and videos**.
 
 The video engine checks the file and refuses any style that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.
 
+## Something not working?
+
+- **No video option.** Why: your Mac has less than 128 GB, you are not an adult, or videos are off. Fix: ask an owner or admin to check Settings.
+- **"No video model is installed".** Why: the video model is not downloaded. Fix: an owner or admin installs it in Settings.
+- **"Home is busy making another picture or video".** Why: Home does one job at a time. Fix: wait. It starts by itself.
+- **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.
+- **Home cannot reach the engine.** Why: the AI engine is restarting. Fix: wait a minute and ask again. Still stuck? Open **Repairs**.
+- **"Something went wrong while making it".** Why: the job failed. Fix: press **Try again**.
+- **No Animate this picture button.** Why: Home did not make that picture, or a clip is running. Fix: ask for a new picture first.
+
 ## Private chats
 
 In an Incognito or temporary chat, the video lives only in memory and is gone when the chat ends. In those chats you can still animate a picture chat made or the first frame of a video you just made.

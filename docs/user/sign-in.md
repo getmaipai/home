@@ -28,3 +28,14 @@ Open **Settings**, choose the **Me** tab, then **PIN / password**. A PIN can be 
 ## If you forgot it
 
 Ask an owner or admin to reset your PIN under **Settings**, **Users**. See [Fix a problem](fix-a-problem.md).
+
+## Something not working?
+
+| What you see | Why | What to do |
+|---|---|---|
+| Red shake and the boxes clear | Wrong code | Try again with the right code |
+| A countdown and the boxes are off | 5 wrong tries in a row locked the account | Wait for the countdown. It clears itself. The next lock is longer |
+| The boxes do not sign you in by themselves | Home does not know your PIN length yet (an older account) | Use the password field and **Sign in** once. Home learns the length from a good sign-in |
+| Only a password field shows | Your sign-in is a password, not a digit PIN | Type it and press **Sign in** |
+| Boxes keep what you typed and show an error | The hub could not be reached | Check the hub is on, then try again |
+| Locked out and forgot the code | Nobody can read your PIN | Ask an owner or admin to reset it in **Settings**, **Users** |

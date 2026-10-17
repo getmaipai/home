@@ -1,0 +1,53 @@
+---
+title: Weather
+description: Ask for the weather in chat, open the Weather app, and choose your places and units.
+---
+
+Home can tell you the weather two ways. Ask in chat, or open the **Weather** app.
+
+## Ask in chat
+
+Type "what's the weather" or "will it rain in Seattle tomorrow". Home answers with a small weather card and a few words. If you do not name a place, Home uses your default place. If it has no place at all, it tells you what is missing and what to do. It does not guess.
+
+## Open the Weather app
+
+Open **Weather** from the apps list, from the search box in the header, or from your favorites. The page shows one big weather card with an animated sky, today's high and low, and an hourly strip.
+
+Above the card is a place picker. The choices, in order:
+
+1. **Current location.** Your device tells Home where you are, only after you allow it in your browser. Home rounds the spot to about 1 km before it asks for the forecast (about 10 km for a child). It uses the spot for that one request and never stores it.
+2. **Your home**, shown as the place name and "(home)". This is the household's home place.
+3. **Your own saved places.**
+
+If the forecast cannot load, the page says so in plain words and tells you what to try. It does not show an empty card.
+
+## Choose your places and units
+
+Press the **Settings** gear on the Weather page. It opens the Weather settings.
+
+- **Weather places.** Add the cities you care about. Remove one to unlist it.
+- **Weather default place.** The place Home uses when you do not name one. **Current location** is the first choice.
+- **Temperature unit.** Degrees Fahrenheit or Celsius. It applies to chat answers and the app. The default is Fahrenheit.
+
+Each person has their own list and unit. A child sees their own list. In an Incognito chat, nothing about the place is saved.
+
+## Set the household's home place
+
+The first time an owner or admin opens Home, it asks where home is. Press **Use my location** to let the browser tell Home (this works on `localhost` or an `https` address), or type a city. Home looks it up in a list that is built in, so no outside service learns your city at this step. It asks you to confirm, like "Chicago, Illinois?", and then saves it. A teen or child sees "Ask a grown-up to set the home location". A city and state works. ZIP codes do not work yet.
+
+You can change the home place later in **Settings**, **Home settings**, **General**.
+
+## What leaves your house
+
+Weather asks one outside service, Open-Meteo, a free public weather service. It gets the place name or the rounded spot, and your home's internet address. It does not get your name or anything you said. Once an hour Home also asks for the weather at your home place so the card is ready. See [What Home looks up for you](/docs/user/privacy-and-safety/what-stays-in-the-house).
+
+## Something not working?
+
+| What you see | Why | What to do |
+|---|---|---|
+| "Ask a grown-up to set the home location" | The household has no home place yet | An owner or admin sets it on the Home page |
+| **Use my location** does nothing | The browser blocked location, or the address is not `localhost` or `https` | Allow location for this site, or type a city |
+| The forecast will not load | Home cannot reach Open-Meteo, or the internet is down | Check the internet, then try again. Home says what is missing |
+| Chat says it has no place | You named none and have no default | Name a place, or set a default place in the Weather settings |
+| Wrong unit | The unit is per person | Change **Temperature unit** in the Weather settings |
+| A city is not found | Home looks up cities in a built-in list. ZIP codes do not work yet | Type the city and state |

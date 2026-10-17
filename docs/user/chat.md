@@ -132,6 +132,10 @@ Your own messages have buttons too. Hover or tap one to see **Copy**, **Edit**, 
 
 Did MaiPai save something you said? A **Memory updated** chip shows up under its reply. Tap the chip to see what was saved, on the [Memory](memory.md) page.
 
+## Pictures Home makes
+
+Adults can ask chat to draw a picture or make a short video, and to animate a picture. See [Pictures](pictures.md) and [Videos](videos.md).
+
 ## Start a new conversation
 
 Tap **New chat** beside the chat list to start fresh. A new chat is saved when you send its first message.
@@ -187,6 +191,18 @@ Turn on **Incognito** before you send a message. An Incognito chat is temporary 
 If a reply cut off early, a **Continue** button appears under it. Tap it and MaiPai picks up where it stopped. The original reply stays the same. One tap makes one more call, then it's done.
 
 ![The Continue button under a cut-off reply.](../assets/screens/chat-continue-desktop-light.png)
+
+## Something not working?
+
+| What you see | Why | What to do |
+|---|---|---|
+| "Something went wrong" under a reply, right after Home restarted or updated | The AI engine was restarting while you asked | Wait a minute, then press **Retry**. If it keeps happening, open **Repairs** |
+| "Getting ready, one moment" and Send waits | The AI is warming up | Wait. Your message stays in the box |
+| "Chat paused" | The AI engine stopped for a while | Keep typing. An owner or admin opens **Repairs** |
+| A lookup says what is missing | Search or weather has no source or place | Follow the line it gives. See [Set up web search](web-search.md) and [Weather](weather.md) |
+| The + menu says pictures are off | This computer's chat model cannot read pictures (under 32 GB), or you are a child without permission | Ask an owner or admin, or send a document instead |
+| A picture will not attach | Over 10 MB, more than 4, or not a picture file | Pick fewer or smaller pictures. iPhone HEIC photos work |
+| The microphone does not work | Browser or Mac permission | See [Talking to Home](voice.md) |
 
 ## Still need help?
 

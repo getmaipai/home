@@ -46,6 +46,15 @@ An owner or admin can let spoken replies include a small human touch, like "hmm,
 
 These sounds only happen in spoken replies, never in the written chat, and never for children or teens. Home never adds one inside a number, a name, a step or a safety message. Chatterbox can make six sounds that were checked by ear: laugh, chuckle, cough, sigh, clear throat and gasp. Pocket TTS can only say "hmm," as a word.
 
-## If voice does not work
+## Something not working?
 
-See [Fix a problem](fix-a-problem.md).
+- **A help box when you start a conversation.** Why: the browser or the Mac blocks the microphone. Fix: follow the box for your browser. In Safari, open **Safari**, **Settings**, **Websites**, **Microphone** and choose **Allow**. In Chrome, click the icon left of the address, then **Site settings**, **Microphone**. On the Mac, open **System Settings**, **Privacy and Security**, **Microphone** and switch your browser on. Then press **Try again**.
+- **The box says the address is not secure.** Why: browsers only allow the microphone on `localhost` or an `https` address. Fix: open Home from one of those.
+- **The box says another app is using the microphone.** Why: another app has it. Fix: close that app, then press **Try again**.
+- **The conversation button is missing.** Why: speech in or speech out is not installed yet. Fix: wait for the downloads to finish, or look in **Repairs**.
+- **Home answers in text but does not speak.** Why: the voice service is not ready, or it fell back. Fix: wait a minute after a restart. Check **Repairs**. Tap **Listen** under the reply to try again.
+- **"Getting ready, one moment".** Why: the AI is warming up after a start. Fix: wait. Send works again when it is ready.
+- **Your voice is not picked up.** Why: the wrong microphone is chosen. Fix: open **Settings**, **Me**, **Voices** and choose the **Microphone**.
+- **No laughs or sighs.** Why: **Natural speech sounds** is off, the voice is Pocket TTS, or you are a child or teen. Fix: an owner or admin sets it to **Light** or **Natural**. Only Chatterbox can make the sounds. Children and teens never hear them.
+
+See also [Fix a problem](fix-a-problem.md).
