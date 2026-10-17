@@ -22,7 +22,18 @@ Home makes two kinds of picture. **Quick** is the usual one: a few seconds, clea
 - **For everyone.** An owner or admin can choose which kind chat makes when nobody asks (below). It starts as Quick.
 - **Edit** always uses Quick.
 
-## Change a picture
+## Change a picture you have
+
+Ask in chat, in your own words. Attach a picture, or point at one already in the chat, and say what you want:
+
+- "Remove the man in the red jacket from this picture." Home finds the people, takes out only the one you mean, and fills the place from what is around it. Nothing new is drawn, so this works on any picture you have. If it cannot tell which person you mean, it says so and does nothing; say where they stand or what they wear, or open the picture with **Edit** and paint over them with **Erase**.
+- "Make the sky clear." "Make the car yellow." "Change the background to a beach." "Fix the lighting, it is too dark." The picture model makes the change. It can redraw small parts of the rest of the picture, so check the result.
+- "Add her to this picture." Attach the scene and a photo of the person (two pictures on one message) and say who is in the photo. Home uses a photo of a person only if that person lives in your home, is an adult, and has said yes in their own **Settings, Pictures and videos**. A child is never used. A photo of anyone else is not used.
+- "Remove the background" and "make it bigger" also work from chat.
+
+The original is never changed. The new picture is the next version of it: press **Edit** on it to see both and go back (**Undo**). A photo that shows people can be changed in words only if it shows exactly one adult in your home who said yes, or no one; to take someone out of a photo of several people, use "remove" above. Home never changes a photo of a real person into something sexual.
+
+## Change a picture in the editor
 
 - **Edit.** Press **Edit** on the picture. In the editor, choose **Comment**, click the part you want to change (or drag a box), and say what you want, like "make the sky pink". Home shows the new picture as a preview. Press **Apply** to keep it as a new version, or discard it. Only the part you pointed at changes.
 - **The editor tools.** Press **Edit** on a picture to open it in the editor: **Remove background** (keeps the subject), **Erase** (paint over something and Home fills the hole), **Upscale** (2x or 4x, bigger and sharper), **Resize**, **Markup** (draw or write on it) and **Comment** (above). The first four run on your computer in a few seconds and need no picture model. A change you apply becomes a new version, and the original stays.

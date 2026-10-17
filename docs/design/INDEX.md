@@ -34,6 +34,7 @@ and a proposed design; otherwise the household IP gets blocked.
 | [vision-images-2026-10-17.md](vision-images-2026-10-17.md) | current, first slice built | VISION-03 rows (Hardware tiers) |
 | [studio-voice-2026-10-17.md](studio-voice-2026-10-17.md) | current, slice 1 live | VOICE-STUDIO-01, REG-02 (Chat throughput) |
 | [image-tools-2026-10-17.md](image-tools-2026-10-17.md) | current; Stack half landed | IMGTOOLS-01 to -09 |
+| [image-editing-2026-10-17.md](image-editing-2026-10-17.md) | current; built, live check open | IMGEDIT-01 to -06 |
 | [household-lists-reminders-2026-10-17.md](household-lists-reminders-2026-10-17.md) | new 2026-10-17, no code | HOUSEHOLD-01 to -04 (to be cut from the note; today the four bundled plugins and GENUI-05 in Skills and Intelligent UI answers) |
 | [smart-home-2026-10-17.md](smart-home-2026-10-17.md) | new 2026-10-17, no code | HOUSE-01 to -05 (to be cut; today the Integrations rows it supersedes) |
 | [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) | current, built 2026-10-17 | LIKENESS-01; closes the VIDEO-GEN-12 owner question |

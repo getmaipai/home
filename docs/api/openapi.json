@@ -41709,6 +41709,26 @@
                     "minLength": 1,
                     "maxLength": 80,
                     "description": "LIKENESS-01: the household adult an uploaded photo shows, picked from the adults list. Left out, the photo must show no one."
+                  },
+                  "mask": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 14000000,
+                    "description": "IMGEDIT-01: a painted area as a base64 PNG (white is the part to change). Only that area can differ from the original."
+                  },
+                  "reference_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "IMGEDIT-01: another picture of this chat the change draws on, such as the person to add to the scene."
+                  },
+                  "reference_subject_person_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "IMGEDIT-01: the household adult the reference photo shows (it must be one who agreed); left out, the reference must show no one."
                   }
                 },
                 "required": [

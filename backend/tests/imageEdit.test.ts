@@ -329,6 +329,32 @@ describe("picture editor routes", () => {
       expect(db.select().from(attachments).all()).toHaveLength(2);
     });
 
+    test("IMGEDIT-01: a painted area rides as the mask (only it can change) and a second picture of this chat is sent as the reference, an upload with no one in it as an upload", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      const other = await upload(client, conversation.value.id);
+      const mask = await pngBase64(40, 30);
+      const started = await commented(client, conversation.value.id, picture.id, { prompt: "Remove the lamp", mask, reference_id: other.id });
+      expect(started.status).toBe(200);
+      expect(fake.edits[0]).toMatchObject({ operation: "edit_masked", instruction: "Remove the lamp", image_source: "uploaded", reference_source: "uploaded" });
+      expect(fake.edits[0]!.mask).toMatch(/^file:/);
+      expect(fake.edits[0]!.reference).toMatch(/^file:/);
+      expect(fake.edits[0]!.region).toBeUndefined();
+      // The same picture twice is refused before anything is sent.
+      fake.edits.length = 0;
+      const same = await commented(client, conversation.value.id, picture.id, { prompt: "Remove the lamp", reference_id: picture.id });
+      expect(same.status).toBe(422);
+      expect(fake.edits).toHaveLength(0);
+      // A reference photo that shows a person needs the adult named; without it nothing is sent.
+      __setPhotoInspectorForTests(async () => ({ people: 1, faces: 1, under18: "no" }));
+      const person = await commented(client, conversation.value.id, picture.id, { prompt: "Add her", reference_id: other.id });
+      expect(person.status).toBe(422);
+      expect(((await person.json()) as { code: string }).code).toBe("photo_has_person");
+      expect(fake.edits).toHaveLength(0);
+    });
+
     test("IMGGEN-SAFE-01: a described change passes the finished-picture check; a possible minor in a sexual result is withheld and never kept as a preview", async () => {
       const { client, actor } = await owner();
       const conversation = resolveOrCreateConversation(actor, "chat");

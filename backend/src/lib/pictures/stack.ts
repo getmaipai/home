@@ -44,7 +44,7 @@ export interface StackImageStatus {
   code?: string | null;
   install?: { remaining_bytes: number };
   loras_supported: boolean;
-  edit: { generative: boolean; masked: boolean };
+  edit: { generative: boolean; masked: boolean; /** IMGEDIT-01: extra pictures an edit takes beside the one it changes; absent on an older Stack. */ references?: number };
   limits: { min_side?: number; max_side?: number; size_step?: number; max_n?: number; max_prompt_chars?: number; max_loras?: number; max_edit_megapixels?: number; queue_max?: number };
   idle_unload_s?: number;
   memory?: { fits: boolean; reason: string | null; peak_gb: number | null };

@@ -16,7 +16,8 @@ import { StackPicturesError } from "./stack";
 import { prepareStyleUse } from "@/lib/likeness/apply";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 
-export const GENERATE_IMAGE_TOOL_ID = "generate_image";
+import { GENERATE_IMAGE_TOOL_ID, runEditPicture } from "./editTool";
+export { GENERATE_IMAGE_TOOL_ID };
 
 export const PICTURE_SIZES: Record<string, string> = {
   square: "1024x1024",
@@ -82,6 +83,9 @@ export async function runGenerateImage(input: RunGenerateImageInput): Promise<To
   const audience = audienceOf(state, input.spoken);
   const refusal = refusalFor(audience, args);
   if (refusal) return refused(callId, args, refusal);
+
+  // IMGEDIT-01: `change` set means the person wants a picture they already have changed, not a new one.
+  if (typeof args.change === "string" && args.change.trim() !== "") return runEditPicture({ state, args, callId, audience });
 
   const prompt = typeof args.prompt === "string" ? args.prompt.trim() : "";
   if (prompt.length < 3) return failed(callId, args, "bad_arguments", "bad_arguments");

@@ -6,6 +6,11 @@ describe("asksForMedia", () => {
   test.each(["what is a good picture size for a phone", "tell me about foxes", "what's the weather", "how long is a video on tiktok", "I like this picture"])("no: %s", (m) => expect(asksForMedia(m)).toBe(false));
 });
 
+describe("asksForMedia: changing a picture they already have (IMGEDIT-01)", () => {
+  test.each(["remove the man in the red jacket from this picture", "make the sky clear in my photo", "can you get rid of the car in the photo", "add my sister to the picture", "swap the background of this image for a beach", "this photo is too dark, fix it"])("asks: %s", (m) => expect(asksForMedia(m)).toBe(true));
+  test.each(["what time is it", "remove the lid from the pot and stir", "tell me about foxes"])("does not: %s", (m) => expect(asksForMedia(m)).toBe(false));
+});
+
 describe("claimsMedia", () => {
   test.each([
     "Your picture is being made. It will show up right below when it is ready.", "Here's your picture of a lighthouse!", "I've made a picture of the fox.", "I'm creating the video now, it takes about two minutes.",

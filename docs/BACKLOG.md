@@ -369,6 +369,12 @@ From [image-tools-2026-10-17.md](design/image-tools-2026-10-17.md): Apple Vision
 - [ ] **IMGTOOLS-07: erase large holes at native resolution** (M, Stack worker, tiled second pass).
 - [ ] **IMGTOOLS-08: compiled Apple helper as a release asset; Linux requirements** (S).
 - [ ] **IMGTOOLS-09: hair, fur, glass test set; BiRefNet-lite for p64 and p128** (M, bench).
+- [x] **IMGEDIT-01: edit a picture in words from chat** (L, `backend/src/lib/pictures/editTool.ts`, `editSources.ts`, `people.ts`, `jobs.ts`; Stack `38639d8`). Built 2026-10-17: `generate_image` with `change` changes a picture the person has (remove people, remove background, upscale, or any change in words, with an optional second picture); the model decides, Home picks the method ([design note](design/image-editing-2026-10-17.md), measured on the Studio: Klein 4B beats Qwen-Image-Edit-2511 on speed, memory and fidelity). The result is the next version of the picture (Original and Undo). Safety is the editor's: likeness rules for photos and references, finished-picture check. Tests `editPicture.test.ts`, `imageEdit.test.ts`, `mediaClaims.test.ts`.
+- [x] **IMGEDIT-02: Comment takes a painted mask and a second picture** (S, API). `POST /api/image-edit/pictures/{id}/comment` accepts `mask` (white is changeable), `reference_id` and `reference_subject_person_id`.
+- [ ] **IMGEDIT-03: live check of the chat edits on the Studio** (S). Real turns with the real chat model: "remove the man in the red jacket" (the reader picks the person), "make the sky clear", "add her to this picture". Not done: the author checked the Stack and Home halves separately, with fake Stacks on the Home side.
+- [ ] **IMGEDIT-04: brush and reference controls in the kit editor Comment** (M, `commons` ui first, then a pin). The API is ready (IMGEDIT-02).
+- [ ] **IMGEDIT-05: owner's ruling on sky, colour and background edits of photos that show several people** (S). Today refused (one consenting adult or no one); a frozen-person mask would allow them without generating anyone.
+- [x] **IMGEDIT-06: Klein masked fill for removed people** (S). Built: on a picture made here the chosen person's outline (Stack `people_mask`) is filled by the picture model, 2.6 s and cleaner than LaMa; uploads and failures use LaMa.
 
 ## Music generation (owner, 2026-10-17)
 

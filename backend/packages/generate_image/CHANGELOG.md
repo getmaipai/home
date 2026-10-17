@@ -2,6 +2,12 @@
 
 All notable changes to the Make a Picture package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.0] - 2026-10-17
+
+### Added
+
+- IMGEDIT-01: the same tool changes a picture the person already has. With `change` set (`attached`, `attached_2` or `latest`) the prompt is the instruction: remove a person (`kind: remove_people`, nothing is drawn, the place is filled from the surroundings), or any other change in words (sky, colour, background, light, add something, add a person from a second picture with `reference`). The original is kept; the result is the next version of the picture, with Undo in the editor. A photo of a person is changed or used only for an adult in this household who agreed (`photo_subject`), checked the way the editor's Comment checks it, and the finished picture goes through the finished-picture check.
+
 ## [0.1.2] - 2026-10-17
 
 ### Added

@@ -1,10 +1,10 @@
 {
   "id": "generate_image",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Media",
-  "display": "Make a Picture",
-  "description": "Make a new picture when someone asks you to draw, paint, illustrate or design one, and call it before you say so.",
+  "display": "Make or Change a Picture",
+  "description": "Make a new picture or change one the person has (remove someone, clear the sky, recolour), and call it before you say so.",
   "offer": {
     "mode": "conditional",
     "gate": "picturesAllowed",
@@ -36,7 +36,7 @@
         "minLength": 3,
         "maxLength": 1200,
         "grounded": false,
-        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. Never call this tool to change a picture that already exists (remove its background, erase something, resize, upscale or crop it): it cannot, so do not call it; tell the person to tap the Edit button on the picture instead."
+        "description": "What to draw, written as a full description in plain English: the subject, the setting, the style and the light or mood, built from what the person asked for. Keep their own words for names and for any text that must appear in the picture. Do not add people, objects or themes they did not ask for. When they ask for another one, one more or the same again, call this tool again with a fresh description of the same subject; never say a picture is coming, ready or on its way without calling it in this reply, and never describe a picture you did not make. When `change` is set, `prompt` is the instruction for the change instead, in plain English and in the person's own words (for example \"remove the man in the red jacket\" or \"make the sky clear blue with no clouds\"); say what to keep if it matters."
       },
       "size": {
         "type": "string",
@@ -75,7 +75,42 @@
       "depicts_real_person": {
         "type": "boolean",
         "grounded": false,
-        "description": "Set true when the person asks for a picture that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home makes one only of an adult in this household who agreed, through their saved style or an attached photo. Otherwise leave it out."
+        "description": "Set true when the person asks for a picture that shows a real, named or identifiable person (a celebrity, a politician, someone they know). Home makes one only of an adult in this household who agreed, through their saved style or an attached photo (with `change` and `photo_subject`). Otherwise leave it out."
+      },
+      "change": {
+        "type": "string",
+        "maxLength": 40,
+        "grounded": false,
+        "description": "Set this, instead of making a new picture, when the person wants a picture they already have changed: remove a person or an object, change the sky or the weather, change the colour of something, add someone or something, swap the background, fix the lighting. Use \"attached\" for the picture on this message (\"attached_2\" for a second one), \"latest\" for the newest picture in this chat (one you made or they showed earlier). The original is kept and the change is a new version. Leave it out to make a new picture."
+      },
+      "kind": {
+        "type": "string",
+        "enum": [
+          "remove_people",
+          "remove_background",
+          "upscale",
+          "change"
+        ],
+        "grounded": false,
+        "description": "Only with `change`. remove_people to take one or more people out (nothing is drawn: the place is filled from the surroundings). remove_background for a cut-out with a transparent background. upscale to make it bigger and sharper. change for anything else."
+      },
+      "who": {
+        "type": "string",
+        "maxLength": 200,
+        "grounded": false,
+        "description": "Only with kind remove_people: which people to take out, in the person's words by position or clothes (\"the man in the red jacket\", \"the girl on the left\") or \"everyone\". Never a name."
+      },
+      "reference": {
+        "type": "string",
+        "maxLength": 40,
+        "grounded": false,
+        "description": "Only with `change`: a second picture the change draws on, for example the photo of the person to add to the scene (\"add her to the picture\"). Same words as `change`: \"attached\", \"attached_2\" or \"latest\"."
+      },
+      "photo_subject": {
+        "type": "string",
+        "maxLength": 80,
+        "grounded": false,
+        "description": "Only with `change`: the name of the adult in this household who is in the photo, when a photo of a person is used (the second picture when there is one, else the one being changed). \"me\" for themselves. Home changes or uses a photo of a person only for an adult in this household who agreed; for anyone else, or a child, do not guess a name: leave it out."
       }
     }
   },

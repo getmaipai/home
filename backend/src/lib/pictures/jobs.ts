@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { attachments, conversationTurns, people } from "@/db/schema";
 import { createAttachment, purgeFileRecord, removeFileBlobs, storeTemporaryChatImage } from "@/lib/attachments";
 import { newFileId, newPictureJobId } from "@/lib/id";
-import { pictureUrl } from "@/lib/imageEdit";
+import { loadSource, pictureUrl, saveVersion } from "@/lib/imageEdit";
 import type { PersonRow } from "@/types";
 import { __clearPictureStoreForTests, markLive, markSettled, saveJob, getPictureJob, pictureJobsForTurn, unfinishedJobs, unfinishedStoredJobs, PICTURE_FAILED_PREFIX, plainFailure, type PictureFile, type PictureJob, type PictureJobKind } from "./jobStore";
 import { allAdapters } from "./adapters";
@@ -43,6 +43,12 @@ export interface StartPictureInput {
   sourceFileId?: string | null;
   /** LIKENESS-01: the picture looks like this household adult (already decided by lib/likeness/decide.ts). */
   likeness?: JobLikeness | null;
+  /** IMGEDIT-01: this job changes a picture already in the chat; the result is saved as its next version. */
+  edit?: { sourceId: string; label: string; method: "instruct" | "erase_people" | "tool" };
+  /** IMGEDIT-01: how the Stack is asked (default: a generation). An edit sends the picture and the instruction to POST /v1/images/edits. */
+  submit?: () => Promise<{ job: string; done: StackPic[] | null }>;
+  /** IMGEDIT-01: work Home does itself, calling the Stack's tools (finding and erasing a person): no Stack job to poll. */
+  local?: (progress: (phase: string, percent: number) => void, signal: AbortSignal) => Promise<StackPic[]>;
 }
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackPicturesError` when the Stack refuses
@@ -55,17 +61,18 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     starting.add(key);
   }
   try {
-    const submitted = await submitGeneration({ ...input.body, timeout_ms: 1 });
+    const submitted = input.local ? null : input.submit ? await input.submit() : await submitGeneration({ ...input.body, timeout_ms: 1 });
     const now = new Date().toISOString();
     const job: PictureJob = {
-      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: submitted.job,
-      percent: 0, phase: "queued", position: null, prompt: input.prompt,
-      request: { size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.likeness ? { likeness: input.likeness } : {}) },
+      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: input.local ? "running" : "queued", stackJob: submitted?.job ?? null,
+      percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
+      request: { size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.likeness ? { likeness: input.likeness } : {}), ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) },
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
     };
     markLive(job);
     saveJob(job);
-    void watch(job, input.actor, submitted.done);
+    if (input.local) void watchLocal(job, input.actor, input.local);
+    else void watch(job, input.actor, submitted!.done);
     return job;
   } finally {
     if (key) starting.delete(key);
@@ -169,6 +176,33 @@ async function watch(job: PictureJob, actor: PersonRow, early: StackPic[] | null
   }
 }
 
+/** IMGEDIT-01: a job Home runs itself (the Stack's tools, a few seconds). It reports phases on the same job record the card polls, ends through the same safety check and storage as any picture, and stops when the person presses Stop. */
+async function watchLocal(job: PictureJob, actor: PersonRow, run: NonNullable<StartPictureInput["local"]>): Promise<void> {
+  if (watching.has(job.id)) return;
+  const controller = new AbortController();
+  watching.set(job.id, controller);
+  markLive(job);
+  try {
+    const pics = await run((phase, percent) => {
+      if (stopped(job) || controller.signal.aborted) return;
+      job.phase = phase; job.percent = Math.max(job.percent, Math.min(95, Math.round(percent))); saveJob(job);
+    }, controller.signal);
+    if (stopped(job) || controller.signal.aborted) return;
+    if (stopForLikeness(job)) return;
+    await finish(job, actor, pics);
+  } catch (error) {
+    if (!stopped(job)) {
+      job.state = "failed";
+      job.error = `${PICTURE_FAILED_PREFIX} ${error instanceof Error && error.message ? error.message : "Something went wrong. Try again."}`.replace(`${PICTURE_FAILED_PREFIX} ${PICTURE_FAILED_PREFIX}`, PICTURE_FAILED_PREFIX);
+      job.files = [];
+      try { saveJob(job); } catch { /* the job ends here either way */ }
+    }
+  } finally {
+    watching.delete(job.id);
+    markSettled(job);
+  }
+}
+
 async function waitForTurnRow(turnId: string, job: PictureJob): Promise<boolean> {
   // The turn's row is written when the reply ends; a fast picture can finish first.
   for (let i = 0; i < 120 && !stopped(job); i += 1) {
@@ -193,17 +227,17 @@ async function adultOnly(job: PictureJob): Promise<boolean> {
 }
 
 async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Promise<void> {
-  const stackJob = job.stackJob!;
+  const stackJob = job.stackJob;
   const files: PictureFile[] = [];
   const storedIds: string[] = [];
-  const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; saveJob(job); void cancelOrDelete(stackJob); };
+  const fail = (message: string) => { discardStored(storedIds); job.state = "failed"; job.error = message; job.files = []; saveJob(job); if (stackJob) void cancelOrDelete(stackJob); };
   try {
     // Fetch and prove every picture first; nothing is stored until the safety check has seen all of them.
     const made: Array<{ raw: Uint8Array; width: number; height: number; meta: { seed: number | null; model: string | null; steps: number | null; ms: number | null } }> = [];
     for (let index = 0; index < pics.length; index += 1) {
       if (stopped(job)) return;
       const pic = pics[index]!;
-      const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob, index);
+      const raw = pic.b64_json ? new Uint8Array(Buffer.from(pic.b64_json, "base64")) : await fetchPicture(stackJob!, index);
       // The bytes are stored exactly as the Stack made them: image-to-video checks their digest against what the engine
       // returned, so nothing may re-encode them. They are decoded here only to prove they are a picture and read the size.
       const info = await sharp(raw, { failOn: "error", limitInputPixels: 64_000_000 }).metadata();
@@ -225,6 +259,14 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       const { raw, width, height, meta } = made[index]!;
       const conversationId = job.conversationId;
       if (!conversationId) throw new Error("no conversation");
+      if (job.request.edit) {
+        // IMGEDIT-01: a change to a picture already in the chat is the next version of that picture (its Original and Undo stay in the editor).
+        const source = loadSource(actor, conversationId, job.request.edit.source_id, true);
+        const version = await saveVersion(actor, source, raw, { op: "comment", label: job.request.edit.label, model: meta.model ?? undefined, ms: meta.ms ?? undefined });
+        storedIds.push(version.id);
+        files.push({ id: version.id, width: version.width ?? width, height: version.height ?? height, ...meta });
+        continue;
+      }
       if (job.temporary) {
         const id = newFileId();
         storeTemporaryChatImage({ id, turnId: job.turnId ?? `gen-${job.id}`, conversationId, ownerPersonId: actor.id, name: "Generated picture", mediaType: "image/png", width, height, bytes: raw, ...(job.request.likeness ? {} : { generated: true as const }) });
@@ -251,7 +293,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
   job.phase = "ready";
   job.error = null;
   saveJob(job);
-  void cancelOrDelete(stackJob);
+  if (stackJob) void cancelOrDelete(stackJob);
 }
 
 /** Stop a job. Safe to call twice; a finished job stays finished. */

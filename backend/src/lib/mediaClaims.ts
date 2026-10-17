@@ -9,11 +9,14 @@ const MEDIA_NOUN = "(?:pictures?|images?|photos?|photographs?|illustrations?|dra
 const MAKE_VERB = "(?:make|makes|create|generate|draw|paint|render|produce|animate|sketch|illustrate|design|film|show me|give me|get me)";
 const DRAW_ONLY = /\b(?:draw|paint|sketch|animate|illustrate|doodle)\b/;
 const ASK_VERB_NOUN = new RegExp(`\\b${MAKE_VERB}\\b[^.!?\\n]{0,60}\\b${MEDIA_NOUN}\\b`);
+// IMGEDIT-01: asking for a picture they already have to be changed ("remove the man from this photo", "make the sky clear in the picture").
+const EDIT_VERB = "(?:remove|erase|delete|get rid of|take (?:him|her|them|it|that|out)|edit|retouch|change|fix|brighten|add|swap|replace|recolou?r|crop out|clear)";
+const ASK_EDIT = new RegExp(`\\b${EDIT_VERB}\\b[^.!?\\n]{0,90}\\b(?:this|that|the|my|these|attached)\\s+${MEDIA_NOUN}\\b|\\b${MEDIA_NOUN}\\b[^.!?\\n]{0,60}\\b${EDIT_VERB}\\b`);
 
 /** Whether the person's message plainly asks for a new picture, video or animation (a loose test: a wrong yes costs one held reply and no re-ask unless it also claims a result). */
 export function asksForMedia(message: string): boolean {
   const text = message.toLowerCase();
-  return DRAW_ONLY.test(text) || ASK_VERB_NOUN.test(text);
+  return DRAW_ONLY.test(text) || ASK_VERB_NOUN.test(text) || ASK_EDIT.test(text);
 }
 
 const CLAIMS = [

@@ -374,6 +374,12 @@ export function latestGeneratedTemporaryImage(actor: PersonRow, conversationId: 
   for (const image of temporaryChatImages.values()) if (image.generated === true && image.ownerPersonId === actor.id && image.conversationId === conversationId && (!best || image.createdAt >= best.createdAt)) best = image;
   return best;
 }
+/** IMGEDIT-01: the newest picture of this temporary chat, whoever made it (an upload, a generated picture or an edit's version). */
+export function latestTemporaryChatImage(actor: PersonRow, conversationId: string): TemporaryChatImage | undefined {
+  let best: TemporaryChatImage | undefined;
+  for (const image of temporaryChatImages.values()) if (image.ownerPersonId === actor.id && image.conversationId === conversationId && image.mediaType.startsWith("image/") && (!best || image.createdAt >= best.createdAt)) best = image;
+  return best;
+}
 export function getTemporaryChatImageForReader(actor: PersonRow, conversationId: string, id: string): TemporaryChatImage | undefined {
   const image = temporaryChatImages.get(id);
   if (!image || image.conversationId !== conversationId || Date.now() - image.createdAt > 2 * 60 * 60 * 1000 || !canAccessPerson(actor, image.ownerPersonId)) return undefined;

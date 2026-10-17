@@ -36,6 +36,8 @@ export interface PictureRequest {
   quality?: "quick" | "detailed";
   /** LIKENESS-01: set when the picture looks like a household adult. Checked again on every poll while the job waits. */
   likeness?: JobLikeness | null;
+  /** IMGEDIT-01: an edit of a picture already in this chat. The result is saved as the next version of that picture (so the editor shows Original and Undo), and its source is never changed. */
+  edit?: { source_id: string; label: string; method: "instruct" | "erase_people" | "tool" };
 }
 
 export interface PictureJob {

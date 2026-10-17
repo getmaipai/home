@@ -54,6 +54,12 @@ function phaseLabel(job: PictureJob): string {
   if (job.phase === "paused: low memory") return "Paused: low memory";
   if (job.phase === "starting" || job.phase === "setting up" || job.phase === "loading") return "Getting the picture model ready";
   if (job.phase === "decoding") return "Finishing the picture";
+  if (job.phase === "finding people") return "Finding the people in the picture";
+  if (job.phase === "removing people") return "Removing them and filling in the background";
+  if (job.phase === "enlarging") return "Making the picture bigger";
+  if (job.phase === "removing background") return "Removing the background";
+  if (job.phase === "starting") return "Getting ready";
+  if (job.kind === "edit") return "Changing the picture";
   return "Drawing";
 }
 
@@ -82,8 +88,8 @@ export function cardView(actor: PersonRow, root: PictureJob, canVary: boolean, d
     ...(active && active.state === "running" ? liveCardFields(active.id, (version) => `/api/pictures/jobs/${encodeURIComponent(active.id)}/preview?v=${version}`) : { stage_label: null, eta_seconds: null, step: null, steps: null, preview_url: null, preview_step: null }),
     elapsed_ms: Math.max(0, Date.now() - new Date(shown.createdAt).getTime()), prompt: root.prompt, kind: root.kind, conversation_id: root.conversationId,
     error: active ? null : last.state === "failed" || last.state === "cancelled" ? last.error : null, files, size: shown.request.size, stop_id: (active ?? root).id,
-    can_vary: canVary && !active && files.length > 0 && files.length < 12,
-    ...qualityFields(last, detailedReadyNow, canVary && !active),
+    can_vary: canVary && root.kind !== "edit" && !active && files.length > 0 && files.length < 12,
+    ...qualityFields(last, detailedReadyNow, canVary && root.kind !== "edit" && !active),
   };
 }
 

@@ -40,10 +40,9 @@ import { asksToUndress, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE,
 import { cancelOrDelete, fetchPicture, getGenerationJob, StackPicturesError, submitEdit } from "@/lib/pictures/stack";
 import { pictureEngineStatus } from "@/lib/pictures/ready";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { preparePhotoUse } from "@/lib/likeness/apply";
-import { photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
+import { prepareEditSource } from "@/lib/pictures/editSources";
+import { MANY_PEOPLE_LINE } from "@/lib/likeness/apply";
 import { likenessStillAllowed, type JobLikeness } from "@/lib/likeness/guard";
-import { subjectEligibility } from "@/lib/likeness/consent";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { StackError } from "@/lib/stack/errors";
 import type { StackImageToolsStatus } from "@/lib/stack/client";
@@ -428,7 +427,7 @@ export function regionForStack(region: CommentRegion | null | undefined): string
 }
 
 /** A Comment: the person describes a change, optionally pointing at an area, and the picture engine changes only that area (the rest of the picture stays as it was). The result is a preview the person applies as a new version, exactly like Erase. Gates run first: only a person who may make pictures, and the two absolute lines on the words. */
-export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; subjectPersonId?: string | null }): Promise<EditProgress> {
+export async function startComment(actor: PersonRow, conversationId: string, id: string, input: { prompt: string; region?: CommentRegion | null; subjectPersonId?: string | null; /** IMGEDIT-01: a painted area (white is changeable) as PNG bytes; only that area can differ. */ maskPng?: Uint8Array | null; /** IMGEDIT-01: another picture of this chat the change draws on (the person to add). */ referenceId?: string | null; referenceSubjectPersonId?: string | null }): Promise<EditProgress> {
   const source = loadSource(actor, conversationId, id, true);
   const denial = pictureDenial(editorAudience(actor));
   if (denial) throw new ImageEditError(403, PICTURE_DENIAL_LINE[denial], `pictures_${denial}`);
@@ -442,44 +441,51 @@ export async function startComment(actor: PersonRow, conversationId: string, id:
   const comment = await commentState(actor);
   if (!comment.enabled) throw new ImageEditError(503, comment.reason ?? COMMENT_NOT_SET_UP, "not_set_up");
   const region = regionForStack(input.region);
-  // LIKENESS-01: where the picture came from decides what the Stack is told. A picture this home made is its own; a picture made to
-  // look like someone is decided again with them; an upload shows either no one (checked) or the one adult the person names, who agreed.
-  let imageSource: "generated" | "uploaded" | "household_photo" = generated ? "generated" : "uploaded";
-  let consentProof: string | undefined;
-  let likeness: JobLikeness | undefined;
-  let subjectForLog: string | null = null;
+  // LIKENESS-01: where the picture came from decides what the Stack is told (pictures/editSources.ts, shared with the chat tool).
   const rootLikeness = generated ? await generatedPictureLikeness(source) : null;
-  const declared = rootLikeness ?? input.subjectPersonId ?? null;
-  if (declared || !generated) {
-    if (!declared) {
-      const verdict = await photoShowsNoPerson(source.bytes);
-      if (!verdict.ok) throw new ImageEditError(422, verdict.line, verdict.reason === "unavailable" ? "photo_check_unavailable" : "photo_has_person");
-    } else {
-      if (!subjectEligibility(declared).ok) throw new ImageEditError(422, "I can only change a photo of an adult who lives in this household and has agreed. Choose that adult from the list, or a photo with no one in it.", "subject_not_allowed");
-      if (!rootLikeness) {
-        const verdict = await singleAdultPhoto(source.bytes);
-        if (!verdict.ok) throw new ImageEditError(422, verdict.line, verdict.reason === "unavailable" ? "photo_check_unavailable" : "photo_not_single_adult");
-      }
-      const prep = await preparePhotoUse({ medium: "picture", audience: editorAudience(actor), declaredSubjectId: declared, bytes: source.bytes, text: prompt, source: "editor" });
-      if (prep.kind === "refused") throw new ImageEditError(403, prep.line, "likeness_refused");
-      imageSource = "household_photo"; consentProof = prep.proof; likeness = prep.job; subjectForLog = prep.subjectId;
-    }
+  const prepared = await prepareEditSource({ audience: editorAudience(actor), bytes: source.bytes, generated, rootLikeness, declaredSubjectId: input.subjectPersonId ?? null, text: prompt, source: "editor" });
+  if (!prepared.ok) throw new ImageEditError(prepared.status, prepared.line, prepared.code);
+  const imageSource = prepared.imageSource;
+  const consentProof = prepared.proof;
+  const likeness = prepared.likeness;
+  const subjectForLog = prepared.subjectId;
+  // IMGEDIT-01: a second picture the change draws on (the person to add to the scene), decided the same way, with its own proof.
+  let reference: { source: SourcePicture; prepared: Extract<Awaited<ReturnType<typeof prepareEditSource>>, { ok: true }> } | null = null;
+  if (input.referenceId) {
+    const referenceSource = loadSource(actor, conversationId, input.referenceId, false);
+    if (referenceSource.id === source.id) throw new ImageEditError(422, "Choose a different picture to draw on than the one you are changing.", "reference_same");
+    const status = await pictureEngineStatus().catch(() => null);
+    if ((status?.edit?.references ?? 0) < 1) throw new ImageEditError(503, "The picture engine on this computer needs its next update before it can use a second picture.", "references_unsupported");
+    const referenceGenerated = await isGeneratedPicture(actor, referenceSource);
+    const referencePrepared = await prepareEditSource({ audience: editorAudience(actor), bytes: referenceSource.bytes, generated: referenceGenerated, rootLikeness: referenceGenerated ? await generatedPictureLikeness(referenceSource) : null, declaredSubjectId: input.referenceSubjectPersonId ?? null, text: prompt, source: "editor" });
+    if (!referencePrepared.ok) throw new ImageEditError(referencePrepared.status, referencePrepared.line, referencePrepared.code);
+    if (referencePrepared.subjectId && subjectForLog && referencePrepared.subjectId !== subjectForLog) throw new ImageEditError(422, MANY_PEOPLE_LINE, "many_people");
+    reference = { source: referenceSource, prepared: referencePrepared };
   }
+  const household = imageSource === "household_photo" || reference?.prepared.imageSource === "household_photo";
+  const likenessAll = likeness ?? reference?.prepared.likeness;
   const form = new FormData();
   form.append("image", new File([new Uint8Array(source.bytes)], "picture", { type: source.mediaType }));
-  form.append("operation", region ? "edit_masked" : "edit");
+  const painted = input.maskPng && input.maskPng.byteLength > 0 ? input.maskPng : null;
+  form.append("operation", region || painted ? "edit_masked" : "edit");
   form.append("instruction", prompt);
-  if (region) form.append("region", region);
+  if (painted) form.append("mask", new File([new Uint8Array(painted)], "mask.png", { type: "image/png" }));
+  else if (region) form.append("region", region);
   form.append("image_source", imageSource);
   if (consentProof) form.append("consent_proof", consentProof);
-  if (imageSource === "household_photo") form.append("audience", "adult");
+  if (reference) {
+    form.append("reference", new File([new Uint8Array(reference.source.bytes)], "reference", { type: reference.source.mediaType }));
+    form.append("reference_source", reference.prepared.imageSource);
+    if (reference.prepared.proof) form.append("reference_proof", reference.prepared.proof);
+  }
+  if (household) form.append("audience", "adult");
   // timeout_ms is how long the Stack holds this request for a finished picture before it answers 202 with the job id: 1 asks for the id at once, and Home polls.
   form.append("timeout_ms", "1");
   try {
     const { job } = await submitEditSource(form, imageSource, generated);
     sweep();
-    jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true, adultOnly: mentionsSexualWord(prompt), promptHash: promptHash(prompt), ...(likeness ? { likeness } : {}) });
-    if (subjectForLog) await recordLikenessUse({ subjectPersonId: subjectForLog, requesterPersonId: actor.id, medium: "picture", way: "photo", adultContent: false, source: "editor" });
+    jobs.set(job, { personId: actor.id, sourceId: id, conversationId, op: "comment", createdAt: Date.now(), generative: true, adultOnly: mentionsSexualWord(prompt), promptHash: promptHash(prompt), ...(likenessAll ? { likeness: likenessAll } : {}) });
+    for (const subjectId of new Set([subjectForLog, reference?.prepared.subjectId ?? null])) if (subjectId) await recordLikenessUse({ subjectPersonId: subjectId, requesterPersonId: actor.id, medium: "picture", way: "photo", adultContent: false, source: "editor" });
     return { state: "running", job, percent: null, label: OP_LABEL.comment };
   } catch (error) {
     throw commentErrorFrom(error);
@@ -512,7 +518,7 @@ async function submitEditSource(form: FormData, source: "generated" | "uploaded"
 }
 
 /** The household adult a picture this home made was made to look like (its provenance records it), or null. */
-async function generatedPictureLikeness(source: SourcePicture): Promise<string | null> {
+export async function generatedPictureLikeness(source: SourcePicture): Promise<string | null> {
   if (source.temporary) return null;
   const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
   const note = row?.provenance ?? "";
@@ -523,7 +529,7 @@ async function generatedPictureLikeness(source: SourcePicture): Promise<string |
   } catch { return null; }
 }
 
-async function isGeneratedPicture(actor: PersonRow, source: SourcePicture): Promise<boolean> {
+export async function isGeneratedPicture(actor: PersonRow, source: SourcePicture): Promise<boolean> {
   if (source.temporary) return getTemporaryChatImageForReader(actor, source.conversationId, source.rootId)?.generated === true;
   const row = db.select({ provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, source.rootId)).get();
   return typeof row?.provenance === "string" && row.provenance.startsWith("picture-gen:");
