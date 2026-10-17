@@ -9,7 +9,7 @@
 // consumers (Go, Desktop, firmware pods).
 import { createRoute, z } from "@hono/zod-openapi";
 import { getCookie, deleteCookie } from "hono/cookie";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull, isNotNull } from "drizzle-orm";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { db, sqlite } from "@/db";
@@ -17,12 +17,13 @@ import { people, personCredentials, passkeyCredentials, sessions } from "@/db/sc
 import { requiresCredential, getAuthMethods, pinDigitsHint, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { isTotpEnabled } from "@/lib/totp";
 import { hashSessionToken, issueSession, sessionSignInSource } from "@/lib/session";
+import { deviceTokens } from "@/db/schema";
 import { hashSecret, secretDigitsOf, verifySecret } from "@/lib/secret";
 import { recordFailedAttempt, clearFailedAttempts, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { requireAuth, invalidateSessionCache } from "@/middleware/auth";
+import { requireAuth, invalidateSessionCache, invalidateSessionCacheForPerson } from "@/middleware/auth";
 import { toRoster, parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { validateDisplayName, validateSecret } from "@/lib/validation";
 import { getSettingValueForPerson, SESSION_LOCK_REQUIRED_KEY, SESSION_LOCK_TIMEOUT_KEY } from "@/lib/settings";
@@ -417,6 +418,10 @@ auth.openapi(changeSecretRoute, async (c) => {
     })
     .run();
 
+  // Password changes revoke every long-lived device credential for this person.
+  db.delete(deviceTokens).where(eq(deviceTokens.personId, actor.id)).run();
+  db.delete(sessions).where(and(eq(sessions.personId, actor.id), isNotNull(sessions.deviceId))).run();
+  invalidateSessionCacheForPerson(actor.id);
   return c.json({ success: true as const }, 200);
 });
 

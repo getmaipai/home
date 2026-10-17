@@ -3,8 +3,9 @@ import { getCookie } from "hono/cookie";
 import type { Context } from "hono";
 import { eq, gt, and, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { sessions, people } from "@/db/schema";
+import { sessions, people, deviceTokens } from "@/db/schema";
 import { hashSessionToken } from "@/lib/session";
+import { resolveDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
 import { resolveApiToken } from "@/lib/apiToken";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
@@ -356,3 +357,34 @@ export const requireApiToken = createMiddleware<AppEnv>(async (c, next) => {
   c.set("person", person);
   await next();
 });
+
+/** Bearer admission is opt-in at each route. Never use this in the general session authenticator. */
+export function requireDeviceScope(scope: "media.offline" | "offline.records") {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const authorization = c.req.header("authorization");
+    if (authorization !== undefined) {
+      const match = /^Bearer ([^ ]+)$/i.exec(authorization);
+      const identity = match ? resolveDeviceToken(match[1]!) : null;
+      const device = identity ? getDeviceById(identity.deviceId) : null;
+      if (!identity || !device || !device.offlineScope.includes(scope)) {
+        return c.json({ error: "This device cannot keep these files. Sign in to Home and check its offline permission, or pair it again." }, 403);
+      }
+      c.set("person", identity.person);
+      c.set("deviceId", device.id);
+      db.update(deviceTokens).set({ lastSeenAt: new Date().toISOString() }).where(eq(deviceTokens.tokenHash, hashDeviceToken(match![1]!))).run();
+    } else {
+      const result = authenticate(c);
+      if (result instanceof Response) return result;
+      const token = getCookie(c, "session")!;
+      const deviceId = resolveSessionDeviceId(token);
+      // Redeeming a device bearer for a cookie must not bypass the offline scope.
+      if (deviceId && !getDeviceById(deviceId)?.offlineScope.includes(scope)) {
+        return c.json({ error: "This device has no offline permission. Sign in on your own browser to change it." }, 403);
+      }
+      c.set("person", result);
+      if (deviceId) c.set("deviceId", deviceId);
+    }
+    c.header("Cache-Control", "private, no-store");
+    await next();
+  });
+}

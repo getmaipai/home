@@ -1189,6 +1189,7 @@ export const hubEndpoints = sqliteTable("hub_endpoints", {
 // watermarks are stored as JSON text (sqlite has no array/object column);
 // lib/devices.ts is the only place that (de)serializes them.
 export const devices = sqliteTable("devices", {
+  offlineScope: text("offline_scope").notNull().default("[]"), // JSON: media.offline, offline.records
   id: text("id").primaryKey(),
   kind: text("kind").notNull(), // "robot" | "pod" | "tv" | "phone" | "desktop" | "browser"
   name: text("name").notNull(),

@@ -4,12 +4,13 @@
 // scope BACKLOG.md's "Sessions per device under Profile with revoke"
 // describes - not a household-wide admin view (that's a later, undecided
 // feature; nothing in this wave's contract asks for one).
+import { getCookie } from "hono/cookie";
 import { createRoute, z } from "@hono/zod-openapi";
 import { upgradeWebSocket } from "hono/bun";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { LIVE_VIEW_CONTENT_TYPE, getLiveView, liveViewAdmits, liveViewStream, pushLiveFrame, startLiveView, stopLiveView } from "@/lib/liveView";
-import { requireAuth, requireRole, requireDeviceSession } from "@/middleware/auth";
-import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById } from "@/lib/devices";
+import { requireAuth, requireRole, requireDeviceSession, resolveHumanSession } from "@/middleware/auth";
+import { listDevicesForPerson, listDevicesByKind, deleteDevice, getDeviceById, setDeviceOfflineScope } from "@/lib/devices";
 import { getDeviceState, getPendingMotorRebootOffer, markMotorRebootAnswered, resolveRequestDevice, stateForViewer, upsertDeviceState } from "@/lib/deviceStates";
 import { speakerAgeBand } from "@/lib/ageBand";
 import { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
@@ -50,6 +51,7 @@ const DeviceSchema = z.object({
   // renders it; carried here so that page has something to read once it
   // exists.
   capabilities: z.array(z.string()),
+  offlineScope: z.array(z.enum(["media.offline", "offline.records"])),
   state: z.object({
     activity: RobotState.shape.activity,
     muted: z.boolean(),
@@ -83,7 +85,7 @@ devicesRoutes.openapi(listRoute, (c) => {
   const actor = c.get("person");
   const devices = listDevicesForPerson(actor.id);
   return c.json(
-    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
+    devices.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: d.kind === "robot" ? stateForViewer(getDeviceState(d.id), actor) : null })),
     200,
   );
 });
@@ -104,7 +106,7 @@ const listRobotsRoute = createRoute({
 devicesRoutes.openapi(listRobotsRoute, (c) => {
   const robots = listDevicesByKind("robot");
   return c.json(
-    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, state: stateForViewer(getDeviceState(d.id), c.get("person")) })),
+    robots.map((d) => ({ id: d.id, kind: d.kind, name: d.name, area: d.area, lastSeenAt: d.lastSeenAt, createdAt: d.createdAt, capabilities: d.capabilities, offlineScope: d.offlineScope as Array<"media.offline" | "offline.records">, state: stateForViewer(getDeviceState(d.id), c.get("person")) })),
     200,
   );
 });
@@ -562,4 +564,20 @@ devicesRoutes.openapi(rotationStatusRoute, (c) => {
   if (!device) return c.json({ error: "No such device" }, 404);
   if (device.kind !== "robot") return c.json({ error: "Not a robot" }, 400);
   return c.json({ rotated: hasRotatedRobotCredential(device.id) }, 200);
+});
+
+const offlineScopeRoute = createRoute({
+  method: "patch", path: "/{id}/offline-scope", tags: ["Devices"], summary: "Set a device's default-deny offline permissions (owner or admin)",
+  middleware: [requireAuth] as const,
+  request: { params: z.object({ id: z.string() }), body: { content: { "application/json": { schema: z.object({ offline_scope: z.array(z.enum(["media.offline", "offline.records"])).max(2) }).strict() } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Permission saved. New byte requests use it immediately." }, ...errorResponses({ 401: "Sign in", 403: "Use your own browser to manage permissions", 404: "Device missing or owned by someone else" }) },
+});
+devicesRoutes.openapi(offlineScopeRoute, (c) => {
+  const session = getCookie(c, "session");
+  if (!session || !resolveHumanSession(session)) return c.json({ error: "A paired device cannot change offline permissions. Sign in on your own browser to change them." }, 403);
+  const actor = c.get("person");
+  const device = getDeviceById(c.req.valid("param").id);
+  if (!device || (device.personId !== actor.id && actor.role !== "owner" && actor.role !== "admin")) return c.json({ error: "This device is not yours to change. Choose your own device or ask an admin." }, 404);
+  setDeviceOfflineScope(device.id, c.req.valid("json").offline_scope);
+  return c.json({ success: true as const }, 200);
 });

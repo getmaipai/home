@@ -20,6 +20,7 @@ export interface Device {
   name: string;
   area: string | null;
   capabilities: string[];
+  offlineScope: string[];
   personId: string;
   watermarks: Record<string, unknown>;
   lastSeenAt: string | null;
@@ -35,6 +36,7 @@ function toDevice(row: typeof devices.$inferSelect): Device {
     name: row.name,
     area: row.area,
     capabilities: JSON.parse(row.capabilities) as string[],
+    offlineScope: parseOfflineScope(row.offlineScope),
     personId: row.personId,
     watermarks: JSON.parse(row.watermarks) as Record<string, unknown>,
     lastSeenAt: row.lastSeenAt,
@@ -57,6 +59,7 @@ export function createDevice(kind: DeviceKind, name: string, personId: string, c
     area: null,
     capabilities: JSON.stringify(capabilities),
     personId,
+    offlineScope: "[]",
     watermarks: "{}",
     lastSeenAt: null,
     createdAt: now,
@@ -129,4 +132,16 @@ export function deleteDevice(id: string, personId: string): boolean {
   // Nothing to clear here - that row staying behind is the whole point.
   db.delete(devices).where(eq(devices.id, id)).run();
   return true;
+}
+
+/** Corrupt or unrecognised scope data grants nothing. */
+function parseOfflineScope(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((scope) => scope === "media.offline" || scope === "offline.records") ? parsed : [];
+  } catch { return []; }
+}
+
+export function setDeviceOfflineScope(id: string, scopes: Array<"media.offline" | "offline.records">): void {
+  db.update(devices).set({ offlineScope: JSON.stringify([...new Set(scopes)]), updatedAt: new Date().toISOString(), hlc: nextHlc() }).where(eq(devices.id, id)).run();
 }

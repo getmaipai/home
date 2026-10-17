@@ -19,7 +19,7 @@
 import { randomBytes, createHash } from "node:crypto";
 import { eq, lt, asc, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
-import { deviceTokens } from "@/db/schema";
+import { deviceTokens, devices, people } from "@/db/schema";
 import { newDeviceTokenId } from "@/lib/id";
 import { createDevice, touchDevice, type DeviceKind } from "@/lib/devices";
 
@@ -81,13 +81,10 @@ export function issueDeviceToken(
  * tokens - the client's cue to walk the person through pairing again
  * (Quick Connect or a fresh passkey sign-in), never a silent retry. */
 export function redeemDeviceToken(token: string, seenUrl: string | null): { personId: string; deviceId: string } | null {
+  const identity = resolveDeviceToken(token);
+  if (!identity) return null;
   const tokenHash = hashDeviceToken(token);
-  const row = db.select().from(deviceTokens).where(eq(deviceTokens.tokenHash, tokenHash)).get();
-  if (!row) return null;
-  if (new Date(row.expiresAt).getTime() < Date.now()) {
-    db.delete(deviceTokens).where(eq(deviceTokens.id, row.id)).run();
-    return null;
-  }
+  const row = db.select().from(deviceTokens).where(eq(deviceTokens.tokenHash, tokenHash)).get()!;
   db.update(deviceTokens)
     .set({ lastSeenAt: new Date().toISOString(), lastSeenUrl: seenUrl })
     .where(eq(deviceTokens.id, row.id))
@@ -103,4 +100,20 @@ export function pruneExpiredDeviceTokens(): void {
 /** Whether any native device token has been redeemed at least once. */
 export function hasRedeemedDeviceToken(): boolean {
   return db.select({ id: deviceTokens.id }).from(deviceTokens).where(isNotNull(deviceTokens.lastSeenAt)).limit(1).get() !== undefined;
+}
+
+/** Fresh on every call: a disabled person, removed device, expiry or 180 days unused revokes access. */
+export function resolveDeviceToken(token: string): { person: typeof people.$inferSelect; personId: string; deviceId: string } | null {
+  const row = db.select().from(deviceTokens).where(eq(deviceTokens.tokenHash, hashDeviceToken(token))).get();
+  if (!row) return null;
+  const expiry = Date.parse(row.expiresAt);
+  const used = Date.parse(row.lastSeenAt ?? row.createdAt);
+  if (!Number.isFinite(expiry) || expiry <= Date.now() || !Number.isFinite(used) || used < Date.now() - 180 * 86400_000) {
+    db.delete(deviceTokens).where(eq(deviceTokens.id, row.id)).run();
+    return null;
+  }
+  const device = db.select().from(devices).where(eq(devices.id, row.deviceId)).get();
+  const person = db.select().from(people).where(eq(people.id, row.personId)).get();
+  if (!device || device.personId !== row.personId || !person || !person.enabled || person.deletedAt || person.memorializedAt) return null;
+  return { person, personId: person.id, deviceId: device.id };
 }

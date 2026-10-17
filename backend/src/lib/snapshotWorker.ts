@@ -27,6 +27,13 @@ if (parentPort) {
     const db = new Database(src);
     try {
       db.query("VACUUM INTO ?").run(dst);
+      // Only scrub the copy. VACUUM again removes credential bytes from free pages too.
+      const snapshot = new Database(dst);
+      try {
+        snapshot.exec("PRAGMA secure_delete = ON");
+        snapshot.exec("DELETE FROM device_tokens");
+        snapshot.exec("VACUUM");
+      } finally { snapshot.close(); }
       parentPort?.postMessage({ ok: true });
     } catch (err) {
       parentPort?.postMessage({ ok: false, error: err instanceof Error ? err.message : String(err) });
