@@ -252,12 +252,48 @@ describe("the routes", () => {
     expect(fake.submitted).toHaveLength(2);
   });
 
-  test("Animate refuses a picture the Stack did not make", async () => {
+  test("Animate refuses a turn that is not the person's own, and a picture the Stack did not make", async () => {
     const owner = await signedIn("Sage", "owner");
     const job = await finishedJob(owner.actor);
-    const res = await owner.client.post("/api/videos/animate", { conversation_id: job.conversationId, turn_id: "turn-x", file_id: "file-nothere", prompt: "make it move" });
+    const foreign = await owner.client.post("/api/videos/animate", { conversation_id: job.conversationId, turn_id: "turn-x", file_id: "file-nothere", prompt: "make it move" });
+    expect(foreign.status).toBe(404);
+    let turnId = "";
+    await withStub({ calls: () => undefined, reply: () => "Hi." }, async () => {
+      const value = await turn(owner.actor, "hello", "chat", { conversationId: job.conversationId });
+      turnId = value.turn_id;
+    });
+    const res = await owner.client.post("/api/videos/animate", { conversation_id: job.conversationId, turn_id: turnId, file_id: "file-nothere", prompt: "make it move" });
     expect(res.status).toBe(422);
     expect(fake.submitted).toHaveLength(1);
+  });
+
+  test("a person can have one clip in the making at a time; a second request is refused in plain words and sends nothing", async () => {
+    fake.pollsToFinish = 1000;
+    const owner = await signedIn("Sage", "owner");
+    const conv = await import("@/lib/conversationHistory");
+    const resolved = conv.resolveOrCreateConversation(owner.actor, "chat", undefined, {});
+    if (!resolved.ok) throw new Error("no conversation");
+    const body = { prompt: "a paper boat", audience: "adult" as const };
+    await startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "a paper boat", body });
+    await expect(startVideoJob({ actor: owner.actor, conversationId: resolved.value.id, turnId: null, temporary: true, kind: "generate", prompt: "another", body })).rejects.toThrow("already have a video being made");
+    expect(fake.submitted).toHaveLength(1);
+  });
+
+  test("an unsatisfiable Range is a 416, never the whole file", async () => {
+    const owner = await signedIn("Sage", "owner");
+    const job = await finishedJob(owner.actor);
+    const file = getVideoJobFor(owner.actor, job.id)!.files[0]!;
+    const res = await owner.client.get(`/api/videos/jobs/${job.id}/files/${file.id}`, { Range: "bytes=999999-" });
+    expect(res.status).toBe(416);
+    expect(res.headers.get("content-range")).toBe("bytes */4096");
+  });
+
+  test("switching an unknown LoRA on or off is a 404 and leaves no row behind", async () => {
+    const owner = await signedIn("Sage", "owner");
+    const res = await owner.client.request("/api/videos/adapters/lora-ffffffffffffffff", { method: "PATCH", body: { enabled: false } });
+    expect(res.status).toBe(404);
+    const { videoAdapterPrefs } = await import("@/db/schema");
+    expect(db.select().from(videoAdapterPrefs).all()).toHaveLength(0);
   });
 
   test("a clip streams with Range for its owner only; a missing job and a stranger's job read the same", async () => {

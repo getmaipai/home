@@ -11,11 +11,11 @@ are upper bounds. Scripts, logs, clips and keyframe sheets are in the author's s
 
 | | Pick | Licence | Why |
 |---|---|---|---|
-| Default (p64, p128) | **Wan2.2 TI2V-5B, FastWan DMD 3-step distillation, MLX** (`lBroth/FastWan2.2-TI2V-5B-MLX` weights) | Apache-2.0 (base `Wan-AI/Wan2.2-TI2V-5B` Apache-2.0; FastWan `FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers` Apache-2.0) | A 5 s, 121 frame, 24 fps clip at 832 x 480 in **about 130 to 140 s end to end** (3 denoise steps, 10 to 16 s), text-to-video and image-to-video in one model, the largest community LoRA base of any permissive model, no safety filter in the weights or the runtime |
+| Default (p128 only) | **Wan2.2 TI2V-5B, FastWan DMD 3-step distillation, MLX** (`lBroth/FastWan2.2-TI2V-5B-MLX` weights) | Apache-2.0 (base `Wan-AI/Wan2.2-TI2V-5B` Apache-2.0; FastWan `FastVideo/FastWan2.2-TI2V-5B-FullAttn-Diffusers` Apache-2.0) | A 5 s, 121 frame, 24 fps clip at 832 x 480 in **about 130 to 140 s end to end** (3 denoise steps, 10 to 16 s), text-to-video and image-to-video in one model, the largest community LoRA base of any permissive model, no safety filter in the weights or the runtime |
 | Runtime | **mlx-video** (MIT, Blaizzy/mlx-video, commit `87db56a`), Wan2.2 path, run by a Stack-managed Python 3.12 worker | MIT | Native MLX (Apple GPU), `--lora` loading built in, image conditioning built in, no server to expose, no network calls at generate time except one tokenizer lookup the pin removes (section 3) |
 | Sound | None from this model. Music and voice already exist as Stack roles (`music`, `tts`); the assembler lays them in | n/a | Wan has no audio. The one permissive model with audio (Kandinsky 6.0) is the fallback below |
 | Fallback / second pin, not default | **Kandinsky 6.0 Video Lite distill (3B, MIT)**: text and image to video **with synchronized 44 kHz audio**, 10 steps | MIT on the card | Measured on this Mac through PyTorch MPS: 22.7 s per step, **227 s denoise alone**, and the untiled decode died at a 194 GB peak. Fails the speed bar today; revisit when an MLX port exists. See section 2 |
-| Smaller tiers (p16, p32) | **Off.** `video` stays "not available" | | Peak 44 GB at 121 frames. A smaller-frame, quantized path was not measured; claiming it would be a guess. Row VIDEO-GEN-09 measures a 480p, 61 frame q8 profile for p32 before any promise |
+| Smaller tiers (p16, p32, p64) | **Off.** `video` stays "not available" | | Peak 44 GB at 121 frames. **p64 is off by the owner's call (2026-10-17):** the clip's 44.1 GB beside the roughly 28 GB resident chat set leaves no room on a 64 GB Mac, so every clip there would be refused with `no_memory`; video is offered only where it can run. A smaller-frame, quantized path was not measured; claiming it would be a guess. Row VIDEO-GEN-09 measures a 480p, 61 frame q8 profile for p32 before any promise |
 
 The bar was "5 s at 480p to 720p in under about 3 minutes warm". 480p meets it (122 to 141 s); 720p does not (308 s, 53.9 GB), see section 4.
 
@@ -170,7 +170,7 @@ acknowledgement). No adult LoRA was downloaded or tested in this session.
   a percentage inside rendering and decoding; **cancel** stops the worker and frees its memory; a job past its deadline answers `202` with the
   id, as the image and tool routes do. Results are held in memory about 10 minutes (the six newest) and Home stores the file as a new
   attachment; nothing is logged with a prompt (rule 6a).
-- **Caps per tier.** p128 and p64: up to 121 frames (5 s) at 832 x 480. p16 and p32: off.
+- **Caps per tier.** p128: up to 121 frames (5 s) at 832 x 480. p16, p32 and p64: off.
   Hard ceilings in the Stack, not settings: 121 frames, 24 fps, the pixel area of 832 x 480 (720p measured at 308 s and 53.9 GB, not offered).
 
 ## 9. Stack API (additive; contract number unchanged)
@@ -247,7 +247,7 @@ exists. Home's own gates (age, surface, household names) still run first; Home m
 **Home still owes:** the `video.*` settings and the age and surface gate (VIDEO-GEN-04; minors off by default), the package and chat tool (05), the player, progress and cancel UI (06),
 the bench and safety review (07), the Settings page for models and LoRAs, and the end-to-end verification (08). The image-generation Stack work by another agent shares the one-at-a-time
 generator admission (a governor `generator` item blocks another), so a picture job and a clip never overlap; a request can sit in `waiting for memory`.
-On a 64 GB Mac the clip cannot fit beside the chat model and is refused at once with `no_memory`; p64 is "on demand" in the profile but will in practice refuse until chat is smaller.
+On a 64 GB Mac the clip cannot fit beside the chat model, so p64 no longer lists video (Stack commit eccc9e9: `VIDEO_TIERS` is `["p128"]` and the p64 profile moves video to not available); Home offers the tool only when `GET /stack/v1/video` answers `available`.
 
 ## Supersedes
 

@@ -11,7 +11,7 @@ import type { TurnState, ToolExecutionOutcome } from "@/lib/turnMachine/contract
 import { outcomeOf } from "@/lib/turnContext";
 import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { videoAdaptersFor, matchVideoAdapter, withVideoTriggerWords } from "./adapters";
-import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, loadGeneratedReference, plainVideoFailure, startVideoJob } from "./jobs";
+import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, loadGeneratedReference, plainVideoFailure, startVideoJob } from "./jobs";
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
@@ -98,7 +98,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let size = VIDEO_SIZES[typeof args.orientation === "string" ? args.orientation : "landscape"] ?? VIDEO_SIZES.landscape!;
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
   if (from) {
-    const id = /^(latest|last|this|that)$/i.test(from) ? latestGeneratedPictureId(actor, state.conversationId) : from;
+    const id = /^(latest|last|this|that)$/i.test(from) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId) : latestGeneratedPictureId(actor, state.conversationId)) : from;
     const ref = id ? loadGeneratedReference(actor, state.conversationId, id, temporary) : null;
     if (!ref || !ref.ok) {
       return outcomeOf({
@@ -145,6 +145,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
       },
     });
   } catch (error) {
+    if (error instanceof StackVideoError && error.code === "already_making") {
+      return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: `No new video was started. Say this to the person in your own words and keep its meaning: ${error.message}` }, data: { refused: "already_making" }, actions: [] } });
+    }
     if (error instanceof StackVideoError && ["unreachable", "no_stack", "not_installed", "unsupported", "no_memory", "queue_full", "not_available_on_this_computer", "model_missing", "setup_failed"].includes(error.code)) {
       return failed(callId, args, error.code, "unavailable", plainVideoFailure(error));
     }

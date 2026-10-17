@@ -43823,7 +43823,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Make another clip from the same words with a new seed",
+        "summary": "Make another clip from the same words with a new seed (also Try again after a failed or stopped one)",
         "parameters": [
           {
             "schema": {

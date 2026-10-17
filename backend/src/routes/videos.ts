@@ -13,6 +13,9 @@ import { adultVideoAdaptersAllowed, householdAllowsVideo, refuseVideoPrompt, sta
 import { videoEngineStatus, videoStatusReady } from "@/lib/videos/ready";
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
 import { latestGeneratedPictureId, VIDEO_SIZES } from "@/lib/videos/tool";
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { conversationTurns } from "@/db/schema";
 import type { PersonRow } from "@/types";
 
 export const videosRoutes = apiRouter();
@@ -23,6 +26,9 @@ export function videoRouteAudience(actor: PersonRow): VideoAudience {
 }
 
 /** The plain words for the video limits, shown on the card and on the settings page. */
+/** The most clips one request's card holds (the first and each Make another). */
+export const MAX_CLIPS_PER_CARD = 8;
+
 export const VIDEO_LIMITS_LINE = "Videos are 5 seconds at 480p and take about 2 minutes.";
 
 const ItemSchema = z.object({
@@ -67,7 +73,7 @@ export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
   return {
     id: root.id, conversation_id: root.conversationId, items: jobs.map(itemView),
-    can_make_another: canMake && !active && jobs.length < 8, limits: VIDEO_LIMITS_LINE,
+    can_make_another: canMake && !active && jobs.length < MAX_CLIPS_PER_CARD, limits: VIDEO_LIMITS_LINE,
   };
 }
 
@@ -132,6 +138,8 @@ videosRoutes.openapi(fileRoute, (c) => {
       headers["content-length"] = String(slice.byteLength);
       return new Response(slice, { status: 206, headers }) as never;
     }
+    // A range that starts past the end (or ends before it starts) is unsatisfiable, not "send everything".
+    return new Response(null, { status: 416, headers: { "content-range": `bytes */${total}`, "cache-control": "private, no-store" } }) as never;
   }
   headers["content-length"] = String(total);
   return new Response(file.bytes, { status: 200, headers }) as never;
@@ -175,6 +183,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   const blocked = await gateRoute(actor, source.prompt);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
   if (!source.conversationId) return c.json({ error: "That video isn't available any more." }, 404) as never;
+  if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
   const audience = videoRouteAudience(actor);
   const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
   // Only LoRAs this person may still use ride along; one turned off since is dropped.
@@ -186,11 +195,11 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     image = ref.base64;
   }
   try {
-    await startVideoJob({
+    const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
       body: { prompt: source.prompt, size: source.request.size, seconds: source.request.seconds, audience: stackAudienceFor(audience), ...(image ? { image, image_source: "generated" as const } : {}), ...(loras.length ? { loras } : {}) },
     });
-    return c.json(videoCardView(actor, source, true), 200);
+    return c.json(videoCardView(actor, started, true), 200);
   } catch (error) {
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
     return c.json({ error: plainVideoFailure(error), code: error instanceof StackVideoError ? error.code : "failed" }, status) as never;
@@ -208,6 +217,8 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const prompt = body.prompt ?? "Bring this picture to life with gentle, natural motion.";
   const blocked = await gateRoute(actor, prompt);
   if (blocked) return c.json(blocked.body, blocked.status) as never;
+  const ownTurn = db.select({ id: conversationTurns.id }).from(conversationTurns).where(and(eq(conversationTurns.id, body.turn_id), eq(conversationTurns.conversationId, body.conversation_id), eq(conversationTurns.personId, actor.id))).get();
+  if (!ownTurn) return c.json({ error: "That chat isn't available any more. Open it again and try once more.", code: "not_found" }, 404) as never;
   const fileId = body.file_id ?? latestGeneratedPictureId(actor, body.conversation_id);
   const ref = fileId ? loadGeneratedReference(actor, body.conversation_id, fileId, false) : null;
   if (!ref || !ref.ok) return c.json({ error: ref && !ref.ok ? ref.line : "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.", code: "reference" }, 422) as never;
@@ -262,6 +273,8 @@ videosRoutes.openapi(patchAdapterRoute, async (c) => {
   const { id } = c.req.valid("param");
   const body = c.req.valid("json");
   try {
+    // Only a LoRA that is in the library gets a switch: an unknown id never leaves a row behind.
+    if (!(await allVideoAdapters()).some((a) => a.id === id)) return c.json({ error: "That style isn't in the library." }, 404) as never;
     if (body.classification || body.name) await updateVideoLora(id, { ...(body.classification ? { classification: body.classification } : {}), ...(body.name ? { name: body.name } : {}) });
     if (typeof body.enabled === "boolean") setVideoAdapterEnabled(id, body.enabled, actor.id);
     dropVideoAdapterCache();

@@ -555,9 +555,11 @@ async function beginTurn(actor: PersonRow, surface: Surface, text: string, opts:
   // IMGGEN-HOME-01 (rule 0): `generate_image` is offered only to an adult on their own written screen, with pictures on
   // for the household and a picture engine installed on the Stack. A child, a teen, a guest, a spoken or shared surface
   // never sees it.
+  // The video status read starts here so it runs beside the picture engine's, not after it (each can wait on the Stack).
+  const videoReadyNow = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) ? videoEngineReady() : Promise.resolve(false);
   const picturesOk = !bare && picturesAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await pictureEngineReady());
   // VIDEO-GEN-05 (rule 0): `generate_video` follows the same gate, with the household's video switch and a video model.
-  const videosOk = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await videoEngineReady());
+  const videosOk = !bare && videosAllowed({ actor, band, surface, surfaceClass, spoken: opts.spoken === true }) && (await videoReadyNow);
   const budget: TurnBudget = withTurnToolGates(thinkingBudget, answerImagesOk, picturesOk, videosOk);
 
   const state: TurnState = {

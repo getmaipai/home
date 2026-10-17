@@ -6,10 +6,9 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, conversationTurns, people, videoJobs } from "@/db/schema";
-import { createAttachment, getTemporaryChatImage, registerTemporaryMedia } from "@/lib/attachments";
+import { createAttachment, readAttachmentForConversation, registerTemporaryMedia } from "@/lib/attachments";
 import { newFileId, newVideoJobId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { readAttachmentForConversation } from "@/lib/attachments";
 import type { PersonRow } from "@/types";
 import { cancelOrDeleteVideo, fetchClip, fetchPoster, getVideoJob, StackVideoError, submitVideo, type StackClip, type VideoBody } from "./stack";
 
@@ -73,6 +72,7 @@ export function busyLine(position: number | null): string {
 export function plainVideoFailure(error: unknown): string {
   if (error instanceof StackVideoError) {
     switch (error.code) {
+      case "already_making": return `${VIDEO_FAILED_PREFIX} ${error.message}`;
       case "queue_full": return `${VIDEO_FAILED_PREFIX} Home already has a full line of videos waiting. Try again in a few minutes.`;
       case "no_memory": case "out_of_memory": return `${VIDEO_FAILED_PREFIX} This computer doesn't have enough free memory for a video right now. Try again in a few minutes.`;
       case "not_installed": case "model_missing": case "setup_failed": return `${VIDEO_FAILED_PREFIX} No video model is installed on this computer yet. An admin can add one in Settings, Pictures and videos.`;
@@ -96,6 +96,8 @@ function trimSentence(text: string): string {
 
 const memory = new Map<string, VideoJob>();
 const watching = new Map<string, AbortController>();
+// The one object a watcher and a Stop both act on, so neither saves a stale copy over the other.
+const liveJobs = new Map<string, VideoJob>();
 
 type Row = typeof videoJobs.$inferSelect;
 function fromRow(row: Row): VideoJob {
@@ -118,7 +120,7 @@ function save(job: VideoJob): void {
 
 /** A job by id for its owner only: nobody sees another person's videos, a parent included. */
 export function getVideoJobFor(actor: PersonRow, id: string): VideoJob | null {
-  const live = memory.get(id);
+  const live = memory.get(id) ?? liveJobs.get(id);
   if (live) return live.personId === actor.id ? live : null;
   const row = db.select().from(videoJobs).where(eq(videoJobs.id, id)).get();
   return row && row.personId === actor.id ? fromRow(row) : null;
@@ -177,6 +179,7 @@ export function readVideoFile(actor: PersonRow, job: VideoJob, fileId: string): 
 export function __resetVideoJobsForTests(): void {
   for (const controller of watching.values()) controller.abort();
   watching.clear();
+  liveJobs.clear();
   memory.clear();
   temporaryClips.clear();
 }
@@ -189,14 +192,20 @@ export const CLIP_POSTER_NOTE = "video-poster:";
 export type ReferenceResult = { ok: true; id: string; base64: string; width: number | null; height: number | null } | { ok: false; line: string };
 const NOT_GENERATED_LINE = "I can only animate a picture that was made here in this home. Ask me to make a picture first, then animate that one.";
 
+/** The newest poster of a clip made in this temporary chat, or null. */
+export function latestTemporaryPosterId(actor: PersonRow, conversationId: string): string | null {
+  let best: TemporaryClip | null = null;
+  for (const clip of temporaryClips.values()) if (clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg" && (!best || clip.createdAt >= best.createdAt)) best = clip;
+  return best?.id ?? null;
+}
+
 /** A picture of this conversation the Stack itself made (a generated picture or a clip's poster), as base64 of its stored bytes, unchanged. Anything else is refused here before the Stack is asked; the Stack checks the bytes' hash again. */
 export function loadGeneratedReference(actor: PersonRow, conversationId: string, fileId: string, temporary: boolean): ReferenceResult {
   if (temporary) {
     const clip = temporaryClips.get(fileId);
     if (clip && clip.ownerPersonId === actor.id && clip.conversationId === conversationId && clip.mediaType === "image/jpeg") return { ok: true, id: fileId, base64: Buffer.from(clip.bytes).toString("base64"), width: null, height: null };
-    // A temporary chat's generated picture is held in memory under this name by lib/pictures/jobs.ts; an upload carries its own file name.
-    const image = getTemporaryChatImage(actor, conversationId, fileId);
-    if (image && image.name === "Generated picture") return { ok: true, id: fileId, base64: Buffer.from(image.bytes).toString("base64"), width: image.width, height: image.height };
+    // In a temporary chat only a clip's own poster counts: nothing in memory records, in a field a person cannot set, that a
+    // picture was made by the Stack (an uploaded photo's name is the person's own), so a temporary picture is never trusted.
     return { ok: false, line: NOT_GENERATED_LINE };
   }
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
@@ -215,6 +224,15 @@ export function loadGeneratedReference(actor: PersonRow, conversationId: string,
   return { ok: true, id: fileId, base64: Buffer.from(read.value.bytes).toString("base64"), width, height };
 }
 
+/** How many of this person's clips are waiting or being made. */
+export function activeVideoJobsFor(actor: PersonRow): number {
+  let count = 0;
+  for (const job of memory.values()) if (job.personId === actor.id && (job.state === "queued" || job.state === "running")) count += 1;
+  const rows = db.select({ id: videoJobs.id }).from(videoJobs).where(and(eq(videoJobs.personId, actor.id), inArray(videoJobs.state, ["queued", "running"]))).all();
+  for (const row of rows) if (!memory.has(row.id)) count += 1;
+  return count;
+}
+
 // ---------------------------------------------------------------- start
 
 export interface StartVideoInput {
@@ -230,6 +248,8 @@ export interface StartVideoInput {
 
 /** Submits to the Stack and returns the job once the Stack has it; throws `StackVideoError` when the Stack refuses. */
 export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
+  // One clip at a time per person: a second one waits until the first is done or stopped, so no one can fill the Stack's line.
+  if (activeVideoJobsFor(input.actor) > 0) throw new StackVideoError(429, "already_making", "You already have a video being made. Wait for it to finish, or stop it first.");
   const submitted = await submitVideo({ ...input.body, timeout_ms: 1 });
   const now = new Date().toISOString();
   const job: VideoJob = {
@@ -239,6 +259,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   save(job);
+  liveJobs.set(job.id, job);
   void watch(job, input.actor, submitted.done);
   return job;
 }
@@ -264,7 +285,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
   watching.set(job.id, controller);
   const deadline = Date.now() + MAX_WATCH_MS;
   try {
-    if (early) { await finish(job, actor, early); return; }
+    if (early) { await finish(job, actor, early, controller.signal); return; }
     while (!controller.signal.aborted && Date.now() < deadline) {
       let status;
       try {
@@ -275,7 +296,8 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
         await sleep(POLL_MS * 2, controller.signal);
         continue;
       }
-      if (status.state === "done") { await finish(job, actor, status.data); return; }
+      if (controller.signal.aborted) return;
+      if (status.state === "done") { await finish(job, actor, status.data, controller.signal); return; }
       if (status.state === "failed") { job.state = "failed"; job.error = plainVideoFailure(new StackVideoError(500, status.code ?? "failed", status.error ?? "")); save(job); return; }
       if (status.state === "cancelled") { job.state = "cancelled"; job.error = null; save(job); return; }
       job.state = status.state === "queued" ? "queued" : "running";
@@ -292,6 +314,7 @@ async function watch(job: VideoJob, actor: PersonRow, early: StackClip[] | null 
     try { save(job); } catch { /* the job ends here either way */ }
   } finally {
     watching.delete(job.id);
+    liveJobs.delete(job.id);
   }
 }
 
@@ -312,51 +335,51 @@ function looksLikeJpeg(bytes: Uint8Array): boolean {
   return bytes.byteLength > 100 && bytes[0] === 0xff && bytes[1] === 0xd8;
 }
 
-async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[]): Promise<void> {
+function saveFailureLine(status: number): string {
+  return status === 403 ? `${VIDEO_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${VIDEO_FAILED_PREFIX} The video couldn't be saved. Try again.`;
+}
+
+async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signal: AbortSignal): Promise<void> {
   const stackJob = job.stackJob!;
-  const clip = clips[0];
-  if (!clip) { job.state = "failed"; job.error = plainVideoFailure(null); save(job); return; }
-  // The Stack's bytes are stored unchanged: a poster that is re-encoded could never start a later clip.
-  const video = await fetchClip(stackJob);
-  const poster = await fetchPoster(stackJob);
-  if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video engine sent a file I couldn't read. Try again.`; save(job); return; }
-  const conversationId = job.conversationId;
-  if (!conversationId) throw new Error("no conversation");
-  const width = clip.width ?? 832;
-  const height = clip.height ?? 480;
-  const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height };
-  let file: VideoFile;
-  if (job.temporary) {
-    const id = newFileId();
-    const posterId = newFileId();
-    storeTemporaryClip({ id, conversationId, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
-    storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster });
-    file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
-  } else {
-    if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
-    const made = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "video/mp4", bytes: video, provenance: `video-gen:${JSON.stringify({ v: 1, job: job.id, ...meta })}`, deduplicate: false });
-    if (!made.ok) {
-      job.state = "failed";
-      job.error = made.status === 403 ? `${VIDEO_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${VIDEO_FAILED_PREFIX} The video couldn't be saved. Try again.`;
-      save(job);
-      return;
+  try {
+    const clip = clips[0];
+    if (!clip) { job.state = "failed"; job.error = plainVideoFailure(null); save(job); return; }
+    // The Stack's bytes are stored unchanged: a poster that is re-encoded could never start a later clip.
+    const video = await fetchClip(stackJob);
+    const poster = await fetchPoster(stackJob);
+    if (signal.aborted) return;
+    if (!looksLikeMp4(video) || !looksLikeJpeg(poster)) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} The video engine sent a file I couldn't read. Try again.`; save(job); return; }
+    const conversationId = job.conversationId;
+    if (!conversationId) throw new Error("no conversation");
+    const width = clip.width ?? 832;
+    const height = clip.height ?? 480;
+    const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height };
+    let file: VideoFile;
+    if (job.temporary) {
+      const id = newFileId();
+      const posterId = newFileId();
+      storeTemporaryClip({ id, conversationId, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
+      storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster });
+      file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
+    } else {
+      if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
+      if (signal.aborted) return;
+      const made = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "video/mp4", bytes: video, provenance: `video-gen:${JSON.stringify({ v: 1, job: job.id, ...meta })}`, deduplicate: false });
+      if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); save(job); return; }
+      const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, job: job.id, width, height })}`, deduplicate: false });
+      if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); save(job); return; }
+      file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
     }
-    const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, job: job.id, width, height })}`, deduplicate: false });
-    if (!madePoster.ok) {
-      job.state = "failed";
-      job.error = madePoster.status === 403 ? `${VIDEO_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${VIDEO_FAILED_PREFIX} The video couldn't be saved. Try again.`;
-      save(job);
-      return;
-    }
-    file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
+    job.files = [file];
+    job.state = "done";
+    job.percent = 100;
+    job.phase = "ready";
+    job.error = null;
+    save(job);
+  } finally {
+    // Done or not, Home has taken what it wanted: the Stack's copy goes (a failed save would otherwise leave a clip on its disk).
+    void cancelOrDeleteVideo(stackJob);
   }
-  job.files = [file];
-  job.state = "done";
-  job.percent = 100;
-  job.phase = "ready";
-  job.error = null;
-  save(job);
-  void cancelOrDeleteVideo(stackJob);
 }
 
 /** Stop a job. Safe to call twice; a finished job stays finished. */
@@ -382,6 +405,7 @@ export function resumeVideoJobs(): void {
 async function resume(job: VideoJob): Promise<void> {
   const person = db.select().from(people).where(eq(people.id, job.personId)).get();
   if (!person || !job.stackJob) { job.state = "failed"; job.error = `${VIDEO_FAILED_PREFIX} Home restarted before it finished. Try again.`; save(job); return; }
+  liveJobs.set(job.id, job);
   void watch(job, person as PersonRow);
 }
 

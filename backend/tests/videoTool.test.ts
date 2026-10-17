@@ -251,6 +251,22 @@ describe("VIDEO-GEN-05: animating a picture the Stack made", () => {
     });
   });
 
+  test("in a temporary chat a picture named like a generated one is still refused: nothing a person can set marks a picture as made by the Stack", async () => {
+    const { storeTemporaryChatImage } = await import("@/lib/attachments");
+    let conversationId = "";
+    await withStub(script(undefined, "Hi."), async () => {
+      const { value } = await streamValue(people.owner, "hello", { temporary: true });
+      conversationId = value.conversation_id;
+    });
+    storeTemporaryChatImage({ id: "file-fakeone", turnId: "turn-1", conversationId, ownerPersonId: people.owner.id, name: "Generated picture", mediaType: "image/png", width: 8, height: 8, bytes: new Uint8Array([1, 2, 3]) });
+    const call = { id: "c", name: "generate_video", args: JSON.stringify({ prompt: "make my photo move", from_picture: "file-fakeone" }) };
+    await withStub(script(call), async () => {
+      const { value } = await streamValue(people.owner, "animate it", { conversationId, temporary: true });
+      expect(value.video).toBeUndefined();
+      expect(fake.submitted).toHaveLength(0);
+    });
+  });
+
   test("with no generated picture in the chat, 'latest' is refused and nothing is sent", async () => {
     const { conversationId } = await conversationWithPicture("composer:upload");
     const call = { id: "c", name: "generate_video", args: JSON.stringify({ prompt: "make it move", from_picture: "latest" }) };
