@@ -7,6 +7,14 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-17
+
+The AI engine gains picture tools and video, and an upgrade now fetches the picture reader it needs.
+
+### Under the hood
+- The installer builds the Stack from a newer pin. It brings picture tools (remove background, erase, upscale, resize), video generation in the engine, and a fix that pulls the picture reader (projector) an installed model needs, with a Repairs item if that fails.
+- Tests can no longer stop or start the installed Stack. A test run used to boot the real engine service out of launchd.
+
 ## [0.2.6] - 2026-10-17
 
 Weather is an app, pictures reach the AI, the voice is Chatterbox, and sign-in uses one box per digit.
