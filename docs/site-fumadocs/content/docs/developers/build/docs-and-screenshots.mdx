@@ -28,6 +28,20 @@ It lists the pages to re-check and the pictures to retake since the last release
 
 Pictures come only from the screenshot script. The drift output prints the `DOCS_SHOTS_ONLY=...` line that retakes just the affected docs pictures. A picture whose file does not start with `docs-` comes from the general screenshot run. Open every retaken picture before using it.
 
+## Browse every screenshot
+
+```bash
+bash scripts/gallery.sh
+```
+
+It collects the images in `docs/assets`, `docs/design/assets` (with the interactive mockups), `docs/site-fumadocs/public/screens`, `frontend/public/setup-art` and `frontend/public/chat-art` from the latest `origin/main`, builds one grouped page (filter box, size switch, full-size view with the arrow keys) in `data-scratch/gallery`, serves it on `127.0.0.1` at a free port and opens it on macOS. A rerun replaces the page and the server.
+
+- `--worktree` uses this checkout's files instead of `origin/main`.
+- `--no-open` prints the address without opening it.
+- `--stop` stops the server. The script only ever stops the process it recorded in `data-scratch/gallery/server.pid`.
+
+The only network use is the `git fetch`. If it times out, the script retries once through `ssh.github.com` on port 443.
+
 ## Kept current by
 
 [Keeping the docs current](/docs/keeping-docs-current) explains the release step. The test `scripts/docsDrift.test.ts` fails if the map falls out of step with the pages.
