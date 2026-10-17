@@ -268,8 +268,8 @@ export async function runSmoke(id: string): Promise<SmokeResult> {
       const loadedProject = loadProjectPackage(id);
       return recordResult(id, loadedProject.ok ? { ok: true, message: "project package loads" } : { ok: false, message: loadedProject.error });
     }
-    if (manifestJson.kind === "module") {
-      // KS-05b: a module package (the shelf's feed lists) ships data, not a recipe, so only
+    if (manifestJson.kind === "module" || manifestJson.kind === "app") {
+      // KS-05b: a module package (the shelf's feed lists) and an app package (pages and data routes, MEDIA-VIDEOS-01) ship data, not a recipe, so only
       // its manifest has to load and validate.
       const loadedModule = loadManifestOnly(id);
       return recordResult(id, loadedModule.ok ? { ok: true, message: "module manifest loads" } : { ok: false, message: loadedModule.error });
