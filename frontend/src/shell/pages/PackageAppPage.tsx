@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@maipai/ui/src/dashboard/components/ui/tabs";
 import { getIcon } from "@maipai/ui/src/icons";
@@ -42,7 +42,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="package-app" data-package={packageId}>
       <h1 className="sr-only">{app?.label ?? "App"}</h1>
-      {app ? <AppToolbar person={person} to={app.to} sections={app.sections} current={pageId} /> : null}
+      {app ? <AppToolbar person={person} to={app.to} label={app.label} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -58,11 +58,12 @@ export function PackageAppPage({ person }: { person: Roster }) {
 }
 
 /** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
-function AppToolbar({ person, to, sections, current }: { person: Roster; to: string; sections: Array<{ page: string; label: string }>; current: string }) {
+function AppToolbar({ person, to, label, settingsArea, sections, current }: { person: Roster; to: string; label: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string }) {
   const navigate = useNavigate();
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
   const pinned = isPinned(to);
   const StarIcon = getIcon("star");
+  const GearIcon = getIcon("settings");
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       {sections.length > 0 ? (
@@ -75,6 +76,13 @@ function AppToolbar({ person, to, sections, current }: { person: Roster; to: str
           </TabsList>
         </Tabs>
       ) : <span />}
+      <div className="flex items-center gap-1">
+      {settingsArea ? (
+        <Button variant="ghost" size="sm" render={<Link to={`/settings/${settingsArea}`} aria-label={`${label} settings`} />}>
+          <GearIcon aria-hidden="true" />
+          Settings
+        </Button>
+      ) : null}
       <Button
         variant="ghost"
         size="sm"
@@ -85,6 +93,7 @@ function AppToolbar({ person, to, sections, current }: { person: Roster; to: str
         <StarIcon aria-hidden="true" fill={pinned ? "currentColor" : "none"} />
         {pinned ? "Remove from favorites" : "Add to favorites"}
       </Button>
+      </div>
     </div>
   );
 }

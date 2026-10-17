@@ -6,28 +6,34 @@ import { api } from "@/lib/api";
 
 const PLACES_KEY = ["entities", "place"];
 
+/** Saved coordinates are kept to two decimals (about 1 km), whatever the search returned. Nothing here logs them. */
+const round2 = (n: number): number => Math.round(n * 100) / 100;
+
 /** The kit location field's adapter, wired to the hub's places and entities
  * routes.
  * The browser prompt runs only inside `useCurrent`, which the kit calls
  * from its button; the position it reads is dropped, never sent or stored. */
-function usePlaceAdapter(scope: "household" | "person"): PlaceAdapter {
+export function usePlaceAdapter(scope: "household" | "person", options: { enabled?: boolean; incognito?: boolean } = {}): PlaceAdapter {
+  const { enabled = true, incognito = false } = options;
   const queryClient = useQueryClient();
-  const query = useQuery({ queryKey: PLACES_KEY, queryFn: () => api.entities("place") });
+  const query = useQuery({ queryKey: PLACES_KEY, queryFn: () => api.entities("place"), enabled });
   const data = query.data;
   return useMemo(() => {
     const rows = (data ?? []).filter((e) => e.kind === "place");
     const names = new Map(rows.map((e) => [e.id, e.name]));
     return {
       labelFor: (id) => names.get(id) ?? "Saved place",
-      search: (q) => api.searchPlaces(q),
+      // Incognito saves nothing and looks nothing up: no search request leaves, no place is stored.
+      search: (q) => (incognito ? Promise.resolve([]) : api.searchPlaces(q)),
       add: async (hit) => {
+        if (incognito) return null;
         try {
           const created = await api.createEntity({
             kind: "place",
             place_kind: "map",
             name: hit.name,
             scope,
-            geo: { lat: hit.lat, lon: hit.lon, precision: "exact", area: hit.area ?? null, from: "search" },
+            geo: { lat: round2(hit.lat), lon: round2(hit.lon), precision: "exact", area: hit.area ?? null, from: "search" },
           });
           await queryClient.invalidateQueries({ queryKey: PLACES_KEY });
           return created.id;
@@ -36,6 +42,7 @@ function usePlaceAdapter(scope: "household" | "person"): PlaceAdapter {
         }
       },
       rename: async (id, name) => {
+        if (incognito) return false;
         try {
           await api.updateEntity(id, { name });
           await queryClient.invalidateQueries({ queryKey: PLACES_KEY });
@@ -46,6 +53,7 @@ function usePlaceAdapter(scope: "household" | "person"): PlaceAdapter {
       },
       useCurrent: () =>
         new Promise<boolean>((resolve) => {
+          if (incognito) return resolve(false);
           if (typeof navigator === "undefined" || !navigator.geolocation) return resolve(false);
           navigator.geolocation.getCurrentPosition(
             () => resolve(true),
@@ -55,7 +63,7 @@ function usePlaceAdapter(scope: "household" | "person"): PlaceAdapter {
         }),
       choices: rows.filter((e) => e.scope === "person").map((e) => e.id),
     } satisfies PlaceAdapter;
-  }, [scope, data, queryClient]);
+  }, [scope, data, queryClient, incognito]);
 }
 
 /** One `location` row: the kit's LocationField with the hub's place calls. */

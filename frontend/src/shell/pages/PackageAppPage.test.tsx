@@ -90,6 +90,23 @@ function open(path: string, width = 1440) {
   return { ...view, client };
 }
 
+describe("an app that declares a settings area", () => {
+  const area = { id: "demo", title: "Demo", app: "/apps/demo", audience: { min_role: "child" }, groups: [{ label: "Demo", sections: ["places"] }], sections: [{ id: "places", label: "Places", icon: "map-pin", kind: "keys", cards: [{ label: "Places", group: "demo", scope: "person" }] }] };
+
+  test("the toolbar has a Settings link named for the app that opens /settings/<area id>", async () => {
+    rows = [{ ...row, settings_area: area } as AppRow];
+    const view = open("/apps/demo");
+    const gear = await view.findByRole("link", { name: "Demo weather settings" });
+    expect(gear.getAttribute("href")).toBe("/settings/demo");
+  });
+
+  test("an app with no settings area has no gear", async () => {
+    const view = open("/apps/demo");
+    await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
+    expect(view.queryByRole("link", { name: /settings/i })).toBeNull();
+  });
+});
+
 describe("a package app at /apps/<id>", () => {
   test("opens, draws its page from schema data and keeps the permanent rail", async () => {
     const view = open("/apps/demo");

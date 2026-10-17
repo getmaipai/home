@@ -48,6 +48,7 @@ import { useStatusApps } from "@/shell/useStatusApps";
 import { sidebarItemStatus } from "@/shell/statusApps";
 import { TabIdentityProvider } from "@/shell/tabIdentity";
 import { useSessionLocked } from "@/shell/sessionLockContext";
+import { packageAreaApps, usePackageAreas } from "@/shell/pages/settings/packageAreas";
 import { activeAppHref, rememberLastAppRoute } from "@/shell/pages/settings/settingsBackLink";
 import { retiredManagePageTarget } from "@/shell/pages/settings/settingsRedirects";
 import { Tour } from "@maipai/ui/src/primitives/Tour";
@@ -154,7 +155,7 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
 
 function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: Roster; onPersonChange: () => void | Promise<void>; onSignedOut: () => void }) {
   const location = useLocation();
-  const selectedAppHref = activeAppHref(location.pathname);
+  const selectedAppHref = activeAppHref(location.pathname, packageAreaApps(usePackageAreas().areas));
   const statusAppsQuery = useStatusApps();
   const { on: incognito, setOn: setIncognito } = useIncognitoContext();
   const locked = useSessionLocked();

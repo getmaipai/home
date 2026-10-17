@@ -15,6 +15,9 @@ import { scopeValueFor, type KitSettingsKey } from "@/shell/pages/settings/setti
 import { requestBrowserAlertPermission } from "@/shell/BrowserAlerts";
 import { Button } from "@maipai/ui/src/ui/button";
 import { WebSearchSettings } from "@/shell/pages/settings/WebSearchSettings";
+import { usePlaceAdapter } from "@/shell/pages/settings/placeAdapter";
+import { useIncognitoContext } from "@/shell/incognitoContext";
+import type { PlaceAdapter } from "@maipai/ui/src/settings/LocationField";
 
 /** SEARXNG-SET-05: the keys the Web search block above the Search cards draws itself, so the cards never repeat them. */
 const WEB_SEARCH_BLOCK_KEYS = ["search.searxng_url", "search.web_sources", "search.ddgs_for_minors"];
@@ -77,7 +80,7 @@ function EaseCardRenderer({ viewingSelf, ...rest }: { viewingSelf: boolean } & O
   return <SettingsRenderer {...rest} rowExtras={easeRowExtras((values.data ?? []) as EaseValue[], viewingSelf, resetKeys)} />;
 }
 
-function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps, returnPath: string) {
+function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps, returnPath: string, places: Record<"household" | "person", PlaceAdapter>) {
   const group = card.group!;
   const scope = card.scope!;
   const title = card.label;
@@ -88,7 +91,8 @@ function keysCard(card: Card, viewer: SettingsViewer, props: SectionContentProps
     scopeValue: scopeValueFor(scope, props.person.id),
     honouredBy: "home",
     only: [group],
-    includeKeys: ownsWebSearch ? props.registry.filter((k) => k.lives_in === group && !WEB_SEARCH_BLOCK_KEYS.includes(k.key)).map((k) => k.key) : allowed ? [...allowed] : undefined,
+    includeKeys: ownsWebSearch ? props.registry.filter((k) => k.lives_in === group && !WEB_SEARCH_BLOCK_KEYS.includes(k.key)).map((k) => k.key) : allowed ? [...allowed, ...(props.packageKeys ?? [])] : undefined,
+    places: scope === "device" ? undefined : places[scope],
     titleOverrides: { [group]: ownsWebSearch ? "Web search rules" : title },
     beforeChange: beforeSettingChange,
     focusKey: props.focusKey,
@@ -111,6 +115,8 @@ export interface SectionContentProps extends SettingsViewProps {
   viewer: SettingsViewer;
   /** The registry as this viewer's pages may draw it (see visibleRegistry). */
   registry: readonly KitSettingsKey[];
+  /** The keys a package settings area draws (see packageAreaKeySet): the person's own, so a minor sees them too. */
+  packageKeys?: ReadonlySet<string>;
   focusKey?: string;
 }
 
@@ -122,6 +128,10 @@ export function SettingsSectionContent(props: SectionContentProps) {
   const location = useLocation();
   const returnPath = `${location.pathname}${location.search}${location.hash}`;
   const viewProps = { person, onPersonChange };
+  // The place calls (search, save, rename) are made only on a page that draws a location row, and not at all in Incognito.
+  const { on: incognito } = useIncognitoContext();
+  const drawsPlaces = section.kind === "keys" && (section.cards ?? []).some((card) => registry.some((k) => k.selector === ("location" as string) && k.lives_in === card.group && k.scope === card.scope));
+  const places = { household: usePlaceAdapter("household", { enabled: drawsPlaces, incognito }), person: usePlaceAdapter("person", { enabled: drawsPlaces, incognito }) };
   if (section.kind === "view") return <>{section.view ? <SettingsView view={section.view} {...viewProps} /> : null}</>;
   const webSearchBlock = section.id === "search" && (viewer.role === "owner" || viewer.role === "admin");
   return (
@@ -137,7 +147,9 @@ export function SettingsSectionContent(props: SectionContentProps) {
         // registry row for that key is not drawn here (the key stays in the registry for other surfaces).
         if (section.id === "voice" && card.group === "person.voice") return null;
         if (card.links) return <SettingsLinks key={card.label} label={card.label} links={card.links.map((link) => ({ label: link.label, href: resolveHref(link.href, viewer) }))} />;
-        return <div key={`${card.scope}:${card.group}`}>{keysCard(card, viewer, props, returnPath)}</div>;
+        return <div key={`${card.scope}:${card.group}`}>
+          {incognito && drawsPlaces ? <p className="text-sm text-muted-foreground">Incognito is on, so places cannot be added or renamed until you turn it off.</p> : null}
+{keysCard(card, viewer, props, returnPath, places)}</div>;
       })}
       {section.trail_view ? <SettingsView view={section.trail_view} {...viewProps} /> : null}
     </div>

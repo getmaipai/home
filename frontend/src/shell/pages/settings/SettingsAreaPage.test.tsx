@@ -384,3 +384,37 @@ describe("old URLs through the route", () => {
     await waitFor(() => expect(where(child)).toBe("/settings/chat/general"));
   });
 });
+
+describe("a package's own settings area", () => {
+  const weatherKeys = [
+    { key: "weather.places", scope: "person", selector: "location", range: { multiple: true, allow_current: false }, default: [], label: "Weather places", help: "Places saved for weather answers.", level: "basic", lives_in: "weather", honoured_by: ["home"] },
+    { key: "weather.default_place", scope: "person", selector: "location", range: { multiple: false, allow_current: true }, default: "current", label: "Weather default place", help: "The place weather uses when you do not name one.", level: "basic", lives_in: "weather", honoured_by: ["home"] },
+  ] as unknown as NonNullable<Parameters<typeof mockHome>[0]>["extraKeys"];
+  const area = { id: "weather", title: "Weather", app: "/apps/weather", audience: { min_role: "child" }, groups: [{ label: "Weather", sections: ["places"] }], sections: [{ id: "places", label: "Places", icon: "map-pin", kind: "keys", cards: [{ label: "Places", group: "weather", scope: "person" }] }] };
+  const apps = [{ package: "weather", page: "index", label: "Weather", icon: "cloud-sun", description: "", category: "Utilities", keywords: [], sections: [], to: "/apps/weather", incognito: "unaffected", settings_area: area }];
+
+  test("/settings/weather opens the package area with the person's places and default as place pickers", async () => {
+    const view = open(makePerson("adult"), "/settings/weather", { apps, extraKeys: weatherKeys, places: [{ id: "p1", kind: "place", name: "Cabin", scope: "person" }] });
+    await waitFor(() => expect(where(view)).toBe("/settings/weather/places"));
+    await waitFor(() => expect(view.getAllByText("Weather places").length).toBeGreaterThan(0));
+    expect(view.queryByText("Not supported in this hub version yet.")).toBeNull();
+    expect(view.getAllByText("Weather default place").length).toBeGreaterThan(0);
+  });
+
+  test("a child opens it too and sees the same two rows (their own list)", async () => {
+    const view = open(makePerson("child"), "/settings/weather", { apps, extraKeys: weatherKeys });
+    await waitFor(() => expect(where(view)).toBe("/settings/weather/places"));
+    await waitFor(() => expect(view.getAllByText("Weather places").length).toBeGreaterThan(0));
+    expect(fixture!.scopes.every((scope) => scope === "person:person-child")).toBe(true);
+  });
+
+  test("while the app list is loading the page waits; once it answers without that area it goes to Account", async () => {
+    const view = open(makePerson("adult"), "/settings/nonesuch", { apps: [] });
+    await waitFor(() => expect(where(view)).toContain("/settings/account"));
+  });
+
+  test("the rail selection and the way back are the app the area belongs to", () => {
+    expect(activeAppHref("/settings/weather/places", { weather: "/apps/weather" })).toBe("/apps/weather");
+    expect(activeAppHref("/settings/chat/general", { weather: "/apps/weather" })).toBe("/chat");
+  });
+});

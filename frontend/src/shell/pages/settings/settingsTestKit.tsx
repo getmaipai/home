@@ -31,6 +31,8 @@ export function makePerson(role: Roster["role"], overrides: Partial<Roster> = {}
   } as Roster & { age_band: "child" | "teen" | "adult" };
 }
 
+const route0 = (url: string): string => url.split("?")[0]!;
+
 export interface HomeFixture {
   /** Every request the page made, as `METHOD url`. */
   requests: string[];
@@ -43,13 +45,13 @@ export interface HomeFixture {
   restore: () => void;
 }
 
-export function mockHome({ robots = false, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps = [] }: { robots?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
+export function mockHome({ robots = false, wakeword = false, hasChild = false, setupChecklist = [], pinnedApps = [], apps, extraKeys = [], places = [] }: { apps?: unknown[]; extraKeys?: SettingsKey[]; places?: Array<Record<string, unknown>>; robots?: boolean; wakeword?: boolean; hasChild?: boolean; setupChecklist?: Array<{ id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }>; pinnedApps?: string[] } = {}): HomeFixture {
   const original = globalThis.fetch;
   const requests: string[] = [];
   const scopes: string[] = [];
   const puts: HomeFixture["puts"] = [];
   let pinnedAppsSerialized = JSON.stringify(pinnedApps);
-  const registry = REGISTRY.filter((key) => wakeword || key.key !== "voice.wakeword.enabled");
+  const registry = [...REGISTRY.filter((key) => wakeword || key.key !== "voice.wakeword.enabled"), ...extraKeys];
   globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
     requests.push(`${init?.method ?? "GET"} ${url}`);
@@ -60,6 +62,8 @@ export function mockHome({ robots = false, wakeword = false, hasChild = false, s
       const def = registry.find((k) => k.key === body.key)!;
       return Promise.resolve(Response.json({ key: def.key, value: body.value, source: "user", label: def.label, help: def.help, level: def.level, secret: def.secret ?? false }));
     }
+    if (apps && route0(url) === "/api/apps") return Promise.resolve(Response.json(apps));
+    if (route0(url) === "/api/entities") return Promise.resolve(Response.json(places));
     if (url.includes("/api/settings/registry")) return Promise.resolve(Response.json(registry));
     if (url.endsWith("/api/voice/cloned")) return Promise.resolve(Response.json({ voices: [] }));
     // ENGINES-AI-01: Engines and AI now draws the engines console and the model list as its trail view, so the

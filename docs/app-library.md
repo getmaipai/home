@@ -30,5 +30,5 @@ capabilities, the same gate as the page and data routes), `useAppCatalog()` in `
 the package scope, so a package page reads only its own package and navigates only inside `/apps/<id>`. Pins are unchanged: a
 package app pins by its route (`/apps/<id>`) in `ui.pinned_apps`; an app that is uninstalled, disabled or hidden by role is
 absent from the catalog, `favoriteApps` skips its pin, and the stored pin stays so a reinstall brings it back. While Incognito
-is on, an app whose manifest says `incognito: "blocked"` is left out. How to write one: "Writing an app package" in the org
+is on, an app whose manifest says `incognito: "blocked"` is left out. An app that declares `contributes.settings_area` gets a Settings gear in its toolbar that opens `/settings/<area id>` (the area rides on the app's row in `GET /api/apps`; `shell/pages/settings/packageAreas.ts` merges it with the spec areas). How to write one: "Writing an app package" in the org
 `docs/PACKAGES.md`. The design is [plans/app-kind-2026-10-16.md](plans/app-kind-2026-10-16.md).

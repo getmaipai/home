@@ -7,8 +7,12 @@ import { useIncognitoContext } from "@/shell/incognitoContext";
  * app page. Install, uninstall, update and role changes invalidate `["apps"]`; it also refetches on window focus. A
  * failed or pending read is an empty list, never an error: the core apps are always there. */
 export function useAppRows(): AppRow[] | undefined {
-  const query = useQuery({ queryKey: ["apps"], queryFn: api.apps, retry: false, refetchOnWindowFocus: true });
-  return query.data;
+  return useAppsQuery().data;
+}
+
+/** The same shared `["apps"]` query with its state, for a page that must tell "still loading" from "not an app". */
+export function useAppsQuery() {
+  return useQuery({ queryKey: ["apps"], queryFn: api.apps, retry: false, refetchOnWindowFocus: true });
 }
 
 /** The core apps merged with the package apps (`mergeAppCatalog`). */

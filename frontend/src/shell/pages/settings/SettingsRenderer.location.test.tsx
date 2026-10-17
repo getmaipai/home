@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { SettingsRenderer } from "@/shell/pages/settings/SettingsRenderer";
-import { visibleRegistry } from "@/shell/pages/settings/settingsViewer";
+import { packageAreaKeySet, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { api } from "@/lib/api";
 
 afterEach(cleanup);
@@ -14,6 +14,18 @@ const weatherPlaces = SettingsKey.parse({ key: "weather.places", scope: "person"
 
 test("only the household home location key reaches the generic cards", () => {
   expect(visibleRegistry([home, weatherPlaces], "adult").map((k) => k.key)).toEqual(["household.home"]);
+});
+
+test("a location key is drawn only when a package area's card draws its group; a minor sees it too", () => {
+  const own = new Set(["weather.places"]);
+  expect(visibleRegistry([home, weatherPlaces], "adult", [], own).map((k) => k.key)).toEqual(["household.home", "weather.places"]);
+  expect(visibleRegistry([home, weatherPlaces], "child", [], own).map((k) => k.key)).toEqual(["weather.places"]);
+  expect(visibleRegistry([home, weatherPlaces], "child").map((k) => k.key)).toEqual([]);
+});
+
+test("packageAreaKeySet names the keys a package area's cards draw, by group and scope", () => {
+  const area = { id: "weather", sections: [{ id: "places", cards: [{ label: "Places", group: "weather.places", scope: "person" }] }] } as never;
+  expect([...packageAreaKeySet([area], [home, weatherPlaces])]).toEqual(["weather.places"]);
 });
 
 test("the household home is a kit place picker: search, save a household place, write its id", async () => {

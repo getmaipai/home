@@ -1,4 +1,4 @@
-import type { Role, SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
+import type { Role, SettingsAreaDef, SettingsViewer } from "@maipai/ui/src/settings/settingsAudience";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { minorVisibleSettingKeys } from "@maipai/home-backend/src/wire";
 import { getDeviceSettingsScope } from "@/lib/deviceSettingsScope";
@@ -24,13 +24,29 @@ export function baseViewer(person: Pick<Roster, "id" | "role" | "age_band">): Se
  * shell draws no developer controls yet) and, for a child or teen, only the
  * keys the old Settings page showed them. One filter feeds the shell, its
  * search and every card, so none of them can show a minor more. */
-export function visibleRegistry(registry: readonly SettingsKey[], band: Band, includeExpertKeys: readonly string[] = []): KitSettingsKey[] {
+export function visibleRegistry(registry: readonly SettingsKey[], band: Band, includeExpertKeys: readonly string[] = [], packageAreaKeys: ReadonlySet<string> = NO_KEYS): KitSettingsKey[] {
   const allowed = minorVisibleSettingKeys(band);
-  // The household home is the one location key drawn here (Settings >
-  // General). A person's place lists belong in each app's own settings area
-  // (PLACE-ELEMENT-01b), never in a generic card.
+  // The household home is the one central location key drawn here (Settings >
+  // General). A person's place lists belong in an app's own settings area
+  // (PLACE-ELEMENT-01b): a location key is drawn only when a package area's
+  // card draws its group (`packageAreaKeys`), never in a generic card. Those
+  // keys are the person's own, so a child or teen sees them too.
   const expertKeys = new Set(includeExpertKeys);
-  return registry.filter((key) => (key.selector !== "location" || key.key === "household.home") && (key.level !== "expert" || expertKeys.has(key.key)) && (!allowed || allowed.has(key.key))) as KitSettingsKey[];
+  return registry.filter((key) => {
+    const ofPackageArea = packageAreaKeys.has(key.key);
+    if (key.selector === "location" && key.key !== "household.home" && !ofPackageArea) return false;
+    if (key.level === "expert" && !expertKeys.has(key.key)) return false;
+    return ofPackageArea || !allowed || allowed.has(key.key);
+  }) as KitSettingsKey[];
+}
+
+const NO_KEYS: ReadonlySet<string> = new Set();
+
+/** The registry keys a package settings area's cards draw: each card's group at its scope. */
+export function packageAreaKeySet(areas: readonly SettingsAreaDef[], registry: readonly SettingsKey[]): ReadonlySet<string> {
+  const drawn = new Set<string>();
+  for (const area of areas) for (const section of area.sections) for (const card of section.cards ?? []) if (card.group && card.scope) drawn.add(`${card.scope}:${card.group}`);
+  return new Set(registry.filter((key) => drawn.has(`${key.scope}:${key.lives_in}`)).map((key) => key.key));
 }
 
 /** The runtime scope string the settings API expects for a card's scope. */

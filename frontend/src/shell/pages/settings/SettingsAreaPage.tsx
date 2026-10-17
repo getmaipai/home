@@ -21,9 +21,10 @@ import { api, type Roster } from "@/lib/api";
 import "@/shell/pages/settings/settingsTokens.css";
 import { useTabItem } from "@/shell/tabIdentity";
 import { settingsArea, settingsPath } from "@/shell/pages/settings/settingsAreas";
+import { usePackageAreas } from "@/shell/pages/settings/packageAreas";
 import { SettingsSectionContent, beforeSettingChange } from "@/shell/pages/settings/SettingsSectionContent";
 import { SettingsView } from "@/shell/pages/settings/settingsViews";
-import { baseViewer, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
+import { baseViewer, packageAreaKeySet, scopeValueFor, visibleRegistry } from "@/shell/pages/settings/settingsViewer";
 import { useSettingsCapabilities } from "@/shell/pages/settings/useSettingsCapabilities";
 import { confirmRouteLeave } from "@/shell/routeLeaveGuard";
 import { useSetupChecklist, setupChecklistCountLine } from "@/shell/useSetupChecklist";
@@ -44,9 +45,12 @@ const DESKTOP_MIN_WIDTH = 960;
  * costs no household request. */
 export function SettingsAreaPage({ person, onPersonChange }: { person: Roster; onPersonChange: () => void | Promise<void> }) {
   const { area: areaId } = useParams();
-  const area = settingsArea(areaId);
+  const { areas: packageAreas, ready } = usePackageAreas();
+  const area = settingsArea(areaId) ?? packageAreas.find((candidate) => candidate.id === areaId);
+  // A package's area is known only once the app list has answered: wait for it, never bounce to Account first.
+  if (!area && !ready) return <Progress mode="spinner" label="Loading settings" />;
   if (!area || !areaAllows(area, baseViewer(person))) return <Navigate to={settingsPath("account")} replace />;
-  return <SettingsAreaBody key={area.id} area={area} person={person} onPersonChange={onPersonChange} />;
+  return <SettingsAreaBody key={area.id} area={area} packageAreas={packageAreas} person={person} onPersonChange={onPersonChange} />;
 }
 
 function scopesOf(area: SettingsAreaDef, viewer: SettingsViewer): Scope[] {
@@ -57,7 +61,7 @@ function scopesOf(area: SettingsAreaDef, viewer: SettingsViewer): Scope[] {
   return [...scopes];
 }
 
-function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsAreaDef; person: Roster; onPersonChange: () => void | Promise<void> }) {
+function SettingsAreaBody({ area, packageAreas, person, onPersonChange }: { area: SettingsAreaDef; packageAreas: readonly SettingsAreaDef[]; person: Roster; onPersonChange: () => void | Promise<void> }) {
   const { section: sectionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
@@ -70,8 +74,9 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   const registryQuery = useQuery<SettingsKey[]>({ queryKey: ["settings-registry"], queryFn: () => api.settingsRegistry(), staleTime: Infinity });
   const { capabilities, ready } = useSettingsCapabilities(person);
   const viewer: SettingsViewer = { ...baseViewer(person), capabilities };
+  const packageKeys = registryQuery.data ? packageAreaKeySet(packageAreas, registryQuery.data) : undefined;
   const registry = registryQuery.data
-    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "home" && sectionId === "network" ? ["network.hub_port"] : [])
+    ? visibleRegistry(registryQuery.data, viewer.band, area.id === "home" && sectionId === "network" ? ["network.hub_port"] : [], packageKeys)
     : undefined;
 
   const scopes = scopesOf(area, viewer);
@@ -146,7 +151,7 @@ function SettingsAreaBody({ area, person, onPersonChange }: { area: SettingsArea
   } else if (active) {
     content = active.kind === "view"
       ? <>{active.view ? <SettingsView view={active.view} person={person} onPersonChange={onPersonChange} /> : null}</>
-      : <SettingsSectionContent section={active} viewer={viewer} registry={registry} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
+      : <SettingsSectionContent section={active} viewer={viewer} registry={registry} packageKeys={packageKeys} person={person} onPersonChange={onPersonChange} focusKey={focusKey} />;
   }
 
   const checklistItems = setupChecklist.checklist.data ?? [];

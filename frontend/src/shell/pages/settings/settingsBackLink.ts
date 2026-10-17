@@ -28,7 +28,11 @@ function appHrefForRoute(path: string): string {
 }
 
 /** One rail selection value for normal app routes and every settings area. */
-export function activeAppHref(pathname: string): string {
+export function activeAppHref(pathname: string, packageAreaApps: Readonly<Record<string, string>> = {}): string {
+  // A package app's own settings area (`/settings/<area id>`): the app it belongs to stays selected.
+  const areaId = /^\/settings\/([^/]+)/.exec(pathname)?.[1];
+  const app = areaId ? packageAreaApps[areaId] : undefined;
+  if (app) return app;
   if (pathname === "/settings/chat" || pathname.startsWith("/settings/chat/")) return "/chat";
   if (pathname === "/settings/account" || pathname.startsWith("/settings/account/") || pathname === "/settings/home" || pathname.startsWith("/settings/home/")) {
     return appHrefForRoute(lastAppRoute());
