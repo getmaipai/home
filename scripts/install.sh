@@ -504,8 +504,16 @@ build_app() {
   local dir="$1" bun_bin="$2"
   fetch_home_commons "$dir" || die "could not fetch the Commons packages Home needs. Read the message above, fix what it names, then run the installer again."
   log "Installing dependencies and building the frontend (this can take a minute)..."
-  (cd "$dir/backend" && "$bun_bin" install --production)
-  (cd "$dir/frontend" && "$bun_bin" install && "$bun_bin" run build)
+  # A fresh Mac has no system node, and dependency install scripts (ssh2) run
+  # `node`. Put a `node` that is Bun on PATH for these commands only.
+  local shim
+  shim=$(mktemp -d) && ln -s "$bun_bin" "${shim}/node" \
+    || die "could not create the temporary node shim. Check that the temp folder is writable, then run the installer again."
+  (cd "$dir/backend" && PATH="${shim}:${PATH}" "$bun_bin" install --production) \
+    || { rm -rf "$shim"; return 1; }
+  (cd "$dir/frontend" && PATH="${shim}:${PATH}" "$bun_bin" install && PATH="${shim}:${PATH}" "$bun_bin" run build) \
+    || { rm -rf "$shim"; return 1; }
+  rm -rf "$shim"
   prime_deno_cache "$dir"
 }
 
