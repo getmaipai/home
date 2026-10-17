@@ -1,7 +1,7 @@
 # Media library (MEDIA-LIB-01, MEDIA-PROGRESS-01)
 
-Backend only. Design: [media-apps-blend-2026-10-17.md](../design/media-apps-blend-2026-10-17.md) sections 7, 8, 10, 11 and 12. The
-app packages (Videos, Shows, Music, Podcasts, Books) build on the routes below; nothing here draws a page.
+Design: [media-apps-blend-2026-10-17.md](../design/media-apps-blend-2026-10-17.md) sections 7, 8, 10, 11 and 12. The
+app packages (Videos, Shows, Music, Podcasts, Books) build on the routes below. Storage includes the shared Trash page.
 
 ## Tables (one migration, 0107, schema version 64)
 
@@ -78,3 +78,25 @@ Routes: `PUT /api/media/progress/{media_id}`, `GET /api/media/progress/{media_id
 `POST /api/media/progress/batch`, `GET|POST /api/media/collections`, `GET /api/media/collections/shared`,
 `GET|PATCH|DELETE /api/media/collections/{id}` (`id` may be `liked`, `watch_later` or `queue`),
 `POST|PUT /api/media/collections/{id}/items`, `DELETE /api/media/collections/{id}/items/{media_id}`, `GET /api/continue`.
+
+## Household trash (TRASH-01)
+
+`lib/trash/registry.ts` is the one provider registry: `registerTrashProvider({ kind, label, list(person), restore(person, id),
+purge(person, id), purgeExpired(now) })`. The media item and collection providers are registered in `providers.ts`. Items use
+source ownership: admins manage household sources, people manage their own person-scoped sources. Source visibility and the
+media band floor still apply. Collections are own-only, including for admins; minors' collection titles pass the child floor.
+Guests get no rows. Unknown kinds, missing records and forbidden records all return 404 on changes.
+
+`GET /api/trash` returns `{ rows }` with kind, id, title, deleted_at, trash_until and the two action flags. `POST
+/api/trash/{kind}/{id}/restore` clears the envelope and source archive path within the keep window. `DELETE
+/api/trash/{kind}/{id}` removes the row and its progress, preserving the archive. A folder audiobook's parts follow its action
+when they were trashed together. No file on disk is deleted. Purging an expired scanner-pruned row also archives its path.
+Purging also discards held progress ticks so a later timer cannot recreate progress for a removed item. A scan refreshes the
+archive after parsing yields, and skips archived chapter paths as well as parent paths. The sweeper runs at boot and every six hours, independently per provider; a failed kind retries next time.
+
+Storage links to `/storage/trash`, a data-declared kit SettingsShell with a kit item list and AlertDialog confirmation.
+The page fetches only the current person's authorized rows and refreshes after a change. Tests: `tests/trash.test.ts` and
+`frontend/src/shell/pages/TrashPage.test.tsx`.
+
+Open: migrate Lists and Memories onto the envelope and register their providers. Media sources themselves are not providers
+in this slice. Subscription polling is not shipped yet; its future writer must honor the same source archive.
