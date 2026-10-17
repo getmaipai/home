@@ -138,12 +138,13 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   // not inside lib/plugins.ts's runPlugin(), so this file can import
   // lib/smoke.ts without smoke.ts's own import of lib/plugins.ts closing
   // a cycle (see lib/smoke.ts's header).
+  // NEWS-00 review: a package app's recipe serves every page's data, so a viewer below any raised page cannot run it directly. Checked
+  // first so a disabled package does not confirm its existence to a viewer who may not use it.
+  if (!appRunAllowed(c.get("person"), id)) return c.json({ error: "no such package" }, 404);
   if (getPackageStatus(id).status === "disabled") {
     return c.json({ error: `${id} is disabled (failed its last smoke test)` }, 403);
   }
   const actor = c.get("person");
-  // NEWS-00 review: a package app's recipe serves every page's data, so a viewer below any raised page cannot run it directly.
-  if (!appRunAllowed(actor, id)) return c.json({ error: "no such package" }, 404);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const result = await runPlugin(id, actor, body);
   if (result.ok) {

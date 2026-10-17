@@ -88,7 +88,18 @@ export function settingsAreaProblems(manifest: PackageManifest): string[] {
   return problems;
 }
 
-/** Reads and validates one package's pages. Cached on the manifest and every page file's size and mtime. */
+const digestCache = new WeakMap<object, string>();
+/** A digest of the whole manifest (floors, pages, data, platforms, requires, settings area): an in-place edit takes effect without a version bump. */
+function manifestDigest(manifest: PackageManifest): string {
+  let digest = digestCache.get(manifest);
+  if (!digest) {
+    digest = createHash("sha256").update(JSON.stringify(manifest)).digest("hex").slice(0, 16);
+    digestCache.set(manifest, digest);
+  }
+  return digest;
+}
+
+/** Reads and validates one package's pages. Cached on the whole manifest and every page file's size and mtime. */
 function loadApp(id: string): LoadedApp | null {
   const loaded = loadManifestOnly(id);
   if (!loaded.ok) return null;
@@ -98,7 +109,7 @@ function loadApp(id: string): LoadedApp | null {
   const dir = resolvePackageDir(id);
   // The stamp covers the manifest's own page, data and floor declarations, not only the version and the page files: a floor raised in
   // the manifest must take effect without a version bump.
-  const stampParts = [manifest.version, manifest.min_role, createHash("sha256").update(JSON.stringify({ pages: contributes.pages, data: contributes.data })).digest("hex").slice(0, 16)];
+  const stampParts = [manifest.version, manifestDigest(manifest)];
   for (const page of contributes.pages) {
     const path = pageFile(dir, page.module);
     try {
@@ -241,12 +252,13 @@ function owningPages(app: LoadedApp, kind: "data" | "actions", id: string): AppP
  * hides. An id no page uses fails closed: it needs the floor of every page, so a reference this scan did not
  * recognise can never open a raised page's data to a lower role. The NEWS-02 action route must call this with
  * "actions" before it does anything. */
-export function appRouteAllowed(person: PersonRow, packageId: string, kind: "data" | "actions", id: string, loaded: LoadedApp | null = visibleApp(person, packageId)): boolean {
+export function appRouteAllowed(person: PersonRow, packageId: string, kind: "data" | "actions", id: string, loaded: LoadedApp | null = visibleApp(person, packageId), unowned: "closed" | "open" = "closed"): boolean {
   const app = loaded;
   if (!app) return false;
   const owners = owningPages(app, kind, id);
   if (owners.length > 0) return owners.some((entry) => pageVisibleTo(person, app.manifest, entry));
-  return (app.contributes.pages ?? []).every((entry) => pageVisibleTo(person, app.manifest, entry));
+  // An id no page names: closed to a viewer below any page, unless the caller serves ids of its own that no page document binds (the media host).
+  return unowned === "open" || (app.contributes.pages ?? []).every((entry) => pageVisibleTo(person, app.manifest, entry));
 }
 
 /** NEWS-00: the picture route of an app (NEWS-02 calls it first). A picture belongs to the whole app: the person must
@@ -255,31 +267,38 @@ export function appImageAllowed(person: PersonRow, packageId: string): boolean {
   return visibleApp(person, packageId) !== null;
 }
 
+/** The role floors alone, without the app's health (lint problems, smoke status, capabilities, platform): the person clears the index page's
+ * floor. `null` for a package that is not an app. */
+export function appIndexFloorOk(person: PersonRow, packageId: string): boolean | null {
+  const app = loadApp(packageId);
+  if (!app) return null;
+  const index = (app.contributes.pages ?? []).find((page) => page.id === "index");
+  return !index || pageVisibleTo(person, app.manifest, index);
+}
+
 /** NEWS-00 review: the direct run route (`POST /api/plugins/:id/run`) of a package that declares pages. A package app's recipe serves
  * every page's data, so the caller needs the floor of every page: a viewer below any raised page is refused (the caller answers 404).
- * A package with no pages is not an app and is unaffected. */
+ * Only floors decide this; a package with no pages is not an app and is unaffected. */
 export function appRunAllowed(person: PersonRow, packageId: string): boolean {
   const app = loadApp(packageId);
   if (!app) return true;
-  if (app.problems.length > 0) return false;
-  const visible = visibleApp(person, packageId);
-  return visible !== null && (visible.contributes.pages ?? []).every((entry) => pageVisibleTo(person, visible.manifest, entry));
+  return (app.contributes.pages ?? []).every((entry) => pageVisibleTo(person, app.manifest, entry));
 }
 
 /** NEWS-00 review: the manifest as one viewer may read it from `GET /api/plugins`: a package app's `contributes.pages` and `contributes.data`
- * hold only what this viewer's floor allows (a raised page and the data only it uses are not listed, nor their inputs). */
+ * hold only what this viewer's floors allow (a raised page and the data only it uses are not listed, nor their inputs). Floors decide this,
+ * not the app's health, so an owner still sees a disabled app's declarations. */
 export function manifestForViewer<T extends PackageManifest>(person: PersonRow, manifest: T): T {
   const contributes = (manifest.contributes ?? {}) as AppContributes & Record<string, unknown>;
   if (!contributes.pages || contributes.pages.length === 0) return manifest;
   const app = loadApp(manifest.id);
-  const visible = app && app.problems.length === 0 ? visibleApp(person, manifest.id) : null;
-  if (!visible) return { ...manifest, contributes: { ...contributes, pages: [], data: [] } } as T;
+  if (!app || appIndexFloorOk(person, manifest.id) === false) return { ...manifest, contributes: { ...contributes, pages: [], data: [] } } as T;
   return {
     ...manifest,
     contributes: {
       ...contributes,
       pages: contributes.pages.filter((entry) => pageVisibleTo(person, manifest, entry)),
-      data: (contributes.data ?? []).filter((entry) => appRouteAllowed(person, manifest.id, "data", entry.id, visible)),
+      data: (contributes.data ?? []).filter((entry) => appRouteAllowed(person, manifest.id, "data", entry.id, app)),
     },
   } as T;
 }
