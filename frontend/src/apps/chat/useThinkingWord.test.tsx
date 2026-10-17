@@ -50,10 +50,13 @@ describe("ReasoningGroup status word", () => {
   test("rotates while running and never repeats consecutively", () => {
     const { container } = render(view(true));
     const seen = [label(container)];
-    for (let i = 0; i < 12; i++) {
-      act(() => { jest.advanceTimersByTime(ROTATE_MAX_MS + 4000); });
-      seen.push(label(container));
+    // Step one second at a time so every change is seen: a long step can hold two changes, and
+    // the second may land back on the word before the first.
+    for (let t = 0; t < 12 * (ROTATE_MAX_MS + 4000); t += 1000) {
+      act(() => { jest.advanceTimersByTime(1000); });
+      if (label(container) !== seen[seen.length - 1]) seen.push(label(container));
     }
+    expect(seen.length).toBeGreaterThan(5);
     expect(THINKING_WORDS).toContain(seen[0] as string);
     for (let i = 1; i < seen.length; i++) {
       expect(THINKING_WORDS).toContain(seen[i] as string);
@@ -70,7 +73,13 @@ describe("ReasoningGroup status word", () => {
 
   test("a later word holds at least 10 seconds", () => {
     const { container } = render(view(true));
-    act(() => { jest.advanceTimersByTime(FIRST_HOLD_MS + 4000); });
+    // The first change lands between FIRST_HOLD_MS and FIRST_HOLD_MS + 4 s; step to it, then the
+    // word it shows must hold for the full minimum before the next change.
+    act(() => { jest.advanceTimersByTime(FIRST_HOLD_MS - 1); });
+    const first = label(container);
+    let guard = 0;
+    while (label(container) === first && guard++ < 20) act(() => { jest.advanceTimersByTime(250); });
+    expect(label(container)).not.toBe(first);
     const second = label(container);
     act(() => { jest.advanceTimersByTime(ROTATE_MIN_MS - 1); });
     expect(label(container)).toBe(second);

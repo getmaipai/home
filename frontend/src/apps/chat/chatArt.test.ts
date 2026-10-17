@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, test } from "bun:test";
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { CHAT_ART, nextChatArt, timeHint } from "@/apps/chat/chatArt";
@@ -18,6 +18,14 @@ function seeded(seed: number) {
     return s / 4294967296;
   };
 }
+
+// Bun runs every test file in one process, so a storage stub left behind here would break any
+// later file that reads localStorage (the throwing one made the settings tests fail).
+const realStorage = Object.getOwnPropertyDescriptor(globalThis, "localStorage");
+afterEach(() => {
+  if (realStorage) Object.defineProperty(globalThis, "localStorage", realStorage);
+  else delete (globalThis as { localStorage?: unknown }).localStorage;
+});
 
 beforeEach(() => {
   const data = new Map<string, string>();
