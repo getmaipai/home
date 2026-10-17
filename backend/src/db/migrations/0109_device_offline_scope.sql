@@ -1,0 +1,1 @@
+ALTER TABLE `devices` ADD `offline_scope` text DEFAULT '[]' NOT NULL;
