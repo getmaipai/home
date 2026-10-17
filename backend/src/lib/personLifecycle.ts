@@ -301,6 +301,8 @@ export function erasePersonData(personId: string, blobsAfterCommit: string[]): E
   // them. A source they owned stays for the household (owner cleared); one only they could see is put in the trash.
   const mediaNow = new Date().toISOString();
   sqlite.query("DELETE FROM media_progress WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM media_watch_sessions WHERE person_id = ?").run(personId);
+  sqlite.query("DELETE FROM media_watch_days WHERE person_id = ?").run(personId);
   sqlite.query("DELETE FROM media_collections WHERE person_id = ?").run(personId);
   sqlite.query("UPDATE media_sources SET deleted_at = ?2 WHERE owner_person_id = ?1 AND scope = 'person' AND deleted_at IS NULL").run(personId, mediaNow);
   sqlite.query("UPDATE media_sources SET owner_person_id = NULL WHERE owner_person_id = ?").run(personId);

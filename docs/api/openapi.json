@@ -53417,6 +53417,146 @@
         }
       }
     },
+    "/api/media/budget": {
+      "get": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "My daily media minutes across all screens",
+        "responses": {
+          "200": {
+            "description": "Zero limit means unlimited.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "limit_min": {
+                      "type": "number"
+                    },
+                    "used_min": {
+                      "type": "number"
+                    },
+                    "left_min": {
+                      "type": "number"
+                    },
+                    "exhausted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "limit_min",
+                    "used_min",
+                    "left_min",
+                    "exhausted"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to read your budget",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/media/budget/{personId}/extend": {
+      "post": {
+        "tags": [
+          "Media"
+        ],
+        "summary": "Add media minutes for today only",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "personId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "minutes": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 1440
+                  }
+                },
+                "required": [
+                  "minutes"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Minutes added. The person's own budget read shows the new limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Choose whole minutes from 1 to 1440",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ask a grown-up to add minutes",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Pick a person from People and try again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/media/progress/{media_id}": {
       "put": {
         "tags": [
@@ -53505,6 +53645,20 @@
                         "additionalProperties": false
                       }
                     ]
+                  },
+                  "session_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100,
+                    "description": "A token for this player run; use a new one on the next run."
+                  },
+                  "playing": {
+                    "type": "boolean",
+                    "description": "False on a pause; true on playing ticks and resume."
+                  },
+                  "seeking": {
+                    "type": "boolean",
+                    "description": "True on a seek: saves the place without counting the jump as playing time."
                   },
                   "duration_s": {
                     "type": "number",
@@ -53598,6 +53752,29 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "budget": {
+                      "type": "object",
+                      "properties": {
+                        "limit_min": {
+                          "type": "number"
+                        },
+                        "used_min": {
+                          "type": "number"
+                        },
+                        "left_min": {
+                          "type": "number"
+                        },
+                        "exhausted": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "limit_min",
+                        "used_min",
+                        "left_min",
+                        "exhausted"
+                      ]
+                    },
                     "progress": {
                       "type": "object",
                       "properties": {
@@ -53727,6 +53904,7 @@
                     }
                   },
                   "required": [
+                    "budget",
                     "progress",
                     "applied"
                   ]
@@ -54042,6 +54220,20 @@
                             }
                           ]
                         },
+                        "session_id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 100,
+                          "description": "A token for this player run; use a new one on the next run."
+                        },
+                        "playing": {
+                          "type": "boolean",
+                          "description": "False on a pause; true on playing ticks and resume."
+                        },
+                        "seeking": {
+                          "type": "boolean",
+                          "description": "True on a seek: saves the place without counting the jump as playing time."
+                        },
                         "duration_s": {
                           "type": "number",
                           "nullable": true,
@@ -54290,6 +54482,29 @@
                             ],
                             "additionalProperties": false,
                             "description": "MEDIA-SPEC-01 (media design sections 7 and 10). One row per person and item: where they are, whether they finished, how often they played it, and their bookmarks. Merge rule (one function, mergeProgress): newest wins by the server stamp after skew correction, a rewind applies when newer, completed is a latch only the person clears, marks union by at_s, a child's row is never written by another person's device."
+                          },
+                          "budget": {
+                            "type": "object",
+                            "properties": {
+                              "limit_min": {
+                                "type": "number"
+                              },
+                              "used_min": {
+                                "type": "number"
+                              },
+                              "left_min": {
+                                "type": "number"
+                              },
+                              "exhausted": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "limit_min",
+                              "used_min",
+                              "left_min",
+                              "exhausted"
+                            ]
                           }
                         },
                         "required": [

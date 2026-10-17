@@ -2,9 +2,9 @@
 // folders) are admin-only to add, remove or rescan; reads are for everyone signed in, filtered by the person's band (a child reads
 // only `band_ok: child` items) and by each source's `visible_to`. lib/media/ holds the rules; this file is only the wire.
 import { createRoute, z } from "@hono/zod-openapi";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { mediaItems, mediaSources } from "@/db/schema";
+import { mediaItems, mediaSources, people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import { apiRouter, errorResponses } from "@/lib/openapi";
@@ -20,6 +20,7 @@ import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/li
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
+import { extendMediaBudget, mediaBudget } from "@/lib/media/watchTime";
 import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
 import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedWith } from "@/lib/media/collections";
 
@@ -301,6 +302,33 @@ const duplicatesRoute = createRoute({
 mediaRoutes.openapi(duplicatesRoute, (c) => c.json(findDuplicates(), 200));
 
 
+// ---- private daily media budget ----
+const BudgetSchema = z.object({ limit_min: z.number(), used_min: z.number(), left_min: z.number(), exhausted: z.boolean() });
+const budgetRoute = createRoute({
+  method: "get", path: "/budget", tags: ["Media"], summary: "My daily media minutes across all screens",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: BudgetSchema } }, description: "Zero limit means unlimited." }, ...errorResponses({ 401: "Sign in to read your budget" }) },
+});
+mediaRoutes.openapi(budgetRoute, (c) => c.json(mediaBudget(c.get("person").id), 200));
+
+const extendBudgetRoute = createRoute({
+  method: "post", path: "/budget/{personId}/extend", tags: ["Media"], summary: "Add media minutes for today only",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ personId: z.string() }), body: { content: { "application/json": { schema: z.object({ minutes: z.number().int().min(1).max(1440) }) } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Minutes added. The person's own budget read shows the new limit." }, ...errorResponses({ 400: "Choose whole minutes from 1 to 1440", 403: "Ask a grown-up to add minutes", 404: "Pick a person from People and try again" }) },
+});
+mediaRoutes.openapi(extendBudgetRoute, (c) => {
+  const { personId } = c.req.valid("param");
+  if (!db.select({ id: people.id }).from(people).where(and(eq(people.id, personId), isNull(people.deletedAt))).get()) {
+    return c.json({ error: "That person was not found. Open People and pick them again." }, 404);
+  }
+  extendMediaBudget(personId, c.req.valid("json").minutes);
+  // No person's usage is returned to the admin who extended the allowance.
+  return c.json({ success: true as const }, 200);
+}, (result, c) => {
+  if (!result.success) return c.json({ error: "Those minutes could not be added. Choose a whole number from 1 to 1440 and try again." }, 400);
+});
+
 // ---- progress (MEDIA-PROGRESS-01, design section 10) ----
 // A person reads and writes only their own rows. The merge is lib/media/progress.ts's `mergeProgress`: newest wins by the server stamp
 // after skew correction, a rewind applies when newer, `completed` is a latch, marks union, a minor's row is written only from their
@@ -313,6 +341,9 @@ const PositionSchema = z.union([
 const MarkSchema = z.object({ at_s: z.number().min(0), label: z.string().max(200).nullable().optional() });
 const WriteBody = z.object({
   position: PositionSchema,
+  session_id: z.string().min(1).max(100).optional().describe("A token for this player run; use a new one on the next run."),
+  playing: z.boolean().optional().describe("False on a pause; true on playing ticks and resume."),
+  seeking: z.boolean().optional().describe("True on a seek: saves the place without counting the jump as playing time."),
   duration_s: z.number().min(0).nullable().optional(),
   completed: z.boolean().optional().describe("true: the person says it is done (a book). false: the person clears it."),
   event: z.enum(["play", "skip", "finish"]).optional().describe("One thing that happened: a play started, a skip, or a finish. Each adds one."),
@@ -327,7 +358,7 @@ type WriteBodyType = z.infer<typeof WriteBody>;
 
 function writeFrom(body: WriteBodyType, serverNow: Date): ProgressWrite {
   return {
-    position: body.position as ProgressWrite["position"], duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
+    position: body.position as ProgressWrite["position"], session_id: body.session_id, playing: body.playing, seeking: body.seeking, duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
     events: body.event ? { [body.event]: true } : undefined, device_id: body.device_id ?? null, stamp: correctedStamp({ sampledAt: body.sampled_at, clientNow: body.client_now, serverNow }),
   };
 }
@@ -346,7 +377,7 @@ const putProgressRoute = createRoute({
   middleware: [requireAuth] as const,
   request: { params: z.object({ media_id: z.string() }), body: { content: { "application/json": { schema: WriteBody } } } },
   responses: {
-    200: { content: { "application/json": { schema: z.object({ progress: MediaProgress, applied: z.boolean().describe("false: a newer place was already stored; only counts, marks and a finish were merged.") }) } }, description: "The row as it now stands." },
+    200: { content: { "application/json": { schema: z.object({ budget: BudgetSchema, progress: MediaProgress, applied: z.boolean().describe("false: a newer place was already stored; only counts, marks and a finish were merged.") }) } }, description: "The row as it now stands." },
     ...errorResponses({ 401: "Not signed in", 403: "This screen belongs to someone else", 404: "No such title, or not one I may see", 422: "Wrong kind of position for this title" }),
   },
 });
@@ -358,7 +389,7 @@ mediaRoutes.openapi(putProgressRoute, (c) => {
   const now = new Date();
   const outcome = writeProgress(actor, item, writeFrom(body, now), { now, immediate: body.immediate });
   if (!outcome.ok) return c.json({ error: REFUSAL_LINES[outcome.refusal] }, outcome.refusal === "other_persons_device" ? 403 : 422);
-  return c.json({ progress: outcome.progress, applied: outcome.positionApplied }, 200);
+  return c.json({ progress: outcome.progress, applied: outcome.positionApplied, budget: outcome.budget! }, 200);
 });
 
 const batchRoute = createRoute({
@@ -370,7 +401,7 @@ const batchRoute = createRoute({
   request: { body: { content: { "application/json": { schema: z.object({ client_now: z.string().datetime().optional(), writes: z.array(WriteBody.extend({ media_id: z.string() })).min(1).max(500) }) } } } },
   responses: {
     200: {
-      content: { "application/json": { schema: z.object({ results: z.array(z.object({ media_id: z.string(), status: z.enum(["applied", "older", "refused", "unknown_title"]), reason: z.string().nullable(), progress: MediaProgress.nullable() })) }) } },
+      content: { "application/json": { schema: z.object({ results: z.array(z.object({ media_id: z.string(), status: z.enum(["applied", "older", "refused", "unknown_title"]), reason: z.string().nullable(), progress: MediaProgress.nullable(), budget: BudgetSchema.optional() })) }) } },
       description: "One result per write, in order. `older` means a newer place was already stored.",
     },
     ...errorResponses({ 401: "Not signed in" }),
@@ -385,7 +416,7 @@ mediaRoutes.openapi(batchRoute, (c) => {
     if (!item) return { media_id: entry.media_id, status: "unknown_title" as const, reason: REFUSAL_LINES.no_such_title, progress: null };
     const outcome = writeProgress(actor, item, writeFrom({ ...entry, client_now: entry.client_now ?? client_now }, now), { now, immediate: true });
     if (!outcome.ok) return { media_id: entry.media_id, status: "refused" as const, reason: REFUSAL_LINES[outcome.refusal], progress: null };
-    return { media_id: entry.media_id, status: outcome.positionApplied ? ("applied" as const) : ("older" as const), reason: null, progress: outcome.progress };
+    return { media_id: entry.media_id, status: outcome.positionApplied ? ("applied" as const) : ("older" as const), reason: null, progress: outcome.progress, budget: outcome.budget };
   });
   return c.json({ results }, 200);
 });

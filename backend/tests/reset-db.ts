@@ -48,6 +48,8 @@ import {
   likenessAdapters,
   mediaCollections,
   mediaProgress,
+  mediaWatchDays,
+  mediaWatchSessions,
   mediaItems,
   mediaSources,
   videoAdapterPrefs,
@@ -189,6 +191,8 @@ export function resetDb(): void {
   db.delete(likenessConsentEvents).run();
   db.delete(mediaCollections).run(); // MEDIA-LIB-01: progress and collections reference people and items, items reference sources
   db.delete(mediaProgress).run();
+  db.delete(mediaWatchSessions).run();
+  db.delete(mediaWatchDays).run();
   db.delete(mediaItems).run();
   db.delete(mediaSources).run();
   db.delete(artifacts).run(); // the chat program's generated-document versions, reference conversations and conversation_turns

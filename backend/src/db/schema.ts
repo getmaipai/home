@@ -2079,3 +2079,23 @@ export const mediaCollections = sqliteTable(
     uniqueIndex("media_collections_singleton_idx").on(table.personId, table.kind).where(sql`${table.kind} IN ('liked', 'watch_later', 'queue')`),
   ],
 );
+
+// MEDIA-KID-01: internal, private metering. Not synced as media records or exposed to admins.
+export const mediaWatchDays = sqliteTable("media_watch_days", {
+  personId: text("person_id").notNull().references(() => people.id),
+  day: text("day").notNull(),
+  usedS: real("used_s").notNull().default(0),
+  audioS: real("audio_s").notNull().default(0),
+  extendedMin: integer("extended_min").notNull().default(0),
+  notified: integer("notified", { mode: "boolean" }).notNull().default(false),
+}, (table) => [primaryKey({ columns: [table.personId, table.day] })]);
+
+export const mediaWatchSessions = sqliteTable("media_watch_sessions", {
+  personId: text("person_id").notNull().references(() => people.id),
+  sessionKey: text("session_key").notNull(),
+  mediaId: text("media_id").notNull(),
+  deviceId: text("device_id"),
+  positionS: real("position_s"),
+  sampledAt: text("sampled_at").notNull(),
+  playing: integer("playing", { mode: "boolean" }).notNull().default(true),
+}, (table) => [primaryKey({ columns: [table.personId, table.sessionKey] })]);

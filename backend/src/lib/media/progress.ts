@@ -14,6 +14,7 @@ import { mediaItems, mediaProgress } from "@/db/schema";
 import { getDeviceById } from "@/lib/devices";
 import { nextHlc } from "@/lib/hlc";
 import { newMediaProgressId } from "@/lib/id";
+import { meterProgress, type MediaBudget } from "./watchTime";
 import { mediaBandOf } from "./band";
 import { progressFromRow, MediaProgress, type MediaItem } from "./model";
 
@@ -42,6 +43,10 @@ export interface ProgressState {
 
 export interface ProgressWrite {
   position: Position;
+  /** A player-run token, stable across this playback's writes; not a person or media id. */
+  session_id?: string;
+  playing?: boolean;
+  seeking?: boolean;
   duration_s?: number | null;
   /** The person says it is done (a book) or not done (`false` clears the latch, if newer than the row). */
   completed?: boolean;
@@ -137,7 +142,7 @@ export function stateOf(record: MediaProgress): ProgressState {
 // ---- storage, coalescing and the write rule ----
 
 export type WriteRefusal = "other_persons_device" | "no_such_title" | "wrong_position_shape";
-export type WriteOutcome = { ok: true; progress: MediaProgress; positionApplied: boolean } | { ok: false; refusal: WriteRefusal };
+export type WriteOutcome = { ok: true; progress: MediaProgress; positionApplied: boolean; budget?: MediaBudget } | { ok: false; refusal: WriteRefusal };
 
 function personIsMinor(person: Parameters<typeof mediaBandOf>[0]): boolean {
   return mediaBandOf(person) !== "adult";
@@ -236,31 +241,32 @@ export function writeProgress(person: Parameters<typeof mediaBandOf>[0] & { id: 
   if (!deviceMayWrite(person, write.device_id)) return { ok: false, refusal: "other_persons_device" };
   if ((item.kind === "book") !== ("locator" in write.position)) return { ok: false, refusal: "wrong_position_shape" };
   const now = options.now ?? new Date();
+  const budget = meterProgress(person, item, write, now);
   const key = `${person.id}|${item.id}`;
   const window = options.coalesceMs ?? COALESCE_MS;
   const held = pending.get(key);
-  const mustStore = options.immediate === true || write.events?.finish === true || write.completed !== undefined || window <= 0;
+  const mustStore = budget.exhausted || options.immediate === true || write.events?.finish === true || write.completed !== undefined || window <= 0;
   if (!mustStore) {
     if (held) {
       // A flood from one tab: plain position ticks replace each other; anything with an event, a mark or a count is kept in order.
       const last = held.writes[held.writes.length - 1]!;
       if (isPlainTick(write) && isPlainTick(last)) held.writes[held.writes.length - 1] = write;
       else held.writes.push(write);
-      return viewOf(person.id, item, held.writes, now);
+      return { ...viewOf(person.id, item, held.writes, now), budget };
     }
     if (now.getTime() - (lastDbWrite.get(key) ?? 0) < window) {
       pending.set(key, { personId: person.id, mediaId: item.id, kind: item.kind, writes: [write] });
       armTimer(window);
-      return viewOf(person.id, item, [write], now);
+      return { ...viewOf(person.id, item, [write], now), budget };
     }
   }
   const writes = held ? [...held.writes, write] : [write];
   if (held) pending.delete(key);
-  return { ok: true, ...store(person.id, item.id, item.kind, writes, now) };
+  return { ok: true, ...store(person.id, item.id, item.kind, writes, now), budget };
 }
 
 /** What the row would be with the held writes applied: the answer a held write returns, without storing it. */
-function viewOf(personId: string, item: Pick<MediaItem, "id" | "kind">, writes: readonly ProgressWrite[], now: Date): WriteOutcome {
+function viewOf(personId: string, item: Pick<MediaItem, "id" | "kind">, writes: readonly ProgressWrite[], now: Date): Extract<WriteOutcome, { ok: true }> {
   const row = rowFor(personId, item.id);
   const merged = foldWrites(item.kind, row ? stateOf(progressFromRow(row)) : null, writes);
   const base = row ? progressFromRow(row) : null;

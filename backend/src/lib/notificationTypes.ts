@@ -182,6 +182,15 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
   // their own, the same "immediate is rare, most things are time_sensitive
   // or passive" posture the org doc asks for.
   {
+    id: "media_time_up",
+    level: "passive",
+    audience: "admins",
+    template: "The daily screen time ran out. You can add more minutes for today.",
+    configurable: false,
+    defaultChannels: ["in_app"],
+    toast: false,
+  },
+  {
     id: "repairs.new",
     level: "time_sensitive",
     audience: "admins",
