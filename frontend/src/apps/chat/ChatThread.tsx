@@ -9,6 +9,7 @@ import { AdminToolFallback, DATA_BINDINGS, MODEL_TRAILING_SLOT, THREAD_SLOTS, TO
 import { ChatConnectionBanner } from "@/apps/chat/chatConnectionBanner";
 import { ChatThreadExtras } from "@/apps/chat/ChatThreadExtras";
 import { ChatAvailabilityContext, engineDownReason } from "@/apps/chat/useChatAvailability";
+import { useComposerFocus } from "@/apps/chat/useComposerFocus";
 import { ChatColumnControlContext } from "@/apps/chat/chatColumnControl";
 import { AdminContext, ChatAgeBandContext } from "@/apps/chat/chatThreadContexts";
 import { useStatusApps } from "@/shell/useStatusApps";
@@ -51,7 +52,7 @@ const BoundToolFallbackGuard: ToolCallMessagePartComponent = (props) => {
 /** getmaipai/home#206: the longest Send waits for a saved chat to open. */
 const OPENING_HOLD_MS = 15_000;
 
-export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId, pageSlots, projectFolderId }: {
+export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false, canUseIncognito = false, onOpenSettings, openingConversationId, pageSlots, projectFolderId, focusKey }: {
   /** Incognito: the kit's temporary-thread styling. */
   temporary?: boolean;
   /** Called with the superseded turn id when an edited message is sent. */
@@ -69,8 +70,11 @@ export function ChatThread({ temporary, onEditSend, thinkingModeVisible = false,
   pageSlots?: Pick<ThreadComponents, "Welcome" | "WelcomeContent" | "BelowComposer" | "BelowComposerContent" | "emptyLayout" | "composerDensity" | "composerPlaceholder">;
   /** Route scope to start a fresh conversation in this project. */
   projectFolderId?: string;
+  /** Changes each time the person arrives on Chat (the rail's Chat, New chat); the composer takes focus on each. */
+  focusKey?: string;
 }) {
   const rootRef = useRef<HTMLDivElement>(null);
+  useComposerFocus(rootRef, focusKey);
   // COLUMN-01: the history column owns these (ChatColumn.tsx); the page
   // provides them, and a ChatThread shown outside the chat page has none.
   const chatColumn = useContext(ChatColumnControlContext);

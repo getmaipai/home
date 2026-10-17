@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@maipai/ui/src/dashboard/components/ui/input-group";
+import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type InstallStatusView } from "@/lib/api";
 import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
 import { engineDownReason, useChatAvailability } from "@/apps/chat/useChatAvailability";
@@ -25,6 +26,13 @@ export function askHref(text: string): string {
 /** HOME-ALIVE-01h: the ask box and three starters, built from kit primitives only (rule 9b). */
 export function AskBox() {
   const navigate = useNavigate();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const fine = useSurface().pointer === "fine";
+  // Arriving on Home puts the cursor in the box (not on a touch screen, where it would pop the keyboard).
+  useEffect(() => {
+    const active = document.activeElement;
+    if (fine && !(active instanceof HTMLElement && active.matches("input, textarea, select, [contenteditable='true']"))) inputRef.current?.focus({ preventScroll: true });
+  }, [fine]);
   const [text, setText] = useState("");
   const availability = useChatAvailability();
   const down = engineDownReason(availability);
@@ -50,7 +58,7 @@ export function AskBox() {
       {down === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="h-auto w-24 max-w-full sm:w-32" />}
       <form onSubmit={submit}>
         <InputGroup>
-          <InputGroupInput value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label="Ask" maxLength={2000} />
+          <InputGroupInput ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label="Ask" maxLength={2000} />
           <InputGroupAddon align="inline-end">
             <InputGroupButton type="submit" variant="default" size="sm" disabled={text.trim() === ""}>Ask</InputGroupButton>
           </InputGroupAddon>

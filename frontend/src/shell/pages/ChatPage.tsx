@@ -1,6 +1,6 @@
 import { lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type FocusEvent, type KeyboardEvent, type ReactNode } from "react";
 import { currentLocationIfGranted } from "@/lib/currentLocation";
-import { Link, useMatch, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useMatch, useNavigate, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { voiceFailureLine, type VoiceFailureKind } from "@maipai/home-backend/src/lib/failureCopy";
@@ -985,6 +985,7 @@ export function ChatPage({ person }: { person: Roster }) {
   // instead of filling the shell header's slot (which spanned the history
   // column too).
   const { on: temporaryNext } = useIncognitoContext();
+  const routeLocation = useLocation();
   const projectRoute = useMatch("/chat/projects/:id");
   const projectFolderId = projectRoute?.params.id ? decodeURIComponent(projectRoute.params.id) : undefined;
   const projectDetailQuery = useQuery({ queryKey: ["chat-folders", person.id, "one", projectFolderId ?? ""], queryFn: () => api.chatFolder(projectFolderId!), enabled: projectFolderId !== undefined && !temporaryNext });
@@ -1653,6 +1654,7 @@ export function ChatPage({ person }: { person: Roster }) {
                   openingConversationId={openingConversationId}
                   pageSlots={projectPage?.slots}
                   projectFolderId={projectPage?.folderId}
+                  focusKey={`${routeLocation.key}:${openingConversationId ?? ""}`}
                 />
                 </PageContext.Provider>
               </ConnectionStateContext.Provider>
