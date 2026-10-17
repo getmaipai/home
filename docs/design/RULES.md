@@ -313,9 +313,12 @@ feel like the native app we are emulating"), and his chat shell layout spec of
 expands (S1 below). Owner-approved 2026-10-06: the app settings design
 (S1 profile menu and More menu, S4) and the mobile design pass (S1 phone
 drawer, S2 phone layout, S3 widths); they supersede the earlier S1
-profile-menu list and the "every width" wording.
+profile-menu list and the "every width" wording. Owner-approved 2026-10-17: S6
+(system status reaches the person through the existing mechanisms); his words are the
+record: "make a rule for that: we already have a pattern and mechanisms to relay system
+status to the user".
 
-Governs: frontend/src/shell/**, frontend/src/apps/**, backend/src/settings/**, backend/src/wire.ts
+Governs: frontend/src/shell/**, frontend/src/apps/**, backend/src/settings/**, backend/src/wire.ts, backend/src/lib/roleHealth.ts, backend/src/lib/healthSnapshot.ts, backend/src/lib/installStatus.ts, backend/src/lib/issues.ts
 
 S1. **The main navigation is permanent.** The column that lists the apps
     (Home, Chat, Library, Family today; more apps later) is present on
@@ -374,3 +377,33 @@ S5. **Copy is per person.** Setting text comes from the spec copy fields
     disabled for them (Disabled for the home, Disabled by Dad).
     COPY-LINT-01 fails the gate on a new key that breaks the machine-checkable
     half; review holds the rest.
+S6. **System status reaches the person through the existing mechanisms.**
+    (Owner-approved 2026-10-17.) A change that must tell a person something
+    about the system's state (starting, restarting, paused, low memory, a job
+    running, an install in progress, a service down, a failed background
+    action) uses the surface that already carries that kind of status and
+    feeds its data source a new reason or state. It never adds a banner, dot,
+    panel, toast or polling loop of its own.
+
+    | Kind of status | Surface (file) | Data source | Who sees it |
+    |---|---|---|---|
+    | Background progress (engine setup, model downloads) | the progress strip, `InstallStrip.tsx` (`ShellInstallStrip`, the setup wizard, the Home ask box) | `lib/installStatus.ts` over the Stack's job list, `/api/install` | everyone, while it runs |
+    | Something needs fixing | a Repairs item with Try again, `RepairsPage.tsx` | `lib/issues.ts` `raiseIssue` / `resolveIssue`, `/api/repairs` (the Stack link raises one in `lib/stack/linkRepairs.ts`) | owner and admin |
+    | The AI or chat is not ready | the chat paused or starting state: composer line, Send hold, Welcome state, `useEngineDownReason` | `lib/roleHealth.ts` through `lib/healthSnapshot.ts` (`/api/health`, `availability`, `reason`, `cause`); the admin pause switch is `lib/chatPause.ts` | everyone in chat; a child gets only the composer line |
+    | Whole-system health | the Status page and the header pill and rail menu, `StatusPage.tsx`, `StatusIndicator.tsx` | `lib/statusApps.ts`, `lib/statusBoard.ts`, `/api/status` (the Stack's health list is synced by `lib/stackHealthSync.ts`) | the Status page everyone; the pill hidden from a child |
+    | One job's progress | that job's own card (picture, video, download) | the job record | whoever started it |
+    | Needs an admin's attention, not a person's screen | Notifications: the bell, `NotificationBell.tsx`, `BrowserAlerts.tsx` | `lib/notifications.ts`, declared in `lib/notificationTypes.ts` | the audience the type declares |
+    | A form or action failed | the kit destructive Alert in that form, with the next step | the failing call's own response, `lib/failureCopy.ts` | the person acting |
+    | A spoken turn is not ready | the voice session's spoken line | the same readiness function as the written chat | the person speaking |
+
+    Status is defined in one place: one readiness function per concern
+    (chat is `roleHealth` through `collectHealth`), and every client reads
+    it (web, voice, robot, Go). A client never recomputes it or keeps its
+    own copy of the rule. A failure that coincides with a not-ready state
+    is reported as that state ("Chat is starting", "Chat is paused") and
+    never as a generic error. Status copy says what is happening and what to
+    do (STYLE.md: the problem as the person sees it, then the next step). A
+    new status surface is a new design: it needs an architect verdict, and
+    the verdict is DUPLICATE when an existing mechanism covers the kind of
+    status. Rejected in review: a new status UI that duplicates an existing
+    one.
