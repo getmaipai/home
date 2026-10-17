@@ -37391,7 +37391,7 @@ a rollback restores a database the older release can read.
   person takes its jobs. If the phrasing round fails after a job started, the reply says it is coming (0.2.9). Earlier picture and
   video turns replay with a note that the tool was called, so the model stops claiming pictures it did not make. "Another one" calls the
   tool again. The tool's prompt argument says it cannot change an existing picture and points to Edit.
-- **Card and menus.** Kit `JobProgress` (Stop), kit `ImageGallery` (size large since ui-v0.5.246) with Edit, kit `ErrorState` with Try again.
+- **Card and menus.** Kit `ImageGeneration` (prompt shimmer card, bar, clock, Stop; ui-v0.5.249), kit `ImageGallery` (size large since ui-v0.5.246) with Edit, kit `ErrorState` with Try again.
   Make a variation is in the reply's More menu (`MakeVariationMenuItem`, `picturesApi.again`).
 - **Settings.** Home settings, Pictures and videos (`PicturesLibrary.tsx`, `VideoLibrary.tsx`; keys in `settings/pictureKeys.ts` and
   `videoKeys.ts`: `generation.adults`, `generation.adult_adapters`, `generation.video.enabled`, `generation.video.adult_adapters`,
