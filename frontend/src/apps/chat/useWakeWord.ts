@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
+import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { WakeWordLoop, type WakeWordLoopOptions } from "@/lib/voice/wake-word-loop";
 import { onWakeDetected, type WakeDetectedEvent } from "@/lib/voice/wake-word-events";
 import { loadInstalledWakewords, DEFAULT_WAKE_WORD_MODEL_ID } from "@/lib/voice/wake-word-models";
@@ -129,8 +129,9 @@ export function useWakeWord({
       if (requestId !== requestIdRef.current) return;
       setEnabled(false);
       setStatus("error");
+      const cause = err instanceof MicCaptureError ? err.cause : err;
       setError(
-        err instanceof DOMException && err.name === "NotAllowedError"
+        cause instanceof DOMException && cause.name === "NotAllowedError"
           ? "Microphone access was denied."
           : err instanceof Error
             ? err.message

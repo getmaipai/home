@@ -16,6 +16,29 @@
 // voice - the household's own hardware doing the echo cancellation the
 // legacy pod's XVF3800 mic array did for real.
 
+import { StreamResampler } from "@/lib/voice/resampler";
+
+const TARGET_RATE = 16_000;
+
+export type MicCaptureErrorKind = "insecure" | "denied" | "setup";
+
+/** Why capture could not start. `kind` picks the message the person sees;
+ * `cause` is the underlying error, logged for diagnosis. */
+export class MicCaptureError extends Error {
+  constructor(readonly kind: MicCaptureErrorKind, readonly cause: unknown) {
+    super(`mic capture ${kind}: ${errName(cause)}: ${errMessage(cause)}`);
+    this.name = "MicCaptureError";
+    console.warn(`[mic] capture failed (${kind}): ${errName(cause)}: ${errMessage(cause)}`);
+  }
+}
+
+function errName(err: unknown): string {
+  return typeof err === "object" && err !== null && "name" in err ? String((err as { name: unknown }).name) : "Error";
+}
+function errMessage(err: unknown): string {
+  return typeof err === "object" && err !== null && "message" in err ? String((err as { message: unknown }).message) : String(err);
+}
+
 const WORKLET_NAME = "wake-word-mic-processor";
 
 const WORKLET_SOURCE = `
@@ -83,68 +106,81 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
           ...(options.deviceId ? { deviceId: { exact: options.deviceId } } : {}),
         } as MediaTrackConstraints,
       }));
-  const stream = await getStream();
-
-  const AudioContextCtor = (window.AudioContext ??
-    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
-  let context: AudioContext;
+  if (!options.getStream && (window.isSecureContext === false || !navigator.mediaDevices?.getUserMedia)) {
+    throw new MicCaptureError("insecure", new Error("not a secure context or mediaDevices missing"));
+  }
+  let stream: MediaStream;
   try {
-    context = new AudioContextCtor({ sampleRate: 16_000 });
-  } catch {
-    context = new AudioContextCtor();
+    stream = await getStream();
+  } catch (err) {
+    const name = errName(err);
+    const kind: MicCaptureErrorKind = name === "NotAllowedError" || name === "PermissionDeniedError" || name === "SecurityError" ? "denied" : "setup";
+    throw new MicCaptureError(kind, err);
   }
 
-  const blobUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "application/javascript" }));
-  await context.audioWorklet.addModule(blobUrl);
-  URL.revokeObjectURL(blobUrl);
-
-  const source = context.createMediaStreamSource(stream);
-  const worklet = new AudioWorkletNode(context, WORKLET_NAME, {
-    numberOfInputs: 1,
-    numberOfOutputs: 0,
-    channelCount: 1,
-    channelCountMode: "explicit",
-    channelInterpretation: "speakers",
-  });
-
-  const targetRate = 16_000;
-  const ratio = context.sampleRate / targetRate;
-  let resampleAccum = 0;
-
-  worklet.port.onmessage = (event: MessageEvent<Float32Array>) => {
-    const incoming = event.data;
-    if (Math.abs(ratio - 1) < 1e-6) {
-      options.onFrame(incoming);
-      return;
+  // Capture runs at the device's own rate and is resampled to 16 kHz here.
+  // Asking for a 16 kHz context over a 44.1/48 kHz microphone throws in
+  // Firefox ("different sample-rate") and is unreliable in Safari.
+  const AudioContextCtor = (window.AudioContext ??
+    (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext) as typeof AudioContext;
+  let context: AudioContext | undefined;
+  let source: MediaStreamAudioSourceNode | undefined;
+  let node: { disconnect: () => void } | undefined;
+  try {
+    context = new AudioContextCtor();
+    // Safari starts a context suspended unless resumed; harmless elsewhere.
+    if (context.state === "suspended") await context.resume().catch(() => {});
+    source = context.createMediaStreamSource(stream);
+    const resampler = new StreamResampler(context.sampleRate, TARGET_RATE);
+    const emit = (frame: Float32Array) => {
+      const out = resampler.process(frame);
+      if (out.length) options.onFrame(out);
+    };
+    if (context.audioWorklet && typeof AudioWorkletNode !== "undefined") {
+      const blobUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "application/javascript" }));
+      try {
+        await context.audioWorklet.addModule(blobUrl);
+      } finally {
+        URL.revokeObjectURL(blobUrl);
+      }
+      const worklet = new AudioWorkletNode(context, WORKLET_NAME, {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1,
+        channelCountMode: "explicit",
+        channelInterpretation: "speakers",
+      });
+      worklet.port.onmessage = (event: MessageEvent<Float32Array>) => emit(event.data);
+      source.connect(worklet);
+      node = { disconnect: () => { worklet.port.onmessage = null; worklet.disconnect(); } };
+    } else {
+      // Old Safari without AudioWorklet.
+      const processor = context.createScriptProcessor(4096, 1, 1);
+      processor.onaudioprocess = (event) => emit(event.inputBuffer.getChannelData(0).slice(0));
+      source.connect(processor);
+      processor.connect(context.destination);
+      node = { disconnect: () => { processor.onaudioprocess = null; processor.disconnect(); } };
     }
-    const outLen = Math.floor((incoming.length - resampleAccum) / ratio);
-    if (outLen <= 0) return;
-    const out = new Float32Array(outLen);
-    let idx = resampleAccum;
-    for (let i = 0; i < outLen; i++) {
-      const base = Math.floor(idx);
-      const frac = idx - base;
-      const a = incoming[Math.min(base, incoming.length - 1)] ?? 0;
-      const b = incoming[Math.min(base + 1, incoming.length - 1)] ?? a;
-      out[i] = a + (b - a) * frac;
-      idx += ratio;
-    }
-    resampleAccum = idx - incoming.length;
-    options.onFrame(out);
-  };
+  } catch (err) {
+    try { source?.disconnect(); } catch { /* ignore */ }
+    stream.getTracks().forEach((track) => { try { track.stop(); } catch { /* ignore */ } });
+    void context?.close().catch(() => {});
+    throw new MicCaptureError("setup", err);
+  }
+  const ctx = context;
+  const src = source;
+  const worklet = node;
 
-  source.connect(worklet);
-  options.onSource?.(context, source);
+  options.onSource?.(ctx, src);
 
   const stop = () => {
     try {
-      worklet.port.onmessage = null;
       worklet.disconnect();
     } catch {
       /* ignore */
     }
     try {
-      source.disconnect();
+      src.disconnect();
     } catch {
       /* ignore */
     }
@@ -155,8 +191,8 @@ export async function startMicCapture(options: MicCaptureOptions): Promise<MicCa
         /* ignore */
       }
     });
-    void context.close().catch(() => {});
+    void ctx.close().catch(() => {});
   };
 
-  return { stop, sampleRate: targetRate };
+  return { stop, sampleRate: TARGET_RATE };
 }

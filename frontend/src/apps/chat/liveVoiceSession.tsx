@@ -28,7 +28,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { VoiceMode } from "@maipai/ui/src/elements/voice-conversation";
 import { createSttSocket, type SttSocket, type SttSocketHandlers } from "@/lib/voice/sttSocket";
-import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
+import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
 import { api } from "@/lib/api";
@@ -37,7 +37,7 @@ export interface LiveVoiceSessionProps {
   composer: { setText: (text: string) => void; send: () => void };
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onProblem?: (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked") => void;
+  onProblem?: (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup") => void;
   /** Optional quiet timeout for wake-opened sessions; null keeps a
    * person-opened voice session active until they end it. */
   idleCloseMs?: number | null;
@@ -189,9 +189,10 @@ export function useLiveVoiceSession({ composer, open, onOpenChange, onProblem, i
                 }
                 micHandle = handle;
               })
-              .catch(() => {
+              .catch((error: unknown) => {
                 if (!cancelled) {
-                  onProblem?.("microphone_blocked");
+                  const kind = error instanceof MicCaptureError ? error.kind : "setup";
+                  onProblem?.(kind === "denied" ? "microphone_blocked" : kind === "insecure" ? "microphone_insecure" : "microphone_setup");
                   onOpenChange(false);
                 }
               });

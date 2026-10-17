@@ -1334,7 +1334,7 @@ export function ChatPage({ person }: { person: Roster }) {
       const line = () => toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" });
       if (kind !== "microphone_blocked") return line();
       // Diagnose only: the browser allows the mic here, so the failure is something else; say so once, never reopen.
-      void micGate.diagnose().then((ok) => { if (ok) line(); });
+      void micGate.diagnose().then((ok) => { if (ok) toast.error(voiceFailureLine("microphone_setup", { minor: person.age_band !== "adult", canOpenRepairs: false }), { id: "voice-problem" }); });
     },
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,

@@ -58,7 +58,7 @@ function Harness({ open, onOpenChange, onProblem = () => {}, isSpeaking, speakin
     composer: runtime.thread.composer,
     open,
     onOpenChange,
-    onProblem: onProblem as (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked") => void,
+    onProblem: onProblem as (kind: "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup") => void,
     turnSchedulerRef,
     liveVoiceActiveRef,
     pendingSpeechRef,

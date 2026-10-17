@@ -2,7 +2,7 @@
 // may read it. Kinds and the classifier live in generationFailure.ts.
 export type FailureKind = "busy" | "memory" | "stopped" | "slow" | "unreachable" | "engine_computer" | "context_too_large" | "other";
 
-export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked";
+export type VoiceFailureKind = "listening_lost" | "listening_engine" | "speaking_failed" | "microphone_blocked" | "microphone_insecure" | "microphone_setup";
 export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adultNoRepairs: string; minor: string }> = {
   listening_lost: {
     adult: "Voice listening stopped because the connection to your hub dropped. Check that the hub is on, then tap the waveform to start again.",
@@ -23,6 +23,16 @@ export const VOICE_FAILURE_COPY: Record<VoiceFailureKind, { adult: string; adult
     adult: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again.",
     adultNoRepairs: "Home can't use your microphone. Allow microphone access in your browser, then tap the waveform again.",
     minor: "I can't use the microphone. Please tell a grown-up.",
+  },
+  microphone_insecure: {
+    adult: "Open Home at http://localhost:3000 or an https address to use the microphone.",
+    adultNoRepairs: "Open Home at http://localhost:3000 or an https address to use the microphone.",
+    minor: "I can't use the microphone here. Please tell a grown-up.",
+  },
+  microphone_setup: {
+    adult: "Your browser could not start the microphone. Try again, or use Chrome.",
+    adultNoRepairs: "Your browser could not start the microphone. Try again, or use Chrome.",
+    minor: "I can't use the microphone right now. Please tell a grown-up.",
   },
 };
 

@@ -1,5 +1,5 @@
 import type { DictationAdapter } from "@assistant-ui/react";
-import { startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
+import { MicCaptureError, startMicCapture, type MicCaptureHandle } from "@/lib/voice/mic-capture";
 import type { SttSocket, SttSocketHandlers } from "@/lib/voice/sttSocket";
 import type { SttServerMessage } from "@/lib/voice/sttContract";
 import type { SentenceSpeechScheduler } from "@/lib/sentenceSpeechScheduler";
@@ -192,7 +192,8 @@ export function createSttDictationAdapter(deps: SttDictationDeps): DictationAdap
                   // the NEXT attempt falls back to the browser's default
                   // input instead of repeating the same failure. This
                   // attempt still ends honestly as an error.
-                  if (preferredDeviceId && error instanceof DOMException && (error.name === "OverconstrainedError" || error.name === "NotFoundError")) {
+                  const cause = error instanceof MicCaptureError ? error.cause : error;
+                  if (preferredDeviceId && cause instanceof DOMException && (cause.name === "OverconstrainedError" || cause.name === "NotFoundError")) {
                     clearMicDevicePreference();
                   }
                   finish("error");
