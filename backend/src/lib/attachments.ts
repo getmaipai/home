@@ -349,6 +349,8 @@ export interface TemporaryChatImage {
   height: number;
   bytes: Uint8Array;
   createdAt: number;
+  /** Set on a version the picture editor made: where it came from (lib/imageEdit.ts). */
+  edit?: { v: 1; op: string; label: string; source: string; source_sha256: string; root: string; engine?: string; model?: string; ms?: number; width: number; height: number };
 }
 const temporaryChatImages = new Map<string, TemporaryChatImage>();
 export function storeTemporaryChatImage(image: Omit<TemporaryChatImage, "createdAt">): void {
@@ -368,6 +370,12 @@ export function getTemporaryChatImageForReader(actor: PersonRow, conversationId:
 }
 export function temporaryChatImagesForTurn(actor: PersonRow, conversationId: string, turnId: string): TemporaryChatImage[] {
   return [...temporaryChatImages.values()].filter((image) => image.ownerPersonId === actor.id && image.conversationId === conversationId && image.turnId === turnId);
+}
+/** The editor's versions of one temporary picture, oldest first. */
+export function listTemporaryChatImageVersions(actor: PersonRow, conversationId: string, rootId: string): (TemporaryChatImage & { edit: NonNullable<TemporaryChatImage["edit"]> })[] {
+  return [...temporaryChatImages.values()]
+    .filter((image): image is TemporaryChatImage & { edit: NonNullable<TemporaryChatImage["edit"]> } => Boolean(image.edit) && image.conversationId === conversationId && image.edit!.root === rootId && Date.now() - image.createdAt <= 2 * 60 * 60 * 1000 && canAccessPerson(actor, image.ownerPersonId))
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 export function removeTemporaryChatImages(conversationId: string): void {
   for (const [id, image] of temporaryChatImages) if (image.conversationId === conversationId) temporaryChatImages.delete(id);

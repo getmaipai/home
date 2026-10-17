@@ -69,6 +69,20 @@ export interface StackSearchServiceStatus {
   library: { name: "ddgs"; version: string };
 }
 
+/** GET /stack/v1/image-tools (IMAGETOOLS-01): the editing tools' state, models and limits. */
+export interface StackImageToolsStatus {
+  state: "unsupported" | "needs-setup" | "building" | "idle" | "running";
+  phase: string | null;
+  vision: boolean;
+  models: Record<string, boolean>;
+  limits: Record<string, number>;
+  operations: string[];
+  reason: string | null;
+}
+/** One finished edit as POST /v1/images/edits states it: a PNG with no metadata. */
+export interface StackImageEditItem { b64_json: string; width: number; height: number; content_type: string; operation: string; engine?: string; model?: string; ms?: number }
+export type StackImageEditReply = { kind: "done"; job: string; item: StackImageEditItem } | { kind: "running"; job: string };
+
 export interface StackClient {
   /** POST /v1/chat/completions. For `stream: true` the Response body reader
    * and its headers come back, not parsed data. */
@@ -88,6 +102,12 @@ export interface StackClient {
   voicePreview(id: string, opts?: { signal?: AbortSignal }): Promise<Response>;
   /** POST /v1/images/generations; returns the job. */
   imageJob(request: RoleRequest, opts?: { signal?: AbortSignal }): Promise<StackJob>;
+  /** GET /stack/v1/image-tools. */
+  imageTools(opts?: { signal?: AbortSignal }): Promise<StackImageToolsStatus>;
+  /** POST /v1/images/edits: 200 is the finished PNG, 202 a job to poll (`job()`), fetch with `imageEditResult()` and stop with `cancelJob()`. */
+  imageEdit(form: FormData, opts?: { signal?: AbortSignal }): Promise<StackImageEditReply>;
+  /** GET /v1/images/edits/{job}: the PNG a finished edit made (the Stack keeps it in memory a few minutes). */
+  imageEditResult(job: string, opts?: { signal?: AbortSignal }): Promise<Uint8Array>;
   submitJob(request: { kind: string; role?: string | null; input?: Record<string, unknown> }, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   job(id: string, opts?: { signal?: AbortSignal }): Promise<StackJob>;
   jobs(opts?: { signal?: AbortSignal }): Promise<StackJob[]>;
@@ -374,6 +394,13 @@ export function createStackClient(options: StackClientOptions = {}): StackClient
       await fail(res);
       throw new Error("unreachable");
     },
+    imageTools: (opts) => call("/stack/v1/image-tools", { method: "GET" }, async (res) => (await json<{ image_tools: StackImageToolsStatus }>(res)).image_tools, opts),
+    imageEdit: (form, opts) => call("/v1/images/edits", formInit(form), async (res) => {
+      const body = await json<{ job: string; data: StackImageEditItem[] }>(res);
+      const item = res.status === 200 ? body.data?.[0] : undefined;
+      return item ? { kind: "done" as const, job: body.job, item } : { kind: "running" as const, job: body.job };
+    }, opts),
+    imageEditResult: (job, opts) => call(`/v1/images/edits/${encodeURIComponent(job)}`, { method: "GET" }, async (res) => new Uint8Array(await res.arrayBuffer()), opts),
     submitJob: (request, opts) => call("/stack/v1/jobs", jsonInit(request), async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     job: (id, opts) => call(`/stack/v1/jobs/${encodeURIComponent(id)}`, { method: "GET" }, async (res) => StackJobSchema.parse((await json<{ job: unknown }>(res)).job), opts),
     jobs: (opts) => call("/stack/v1/jobs", { method: "GET" }, async (res) => { const body = await json<{ jobs: unknown }>(res); return Array.isArray(body.jobs) ? body.jobs.map((job) => StackJobSchema.parse(job)) : []; }, opts),
