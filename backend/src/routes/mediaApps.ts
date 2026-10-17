@@ -4,6 +4,7 @@
 // lib/media/appHost.ts; this file is the wire.
 import { apiRouter } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
+import { appRouteAllowed } from "@/lib/apps";
 import { coerceNumber, mediaAppAllowed, mediaAppData, saveProgress, setListed, MEDIA_APP_IDS, type DataParams, type MediaAppId } from "@/lib/media/appHost";
 
 type Body = Record<string, unknown>;
@@ -28,6 +29,8 @@ export function createMediaAppRoutes(appId: MediaAppId) {
   routes.post("/data/:dataId", requireAuth, async (c, next) => {
     const person = c.get("person");
     if (!mediaAppAllowed(person, appId)) return next();
+    // NEWS-00 review: a data id that only a raised page uses needs that page's floor (the plugin route checks the same).
+    if (!appRouteAllowed(person, appId, "data", c.req.param("dataId"))) return next();
     const value = mediaAppData(person, appId, c.req.param("dataId"), paramsOf(await bodyOf(c.req.raw)));
     if (value === null) return next();
     return c.json(value as never, 200);

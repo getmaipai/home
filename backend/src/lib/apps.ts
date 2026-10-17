@@ -8,6 +8,7 @@
 // `filterAnswerBlocks` exactly as a chat turn's do.
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import Ajv2020 from "ajv/dist/2020.js";
 import UI_SCHEMA from "@maipai/spec/ui/schema.json" with { type: "json" };
 import { checkAppPackage, type AppContributes, type AppDataEntry, type AppPageEntry } from "@maipai/spec/ui/app-check.js";
@@ -95,7 +96,9 @@ function loadApp(id: string): LoadedApp | null {
   const contributes = (manifest.contributes ?? {}) as AppContributes;
   if (!contributes.pages || contributes.pages.length === 0) return null;
   const dir = resolvePackageDir(id);
-  const stampParts = [manifest.version];
+  // The stamp covers the manifest's own page, data and floor declarations, not only the version and the page files: a floor raised in
+  // the manifest must take effect without a version bump.
+  const stampParts = [manifest.version, manifest.min_role, createHash("sha256").update(JSON.stringify({ pages: contributes.pages, data: contributes.data })).digest("hex").slice(0, 16)];
   for (const page of contributes.pages) {
     const path = pageFile(dir, page.module);
     try {
@@ -119,7 +122,7 @@ function loadApp(id: string): LoadedApp | null {
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
-  problems.push(...settingsAreaProblems(manifest));
+  problems.push(...settingsAreaProblems(manifest), ...sharedModuleProblems(contributes));
   if (problems.length > 0 && !warned.has(`${id}|${stamp}`)) {
     warned.add(`${id}|${stamp}`);
     console.warn(`[apps] ${id}: app refused: ${problems.join("; ")}`);
@@ -127,6 +130,18 @@ function loadApp(id: string): LoadedApp | null {
   const app: LoadedApp = { manifest, contributes, pages, problems };
   loadCache.set(id, { stamp, app });
   return app;
+}
+
+/** Two page entries may not name one module file: a second entry with a lower floor would serve the raised page's document. */
+function sharedModuleProblems(contributes: AppContributes): string[] {
+  const seen = new Map<string, string>();
+  const out: string[] = [];
+  for (const page of contributes.pages ?? []) {
+    const first = seen.get(page.module);
+    if (first !== undefined) out.push(`page "${page.id}" shares its module "${page.module}" with page "${first}"; each page needs its own file so its floor holds`);
+    else seen.set(page.module, page.id);
+  }
+  return out;
 }
 
 /** The plain-language problems with a package's app pages, or an empty list (also for a package that is not an app).
@@ -144,7 +159,7 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
-  problems.push(...settingsAreaProblems(manifest));
+  problems.push(...settingsAreaProblems(manifest), ...sharedModuleProblems(contributes));
   return problems;
 }
 
@@ -238,6 +253,35 @@ export function appRouteAllowed(person: PersonRow, packageId: string, kind: "dat
  * see the app, which already requires its index page. The route must still check the item is in the asker's released set. */
 export function appImageAllowed(person: PersonRow, packageId: string): boolean {
   return visibleApp(person, packageId) !== null;
+}
+
+/** NEWS-00 review: the direct run route (`POST /api/plugins/:id/run`) of a package that declares pages. A package app's recipe serves
+ * every page's data, so the caller needs the floor of every page: a viewer below any raised page is refused (the caller answers 404).
+ * A package with no pages is not an app and is unaffected. */
+export function appRunAllowed(person: PersonRow, packageId: string): boolean {
+  const app = loadApp(packageId);
+  if (!app) return true;
+  if (app.problems.length > 0) return false;
+  const visible = visibleApp(person, packageId);
+  return visible !== null && (visible.contributes.pages ?? []).every((entry) => pageVisibleTo(person, visible.manifest, entry));
+}
+
+/** NEWS-00 review: the manifest as one viewer may read it from `GET /api/plugins`: a package app's `contributes.pages` and `contributes.data`
+ * hold only what this viewer's floor allows (a raised page and the data only it uses are not listed, nor their inputs). */
+export function manifestForViewer<T extends PackageManifest>(person: PersonRow, manifest: T): T {
+  const contributes = (manifest.contributes ?? {}) as AppContributes & Record<string, unknown>;
+  if (!contributes.pages || contributes.pages.length === 0) return manifest;
+  const app = loadApp(manifest.id);
+  const visible = app && app.problems.length === 0 ? visibleApp(person, manifest.id) : null;
+  if (!visible) return { ...manifest, contributes: { ...contributes, pages: [], data: [] } } as T;
+  return {
+    ...manifest,
+    contributes: {
+      ...contributes,
+      pages: contributes.pages.filter((entry) => pageVisibleTo(person, manifest, entry)),
+      data: (contributes.data ?? []).filter((entry) => appRouteAllowed(person, manifest.id, "data", entry.id, visible)),
+    },
+  } as T;
 }
 
 function visibleApp(person: PersonRow, id: string): LoadedApp | null {

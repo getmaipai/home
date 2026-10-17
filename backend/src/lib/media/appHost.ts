@@ -7,7 +7,7 @@ import { and, desc, eq, inArray, isNull, sql, type SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaItems, mediaSources } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
-import { appVisibleTo } from "@/lib/apps";
+import { appImageAllowed, appRouteAllowed } from "@/lib/apps";
 import type { PersonRow } from "@/types";
 import { readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf } from "./band";
@@ -64,7 +64,8 @@ export function mediaAppAllowed(person: PersonRow, appId: string): boolean {
   const loaded = loadManifestOnly(appId);
   if (!loaded.ok) return false;
   if (!loaded.value.contributes || !(loaded.value.contributes as { pages?: unknown[] }).pages?.length) return false;
-  return appVisibleTo(person, loaded.value);
+  // NEWS-00 review: the same check as the plugin routes: the person's role clears the package, the index page's floor and every other app rule.
+  return appImageAllowed(person, appId);
 }
 
 /** A child (and a guest, read as a child) sees the household library plus channels an adult followed for them, and no discovery. */

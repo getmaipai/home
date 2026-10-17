@@ -17,7 +17,7 @@ import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
-import { getAppData, getAppPage } from "@/lib/apps";
+import { appRunAllowed, getAppData, getAppPage, manifestForViewer } from "@/lib/apps";
 
 export const pluginsRoutes = apiRouter();
 
@@ -32,7 +32,7 @@ pluginsRoutes.get("/", requireAuth, async (c) => {
   const rows = manifests.map((manifest) => {
     const status = statuses.get(manifest.id);
     return {
-      ...manifest,
+      ...manifestForViewer(actor, manifest),
       installed_version: manifest.version,
       latest_version: manifest.version,
       channel: "stable" as const,
@@ -142,6 +142,8 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
     return c.json({ error: `${id} is disabled (failed its last smoke test)` }, 403);
   }
   const actor = c.get("person");
+  // NEWS-00 review: a package app's recipe serves every page's data, so a viewer below any raised page cannot run it directly.
+  if (!appRunAllowed(actor, id)) return c.json({ error: "no such package" }, 404);
   const body = (await c.req.json().catch(() => ({}))) as Record<string, unknown>;
   const result = await runPlugin(id, actor, body);
   if (result.ok) {
