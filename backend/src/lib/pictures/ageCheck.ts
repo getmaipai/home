@@ -17,7 +17,7 @@ import { people } from "@/db/schema";
 import { toWireMessage, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
 import { getStackClient } from "@/lib/stackEngine";
-import { UNCLOTHED_PHRASES, hasWord, mentionsSexualWord, normalise } from "./minorLine";
+import { mentionsSexualWord, mentionsUnclothedPhrase } from "./minorLine";
 
 // ---------------------------------------------------------------- the lines the person reads
 
@@ -172,8 +172,7 @@ export type AdapterClass = "all-ages" | "adult-only";
  */
 export async function isAdultOnlyJob(prompt: string, styleIds: readonly string[], classOf: (id: string) => Promise<AdapterClass | undefined>): Promise<boolean> {
   if (mentionsSexualWord(prompt)) return true;
-  const words = normalise(prompt);
-  if (UNCLOTHED_PHRASES.some((phrase) => hasWord(words, phrase))) return true;
+  if (mentionsUnclothedPhrase(prompt)) return true;
   for (const id of styleIds) {
     let cls: AdapterClass | undefined;
     try { cls = await classOf(id); } catch { cls = undefined; }

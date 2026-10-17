@@ -1,7 +1,7 @@
 // The absolute line on minors for pictures and videos (lib/pictures/minorLine.ts). Owner's ruling, 2026-10-17:
 // adults get adult content; a real minor marker beside a sexual or nudity word refuses; ordinary adult wording passes.
 import { describe, expect, test } from "bun:test";
-import { MINOR_MARKERS, SEXUAL_WORDS, minorSexualMatch } from "@/lib/pictures/minorLine";
+import { MINOR_MARKERS, SEXUAL_WORDS, minorSexualMatch, mixedScriptMinorCue } from "@/lib/pictures/minorLine";
 import { asksToUndress, promptViolatesMinorLine, refusePrompt, PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
 import { refuseVideoPrompt, VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 
@@ -63,5 +63,42 @@ describe("the refusal text and the other lines", () => {
   test("an uploaded photo is still not dressed in swimwear or undressed", () => {
     expect(asksToUndress("put her in a bikini")).toBe(true);
     expect(asksToUndress("change her sweater to blue")).toBe(false);
+  });
+});
+
+describe("the prompt floor reads every disguise of a marker and of a sexual word (shared normaliser)", () => {
+  const markers = ["child", "ch1ld", "c.h.i.l.d", "c h i l d", "ch*ld", "chiiild", "chhiilldd", "ch​ild", "chіld", "ｃｈｉｌｄ", "niño", "niña", "enfant", "kinder", "bambino", "criança", "子供", "ребёнок"];
+  test.each(markers)("marker %s beside a plain sexual word refuses", (marker) => {
+    const prompt = `a ${marker} naked`;
+    expect(promptViolatesMinorLine(prompt)).toBe(true);
+    expect(refusePrompt(prompt)).toBe("minor_sexual");
+    expect(refuseVideoPrompt(prompt)).toBe("minor_sexual");
+  });
+  const sexual = ["n4ked", "n.a.k.e.d", "n a k e d", "nak*d", "nakeeed", "n​aked", "nackt", "desnudo"];
+  test.each(sexual)("a plain marker beside %s refuses", (word) => {
+    expect(promptViolatesMinorLine(`a child ${word}`)).toBe(true);
+  });
+  test("a disguised age under 18 beside a sexual word refuses", () => {
+    for (const age of ["14 anos", "14 ans", "14 jahre alt", "14歳", "12 лет", "1 4 y o".replace(/ /g, ""), "14ｙｏ"]) expect(promptViolatesMinorLine(`${age} naked`)).toBe(true);
+  });
+  test("ordinary look-alikes stay allowed", () => {
+    for (const p of ["a chilled drink", "childhood home, oil painting", "hello little one", "stepped on a rug", "a Bob in a red hat", "kids building a snowman, 5 of them", "a bikini girl 25yo"]) {
+      expect(promptViolatesMinorLine(p)).toBe(false);
+    }
+  });
+});
+
+describe("non-Latin scripts: documented fail-closed rule", () => {
+  test("a prompt mixing Latin letters with another script and carrying an age cue is refused", () => {
+    expect(mixedScriptMinorCue("a happy child 公園")).toBe(true);
+    expect(mixedScriptMinorCue("a 12 year old in 公園")).toBe(true);
+    expect(refusePrompt("a happy child in the 公園")).toBe("minor_sexual");
+    expect(refusePrompt("a happy 子供 at the beach")).toBe("minor_sexual");
+  });
+  test("mixed scripts without an age cue, and a prompt wholly in one listed script, are judged by their own lists", () => {
+    expect(refusePrompt("a red lantern at the 公園 gate")).toBeNull();
+    expect(refusePrompt("子供が公園で遊ぶ")).toBeNull();
+    expect(refusePrompt("子供 ヌード")).toBe("minor_sexual");
+    expect(refusePrompt("ребёнок голый")).toBe("minor_sexual");
   });
 });

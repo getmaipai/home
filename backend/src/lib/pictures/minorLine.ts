@@ -41,53 +41,80 @@ export const UNCLOTHED_PHRASES: readonly string[] = [
   "bare chested", "bare skin", "bare bottom", "bare butt", "birthday suit", "au naturel", "wearing nothing", "not wearing anything", "not wearing any clothes",
 ];
 
-const AGE_WORDS = "one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen";
-const AGE_NUMBER = "(?:[1-9]|1[0-7])";
-/** An age under 18 in any written form: "14yo", "15 y o", "12 yr", "16 year old", "12 years of age", "age 15", "aged 9", "twelve years old". Whole numbers only, so 25 and 40 pass. */
-export const MINOR_AGE = new RegExp(
-  [
-    `\\b${AGE_NUMBER}\\s?(?:yo|y o|yr|yrs)\\b`,
-    `\\b${AGE_NUMBER}\\s?(?:year|years|yr|yrs)\\s(?:old|olds|of age)\\b`,
-    `\\bage[sd]?\\s${AGE_NUMBER}\\b`,
-    `\\bage[sd]?\\s(?:${AGE_WORDS})\\b`,
-    `\\b(?:${AGE_WORDS})\\s(?:year|years|yr|yrs)\\s(?:old|of age)\\b`,
-    `\\b(?:${AGE_WORDS})\\s?(?:yo|y o)\\b`,
-  ].join("|"),
-);
+// ---------------------------------------------------------------- matching: one normaliser, shared with the chat floor
+// All matching goes through commons' spec/safety/ts/fold.ts (the same folding `detectCsam` uses): invisible characters,
+// look-alike letters, leetspeak, dotted/spaced/masked/repeated letters, other languages and native scripts. This file keeps
+// only the English lists and the pairing rule. Update the lists here and nowhere else; the folding there and nowhere else.
+import {
+  MINOR_AGE, MINOR_WORDS_I18N, NATIVE_MINOR, NATIVE_SEXUAL, SEXUAL_WORDS_I18N, TermSet, foldForSafety, hasMinorAge, type SafetyFold,
+} from "@maipai/spec/safety/ts/fold.js";
 
+export { MINOR_AGE };
+
+/** The text as plain lowercase words between single spaces, folded the same way the floors fold it (for callers that need a word reading). */
 export function normalise(text: string): string {
-  return ` ${text.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim()} `;
+  return ` ${foldForSafety(text).plain} `;
 }
 
-export function hasWord(haystack: string, term: string): boolean {
-  const needle = ` ${term} `;
-  if (haystack.includes(needle)) return true;
-  // A stem such as "masturbat" or "molest" matches the start of a word.
-  return term.length >= 6 && haystack.includes(` ${term}`);
+/** Sexual-word terms of six or more letters also match as the start of a word ("masturbat", "molest"); markers are whole words only ("infant" is not "infantry"). */
+const sexualPrefix = (term: string): boolean => term.length >= 6;
+
+const SEXUAL_SET = new TermSet([...SEXUAL_WORDS, ...SEXUAL_WORDS_I18N], { prefix: sexualPrefix });
+const UNCLOTHED_SET = new TermSet(UNCLOTHED_PHRASES, { prefix: sexualPrefix });
+const MARKER_SET = new TermSet([...MINOR_MARKERS, ...MINOR_WORDS_I18N]);
+
+/** True when `term` (a word or phrase) is in the text under any disguise, read the way a sexual word is read (a long stem matches the start of a word). */
+export function hasWord(text: string, term: string): boolean {
+  let set = TERM_CACHE.get(term);
+  if (!set) { set = new TermSet([term], { prefix: sexualPrefix }); TERM_CACHE.set(term, set); }
+  return set.matches(foldForSafety(text));
 }
+const TERM_CACHE = new Map<string, TermSet>();
 
 /** Phrases that carry a sexual word without being sexual ("sex reveal party"); removed before the check. */
-const NEUTRAL_PHRASES = [" sex reveal ", " gender reveal "];
-function cleaned(text: string): string {
-  let n = normalise(text);
-  for (const phrase of NEUTRAL_PHRASES) n = n.split(phrase).join(" ");
-  return n;
+const NEUTRAL_PHRASES = /\b(?:sex|gender)[\s\-]+reveal\b/gi;
+function foldedForLine(text: string): SafetyFold {
+  return foldForSafety(text.replace(NEUTRAL_PHRASES, " "));
 }
 
-/** Markers are whole words only ("infant" must not match "infantry"); the prefix reading in hasWord is for sexual stems. */
-function hasMarker(haystack: string, term: string): boolean {
-  return haystack.includes(` ${term} `);
+function sexualIn(fold: SafetyFold): boolean {
+  return SEXUAL_SET.matches(fold) || NATIVE_SEXUAL.test(fold);
 }
 
 export function mentionsSexualWord(text: string): boolean {
-  const n = cleaned(text);
-  return SEXUAL_WORDS.some((term) => hasWord(n, term));
+  return sexualIn(foldedForLine(text));
 }
 
-/** True when the text puts a minor marker (or an age under 18) beside a sexual or nudity word, however far apart. */
+/** True when the text carries a plain "no clothes" phrase (alone it is ordinary; beside a minor marker it counts as sexual). */
+export function mentionsUnclothedPhrase(text: string): boolean {
+  return UNCLOTHED_SET.matches(foldedForLine(text));
+}
+
+/** True when the words carry a minor marker or an age under 18 (any disguise, any listed language), with no sexual word needed. */
+export function mentionsMinorCue(text: string): boolean {
+  return minorCueIn(foldedForLine(text));
+}
+
+function minorCueIn(fold: SafetyFold): boolean {
+  return MARKER_SET.matches(fold) || NATIVE_MINOR.test(fold) || hasMinorAge(fold);
+}
+
+/** True when the text puts a minor marker (or an age under 18) beside a sexual or nudity word, however far apart, under any disguise. */
 export function minorSexualMatch(text: string): boolean {
-  const n = cleaned(text);
-  const sexual = SEXUAL_WORDS.some((term) => hasWord(n, term)) || UNCLOTHED_PHRASES.some((term) => hasWord(n, term));
-  if (!sexual) return false;
-  return MINOR_MARKERS.some((term) => hasMarker(n, term)) || MINOR_AGE.test(n);
+  const fold = foldedForLine(text);
+  if (!sexualIn(fold) && !UNCLOTHED_SET.matches(fold)) return false;
+  return minorCueIn(fold);
+}
+
+/**
+ * The fail-closed rule for text in more than one script (docs: commons spec/safety/README.md, "the obfuscation normaliser").
+ * The folding reads Latin, the listed non-Latin scripts (Japanese, Chinese, Korean, Russian, Arabic) and the look-alike
+ * letters; it cannot read the other part of a prompt that mixes Latin letters with some other script, and that part could
+ * hold the sexual wording. So a prompt that mixes scripts AND carries any age cue (a minor marker, a native age word or an
+ * age under 18) is refused for pictures and videos. A prompt wholly in one script is judged by its own lists; a prompt wholly
+ * in an unlisted script is a known gap that only the finished-picture check covers.
+ */
+export function mixedScriptMinorCue(text: string): boolean {
+  const fold = foldedForLine(text);
+  return fold.mixedScripts && minorCueIn(fold);
 }

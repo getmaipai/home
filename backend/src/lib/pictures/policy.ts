@@ -20,7 +20,7 @@ import type { Surface } from "@/lib/turnShared";
 import type { PersonRow } from "@/types";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { mentionsSexualWord, minorSexualMatch, normalise } from "@/lib/pictures/minorLine";
+import { mentionsSexualWord, minorSexualMatch, mixedScriptMinorCue, normalise } from "@/lib/pictures/minorLine";
 
 export const GENERATION_ADULTS_KEY = "generation.adults";
 export const GENERATION_ADULT_ADAPTERS_KEY = "generation.adult_adapters";
@@ -121,7 +121,7 @@ export const PROMPT_REFUSAL_LINE: Record<PromptRefusal, string> = {
 /** The absolute line on a minor, applied to every picture request for every person, with no setting that reaches it. A sexual term anywhere beside a minor or minor-looking term refuses, however far apart they are: the request is short and over-refusing it costs a rephrase, under-refusing it costs a child. The chat floor's own `detectCsam` runs first. */
 export function promptViolatesMinorLine(prompt: string): boolean {
   if (detectCsam(prompt).matched.length > 0) return true;
-  return minorSexualMatch(prompt);
+  return minorSexualMatch(prompt) || mixedScriptMinorCue(prompt);
 }
 
 /** The prompt-level refusal, or null when the request may proceed. `depictsRealPerson` is the model's own statement in the tool call that the person asked for the likeness of a real, named or identifiable person; there is no word list of names, and the Stack refuses likeness adapters at import. */
