@@ -470,11 +470,15 @@ For Jesse (each goes through the question wizard when he is back; nothing above 
 
 - **A.** Whether the coworker's iOS app becomes the iPhone half of Go (one native client, principle 7) or stays his own app pointed at
   Home's offline routes for now. This note assumes Go.
+  > **Decided 2026-10-17 (Owner-approved: 2026-10-17):** yes. The coworker's FileTube iOS app becomes Go's iPhone half: one iPhone
+  > app for the household, and Go carries FileTube's device-token offline protocol (section 9, layer 3).
 - **B.** Whether live web video browsing (trending, related, open search) is wanted for adults at all, or only "save this link"
   and subscriptions. This note ships the latter and holds browsing as opt-in later.
   > **Superseded in part 2026-10-17** by [live-video-2026-10-17.md](live-video-2026-10-17.md): answered, live browsing is wanted, for everyone.
 - **C.** Default quality ceiling for saved video (this note: 1080p household default, 4K only when an admin raises it, since the
   Studio's disk and the Apple TV's decoder both argue for it).
+  > **Decided 2026-10-17 (Owner-approved: 2026-10-17):** 1080p is the default ceiling for saved video; 4K only when an admin raises
+  > it. The Stack media service's `media.fetch` defaults `quality` to `1080`.
 
 ## Supersedes
 
