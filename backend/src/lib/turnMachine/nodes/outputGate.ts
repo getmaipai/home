@@ -31,6 +31,8 @@ import { surfaceClassOf } from "@/lib/surfaceClass";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import type { Surface } from "@/lib/turnShared";
 import { REFUSAL_FIRST } from "@/lib/replyVariation";
+import { PROMPT_REFUSAL_LINE } from "@/lib/pictures/policy";
+import { VIDEO_REFUSAL_LINE } from "@/lib/videos/policy";
 import { envelopeToolCall } from "@/lib/llm";
 import { failureLine } from "@/lib/generationFailure";
 import { notifyOncePerTurn } from "@/lib/turnShared";
@@ -72,6 +74,8 @@ export interface StreamGateResult {
    * answer is unaffected, and what had already been released stays. */
   reasoningRefused: boolean;
 }
+
+const FIXED_MINOR_REFUSAL_LINES: ReadonlySet<string> = new Set([PROMPT_REFUSAL_LINE.minor_sexual, VIDEO_REFUSAL_LINE.minor_sexual]);
 
 /** THIN-5B (rules 2 and 10): the reasoning lane of the streaming gate. An
  * adult's reasoning is released as it is generated and checked as it
@@ -626,6 +630,12 @@ export const outputGateNode: Node<OutputGateInput, OutputGateOutput> = async (st
     return { outcome: { ok: true }, output: { refused: false, text: streamed.text, speech: input.reply.speech, sources: input.reply.sources, reasoningOut, reasoning: { emitted: reasoningOut !== undefined, withheld_for: withheldFor } } };
   }
 
+  // Home's own fixed refusal of a picture or video request that crosses the minor line names children and sexual
+  // situations on purpose (the person must be told why). Exactly these lines pass the whole-reply floor; any other
+  // text, including a model quoting them, is checked as usual.
+  if (FIXED_MINOR_REFUSAL_LINES.has(input.reply.text)) {
+    return { outcome: { ok: true }, output: { refused: false, text: input.reply.text, speech: input.reply.speech, sources: input.reply.sources, reasoning: { emitted: false, withheld_for: input.reasoningEmit ? "gate" : input.reasoningWithheldFor } } };
+  }
   const repairedRaw = assessReply(input.reply.text) ? repairReply(input.reply.text) : input.reply.text;
   const repaired = band === "child" ? stripLinksForChild(repairedRaw) : repairedRaw;
   const evaluation = evaluateReply({ text: repairedRaw, speech: input.reply.speech }, band);

@@ -73,7 +73,7 @@ export function stackAudienceFor(input: VideoAudience): "all-ages" | "adult" {
 // ---------------------------------------------------------------- absolute lines
 
 export const VIDEO_REFUSAL_LINE: Record<PromptRefusal, string> = {
-  minor_sexual: "I won't make that. Videos that put a young person, or anyone who looks young, in an adult scene are never made here, whatever the settings. Change the request and try again.",
+  minor_sexual: "I can't make that. Videos of children in sexual situations are never allowed.",
   real_person: "I won't make a video of a real person's likeness, because they haven't agreed to it. Ask for an invented person, a character or a place instead.",
 };
 
