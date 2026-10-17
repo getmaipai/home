@@ -10,6 +10,10 @@ import { SpecSheet } from "@maipai/ui/src/elements/spec-sheet";
 import { ArtifactCard } from "@maipai/ui/src/elements/artifact-card";
 import { ToolTimeline } from "@maipai/ui/src/elements/tool-timeline";
 import { JobProgress, type JobStage } from "@maipai/ui/src/elements/job-progress";
+import { ErrorState } from "@maipai/ui/src/elements/error-state";
+import { ImageGallery } from "@maipai/ui/src/elements/image-gallery";
+import { ImageEditContext } from "@maipai/ui/src/elements/attachment.aui";
+import { picturesApi, type PictureCard } from "@/lib/picturesApi";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@maipai/ui/src/ui/dropdown-menu";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
@@ -400,4 +404,93 @@ export const ToolTimelineToolRender: ToolCallMessagePartComponent<Record<string,
       faviconUrl={faviconUrl}
     />
   );
+};
+
+
+// IMGGEN-UI-01: a picture the person asked for. The turn names the job (`TurnValue.picture`); the card polls Home
+// for it. Two tool-call parts share one query, each drawing one shipped Element: "picture_progress" is the kit's
+// JobProgress while a picture is being made (elapsed time and a Stop control), "picture" is the finished pictures
+// through the same image gallery every answer uses (so Edit opens the editor) or, when nothing came, the kit's
+// ErrorState with a Try again.
+const PICTURE_POLL_MS = 700;
+const PICTURE_SETTLED = new Set(["done", "failed", "cancelled"]);
+
+function usePictureCard(id: string | undefined) {
+  return useQuery({
+    queryKey: ["picture", id],
+    queryFn: ({ signal }) => picturesApi.card(id!, signal),
+    enabled: id !== undefined,
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && PICTURE_SETTLED.has(q.state.data.state)) ? false : PICTURE_POLL_MS),
+  });
+}
+
+function galleryImagesOf(card: PictureCard) {
+  return card.files.map((file) => ({
+    id: file.id,
+    src: file.url,
+    alt: file.alt,
+    caption: [file.seed !== null ? `Seed ${file.seed}` : null, file.steps !== null ? `${file.steps} steps` : null, file.ms !== null ? `${(file.ms / 1000).toFixed(1)} s` : null].filter(Boolean).join(" · "),
+  }));
+}
+
+export const PictureProgressToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = usePictureCard(result?.id);
+  const card = query.data;
+  const active = card !== undefined && (card.state === "queued" || card.state === "running");
+  const [tick, setTick] = useState(() => Date.now());
+  const [fetchedAt, setFetchedAt] = useState(() => Date.now());
+  useEffect(() => { if (card) setFetchedAt(Date.now()); }, [card]);
+  useEffect(() => {
+    if (!active) return;
+    const timer = setInterval(() => setTick(Date.now()), 1_000);
+    return () => clearInterval(timer);
+  }, [active]);
+  if (!result || !card || !active) return null;
+  const elapsedSeconds = Math.max(0, Math.round((card.elapsed_ms + Math.max(0, tick - fetchedAt)) / 1000));
+  return (
+    <JobProgress
+      variant="compact"
+      title="Making your picture"
+      stages={[{ name: card.label, weight: 1 }]}
+      stageIndex={0}
+      stageProgress={Math.max(0.02, card.percent / 100)}
+      eta={`${elapsedSeconds}s`}
+      cancelLabel="Stop"
+      onCancel={() => { void picturesApi.stop(card.stop_id).then(() => query.refetch()).catch(() => query.refetch()); }}
+    />
+  );
+};
+
+export const PictureToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
+  const query = usePictureCard(result?.id);
+  const [retrying, setRetrying] = useState(false);
+  const edit = useContext(ImageEditContext);
+  const card = query.data;
+  if (!result) return null;
+  if (!card) {
+    return query.isError ? <ErrorState layout="inline" title="I couldn't check on that picture" detail="Reload the chat to try again." retrying={false} /> : null;
+  }
+  if (card.files.length > 0) {
+    // The kit's own Edit button opens the editor on a picture of the person's own (a stored file in this chat).
+    const target = (image: { id: string; src: string; alt: string }) => ({ id: image.id, name: image.alt || "picture", src: image.src });
+    return (
+      <ImageGallery
+        images={galleryImagesOf(card)}
+        maxVisible={4}
+        {...(edit ? { onEditImage: (image: { id: string; src: string; alt: string }) => edit.onEdit(target(image)), canEditImage: (image: { id: string; src: string; alt: string }) => (edit.canEdit ? edit.canEdit(target(image)) : true), editLabel: edit.label ?? "Edit picture" } : {})}
+      />
+    );
+  }
+  if (card.state === "failed" || card.state === "cancelled") {
+    return (
+      <ErrorState
+        layout="inline"
+        title={card.state === "cancelled" ? "You stopped this picture" : (card.error ?? "I couldn't make that picture. Try again or change the request.")}
+        retrying={retrying}
+        retryLabel="Try again"
+        onRetry={() => { setRetrying(true); void picturesApi.again(card.id).then(() => query.refetch()).catch(() => undefined).finally(() => setRetrying(false)); }}
+      />
+    );
+  }
+  return null;
 };

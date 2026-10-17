@@ -49,7 +49,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@maipa
 import { StatusIndicator } from "@maipai/ui/src/ui/status";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { appStatusToSidebar } from "@/shell/statusApps";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { picturesApi } from "@/lib/picturesApi";
 import { Link } from "react-router-dom";
 import { sourcesFromMessage } from "@/apps/chat/chatSources";
 import { messageText } from "@/apps/chat/chatMessageText";
@@ -402,11 +403,41 @@ export function RememberThisMenuItem() {
   );
 }
 
+/** IMGGEN-UI-01: "Make a variation" in the More menu of a reply that started a picture: another picture from the same
+ * words with a new seed, added to the same card. Shown only once nothing is being made on that card. */
+const VariationIcon = getIcon("refresh-cw");
+export function MakeVariationMenuItem() {
+  const queryClient = useQueryClient();
+  const pictureId = useAuiState((s) => {
+    const part = s.message.content.find((p) => p.type === "tool-call" && p.toolName === "picture");
+    return part && part.type === "tool-call" ? (part.result as { id?: string } | undefined)?.id : undefined;
+  });
+  const card = useQuery({ queryKey: ["picture", pictureId], queryFn: () => picturesApi.card(pictureId!), enabled: pictureId !== undefined, staleTime: 5_000 });
+  const [busy, setBusy] = useState(false);
+  if (!pictureId || !card.data?.can_vary) return null;
+  return (
+    <ActionBarMorePrimitive.Item
+      // eslint-disable-next-line shadcn/no-unknown-classes -- aui-action-bar-more-item is a kit ActionBarMorePrimitive class, not a Tailwind utility
+      className="aui-action-bar-more-item hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 text-sm outline-none select-none disabled:pointer-events-none disabled:opacity-50"
+      disabled={busy}
+      onSelect={(e) => {
+        e.preventDefault();
+        setBusy(true);
+        void picturesApi.again(pictureId).then(() => queryClient.invalidateQueries({ queryKey: ["picture", pictureId] })).catch(() => undefined).finally(() => setBusy(false));
+      }}
+    >
+      <VariationIcon className="size-4" />
+      Make a variation
+    </ActionBarMorePrimitive.Item>
+  );
+}
+
 export function AssistantMoreItems() {
   const temporary = useContext(TemporaryChatContext).on;
   return (
     <>
       <RememberThisMenuItem />
+      <MakeVariationMenuItem />
       {temporary ? null : <BranchInNewChatMenuItem />}
       <CompareWithBareModelMenuItem />
       <BareModeSwitchMenuItem />
