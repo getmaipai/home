@@ -444,6 +444,82 @@ describe("judgeTurn() - dedupe by supersede", () => {
     expect(newRow.validTo).toBe("2099-01-01T00:00:00.000Z"); // the new record keeps its own, real valid_to
   });
 
+  test("MEMORY-CORRECT-01: a record the same turn already wrote never takes the dedupe slot, so the contradicted older record is retired", async () => {
+    // Live 2026-10-17: "actually my favorite color is blue, not green" had the model call
+    // `remember` in the turn, so the judge's nearest candidate was the turn's own "blue"
+    // write; it superseded that duplicate and left the older "green" record active, and
+    // the next recall reported conflicting information.
+    const { actor } = await owner();
+    const { sqlite } = await import("@/db");
+    const storeVector = (id: string, vector: number[]) =>
+      sqlite
+        .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
+        .run(id, Buffer.from(new Float32Array(vector).buffer));
+    // The same texts and vector the SUPERSEDE test above uses, so the older record lands where the model decides.
+    const older = remember(actor, { text: "Marlow lives in New York", category: "fact", tier: "durable", scope: "person", person: actor.id, source: "turn-older", importance: 0.5 });
+    if (!older.ok) throw new Error("setup failed");
+    storeVector(older.value.id, [1, 0, 0, 0]);
+    const turn = makeTurn(actor, "actually I moved to Boston, not New York", "Got it, you live in Boston now.");
+    // The turn's own write, as the remember tool stores it before the judge runs.
+    const own = remember(actor, { text: "I live in Boston", category: "fact", tier: "durable", scope: "person", person: actor.id, source: turn.id, importance: 0.5 });
+    if (!own.ok) throw new Error("setup failed");
+    storeVector(own.value.id, [1, 0, 0, 0]);
+
+    let dedupePrompt = "";
+    await withScriptedJudge(
+      (schemaName, request) => {
+        if (schemaName === "memory_extraction") {
+          return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.5 }] };
+        }
+        if (schemaName === "memory_dedupe") {
+          dedupePrompt = String(request.messages[request.messages.length - 1]!.content);
+          return { action: "SUPERSEDE", id: older.value.id, merged_text: "Marlow lives in Boston", contradiction: true };
+        }
+        return undefined;
+      },
+      () => judgeTurn(turn),
+    );
+
+    // The decision saw the older record and never the turn's own write.
+    expect(dedupePrompt).toContain(older.value.id);
+    expect(dedupePrompt).not.toContain(own.value.id);
+    const olderRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, older.value.id)).get()!;
+    expect(olderRow.status).toBe("superseded");
+    const ownRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, own.value.id)).get()!;
+    expect(ownRow.status).toBe("superseded");
+    const active = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(active.map((r) => r.text)).toEqual(["Marlow lives in Boston"]);
+    expect(olderRow.supersededBy).toBe(active[0]!.id);
+    expect(ownRow.supersededBy).toBe(active[0]!.id);
+  });
+
+  test("MEMORY-CORRECT-01: with nothing older to merge into, the turn's own write is replaced by the judge's statement, as before", async () => {
+    const { actor } = await owner();
+    const { sqlite } = await import("@/db");
+    const turn = makeTurn(actor, "remember that I live in Boston", "Got it.");
+    const own = remember(actor, { text: "I live in Boston", category: "fact", tier: "durable", scope: "person", person: actor.id, source: turn.id, importance: 0.5 });
+    if (!own.ok) throw new Error("setup failed");
+    sqlite
+      .query("INSERT INTO memory_embeddings (memory_id, space, dims, vector, hlc, preprocess) VALUES (?, 'test', 4, ?, 'test-hlc', 'v1')")
+      .run(own.value.id, Buffer.from(new Float32Array([1, 0, 0, 0]).buffer));
+    let dedupeAsked = false;
+    await withScriptedJudge(
+      (schemaName) => {
+        if (schemaName === "memory_extraction") return { facts: [{ text: "Marlow lives in Boston", category: "fact", scope: "person", importance: 0.5 }] };
+        if (schemaName === "memory_dedupe") dedupeAsked = true;
+        return undefined;
+      },
+      () => judgeTurn(turn),
+    );
+    // No older candidate: the decision is never asked of the model.
+    expect(dedupeAsked).toBe(false);
+    const ownRow = db.select().from(memoryRecords).where(eq(memoryRecords.id, own.value.id)).get()!;
+    expect(ownRow.status).toBe("superseded");
+    const active = db.select().from(memoryRecords).where(eq(memoryRecords.status, "active")).all();
+    expect(active.map((r) => r.text)).toEqual(["Marlow lives in Boston"]);
+    expect(ownRow.supersededBy).toBe(active[0]!.id);
+  });
+
   // A code review of the issue #27 fix (2026-09-06): this dedupe path
   // attributes its own supersede() call to whoever's turn it was - any
   // household role, including a child - and similarByVector() does not

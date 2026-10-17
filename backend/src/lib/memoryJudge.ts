@@ -1354,7 +1354,22 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
           categoryToRecordKind(fact.category),
         )
       : [];
-    const decision = await decideDedupe(fact.text, candidates);
+    // MEMORY-CORRECT-01 (live, 2026-10-17): "actually my favorite color is
+    // blue, not green" had the model call `remember` first, so by the time
+    // this judge ran, the turn's own write ("my favorite color is blue") was
+    // the nearest candidate. The dedupe took that slot, the one SUPERSEDE a
+    // fact gets went to the duplicate, and the contradicted "green" record
+    // stayed active beside it. A record this same turn already wrote is not
+    // a candidate for the decision: the decision runs against the older
+    // records, and the turn's own write is folded in afterwards (retired in
+    // favour of the record written here, or, with nothing older to merge
+    // into, replaced by the judge's own statement of the fact, as before).
+    const ownWrites = candidates.filter((c) => c.record.source === turn.id);
+    const olderCandidates = candidates.filter((c) => c.record.source !== turn.id);
+    let decision = await decideDedupe(fact.text, olderCandidates);
+    if (decision.action === "ADD" && ownWrites.length > 0) {
+      decision = { action: "SUPERSEDE", id: ownWrites[0]!.record.id, mergedText: fact.text, contradiction: false };
+    }
     // Item 4b, once more just before the write: embed() plus
     // decideDedupe() took seconds, and a "forget that" in that window
     // must win (forgetCommand.ts also sweeps a record that slips past).
@@ -1460,6 +1475,14 @@ export async function judgeTurn(turn: ConversationTurnRow): Promise<JudgeTurnRes
         writtenIds.push(result.value.id);
       } else {
         console.error(`[memoryJudge] remember failed for turn ${turn.id}: ${result.error}`);
+      }
+    }
+    // MEMORY-CORRECT-01: the turn's own write(s) of this fact give way to the
+    // record written here, so one active record remains, never a duplicate.
+    if (recordWritten) {
+      const createdId = writtenIds[writtenIds.length - 1]!;
+      for (const own of ownWrites) {
+        if (own.record.id !== createdId && own.record.id !== decision.id) supersedeInFavorOfExisting(own.record.id, createdId);
       }
     }
     if (fact.relation && recordWritten) writeFactRelation(speaker, fact, subject, turn);
