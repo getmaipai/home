@@ -61,7 +61,14 @@ const sexualPrefix = (term: string): boolean => term.length >= 6;
 
 const SEXUAL_SET = new TermSet([...SEXUAL_WORDS, ...SEXUAL_WORDS_I18N], { prefix: sexualPrefix });
 const UNCLOTHED_SET = new TermSet(UNCLOTHED_PHRASES, { prefix: sexualPrefix });
-const MARKER_SET = new TermSet([...MINOR_MARKERS, ...MINOR_WORDS_I18N]);
+/** "cp" is also vitamin C P, C. P., calcium phosphate and a shell command: it counts as the abbreviation (typed, dotted or spaced) unless the text is about chemistry, nutrition or code. */
+const AMBIGUOUS_MARKERS = new Set(["cp"]);
+const MARKER_SET = new TermSet([...MINOR_MARKERS.filter((m) => !AMBIGUOUS_MARKERS.has(m)), ...MINOR_WORDS_I18N]);
+const CP_SET = new TermSet(["cp"]);
+const CP_CONTEXT = /(?<![\p{L}\p{N}])(?:vitamin|vitamins|mineral|minerals|supplement|supplements|calcium|phosphate|phosphorus|chemistry|chemical|protein|cell|cells|folder|file|files|terminal|command|bash|linux|shell|script)(?![\p{L}\p{N}])/u;
+function cpMarkerIn(fold: SafetyFold): boolean {
+  return CP_SET.matches(fold) && !CP_CONTEXT.test(fold.plain);
+}
 
 /** True when `term` (a word or phrase) is in the text under any disguise, read the way a sexual word is read (a long stem matches the start of a word). */
 export function hasWord(text: string, term: string): boolean {
@@ -96,7 +103,7 @@ export function mentionsMinorCue(text: string): boolean {
 }
 
 function minorCueIn(fold: SafetyFold): boolean {
-  return MARKER_SET.matches(fold) || NATIVE_MINOR.test(fold) || hasMinorAge(fold);
+  return MARKER_SET.matches(fold) || cpMarkerIn(fold) || NATIVE_MINOR.test(fold) || hasMinorAge(fold);
 }
 
 /** True when the text puts a minor marker (or an age under 18) beside a sexual or nudity word, however far apart, under any disguise. */

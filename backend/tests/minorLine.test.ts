@@ -102,3 +102,12 @@ describe("non-Latin scripts: documented fail-closed rule", () => {
     expect(refusePrompt("ребёнок голый")).toBe("minor_sexual");
   });
 });
+
+describe('the abbreviation "cp" as a marker', () => {
+  test("it still refuses beside a sexual word, typed, dotted or spaced", () => {
+    for (const p of ["cp nude", "C. P. nude", "c p nude", "nude cp"]) expect(promptViolatesMinorLine(p)).toBe(true);
+  });
+  test("vitamin C P, calcium phosphate and a shell command are not markers", () => {
+    for (const p of ["vitamin C P with a nude color label", "cp the file to the folder, explicit mode", "calcium phosphate (C P) in a sexy chart"]) expect(minorSexualMatch(p)).toBe(false);
+  });
+});
