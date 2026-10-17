@@ -57,7 +57,9 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
   const optionIds = missingId ? [missingId, ...voices.map((voice) => voice.id)] : voices.map((voice) => voice.id);
   const testing = preview.voiceId === selectedId && selectedId !== "";
   const testBusy = testing && preview.busy;
-  const testReason = voices.length === 0 ? null : missingId && selectedId === missingId ? "This voice is not on the list, so it cannot be tested." : null;
+  // An owner or admin can test a voice that is not downloaded yet; it downloads on first play (owner ruling 2026-10-17).
+  const downloading = testBusy && voices.find((voice) => voice.id === selectedId)?.onDisk === false;
+  const testReason = voices.length === 0 ? null : missingId && selectedId === missingId ? "This voice is not on this home yet, so it cannot be tested." : null;
   return <>
     <h2 className="text-base font-medium">Choose a voice for {who}</h2>
     {isGuardian && targets.length > 1 ? <Select aria-label="Choose a voice for" value={target.id} options={targets.map((entry) => entry.id)} getLabel={(id) => id === person.id ? "You" : targets.find((entry) => entry.id === id)?.display_name ?? id} onValueChange={(id) => { voicePreviewPlayer.stop(); setTargetId(id); setSaved(false); setSaveError(null); }} /> : null}
@@ -71,6 +73,7 @@ export function VoiceBrowserSection({ person }: { person: Roster }) {
       </div>}
     </AsyncState>}
     {testReason ? <p className="text-sm text-muted-foreground">{testReason}</p> : null}
+    {downloading ? <p role="status" className="text-sm text-muted-foreground">Downloading this voice, one moment.</p> : null}
     {preview.error ? <p role="alert">{preview.error}</p> : null}
     {saveError ? <p role="alert">{saveError}</p> : null}
     <p role="status" className="text-sm text-muted-foreground">{saved ? "Saved." : ""}</p>

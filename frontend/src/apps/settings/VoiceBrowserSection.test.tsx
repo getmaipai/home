@@ -54,7 +54,7 @@ describe("VoiceBrowserSection", () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "vera" });
     expect((await trigger(view)).textContent).toBe("Vera (not on this home's list)");
     expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true);
-    view.getByText("This voice is not on the list, so it cannot be tested.");
+    view.getByText("This voice is not on this home yet, so it cannot be tested.");
   });
   test("choosing another voice saves at once and confirms quietly", async () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "alba" });
@@ -82,6 +82,24 @@ describe("VoiceBrowserSection", () => {
     const stopButton = await view.findByRole("button", { name: "Stop" });
     stop.mockClear(); fireEvent.click(stopButton);
     expect(stop).toHaveBeenCalled();
+  });
+  test("owner ruling 2026-10-17: testing a voice that is not downloaded yet says it is downloading; an installed one does not", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "javert" });
+    const start = spyOn(voicePreviewPlayer, "start").mockImplementation(async (id: string) => { (voicePreviewPlayer as unknown as { update(s: unknown): void }).update({ voiceId: id, busy: true, error: null }); });
+    await trigger(view);
+    fireEvent.click(view.getByRole("button", { name: "Test" }));
+    expect(start).toHaveBeenCalledWith("x-voice-javert");
+    await view.findByText("Downloading this voice, one moment.");
+    voicePreviewPlayer.stop();
+  });
+  test("a voice already on disk shows no download note while it prepares", async () => {
+    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "alba" });
+    spyOn(voicePreviewPlayer, "start").mockImplementation(async (id: string) => { (voicePreviewPlayer as unknown as { update(s: unknown): void }).update({ voiceId: id, busy: true, error: null }); });
+    await trigger(view);
+    fireEvent.click(view.getByRole("button", { name: "Test" }));
+    await waitFor(() => expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true));
+    expect(view.queryByText("Downloading this voice, one moment.")).toBeNull();
+    voicePreviewPlayer.stop();
   });
   test("no voices yet shows the warming line and a disabled Test", async () => {
     const view = renderPage([]);

@@ -56,7 +56,10 @@ voiceRoutes.openapi(stackVoicesRoute, async (c) => {
     : "Ask the person who manages Home to start it in Settings, then Engines.";
   if (!isStackConfigured()) return c.json({ error: `The Stack that speaks for Home is not running. ${outageHelp}` }, 503);
   try {
-    const voices: StackVoice[] = await getStackClient().voices();
+    const all: StackVoice[] = await getStackClient().voices();
+    // Owner ruling 2026-10-17: an owner or admin lists every voice (a voice not yet downloaded installs on first
+    // preview); everyone else sees only voices already on disk, so Test never ends in a refusal.
+    const voices = isOwnerOrAdmin(c.get("person")) ? all : all.filter((voice) => voice.onDisk);
     return c.json({ voices }, 200);
   } catch (err) {
     const failure = stackFailureResult(err, "tts");

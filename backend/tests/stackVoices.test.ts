@@ -59,6 +59,18 @@ describe("GET /api/voice/voices", () => {
     expect((await new TestClient().get("/api/voice/voices")).status).toBe(401);
   });
 
+  test("owner ruling 2026-10-17: an owner lists voices not yet downloaded; everyone else sees only voices on disk", async () => {
+    await fixtureFor([{ id: "v-disk", name: "Here", onDisk: true }, { id: "v-new", name: "Later", onDisk: false }]);
+    const owner = await ownerClient();
+    const ownerBody = await (await requestWithFixture(owner)).json() as { voices: Array<{ id: string }> };
+    expect(ownerBody.voices.map((voice) => voice.id)).toEqual(["v-disk", "v-new"]);
+    const adultResult = await owner.post("/api/people", { displayName: "Marlow", role: "adult", secret: "0000" });
+    const adult = new TestClient();
+    await adult.post("/api/auth/verify-secret", { personId: (await adultResult.json() as { id: string }).id, secret: "0000" });
+    const adultBody = await (await requestWithFixture(adult)).json() as { voices: Array<{ id: string }> };
+    expect(adultBody.voices.map((voice) => voice.id)).toEqual(["v-disk"]);
+  });
+
   test("a row with no id is skipped and the rest still list", async () => {
     await fixtureFor([{ id: "v-1", name: "One" }, { name: "No id" }, { id: "v-3", name: "Three" }]);
     const res = await requestWithFixture(await ownerClient());
