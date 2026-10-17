@@ -187,14 +187,12 @@ function relationNounPatterns(): RegExp[] {
   const name = "(?<name>(?-i:\\p{Lu}[\\p{L}-]*(?:\\s+\\p{Lu}[\\p{L}-]*)*))(?![\\p{L}])";
   const nouns = `(?<noun>${alternatives})(?:'s\\s+(?<inner>${alternatives}))?`;
   relationNounRes = [
-    new RegExp(`(?<![\\p{L}])(?<head>my|our|the|a|an)\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
+    // WHO-ASK-02: "my dog's name is Rivet", "our cat is named Pip" state the kind in the sentence too.
+    new RegExp(`(?<![\\p{L}])(?<head>my|our|the|a|an)\\s+(?:[a-z-]+\\s+)?${nouns}(?:'s\\s+name\\s+is|'s\\s+called|\\s+is\\s+(?:named|called)|\\s+(?:named|called))?,?\\s+${name}`, "giu"),
     new RegExp(`(?<![\\p{L}])(?<head>(?-i:\\p{Lu}[\\p{L}]+'s))\\s+(?:[a-z-]+\\s+)?${nouns},?\\s+${name}`, "giu"),
     // The connector is required: "Tell Nadia my phone is broken" is a
     // verb and its object, not Nadia's phone (a review).
     new RegExp(`${name}(?:,|\\s+(?:is|who is|who's))\\s+(?<head>my|our)\\s+(?:[a-z-]+\\s+)?${nouns}(?![\\p{L}])`, "giu"),
-    // WHO-ASK-02: "my dog's name is Rivet", "our cat is named Pip", "my wife is called Serena" state
-    // the kind in the sentence, so the name needs no who-question.
-    new RegExp(`(?<![\\p{L}])(?<head>my|our)\\s+(?:[a-z-]+\\s+)?(?<noun>${alternatives})(?:'s\\s+name\\s+is|'s\\s+called|\\s+is\\s+(?:named|called)|\\s+named|\\s+called),?\\s+${name}`, "giu"),
   ];
   return relationNounRes;
 }
