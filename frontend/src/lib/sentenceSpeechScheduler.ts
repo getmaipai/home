@@ -22,6 +22,7 @@
 // made (one JSON payload per sentence, not streamed either).
 import { ApiError, api } from "@/lib/api";
 import { createLevelMeter, type LevelMeter } from "@/lib/voice/audioLevelMeter";
+import { audioSession, type AudioHandle } from "@/shell/audioSession";
 
 const MAX_PARALLEL_FETCHES = 2;
 
@@ -65,6 +66,8 @@ export class SentenceSpeechScheduler {
   private readonly speechStream: typeof api.streamSpeech;
   private readonly scheduledSentences: Array<{ visibleEnd?: number; startTime: number }> = [];
   private heardEndAtStop?: number;
+  // AUDIO-SESSION-01: the reply's voice is one registration with the shell's audio session, taken at the first sentence.
+  private sessionHandle: AudioHandle | null = null;
 
   /** Fires once, the moment the first sentence is actually scheduled to
    * play - the real "time to first audio" signal. */
@@ -159,9 +162,25 @@ export class SentenceSpeechScheduler {
     this.scheduleBuffer(audioBuffer, meta);
   }
 
+  private joinAudioSession(): void {
+    if (this.sessionHandle) return;
+    const context = this.audioContext;
+    const bus = this.playbackBus;
+    this.sessionHandle = audioSession.registerVoice({
+      pause: () => { void context.suspend?.().catch(() => {}); },
+      resume: () => { void context.resume?.().catch(() => {}); },
+      setVolume: (volume) => { if (bus?.gain) bus.gain.value = volume; },
+    });
+    // Starting to speak pauses a podcast or video that plays; the voice is then the thing that plays.
+    this.sessionHandle.requestFocus();
+  }
+
   private scheduleBuffer(audioBuffer: AudioBuffer, meta?: SpeechSentenceMeta): void {
+    this.joinAudioSession();
+    const rate = audioSession.speedFor("spoken_reply");
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
+    if (rate !== 1 && source.playbackRate) source.playbackRate.value = rate;
     source.connect(this.playbackBus);
     const startTime = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startTime);
@@ -170,9 +189,13 @@ export class SentenceSpeechScheduler {
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     source.onended = () => {
       this.finishedCount++;
-      if (this.streamDone && this.finishedCount === this.scheduledCount) this.onEnded?.();
+      if (this.streamDone && this.finishedCount === this.scheduledCount) {
+        this.sessionHandle?.release();
+        this.sessionHandle = null;
+        this.onEnded?.();
+      }
     };
-    this.nextStartTime = startTime + audioBuffer.duration;
+    this.nextStartTime = startTime + audioBuffer.duration / (source.playbackRate && rate !== 1 ? rate : 1);
   }
 
   /** Call once no more sentences are coming (the reply finished
@@ -202,6 +225,8 @@ export class SentenceSpeechScheduler {
     this.abortController.abort();
     for (const wake of this.waiters.splice(0)) wake();
     this.meter.stop();
+    this.sessionHandle?.release();
+    this.sessionHandle = null;
     this.audioContext.close().catch(() => {});
   }
 }

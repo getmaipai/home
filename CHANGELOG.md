@@ -38,6 +38,11 @@ Conversation mode speaks a real answer again. Pictures and videos can look like 
 ### Pictures
 - Two kinds of picture, in plain words. **Quick** (a few seconds) stays the default; **Detailed** (15 to 30 seconds, finer detail, many more styles) is the choice for people who want it. Chat uses Detailed when you ask for the best quality, photoreal or a custom look and says so; a style made for Detailed uses it on its own; a **Make it Detailed** or **Make it Quick** button on each picture makes it again the other way. Settings, Pictures and videos has a **Picture quality** row, a **What is the difference?** comparison and **Get Detailed pictures** when it is not installed. Model names appear only under **Details**.
 
+### Audio
+- One thing plays at a time. A spoken reply pauses a podcast or video, and starting one pauses MaiPai's voice.
+- Spoken reply speed is a setting (Settings, Voice), along with podcast, audiobook and video speed for the media apps.
+- One sleep timer (15, 30, 45 or 60 minutes, or the end of the chapter or episode) fades out and pauses whatever plays, MaiPai's voice included. The media apps place its menu.
+
 ## [0.2.13] - 2026-10-17
 
 Chat answers while the faster engine downloads, and Home can pause chat and show what is installing.

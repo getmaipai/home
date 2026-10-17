@@ -13,6 +13,8 @@
 // come from the 44-byte header; playback simply ends when the stream
 // itself ends (finish()).
 
+import { audioSession, type AudioHandle } from "@/shell/audioSession";
+
 const HEADER_BYTES = 44;
 // Small enough that the first chunk of real speech starts playing almost
 // immediately (the whole point of streaming), large enough to avoid
@@ -33,6 +35,10 @@ export class StreamingWavPlayer {
   private finishedCount = 0;
   private streamDone = false;
   private stopped = false;
+  // AUDIO-SESSION-01: one registration with the shell's audio session, taken when the first chunk is scheduled.
+  private sessionHandle: AudioHandle | null = null;
+  private readonly applyRate: boolean;
+  private volumeNode: GainNode | null = null;
 
   /** Fires once, the moment the first chunk is actually scheduled to
    * play - the real "time to first audio" signal, not just "the fetch
@@ -45,7 +51,9 @@ export class StreamingWavPlayer {
    * rebuilt here since there is no one element to listen to any more. */
   onEnded?: () => void;
 
-  constructor() {
+  /** `rate: false` plays at normal speed whatever the person's spoken reply speed is (a voice preview). */
+  constructor(options: { rate?: boolean } = {}) {
+    this.applyRate = options.rate !== false;
     // Created synchronously by the caller, in the same click handler
     // that triggered playback, never after an awaited fetch: an
     // AudioContext only counts as unlocked by a real user gesture if it
@@ -56,6 +64,26 @@ export class StreamingWavPlayer {
     // WebKit/Safari enforce this strictly (a code review, 2026-09-04,
     // flagged the risk in the previous version).
     this.audioContext = new AudioContext({ latencyHint: "interactive" });
+  }
+
+  private get outputNode(): AudioNode {
+    return this.volumeNode ?? this.audioContext.destination;
+  }
+
+  private joinAudioSession(): void {
+    if (this.sessionHandle) return;
+    const context = this.audioContext;
+    if (typeof context.createGain === "function") {
+      this.volumeNode = context.createGain();
+      this.volumeNode.connect(context.destination);
+    }
+    const gain = this.volumeNode;
+    this.sessionHandle = audioSession.registerVoice({
+      pause: () => { void context.suspend?.().catch(() => {}); },
+      resume: () => { void context.resume?.().catch(() => {}); },
+      setVolume: (volume) => { if (gain?.gain) gain.gain.value = volume; },
+    });
+    this.sessionHandle.requestFocus();
   }
 
   private parseWavHeader(header: Uint8Array): void {
@@ -97,18 +125,25 @@ export class StreamingWavPlayer {
       }
     }
 
+    this.joinAudioSession();
+    const rate = this.applyRate ? audioSession.speedFor("spoken_reply") : 1;
     const source = this.audioContext.createBufferSource();
     source.buffer = audioBuffer;
-    source.connect(this.audioContext.destination);
+    if (rate !== 1 && source.playbackRate) source.playbackRate.value = rate;
+    source.connect(this.outputNode);
     const startTime = Math.max(this.audioContext.currentTime, this.nextStartTime);
     source.start(startTime);
     this.scheduledCount++;
     if (this.scheduledCount === 1) this.onFirstAudio?.();
     source.onended = () => {
       this.finishedCount++;
-      if (this.streamDone && this.finishedCount === this.scheduledCount) this.onEnded?.();
+      if (this.streamDone && this.finishedCount === this.scheduledCount) {
+        this.sessionHandle?.release();
+        this.sessionHandle = null;
+        this.onEnded?.();
+      }
     };
-    this.nextStartTime = startTime + audioBuffer.duration;
+    this.nextStartTime = startTime + audioBuffer.duration / (source.playbackRate && rate !== 1 ? rate : 1);
   }
 
   /** Feed one chunk from the response body's reader, in order, as it
@@ -154,6 +189,8 @@ export class StreamingWavPlayer {
   stop(): void {
     if (this.stopped) return;
     this.stopped = true;
+    this.sessionHandle?.release();
+    this.sessionHandle = null;
     this.audioContext.close().catch(() => {});
   }
 }

@@ -15,7 +15,7 @@ export class VoicePreviewController {
   private reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
   private generation = 0;
 
-  constructor(private readonly makePlayer: () => Player = () => new StreamingWavPlayer(), private readonly requestPreview: PreviewRequest = (id, signal) => api.previewVoice(id, signal)) {}
+  constructor(private readonly makePlayer: () => Player = () => new StreamingWavPlayer({ rate: false }), private readonly requestPreview: PreviewRequest = (id, signal) => api.previewVoice(id, signal)) {}
 
   getState = () => this.state;
   subscribe = (listener: Listener) => { this.listeners.add(listener); listener(this.state); return () => this.listeners.delete(listener); };

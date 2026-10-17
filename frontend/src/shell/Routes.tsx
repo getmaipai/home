@@ -41,6 +41,7 @@ import { ChatHeaderDataProvider } from "@/apps/chat/chatHeaderData";
 import { discardIncognitoThreads } from "@/apps/chat/chatThreadListAdapter";
 import { api, type Roster } from "@/lib/api";
 import { toast } from "sonner";
+import { AudioSessionProvider } from "@/shell/audioSessionContext";
 import { IncognitoProvider, INCOGNITO_DISCARDED_EVENT, useIncognitoContext } from "@/shell/incognitoContext";
 import { MemoriesRedirect } from "@/shell/MemoriesRedirect";
 import { InstallDock } from "@/shell/InstallDock";
@@ -141,9 +142,11 @@ function RoutesInner({ person, onPersonChange, onSignedOut }: { person: Roster; 
   useAccent(person.accent);
 
   return (
-    <IncognitoProvider>
-      <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} />
-    </IncognitoProvider>
+    <AudioSessionProvider personId={person.id}>
+      <IncognitoProvider>
+        <RoutesWithIncognito person={person} onPersonChange={onPersonChange} onSignedOut={onSignedOut} />
+      </IncognitoProvider>
+    </AudioSessionProvider>
   );
 }
 

@@ -37439,3 +37439,38 @@ accordion (kit `Collapsible`) to see each install as the kit `JobProgress` with 
 everyone else sees the same line with no control. A hidden `role="status"` line announces the start and the finish once. The chat page no
 longer draws a download card of its own (`ChatMessageQueue`); Settings, Models and storage keeps its `JobProgress` rows. When the Stack's
 component list carries plain labels in the install plan, replace the rules in `installWords.ts` with that list (same ids).
+
+### The audio session (AUDIO-SESSION-01)
+
+`frontend/src/shell/audioSession.ts` is the one audio session; `createAudioSession()` makes one (tests) and `audioSession` is the shell's.
+`audioSessionContext.tsx` reads it for React; `AudioSessionProvider` (mounted in `Routes.tsx`) loads the person's `audio.speed.*` values
+(`settings-values` cache) into it and gives it the writer that saves a chosen rate (`api.setSetting`, then invalidates the cache). It draws
+nothing (RULES S2: the docked mini bar is the kit Player's `mini` layout, placed by a media app inside its own area; S6: no status UI).
+
+API for a media app:
+
+- `useAudioRegistration(element, { kind, item, previous?, next? })` registers a media element while mounted. Pass the element itself
+  (callback ref or state). `kind` is `podcast | audiobook | video | music | spoken_reply`; `item` is `{ title, artist?, album?, artworkUrl?, chapters? }`
+  (`chapters` is `{ start_s, end_s }[]`, used by the sleep timer's end of chapter). An inline `item` literal each render is fine.
+- Without React: `audioSession.registerElement(el, opts)` returns `{ requestFocus(), release(), updateItem(item), focused }`.
+  A registered element's own `play` event takes focus and pauses the previous holder, so a plain `el.play()` is enough; call
+  `handle.requestFocus()` first to pause the others before an awaited `play()`.
+- `useMiniBar()` returns `{ state, controls, sleep, startSleepTimer, cancelSleepTimer }`. `state` is `{ kind, item, playing, rate, hasPrevious,
+  hasNext }` or null (nothing loaded, or only chat voice plays: draw nothing). `controls` is `play, pause, toggle, stop, seekBy(s), seekTo(s),
+  setRate(rate), previous, next`. `useAudioPosition()` gives `{ position, duration }` of the focused element (updates with `timeupdate`).
+  `useAudioSessionState()` gives the whole snapshot: `current`, `miniBar`, `sleep` (`{ option, endsAt }`), `sleepHold`.
+- Speed: on register (and on `loadedmetadata`) the element gets the person's `audio.speed.<kind>` as `playbackRate` and `defaultPlaybackRate`
+  (1 for `music`). If the rate then changes on the element (the Player's menu), the session saves it as the person's speed for that kind and
+  applies it to the other registered elements of the kind. Rates clamp to 0.5 to 3.
+- Sleep timer: `startSleepTimer(15 | 30 | 45 | 60 | "end_of_item")`. A number fades over 4 s so the pause lands at the deadline, then pauses the
+  focused thing (media or chat voice) and restores its volume. `"end_of_item"` pauses at the end of the chapter playing (from `item.chapters`),
+  else lets the item end and sets `sleepHold` until anything plays again: an app that advances to the next item on `ended` checks `sleepHold`.
+- Media Session: metadata, play, pause, stop, seekbackward, seekforward, seekto, previoustrack, nexttrack are installed once, on the first focus,
+  and follow the focused item. previoustrack and nexttrack call the app's `previous`/`next`, else seek.
+
+Chat voice joins as a voice source: `SentenceSpeechScheduler` (spoken replies) and `StreamingWavPlayer` (read aloud; `{ rate: false }` for
+voice previews) call `audioSession.registerVoice(...)` when their first sentence is scheduled, take focus (pausing media), release when they end
+or stop, and are paused through `AudioContext.suspend()` when media takes focus. Spoken reply speed uses the `AudioBufferSourceNode`
+`playbackRate`, so a faster reply also sounds higher. Settings: `backend/src/settings/audioKeys.ts` (person scope, number 0.5 to 3, default 1,
+`copy.does`, `lives_in: person.voice`, so they show in Settings, Voice through `SettingsShell`). They ride in `aheadOfSpec`
+(`scripts/check.sh`) until a spec tag carries them; a Playback section needs `areas.json` in `commons` first.
