@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { readyRole } from "@/apps/chat/engineRoles";
+import { readyRole, usableRole } from "@/apps/chat/engineRoles";
 import type { EnginesOverview } from "@/lib/api";
 
 describe("readyRole", () => {
@@ -58,5 +58,15 @@ describe("readyRole", () => {
   test("each ready role is found by its own id", () => {
     expect(readyRole(sttReady, "stt")).toBe(true);
     expect(readyRole(ttsReady, "tts")).toBe(true);
+  });
+});
+
+describe("usableRole", () => {
+  const one = (state: string) => ({ roles: [{ id: "tts", state: { state } }] }) as unknown as EnginesOverview;
+  for (const state of ["installed", "loaded", "ready"]) test(`${state} is usable`, () => expect(usableRole(one(state), "tts")).toBe(true));
+  for (const state of ["notInstalled", "offline"]) test(`${state} is not usable`, () => expect(usableRole(one(state), "tts")).toBe(false));
+  test("absent role and undefined overview are not usable", () => {
+    expect(usableRole(one("ready"), "stt")).toBe(false);
+    expect(usableRole(undefined, "tts")).toBe(false);
   });
 });

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, jest, test } from "bun:test";
 import { act, cleanup, render } from "@testing-library/react";
 import { ReasoningGroup } from "@/apps/chat/chatThreadSlots";
 import { resetThinkingWordForTests } from "@/apps/chat/useThinkingWord";
-import { THINKING_WORDS, ROTATE_MAX_MS, ROTATE_MIN_MS, nextRotationDelay, pickThinkingWord } from "@/apps/chat/thinkingWords";
+import { THINKING_WORDS, FIRST_HOLD_MS, ROTATE_MAX_MS, ROTATE_MIN_MS, nextRotationDelay, pickThinkingWord } from "@/apps/chat/thinkingWords";
 
 const realMatchMedia = window.matchMedia;
 function reduceMotion(on: boolean) {
@@ -40,9 +40,9 @@ describe("thinking words", () => {
     for (const prev of THINKING_WORDS) for (const r of [0, 0.25, 0.5, 0.99999]) expect(pickThinkingWord(prev, () => r)).not.toBe(prev);
   });
 
-  test("delay stays between 2.5 and 4 seconds", () => {
-    expect(nextRotationDelay(() => 0)).toBe(ROTATE_MIN_MS);
-    expect(nextRotationDelay(() => 1)).toBe(ROTATE_MAX_MS);
+  test("delay stays between 10 and 14 seconds", () => {
+    expect(nextRotationDelay(() => 0)).toBe(10_000);
+    expect(nextRotationDelay(() => 1)).toBe(14_000);
   });
 });
 
@@ -51,7 +51,7 @@ describe("ReasoningGroup status word", () => {
     const { container } = render(view(true));
     const seen = [label(container)];
     for (let i = 0; i < 12; i++) {
-      act(() => { jest.advanceTimersByTime(ROTATE_MAX_MS); });
+      act(() => { jest.advanceTimersByTime(ROTATE_MAX_MS + 4000); });
       seen.push(label(container));
     }
     expect(THINKING_WORDS).toContain(seen[0] as string);
@@ -61,11 +61,19 @@ describe("ReasoningGroup status word", () => {
     }
   });
 
-  test("does not rotate before 2.5 seconds", () => {
+  test("does not rotate at all for the first 8 seconds", () => {
     const { container } = render(view(true));
     const first = label(container);
-    act(() => { jest.advanceTimersByTime(ROTATE_MIN_MS - 1); });
+    act(() => { jest.advanceTimersByTime(FIRST_HOLD_MS - 1); });
     expect(label(container)).toBe(first);
+  });
+
+  test("a later word holds at least 10 seconds", () => {
+    const { container } = render(view(true));
+    act(() => { jest.advanceTimersByTime(FIRST_HOLD_MS + 4000); });
+    const second = label(container);
+    act(() => { jest.advanceTimersByTime(ROTATE_MIN_MS - 1); });
+    expect(label(container)).toBe(second);
   });
 
   test("the next turn starts on a different word than the last one showed", () => {
@@ -93,7 +101,7 @@ describe("ReasoningGroup status word", () => {
     const region = container.querySelector('[role="status"]');
     expect(region?.getAttribute("aria-live")).toBe("polite");
     for (let i = 0; i < 5; i++) {
-      act(() => { jest.advanceTimersByTime(ROTATE_MAX_MS); });
+      act(() => { jest.advanceTimersByTime(ROTATE_MAX_MS + 4000); });
       expect(status(container)).toBe("Thinking");
     }
     act(() => { jest.advanceTimersByTime(1000); });

@@ -49,10 +49,39 @@ describe("ComposerVoiceControls (HANDSFREE-01 (b); mounted via ComposerExtraEnd,
     }
   });
 
-  test("absent when only one of stt/tts is ready", async () => {
+  test("present when stt is ready and tts is installed but not loaded yet (a cold Stack)", async () => {
+    const restore = stubEngines([
+      { id: "stt", state: "installed" },
+      { id: "tts", state: "installed" },
+    ]);
+    try {
+      const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);
+      expect(await view.findByLabelText("Start a voice conversation")).toBeTruthy();
+    } finally {
+      restore();
+    }
+  });
+
+  for (const bad of ["offline", "notInstalled"]) {
+    test(`absent when tts is ${bad}`, async () => {
+      const restore = stubEngines([
+        { id: "stt", state: "ready" },
+        { id: "tts", state: bad },
+      ]);
+      try {
+        const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);
+        await waitFor(() => expect(globalThis.fetch).toHaveBeenCalled());
+        await new Promise((r) => setTimeout(r, 50));
+        expect(view.queryByLabelText("Start a voice conversation")).toBeNull();
+      } finally {
+        restore();
+      }
+    });
+  }
+
+  test("absent when only stt is present and tts has no role", async () => {
     const restore = stubEngines([
       { id: "stt", state: "ready" },
-      { id: "tts", state: "loaded" },
     ]);
     try {
       const view = renderWithQueryClient(<AdminContext.Provider value><ComposerVoiceControls /></AdminContext.Provider>);

@@ -30,8 +30,10 @@ export const THINKING_WORDS: readonly string[] = [
 export const STATIC_THINKING_WORD = "Thinking";
 export const DONE_THINKING_ANNOUNCEMENT = "Done thinking";
 
-export const ROTATE_MIN_MS = 2500;
-export const ROTATE_MAX_MS = 4000;
+/** No rotation at all for the first 8 seconds of a turn, then each word holds 10 to 14 seconds. */
+export const FIRST_HOLD_MS = 8000;
+export const ROTATE_MIN_MS = 10_000;
+export const ROTATE_MAX_MS = 14_000;
 
 /** A random word that is never `previous`. */
 export function pickThinkingWord(previous: string | null, rand: () => number = Math.random): string {
@@ -39,7 +41,7 @@ export function pickThinkingWord(previous: string | null, rand: () => number = M
   return choices[Math.min(choices.length - 1, Math.floor(rand() * choices.length))] as string;
 }
 
-/** Milliseconds until the next word, between 2.5 and 4 seconds. */
+/** Milliseconds until the next word, between 10 and 14 seconds. */
 export function nextRotationDelay(rand: () => number = Math.random): number {
   return Math.round(ROTATE_MIN_MS + rand() * (ROTATE_MAX_MS - ROTATE_MIN_MS));
 }

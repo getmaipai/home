@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { STATIC_THINKING_WORD, nextRotationDelay, pickThinkingWord } from "@/apps/chat/thinkingWords";
+import { FIRST_HOLD_MS, ROTATE_MIN_MS, STATIC_THINKING_WORD, nextRotationDelay, pickThinkingWord } from "@/apps/chat/thinkingWords";
 
 // The last word any turn showed, so the next turn starts on a different one.
 let lastShown: string | null = null;
@@ -18,8 +18,8 @@ function prefersReducedMotion(): boolean {
 }
 
 /**
- * The status word for a reasoning group. While `running` it rotates every 2.5
- * to 4 seconds, never repeating the word before it, and each turn starts on a
+ * The status word for a reasoning group. While `running` it holds one word for
+ * the first 8 seconds, then rotates every 10 to 14 seconds, never repeating the word before it, and each turn starts on a
  * different word from the last. Under `prefers-reduced-motion` it stays on
  * "Thinking" with no timer.
  */
@@ -35,15 +35,15 @@ export function useThinkingWord(running: boolean): string {
     lastShown = current;
     setWord(current);
     let timer: ReturnType<typeof setTimeout>;
-    const schedule = () => {
+    const schedule = (delay: number) => {
       timer = setTimeout(() => {
         current = pickThinkingWord(current);
         lastShown = current;
         setWord(current);
-        schedule();
-      }, nextRotationDelay());
+        schedule(nextRotationDelay());
+      }, delay);
     };
-    schedule();
+    schedule(FIRST_HOLD_MS + nextRotationDelay() - ROTATE_MIN_MS);
     return () => clearTimeout(timer);
   }, [running]);
   return word;

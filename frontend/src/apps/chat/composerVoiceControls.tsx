@@ -19,7 +19,7 @@ import { useContext } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { getIcon } from "@maipai/ui/src/icons";
-import { readyRole } from "@/apps/chat/engineRoles";
+import { usableRole } from "@/apps/chat/engineRoles";
 import { AdminContext } from "@/apps/chat/chatThreadContexts";
 import { useVoiceSession } from "@/apps/chat/voiceSessionContext";
 import { api, type EnginesOverview } from "@/lib/api";
@@ -51,7 +51,7 @@ function WaveformButton({ onClick, engineDown }: { onClick: () => void; engineDo
   );
 }
 
-/** Renders only when both `stt` and `tts` roles are ready (HANDSFREE-01's
+/** Renders only when both `stt` and `tts` roles are installed, loaded or ready (HANDSFREE-01's
  * own acceptance: "voice and glance have no controls" without them) -
  * absent, not disabled, the same posture Create image and the composer
  * Attach's other role-gated rows already take. */
@@ -69,6 +69,6 @@ export function ComposerVoiceControls({ disabled = false, engineDown }: { disabl
   // posture the rest of this file already takes for a role that isn't
   // ready.
   const session = useVoiceSession();
-  if (disabled || !readyRole(overview, "stt") || !readyRole(overview, "tts")) return null;
+  if (disabled || !usableRole(overview, "stt") || !usableRole(overview, "tts")) return null;
   return <WaveformButton onClick={() => session?.setOpen(true)} engineDown={engineDown} />;
 }

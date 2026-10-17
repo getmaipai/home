@@ -7,3 +7,11 @@ import type { EnginesOverview } from "@/lib/api";
 export function readyRole(overview: EnginesOverview | undefined, id: string): boolean {
   return Array.isArray(overview?.roles) && overview.roles.some((role) => role.id === id && role.state.state === "ready");
 }
+
+/** The live conversation button needs a role that is installed, loaded or
+ * ready. Installed-not-loaded is a Stack that has not warmed the role yet, not
+ * an unavailable one: the button stays and the first use warms it. Only
+ * notInstalled, offline or an absent role hides it. One definition. */
+export function usableRole(overview: EnginesOverview | undefined, id: string): boolean {
+  return Array.isArray(overview?.roles) && overview.roles.some((role) => role.id === id && ["installed", "loaded", "ready"].includes(role.state.state));
+}
