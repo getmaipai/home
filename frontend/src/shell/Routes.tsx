@@ -109,9 +109,21 @@ function PageHeaderLayout() {
   return (
     <>
       {title ? <h1 className="sr-only">{title}</h1> : null}
-      <InstallStrip />
       <Outlet />
     </>
+  );
+}
+
+/** The install/download line, pinned to the bottom of every page for the people who can act on it
+ * (admins and the owner). Fixed, so the page never shifts; it renders nothing once the install is
+ * done, and the Home settings AI page already shows its own copy. */
+function ShellInstallStrip({ person }: { person: Roster }) {
+  const { pathname } = useLocation();
+  if (!meetsMinRole(person.role, "admin") || pathname.startsWith("/settings/home/ai")) return null;
+  return (
+    <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-2">
+      <div className="pointer-events-auto w-full max-w-md rounded-md border bg-background/95 px-3 py-2 shadow-sm"><InstallStrip compact detailsHref={null} /></div>
+    </div>
   );
 }
 
@@ -179,6 +191,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
     <TabIdentityProvider temporary={incognito} locked={locked} ageBand={person.age_band}>
     <ChatHeaderDataProvider>
       <BrowserAlerts person={person} />
+      <ShellInstallStrip person={person} />
       {activeTour ? (
         <Tour
           steps={activeTour.tour.steps.map((step) => ({
