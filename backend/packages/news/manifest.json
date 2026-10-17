@@ -348,33 +348,6 @@
       "who": "the Internet Archive",
       "opt_in": true,
       "retention": "unknown, see the service policy"
-    },
-    {
-      "id": "story-pictures",
-      "destination": "The picture host named by a chosen feed",
-      "when": "the first time a screen shows a story while News pictures are on; never in the background",
-      "what": "a plain GET for the picture file and your home's internet address",
-      "who": "The publisher's picture host",
-      "opt_in": true,
-      "retention": "See the receiving site's own policy."
-    },
-    {
-      "id": "story-text",
-      "destination": "The publisher of a chosen story",
-      "when": "when you open a story whose feed has no full text; background reading requires the separate full-text prefetch setting",
-      "what": "a plain GET for that page and your home's internet address",
-      "who": "The publisher",
-      "opt_in": true,
-      "retention": "See the receiving site's own policy."
-    },
-    {
-      "id": "story-archive",
-      "destination": "Internet Archive",
-      "when": "when a teen or adult opens a story whose page is gone, while the archive fallback is on",
-      "what": "the missing page's address and your home's internet address",
-      "who": "Internet Archive",
-      "opt_in": true,
-      "retention": "See the receiving site's own policy."
     }
   ],
   "permissions": [
