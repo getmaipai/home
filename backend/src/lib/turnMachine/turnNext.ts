@@ -16,6 +16,7 @@ import type { Surface, TurnFailure, SpeakerEvidence, PresentPerson, TurnStreamRe
 import type { TurnErrorDetail, TurnValue } from "@/wire";
 import { turnErrorDetailFrom } from "@/lib/turnErrorDetail";
 import { attachDocuments } from "./documents";
+import { stripCueTags } from "@/lib/voiceCues";
 import { validateTurnInput, validateContinuationInput, BareModeForbidden, loadAllManifests, commandOpeners, computedPatternMatch, StreamSafetyRefusal, StreamUnavailable, CRISIS_RESOURCES_TEXT, crisisSupportFor, deriveCrisisResources, judgeStatusAtInsert, variedConstantReply, speechTextFor } from "@/lib/turnShared";
 import { acquireTurnLease, type TurnLease } from "@/lib/turnActivity";
 import type { PersonRow } from "@/lib/memoryIngestion";
@@ -826,7 +827,11 @@ async function finishTurn(begun: BegunTurn): Promise<TurnValue> {
  * projection normalized the same way. A written or glance turn keeps whatever speech its own
  * node authored (none for the model's text), so a written adult reply
  * is exactly what it was before this port. */
-function finalizeNextReply(state: TurnState, value: TurnValue): TurnValue {
+function finalizeNextReply(state: TurnState, rawValue: TurnValue): TurnValue {
+  // REG-02: the composer, never the model, adds nonverbal cues, and only to the spoken rendering; a tag the model wrote is dropped from the reply.
+  const cleanText = stripCueTags(rawValue.reply.text);
+  const cleanSpeech = rawValue.reply.speech === undefined ? undefined : stripCueTags(rawValue.reply.speech);
+  const value = cleanText === rawValue.reply.text && cleanSpeech === rawValue.reply.speech ? rawValue : { ...rawValue, reply: { ...rawValue.reply, text: cleanText, ...(cleanSpeech === undefined ? {} : { speech: cleanSpeech }) } };
   const { text, speech } = value.reply;
   const spokenTurn = surfaceClassOf(state.surface, state.spoken) === "spoken";
   // An authored speech text is kept as authored, and on a spoken turn it

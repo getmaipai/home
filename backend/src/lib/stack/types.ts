@@ -28,6 +28,8 @@ export const StackVoiceSchema = z.object({
   onDisk: z.preprocess((v) => typeof v === "boolean" ? v : false, z.boolean()),
   licence: z.preprocess((v) => typeof v === "string" || v === null ? v : null, z.string().nullable()),
   revision: z.preprocess((v) => typeof v === "string" && v.trim() ? v.trim() : "unknown", z.string()),
+  // REG-02: the nonverbal tags this voice's engine honors (`tts.tags` on the Stack's voice entry). Absent on a Stack or engine without them.
+  tags: z.preprocess((v) => Array.isArray(v) ? v.filter((t) => typeof t === "string") : undefined, z.array(z.string()).optional()),
 }).strip();
 
 export interface FitPlanRequest {
@@ -155,6 +157,8 @@ export interface RoleInfo extends ChatRoleContext {
   /** VISION-02b: the most tokens one picture takes in the chat process
    * (its declared --image-max-tokens); null or absent when it reads none. */
   picture_tokens_max?: number | null;
+  /** REG-02: the nonverbal tags the role's engine honors (`tts.tags`), tts role only; absent or empty means none. */
+  tts?: { tags?: string[] };
   check: {
     state: "not checked" | "passed" | "failed" | "skipped";
     at: string | null;

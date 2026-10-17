@@ -1956,6 +1956,25 @@ invented for the roster's household, and added to
     record owns the dials, and the named voice/register tests plus
     `bash scripts/check.sh` pass.
 
+    **Built 2026-10-17 (Home half, composer-owned, no model hint):**
+    `backend/src/lib/voiceCues.ts` is the pure insertion policy (cues only
+    at sentence boundaries, a seeded roll, light: 1 per turn and 3 turns
+    apart, natural: 2 per turn, 3 sentences apart; nothing for a child or
+    teen, a safety, refusal, crisis, package or error line, a number, link,
+    instruction or alarm sentence). `POST /api/tts` applies it per sentence
+    of a live spoken model turn (`turnAllowsVoiceCues`, fails closed);
+    `lib/tts.ts` drops any bracketed tag the engine does not advertise
+    (`sanitizeSpeechTags`), and `finalizeNextReply` strips a tag the model
+    wrote from the reply. `lib/ttsCapabilities.ts` reads `tts.tags` from the
+    Stack's tts role (absent means none, so Pocket TTS gets no tag, only an
+    optional plain-text "Hmm," or "Well," opener). Setting `voice.hesitations`
+    (off, light, natural; default light; household, so a minor never sees
+    it). Still open: the Stack must publish `tts.tags` on the tts role and
+    voice entry (STACK-TTS-02 / VOICE-STUDIO-01); the blind listening test;
+    companion dials; a model-written tag in the live token stream is
+    stripped only from the final stored reply, not from streamed deltas;
+    Wyoming satellites get the tag drop but no cue insertion yet.
+
 <a id="exp-01"></a>
 
 - [x] **EXP-01: historical record** (completed or explicitly dropped; details in [BACKLOG-HISTORY.md](BACKLOG-HISTORY.md#exp-01)).

@@ -1,10 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { requireAuth } from "@/middleware/auth";
 import { synthesizeSpeech } from "@/lib/tts";
-import { getPersonSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { getTtsTags } from "@/lib/ttsCapabilities";
+import { DEFAULT_HESITATION_LEVEL, HESITATION_LEVELS, planForPerson, type HesitationLevel } from "@/lib/voiceCues";
 import type { AppEnv } from "@/types";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { isOwnedStaleTurnGeneration } from "@/routes/turn";
+import { isOwnedStaleTurnGeneration, turnAllowsVoiceCues } from "@/routes/turn";
 
 export const ttsRoutes = apiRouter();
 
@@ -56,7 +59,16 @@ ttsRoutes.openapi(ttsSynthesizeRoute, async (c) => {
   if (body.turn_id && body.generation !== undefined && isOwnedStaleTurnGeneration(body.turn_id, actor.id, body.generation)) return c.json({ error: "That reply was stopped, so this sentence was not spoken. Ask again to hear a new answer.", code: "turn_cancelled" }, 409);
   const voiceId = getPersonSettingValue(actor, "tts.voice_id") as string;
   const startedAt = Date.now();
-  const result = await synthesizeSpeech(body.text, voiceId);
+  // REG-02: the composer adds a spoken cue to a model-worded spoken turn's sentence, never to the written text.
+  let spoken = body.text;
+  if (body.turn_id) {
+    const configured = getHouseholdSettingValue("voice.hesitations");
+    const level = HESITATION_LEVELS.includes(configured as HesitationLevel) ? (configured as HesitationLevel) : DEFAULT_HESITATION_LEVEL;
+    if (level !== "off") {
+      spoken = planForPerson(actor.id, { text: body.text, turnId: body.turn_id, level, band: speakerAgeBand(actor, new Date()), supportedTags: await getTtsTags(), blocked: !turnAllowsVoiceCues(body.turn_id, actor.id) }).text;
+    }
+  }
+  const result = await synthesizeSpeech(spoken, voiceId);
   if (!result.ok) {
     return c.json({ error: result.error, code: result.code }, result.status);
   }

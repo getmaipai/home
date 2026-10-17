@@ -121,4 +121,29 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.ai",
     honoured_by: ["home"],
   }),
+  // REG-02: composer-owned spoken hesitations and nonverbal cues. One
+  // household setting an admin sets; a child or teen never gets a cue
+  // whatever it says (chat rule 0, lib/voiceCues.ts), and the key is not
+  // a per-person one so a minor has nothing to see or change.
+  SettingsKey.parse({
+    key: "voice.hesitations",
+    scope: "household",
+    selector: "select",
+    range: { options: ["off", "light", "natural"] },
+    default: "light",
+    label: "Natural speech sounds",
+    copy: {
+      does: "Lets spoken replies include a light \"hmm,\" or a laugh now and then, never in the written chat and never for children or teens.",
+      options: {
+        off: "Spoken replies are read exactly as written.",
+        light: "A rare \"hmm,\" or laugh, at most once per reply.",
+        natural: "A little more often, at most twice per reply.",
+      },
+      option_labels: { off: "Off", light: "Light", natural: "Natural" },
+    },
+    help: "Lets spoken replies include a light \"hmm,\" or a laugh now and then. The written chat never shows them, and children and teens never hear them.",
+    level: "basic",
+    lives_in: "household.ai",
+    honoured_by: ["home"],
+  }),
 ];

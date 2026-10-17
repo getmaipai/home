@@ -3,12 +3,15 @@ import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { synthesizeSpeech } from "@/lib/tts";
-import { setHouseholdSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
+import { __setTtsTagsForTests } from "@/lib/ttsCapabilities";
+import { turnAllowsVoiceCues } from "@/routes/turn";
 import { listIssues } from "@/lib/issues";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
 
 beforeEach(() => {
+  __setTtsTagsForTests(null);
   resetDb();
   __resetThrottleForTests();
   __setStackClientForTests(null);
@@ -195,5 +198,56 @@ describe("lib/tts.ts routed through a configured Stack", () => {
     }
     const issue = listIssues().find((i) => i.source === "stack" && i.key === "offline.tts");
     expect(issue?.detail).toBe("the tts engine process is not running");
+  });
+});
+
+// REG-02: tags reach only an engine that honors them, and the speech route never invents a cue without a spoken model turn.
+describe("REG-02 spoken cues", () => {
+  let fixture: StackFixture;
+  let receivedText: string[] = [];
+
+  beforeEach(() => {
+    receivedText = [];
+    fixture = startStackFixture({
+      "POST /v1/audio/speech": async (req) => {
+        receivedText.push(String((await req.formData()).get("text")));
+        return new Response(new Uint8Array(44), { headers: { "content-type": "audio/wav", ...IDENTITY_HEADERS } });
+      },
+    });
+    setHouseholdSettingValue("engines.stack.url", fixture.url);
+    __setStackClientForTests(fixture.client);
+  });
+  afterEach(() => { fixture.stop(); __setTtsTagsForTests(null); });
+
+  test("regression: an engine with no tags never receives [laugh]", async () => {
+    __setTtsTagsForTests([]);
+    await synthesizeSpeech("That was funny [laugh] indeed.", "alba");
+    expect(receivedText).toEqual(["That was funny indeed."]);
+  });
+
+  test("an engine that honors laugh receives it, and an unlisted tag is dropped", async () => {
+    __setTtsTagsForTests(["laugh"]);
+    await synthesizeSpeech("That was funny [laugh] indeed [burp].", "alba");
+    expect(receivedText).toEqual(["That was funny [laugh] indeed."]);
+  });
+
+  test("a turn id that is not a live spoken turn of this person allows no cue", () => {
+    expect(turnAllowsVoiceCues("no-such-turn", "someone")).toBe(false);
+  });
+
+  test("POST /api/tts leaves the text untouched when the turn is not a live spoken turn", async () => {
+    __setTtsTagsForTests(["laugh"]);
+    const owner = new TestClient();
+    await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
+    const line = "That joke was honestly pretty funny.";
+    const res = await owner.post("/api/tts", { text: line, turn_id: "no-such-turn", generation: 0 });
+    expect(res.status).toBe(200);
+    expect(receivedText).toEqual([line]);
+  });
+
+  test("voice.hesitations defaults to light and takes off, light, natural only", () => {
+    expect(getHouseholdSettingValue("voice.hesitations")).toBe("light");
+    expect(setHouseholdSettingValue("voice.hesitations", "natural").ok).toBe(true);
+    expect(setHouseholdSettingValue("voice.hesitations", "loud").ok).toBe(false);
   });
 });

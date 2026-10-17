@@ -3,6 +3,8 @@
 // client failure into a typed result a route can translate straight into
 // an HTTP response, instead of a thrown error a caller has to guess the
 // right status code for.
+import { getTtsTags } from "@/lib/ttsCapabilities";
+import { sanitizeSpeechTags } from "@/lib/voiceCues";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
 const TTS_UNAVAILABLE_COPY = "Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
@@ -42,7 +44,9 @@ async function synthesizeViaStack(text: string, voiceUrl?: string): Promise<TtsO
   }
 }
 
-export async function synthesizeSpeech(text: string, voiceUrl?: string): Promise<TtsOpResult> {
+export async function synthesizeSpeech(rawText: string, voiceUrl?: string): Promise<TtsOpResult> {
+  // REG-02: a bracketed tag the active engine does not advertise is dropped here, the last step before the engine, so "[laugh]" is never read aloud.
+  const text = typeof rawText === "string" ? sanitizeSpeechTags(rawText, await getTtsTags()) : rawText;
   if (typeof text !== "string" || text.trim().length === 0) {
     return { ok: false, status: 400, code: "invalid_input", error: "text must be a non-empty string" };
   }

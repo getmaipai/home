@@ -7,7 +7,7 @@ import sharp from "sharp";
 import { eq } from "drizzle-orm";
 import { requireAuth } from "@/middleware/auth";
 import { normalizeForSpeech } from "@maipai/spec/voice/ts/normalizeForSpeech.js";
-import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
+import { StreamSafetyRefusal, StreamUnavailable, DocumentAttachmentError, BareModeForbidden, crisisSupportFor, conversationInCrisis, type Surface, type TurnOpResult, type TurnStreamResult } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { isOwnerOrAdmin, canHaveTemporaryChat } from "@/lib/access";
 import { pickThinkingCue } from "@/lib/replyVariation";
@@ -99,6 +99,8 @@ interface ResumeSession {
   // sees `ownerId`, a bare string.
   dropReasoning: boolean;
   spokenTurn: boolean;
+  /** REG-02: set once the turn is known to be a refusal, error, crisis, package or command line; no spoken cue after that. */
+  cueBlocked?: boolean;
   modelStatus?: ModelSelectionStatus;
   conversationId: string;
   turnId: string;
@@ -127,6 +129,14 @@ export function isStaleTurnGeneration(turnId: string, generation: number | undef
 export function isOwnedStaleTurnGeneration(turnId: string, ownerId: string, generation: number | undefined): boolean {
   const session = inFlightTurns.get(turnId);
   return Boolean(session && session.ownerId === ownerId && isStaleTurnGeneration(turnId, generation));
+}
+
+/** REG-02: whether the speech route may add a spoken cue to this turn's
+ * sentences. Fails closed: only the owner's own, spoken, model-worded turn
+ * that has not been a refusal, an error or a crisis qualifies. */
+export function turnAllowsVoiceCues(turnId: string, ownerId: string): boolean {
+  const session = inFlightTurns.get(turnId);
+  return Boolean(session && session.ownerId === ownerId && session.spokenTurn && !session.cueBlocked && !conversationInCrisis(session.conversationId));
 }
 
 export function staleGenerationEvent(event: TurnStreamEvent | ToolStreamEvent, stale: boolean): TurnStreamEvent | ToolStreamEvent | null {
@@ -399,6 +409,7 @@ function appendSessionEvent(session: ResumeSession, event: TurnStreamEvent): voi
   const sequence = (event.type === "delta" || event.type === "reasoning") && event.sequence !== undefined ? event.sequence : null;
   const stored: StoredStreamEvent = { event, sequence, afterSequence: session.sequence, terminal: isTerminalEvent(event) };
   session.events.push(stored);
+  if (event.type === "error" || (event.type === "done" && (event.value.source !== "model" || event.value.crisis_resources))) session.cueBlocked = true;
   if (stored.terminal) session.terminal = true;
   for (const subscriber of [...session.subscribers]) {
     if (!shouldDeliver(stored, subscriber.resumeFrom)) continue;
