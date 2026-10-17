@@ -43,6 +43,9 @@ export interface UseImageEditor {
   /** Same handler for an answer block's pictures (kit AnswerBlock onImageEdit). */
   editFromSrc: (target: ImageEditTarget) => void;
   close: () => void;
+  /** LIKENESS-01: the household adult the person says is in the open photo ("" = no one, "nobody"); sent with a Comment. */
+  subjectId: string;
+  setSubjectId: (id: string) => void;
   /** The Element's props, or null while nothing is open. */
   props: ImageEditorProps | null;
 }
@@ -51,6 +54,7 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
   const queryClient = useQueryClient();
   const [open, setOpen] = useState<OpenImage | null>(null);
   const [currentId, setCurrentId] = useState<string | null>(null);
+  const [subjectId, setSubjectId] = useState("");
   const { canShare, onShare, onOpen } = options;
 
   const statusQuery = useQuery<ImageEditStatus>({
@@ -132,7 +136,7 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
       onComment: async (request, ctl): Promise<{ message: string; pending?: ImageEditorPending }> => {
         ctl.onProgress({ percent: null, label: "Sending your change" });
         // The start request is not aborted with Stop: the server may already have a job, and its id is what Stop needs.
-        let progress = await imageEditApi.comment(open.conversationId, sourceId, request);
+        let progress = await imageEditApi.comment(open.conversationId, sourceId, { ...request, subject_person_id: subjectId && subjectId !== "nobody" ? subjectId : null });
         const stop = (job: string) => { void imageEditApi.cancel(job).catch(() => undefined); };
         while (progress.state === "queued" || progress.state === "running") {
           const job = progress.job;
@@ -148,7 +152,7 @@ export function useImageEditor(options: { canShare: boolean; onShare: (versionId
         throw new Error(progress.state === "failed" || progress.state === "cancelled" ? progress.error : "The change did not finish. Try again.");
       },
     };
-  }, [open, currentId, versionsQuery.data, statusQuery.data, statusQuery.isError, canShare, onShare, close, queryClient, versionsKey]);
+  }, [open, currentId, versionsQuery.data, statusQuery.data, statusQuery.isError, canShare, onShare, close, queryClient, versionsKey, subjectId]);
 
-  return { open, editContext, editFromSrc, close, props };
+  return { open, editContext, editFromSrc, close, subjectId, setSubjectId, props };
 }

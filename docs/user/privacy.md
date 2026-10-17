@@ -26,6 +26,10 @@ When a written answer includes pictures, Home gets a few picture files from the 
 
 An adult can also generate an API token for another app or device. This page shows that too, under its own heading. It is the one thing that goes the other way: an app or device you gave the token to can send text or audio to your hub over your home network and receive a reply. Revoking the token ends that access.
 
+## Pictures and videos of a person
+
+A picture, video or style that looks like someone in your home is made on your own computer, only when that adult has said yes in their own settings. Home keeps a dated note each time they change their answer, and a list of each time something was made that looks like them. Only they can read it. No photo or prompt is kept in that list. Nothing about it leaves your house.
+
 ## What never leaves your house
 
 Your conversations stay on this computer. So does everything MaiPai remembers, and every profile in your household. MaiPai does not collect usage stats or crash reports. Nothing your family says is used to train anything. Your browser saves a copy of MaiPai's own screens on this device so the app can still open without internet. That cache is same-origin only: it stores the app's own files, never anything you typed or anything MaiPai remembers.

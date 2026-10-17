@@ -3,6 +3,7 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
+import { likenessApi } from "@/lib/likenessApi";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
 
 afterEach(cleanup);
@@ -60,16 +61,37 @@ describe("Pictures and videos settings view", () => {
     v.restore();
   });
 
-  test("the add form needs the likeness box, sends not sure as unsure and then shows the confirmation", async () => {
+  test("the add form needs the answer to 'Who does this style look like?', then sends it and not sure as unsure", async () => {
+    const original = { ...likenessApi };
+    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false, agreed: true }, { id: "p-nadia", name: "Nadia", self: false, agreed: false }]);
     const v = mount(overview({ adapters: [] }));
     await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
     fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
     fireEvent.change(v.getByLabelText("Link to the .safetensors file"), { target: { value: "https://huggingface.co/x/y/resolve/main/a.safetensors" } });
+    // Nothing is sent until the question is answered.
+    expect(v.getByRole("button", { name: "Add style" })).toBeDisabled();
+    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
+    fireEvent.click(await v.findByRole("option", { name: "Nobody (not a real person)" }));
+    await waitFor(() => expect(v.getByRole("button", { name: "Add style" })).not.toBeDisabled());
     fireEvent.click(v.getByRole("button", { name: "Add style" }));
     await waitFor(() => expect(picturesAdminApi.addAdapter).toHaveBeenCalled());
     const sent = (picturesAdminApi.addAdapter as unknown as { mock: { calls: Array<[FormData]> } }).mock.calls[0]![0];
     expect(sent.get("all_ages")).toBe("unsure");
-    expect(sent.get("not_real_person")).toBe("false");
+    expect(sent.get("looks_like")).toBe("nobody");
+    Object.assign(likenessApi, original);
+    v.restore();
+  });
+
+  test("an adult who has not agreed is listed but cannot be picked", async () => {
+    const original = { ...likenessApi };
+    likenessApi.adults = mock(async () => [{ id: "p-marlow", name: "Marlow", self: false, agreed: true }, { id: "p-nadia", name: "Nadia", self: false, agreed: false }]);
+    const v = mount(overview({ adapters: [] }));
+    await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
+    fireEvent.click(v.getByRole("combobox", { name: "Who does this style look like?" }));
+    const agreed = await v.findByRole("option", { name: "Marlow" });
+    expect(agreed.getAttribute("aria-disabled")).not.toBe("true");
+    expect((await v.findByRole("option", { name: "Nadia (has not agreed)" })).getAttribute("aria-disabled")).toBe("true");
+    Object.assign(likenessApi, original);
     v.restore();
   });
 

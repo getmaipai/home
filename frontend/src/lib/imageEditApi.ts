@@ -52,6 +52,6 @@ export const imageEditApi = {
     return send<{ version: PictureVersion }>(`/api/image-edit/pictures/${encodeURIComponent(id)}/versions`, { method: "POST", body: form }).then((body) => body.version);
   },
   /** A change in words (IMGGEN-EDITOR-01): starts the picture engine's edit; poll `poll()` with the job it names, then apply the preview. */
-  comment: (conversationId: string, id: string, request: { prompt: string; region: { x: number; y: number; width: number; height: number } | null }, signal?: AbortSignal) =>
+  comment: (conversationId: string, id: string, request: { prompt: string; region: { x: number; y: number; width: number; height: number } | null; subject_person_id?: string | null }, signal?: AbortSignal) =>
     send<EditProgress>(`/api/image-edit/pictures/${encodeURIComponent(id)}/comment`, { ...json({ conversation_id: conversationId, ...request }), ...(signal ? { signal } : {}) }),
 };

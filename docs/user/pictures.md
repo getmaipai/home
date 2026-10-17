@@ -41,10 +41,20 @@ Open **Settings**, **Home settings**, **Pictures and videos**.
 2. Give it a name and paste a Hugging Face link to the file, or choose a file from this computer.
 3. Say what the licence is and tick the box to say you read it.
 4. Say if it is fine for all ages. If you are not sure, only adults can use it.
-5. Tick the box to say it is not a likeness of a real person.
+5. Answer **Who does this style look like?** Choose **Nobody (not a real person)**, or an adult in your home who has agreed. A style of a person has to be added as a file, not a link.
 6. Press **Add style**. Check the fingerprint and licence it shows, then press **Turn it on**.
 
-The picture engine checks the file and refuses styles of real people and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.
+The picture engine checks the file and refuses styles of public figures and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.
+
+## Pictures that look like someone in your home
+
+Home can make a picture that looks like an adult in your home, but only if that adult said yes. A style of a person comes from a file you add; a photo of a person comes from a photo you attach. Children and teens are never made this way, and neither is anyone outside your home.
+
+To say yes, an adult opens **Settings**, **Pictures and videos** on their own account and turns on **Let other adults in this household make pictures, videos and styles that look like me**. Nobody else can turn it on for them, not even an owner. They can turn it off at any time. When they do, anything still waiting is stopped, nobody can ask for it again, and every saved style of them is removed. Things already made stay with the person who made them.
+
+A second switch, **Including adult content**, is off until they turn it on, and only counts while the first is on. A photo of a real person is never turned into adult content, whatever anyone agreed to.
+
+The page also lists every time someone made something that looks like them, and who. They are told each time, too.
 
 ## Something not working?
 

@@ -38,7 +38,7 @@ export const picturesApi = {
 export interface AdminAdapter {
   id: string; name: string; base_model: string; classification: "all-ages" | "adult-only"; classification_note: string | null;
   licence: string; licence_known: boolean; source_url: string | null; bytes: number; sha256: string; trigger_words: string[]; added_at: string;
-  enabled: boolean; needs_confirmation: boolean;
+  enabled: boolean; needs_confirmation: boolean; looks_like?: { id: string; name: string } | null;
 }
 export interface AdminOverview {
   stack: "ok" | "unreachable";

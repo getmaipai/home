@@ -33,6 +33,8 @@ they made and the settings an admin sets.
 - **Surfaces.** A shared screen with a child possibly present (a TV, a pod) never shows an adult's generation; the result waits
   in the adult's gallery with a notification (rule 0's surface gate, SAFETY.md's reasoning rule applied to pictures).
 
+> **Superseded in part (owner, 2026-10-17):** an adult may make a picture, video or style of a consenting household adult, and edit an uploaded photo of one. The design is [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md); the absolute lines below otherwise stand.
+
 ## Users and gates
 
 | Person | Generates | Edits own pictures | Edits of real people | Adapters |

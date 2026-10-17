@@ -41595,6 +41595,13 @@
                       "width",
                       "height"
                     ]
+                  },
+                  "subject_person_id": {
+                    "type": "string",
+                    "nullable": true,
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "LIKENESS-01: the household adult an uploaded photo shows, picked from the adults list. Left out, the photo must show no one."
                   }
                 },
                 "required": [
@@ -41975,6 +41982,23 @@
                           },
                           "needs_confirmation": {
                             "type": "boolean"
+                          },
+                          "looks_like": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                           }
                         },
                         "required": [
@@ -41991,7 +42015,8 @@
                           "trigger_words",
                           "added_at",
                           "enabled",
-                          "needs_confirmation"
+                          "needs_confirmation",
+                          "looks_like"
                         ]
                       }
                     },
@@ -42381,6 +42406,23 @@
                         },
                         "needs_confirmation": {
                           "type": "boolean"
+                        },
+                        "looks_like": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name"
+                          ],
+                          "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                         }
                       },
                       "required": [
@@ -42397,7 +42439,8 @@
                         "trigger_words",
                         "added_at",
                         "enabled",
-                        "needs_confirmation"
+                        "needs_confirmation",
+                        "looks_like"
                       ]
                     }
                   },
@@ -42553,17 +42596,22 @@
                     "type": "string",
                     "maxLength": 400
                   },
+                  "looks_like": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."
+                  },
                   "not_real_person": {
                     "type": "string",
                     "enum": [
                       "true",
                       "false"
-                    ]
+                    ],
+                    "description": "Older clients: the same as looks_like 'nobody'."
                   }
                 },
                 "required": [
-                  "name",
-                  "not_real_person"
+                  "name"
                 ]
               }
             }
@@ -42643,6 +42691,23 @@
                             },
                             "needs_confirmation": {
                               "type": "boolean"
+                            },
+                            "looks_like": {
+                              "type": "object",
+                              "nullable": true,
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                }
+                              },
+                              "required": [
+                                "id",
+                                "name"
+                              ],
+                              "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                             }
                           },
                           "required": [
@@ -42659,7 +42724,8 @@
                             "trigger_words",
                             "added_at",
                             "enabled",
-                            "needs_confirmation"
+                            "needs_confirmation",
+                            "looks_like"
                           ]
                         }
                       },
@@ -42875,6 +42941,23 @@
                     },
                     "needs_confirmation": {
                       "type": "boolean"
+                    },
+                    "looks_like": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -42891,7 +42974,8 @@
                     "trigger_words",
                     "added_at",
                     "enabled",
-                    "needs_confirmation"
+                    "needs_confirmation",
+                    "looks_like"
                   ]
                 }
               }
@@ -43872,6 +43956,207 @@
         }
       }
     },
+    "/api/likeness/me": {
+      "get": {
+        "tags": [
+          "Likeness"
+        ],
+        "summary": "Where the signed-in person stands on pictures, videos and styles that look like them, their history and the use log",
+        "responses": {
+          "200": {
+            "description": "Only the person's own.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eligible": {
+                      "type": "boolean",
+                      "description": "Only an adult has these switches; a child or a teen is never the subject of anything."
+                    },
+                    "adults": {
+                      "type": "boolean"
+                    },
+                    "adult_content": {
+                      "type": "boolean"
+                    },
+                    "history": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "option": {
+                            "type": "string",
+                            "enum": [
+                              "adults",
+                              "adult_content"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "on",
+                              "off"
+                            ]
+                          },
+                          "changed_at": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "option",
+                          "state",
+                          "changed_at"
+                        ]
+                      }
+                    },
+                    "uses": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "who": {
+                            "type": "string"
+                          },
+                          "medium": {
+                            "type": "string",
+                            "enum": [
+                              "picture",
+                              "video"
+                            ]
+                          },
+                          "way": {
+                            "type": "string",
+                            "enum": [
+                              "style",
+                              "photo"
+                            ]
+                          },
+                          "adult_content": {
+                            "type": "boolean"
+                          },
+                          "used_at": {
+                            "type": "string"
+                          },
+                          "line": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "who",
+                          "medium",
+                          "way",
+                          "adult_content",
+                          "used_at",
+                          "line"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "eligible",
+                    "adults",
+                    "adult_content",
+                    "history",
+                    "uses"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/likeness/adults": {
+      "get": {
+        "tags": [
+          "Likeness"
+        ],
+        "summary": "The household's adults, for the pickers (who a style looks like, who is in a photo)",
+        "responses": {
+          "200": {
+            "description": "Adults only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "adults": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "self": {
+                            "type": "boolean"
+                          },
+                          "agreed": {
+                            "type": "boolean",
+                            "description": "Whether they have agreed to pictures, videos and styles that look like them (always true for the person asking, about themselves)."
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "self",
+                          "agreed"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "adults"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an adult can use these pickers",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/videos/status": {
       "get": {
         "tags": [
@@ -44729,7 +45014,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Animate a picture this home made (a generated picture or a clip's poster)",
+        "summary": "Animate a picture this home made, or a photo of a household adult who agreed",
         "requestBody": {
           "content": {
             "application/json": {
@@ -44755,6 +45040,12 @@
                     "type": "string",
                     "minLength": 3,
                     "maxLength": 1200
+                  },
+                  "photo_subject_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80,
+                    "description": "LIKENESS-01: with a photo (file_id) that was not made here: the household adult the photo shows, picked from the adults list. Anyone else is refused."
                   }
                 },
                 "required": [
@@ -45059,6 +45350,23 @@
                           },
                           "added_at": {
                             "type": "string"
+                          },
+                          "looks_like": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name"
+                            ],
+                            "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                           }
                         },
                         "required": [
@@ -45074,7 +45382,8 @@
                           "strength_default",
                           "bytes",
                           "source_url",
-                          "added_at"
+                          "added_at",
+                          "looks_like"
                         ]
                       }
                     }
@@ -45216,6 +45525,23 @@
                     },
                     "added_at": {
                       "type": "string"
+                    },
+                    "looks_like": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -45231,7 +45557,8 @@
                     "strength_default",
                     "bytes",
                     "source_url",
-                    "added_at"
+                    "added_at",
+                    "looks_like"
                   ]
                 }
               }
@@ -45408,12 +45735,18 @@
                   "trigger_words": {
                     "type": "string",
                     "maxLength": 400
+                  },
+                  "looks_like": {
+                    "type": "string",
+                    "maxLength": 80,
+                    "description": "LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."
                   }
                 },
                 "required": [
                   "file",
                   "name",
-                  "licence"
+                  "licence",
+                  "looks_like"
                 ]
               }
             }
@@ -45473,6 +45806,23 @@
                     },
                     "added_at": {
                       "type": "string"
+                    },
+                    "looks_like": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name"
+                      ],
+                      "description": "LIKENESS-01: the household adult this style looks like, or null for nobody."
                     }
                   },
                   "required": [
@@ -45488,7 +45838,8 @@
                     "strength_default",
                     "bytes",
                     "source_url",
-                    "added_at"
+                    "added_at",
+                    "looks_like"
                   ]
                 }
               }

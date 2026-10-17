@@ -29,13 +29,13 @@ If a video will not send from a file you saved, use **Share** on the card instea
 
 After chat has made you a picture, say "animate this picture" or open the **More** menu under the reply and choose **Animate this picture**. Home makes a 5 second video that starts from that picture.
 
-Home only animates pictures it made itself. It never animates a photo you uploaded or a photo of a person.
+Home animates pictures it made itself. It can also animate a photo you attach of an adult in your home who has said yes: attach one photo and say who is in it, for example "animate this, it's Marlow". Home checks that the photo shows only that one adult. A photo of a child, of two people, of someone outside your home, or one it cannot check, is never animated. A photo of a real person is never turned into adult content.
 
 ## Who can make videos
 
 Adults can, on their own screen, in a written chat. Children and teens cannot, and no setting changes that. Spoken answers, the TV and other shared screens never make videos. A guest cannot.
 
-Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a video of a real person who has not agreed to it. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
+Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a video of a real person who has not agreed to it. An adult in your home can say yes for themselves in **Settings**, **Pictures and videos** on their own account; see Pictures for how that works. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
 
 ## Choose how it works (owner and admin)
 

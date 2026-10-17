@@ -17,6 +17,7 @@ import { Item, ItemActions, ItemContent, ItemDescription, ItemFooter, ItemGroup,
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@maipai/ui/src/dashboard/components/ui/alert-dialog";
 import { ApiError } from "@/lib/api";
 import { picturesAdminApi, type AdminAdapter, type AdminOverview } from "@/lib/picturesApi";
+import { LooksLikePicker, NOBODY } from "@/apps/settings/LooksLikePicker";
 
 const OVERVIEW_KEY = ["pictures-admin"] as const;
 /** Home takes a request body of at most 128 MiB (the server's own limit); a bigger style comes by its Hugging Face link. */
@@ -126,7 +127,7 @@ function StyleRow({ a, refresh, setError }: { a: AdminAdapter; refresh: () => vo
         <ItemContent>
           <ItemTitle>{a.name} <Badge variant={a.classification === "adult-only" ? "destructive" : "secondary"}>{a.classification === "adult-only" ? "Adults only" : "All ages"}</Badge></ItemTitle>
           <ItemDescription clamp={false}>
-            {a.licence} · {size(a.bytes)} · made for {a.base_model}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}
+            {a.licence} · {size(a.bytes)} · made for {a.base_model}{a.trigger_words.length ? ` · adds: ${a.trigger_words.join(", ")}` : ""}{a.looks_like ? ` · looks like ${a.looks_like.name}` : ""}
           </ItemDescription>
           {a.needs_confirmation ? (
             <Alert>
@@ -173,7 +174,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
   const [read, setRead] = useState(false);
   const [allAges, setAllAges] = useState<"yes" | "no" | "unsure">("unsure");
   const [words, setWords] = useState("");
-  const [notReal, setNotReal] = useState(false);
+  const [looksLike, setLooksLike] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [job, setJob] = useState<string | null>(null);
@@ -193,14 +194,14 @@ function AddStyle({ refresh }: { refresh: () => void }) {
     form.append("licence_acknowledged", read ? "true" : "false");
     form.append("all_ages", allAges);
     form.append("trigger_words", words);
-    form.append("not_real_person", notReal ? "true" : "false");
+    form.append("looks_like", looksLike);
     if (source === "link") form.append("url", url.trim());
     else if (file) form.append("file", file, file.name);
     try {
       const reply = await picturesAdminApi.addAdapter(form);
       if ("job" in reply) setJob(reply.job);
       else { refresh(); }
-      setName(""); setUrl(""); setFile(null); setLicence(""); setRead(false); setWords(""); setNotReal(false); setAllAges("unsure");
+      setName(""); setUrl(""); setFile(null); setLicence(""); setRead(false); setWords(""); setLooksLike(""); setAllAges("unsure");
     } catch (e) { setError(messageOf(e, "The style could not be added. Check that the engine is running, then try again.")); }
     finally { setBusy(false); }
   }
@@ -214,7 +215,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Input id="style-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ink wash" required maxLength={80} disabled={busy} />
         </div>
         <RadioGroup value={source} onValueChange={(v) => setSource(v as "link" | "file")} aria-label="Where the style is">
-          <div className="flex items-center gap-2"><RadioGroupItem value="link" id="style-src-link" /><Label htmlFor="style-src-link">Hugging Face link</Label></div>
+          <div className="flex items-center gap-2"><RadioGroupItem value="link" id="style-src-link" disabled={looksLike !== "" && looksLike !== NOBODY} /><Label htmlFor="style-src-link">Hugging Face link</Label></div>
           <div className="flex items-center gap-2"><RadioGroupItem value="file" id="style-src-file" /><Label htmlFor="style-src-file">A file from this computer</Label></div>
         </RadioGroup>
         {source === "link" ? (
@@ -246,12 +247,13 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Label htmlFor="style-words">Words that switch the style on (optional, separated by commas)</Label>
           <Input id="style-words" value={words} onChange={(e) => setWords(e.target.value)} maxLength={400} disabled={busy} />
         </div>
-        <div className="flex items-center gap-2"><Checkbox id="style-real" checked={notReal} onCheckedChange={(v) => setNotReal(v === true)} /><Label htmlFor="style-real">This style is not a likeness of a real person.</Label></div>
-        <p className="text-sm text-muted-foreground">The picture engine also checks the file and refuses styles of real people and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.</p>
+        <LooksLikePicker id="style-looks-like" label="Who does this style look like?" value={looksLike} onChange={(v) => { setLooksLike(v); if (v !== NOBODY && source === "link") setSource("file"); }} disabled={busy}
+          help="Pick an adult in this household only if they have agreed, in their own settings. A style of a child, a teen, a guest or anyone outside the household is never added. A style of an adult here is always adults only, and is removed if they take their agreement back." />
+        <p className="text-sm text-muted-foreground">The picture engine also checks the file and refuses styles of public figures and anything that puts a child in an adult scene. It cannot catch everything, so only add styles you trust.</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         {job ? <Progress value={progress?.percent ?? 0} aria-label="Fetching the style" /> : null}
         {progress?.state === "failed" ? <p role="alert" className="text-sm text-destructive">{progress.error}</p> : null}
-        <div><Button type="submit" disabled={busy || job !== null}>{busy ? "Adding…" : "Add style"}</Button></div>
+        <div><Button type="submit" disabled={busy || job !== null || looksLike === ""}>{busy ? "Adding…" : "Add style"}</Button></div>
       </form>
     </section>
   );

@@ -20,6 +20,7 @@ import { RobotPasswordSection } from "@/apps/settings/RobotPasswordSection";
 import { RoutingStatsSection } from "@/apps/settings/RoutingStatsSection";
 import { ReferenceLibrarySettings } from "@/apps/settings/ReferenceLibrarySettings";
 import { PicturesLibrary } from "@/apps/settings/PicturesLibrary";
+import { LikenessSettings } from "@/apps/settings/LikenessSettings";
 import { VideoLibrary } from "@/apps/settings/VideoLibrary";
 import { CommandsSection } from "@/apps/settings/CommandsSection";
 import { SizingPanel } from "@/shell/pages/settings/SizingPanel";
@@ -73,6 +74,7 @@ function HomeEngineAdminSettings({ person }: SettingsViewProps) {
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }
 function HomeDevicesAdminSettings() { return <><AddRobotSection /><RobotPasswordSection /></>; }
+function AccountLikenessView() { useTabItem("Pictures and videos"); return <LikenessSettings />; }
 function PicturesLibraryView() { useTabItem("Pictures and videos"); return <><PicturesLibrary /><VideoLibrary /></>; }
 function HomeRoutingStatsSettings() { return <RoutingStatsSection />; }
 
@@ -87,6 +89,7 @@ export const SETTINGS_VIEWS: Record<string, ComponentType<SettingsViewProps>> = 
   "home.routing_stats": HomeRoutingStatsSettings,
   "home.reference_library": ReferenceLibrarySettings,
   "home.pictures_library": PicturesLibraryView,
+  "account.likeness": AccountLikenessView,
   "account.device_appearance": DeviceAppearanceSettings,
   "chat.skills": ChatSkillsSettings,
   "chat.shortcuts": ChatShortcutsSettings,

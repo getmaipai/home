@@ -133,9 +133,9 @@ never overrides the metadata when the metadata says adult.
 
 **Absolute lines (no setting, role or flag lifts them):** no sexual content depicting a minor or anyone who looks like a minor, and no
 non-consensual imagery of a real, identifiable person. SAFETY.md already states "no feature is built whose purpose is generating imagery of identifiable
-real people"; the video pipeline inherits it as written. **Design question for Jesse (RULES.md is silent on it):** whether an adult may make a
-video of a real family member with that person's consent. Until he answers, an image-to-video job that starts from a stored picture of a
-household member is refused for everyone, and a text-only prompt naming a household member passes the household-name gate the chat already uses.
+real people"; the video pipeline inherits it as written. **Closed by Jesse on 2026-10-17: yes, an adult may make a video or a likeness style of a consenting household adult**, with the design and
+limits in [likeness-consent-2026-10-17.md](likeness-consent-2026-10-17.md) (consent switch per person, signed proof, photo check, notification and log).
+A text-only prompt naming a household member passes the household-name gate the chat already uses and produces an invented person.
 
 **How the lines are enforced without a filter in the model.** The Wan weights and mlx-video carry no safety filter (checked in source: no
 checker, no classifier, no word list). Enforcement lives in Home, where the person is known: the age and surface gate before the job exists, the
@@ -246,7 +246,7 @@ the three steps, decoding reports tiles, so a poll shows movement every few seco
   and any file whose own description names a minor in a sexual context (`lora_refused`); a file whose description names adult content cannot be all-ages. It also refuses an
   adult-only id when `audience` is `all-ages`, as a second lock.
 
-**Reference pictures (VIDEO-GEN-12).** The Stack accepts `image_source: "generated"` only, and only for bytes whose sha256 it recorded when its own image generator (or one of its clips'
+**Reference pictures (VIDEO-GEN-12, ruling 2026-10-17 adds `household_photo` with Home's signed proof).** The Stack accepts `image_source: "generated"` and `"household_photo"` only, and only for bytes whose sha256 it recorded when its own image generator (or one of its clips'
 posters) produced them. So Home must send the stored picture unchanged (no re-encode, resize or metadata edit), and an uploaded photo can never start a clip until the real-person check
 exists. Home's own gates (age, surface, household names) still run first; Home must not set `generated` for anything else.
 
