@@ -225,7 +225,7 @@ belongs with the Ask record work.
 ## Podcasts (MEDIA-PODCASTS-01)
 
 Podcasts are `feed` records with `purpose: "podcast"` read by the ONE shelf poller (`lib/shelf/shelfPoller.ts`: conditional GET, one request
-per host, backoff, the SSRF guard). Migration 0111 (schema version 68) adds `feeds.purpose` (default `news`), `attachments.origin` (default
+per host, backoff, the SSRF guard). Migration 0112 (schema version 69) adds `feeds.purpose` (default `news`), `attachments.origin` (default
 `sent`) and `attachments.media_source_id`. `listFeeds(purpose?)`: the news shelf (`shelfRead`, `syncShelfFeeds`) asks for `news`, so a
 podcast feed is never read as news and never deleted by the settings sync. `pollDueFeeds` polls both purposes; a podcast feed is polled while
 it has a live, unpaused source (the news-shelf switch and tick-boxes do not apply), at the source's `poll_minutes`. The size cap is 8 MB for a
