@@ -22,7 +22,10 @@ export function sourceVisibleTo(source: Pick<MediaSource, "kind" | "visible_to" 
   if (source.deleted_at) return false;
   if (source.scope === "person" && source.owner_person_id !== actor.id) return false;
   const named = Array.isArray(source.visible_to) && source.visible_to.includes(actor.id);
-  if (!discoveryAllowed(actor) && !(source.kind === "root" && source.scope === "household") && !named) return false;
+  // Allowlist mode (MEDIA-KID-01): the household library, a source an adult named this person on, or a source made for this
+  // person (scope person, owned by them: an adult sets these up; a child never adds one).
+  const ownSource = source.scope === "person" && source.owner_person_id === actor.id;
+  if (!discoveryAllowed(actor) && !(source.kind === "root" && source.scope === "household") && !named && !ownSource) return false;
   return source.visible_to === "household" || named;
 }
 
