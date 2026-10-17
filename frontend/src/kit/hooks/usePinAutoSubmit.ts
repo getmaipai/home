@@ -51,11 +51,13 @@ export function usePinAutoSubmit({ secret, selected, pinDigits, busy, onSubmit }
   }, [selected]);
 
   useEffect(() => {
-    if (!selected || busy) return;
+    if (!selected) return;
+    // A cleared or shorter entry is a fresh attempt: the same wrong code typed again must submit
+    // again. Reset before the busy check so it never depends on how the caller batches its updates.
+    if (pinDigits && secret.length !== pinDigits) lastTriedRef.current = null;
+    if (busy) return;
     if (lastTriedRef.current === secret) return;
     if (!pinDigits || pinDigits < 1) return;
-    // A cleared or shorter entry is a fresh attempt: the same wrong code typed again must submit again.
-    if (secret.length !== pinDigits) lastTriedRef.current = null;
     if (secret.length !== pinDigits || !/^\d+$/.test(secret)) return;
     lastTriedRef.current = secret;
     onSubmit();

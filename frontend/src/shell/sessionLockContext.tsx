@@ -34,7 +34,9 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
   const error = attemptState.message;
   const [busy, setBusy] = useState(false);
 
-  const pinDigits = person?.pinDigits ?? null;
+  const [wantsPassword, setWantsPassword] = useState(false);
+  const accountDigits = person?.pinDigits && person.pinDigits >= 1 ? person.pinDigits : null;
+  const pinDigits = wantsPassword ? null : accountDigits;
   const timeoutMs = (person?.sessionLockTimeoutMinutes ?? 5) * 60 * 1000;
   useIdleTimer(timeoutMs, () => setLocked(true), person?.sessionLockRequired ?? false);
 
@@ -47,9 +49,11 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
       await api.verifySecret(person.id, secret);
       setLocked(false);
       setSecret("");
+      setWantsPassword(false);
+      attemptState.reset();
     } catch (err) {
-      setSecret("");
-      attemptState.fail(err, "Could not unlock. Check your connection and try again.");
+      // A wrong code empties the boxes; a network error keeps what was typed.
+      if (attemptState.fail(err, "Could not unlock. Check your connection and try again.", accountDigits ? "passcode" : "PIN or password")) setSecret("");
     } finally {
       setBusy(false);
     }
@@ -95,7 +99,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                           id="lock-secret"
                           type="password"
                           value={secret}
-                          disabled={busy || attemptState.locked}
+                          disabled={attemptState.locked}
                           onChange={(e) => setSecret(e.target.value)}
                           // eslint-disable-next-line jsx-a11y/no-autofocus
                           autoFocus
@@ -109,9 +113,21 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                       </p>
                     ) : null}
                     {pinDigits === null ? (
-                    <Button type="submit" size="lg" disabled={busy || attemptState.locked}>
-                      {busy ? "Unlocking…" : "Unlock"}
-                    </Button>
+                      <Button type="submit" size="lg" disabled={busy || attemptState.locked}>
+                        {busy ? "Unlocking…" : "Unlock"}
+                      </Button>
+                    ) : null}
+                    {accountDigits !== null ? (
+                      <Button
+                        type="button"
+                        variant="link"
+                        onClick={() => {
+                          setWantsPassword(!wantsPassword);
+                          setSecret("");
+                        }}
+                      >
+                        {wantsPassword ? "Use a PIN instead" : "Use a password instead"}
+                      </Button>
                     ) : null}
                   </form>
                 </div>

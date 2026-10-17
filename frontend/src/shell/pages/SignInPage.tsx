@@ -58,8 +58,9 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
     useProfileSignIn(onSignedIn);
 
   // pinDigits null/absent: length unknown or a password, so no keypad.
-  const pinDigits = selected?.pinDigits ?? null;
-  const usePassword = wantsPassword || pinDigits === null;
+  const pinDigits = selected?.pinDigits && selected.pinDigits >= 1 ? selected.pinDigits : null;
+  const passcodeDigits = wantsPassword ? null : pinDigits;
+  const usePassword = passcodeDigits === null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-accent px-4">
@@ -90,7 +91,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                     <Avatar name={selected.display_name} className="size-16 text-xl" />
                     <h1 className="text-lg font-semibold">{selected.display_name}</h1>
                   </div>
-                  {usePassword ? (
+                  {passcodeDigits === null ? (
                     <div className="space-y-1.5">
                       <Label htmlFor="secret" className="text-sm font-normal text-muted-foreground">
                         Password
@@ -99,7 +100,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                         key={attempt}
                         id="secret"
                         type="password"
-                        disabled={busy || locked}
+                        disabled={locked}
                         aria-invalid={Boolean(secretError) && secret === "" ? true : undefined}
                         value={secret}
                         onChange={(e) => setSecret(e.target.value)}
@@ -113,12 +114,12 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-3">
-                      <p className="text-sm text-muted-foreground">Enter your {pinDigits ?? 4}-digit passcode</p>
+                      <p className="text-sm text-muted-foreground">Enter your {passcodeDigits}-digit passcode</p>
                       {/* key={attempt}: a wrong code remounts the boxes empty, focus on the first box, red with a shake. */}
                       <PasscodeInput
                         key={attempt}
                         id="secret"
-                        digits={pinDigits ?? 4}
+                        digits={passcodeDigits}
                         value={secret}
                         onChange={setSecret}
                         invalid={Boolean(secretError) && secret === ""}

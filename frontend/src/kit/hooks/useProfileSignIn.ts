@@ -27,9 +27,9 @@ export function useProfileSignIn(onSignedIn: () => void) {
       await api.verifySecret(selected.id, secret);
       onSignedIn();
     } catch (e) {
-      // A wrong code empties the boxes so the next try starts clean.
-      setSecret("");
-      attemptState.fail(e, "Sign-in failed. Check your connection and try again.");
+      // A wrong code empties the boxes so the next try starts clean; a network error keeps what was typed.
+      const what = selected.pinDigits ? "passcode" : "PIN or password";
+      if (attemptState.fail(e, "Sign-in failed. Check your connection and try again.", what)) setSecret("");
     } finally {
       setBusy(false);
     }

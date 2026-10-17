@@ -25,28 +25,33 @@ export function usePasscodeAttempt() {
         setLockedUntil(null);
         setAttempt((n) => n + 1);
       }
-    }, 500);
+    }, 1000);
     return () => clearInterval(id);
   }, [lockedUntil]);
 
   const lockSeconds = lockedUntil === null ? 0 : Math.max(0, Math.ceil((lockedUntil - now) / 1000));
   const locked = lockSeconds > 0;
 
-  /** Record a failed attempt. `fallback` is the line for an error that is not the hub's. */
-  function fail(e: unknown, fallback: string) {
-    setAttempt((n) => n + 1);
+  /** Record a failed attempt and return true when the hub judged the code (wrong, or locked out), so
+   * the caller empties the boxes. A network or server error returns false: the typed code stays,
+   * nothing shakes, and the line says what to do. `what` names the credential in the wrong-code
+   * line ("passcode", "password", "PIN or password"). */
+  function fail(e: unknown, fallback: string, what = "passcode"): boolean {
     if (e instanceof ApiError && e.status === 429) {
       const t = Date.now();
       setNow(t);
       setLockedUntil(t + (e.retryAfter ?? 60) * 1000);
       setError(null);
-      return;
+      setAttempt((n) => n + 1);
+      return true;
     }
     if (e instanceof ApiError && e.status === 401) {
-      setError("That passcode is not right. Try again.");
-      return;
+      setError(`That ${what} is not right. Try again.`);
+      setAttempt((n) => n + 1);
+      return true;
     }
-    setError(e instanceof ApiError ? e.message : fallback);
+    setError(e instanceof ApiError && e.status !== 0 && e.status < 500 ? e.message : fallback);
+    return false;
   }
 
   function clear() {

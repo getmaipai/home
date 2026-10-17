@@ -174,7 +174,7 @@ describe("SessionLockGate", () => {
       await act(async () => {
         fireEvent.click(button);
       });
-      await waitFor(() => expect(document.body.textContent).toContain("That passcode is not right"));
+      await waitFor(() => expect(document.body.textContent).toContain("That PIN or password is not right"));
       expect(document.body.querySelector('input[type="password"]')).not.toBeNull();
     } finally {
       restore();
@@ -201,6 +201,41 @@ describe("SessionLockGate", () => {
       });
       await waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("Try again in 2:00"));
       expect((document.body.querySelector("input[data-input-otp]") as HTMLInputElement).disabled).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a PIN account can fall back to a password on the lock screen and a server error keeps the typed code", async () => {
+    let status = 500;
+    const restore = stubFetch({
+      "/api/auth/verify-secret": () => Response.json({ error: "boom" }, { status }),
+    });
+    try {
+      renderWithQueryClient(
+        <SessionLockGate person={makePerson({ pinDigits: 4, sessionLockRequired: true, sessionLockTimeoutMinutes: FAST_TIMEOUT_MINUTES })}>
+          <div>the app</div>
+        </SessionLockGate>,
+      );
+      const input = await waitFor(() => {
+        const el = document.body.querySelector("input[data-input-otp]");
+        if (!el) throw new Error("not locked yet");
+        return el as HTMLInputElement;
+      });
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "1234" } });
+      });
+      await waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("Check your connection"));
+      // not judged: the code stays typed and the boxes are not red
+      expect((document.body.querySelector("input[data-input-otp]") as HTMLInputElement).value).toBe("1234");
+      document.body.querySelectorAll('[data-slot="passcode-input-slot"]').forEach((el) => expect(el.getAttribute("data-invalid")).toBeNull());
+      status = 401;
+      const toggle = Array.from(document.body.querySelectorAll("button")).find((b) => /use a password instead/i.test(b.textContent ?? ""))!;
+      await act(async () => {
+        fireEvent.click(toggle);
+      });
+      expect(document.body.querySelector("input[data-input-otp]")).toBeNull();
+      expect(document.body.querySelector('input[type="password"]')).not.toBeNull();
     } finally {
       restore();
     }
