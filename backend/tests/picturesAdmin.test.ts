@@ -113,6 +113,17 @@ describe("adding a style", () => {
     expect(await res.json()).toEqual({ error: "This style was refused: its description names a real person's likeness.", code: "lora_refused" });
   });
 
+  test("a path on this computer is sent to the Stack as a path, for files too big for a form; a path that is not a full .safetensors path is refused", async () => {
+    const { client } = await owner();
+    const res = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, path: "/Users/you/Downloads/ink-wash.safetensors" }, false));
+    expect(res.status).toBe(200);
+    expect(((await res.json()) as { adapter: { enabled: boolean; needs_confirmation: boolean } }).adapter).toMatchObject({ enabled: false, needs_confirmation: true });
+    expect(fake.loraAdds.at(-1)).toMatchObject({ path: "/Users/you/Downloads/ink-wash.safetensors", name: "Ink Wash" });
+    const bad = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, path: "Downloads/ink-wash.ckpt" }, false));
+    expect(bad.status).toBe(422);
+    expect(((await bad.json()) as { code: string }).code).toBe("bad_path");
+  });
+
   test("a link starts a job; the finished job brings the style in switched off", async () => {
     const { client } = await owner();
     const res = await client.postForm("/api/pictures/admin/adapters", form({ ...GOOD, url: "https://huggingface.co/x/y/resolve/main/a.safetensors" }, false));

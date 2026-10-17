@@ -95,6 +95,21 @@ describe("Pictures and videos settings view", () => {
     v.restore();
   });
 
+  test("a big style file already on this computer is added by its path, with no link and no upload", async () => {
+    const v = mount(overview({ adapters: [] }));
+    await waitFor(() => expect(v.getByLabelText("Name")).toBeTruthy());
+    fireEvent.change(v.getByLabelText("Name"), { target: { value: "Ink Wash" } });
+    fireEvent.click(v.getByRole("radio", { name: "A file already on this computer (for big files)" }));
+    fireEvent.change(v.getByLabelText("Where the .safetensors file is saved on this computer"), { target: { value: " /Users/you/Downloads/ink.safetensors " } });
+    fireEvent.click(v.getByRole("button", { name: "Add style" }));
+    await waitFor(() => expect(picturesAdminApi.addAdapter).toHaveBeenCalled());
+    const sent = (picturesAdminApi.addAdapter as unknown as { mock: { calls: Array<[FormData]> } }).mock.calls[0]![0];
+    expect(sent.get("path")).toBe("/Users/you/Downloads/ink.safetensors");
+    expect(sent.get("url")).toBeNull();
+    expect(sent.get("file")).toBeNull();
+    v.restore();
+  });
+
   test("an engine that is not answering says so in plain words", async () => {
     const v = mount(overview({ stack: "unreachable", adapters: [] }));
     await waitFor(() => expect(v.getByText("The picture engine isn't answering")).toBeTruthy());

@@ -166,10 +166,11 @@ function StyleRow({ a, refresh, setError }: { a: AdminAdapter; refresh: () => vo
 }
 
 function AddStyle({ refresh }: { refresh: () => void }) {
-  const [source, setSource] = useState<"link" | "file">("link");
+  const [source, setSource] = useState<"link" | "file" | "path">("link");
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [path, setPath] = useState("");
   const [licence, setLicence] = useState("");
   const [read, setRead] = useState(false);
   const [allAges, setAllAges] = useState<"yes" | "no" | "unsure">("unsure");
@@ -184,7 +185,7 @@ function AddStyle({ refresh }: { refresh: () => void }) {
     event.preventDefault();
     setError(null);
     if (source === "file" && file && file.size > MAX_UPLOAD_BYTES) {
-      setError(`That file is ${size(file.size)}. Home can take files up to ${size(MAX_UPLOAD_BYTES)} here. For a bigger one, paste its Hugging Face link instead.`);
+      setError(`That file is ${size(file.size)}. Home can take files up to ${size(MAX_UPLOAD_BYTES)} here. For a bigger one, choose \"A file already on this computer\" and type where it is saved, or paste its Hugging Face link.`);
       return;
     }
     setBusy(true);
@@ -196,12 +197,13 @@ function AddStyle({ refresh }: { refresh: () => void }) {
     form.append("trigger_words", words);
     form.append("looks_like", looksLike);
     if (source === "link") form.append("url", url.trim());
+    else if (source === "path") form.append("path", path.trim());
     else if (file) form.append("file", file, file.name);
     try {
       const reply = await picturesAdminApi.addAdapter(form);
       if ("job" in reply) setJob(reply.job);
       else { refresh(); }
-      setName(""); setUrl(""); setFile(null); setLicence(""); setRead(false); setWords(""); setLooksLike(""); setAllAges("unsure");
+      setName(""); setUrl(""); setFile(null); setPath(""); setLicence(""); setRead(false); setWords(""); setLooksLike(""); setAllAges("unsure");
     } catch (e) { setError(messageOf(e, "The style could not be added. Check that the engine is running, then try again.")); }
     finally { setBusy(false); }
   }
@@ -214,14 +216,21 @@ function AddStyle({ refresh }: { refresh: () => void }) {
           <Label htmlFor="style-name">Name</Label>
           <Input id="style-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ink wash" required maxLength={80} disabled={busy} />
         </div>
-        <RadioGroup value={source} onValueChange={(v) => setSource(v as "link" | "file")} aria-label="Where the style is">
+        <RadioGroup value={source} onValueChange={(v) => setSource(v as "link" | "file" | "path")} aria-label="Where the style is">
           <div className="flex items-center gap-2"><RadioGroupItem value="link" id="style-src-link" disabled={looksLike !== "" && looksLike !== NOBODY} /><Label htmlFor="style-src-link">Hugging Face link</Label></div>
           <div className="flex items-center gap-2"><RadioGroupItem value="file" id="style-src-file" /><Label htmlFor="style-src-file">A file from this computer</Label></div>
+          <div className="flex items-center gap-2"><RadioGroupItem value="path" id="style-src-path" disabled={looksLike !== "" && looksLike !== NOBODY} /><Label htmlFor="style-src-path">A file already on this computer (for big files)</Label></div>
         </RadioGroup>
         {source === "link" ? (
           <div className="flex flex-col gap-2">
             <Label htmlFor="style-url">Link to the .safetensors file</Label>
             <Input id="style-url" type="url" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://huggingface.co/.../resolve/main/style.safetensors" required disabled={busy} />
+          </div>
+        ) : source === "path" ? (
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="style-path">Where the .safetensors file is saved on this computer</Label>
+            <Input id="style-path" value={path} onChange={(e) => setPath(e.target.value)} placeholder="/Users/you/Downloads/style.safetensors" required disabled={busy} />
+            <p className="text-sm text-muted-foreground">Download the file yourself, from Civitai or anywhere else you trust, then give its full path. Nothing is fetched for you and no account is needed.</p>
           </div>
         ) : (
           <div className="flex flex-col gap-2">

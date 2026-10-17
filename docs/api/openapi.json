@@ -42554,7 +42554,7 @@
         "tags": [
           "Pictures admin"
         ],
-        "summary": "Add a style (LoRA) by Hugging Face link or file",
+        "summary": "Add a style (LoRA) by Hugging Face link, file, or a path on this computer",
         "requestBody": {
           "content": {
             "multipart/form-data": {
@@ -42572,6 +42572,10 @@
                   },
                   "file": {
                     "nullable": true
+                  },
+                  "path": {
+                    "type": "string",
+                    "maxLength": 1000
                   },
                   "licence": {
                     "type": "string",

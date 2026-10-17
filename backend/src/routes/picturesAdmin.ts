@@ -153,9 +153,9 @@ picturesAdminRoutes.openapi(jobRoute, async (c) => {
 });
 
 const addRoute = createRoute({
-  method: "post", path: "/adapters", tags: ["Pictures admin"], summary: "Add a style (LoRA) by Hugging Face link or file", middleware: [requireRole("owner", "admin")] as const,
+  method: "post", path: "/adapters", tags: ["Pictures admin"], summary: "Add a style (LoRA) by Hugging Face link, file, or a path on this computer", middleware: [requireRole("owner", "admin")] as const,
   request: { body: { content: { "multipart/form-data": { schema: z.object({
-    name: z.string().min(1).max(80), url: z.string().max(600).optional(), file: z.any().optional(),
+    name: z.string().min(1).max(80), url: z.string().max(600).optional(), file: z.any().optional(), path: z.string().max(1000).optional(),
     licence: z.string().max(200).optional(), licence_acknowledged: z.enum(["true", "false"]).optional(),
     all_ages: z.enum(["yes", "no", "unsure"]).optional(), trigger_words: z.string().max(400).optional(),
     looks_like: z.string().max(80).optional().describe("LIKENESS-01: 'nobody', or the id of the household adult the style looks like (they must have agreed, or be the one adding it)."),
@@ -180,9 +180,16 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
   const trigger = String(form.trigger_words ?? "").split(",").map((w) => w.trim()).filter(Boolean).slice(0, 12);
   try {
     const file = form.file;
-    if (file instanceof File && file.size > 0) {
+    const path = String(form.path ?? "").trim();
+    // A file arrives as a form part; a path names a file the admin already saved on this computer (most community styles are over the
+    // 128 MB a form can carry). Either way the Stack reads it and runs the same checks.
+    if (path && !(file instanceof File && file.size > 0) && (!path.startsWith("/") || !path.toLowerCase().endsWith(".safetensors"))) return c.json({ error: "Type the full path of the .safetensors file, starting with /, for example /Users/you/Downloads/style.safetensors.", code: "bad_path" }, 422) as never;
+    // A style of a person is proved against the bytes of the file the admin chose here; a path on disk is not that.
+    if (path && !(file instanceof File && file.size > 0) && subjectCheck.kind === "person") return c.json({ error: "A style that looks like a person has to be added by choosing the file here, not by its path.", code: "likeness_file_required" }, 422) as never;
+    if ((file instanceof File && file.size > 0) || path) {
       const stack = new FormData();
-      stack.append("file", file, file.name || "style.safetensors");
+      if (file instanceof File && file.size > 0) stack.append("file", file, file.name || "style.safetensors");
+      else stack.append("path", path);
       stack.append("name", name);
       stack.append("licence", licenceText || "unknown");
       stack.append("licence_acknowledged", ack ? "true" : "false");
@@ -204,7 +211,7 @@ picturesAdminRoutes.openapi(addRoute, async (c) => {
       return c.json({ adapter: present(found ?? { ...lora, enabled: false }, pendingIds()) }, 200) as never;
     }
     const url = String(form.url ?? "").trim();
-    if (!url) return c.json({ error: "Paste a Hugging Face link to the .safetensors file, or choose the file.", code: "source_required" }, 422) as never;
+    if (!url) return c.json({ error: "Paste a Hugging Face link to the .safetensors file, choose the file, or type where it is saved on this computer.", code: "source_required" }, 422) as never;
     // A style of a person is added from the file itself: its proof is bound to the file's hash, and a link's bytes can change.
     if (subjectCheck.kind === "person") return c.json({ error: "A style that looks like a person has to be added as a file, not from a link. Download it, then choose the file.", code: "likeness_file_required" }, 422) as never;
     const started = await addLoraUrl({ url, name, ...(licenceText ? { licence: licenceText } : {}), licence_acknowledged: ack, classification, trigger_words: trigger, added_by: adminId });

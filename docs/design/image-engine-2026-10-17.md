@@ -18,6 +18,8 @@ launchd services and `/usr/local/maipai-home` were not touched. Weights came fro
 
 ## 1. The decision
 
+**Superseded for a 128 GB computer by section 16 (owner ruling, 2026-10-17): Z-Image-Turbo is the default there; Klein stays for quick pictures, edits and every smaller tier. The rest of this section is the original pick.**
+
 | Slot | Pick | Runtime | Licence | Why in one line |
 |---|---|---|---|---|
 | Default (every tier that can hold it: p32 and up) | **FLUX.2 Klein 4B distilled**, 8-bit, 4 steps | mflux 0.23.0 on MLX, in a Stack-managed worker | Apache-2.0 | 4.0 s per 1024 px picture warm, 13.5 GB peak, text rendered correctly, and the same weights do reference edits (8.4 s) |
@@ -121,7 +123,7 @@ job API.
 ## 4. Community LoRA ecosystem (criterion 3)
 
 Counts are Hugging Face models filtered by `base_model:adapter:<base>` (a count of 1000 means the listing cap). CivitAI's bulk listing
-refused anonymous requests with 403, so its counts were not taken; for CivitAI the statements below are qualitative and unverified.
+refused anonymous requests with 403 on the first pass; the later pass in section 16 got through with an ordinary browser User-Agent and counted CivitAI properly. **Hugging Face undercounts every base whose community lives on CivitAI** (Chroma: 7 here, 1,105 there), so section 16, not this table, decides criterion 3.
 
 | Base | Hugging Face adapters | Notes |
 |---|---:|---|
@@ -390,3 +392,86 @@ The decision rows (child and sexual withholds; adult and sexual passes; possibly
 failure and ordinary passes) are unit tests on scripted verdicts. **Not measured here, on purpose:** the false-negative rate on real adult
 content with a minor-looking subject, because no explicit or sexual image was made or looked at. A person with a youthful look who is an adult
 may be labeled `possibly_minor`; on an ordinary job that costs nothing, on an adult-only job it is withheld, which is the safe side.
+
+## 16. The default picture model, decided on CivitAI as well as Hugging Face (2026-10-17)
+
+Owner ask (Jesse, 2026-10-17): the default picture model should be fast, high quality, have a very large community LoRA ecosystem (CivitAI,
+not only Hugging Face) and ideally carry no baked-in filter, so adults get adult output while rule 0's age gates and the two absolute lines
+(section 6) still apply in our own code. **Measured** below means a number taken today by a request or a run; **read** means taken from a
+card or page; **not tested** means neither.
+
+### 16.1 Comparison
+
+CivitAI: `GET /api/v1/models?types=LORA&baseModels=<base>&nsfw=true`, paged at 100, read-only, no account, one request a second, counting
+distinct models with at least one version on that base (the household sent nothing). A count with a plus sign hit the 30-request cap I set
+(3,000 models) and is a floor. "Adult-rated" is a model flagged NSFW or rated R and above by CivitAI itself.
+
+| Model | CivitAI LoRAs (measured) | HF adapters (measured) | Licence (read) | Built-in filter | 1024 px speed on this M5 Max | Size / runtime |
+|---|---:|---:|---|---|---|---|
+| **Z-Image-Turbo 6B** | **8,913** (6,730 adult-rated) | 879 | Apache-2.0, not gated | none stated on the card (read); the community calls it unfiltered (secondary sources, not tested by output) | 12.9 s warm, 8-bit, 9 steps (measured, section 3.1); 30 s through the live Stack under heavy load (owner's number) | 30 GB peak at 8-bit; mflux (MLX), built |
+| Z-Image base | 1,224 (926 adult-rated) | 152 | Apache-2.0 | none stated | slower (more steps, guidance); not benched | same family; benchmark row IMGGEN-BENCH-01 |
+| FLUX.2 Klein 4B | 205 (153 adult-rated) | 81 | Apache-2.0 | the card tells deployers to add NSFW filters; few adult LoRAs exist for it | 4.0 s warm, 8-bit (measured) | 13.5 GB peak; mflux, built; the only model that edits |
+| FLUX.2 Klein 9B | 1,285 | 112 | FLUX Non-Commercial, gated | as Klein | not benched | rejected on licence (section 2) |
+| Chroma1-HD 8.9B | 1,105 (962 adult-rated) | 7 (31 on Chroma) | Apache-2.0 | none by design ("not aligned with a specific safety filter", read) | not tested; 40 steps with guidance on the card, so two passes a step: slow | not in mflux's model list (read); no runtime in our Stack |
+| Illustrious XL (SDXL family) | 3,000+ (2,845+ adult-rated among the first 3,000) | 14 (770 on the v0 base) | card lists `sdxl-license`; derivatives list `faipl-1.0-sd` (Fair AI Public License, share-alike on derivative models); read the exact text before adding | none stated; trained on tagged booru data | about 29 s at 20 steps, 8 to 10 s with a 4-step Lightning or DMD2 LoRA (SDXL costs, measured in section 3.3 on sd.cpp; Illustrious has the same architecture) | 6.6 GB; sd.cpp, not built here |
+| Pony Diffusion V6 XL | 2,996+ | 7 | CreativeML OpenRAIL-M (read) | none stated | as SDXL | as above |
+| NoobAI-XL (Illustrious derivative) | 2,996+ | 8 to 30 | not read | none stated | as SDXL | as above |
+| SDXL 1.0 / SDXL-Lightning | 2,999+ / 97 | 1,000+ | OpenRAIL++-M | none | 8 to 9 s Lightning 4-step (measured) | 6.6 GB; sd.cpp |
+| FLUX.1 dev / schnell | 2,999+ / 550 | 1,000+ / 283 | dev non-commercial; schnell Apache-2.0 | dev has a filtered pipeline | not benched | 12B, about 24 GB bf16; mflux has it; LoRAs do not load on Klein |
+| Qwen-Image 20B | 1,661 (the "Qwen" filter also holds edit variants) | 506 | Apache-2.0 | none stated | not benched | about 40 GB of weights |
+| HiDream-I1 17B | 65 | 30 | MIT | not read | not benched | 17B |
+| Lumina | 43 | not counted | not read | not read | not benched | not read |
+
+What the numbers say. Z-Image-Turbo has 43 times Klein's CivitAI library and three quarters of them are adult-rated by CivitAI's own flags
+(6,730 of 8,913). The only models with more LoRAs are the SDXL family, which are older, bigger to run per picture on our
+Mac (8 to 29 s on a runtime that is 3 to 4 times slower than MLX for the same weights) and have no engine in the Stack yet. Chroma is the
+only model with an explicit "no safety filter" statement, but it has one eighth of Z-Image's library and no Apple runtime in the Stack.
+
+The earlier pick (section 1) counted Hugging Face only and so rejected Chroma at 7 adapters; CivitAI shows 1,105. That does not change the
+decision (Z-Image is eight times larger and already built) and it moves Chroma to "worth a bench when mflux supports it".
+
+Typical file sizes matter to the add flow: of the 100 most-downloaded Z-Image-Turbo LoRAs (measured, one request), the median file is 162 MB, 69
+percent are over the 120 MB a form upload can carry, the largest is 1.45 GB, none is over the Stack's 2 GB cap. Klein's median is 88 MB.
+
+### 16.2 Decision
+
+| Tier | Default for a request with no model and no LoRA | Also installed by the wizard | Optional in Models and storage |
+|---|---|---|---|
+| p128 | **Z-Image-Turbo** (8-bit, 9 steps, 34 GB admission, about 13 s measured) | FLUX.2 Klein 4B (quick pictures, every edit and Comment, 15 GB) | Video; later the anime model (IMGGEN-SDXL-01) |
+| p64 | FLUX.2 Klein 4B (unchanged) | none | Z-Image-Turbo only after IMGGEN-ZIT-P64 measures it |
+| p32 | FLUX.2 Klein 4B at 4-bit | none | none |
+| p16 | off | | |
+
+- **Why Z-Image-Turbo wins the default.** It is the only candidate that clears all four of the owner's tests at once: a CivitAI library of
+  8,913 (the largest of any model our runtime can run), Apache-2.0 and not gated (a household admin can download it, and the Stack already pins
+  and installs it), no filter stated on its card, and 12.9 s a picture on MLX with the best skin and fur texture of the benched set.
+  What it gives up: it is about three times slower than Klein, it cannot edit, and its folded-hands anatomy was worse in the bench.
+- **What Klein stays for.** Fast photoreal (4.0 s), text in pictures that reads correctly, all edits and Comment, and the only model on
+  p32 and p64. It is installed beside Z-Image on p128 (15 GB) because an edit is always a Klein job.
+- **The licence caveat that remains.** Z-Image-Turbo's licence is Apache-2.0 with no use restriction on the card, so no licence reason stops adult
+  output; the two absolute lines are enforced in our code and unchanged (sections 6 and 15), and the marketing rule (never pitch generation as
+  "uncensored") is unchanged.
+- **p64 stays on Klein for now.** The only Z-Image memory numbers are 8-bit: 30.1 GB MLX peak (bf16 33.7 GB), so most of the peak is probably the
+  load, not the steady state. With the chat model at 18 to 20 GB resident and the other roles, a 34 GB admission does not fit a 64 GB computer, and I could not
+  measure 4-bit today: the Stack's weights on the Studio were uninstalled by another session and the earlier bench copy is gone, so a run
+  needs a 24 GB download under the bench lock. Row IMGGEN-ZIT-P64 holds the measurement; nothing about p64 is guessed.
+- **The second model, anime and illustration.** Illustrious XL (or its NoobAI derivative; Pony V6 is older) is the right second model for the Civitai
+  anime and illustration LoRA library, installable in Models and storage, never the default. It needs the sd.cpp worker built (IMGGEN-SDXL-01, Large)
+  and the owner's acceptance of its licence (section 9 question b, now a Fair AI Public License share-alike term on derivative models, not only OpenRAIL).
+  Until then the Stack refuses these files with a sentence naming the family.
+
+### 16.3 What changed in the code (2026-10-17)
+
+- **Stack** (IMGGEN-DEFAULT-01): `defaultFamilyFor(tier)` picks Z-Image-Turbo on p128 when installed, else Klein; `GET /stack/v1/image` reports it as `default_model`;
+  the disk plan marks `pictures-zimage` `recommended` on p128 (label "Make pictures (Z-Image Turbo)") and renames the Klein row there "Quick pictures
+  and edits"; a LoRA still selects the base it was made for. LoRA detection reads Civitai-style files: a kohya-named Z-Image file
+  (`lora_unet_layers_N_attention`) is no longer mistaken for SDXL because of its `lora_unet_` prefix, a header that declares its base wins, and Pony, Illustrious,
+  NoobAI, FLUX.1 and Chroma files are refused with their family named. Not verified against real Civitai files (none was downloaded: the add flow takes a file the admin
+  saved, and fetching one was not part of this research); the detection is tested on synthetic headers.
+- **Home**: the Stack's plan drives the wizard and Models and storage, so the new default and sizes flow through with no Home change. The one Home gap found
+  is the add flow: Civitai is never fetched (no accounts, no phone-home), so an admin downloads the file, and 69 percent of popular Z-Image LoRAs exceed the 120 MB the form
+  and Bun's request cap allow. Settings, Pictures and videos now has "A file already on this computer": the admin types the path and the Stack reads it with the same
+  checks (audience unclear means adult-only, likeness and minor refusals, hash, base from the tensors).
+- **Unverified**: Z-Image-Turbo end to end through the Stack at the new default (the live Studio had its weights uninstalled during this session); a 4-bit/8-bit p64
+  run; any Chroma or SDXL speed on this Mac beyond section 3.3; real Civitai LoRA headers; the uncensored behaviour (by design nothing explicit was generated).
+
