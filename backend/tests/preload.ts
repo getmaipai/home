@@ -19,6 +19,19 @@ import type { StackFixture } from "./stackFixture";
 
 let defaultScriptedStack: StackFixture;
 
+// FLAKE-LOAD-01 (cause d, port collision): a test server started with `Bun.serve({ port: 0 })` and no hostname binds the
+// wildcard address, while every client dials 127.0.0.1. macOS lets another process bind 127.0.0.1 on the SAME port number
+// as a live wildcard listener (and the more specific bind wins for 127.0.0.1), so under parallel shards and other
+// sessions' tests a stub engine intermittently answered with another process's body ("wrong path", a truncated SSE stream
+// that surfaced as "the chat stream ended before the engine finished the reply", "engine dropped"). The spec package's
+// startStubLlmServer is one such caller. A test server with an OS-assigned port and no hostname now binds loopback only,
+// which is where it is always dialled; an explicit hostname or a fixed port is left untouched.
+{
+  const realServe = Bun.serve.bind(Bun) as unknown as (options: Record<string, unknown>) => unknown;
+  (Bun as unknown as { serve: unknown }).serve = (options: Record<string, unknown>) =>
+    realServe(options && options.port === 0 && options.hostname === undefined && options.unix === undefined ? { ...options, hostname: "127.0.0.1" } : options);
+}
+
 // SINGLE-INSTANCE-02 (#196): a hub booted by a test (or by a script a test
 // runs) has its own throwaway data directory and port, and must never
 // take, or be refused by, the machine-wide hub lock. Only tests set this.
