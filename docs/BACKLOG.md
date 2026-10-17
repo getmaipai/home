@@ -1197,6 +1197,8 @@ The org `CLAUDE.md` was cut from 1,003 to about 250 lines and its long rules mov
 
 ## Projects (2026-09-26)
 
+Design for the storybook shelf and bedtime mode: [stories](design/stories-2026-10-17.md) (2026-10-17).
+
 The harness design: a prompt becomes either a turn (unchanged) or a durable background project of typed recipe steps, per `docs/plans/harness-turns-and-projects-2026-09-26.md` (proposed, awaiting Jesse's read; nothing below starts before that read). The runner is Home host machinery; every project type is a catalog package shipping a recipe; hardware never branches the code, the per-model budget record and the Stack's governor do the sizing. The owner direction section (2026-09-26) sets the emphasis: the model-authored loop is the target, recipes are the skills half of the same substrate, and `plan_authoring` is gated by measurement only.
 
 - [x] **PROJECT-SPEC-01: the project record and recipe/step schemas** (M, spec-first, in `commons`). Objective: the design's project record (id, type, filled recipe, per-step state, artifacts with gate verdicts, provenance, clock stamps, terminal state) and the closed step vocabulary (`text`, `media`, `tool`, `assemble`, `gate`) as spec schemas with round-trip fixtures. Mirror: the manifest schema's own shape and fixtures. Out of scope: any runner code. Exit: commons `bash scripts/check.sh`. **Landed 2026-09-26: commons 5031401, tag spec-v0.1.40 (Codex lane from the coordinator-pinned brief; low review, zero findings, one pass; full commons gate green; the naming ruling, ProjectPlan not recipe, is in the commit message - a design-resolver pass for PROJECT-PKGTYPE-01 (2026-09-27) found this row's own claim that the ruling is also "in the design record" is wrong, corrected by that item's one-line addition to `docs/plans/harness-turns-and-projects-2026-09-26.md`).**
@@ -4459,6 +4461,8 @@ set with anything below bronze, which today it structurally can't check
 
 ## Skills (Tier 0 catalog)
 
+Design for the lists, reminders and timers app: [Household](design/household-lists-reminders-2026-10-17.md) (2026-10-17).
+
 Bundled today: `remember`, `recall`, `weather`, `define`, `joke`, `trivia`.
 All six are `kind: "plugin"` recipes (backend/packages/<name>/recipe.json),
 not `kind: "skill"`s in this repo's own architectural sense (a `SKILL.md`
@@ -4735,6 +4739,8 @@ alongside the first sourced skill, not before it.
 
 ## Integrations
 
+Design: [smart home through Home Assistant](design/smart-home-2026-10-17.md) (2026-10-17).
+
 - [ ] **Calendar** (L) - doesn't exist. Needs a design decision first:
       local-only entry within MaiPai vs. a real CalDAV/OAuth connection to
       an existing family calendar (Google/Apple/Nextcloud). See the
@@ -4800,6 +4806,8 @@ alongside the first sourced skill, not before it.
       data model to design from scratch.
 
 ## Generation (image, video)
+
+Design (person-facing half): [pictures people make](design/image-generation-2026-10-17.md) (2026-10-17); the engine half stays in `plans/hub-on-apple-silicon-2026-09-17.md`.
 
 - [ ] **ENGINE-HOST-03: Choose one foreground model for chat, intelligence,
       and coding** (S) - run the owner-ordered conversation, Session C coding,
@@ -7920,6 +7928,8 @@ Design: [the assistant layer plan](plans/assistant-layer-2026-10-04.md), note-le
 - [ ] **Proactive and ambient intelligence: superseded** (2026-10-04). The unprompted "GTA VI is out today" idea is now HEARTBEAT-01 (the morning note, silence when nothing changed), ERRAND-01 and PRICEWATCH-01, all under "Assistant layer" above, designed in [the assistant layer plan](plans/assistant-layer-2026-10-04.md). The skill-result caching idea (manifest `cache` and `warm` fields, plan 4.10) stays as a later recipe field, to be picked up once HEARTBEAT-01 shows it is needed.
 
 ## Portability and the link (hub <-> robot)
+
+Design (hub side): [devices and the robot link](design/devices-and-robot-link-2026-10-17.md) (2026-10-17).
 
 Plan chapter 7 (pairing, one oplog with HLCs, merge policies, the
 never-sync allowlist, adoption) and principle 3 (every record is the
