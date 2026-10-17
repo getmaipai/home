@@ -7,6 +7,8 @@ export interface SetupDownloadClient {
   modelCatalog(): Promise<Record<string, unknown>>;
   /** The Stack's own plan for this computer; absent on a Stack too old to have one. */
   installPlan?(query?: { vramGb?: number }): Promise<StackInstallPlan>;
+  /** Installs a pinned engine build (POST /stack/v1/engines/{name}/install). */
+  engineAction?(name: string, action: "install"): Promise<Record<string, unknown>>;
   pullModel(body: { id: string; role: string; repo?: string; url: string; sha256: string; approx_bytes?: number; licence: string; revision: string; engine?: string; archive?: boolean; hub_file?: string; component?: string }): Promise<Record<string, unknown>>;
 }
 
@@ -47,6 +49,15 @@ async function plannedPulls(client: SetupDownloadClient, vramGb?: number): Promi
 export async function startSetupDownloads(client: SetupDownloadClient = getStackClient(), options: { vramGb?: number } = {}): Promise<number> {
   // No number given: use the memory answer saved when the plan was chosen.
   const pulls = await plannedPulls(client, resolveMemoryGb(options.vramGb));
+  // Models are useless without the engine build that runs them: the Stack
+  // never fetches one on its own, so install each named engine first.
+  const engines = [...new Set(pulls.map((pull) => pull.engine).filter((name): name is string => Boolean(name)))];
+  if (client.engineAction) {
+    for (const name of engines) {
+      try { await client.engineAction(name, "install"); }
+      catch (error) { console.error(`Could not install the ${name} engine build. Chat stays paused until it is installed: press Try again in Settings, Engines. ${error instanceof Error ? error.message : String(error)}`); }
+    }
+  }
   let cursor = 0;
   const worker = async () => {
     while (cursor < pulls.length) {

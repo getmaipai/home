@@ -35,3 +35,17 @@ test("setup downloads start four jobs concurrently, chat first, and keep going a
   expect(starts).toHaveLength(5);
 });
 
+
+test("setup downloads install each named engine build before pulling models", async () => {
+  const order: string[] = [];
+  const client: SetupDownloadClient = {
+    modelCatalog: async () => ({ models: [
+      { id: "a", role: "chat", revision: "r", engine: "llama-server", download: { url: "https://example.invalid/a", sha256: "a".repeat(64) } },
+      { id: "b", role: "embed", revision: "r", engine: "llama-server", download: { url: "https://example.invalid/b", sha256: "a".repeat(64) } },
+    ] }),
+    engineAction: async (name, action) => { order.push(`${action}:${name}`); return {}; },
+    pullModel: async ({ id }) => { order.push(`pull:${id}`); return {}; },
+  };
+  await startSetupDownloads(client);
+  expect(order).toEqual(["install:llama-server", "pull:a", "pull:b"]);
+});
