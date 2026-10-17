@@ -124,7 +124,7 @@ setting, `stack.voice.engine` (`auto`, `chatterbox-turbo`, `pocket`; applies at 
 - **Licences recorded on the pins:** weights Apache-2.0 per the `mlx-community` card (the upstream ResembleAI card says MIT), `mlx-audio`
   code MIT, no watermark code in the MLX port; downloaded at install, never vendored. Reference-clip cloning is not in slice 1 (it needs
   S3TokenizerV2, 472 MB, pinned beside it).
-- **Orpheus:** not built. The registry has the slot (`orpheus`, `built: false`), the server script takes a new engine class, and the setting
+- **Orpheus:** not built, rejected by ear 2026-10-17. The registry has the slot (`orpheus`, `built: false`), the server script takes a new engine class, and the setting
   gains the option when its pins land.
 - **Home side (other agent):** nothing in Home changes for speech to work (same wire); composer tags and REG-02 read `tts.tags`.
 
@@ -134,11 +134,11 @@ After listening to the benchmark samples and the live Stack sample (`chatterbox_
 chose Chatterbox Turbo (MLX) as the Studio's voice. He picked the Chatterbox sample by ear.
 
 - Slice 1 is done and stands as built. The tags are live: the composer (REG-02) writes only the tags listed in `tts.tags`.
-- Orpheus stays an optional later slice (slice 2), built only if wanted.
+- Orpheus 3B was rejected by ear (owner, 2026-10-17: "was just bad"). It is not a candidate and not a later slice.
 - Pocket TTS stays the small-machine fallback.
 - Reference-clip cloning for Chatterbox stays later (slice 3, pins S3TokenizerV2).
 
 ## Next
 
 1. REG-02: tag vocabulary per engine (read `tts.tags`), tag passthrough test from `reply.speech` to the engine.
-2. Optional later: Orpheus (slice 2), reference-clip voices (slice 3).
+2. Optional later: reference-clip voices (slice 3).
