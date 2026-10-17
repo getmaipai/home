@@ -285,3 +285,11 @@ describe("the sandbox's own permission model (real deno run, no MCP involved)", 
     }
   });
 });
+
+describe("denoEnv", () => {
+  test("passes the install's DENO_DIR to the sandbox child and nothing else of the parent's", async () => {
+    const { denoEnv } = await import("@/lib/denoHost");
+    expect(denoEnv({ DENO_DIR: "/srv/home/data/deno", SECRET: "x" })).toEqual({ DENO_NO_PACKAGE_JSON: "1", DENO_DIR: "/srv/home/data/deno" });
+    expect(denoEnv({})).toEqual({ DENO_NO_PACKAGE_JSON: "1" });
+  });
+});

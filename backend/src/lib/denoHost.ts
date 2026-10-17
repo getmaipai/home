@@ -119,6 +119,14 @@ export function buildDenoRunArgs(sourceDir: string, dataDir: string, entry: stri
   return ["run", `--allow-read=${sourceDir},${dataDir}`, `--allow-write=${dataDir}`, "--cached-only", entry];
 }
 
+/** The child gets only this plus the SDK's small default set (no DENO_DIR), so the
+ * install's cache folder (scripts/install.sh fills it, the service sets DENO_DIR) is passed through. */
+export function denoEnv(source: Record<string, string | undefined> = process.env): Record<string, string> {
+  const env: Record<string, string> = { DENO_NO_PACKAGE_JSON: "1" };
+  if (source.DENO_DIR) env.DENO_DIR = source.DENO_DIR;
+  return env;
+}
+
 async function startProcess(id: string, manifest: PackageManifest, actor: PersonRow): Promise<SandboxProcess> {
   const sourceDir = resolvePackageDir(id);
   const dataDir = tier1PackageDataDir(id);
@@ -130,7 +138,7 @@ async function startProcess(id: string, manifest: PackageManifest, actor: Person
     // Bundled handlers use Deno's npm: specifiers from the global cache.
     // Deno 2.9 otherwise detects backend/package.json from cwd and expects
     // a Deno-managed node_modules tree, which Bun does not provide.
-    env: { DENO_NO_PACKAGE_JSON: "1" },
+    env: denoEnv(),
     cwd: sourceDir,
     stderr: "pipe",
   });

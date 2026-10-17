@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- A fresh install no longer starts with 12 built-in packages switched off (music, news, sports, the almanac set and the lookups). The installer now fetches their pinned Deno dependencies once, and Home reads them from its own cache folder. Closes #217.
+
 ## [0.2.1] - 2026-10-16
 
 A fresh install of 0.2.0 stopped at the dependency step. This release fixes that.

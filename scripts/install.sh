@@ -505,6 +505,35 @@ build_app() {
   log "Installing dependencies and building the frontend (this can take a minute)..."
   (cd "$dir/backend" && "$bun_bin" install --production)
   (cd "$dir/frontend" && "$bun_bin" install && "$bun_bin" run build)
+  prime_deno_cache "$dir"
+}
+
+# The built-in data packages run under Deno with --cached-only, so nothing
+# downloads while Home runs. That makes this the one place their pinned
+# dependencies (jsr: and npm: imports) are fetched, once, into a Deno cache
+# inside the install that the service points DENO_DIR at. Without it every
+# package that imports one fails its boot smoke test and starts switched off.
+# A missing Deno is not fatal: those packages stay off and Home says so.
+prime_deno_cache() {
+  local dir="$1" deno_bin cache="$1/data/deno" entry failed=0 n=0
+  deno_bin=$(command -v deno 2>/dev/null || true)
+  if [ -z "$deno_bin" ]; then
+    log "Deno is not installed, so the built-in data packages (music, news, sports and the almanac set) will stay off until it is. Install Deno from https://deno.com, then run the installer again."
+    return 0
+  fi
+  log "Fetching the pinned Deno dependencies for the built-in packages (one time)..."
+  mkdir -p "$cache" || { log "Could not create ${cache}; the built-in data packages may start switched off."; return 0; }
+  for entry in "$dir"/backend/packages/*/handler_test.ts; do
+    [ -f "$entry" ] || continue
+    n=$((n + 1))
+    DENO_NO_PACKAGE_JSON=1 DENO_DIR="$cache" "$deno_bin" cache --no-check "$entry" >/dev/null 2>&1 || failed=$((failed + 1))
+  done
+  if [ "$failed" -gt 0 ]; then
+    log "${failed} of ${n} built-in packages could not fetch their dependencies (no network to JSR or npm?). They start switched off; run the installer again when the network is back."
+  fi
+  if [ "${SERVICE_USER:-}" != "" ] && id "$SERVICE_USER" >/dev/null 2>&1; then
+    chown -R "$SERVICE_USER" "$cache" 2>/dev/null || true
+  fi
 }
 
 # Home runs as the unprivileged service account on Linux, inside a
@@ -559,6 +588,7 @@ WorkingDirectory=${dir}/backend
 Environment=NODE_ENV=production
 Environment=PORT=${port}
 Environment=MAIPAI_STACK_PORT=${stack_port}
+Environment=DENO_DIR=${dir}/data/deno
 ExecStart=${bun_bin} run start
 Restart=on-failure
 RestartSec=5
@@ -616,6 +646,7 @@ install_launchd_daemon() {
     <key>NODE_ENV</key><string>production</string>
     <key>PORT</key><string>${port}</string>
     <key>MAIPAI_STACK_PORT</key><string>${stack_port}</string>
+    <key>DENO_DIR</key><string>${dir}/data/deno</string>
   </dict>
   <key>RunAtLoad</key><true/>
   <key>KeepAlive</key><true/>

@@ -1271,6 +1271,34 @@ describe("Home service files carry both ports", () => {
       expect(text).toContain("<key>RunAtLoad</key><true/>");
       expect(text).toContain("<key>KeepAlive</key><true/>");
       expect(text).toContain(`${dir}/app/data/logs/launchd.err.log`);
+      expect(text).toContain(`<key>DENO_DIR</key><string>${dir}/app/data/deno</string>`);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("the installer fills the Deno cache the service reads, one package test at a time", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-deno-prime-"));
+    try {
+      mkdirSync(join(dir, "app/backend/packages/a"), { recursive: true });
+      mkdirSync(join(dir, "app/backend/packages/b"), { recursive: true });
+      writeFileSync(join(dir, "app/backend/packages/a/handler_test.ts"), "");
+      writeFileSync(join(dir, "app/backend/packages/b/handler_test.ts"), "");
+      mkdirSync(join(dir, "bin"));
+      const fake = join(dir, "bin/deno");
+      writeFileSync(fake, `#!/bin/bash\necho "$DENO_DIR $*" >> "${dir}/calls"\n`, { mode: 0o755 });
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; prime_deno_cache "${dir}/app"`], { env: { ...process.env, PATH: `${dir}/bin:${process.env.PATH}` } });
+      expect(result.exitCode).toBe(0);
+      const calls = readFileSync(join(dir, "calls"), "utf8").trim().split("\n");
+      expect(calls).toHaveLength(2);
+      for (const call of calls) expect(call).toStartWith(`${dir}/app/data/deno cache `);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test("without Deno the installer says what stays off and does not fail", () => {
+    const dir = mkdtempSync(join(tmpdir(), "maipai-deno-missing-"));
+    try {
+      const result = Bun.spawnSync(["bash", "-c", `source "${INSTALL_SH}"; PATH=/usr/bin:/bin; prime_deno_cache "${dir}/app"`]);
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout.toString() + result.stderr.toString()).toContain("Deno is not installed");
     } finally { rmSync(dir, { recursive: true, force: true }); }
   });
 
