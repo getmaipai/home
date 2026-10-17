@@ -53,6 +53,12 @@ function stubFetch(
       onCommand(deviceCommand[1]!, JSON.parse(String(init?.body)) as unknown);
       return Promise.resolve(new Response(JSON.stringify({ id: "command-1" }), { status: 202 }));
     }
+    const scopeEdit = url.match(/\/api\/devices\/([^/]+)\/offline-scope$/);
+    if (scopeEdit && method === "PATCH") {
+      const { offline_scope } = JSON.parse(String(init?.body)) as { offline_scope: DeviceInfo["offlineScope"] };
+      deviceRows = deviceRows.map((row) => row.id === scopeEdit[1] ? { ...row, offlineScope: offline_scope } : row);
+      return Promise.resolve(Response.json({ success: true }));
+    }
     const deviceDelete = url.match(/\/api\/devices\/([^/]+)$/);
     if (deviceDelete && method === "DELETE") {
       onAction("device", deviceDelete[1]!);
@@ -486,4 +492,16 @@ describe("DevicesSection", () => {
     expect(view.queryByTestId("robot-live-view")).toBeNull();
     expect(view.getByRole("button", { name: "Live view" })).toBeTruthy();
   });
+});
+
+test("a device owner can toggle offline permission and sees Remove all for this browser", async () => {
+  const restore = stubFetch([device({ offlineScope: [] })], []);
+  try {
+    const view = renderSection();
+    const permission = await view.findByRole("switch", { name: "Can keep media on this device" });
+    expect(permission).not.toBeChecked();
+    fireEvent.click(permission);
+    await waitFor(() => expect(permission).toBeChecked());
+    expect(view.getByRole("button", { name: "Remove all offline copies" })).toBeInTheDocument();
+  } finally { restore(); }
 });

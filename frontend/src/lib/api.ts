@@ -1,3 +1,4 @@
+import { removeAllOfflineMedia } from "@/lib/offlineMedia";
 import type { StatusAppsWire, AppRow as AppRowWire } from "@maipai/home-backend/src/wire";
 import type { RobotState } from "@maipai/spec/gen/ts/robot-state.js";
 import type { StackFitPlan } from "@maipai/spec/gen/ts/stack-fit-plan.js";
@@ -258,6 +259,7 @@ export interface DeviceInfo {
   createdAt: string;
   capabilities: string[];
   /** ROBOT-CARD-01: robots only; `null` until the first report. */
+  offlineScope?: Array<"media.offline" | "offline.records">;
   state?: RobotDeviceState | null;
 }
 // ROBOT-CARD-01: the robot's last reported frame plus the hub's derived
@@ -541,6 +543,8 @@ function isAbortError(err: unknown): boolean {
 // the interpreter needs the same request plumbing (credentials,
 // timeout, error shape) directly rather than duplicating it.
 export async function request<T>(path: string, init?: RequestInit & { timeoutMs?: number }): Promise<T> {
+  // A shared browser must discard the previous person's copies before any sign-in or sign-out.
+  if (path.startsWith("/api/auth/") && init?.method && init.method !== "GET") await removeAllOfflineMedia();
   const { timeoutMs, ...rest } = init ?? {};
   const { signal, clear } = withTimeout(timeoutMs);
   try {
@@ -560,6 +564,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
+      if (res.status === 401) await removeAllOfflineMedia();
       throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined);
     }
     return body as T;
@@ -808,6 +813,8 @@ export const api = {
   // household-wide admin view"), the same personal-Profile-page scope
   // PIN/password change already has.
   devices: () => request<DeviceInfo[]>("/api/devices"),
+  setDeviceOfflineScope: (id: string, offline_scope: Array<"media.offline" | "offline.records">) =>
+    request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}/offline-scope`, { method: "PATCH", body: JSON.stringify({ offline_scope }) }),
   revokeDevice: (id: string) =>
     request<{ success: true }>(`/api/devices/${encodeURIComponent(id)}`, { method: "DELETE" }),
   // ROBOT-DEVICE-01: "Add a robot" - discover a unit on the LAN, then

@@ -78,11 +78,56 @@ describe("sw.ts (getmaipai/home#90): Firefox gets zero 'fetch' listeners, not on
     );
     expect(firefoxListeners.listenersByType.get("fetch") ?? []).toHaveLength(0);
 
+    for (const [name, ua] of [
+      ["safari", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 Version/18.0 Safari/605.1.15"],
+      ["ios", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Version/18.0 Mobile/15E148 Safari/604.1"],
+      ["crios", "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 CriOS/128.0.0.0 Mobile Safari/604.1"],
+    ] as const) {
+      const webkit = await loadSwWithUserAgent(ua, `ua=${name}`);
+      expect(webkit.listenersByType.get("fetch") ?? []).toHaveLength(0);
+    }
+
     const chromiumListeners = await loadSwWithUserAgent(
       "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36",
       "ua=chromium",
     );
     expect((chromiumListeners.listenersByType.get("fetch") ?? []).length).toBeGreaterThan(0);
+  });
+
+  test("Chromium offline file requests use the explicit bucket, honour Range, and download bypasses the cache", async () => {
+    const { fakeSelf, listenersByType } = await loadSwWithUserAgent("Mozilla/5.0 Chrome/128.0.0.0 Safari/537.36", "cached-file");
+    Object.assign(fakeSelf, { location: { origin: "https://example.com" } });
+    const previousSelf = (globalThis as { self?: unknown }).self;
+    const previousCaches = globalThis.caches;
+    const previousFetch = globalThis.fetch;
+    (globalThis as { self?: unknown }).self = fakeSelf;
+    let network = 0;
+    let bucket = "";
+    Object.assign(globalThis, { caches: { open: async (name: string) => {
+      bucket = name;
+      return { match: async () => new Response("0123456789", { headers: { ETag: '\"fp\"', "Content-Length": "10" } }) };
+    } }, fetch: async () => { network++; return new Response("network"); } });
+    try {
+      const listener = listenersByType.get("fetch")![0] as (event: unknown) => void;
+      const call = async (url: string, headers: Record<string, string> = {}) => {
+        let response: Promise<Response> | undefined;
+        listener({ request: new Request(url, { headers }), respondWith: (value: Promise<Response>) => { response = value; } });
+        return response ? await response : null;
+      };
+      const url = "https://example.com/api/media/offline/file/media/media-nova00";
+      expect(await (await call(url))!.text()).toBe("0123456789");
+      const partial = await call(url, { Range: "bytes=2-4", "If-Range": '\"fp\"' });
+      expect(partial!.status).toBe(206); expect(await partial!.text()).toBe("234");
+      expect((await call(url, { Range: "bytes=2-4", "If-Range": '\"old\"' }))!.status).toBe(200);
+      expect((await call(url, { Range: "bytes=99-100" }))!.status).toBe(416);
+      expect(await call(url + "?download=1")).toBeNull();
+      expect(await call("https://example.com/api/media/items")).toBeNull();
+      expect(await call("https://other.example.com/api/media/offline/file/media/media-nova00")).toBeNull();
+      expect(bucket).toBe("maipai-media-v1"); expect(network).toBe(0);
+    } finally {
+      (globalThis as { self?: unknown }).self = previousSelf;
+      Object.assign(globalThis, { caches: previousCaches, fetch: previousFetch });
+    }
   });
 
   test("a new worker skips waiting on install (home#128)", async () => {

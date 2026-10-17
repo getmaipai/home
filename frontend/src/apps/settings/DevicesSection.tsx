@@ -6,6 +6,9 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { EmptyState } from "@maipai/ui/src/primitives/EmptyState";
 import { Badge } from "@maipai/ui/src/ui/badge";
 import { Button } from "@maipai/ui/src/ui/button";
+import { Switch } from "@maipai/ui/src/ui/switch";
+import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
+import { listKept, removeAllOfflineMedia } from "@/lib/offlineMedia";
 import { Card } from "@maipai/ui/src/dashboard/components/ui/card";
 import { RobotBody } from "@/apps/settings/RobotBody";
 import { api, ApiError, type DeviceInfo, type SessionInfo } from "@/lib/api";
@@ -32,6 +35,7 @@ const DEVICE_KIND_LABELS: Record<DeviceInfo["kind"], string> = {
 export function DevicesSection() {
   const queryClient = useQueryClient();
   const devicesQuery = useQuery<DeviceInfo[]>({ queryKey: ["devices"], queryFn: () => api.devices(), refetchInterval: 5000 });
+  const keptQuery = useQuery({ queryKey: ["offline-media"], queryFn: listKept });
   const sessionsQuery = useQuery<SessionInfo[]>({ queryKey: ["sessions"], queryFn: () => api.sessions() });
   const [confirming, setConfirming] = useState<{ kind: "device" | "session"; id: string; label: string } | null>(null);
   const [busy, setBusy] = useState(false);
@@ -57,9 +61,22 @@ export function DevicesSection() {
     }
   }
 
+  async function setOffline(device: DeviceInfo, enabled: boolean) {
+    setBusy(true);
+    setActionError(null);
+    try {
+      const scopes: NonNullable<DeviceInfo["offlineScope"]> = (device.offlineScope ?? []).filter((scope) => scope !== "media.offline");
+      if (enabled) scopes.push("media.offline");
+      await api.setDeviceOfflineScope(device.id, scopes);
+      await devicesQuery.refetch();
+    } catch {
+      setActionError("The offline permission could not be saved. Check your connection, then try again.");
+    } finally { setBusy(false); }
+  }
+
   return (
     <>
-      {actionError ? <p className="text-base text-destructive">{actionError}</p> : null}
+      {actionError ? <Alert variant="destructive"><AlertDescription>{actionError}</AlertDescription></Alert> : null}
 
       <Section heading="Devices">
         <AsyncState
@@ -81,6 +98,10 @@ export function DevicesSection() {
               <div className="flex flex-col gap-4">
               {robots.map((r) => (
                 <Card key={r.id} data-testid="robot-card">
+                <label>
+                  <Switch checked={r.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(r, checked)} />
+                  Can keep media on this device
+                </label>
                 <RobotBody
                   device={r}
                   busy={busy}
@@ -119,6 +140,10 @@ export function DevicesSection() {
                         {d.area ? `${d.area} · ` : ""}
                         {d.lastSeenAt ? `last seen ${whenText(d.lastSeenAt)}` : "never connected"}
                       </span>
+                      <label>
+                        <Switch checked={d.offlineScope?.includes("media.offline") ?? false} disabled={busy} onCheckedChange={(checked) => void setOffline(d, checked)} />
+                        Can keep media on this device
+                      </label>
                     </div>
                   );
                 }}
@@ -148,6 +173,19 @@ export function DevicesSection() {
             );
           }}
         </AsyncState>
+      </Section>
+
+      <Section heading="Copies in this browser">
+        <p>Saved files on the hub still work when the internet is down. Copies here let this browser play when it cannot reach the hub.</p>
+        <AsyncState data={keptQuery.data} error={keptQuery.isError} isFetching={keptQuery.isFetching} onRetry={() => keptQuery.refetch()} errorMessage="Copies could not be listed. Try again." loadingLabel="Loading copies">
+          {(items) => items.length ? <List items={items} getKey={(item) => item.id} label="Offline copies" renderItem={(item) => <span>{item.title}</span>} /> : <EmptyState icon="inbox" text="No media kept in this browser." />}
+        </AsyncState>
+        <Button variant="destructive" disabled={busy} onClick={async () => {
+          setBusy(true);
+          try { await removeAllOfflineMedia(); await keptQuery.refetch(); }
+          catch { setActionError("Offline copies could not be removed. Try again in this browser."); }
+          finally { setBusy(false); }
+        }}>Remove all offline copies</Button>
       </Section>
 
       <Section heading="Signed-in sessions">

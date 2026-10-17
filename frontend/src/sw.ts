@@ -30,6 +30,7 @@
 //   a handler), so Firefox was still getting precache interception for
 //   every JS/CSS/font/icon request even though this comment claimed
 //   otherwise. Skipped entirely on Firefox now, below.
+// - WebKit also gets no fetch handler: interception breaks background media.
 // - Everywhere else, the built JS/CSS/font/icon assets are precached and
 //   served cache-first by `precacheAndRoute` below, unchanged from
 //   workbox's own default - correct because Vite's filenames are content-
@@ -67,12 +68,42 @@ import { precacheAndRoute, cleanupOutdatedCaches, matchPrecache } from "workbox-
 declare const self: ServiceWorkerGlobalScope;
 
 const OFFLINE_URL = "/offline.html";
-const PASSTHROUGH = /\bFirefox\//.test(self.navigator?.userAgent ?? "");
+const UA = self.navigator?.userAgent ?? "";
+const CHROMIUM = /\b(?:Chrome|Chromium|Edg)\//.test(UA) && !/iPhone|iPad|iPod/.test(UA);
+const PASSTHROUGH = /\bFirefox\//.test(UA) || (/AppleWebKit\//.test(UA) && !CHROMIUM);
 
 if (!PASSTHROUGH) {
   self.addEventListener("fetch", (event: FetchEvent) => {
     const req = event.request;
-    if (req.method !== "GET" || req.mode !== "navigate") return;
+    if (req.method !== "GET") return;
+    const url = new URL(req.url);
+    if (CHROMIUM && url.origin === self.location.origin && url.pathname.startsWith("/api/media/offline/file/") && !url.searchParams.has("download")) {
+      // Only explicitly kept full copies enter this bucket. A network miss is never saved automatically.
+      // Slicing a full cached response supports media players' Range requests without caching 206 responses.
+      event.respondWith(caches.open("maipai-media-v1").then(async (cache) => {
+        const cached = await cache.match(req.url);
+        if (!cached) return fetch(req);
+        const range = req.headers.get("range");
+        const ifRange = req.headers.get("if-range");
+        if (!range || (ifRange && ifRange !== cached.headers.get("etag") && ifRange !== cached.headers.get("last-modified"))) return cached;
+        const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+        if (!match || (!match[1] && !match[2])) return cached;
+        const blob = await cached.blob();
+        const start = match[1] ? Number(match[1]) : Math.max(0, blob.size - Number(match[2]));
+        const end = match[1] && match[2] ? Math.min(Number(match[2]), blob.size - 1) : blob.size - 1;
+        const headers = new Headers(cached.headers);
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(end) || start > end || start >= blob.size) {
+          headers.set("Content-Range", `bytes */${blob.size}`);
+          headers.delete("Content-Length");
+          return new Response(null, { status: 416, headers });
+        }
+        headers.set("Content-Range", `bytes ${start}-${end}/${blob.size}`);
+        headers.set("Content-Length", String(end - start + 1));
+        return new Response(blob.slice(start, end + 1), { status: 206, headers });
+      }));
+      return;
+    }
+    if (req.mode !== "navigate") return;
     // `matchPrecache`, not a bare `caches.match(OFFLINE_URL)`: a precached
     // entry's real cache key carries a `?__WB_REVISION__=...` query param
     // workbox adds itself, so a plain string match against the clean URL
