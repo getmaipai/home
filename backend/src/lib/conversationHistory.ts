@@ -2279,6 +2279,14 @@ function withPicturesNote(text: string, images: readonly ChatImagePart[]): strin
   return images.length > 0 ? `${text}\n\n${picturesWindowNote(images)}` : text;
 }
 
+/** What the window says about an earlier picture or video turn: the tool was called and started the job, so a later
+ * turn knows that saying a picture is coming goes with calling the tool. */
+function mediaToolNote(pluginId: string | null): string | null {
+  if (pluginId === "generate_image") return "[The Make a Picture tool was called for this message and started the picture the reply speaks of.]";
+  if (pluginId === "generate_video") return "[The Make a Video tool was called for this message and started the video the reply speaks of.]";
+  return null;
+}
+
 function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
   // UPLOAD-IMG-02: an earlier message's pictures stay a known, unseen
   // fact in the window (chatImageNote.ts), so a follow-up never reads as
@@ -2294,7 +2302,11 @@ function turnTextMessages(t: ConversationTurnRow): LlmMessage[] {
   // turn it describes: the person's message, under the note label, never
   // the assistant's words (item 1b, Fix B3) and never a mid-history system
   // message.
-  if (modelTurn && !t.guardReason) return [{ role: "user", content: userText }, { role: "assistant", content: redactCredentials(t.replyText) }];
+  // A picture or video turn replays with a note that the tool ran. Without it the window held only the model's own
+  // "it is on its way, it appears below" and the model, several picture turns in, wrote that line again on a turn
+  // where it never called the tool (found by the generation QA, 2026-10-17: a reply claimed a picture and no job existed).
+  const mediaNote = modelTurn && !t.guardReason && t.source === "plugin" ? mediaToolNote(t.pluginId) : null;
+  if (modelTurn && !t.guardReason) return [{ role: "user", content: mediaNote ? `${userText}\n\n${foldedBlock(mediaNote)}` : userText }, { role: "assistant", content: redactCredentials(t.replyText) }];
   const note = modelTurn ? guardedTurnNote(t) : nonModelWindowNote(t);
   return [{ role: "user", content: `${userText}\n\n${foldedBlock(note)}` }];
 }

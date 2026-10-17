@@ -1651,6 +1651,23 @@ describe("buildConversationWindow() (step 3)", () => {
     expect(window.messages.some((m) => m.content.includes("answered:"))).toBe(false);
   });
 
+  // Generation QA, 2026-10-17: after several picture turns the model wrote "your picture is on its way, it appears
+  // below" on a turn where it never called generate_image (no job existed). The window held only its own earlier
+  // reply for those turns, so the line looked like something it could say without the call.
+  test("an earlier picture or video turn replays with a note that the tool was called, and the model's own reply stays", async () => {
+    const { actor } = await owner();
+    const conv = resolveOrCreateConversation(actor, "chat");
+    if (!conv.ok) throw new Error(conv.error);
+    logTurn(actor, "chat", "draw a lighthouse at dusk", { reply: { text: "Your lighthouse is on its way." }, source: "plugin", plugin_id: "generate_image", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-media-note-1" });
+    logTurn(actor, "chat", "make a video of a paper boat", { reply: { text: "Your video is on its way." }, source: "plugin", plugin_id: "generate_video", routing: { tier: "tool", score: 1 }, safety: SAFE, conversation_id: conv.value.id, turn_id: "turn-media-note-2" });
+    const window = await buildConversationWindow(conv.value);
+    const picture = window.messages.find((m) => m.role === "user" && m.content.includes("draw a lighthouse at dusk"));
+    const video = window.messages.find((m) => m.role === "user" && m.content.includes("make a video of a paper boat"));
+    expect(picture!.content).toContain("Make a Picture tool was called");
+    expect(video!.content).toContain("Make a Video tool was called");
+    expect(window.messages.some((m) => m.role === "assistant" && m.content === "Your lighthouse is on its way.")).toBe(true);
+  });
+
   test("a guard-replaced reply after a tool call is still quoted as a note, never given back as the assistant's words", async () => {
     const { actor } = await owner();
     const conv = resolveOrCreateConversation(actor, "chat");
