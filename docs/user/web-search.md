@@ -35,7 +35,7 @@ When you search, MaiPai sends your search words to your SearXNG. It does not nee
 
 ## Add DuckDuckGo as a second source (optional)
 
-SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. It is off unless you set it up, and only adults use it. Children, teens and guests always use SearXNG alone.
+SearXNG stays your main search. You can also add DuckDuckGo, and MaiPai blends both lists into one. If SearXNG could not be set up during setup, DuckDuckGo is turned on for you, and you can turn it off under **Settings**, then **Search**. It only works once its small search service is running, and only adults use it. Children, teens and guests always use SearXNG alone.
 
 1. Start the small search service that comes with MaiPai. In the `scripts/ddgs-sidecar` folder, create its environment with `python3 -m venv .venv`, install with `.venv/bin/pip install -r requirements.txt`, then run `.venv/bin/python server.py`.
 2. Tell MaiPai where it is by setting `MAIPAI_DDGS_URL` to `http://127.0.0.1:8793` and restarting MaiPai.

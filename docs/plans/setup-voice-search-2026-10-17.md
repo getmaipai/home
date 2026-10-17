@@ -12,7 +12,7 @@ best belongs"). Not accepted until the architect rules and Jesse answers the one
 | Microphone permission | Asked by the browser at first use (`frontend/src/lib/voice/mic-capture.ts`). It needs a click and a secure page, so it cannot be done in setup. |
 | Web search, Stack-owned SearXNG | **Missing.** STACK-SEARCH-01 is in the Stack repo and not built (plan note, 2026-10-13). With `search.searxng_url` empty, `requireSearxngSettings()` in `backend/src/lib/packageHost.ts` throws, so a new household has no web search. |
 | Web search, row 12 and "Use it" | Built. `searchRows` in `backend/src/setup/checks/checks.ts` probes loopback 8888 and 8080 and the plan page offers a found instance; it never writes the setting without the click (rule 11). The row is hidden on Checks (`CheckGrid.tsx`). |
-| ddgs | Built as an adults-only second source (SEARCH-DDGS-01), but it needs a hand-run sidecar (`scripts/ddgs-sidecar`, `MAIPAI_DDGS_URL`). STACK-DDGS-01 (Stack supervises it) is open. It is off by default by the owner's ruling of 2026-10-11 (THIRD-PARTY-SERVICES.md). |
+| ddgs | Built as an adults-only second source (SEARCH-DDGS-01), but it needs a hand-run sidecar (`scripts/ddgs-sidecar`, `MAIPAI_DDGS_URL`). STACK-DDGS-01 (Stack supervises it) is open. It was off by default (ruling of 2026-10-11); Jesse ruled it ON by default for adults on 2026-10-17 (see Ruling). |
 | Own SearXNG address field, Test | The checker exists (`checkSearchInstance`, `GET /api/search/instance`, `/apply`). The setup flow has no address field. |
 
 ## Decision
@@ -37,8 +37,10 @@ install or ask. Turning voice off belongs to SETUP-PLAN-CUSTOMIZE-01, not a new 
    - Buttons: "Use it" and "Skip for now". "Use it" extends the existing `POST /search/use-candidate` in `backend/src/routes/setup.ts` (no new route): the same no-people-yet guard and the same checker pass before saving. Its host test widens from loopback ports 8888 and 8080 to what a typed address may be: `http` or `https`, no credentials in the URL, and a host that is loopback, a private network address (10.x, 172.16 to 31.x, 192.168.x) or a `.local` name. Public hosts, link-local and metadata addresses (169.254.x) are refused with "Use a search service on your home network." A found-on-this-computer instance still goes through the same route.
    - Skip leaves Home answering from its offline library and the model's own knowledge (the existing degrade path). The
      fix later is Settings, Web search (SEARXNG-SET-05).
-3. *Alternatives (ddgs).* Not switched on silently. See the open question. Until STACK-DDGS-01 lands there is no sidecar to
-   enable, so the screen cannot offer ddgs honestly.
+3. *Alternatives (ddgs).* On by default for adults when SearXNG could not be set up (ruling below). The screen says so in one
+   line, and "Use it" and "Skip for now" both write `search.web_sources` as `["searxng", "ddgs"]`. Until STACK-DDGS-01 lands
+   there is no helper, so DuckDuckGo stays unbuilt and answers nothing (`webSourcesFor` drops an unbuilt source); the
+   privacy row shows only while the helper runs. An admin turns it off under Settings, Search.
 4. *Ordering.* The fallback screen is useful now (it is exactly today's state) and disappears by itself once STACK-SEARCH-01
    makes row 12 green. Build it first.
 
@@ -52,15 +54,16 @@ the Stack, asked only on failure", replacing the one-line "Use it" on the plan p
 - Rule 0: `search.web_sources` is an admin-only household setting. Setup does not run as an admin: the setup routes refuse once anyone exists (`people` has a row), and the fallback keeps that guard. No conflict. Children and
   teens remain SearXNG-only, so without SearXNG they have no web search even if ddgs is on for adults.
 - Rule 6: no wording of the answer changes; the degrade path is unchanged.
-- **Conflict to name, not drop:** enabling ddgs by default contradicts THIRD-PARTY-SERVICES.md ("off by default, adults
-  only", owner's ruling 2026-10-11). It is not a RULES.md rule, but only Jesse changes it.
+- ddgs by default: this contradicted THIRD-PARTY-SERVICES.md ("off by default", ruling 2026-10-11). Jesse reversed it on
+  2026-10-17 (see Ruling). It is not a RULES.md rule and RULES.md says nothing on ddgs. The age and surface gates are unchanged.
 - Privacy (PRIVACY.md): the fallback adds no outbound connection; Test calls the address the person typed. The ddgs and
   SearXNG privacy rows exist; the Stack's install hosts need rows in the STACK-SEARCH-01 commit.
 
-## Open question for Jesse
+## Ruling (Jesse, 2026-10-17, in chat)
 
-Should ddgs (DuckDuckGo, adults only, through a Stack-run helper) switch on by default when SearXNG could not be set up,
-or stay off until an admin turns it on?
+When SearXNG cannot be set up, the built-in DuckDuckGo source (ddgs, adults only) turns ON by default. This reverses the
+2026-10-11 "off by default". Children, teens and guests stay SearXNG-only (age and surface gates outrank everything).
+Recorded in THIRD-PARTY-SERVICES.md and PRIVACY.md (`.github/docs`). Owner-approved: 2026-10-17.
 
 ## Supersedes
 
@@ -72,4 +75,4 @@ or stay off until an admin turns it on?
 APPROVED with four amendments, applied above: (1) extend `POST /search/use-candidate` and state the allowed hosts;
 (2) correct the rule 0 line; (3) list what the fallback replaces under Supersedes; (4) SETUP-SEARCH-03 depends on
 SEARXNG-SET-02 and wires the existing `stackSearchState` hook. Ruled 2026-10-17 against RULES.md rules 0, 6, 9 and 11. The
-ddgs-by-default question stays open and is Jesse's alone.
+ddgs-by-default question was answered by Jesse on 2026-10-17 (Ruling): on by default for adults.
