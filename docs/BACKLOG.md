@@ -23,6 +23,13 @@ decision history live in `docs/dev.md` and the records under `docs/plans/` and `
     Design: [setup-voice-search-2026-10-17](plans/setup-voice-search-2026-10-17.md)
 - [ ] **DATA-WEATHER-CATALOG-01:** Port Home's weather package updates (0.1.1, model-selected routing, household home-place warming and privacy copy, and current/hourly/7-day forecast blocks) to `getmaipai/catalog/plugins/utilities/weather`, verify the package there, then refresh Home's bundled copy from catalog.
 
+## Tests and gates
+
+- [ ] **TEST-ENV-01: the full gate and a few tests need Playwright's Chromium, which the Mac Studio lacks** (S). `check.sh` stops at `frontend: a11y` and one frontend test errors with "Executable doesn't exist" (`~/Library/Caches/ms-playwright/chromium_headless_shell-1243`). Baseline 2026-10-17: the same on v0.2.5. Fix: `bunx playwright install chromium` on the gate machine, or have the gate say so in plain words and skip.
+- [ ] **TEST-LOAD-01: eight frontend tests pass alone and fail inside the full run on a loaded machine** (S). UsersPage (non-admin denial), ChatPage.calmErrors (Send waits for the engine, 17 s), UsersSection.companions (2), VoiceBrowserSection (service down), chatChildLinks (touch citation, 14 s) and the setup preview bundle test (120 s vite build). Cause not proven: load average 8 to 15 from other sessions. Check: rerun the full suite with nothing else running; raise or remove the per-test timeouts that are hit.
+- [ ] **TEST-DENO-01: with Deno on PATH, `runAllSmokeTests` reports 12 failed bundled packages** (S). Without Deno they are skipped, so the test passes only on a machine with no Deno. Likely cause: the offline Deno cache is not primed in a worktree (`prime_deno_cache` in `install.sh`). Check: run `deno test --cached-only` in one failing package and read the message.
+- [ ] **TEST-POLLUTION-01: Bun runs every test file in one process, so a global left behind fails unrelated files** (S). The chatArt test left a throwing `localStorage` and failed about 100 later frontend tests (fixed 2026-10-17, 0f498dc4). Add a lint or a shared reset that fails a file that leaves `globalThis.localStorage` changed.
+
 ## Engines: another computer at home
 
 - [ ] **SETUP-SEARCH-REMOTE-PROBE-01: Stack-side search probe for a remote engine** (S, after STACK-SEARCH-01). The hub cannot reach the remote engine computer's loopback. Add a Stack-side probe through the Stack's supported interface; do not scan the network. Reuse the one SearXNG checker semantics without adding a second Home checker.
