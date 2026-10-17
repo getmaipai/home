@@ -48,6 +48,7 @@ const FamilyPage = lazyNamed(() => import("@/shell/pages/FamilyPage"), "FamilyPa
 const ProjectsPage = lazyNamed(() => import("@/shell/pages/ProjectsPage"), "ProjectsPage");
 const PersonProfilePage = lazyNamed(() => import("@/shell/pages/PersonProfilePage"), "PersonProfilePage");
 const StoragePage = lazyNamed(() => import("@/shell/pages/StoragePage"), "StoragePage");
+const TrashPage = lazyNamed(() => import("@/shell/pages/TrashPage"), "TrashPage");
 const PerformancePage = lazyNamed(() => import("@/shell/pages/PerformancePage"), "PerformancePage");
 const TurnTracePage = lazyNamed(() => import("@/shell/pages/TurnTracePage"), "TurnTracePage");
 const UpdatesPage = lazyNamed(() => import("@/shell/pages/UpdatesPage"), "UpdatesPage");
@@ -254,6 +255,7 @@ function RoutesWithIncognito({ person, onPersonChange, onSignedOut }: { person: 
               heading, so these routes sit beside chat, outside
               PageHeaderLayout. `/settings` and every old `?tab=` link
               replace to the page that holds them now; `/customize` is gone. */}
+          <Route path="storage/trash" element={<TrashPage person={person} />} />
           <Route path="settings" element={<SettingsEntryRedirect person={person} />} />
           <Route path="settings/:area/:section?" element={<Suspense fallback={<RouteSkeleton />}><SettingsAreaPage person={person} onPersonChange={onPersonChange} /></Suspense>} />
           {/* ENGINES-AI-01: the Manage pages that moved into Home settings are links that land on their section. */}

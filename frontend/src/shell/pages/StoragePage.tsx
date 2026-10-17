@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -177,6 +178,7 @@ function StorageContent({ data, person, isAdmin, cacheRows, cacheLoading, clearA
           </CardContent>
         </Card>
       ) : null}
+      <Button variant="outline" nativeButton={false} render={<Link to="/storage/trash" />}>Trash</Button>
       <DataTable {...model} toolbar={<DataTableControls model={model} />} caption="Storage usage by person" getRowId={(row) => row.person} />
       {isAdmin ? <>
         <SettingsRenderer scope="household" scopeValue="household" only={["household.storage"]} />
