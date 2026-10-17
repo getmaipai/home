@@ -7,6 +7,10 @@ import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import sharp from "sharp";
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { people as peopleTable } from "@/db/schema";
+import { AI_SETTINGS_KEYS } from "@/settings/aiKeys";
 import { resetDb } from "../reset-db";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -18,7 +22,7 @@ import { setHouseholdSettingValue, setValue } from "@/lib/settings";
 import { runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { contextToMessages } from "@/lib/turnMachine/messages";
 import { markPicturesShown, messagesCarryPictures, pictureRetryAllowed, withoutPictures } from "@/lib/turnMachine/nodes/model";
-import { __setChatPictureCapabilityForTests, chatModelReadsPictures, picturePartsAllowed } from "@/lib/chatPictures";
+import { __setChatPictureCapabilityForTests, chatModelReadsPictures, photoUploadsAllowed, picturePartsAllowed } from "@/lib/chatPictures";
 import { toWireMessage, type LlmImagePart, type LlmMessage } from "@/lib/llm";
 import { countTokens } from "@/lib/tokenCount";
 import { storeTemporaryChatImage } from "@/lib/attachments";
@@ -119,6 +123,18 @@ describe("VISION-02c: picture parts for a chat model that reads pictures", () =>
     expect(picturePartsAllowed(ON, people.child)).toBe(true);
     expect(picturePartsAllowed(ON, people.owner)).toBe(true);
     expect(picturePartsAllowed({ imageParts: false, pictureTokensMax: null }, people.owner)).toBe(false);
+  });
+
+  test("owner ruling 2026-10-17: a teen sends picture parts by default; the setting default is on, a parent can turn it off, a teen can too", () => {
+    db.update(peopleTable).set({ role: "teen" }).where(eq(peopleTable.id, people.child.id)).run();
+    const teen = db.select().from(peopleTable).where(eq(peopleTable.id, people.child.id)).get()!;
+    expect(AI_SETTINGS_KEYS.find((k) => k.key === "chat.photo_uploads")?.default).toBe(true);
+    expect(photoUploadsAllowed(teen)).toBe(true);
+    expect(picturePartsAllowed(ON, teen)).toBe(true);
+    expect(setValue(people.owner, `person:${teen.id}`, "chat.photo_uploads", false).ok).toBe(true);
+    expect(picturePartsAllowed(ON, teen)).toBe(false);
+    expect(setValue(teen, `person:${teen.id}`, "chat.photo_uploads", true).ok).toBe(true);
+    expect(picturePartsAllowed(ON, teen)).toBe(true);
   });
 
   test("an adult with photo uploads turned off sends no picture parts", () => {

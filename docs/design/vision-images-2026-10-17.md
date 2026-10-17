@@ -13,7 +13,7 @@ The pipeline is built end to end and waits on one fact, whether the running chat
 | Piece | Where | State |
 |---|---|---|
 | Attachment upload, storage, a picture part to the model | VISION-02c, `backend/src/lib/chatPictures.ts`, `chatImageNote.ts` | Landed. Sends OpenAI `image_url` parts (stored picture as a data URL) to the local engine only |
-| The gate: who may send photos | `photoUploadsAllowed`: capability `upload.photo`, setting `chat.photo_uploads`, a child only after a parent turned it on | Landed |
+| The gate: who may send photos | `photoUploadsAllowed`: capability `upload.photo`, setting `chat.photo_uploads` (default on; a child only after a parent turned it on; a teen on by default like an adult) | Landed |
 | The capability flag | `chatModelReadsPictures()` reads the Stack's chat role row (`model.imageInput` true, `picture_tokens_max` > 0, state up); never a model id (rule 8) | Landed. This is why the + menu says pictures are off |
 | Spec | `ModelCapabilities.image_input` (commons spec-v0.1.83) | Landed |
 | Stack: projector launch, picture check, token bound, fit plan | `--mmproj`, `--image-max-tokens`, `supervisor.ts`, `engineArgs.ts`, `fitPlan.ts` (VISION-02b) | Landed, tested with Qwen3-VL-8B |
@@ -70,8 +70,8 @@ Without the file the launch is text only exactly as today; no tier breaks.
 **Safety and age (rule 0; SAFETY.md).**
 
 - Age and surface gates are unchanged and still outrank this. A picture reaches the model only when `picturePartsAllowed` says so:
-  the person's `upload.photo` capability, `chat.photo_uploads` on, a child only after a parent turned it on, a teen by the same
-  setting, an identified speaker whose band is the account's own.
+  the person's `upload.photo` capability, `chat.photo_uploads` on, a child only after a parent turned it on, a teen on by default
+  like an adult (owner's ruling 2026-10-17: a parent or the teen can turn it off; this closes the open question about teens), an identified speaker whose band is the account's own.
 - An uploaded picture passes the same gates as text where text has them: the person's answer about it passes the output gate at their
   grain (a child's and every spoken turn per sentence, an adult's as it streams, a teen's by the admin choice). A minor's turn sends
   thinking off and drops any reasoning the engine returns (rule 2; Muse reasons every turn at strength low, so the drop is what applies).
