@@ -460,8 +460,11 @@ describe("turnNext.ts: the interim rule", () => {
 // "consequential proposal" test's own technique, above) sidesteps the
 // routing question entirely - a real, separate finding, reported but
 // not fixed here, same as the issue's own text draws that line.
+// TEST-RED-01: almanac-date is a Deno package, offered only once its smoke test has run, so on a
+// machine without Deno the model is never offered the tool and there is no outcome to carry.
+const HAS_DENO = Boolean(Bun.which("deno"));
 describe("turnNext.ts: structured_part and artifact reach TurnValue (home#147)", () => {
-  test("a successful almanac-date outcome carries a structured_part spec sheet on the new path", async () => {
+  test.skipIf(!HAS_DENO)("a successful almanac-date outcome carries a structured_part spec sheet on the new path", async () => {
     const original = CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget;
     CATALOG.find((m) => m.id === "qwen3-8b-instruct-q4-k-m")!.turn_budget = { ...original!, tools_offered: [...(original!.tools_offered ?? []), "almanac-date"] };
     try {

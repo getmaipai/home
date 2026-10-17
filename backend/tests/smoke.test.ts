@@ -128,6 +128,9 @@ describe("runAllSmokeTests", () => {
 // permission tests take, for the identical reason (its own header
 // explains why: never mistaken for one of the bronze-completeness
 // suite's own bundled packages).
+// TEST-RED-01: these two spawn a real Deno; a machine without one has nothing to time out, so they
+// skip there (the "Deno is optional" block below covers the missing-Deno behaviour itself).
+const HAS_DENO = Boolean(Bun.which("deno"));
 describe("runDenoTestSmoke timeout (COR-2)", () => {
   let tempDir: string;
 
@@ -139,7 +142,7 @@ describe("runDenoTestSmoke timeout (COR-2)", () => {
     rmSync(tempDir, { recursive: true, force: true });
   });
 
-  test("a hanging deno test is killed and reported as a timeout, not left running forever", async () => {
+  test.skipIf(!HAS_DENO)("a hanging deno test is killed and reported as a timeout, not left running forever", async () => {
     // A real, long timer, not an eternally-unresolved bare Promise: Deno's
     // own sanitizers fail an unresolved-with-nothing-pending promise
     // almost instantly on their own ("Promise resolution is still
@@ -156,7 +159,7 @@ describe("runDenoTestSmoke timeout (COR-2)", () => {
     expect(result.message).toContain("timed out");
   }, 15_000);
 
-  test("a fast-passing deno test is unaffected by the timeout", async () => {
+  test.skipIf(!HAS_DENO)("a fast-passing deno test is unaffected by the timeout", async () => {
     writeFileSync(join(tempDir, "passes.test.ts"), `Deno.test("passes", () => {});`);
     const result = await runDenoTestSmoke(tempDir, 30_000);
     expect(result.ok).toBe(true);
