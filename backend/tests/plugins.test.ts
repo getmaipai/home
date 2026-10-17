@@ -23,6 +23,7 @@ import { db } from "@/db";
 import { scheduledJobs, packageInstalls } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { __drainBackgroundWorkForTests } from "@/lib/backgroundWork";
+import { __clearPackageCacheDirForTests } from "@/lib/packageCache";
 import { useDefaultScriptedStack } from "./stackFixture";
 import { HOME_USER_AGENT } from "@/lib/outbound";
 
@@ -665,6 +666,9 @@ describe("warmPackage weather privacy", () => {
     __resetSettingsCacheForTests();
     expect(getHouseholdSettingValue("household.home")).toBe(place.id);
     __resetWarmStateForTests();
+    // FLAKE-LOAD-01 (cause b): the weather package's on-disk response cache lives in the data dir every file of the shard shares, so an earlier
+    // file's Portland forecast answered the second request and "2 calls" became 1. Each warm test starts with no cached weather.
+    __clearPackageCacheDirForTests("weather");
     return client;
   }
 
