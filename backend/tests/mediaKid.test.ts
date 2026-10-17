@@ -5,7 +5,9 @@ import { db } from "@/db";
 import { mediaItems, mediaSources, people, notificationDeliveries, notificationHolds } from "@/db/schema";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { discoveryAllowed } from "@/lib/media/access";
-import { mediaBudget, mediaDay, extendMediaBudget, MEDIA_KID_COPY, SESSION_ROW_CAP } from "@/lib/media/watchTime";
+import { mediaBudget, mediaDay, extendMediaBudget, MEDIA_KID_COPY, SESSION_ROW_CAP, minorMayKeepOffline } from "@/lib/media/watchTime";
+import { getRegistryKey } from "@/lib/settingsRegistry";
+import { allowanceKeyFor, ALLOWANCE_SETTINGS_KEYS } from "@/settings/allowanceKeys";
 import { createDevice } from "@/lib/devices";
 import { erasePersonData } from "@/lib/personLifecycle";
 import { lintSettingCopy } from "@maipai/spec/interpreters/ts/describeSetting.js";
@@ -235,7 +237,7 @@ test("a minor saves a place after exhaustion; an admin extends today; notificati
   expect(await saved.json()).toMatchObject({ progress: { position: { seconds: 70 } }, budget: { exhausted: true } });
   await Promise.resolve();
   expect(timeUpRows()).toHaveLength(2); // owner and admin, one delivery each
-  for (const row of timeUpRows()) { expect(row.text).toBe("The daily screen time ran out. You can add more minutes for today."); }
+  for (const row of timeUpRows()) { expect(row.text).toBe("sprout's daily screen time ran out. You can add more minutes for today."); }
   await owner.post(`/api/media/budget/${child.id}/extend`, { minutes: 1 });
   expect(mediaBudget(child.id, start)).toMatchObject({ limit_min: 2, exhausted: false });
   for (let n = 7; n <= 12; n++) tick(child, video, at(start, n * 10), n * 10);
@@ -249,12 +251,90 @@ test("a minor saves a place after exhaustion; an admin extends today; notificati
   expect(timeUpRows()).toHaveLength(4);
 });
 
-test("teen exhaustion is enforced without sending their activity to admins", async () => {
+test("a teen with a budget reaches the admins too, by name, once a day; no title or activity is sent", async () => {
   const { teen, video, set } = await setup(); const start = clock();
   expect((await set(`person:${teen.id}`, "allowance.media.daily_minutes", 1)).status).toBe(200);
   for (let n = 0; n <= 6; n++) tick(teen, video, at(start, n * 10), n * 10);
+  await Promise.resolve();
   expect(mediaBudget(teen.id, start).exhausted).toBe(true);
-  expect(timeUpRows()).toHaveLength(0);
+  const rows = timeUpRows();
+  expect(rows).toHaveLength(2);
+  for (const row of rows) { expect(row.text).toBe("nova's daily screen time ran out. You can add more minutes for today."); expect(row.text).not.toContain("Moon"); }
+  tick(teen, video, at(start, 70), 70);
+  await Promise.resolve();
+  expect(timeUpRows()).toHaveLength(2);
+});
+
+test("two children are told apart: each time-up notice names its own child", async () => {
+  const { owner, child, video, set } = await setup(); const start = clock();
+  const res = await owner.post("/api/people", { displayName: "pippa-jr", role: "child", secret: "0000" });
+  const { id } = await res.json() as { id: string };
+  const second = { id, row: db.select().from(people).where(eq(people.id, id)).get()! };
+  for (const kid of [child, second]) {
+    await set(`person:${kid.id}`, "allowance.media.daily_minutes", 1);
+    for (let n = 0; n <= 6; n++) tick(kid as never, video, at(start, n * 10), n * 10, { meterKey: kid.id });
+  }
+  await Promise.resolve();
+  const texts = timeUpRows().map((row) => row.text);
+  expect(texts.filter((t) => t.startsWith("sprout's"))).toHaveLength(2);
+  expect(texts.filter((t) => t.startsWith("pippa-jr's"))).toHaveLength(2);
+});
+
+test("an exhausted minor cannot read content bytes; extending, audio exemption and adults are unaffected", async () => {
+  const { owner, child, teen, adult, video, item, set } = await setup(); const start = clock();
+  const track = item("media-track000001", "msrc-library0001", "track");
+  const status = async (who: { client: TestClient }, id = video) => (await who.client.get(`/api/media/items/${id}/content`)).status;
+  for (const kid of [child, teen]) await set(`person:${kid.id}`, "allowance.media.daily_minutes", 1);
+  expect(await status(child)).not.toBe(403); // under budget: this fixture has no bytes, so 404, but never time-up
+  for (const kid of [child, teen]) for (let n = 0; n <= 6; n++) tick(kid, video, at(start, n * 10), n * 10, { meterKey: kid.id });
+  for (const kid of [child, teen]) {
+    const res = await kid.client.get(`/api/media/items/${video}/content`);
+    expect(res.status).toBe(403);
+    expect(await res.json()).toEqual({ error: `${MEDIA_KID_COPY.timeUp} ${MEDIA_KID_COPY.askForMore}`, code: "media_time_up" });
+    expect((await kid.client.get(`/api/media/items/${video}/content`, { Range: "bytes=0-9" })).status).toBe(403);
+  }
+  expect(await status(adult)).not.toBe(403);
+  expect(await status({ client: owner })).not.toBe(403);
+  await set("household", "media.budget.exempt_bedtime_audio", true);
+  // Exempt audio seconds only free the budget when they were audio; this child's seconds were video, so still exhausted for video.
+  expect(await status(child)).toBe(403);
+  await owner.post(`/api/media/budget/${child.id}/extend`, { minutes: 5 });
+  expect(await status(child)).not.toBe(403);
+  expect(await status(teen)).toBe(403);
+  expect(await status(teen, track)).toBe(403);
+});
+
+test("a long client tick interval is metered by wall clock up to the long cap; a seek keeps the tight cap", async () => {
+  const { child, video } = await setup(); const start = clock();
+  tick(child, video, start, 0);
+  tick(child, video, at(start, 60), 60);
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(1);
+  tick(child, video, at(start, 180), 180);
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(3); // 120 s cap, not 12
+  tick(child, video, at(start, 300), 1000); // a forward seek over two minutes: wall-clock part, tight cap
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(3 + 12 / 60);
+  tick(child, video, at(start, 600), 1010); // idle five minutes then a 10 s advance: 10 s
+  expect(mediaBudget(child.id, start).used_min).toBeCloseTo(3 + 22 / 60);
+});
+
+test("a minor with a media budget cannot keep media offline; adults and unlimited minors follow the usual grant", async () => {
+  const { child, teen, adult, set } = await setup();
+  expect(minorMayKeepOffline(child.row)).toBe(true);
+  await set(`person:${child.id}`, "allowance.media.daily_minutes", 30);
+  await set(`person:${teen.id}`, "allowance.media.daily_minutes", 30);
+  await set(`person:${adult.id}`, "allowance.media.daily_minutes", 30);
+  const fresh = (id: string) => db.select().from(people).where(eq(people.id, id)).get()!;
+  expect(minorMayKeepOffline(fresh(child.id))).toBe(false);
+  expect(minorMayKeepOffline(fresh(teen.id))).toBe(false);
+  expect(minorMayKeepOffline(fresh(adult.id))).toBe(true);
+  await set(`person:${child.id}`, "allowance.media.daily_minutes", 0);
+  expect(minorMayKeepOffline(fresh(child.id))).toBe(true);
+});
+
+test("the media allowance's guardian control is declared on the key itself", () => {
+  const key = ALLOWANCE_SETTINGS_KEYS.find((k) => k.key === allowanceKeyFor("Media"))!;
+  expect(key.control).toEqual({ child: "guardian", teen: "guardian", adult: "self" });
+  expect(getRegistryKey(allowanceKeyFor("Media"))?.control).toEqual({ child: "guardian", teen: "guardian", adult: "self" });
 });
 
 test("local midnight splits usage and expires today's extension", async () => {

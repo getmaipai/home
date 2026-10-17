@@ -27305,6 +27305,7 @@
           },
           "403": {
             "description": "Use your own browser, and ask a grown-up if you are a child or teen",
+            "description": "Use your own browser to manage permissions",
             "content": {
               "application/json": {
                 "schema": {
@@ -53145,6 +53146,16 @@
               }
             }
           },
+          "403": {
+            "description": "Screen time is done for today (code media_time_up)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
           "404": {
             "description": "No such title, or its file is not there right now",
             "content": {
@@ -53645,20 +53656,6 @@
                         "additionalProperties": false
                       }
                     ]
-                  },
-                  "session_id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100,
-                    "description": "A token for this player run; use a new one on the next run."
-                  },
-                  "playing": {
-                    "type": "boolean",
-                    "description": "False on a pause; true on playing ticks and resume."
-                  },
-                  "seeking": {
-                    "type": "boolean",
-                    "description": "True on a seek: saves the place without counting the jump as playing time."
                   },
                   "duration_s": {
                     "type": "number",
@@ -54219,20 +54216,6 @@
                               "additionalProperties": false
                             }
                           ]
-                        },
-                        "session_id": {
-                          "type": "string",
-                          "minLength": 1,
-                          "maxLength": 100,
-                          "description": "A token for this player run; use a new one on the next run."
-                        },
-                        "playing": {
-                          "type": "boolean",
-                          "description": "False on a pause; true on playing ticks and resume."
-                        },
-                        "seeking": {
-                          "type": "boolean",
-                          "description": "True on a seek: saves the place without counting the jump as playing time."
                         },
                         "duration_s": {
                           "type": "number",

@@ -23,7 +23,7 @@ import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/li
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
-import { extendMediaBudget, mediaBudget } from "@/lib/media/watchTime";
+import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal } from "@/lib/media/watchTime";
 import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
 import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedWith } from "@/lib/media/collections";
 
@@ -241,13 +241,15 @@ const contentRoute = createRoute({
   responses: {
     200: { content: { "application/octet-stream": { schema: z.string() } }, description: "The whole file." },
     206: { content: { "application/octet-stream": { schema: z.string() } }, description: "The requested range." },
-    ...errorResponses({ 401: "Not signed in", 404: "No such title, or its file is not there right now", 416: "Range not satisfiable", 422: "A folder audiobook: play its parts" }),
+    ...errorResponses({ 401: "Not signed in", 403: "Screen time is done for today (code media_time_up)", 404: "No such title, or its file is not there right now", 416: "Range not satisfiable", 422: "A folder audiobook: play its parts" }),
   },
 });
 mediaRoutes.openapi(contentRoute, async (c) => {
   const actor = c.get("person");
   const item = readableItem(actor, c.req.valid("param").id);
   if (!item) return c.json({ error: "That title is not in the library." }, 404);
+  const timeUp = mediaTimeUpRefusal(actor);
+  if (timeUp) return c.json(timeUp, 403);
   const served = await serveItemBytes(actor, item, c.req.header("Range"));
   if (served instanceof Response) return served as never;
   return c.json({ error: served.error }, served.status);
@@ -350,8 +352,6 @@ const PositionSchema = z.union([
 const MarkSchema = z.object({ at_s: z.number().min(0), label: z.string().max(200).nullable().optional() });
 const WriteBody = z.object({
   position: PositionSchema,
-  playing: z.boolean().optional().describe("False on a pause; true on playing ticks and resume."),
-  seeking: z.boolean().optional().describe("True on a seek: saves the place without counting the jump as playing time."),
   duration_s: z.number().min(0).nullable().optional(),
   completed: z.boolean().optional().describe("true: the person says it is done (a book). false: the person clears it."),
   event: z.enum(["play", "skip", "finish"]).optional().describe("One thing that happened: a play started, a skip, or a finish. Each adds one."),
@@ -366,7 +366,7 @@ type WriteBodyType = z.infer<typeof WriteBody>;
 
 function writeFrom(body: WriteBodyType, serverNow: Date): ProgressWrite {
   return {
-    position: body.position as ProgressWrite["position"], playing: body.playing, seeking: body.seeking, duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
+    position: body.position as ProgressWrite["position"], duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
     events: body.event ? { [body.event]: true } : undefined, device_id: body.device_id ?? null, stamp: correctedStamp({ sampledAt: body.sampled_at, clientNow: body.client_now, serverNow }),
   };
 }

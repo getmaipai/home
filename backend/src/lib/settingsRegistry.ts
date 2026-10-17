@@ -24,6 +24,7 @@ import { PICTURE_SETTINGS_KEYS } from "@/settings/pictureKeys";
 import { VIDEO_SETTINGS_KEYS } from "@/settings/videoKeys";
 import { LIKENESS_SETTINGS_KEYS } from "@/settings/likenessKeys";
 import { MEDIA_SETTINGS_KEYS } from "@/settings/mediaKeys";
+import { ALLOWANCE_SETTINGS_KEYS } from "@/settings/allowanceKeys";
 import { VOICE_SETTINGS_KEYS } from "@/settings/voiceKeys";
 import { AUDIO_SETTINGS_KEYS } from "@/settings/audioKeys";
 
@@ -55,6 +56,12 @@ function bundledPackageKeys(): SettingsKey[] {
 // It is kept outside the committed Commons registry and resolves through
 // household.home in settings.ts until the shipped location selector lands.
 
+/** The Media allowance's `control` is written once, in allowanceKeys.ts; the spec snapshot's copy of the key has none. */
+function withOwnControl(key: SettingsKey): SettingsKey {
+  const own = key.control ? undefined : ALLOWANCE_SETTINGS_KEYS.find((entry) => entry.key === key.key && entry.control);
+  return own ? { ...key, control: own.control } : key;
+}
+
 function loadRegistry(): SettingsKey[] {
   const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as unknown[];
   // KS-MODE-01: spec-v0.1.116 still declares the retired search.wikipedia_fallback.
@@ -70,7 +77,7 @@ function loadRegistry(): SettingsKey[] {
   const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...LIKENESS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map(withPersonGuardFacts);
   const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...LIKENESS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
-  return combined.map((key) => withPersonGuardFacts(key.key === "allowance.media.daily_minutes" ? { ...key, control: { child: "guardian", teen: "guardian", adult: "self" } } : key));
+  return combined.map((key) => withPersonGuardFacts(withOwnControl(key)));
 }
 
 // INITIATIVE-01: person.robot.may_address is guardian-set for a child too (assertCanSetRobotMayAddress in settings.ts).

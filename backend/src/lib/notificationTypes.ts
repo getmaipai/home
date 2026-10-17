@@ -185,7 +185,7 @@ export const NOTIFICATION_TYPES: readonly NotificationType[] = [
     id: "media_time_up",
     level: "passive",
     audience: "admins",
-    template: "The daily screen time ran out. You can add more minutes for today.",
+    template: "{name}'s daily screen time ran out. You can add more minutes for today.",
     configurable: false,
     defaultChannels: ["in_app"],
     toast: false,

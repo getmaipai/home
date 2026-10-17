@@ -36,6 +36,8 @@ export function allowanceKeyFor(category: AllowanceCategory): string {
   return `allowance.${category.toLowerCase().replace(/\s+/g, "_")}.daily_minutes`;
 }
 
+/** The shared spec snapshot declares these keys today and wins in the registry merge; settingsRegistry.ts takes the Media key's
+ * `control` from this definition (the one place it is written) until a commons spec tag carries it, then the lookup goes. */
 export const ALLOWANCE_SETTINGS_KEYS: SettingsKey[] = ALLOWANCE_CATEGORIES.map((category) =>
   SettingsKey.parse({
     key: allowanceKeyFor(category),
@@ -47,5 +49,7 @@ export const ALLOWANCE_SETTINGS_KEYS: SettingsKey[] = ALLOWANCE_CATEGORIES.map((
     level: "basic",
     lives_in: "person.allowance",
     honoured_by: ["home"],
+    // MEDIA-KID-01: a minor's media minutes are the guardian's to set (settings.ts isMediaProtection enforces it).
+    ...(category === "Media" ? { control: { child: "guardian", teen: "guardian", adult: "self" } } : {}),
   }),
 );

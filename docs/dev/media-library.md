@@ -178,7 +178,7 @@ only confirms the change; it reveals no usage. `GET /api/media/budget` returns t
 adds private `media_watch_days` totals (seconds, audio seconds, today's extension and notification latch) and
 `media_watch_sessions` sample cursors. Both are erased when the person leaves. Session cursors survive a restart; duplicate or
 older samples never count twice. Metering ignores the `playing`, `seeking` and event flags and the client stamp: between two writes of one cursor it counts the least of
-server wall-clock elapsed, forward position advance and the 10-second cadence plus 2 seconds of slack. A jump bigger than elapsed plus slack is a seek and only the wall-clock part counts; no forward movement counts nothing. The cursor key is server-derived: the hashed auth session
+server wall-clock elapsed, forward position advance and a 120-second ceiling per write (a client may tick as rarely as once a minute, so the ceiling is not the 10-second cadence). A jump bigger than elapsed plus slack is a seek and only the wall-clock part counts, kept to the tight 12-second cap (10-second cadence plus 2 seconds of slack); no forward movement counts nothing. The cursor key is server-derived: the hashed auth session
 cookie plus the media item, never a request field, so rotating anything in the body cannot start a fresh baseline. Cursor rows older
 than two days are dropped and each person keeps at most 200. The first write of a cursor is a baseline. Reader locator ticks use the bounded wall-clock time. The saved place still uses the skew-corrected sample stamp.
 
@@ -190,9 +190,28 @@ count. Turning it off restores their counted seconds for today.
 
 An exhausted progress write still saves the person's place immediately and returns `budget` alongside `progress` and `applied`.
 Batch results include it for each accepted write too. The player must pause on `exhausted`. A child's exhaustion claims a durable
-once-per-day latch and raises the passive `media_time_up` notification for household admins. Its fixed text contains no person,
-media, source or activity details. Teens get the same exhausted flag with no admin notification. Kid copy placeholders are in
-`MEDIA_KID_COPY`, awaiting the shared kid-mode catalog.
+once-per-day latch and raises the passive `media_time_up` notification for household admins, who are the child's guardians. The
+text names the child ("{name}'s daily screen time ran out...") so an admin with two children knows whose minutes to extend, and
+carries `subjectPersonId`; it holds no media, source or activity detail. Teens with a budget get the same notice (same latch,
+same text with the teen's name). Decision: a teen's budget is set by a guardian, so the guardian is told when it runs out; the
+notice reveals that time ran out, never what was watched. Kid copy placeholders are in `MEDIA_KID_COPY`, awaiting the shared
+kid-mode catalog.
+
+Exhaustion is enforced on bytes too, not only reported in progress responses. For a child, teen or guest whose budget is
+exhausted, `GET /api/media/items/{id}/content` returns 403 `{error: "Screen time is done for today. Ask a grown-up for more.",
+code: "media_time_up"}` (`mediaTimeUpRefusal(person)` in `watchTime.ts`). Adults are never refused. OFFLINE-01's offline file route
+must call `mediaTimeUpRefusal` the same way (the integrator wires it).
+
+Offline keeping (decision, 2026-10-17): offline copies play without the hub, so no server clock meters them. A minor whose
+`allowance.media.daily_minutes` is above 0 cannot keep media offline: `minorMayKeepOffline(person)` in `watchTime.ts` returns
+false for them (true for adults, and for a minor with no budget). OFFLINE-01's keep path (the device keep route and the
+browser keep) must call it and refuse with the kid line; the integrator wires it when OFFLINE lands. Offline progress batches
+must also pass the device meter key `d:<deviceId>` to `writeProgress`. The simpler, safer rule was chosen over metering offline
+time from corrected event stamps.
+
+The Media allowance's guardian-only `control` is written once, on the key definition in `allowanceKeys.ts`; the registry takes it
+from there because the shared spec snapshot still declares the key without it (drop the lookup when a commons spec tag carries
+it). `discoveryAllowed(person)` has no caller in this slice by design: the discovery shelves that call it are the app slices'.
 
 `frontend/src/lib/useMediaBudget.ts` reads the signed-in person's budget and returns `{exhausted, leftMinutes}`. Pass the person id
 so changing profiles cannot reuse another person's allowance. Unknown or failed reads return exhausted. Players feed every
@@ -200,4 +219,7 @@ progress response's `budget` to `updateMediaBudget(queryClient, personId, budget
 `mediaBudgetQueryKey`. This uses React Query and progress responses, with no new status surface or polling loop.
 
 Open: `media.allowed_hours` needs a shipped time selector (see `allowanceKeys.ts`); every app must wire pause, ticks, resume and
-extension refresh; the ask-a-grown-up action must use the one Ask record. No second ask store or UI is added here.
+extension refresh; the ask-a-grown-up action must use the one Ask record. No second ask store or UI is added here. Also open: an
+"Add minutes" action on the time-up notice. The notification registry has no `actions[]` support yet (NOTIFICATIONS.md declares
+it), so the notice says an admin can add minutes and the extend route is `POST /api/media/budget/{personId}/extend`; the button
+belongs with the Ask record work.

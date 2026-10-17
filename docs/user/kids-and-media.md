@@ -15,8 +15,12 @@ When screen time runs out, Home keeps the last place and tells the player to pau
 > Screen time is done for today.
 > Ask a grown-up for more.
 
-The home admins get one notice that daily screen time ran out. It does not name the child or say what they watched, heard or
-read. An owner or admin can add minutes for that day. Extra minutes end at midnight.
+When time runs out, the video or song file stops loading too, so a child cannot keep watching by opening the file directly.
+
+The home admins get one notice a day, for a child or a teen who has a time limit. It names the person whose time ran out. It
+does not say what they watched, heard or read. An owner or admin can add minutes for that day. Extra minutes end at midnight.
+
+A child or teen with a time limit cannot keep media for offline use, because the Home computer cannot count time it cannot see.
 
 These safety checks and budget tools are ready for media apps to use. Each app still needs to connect its player to the budget.
 There is no new parent screen yet. Allowed hours and a button to ask a grown-up are still to come.
