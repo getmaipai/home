@@ -1,0 +1,26 @@
+# Bronze criteria per getmaipai/.github's docs/PACKAGES.md.
+package: videos
+scale: bronze
+bronze:
+  tests_green:
+    met: true
+    note: Home's backend/tests/mediaApps.test.ts and frontend/src/shell/mediaApp.test.tsx cover the data ids, actions, child view and shell half.
+  routing_examples:
+    met: true
+    note: an app package has no chat tool, so it has no routing examples
+  privacy_row_per_data_source:
+    met: true
+    note: data_sources is empty; the app reads only the hub's own library
+  offline_behavior_stated:
+    met: true
+    note: "offline: degraded - videos saved on the hub play with the internet off; nothing needs the internet. Videos not yet saved (a later web source) would not play."
+  smoke_test:
+    met: true
+    note: smoke.kind static, the manifest and pages load
+  readme_and_changelog:
+    met: true
+  lint_clean:
+    met: true
+silver:
+  diagnostics_and_reauth:
+    met: false

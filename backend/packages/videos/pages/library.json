@@ -1,0 +1,48 @@
+{
+  "type": "page",
+  "id": "library",
+  "title": "Library",
+  "body": [
+    {
+      "type": "picker",
+      "state": "channel",
+      "label": "Channel",
+      "placeholder": "All channels",
+      "bind": {
+        "source": "package",
+        "path": "channels"
+      },
+      "item_key_field": "id",
+      "item_label_field": "label"
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Library",
+      "bind": {
+        "source": "package",
+        "path": "library",
+        "params": {
+          "channel": "$state.channel"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No videos in the library yet."
+      }
+    }
+  ]
+}

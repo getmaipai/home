@@ -61,7 +61,7 @@ describe("the Weather app is a package app", () => {
     const { client: childClient } = await child(client);
     for (const who of [client, teenClient, childClient]) {
       const rows = (await (await who.get("/api/apps")).json()) as Array<Record<string, unknown>>;
-      expect(rows).toEqual([expect.objectContaining({ package: "weather", label: "Weather", icon: "cloud-sun", to: "/apps/weather", incognito: "unaffected" })]);
+      expect(rows.filter((row) => row.package === "weather")).toEqual([expect.objectContaining({ package: "weather", label: "Weather", icon: "cloud-sun", to: "/apps/weather", incognito: "unaffected" })]);
     }
   });
 

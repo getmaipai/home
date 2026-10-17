@@ -1,0 +1,64 @@
+{
+  "id": "videos",
+  "version": "0.1.0",
+  "kind": "app",
+  "category": "Media",
+  "display": "Videos",
+  "description": "Watch the videos saved on your hub: a home with what to continue and what is new, a library by channel, watch later and history.",
+  "author": "MaiPai",
+  "license": "AGPL-3.0",
+  "homepage": "https://github.com/getmaipai/home",
+  "requires": [],
+  "optional": [],
+  "platforms": ["home"],
+  "min_role": "child",
+  "consequential": false,
+  "offline": "degraded",
+  "config": [],
+  "data_sources": [],
+  "permissions": [],
+  "notifications": [],
+  "backup": "exclude",
+  "background": false,
+  "contributes": {
+    "pages": [
+      { "id": "index", "label": "Videos", "icon": "circle-play", "nav": true, "kind": "schema", "module": "index", "keywords": ["video", "movies", "clips", "watch", "youtube", "channel"] },
+      { "id": "library", "label": "Library", "icon": "library", "nav": true, "kind": "schema", "module": "library" },
+      { "id": "watch", "label": "Watch", "icon": "play", "nav": false, "kind": "schema", "module": "watch" },
+      { "id": "watch-later", "label": "Watch later", "icon": "clock", "nav": true, "kind": "schema", "module": "watch-later" },
+      { "id": "history", "label": "History", "icon": "history", "nav": true, "kind": "schema", "module": "history" }
+    ],
+    "data": [
+      { "id": "featured", "rows": "list" },
+      { "id": "continue", "rows": "list" },
+      { "id": "new", "rows": "list" },
+      { "id": "recent", "rows": "list" },
+      { "id": "more-from", "rows": "list" },
+      { "id": "liked", "rows": "list" },
+      { "id": "again", "rows": "list" },
+      { "id": "library", "rows": "list" },
+      { "id": "channels", "rows": "list" },
+      { "id": "watch-later", "rows": "list" },
+      { "id": "history", "rows": "list" },
+      { "id": "item", "rows": "list" },
+      { "id": "up-next", "rows": "list" },
+      { "id": "item-actions", "rows": "list" }
+    ],
+    "settings_area": {
+      "id": "videos",
+      "title": "Videos",
+      "app": "/apps/videos",
+      "audience": { "min_role": "child" },
+      "groups": [{ "label": "Videos", "sections": ["speed", "storage"] }],
+      "sections": [
+        { "id": "speed", "label": "Video speed", "icon": "gauge", "kind": "link", "href": "/settings/account/voice", "keywords": ["playback", "speed", "faster", "slower"] },
+        { "id": "storage", "label": "Saved videos and storage", "icon": "hard-drive", "kind": "link", "href": "/settings/home/storage", "min_role": "admin", "keywords": ["library", "folders", "saved copies", "trash"] }
+      ]
+    }
+  },
+  "min_app": "0.1.0",
+  "tier": 0,
+  "quality_scale": "bronze",
+  "smoke": { "kind": "static" },
+  "incognito": "unaffected"
+}

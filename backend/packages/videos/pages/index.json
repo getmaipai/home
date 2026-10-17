@@ -1,0 +1,178 @@
+{
+  "type": "page",
+  "id": "index",
+  "title": "Videos",
+  "body": [
+    {
+      "type": "billboard",
+      "bind": {
+        "source": "package",
+        "path": "featured"
+      },
+      "label": "Featured videos",
+      "item_key_field": "id",
+      "item_title_field": "title",
+      "item_subtitle_field": "{summary}",
+      "item_eyebrow_field": "{channel}",
+      "item_art_field": "backdrop",
+      "primary": {
+        "label": "Play",
+        "icon": "play",
+        "action": {
+          "play": {
+            "media_id": "{id}"
+          }
+        }
+      },
+      "secondary": [
+        {
+          "label": "Watch later",
+          "icon": "plus",
+          "action": {
+            "call": {
+              "target": "/api/plugins/videos/watch-later",
+              "args": {
+                "media_id": "{id}"
+              }
+            }
+          }
+        }
+      ],
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "No videos yet. Ask an admin to add a video folder in Settings, Saved videos and storage."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Continue watching",
+      "bind": {
+        "source": "package",
+        "path": "continue"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Nothing to continue yet. Videos you start show up here."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "New from your channels",
+      "bind": {
+        "source": "package",
+        "path": "new"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Nothing new from the channels you follow."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Recently added",
+      "bind": {
+        "source": "package",
+        "path": "recent"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Nothing was added lately."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "More from your most watched",
+      "bind": {
+        "source": "package",
+        "path": "more-from"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Watch a few videos and more from the same place shows up here."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Watch again",
+      "bind": {
+        "source": "package",
+        "path": "again"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Videos you finish show up here."
+      }
+    }
+  ]
+}

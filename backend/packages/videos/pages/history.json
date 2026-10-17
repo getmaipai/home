@@ -1,0 +1,33 @@
+{
+  "type": "page",
+  "id": "history",
+  "title": "History",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "History",
+      "bind": {
+        "source": "package",
+        "path": "history"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Videos you watch show up here."
+      }
+    }
+  ]
+}

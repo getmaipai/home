@@ -1,0 +1,33 @@
+{
+  "type": "page",
+  "id": "watch-later",
+  "title": "Watch later",
+  "body": [
+    {
+      "type": "media_shelf",
+      "heading": "Watch later",
+      "bind": {
+        "source": "package",
+        "path": "watch-later"
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Nothing saved for later. Choose Watch later on a video to keep it here."
+      }
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "type": "page",
+  "id": "watch",
+  "title": "Watch",
+  "body": [
+    {
+      "type": "player",
+      "bind": {
+        "source": "package",
+        "path": "item",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "kind": "video",
+      "autoplay_next": true,
+      "on_progress": {
+        "call": {
+          "target": "/api/plugins/videos/progress",
+          "args": {
+            "media_id": "{id}",
+            "position_s": "{position_s}",
+            "duration_s": "{duration_s}",
+            "reason": "{reason}"
+          }
+        }
+      },
+      "on_next": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "This video is not on the hub. Go back to Videos and pick another."
+      }
+    },
+    {
+      "type": "media_shelf",
+      "heading": "Up next",
+      "bind": {
+        "source": "package",
+        "path": "up-next",
+        "params": {
+          "id": "$state.id"
+        }
+      },
+      "item_key_field": "id",
+      "item_label_field": "title",
+      "item_subtitle_field": "{channel}",
+      "item_media_field": "thumbnail",
+      "item_progress_field": "progress",
+      "item_badge_field": "copy_label",
+      "item_meta_field": "duration_s",
+      "aspect": "wide",
+      "on_select": {
+        "play": {
+          "media_id": "{id}"
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "film",
+        "text": "Nothing else to watch right now."
+      }
+    }
+  ]
+}
