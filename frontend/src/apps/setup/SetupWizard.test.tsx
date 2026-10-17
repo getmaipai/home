@@ -210,13 +210,6 @@ describe("SetupWizard", () => {
         await waitFor(() => expect(rendered.getByRole("button", { name: "Download" }).hasAttribute("disabled")).toBe(false));
         await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Download" })); });
       } finally { URL.createObjectURL = createUrl; URL.revokeObjectURL = revoke; HTMLAnchorElement.prototype.click = click; }
-      await waitFor(() => expect(rendered.getByRole("button", { name: "Continue" }).hasAttribute("disabled")).toBe(false));
-      const createUrl = URL.createObjectURL; const click = HTMLAnchorElement.prototype.click;
-      URL.createObjectURL = () => "blob:test"; HTMLAnchorElement.prototype.click = () => {};
-      try {
-        await waitFor(() => expect(rendered.getByRole("button", { name: "Download" }).hasAttribute("disabled")).toBe(false));
-        await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Download" })); });
-      } finally { URL.createObjectURL = createUrl; HTMLAnchorElement.prototype.click = click; }
       await advanceTo(rendered, "Continue", "You're all set");
       expect(h.posts).toEqual(["welcome", "engine_location", "storage", "checks", "plan", "owner", "backup_key"]);
       await act(async () => { fireEvent.click(rendered.getByRole("button", { name: "Open my Home" })); });
