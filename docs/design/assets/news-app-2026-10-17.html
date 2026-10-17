@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>News app mockup</title>
+<meta name="description" content="Design mockup for the MaiPai Home News app: Today feed, channels, reader. Tokens follow the kit's tokens.css. Placeholder stories only.">
+<style>
+  /* Tokens copied from commons/ui/src/tokens.css (light root, dark under prefers-color-scheme). Placeholder content only. */
+  :root {
+    --background: #f4f7fb; --foreground: #0b1730; --card: #ffffff; --card-foreground: #0b1730;
+    --border: #c9d6e6; --muted: #e3eaf3; --muted-foreground: #4a5f7a; --primary: #21a6ff; --primary-foreground: #07111f;
+    --hue-violet: #a434ff; --hue-teal: #00e3ae; --hue-orange: #ff8a35; --hue-pink: #ff3e9a;
+    --radius-card: 16px; --radius-control: 10px; --radius-pill: 999px;
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --background: #07111f; --foreground: #f4f8ff; --card: #102238; --card-foreground: #f4f8ff;
+      --border: #294563; --muted: #142a43; --muted-foreground: #a9bed7;
+    }
+  }
+  :root[data-theme="dark"] {
+    --background: #07111f; --foreground: #f4f8ff; --card: #102238; --card-foreground: #f4f8ff;
+    --border: #294563; --muted: #142a43; --muted-foreground: #a9bed7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 16px; line-height: 1.45; }
+  .shell { display: grid; grid-template-columns: 56px minmax(0, 1fr); min-height: 100vh; }
+  main { min-width: 0; }
+  .rail { border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 14px 0; }
+  .rail .dot { width: 28px; height: 28px; border-radius: 8px; background: var(--muted); }
+  .rail .dot.active { background: var(--primary); }
+  main { padding: 20px 24px 48px; max-width: 1280px; width: 100%; margin: 0 auto; }
+  header.top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 8px; }
+  h1 { font-size: 34px; font-weight: 800; letter-spacing: -0.02em; margin: 0; }
+  .date { color: var(--muted-foreground); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; font-size: 12px; }
+  .tabs { display: flex; gap: 6px; margin: 10px 0 18px; overflow-x: auto; }
+  .tab { border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 6px 14px; font-weight: 600; font-size: 14px; white-space: nowrap; background: var(--card); }
+  .tab.active { background: var(--foreground); color: var(--background); border-color: var(--foreground); }
+  .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; }
+  .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; display: flex; flex-direction: column; }
+  .img { background: linear-gradient(135deg, var(--hue-violet), var(--primary)); aspect-ratio: 16 / 9; }
+  .img.teal { background: linear-gradient(135deg, var(--hue-teal), var(--primary)); }
+  .img.orange { background: linear-gradient(135deg, var(--hue-orange), var(--hue-pink)); }
+  .img.pink { background: linear-gradient(135deg, var(--hue-pink), var(--hue-violet)); }
+  .body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .kicker { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--primary); }
+  .kicker.src { color: var(--muted-foreground); }
+  .hl { font-weight: 800; letter-spacing: -0.015em; margin: 0; }
+  .hero .hl { font-size: 30px; line-height: 1.12; }
+  .featured .hl { font-size: 20px; line-height: 1.2; }
+  .row .hl { font-size: 17px; line-height: 1.25; }
+  .dek { color: var(--muted-foreground); font-size: 15px; margin: 0; }
+  .meta { display: flex; gap: 10px; align-items: center; color: var(--muted-foreground); font-size: 13px; margin-top: 4px; }
+  .badge { border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 1px 8px; font-size: 12px; font-weight: 600; }
+  .hero { grid-column: span 8; grid-row: span 2; }
+  .hero .img { aspect-ratio: 16 / 9; }
+  .hero .dek { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .featured { grid-column: span 4; }
+  .featured.half { grid-column: span 6; }
+  .card.channel { flex-direction: row; }
+  .row { grid-column: span 12; flex-direction: row; align-items: stretch; }
+  .row .img { width: 160px; aspect-ratio: 4 / 3; flex: none; }
+  .row .body { justify-content: center; }
+  h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.015em; margin: 28px 0 12px; display: flex; justify-content: space-between; align-items: baseline; }
+  h2 small { color: var(--muted-foreground); font-size: 14px; font-weight: 600; }
+  .shelf { display: grid; grid-auto-flow: column; grid-auto-columns: 220px; gap: 14px; overflow-x: auto; padding-bottom: 6px; }
+  .shelf .card .hl { font-size: 15px; }
+  .channel { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+  .channel .mark { width: 40px; height: 40px; border-radius: 10px; background: var(--muted); flex: none; }
+  .channel .name { font-weight: 700; }
+  .channel .sub { color: var(--muted-foreground); font-size: 13px; }
+  .follow { margin-left: auto; border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 6px 12px; font-weight: 600; font-size: 13px; }
+  .follow.on { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .reader { max-width: 720px; margin: 0 auto; padding-top: 8px; }
+  .reader h1 { font-size: 36px; line-height: 1.1; }
+  .reader .byline { color: var(--muted-foreground); font-size: 14px; margin: 10px 0 18px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .reader p { font-size: 19px; line-height: 1.6; margin: 0 0 18px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0 22px; }
+  .btn { border: 1px solid var(--border); border-radius: var(--radius-control); padding: 8px 14px; font-weight: 600; font-size: 14px; background: var(--card); }
+  .btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+  .summary { border-left: 3px solid var(--primary); padding: 4px 0 4px 14px; margin: 0 0 22px; color: var(--muted-foreground); font-size: 16px; }
+  .summary b { color: var(--foreground); }
+  .section-label { margin: 48px 0 8px; color: var(--muted-foreground); font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-size: 12px; border-top: 1px dashed var(--border); padding-top: 24px; }
+  .note { color: var(--muted-foreground); font-size: 13px; margin: 0 0 14px; }
+  @media (max-width: 959px) {
+    .hero, .featured, .featured.half { grid-column: span 12; }
+    .hero { grid-row: auto; }
+    .card.channel { grid-column: span 12 !important; }
+    .hero .hl { font-size: 26px; }
+    .row .img { width: 112px; }
+  }
+  @media (max-width: 639px) {
+    .shell { grid-template-columns: 1fr; }
+    .rail { display: none; }
+    main { padding: 16px 16px 40px; }
+    h1 { font-size: 30px; }
+    .reader h1 { font-size: 28px; }
+    .reader p { font-size: 18px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="rail" aria-label="Main navigation (placeholder)"><div class="dot"></div><div class="dot"></div><div class="dot"></div><div class="dot active"></div><div class="dot"></div></nav>
+  <main>
+    <p class="note">Mockup A: Today feed (adult). Placeholder stories and publishers; gradients stand in for proxied images.</p>
+    <header class="top">
+      <div><div class="date">Friday, October 17</div><h1>Today</h1></div>
+      <div class="date">Updated 7:40</div>
+    </header>
+    <div class="tabs"><span class="tab active">Today</span><span class="tab">My Mix</span><span class="tab">Following</span><span class="tab">Saved</span></div>
+
+    <section class="grid" aria-label="Top stories">
+      <article class="card hero"><div class="img"></div><div class="body">
+        <span class="kicker">Top story · 4 outlets</span>
+        <h3 class="hl">River trail reopens after two years of repairs, with a new bridge and night lighting</h3>
+        <p class="dek">The 11-kilometre path links three parks and the ferry terminal. The city says the lighting runs on solar panels fitted along the route.</p>
+        <div class="meta"><span>Daily Example</span><span>·</span><span>2h ago</span><span class="badge">Saved</span></div>
+      </div></article>
+      <article class="card featured"><div class="img teal"></div><div class="body">
+        <span class="kicker">Science</span>
+        <h3 class="hl">Probe sends first close images of the icy moon's plumes</h3>
+        <div class="meta"><span>Space Example</span><span>·</span><span>5h ago</span></div>
+      </div></article>
+      <article class="card featured"><div class="img orange"></div><div class="body">
+        <span class="kicker">Local</span>
+        <h3 class="hl">Farmers' market moves indoors for the winter season</h3>
+        <div class="meta"><span>Town Example</span><span>·</span><span>1h ago</span></div>
+      </div></article>
+      <article class="card featured half"><div class="img pink"></div><div class="body">
+        <span class="kicker">Technology</span>
+        <h3 class="hl">Repair-at-home rules for phones take effect next month</h3>
+        <div class="meta"><span>Tech Example</span><span>·</span><span>3h ago</span></div>
+      </div></article>
+      <article class="card featured half"><div class="img"></div><div class="body">
+        <span class="kicker">Sports</span>
+        <h3 class="hl">Under-12 league final moved to Sunday because of rain</h3>
+        <div class="meta"><span>Sports Example</span><span>·</span><span>40m ago</span></div>
+      </div></article>
+    </section>
+
+    <h2>From your channels <small>Science · Local · Space Example</small></h2>
+    <div class="shelf">
+      <article class="card"><div class="img teal"></div><div class="body"><span class="kicker src">Space Example</span><h3 class="hl">Why the plumes matter for the search for life</h3></div></article>
+      <article class="card"><div class="img orange"></div><div class="body"><span class="kicker src">Town Example</span><h3 class="hl">Library extends weekend hours</h3></div></article>
+      <article class="card"><div class="img pink"></div><div class="body"><span class="kicker src">Science Example</span><h3 class="hl">A cheaper way to make fertiliser from air</h3></div></article>
+      <article class="card"><div class="img"></div><div class="body"><span class="kicker src">Town Example</span><h3 class="hl">Bus route 14 gets evening service</h3></div></article>
+    </div>
+
+    <h2>More today <small>chronological</small></h2>
+    <section class="grid">
+      <article class="card row"><div class="img teal"></div><div class="body"><span class="kicker src">Daily Example · 6h ago</span><h3 class="hl">Council votes to plant 2,000 street trees by spring</h3></div></article>
+      <article class="card row"><div class="img"></div><div class="body"><span class="kicker src">Tech Example · 7h ago</span><h3 class="hl">Open-source mapping project passes one billion edits</h3></div></article>
+      <article class="card row"><div class="img orange"></div><div class="body"><span class="kicker src">Health Example · 8h ago</span><h3 class="hl">Flu season starts early; clinics add Saturday hours</h3></div></article>
+    </section>
+
+    <p class="section-label">Mockup B: Following (channels)</p>
+    <h1>Following</h1>
+    <div class="tabs"><span class="tab active">Topics</span><span class="tab">Sources</span></div>
+    <section class="grid">
+      <div class="card channel" style="grid-column: span 6"><div class="mark"></div><div><div class="name">Science</div><div class="sub">12 stories today · from 3 sources</div></div><span class="follow on">Following</span></div>
+      <div class="card channel" style="grid-column: span 6"><div class="mark"></div><div><div class="name">Local</div><div class="sub">5 stories today · Town Example</div></div><span class="follow on">Following</span></div>
+      <div class="card channel" style="grid-column: span 6"><div class="mark"></div><div><div class="name">Sports</div><div class="sub">9 stories today</div></div><span class="follow">Follow</span></div>
+      <div class="card channel" style="grid-column: span 6"><div class="mark"></div><div><div class="name">Technology</div><div class="sub">7 stories today</div></div><span class="follow">Follow</span></div>
+    </section>
+
+    <p class="section-label">Mockup C: Reader</p>
+    <article class="reader">
+      <span class="kicker">Daily Example · Local</span>
+      <h1>River trail reopens after two years of repairs, with a new bridge and night lighting</h1>
+      <div class="byline"><span>Published today, 5:30</span><span>·</span><span>4 outlets covering this</span><span>·</span><span>6 min read</span></div>
+      <div class="actions"><span class="btn primary">Listen</span><span class="btn">Save</span><span class="btn">Key points</span><span class="btn">Open on site</span></div>
+      <div class="img" style="border-radius: var(--radius-card); margin-bottom: 22px"></div>
+      <div class="summary"><b>Key points, written on this hub:</b> the trail is open end to end; the bridge replaces the 1970s crossing; lighting is solar; night access ends at 11.</div>
+      <p>The river trail reopened on Friday morning after two years of repairs, the city said. The new bridge replaces the crossing closed in 2024, and the whole 11-kilometre route is lit at night for the first time.</p>
+      <p>Crews fitted 300 solar lamps along the path. The lights come on at dusk and switch off at 11, when the trail closes. The ferry terminal end gains a bike-repair stand and a water fountain.</p>
+      <p>Three parks connect through the route, and the city expects most people to reach it by the number 14 bus, which gains evening service next month.</p>
+    </article>
+  </main>
+</div>
+</body>
+</html>
