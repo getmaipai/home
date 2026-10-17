@@ -2,7 +2,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
-import { InputGroup, InputGroupAddon, InputGroupButton, InputGroupInput } from "@maipai/ui/src/dashboard/components/ui/input-group";
+import { InputGroup, InputGroupAddon, InputGroupInput } from "@maipai/ui/src/dashboard/components/ui/input-group";
+import { HitField } from "@maipai/ui/src/settings/HitField";
 import { useSurface } from "@maipai/ui/src/useSurface";
 import { api, type InstallStatusView } from "@/lib/api";
 import { STARTER_SUGGESTIONS } from "@/apps/chat/chatStarterSuggestions";
@@ -58,19 +59,28 @@ export function AskBox() {
       {down === undefined ? null : <img src="/setup-art/warming-up.webp" alt="" width={1312} height={1190} className="h-auto w-24 max-w-full sm:w-32" />}
       <form onSubmit={submit}>
         <InputGroup>
-          <InputGroupInput ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label="Ask" maxLength={2000} />
+          {/* The field sits in the kit's HitField label (a 48 px target for a text input); the button is the
+              kit's row size (28 px box, 48 px hit area). The span keeps the addon's negative end margin off
+              the group's edge (it only applies to a direct button child). The button is aria-disabled, not
+              disabled, while the box is empty: a disabled control fades the whole group (kit has-disabled), and
+              the faded placeholder fails WCAG contrast. An empty submit does nothing (see submit). */}
+          <HitField pad={10} className="flex-1">
+            <InputGroupInput ref={inputRef} value={text} onChange={(event) => setText(event.target.value)} placeholder={placeholder} aria-label="Ask" maxLength={2000} />
+          </HitField>
           <InputGroupAddon align="inline-end">
-            <InputGroupButton type="submit" variant="default" size="sm" disabled={text.trim() === ""}>Ask</InputGroupButton>
+            <span className="flex">
+              <Button type="submit" variant="default" size="row" aria-disabled={text.trim() === "" || undefined}>Ask</Button>
+            </span>
           </InputGroupAddon>
         </InputGroup>
       </form>
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-x-2 gap-y-5">
         {STARTERS.map((starter) => (
           <Button
             key={starter.title}
             type="button"
             variant="outline"
-            size="sm"
+            size="row"
             disabled={down !== undefined}
             aria-label={down === undefined ? undefined : `${starter.title} ${starter.label}. ${down}`}
             onClick={() => navigate(askHref(starter.prompt))}

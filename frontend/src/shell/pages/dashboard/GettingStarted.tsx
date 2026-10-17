@@ -26,11 +26,11 @@ export function GettingStarted({ person }: { person: Roster }) {
         <CardContent>
           <ItemGroup>
             {rows.map((item) => (
-              <Item key={item.id} size="sm">
+              <Item key={item.id} size="sm" role="listitem">
                 <ItemContent><ItemTitle>{item.title}</ItemTitle></ItemContent>
                 <ItemActions>
-                  <Button variant="outline" size="sm" nativeButton={false} render={<Link to={item.open.href} />}>{item.open.label}</Button>
-                  <Button variant="ghost" size="sm" disabled={dismiss.isPending} onClick={() => dismiss.mutate(item.id)}>Skip</Button>
+                  <Button variant="outline" size="row" nativeButton={false} render={<Link to={item.open.href} />}>{item.open.label}<span className="sr-only"> {item.title}</span></Button>
+                  <Button variant="ghost" size="row" disabled={dismiss.isPending} onClick={() => dismiss.mutate(item.id)}>Skip<span className="sr-only"> {item.title}</span></Button>
                 </ItemActions>
               </Item>
             ))}

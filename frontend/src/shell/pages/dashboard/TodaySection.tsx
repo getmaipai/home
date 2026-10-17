@@ -52,7 +52,7 @@ export function TodaySection() {
       <CardContent>
         <ItemGroup>
           {slot.data.items.map((item, index) => (
-            <Item key={`${item.title}-${index}`} size="sm">
+            <Item key={`${item.title}-${index}`} size="sm" role="listitem">
               <ItemContent>
                 <ItemTitle>{item.title}</ItemTitle>
                 {item.subtitle ? <ItemDescription>{item.subtitle}</ItemDescription> : null}
@@ -73,7 +73,7 @@ export function TodaySection() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{cards(first)}</div>
       {rest.length === 0 ? null : (
         <Collapsible>
-          <CollapsibleTrigger render={<Button variant="outline" size="sm" />}>More</CollapsibleTrigger>
+          <CollapsibleTrigger render={<Button variant="outline" size="row" />}>More</CollapsibleTrigger>
           <CollapsibleContent>
             <div className="grid gap-4 pt-3 sm:grid-cols-2 lg:grid-cols-3">{cards(rest)}</div>
           </CollapsibleContent>

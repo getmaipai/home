@@ -109,6 +109,24 @@ describe("DashboardPage (Home)", () => {
     }
   });
 
+  test("an empty Ask does nothing and never disables the group (a disabled control fades the placeholder below WCAG contrast)", async () => {
+    const { restore } = mockFetch();
+    try {
+      const view = renderHome(makePerson("adult"));
+      await view.findByRole("textbox", { name: "Ask" });
+      const ask = view.getByRole("button", { name: "Ask" }) as HTMLButtonElement;
+      expect(ask.disabled).toBe(false);
+      expect(ask.getAttribute("aria-disabled")).toBe("true");
+      fireEvent.click(ask);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(view.queryByTestId("where")).toBeNull();
+      fireEvent.change(view.getByRole("textbox", { name: "Ask" }), { target: { value: "Hi" } });
+      expect(ask.getAttribute("aria-disabled")).toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
   test("three starters open Chat with their prompt", async () => {
     const { restore } = mockFetch();
     try {
@@ -201,10 +219,28 @@ describe("DashboardPage (Home)", () => {
       expect(hrefOf("Updates")).toBe("/updates");
       expect(hrefOf("Repairs")).toBe("/repairs");
       await view.findByText("Getting started");
-      await view.findByText("Step b");
+      await view.findByRole("button", { name: "Open Step b" });
+      // Each row is a list item whose buttons name their step, so three rows never read as three identical "Open" / "Skip" pairs.
+      const section = view.getByRole("region", { name: "Getting started" });
+      expect(section.querySelectorAll('[role="listitem"]')).toHaveLength(3);
+      expect(view.getAllByRole("button", { name: /^Skip Step / }).map((b) => b.textContent)).toEqual(["Skip Step b", "Skip Step c", "Skip Step d"]);
       expect(view.queryByText("Step a")).toBeNull();
       expect(view.queryByText("Step e")).toBeNull();
       expect(hrefOf("1 more")).toBe("/settings/home/general");
+    } finally {
+      restore();
+    }
+  });
+
+  test("every Home control carries the kit's 48 px hit area (the row size) and the ask field sits in a hit-field label", async () => {
+    const { restore } = mockFetch({ checklist: [checklistItem("a", false)] });
+    try {
+      const view = renderHome(makePerson("owner"));
+      await view.findByRole("button", { name: "Open Step a" });
+      for (const el of [view.getByRole("button", { name: "Updates" }), view.getByRole("button", { name: "Repairs" }), view.getByRole("button", { name: "Open Step a" }), view.getByRole("button", { name: "Skip Step a" }), view.getByRole("button", { name: "Ask" })]) {
+        expect(el.className, el.textContent ?? "").toContain("cn-button-size-row");
+      }
+      expect(view.getByLabelText("Ask").closest('[data-slot="hit-field"]')).not.toBeNull();
     } finally {
       restore();
     }

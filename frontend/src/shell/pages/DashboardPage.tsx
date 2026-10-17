@@ -21,9 +21,9 @@ export function DashboardPage({ person }: { person: Roster }) {
       <h1 className="sr-only">Home</h1>
       <Greeting displayName={person.display_name} />
       {admin ? (
-        <nav aria-label="Looking after your hub" className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/updates" />}>Updates</Button>
-          <Button variant="outline" size="sm" nativeButton={false} render={<Link to="/repairs" />}>Repairs</Button>
+        <nav aria-label="Looking after your hub" className="flex flex-wrap gap-x-2 gap-y-5">
+          <Button variant="outline" size="row" nativeButton={false} render={<Link to="/updates" />}>Updates</Button>
+          <Button variant="outline" size="row" nativeButton={false} render={<Link to="/repairs" />}>Repairs</Button>
         </nav>
       ) : null}
       <div className="grid gap-6 lg:grid-cols-12">
