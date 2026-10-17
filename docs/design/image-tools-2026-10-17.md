@@ -97,7 +97,7 @@ outputs through the real Stack route in `e2e/`.
 
 | Row | What |
 |---|---|
-| IMGTOOLS-01 | Stack: tools service, worker, pins, install plan, `/v1/images/edits`, status route, tests. Built, state in the row |
+| IMGTOOLS-01 | Stack: tools service, worker, pins, install plan, `/v1/images/edits`, status route, tests. **Built and landed, Stack `b8a0ea9`**; verified end to end on a scratch Stack (own data dir, port 8793) with real images: Vision cut-out 0.6 s, IS-Net 2.5 s at 2048 px, erase 1.5 s warm (6.8 s with model load), upscale 2x of 1024 px 4.4 s, EXIF stripped and orientation applied, empty mask 422, oversize 413. The STACK_TAG pin bump is not done |
 | IMGTOOLS-02 | Architect verdict on this note, then Home endpoints |
 | IMGTOOLS-03 | Home: `POST /api/images/:id/edit` calling the Stack, new picture version, gates |
 | IMGTOOLS-04 | Home: tools status wired to the editor's enabled state |
