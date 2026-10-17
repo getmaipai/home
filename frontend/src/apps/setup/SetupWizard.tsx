@@ -67,7 +67,8 @@ const SCREEN_ART: Partial<Record<ScreenId, string>> = {
   engine_location: "/setup-art/where.webp",
   storage: "/setup-art/storage.webp",
   plan: "/setup-art/plan.webp",
-  // web_search: no art yet; add "/setup-art/search.webp" here once that file exists.
+  host_tune: "/setup-art/tune.webp",
+  web_search: "/setup-art/search.webp",
   owner: "/setup-art/owner.webp",
   backup: "/setup-art/backup.webp",
   checks: "/setup-art/checking.webp",
