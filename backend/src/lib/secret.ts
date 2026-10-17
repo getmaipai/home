@@ -42,6 +42,15 @@ export function ensureSecretPepperReady(): void {
   getPepper();
 }
 
+/** The non-secret length class stored beside the hash
+ * (person_credentials.secret_digits): the digit count of an all-digit PIN
+ * of 4 to 10 digits, else 0 (a password or anything non-numeric). The
+ * sign-in screen uses it to size the PIN entry and to auto-submit only at
+ * the exact length, so a longer PIN is never tried at 4 digits first. */
+export function secretDigitsOf(secret: string): number {
+  return /^\d{4,10}$/.test(secret) ? secret.length : 0;
+}
+
 export async function hashSecret(secret: string): Promise<string> {
   return Bun.password.hash(applyPepper(secret), {
     algorithm: "argon2id",

@@ -114,6 +114,42 @@ describe("SessionLockGate", () => {
     }
   });
 
+  test("a 6-digit PIN account is never tried at 4 digits; one attempt at 6 (pinDigits, 2026-10-17)", async () => {
+    let calls = 0;
+    const restore = stubFetch({
+      "/api/auth/verify-secret": () => {
+        calls += 1;
+        return Response.json({ success: true });
+      },
+    });
+    try {
+      renderWithQueryClient(
+        <SessionLockGate person={makePerson({ pinDigits: 6, sessionLockRequired: true, sessionLockTimeoutMinutes: FAST_TIMEOUT_MINUTES })}>
+          <div>the app</div>
+        </SessionLockGate>,
+      );
+      const input = await waitFor(() => {
+        const el = document.body.querySelector('input[type="password"]');
+        if (!el) throw new Error("not locked yet");
+        return el as HTMLInputElement;
+      });
+      for (const v of ["1", "12", "123", "1234", "12345"]) {
+        await act(async () => {
+          fireEvent.change(input, { target: { value: v } });
+        });
+      }
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls).toBe(0);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "123456" } });
+      });
+      await waitForGone(() => document.body.querySelector('input[type="password"]'));
+      expect(calls).toBe(1);
+    } finally {
+      restore();
+    }
+  });
+
   test("a wrong PIN shows an inline error and stays locked", async () => {
     const restore = stubFetch({
       "/api/auth/verify-secret": () => Response.json({ error: "Invalid PIN or password" }, { status: 401 }),

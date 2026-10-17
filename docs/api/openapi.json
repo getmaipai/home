@@ -800,6 +800,10 @@
                       "hasSecret": {
                         "type": "boolean"
                       },
+                      "pinDigits": {
+                        "type": "integer",
+                        "nullable": true
+                      },
                       "hasPasskeys": {
                         "type": "boolean"
                       },
@@ -822,6 +826,7 @@
                       "updated_at",
                       "hlc",
                       "hasSecret",
+                      "pinDigits",
                       "hasPasskeys",
                       "age_band"
                     ],
@@ -1497,6 +1502,10 @@
                     "hasSecret": {
                       "type": "boolean"
                     },
+                    "pinDigits": {
+                      "type": "integer",
+                      "nullable": true
+                    },
                     "hasPasskeys": {
                       "type": "boolean"
                     },
@@ -1525,6 +1534,7 @@
                     "updated_at",
                     "hlc",
                     "hasSecret",
+                    "pinDigits",
                     "hasPasskeys",
                     "age_band",
                     "sessionLockRequired",

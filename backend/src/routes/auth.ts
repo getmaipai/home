@@ -14,10 +14,10 @@ import { Person } from "@maipai/spec/gen/ts/person.js";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { db, sqlite } from "@/db";
 import { people, personCredentials, passkeyCredentials, sessions } from "@/db/schema";
-import { requiresCredential, getAuthMethods, roleRequiresCredential } from "@/lib/personAuthMethods";
+import { requiresCredential, getAuthMethods, pinDigitsHint, roleRequiresCredential } from "@/lib/personAuthMethods";
 import { isTotpEnabled } from "@/lib/totp";
 import { hashSessionToken, issueSession, sessionSignInSource } from "@/lib/session";
-import { hashSecret, verifySecret } from "@/lib/secret";
+import { hashSecret, secretDigitsOf, verifySecret } from "@/lib/secret";
 import { recordFailedAttempt, clearFailedAttempts, LOCKOUT_THRESHOLD } from "@/lib/credentialLockout";
 import { getClientIp, throttleCheck, throttleFail, throttleReset } from "@/lib/secretThrottle";
 import { newPersonId } from "@/lib/id";
@@ -31,7 +31,7 @@ import { setupLocalOnly } from "@/middleware/setupLocalOnly";
 export const auth = apiRouter();
 auth.use("/setup", setupLocalOnly);
 
-const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), hasPasskeys: z.boolean(), age_band: z.enum(["child", "teen", "adult"]) });
+const RosterSchema = Person.omit({ birthdate: true }).extend({ hasSecret: z.boolean(), pinDigits: z.number().int().nullable(), hasPasskeys: z.boolean(), age_band: z.enum(["child", "teen", "adult"]) });
 
 // Shared by /verify-secret and /change-secret: "prove you know this
 // person's current secret" is the identical lockout-check, verify,
@@ -108,7 +108,7 @@ auth.openapi(profilesRoute, (c) => {
   // tiny query for the distinct set of people with any passkey, rather
   // than one passkey lookup per row in a loop.
   const rows = db
-    .select({ person: people, secretHash: personCredentials.secretHash })
+    .select({ person: people, secretHash: personCredentials.secretHash, secretDigits: personCredentials.secretDigits })
     .from(people)
     .leftJoin(personCredentials, eq(people.id, personCredentials.personId))
     .where(isNull(people.deletedAt))
@@ -119,6 +119,7 @@ auth.openapi(profilesRoute, (c) => {
     rows.map((r) => ({
       ...toRoster(r.person),
       hasSecret: r.secretHash != null,
+      pinDigits: pinDigitsHint(r.secretDigits),
       hasPasskeys: withPasskeys.has(r.person.id),
     })),
     200,
@@ -200,6 +201,7 @@ auth.openapi(setupRoute, async (c) => {
   const created = insertOwnerIfNoneExists(personToDbValues(candidate.data), {
     personId: id,
     secretHash,
+    secretDigits: secretDigitsOf(secret.value),
     failedAttempts: 0,
     createdAt: now,
     updatedAt: now,
@@ -297,6 +299,11 @@ auth.openapi(verifySecretRoute, async (c) => {
   if (!verified.ok) return c.json(verified.body, verified.status);
 
   clearFailedAttempts(personId);
+  // Lazy backfill: a row written before secret_digits existed is
+  // classified now, the one moment the plaintext is in hand.
+  if (record.secretDigits === null) {
+    db.update(personCredentials).set({ secretDigits: secretDigitsOf(secret) }).where(eq(personCredentials.personId, personId)).run();
+  }
 
   // Step 6: optional TOTP for owner/admin - a second factor delays the
   // session, it never replaces the PIN/password check above. POST
@@ -331,10 +338,10 @@ const meRoute = createRoute({
 });
 auth.openapi(meRoute, (c) => {
   const person = c.get("person");
-  const { hasSecret, hasPasskeys } = getAuthMethods(person.id);
+  const { hasSecret, hasPasskeys, pinDigits } = getAuthMethods(person.id);
   const sessionLockRequired = getSettingValueForPerson(person.id, SESSION_LOCK_REQUIRED_KEY) as boolean;
   const sessionLockTimeoutMinutes = getSettingValueForPerson(person.id, SESSION_LOCK_TIMEOUT_KEY) as number;
-  return c.json({ ...toRoster(person), hasSecret, hasPasskeys, sessionLockRequired, sessionLockTimeoutMinutes }, 200);
+  return c.json({ ...toRoster(person), hasSecret, pinDigits, hasPasskeys, sessionLockRequired, sessionLockTimeoutMinutes }, 200);
 });
 
 // A person changing (or, for a PIN-free profile, first setting) their own
@@ -403,10 +410,10 @@ auth.openapi(changeSecretRoute, async (c) => {
   // an INSERT, the second failing with a primary-key violation instead of
   // the intended idempotent "set the PIN" outcome.
   db.insert(personCredentials)
-    .values({ personId: actor.id, secretHash, failedAttempts: 0, createdAt: now, updatedAt: now })
+    .values({ personId: actor.id, secretHash, secretDigits: secretDigitsOf(newSecret.value), failedAttempts: 0, createdAt: now, updatedAt: now })
     .onConflictDoUpdate({
       target: personCredentials.personId,
-      set: { secretHash, failedAttempts: 0, lockedUntil: null, updatedAt: now },
+      set: { secretHash, secretDigits: secretDigitsOf(newSecret.value), failedAttempts: 0, lockedUntil: null, updatedAt: now },
     })
     .run();
 

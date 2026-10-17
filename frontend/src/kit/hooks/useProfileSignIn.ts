@@ -14,7 +14,7 @@ export function useProfileSignIn(onSignedIn: () => void) {
   const [tapError, setTapError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  usePinAutoSubmit({ secret, selected, busy, onSubmit: () => void handleSecretSubmit() });
+  usePinAutoSubmit({ secret, selected, pinDigits: selected?.pinDigits, busy, onSubmit: () => void handleSecretSubmit() });
 
   async function handleSecretSubmit(e?: FormEvent) {
     e?.preventDefault();

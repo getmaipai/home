@@ -1,0 +1,1 @@
+ALTER TABLE `person_credentials` ADD `secret_digits` integer;

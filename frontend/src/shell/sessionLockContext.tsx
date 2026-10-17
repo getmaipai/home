@@ -50,7 +50,7 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
     }
   }
 
-  usePinAutoSubmit({ secret, selected: locked, busy, onSubmit: () => void handleUnlock() });
+  usePinAutoSubmit({ secret, selected: locked, pinDigits: person?.pinDigits, busy, onSubmit: () => void handleUnlock() });
 
   return (
     <SessionLockedContext.Provider value={locked}>

@@ -2,7 +2,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { people, personCredentials } from "@/db/schema";
-import { hashSecret } from "@/lib/secret";
+import { hashSecret, secretDigitsOf } from "@/lib/secret";
 import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { requireAuth, requireRoleOrGrant, ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middleware/auth";
@@ -196,7 +196,7 @@ peopleRoutes.openapi(createRoute_, async (c) => {
 
   if (secret) {
     db.insert(personCredentials)
-      .values({ personId: id, secretHash: await hashSecret(secret), failedAttempts: 0, createdAt: now, updatedAt: now })
+      .values({ personId: id, secretHash: await hashSecret(secret), secretDigits: secretDigitsOf(secret), failedAttempts: 0, createdAt: now, updatedAt: now })
       .run();
   }
 

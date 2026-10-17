@@ -37207,3 +37207,11 @@ returns its reasoning as `reasoning_content`), are in the Stack's
 Not done here: no Muse file has been downloaded or run on the Studio
 (19.7 GB, the owner's call), so tokens per second, load time and the
 bench numbers are still unmeasured.
+
+## Sign-in PIN length (2026-10-17)
+
+Bug found live on a real install: the sign-in screen auto-submitted at exactly 4 digits, so a 6-digit passcode fired a wrong 4-digit attempt first on every sign-in, burning one of the five allowed failures (`person_credentials.failed_attempts`, lock after 5).
+
+Policy found: the hub accepts any secret of 4 to 128 characters for every role (`lib/validation.ts` `validateSecret`); there is no 6-digit minimum and no separate child rule. Owner, admin and adult roles require a credential (`shared/personCredentialRoles`); the length is the person's choice.
+
+Fix: `person_credentials.secret_digits` (migration 0103) holds a non-secret length class written wherever a secret is set (`/api/auth/setup`, `/api/auth/change-secret`, `POST /api/people`): the digit count (4 to 10) for an all-digit secret, 0 for a password, NULL for a row written before the column existed. `GET /api/auth/profiles` and `/api/auth/me` add `pinDigits` (that count, else null; additive). A NULL row is classified by its next successful `/verify-secret`, the one moment the plaintext is in hand, so no failed attempt is ever needed to learn it. `usePinAutoSubmit` takes `pinDigits` and fires only when the secret is all digits of exactly that length; null never auto-submits. `SignInPage` shows that many keypad slots, or the password field with a Sign in button when `pinDigits` is null. The session lock screen passes the same hint. The server enforces nothing new.

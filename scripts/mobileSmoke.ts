@@ -236,9 +236,11 @@ export async function runMobileSmoke(opts: MobileSmokeOptions): Promise<MobileSm
     await step(page, "20-owner-password-fallback", async () => {
       await page.goto(`${opts.baseUrl}/sign-in`);
       await page.getByRole("button", { name: opts.ownerName }).tap();
-      await page.locator('[data-slot="input-otp"]').waitFor();
-      await page.getByRole("button", { name: /use a password instead/i }).tap();
+      // A password account has no keypad (pinDigits is null): the password
+      // field shows directly. A PIN account shows the keypad first.
       const field = page.locator('input[type="password"]');
+      await page.locator('[data-slot="input-otp"], input[type="password"]').first().waitFor();
+      if (!(await field.isVisible())) await page.getByRole("button", { name: /use a password instead/i }).tap();
       await field.waitFor();
       await field.fill(opts.ownerSecret);
       await page.getByRole("button", { name: /^sign in$/i }).tap();

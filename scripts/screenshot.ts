@@ -9804,7 +9804,7 @@ async function captureDocsShots(browser: Browser, sessionValue: string): Promise
     await page.getByText("Enter your PIN").waitFor({ timeout: 15000 });
     await page.keyboard.type("0000");
     await page.getByText(/Use a password instead/).first().waitFor({ timeout: 15000 });
-    await page.getByText(/password longer than 4/).waitFor({ timeout: 15000 });
+    await page.getByText(/Sign in with a password\?/).waitFor({ timeout: 15000 });
   }, { signedIn: false });
 
   // Chat: an empty first chat, and the delete menu on a saved chat.

@@ -26,6 +26,7 @@ function makePerson(overrides: Partial<Roster> = {}): Roster {
     memorialized_at: null,
     hlc: "1788000000000:0:test",
     hasSecret: true,
+    pinDigits: 4,
     ...overrides,
   } as Roster;
 }
@@ -370,6 +371,92 @@ describe("SignInPage credential step is a numeric keypad (MOBILE-LIVE-01)", () =
       expect(document.body.querySelector("input[data-input-otp]")).not.toBeNull();
     } finally {
       globalThis.fetch = originalFetch;
+      restore();
+    }
+  });
+});
+
+describe("SignInPage sizes the keypad to the account (pinDigits, 2026-10-17)", () => {
+  async function openFor(person: Roster, verify: () => Response) {
+    const restore = stubFetch({ "/api/auth/profiles": [person], "/api/auth/verify-secret": verify });
+    const onSignedIn = mock(() => {});
+    renderSignIn(onSignedIn);
+    const button = await waitFor(() => {
+      const el = document.body.querySelector("button");
+      if (!el) throw new Error("not yet rendered");
+      return el;
+    });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    return { restore, onSignedIn };
+  }
+
+  test("a 6-digit passcode shows six slots and makes exactly one attempt, none at 4 digits", async () => {
+    let calls = 0;
+    const secrets: string[] = [];
+    const original = globalThis.fetch;
+    const { restore, onSignedIn } = await openFor(makePerson({ pinDigits: 6 }), () => {
+      calls += 1;
+      return Response.json({ success: true });
+    });
+    const stubbed = globalThis.fetch;
+    globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
+      if (String(input).includes("/api/auth/verify-secret")) secrets.push(JSON.parse(String(init?.body ?? "{}")).secret);
+      return stubbed(input, init);
+    }) as unknown as typeof fetch;
+    try {
+      const input = await waitFor(() => {
+        const el = document.body.querySelector("input[data-input-otp]");
+        if (!el) throw new Error("not yet rendered");
+        return el as HTMLInputElement;
+      });
+      expect(document.body.querySelectorAll('[data-slot="input-otp-slot"]').length).toBe(6);
+      for (const partial of ["1", "12", "123", "1234", "12345"]) {
+        await act(async () => {
+          fireEvent.change(input, { target: { value: partial } });
+        });
+      }
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls).toBe(0);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "123456" } });
+      });
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(calls).toBe(1);
+      expect(secrets).toEqual(["123456"]);
+    } finally {
+      globalThis.fetch = original;
+      restore();
+    }
+  });
+
+  test("an unknown length (pinDigits null) shows the password field and never auto-submits", async () => {
+    let calls = 0;
+    const { restore, onSignedIn } = await openFor(makePerson({ pinDigits: null }), () => {
+      calls += 1;
+      return Response.json({ success: true });
+    });
+    try {
+      const field = await waitFor(() => {
+        const el = document.body.querySelector('input[type="password"]');
+        if (!el) throw new Error("not yet rendered");
+        return el as HTMLInputElement;
+      });
+      expect(document.body.querySelector("input[data-input-otp]")).toBeNull();
+      for (const v of ["1234", "123456"]) {
+        await act(async () => {
+          fireEvent.change(field, { target: { value: v } });
+        });
+      }
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls).toBe(0);
+      await act(async () => {
+        fireEvent.click(buttonByText(/^sign in$/i));
+      });
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      expect(calls).toBe(1);
+    } finally {
       restore();
     }
   });

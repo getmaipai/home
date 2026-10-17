@@ -6,7 +6,7 @@ describe("usePinAutoSubmit", () => {
   test("fires once a 4-digit PIN lands", () => {
     const onSubmit = mock(() => {});
     const { rerender } = renderHook(
-      ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected: { id: "p1" }, busy: false, onSubmit }),
+      ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected: { id: "p1" }, pinDigits: 4, busy: false, onSubmit }),
       { initialProps: { secret: "12" } },
     );
     expect(onSubmit).not.toHaveBeenCalled();
@@ -18,7 +18,7 @@ describe("usePinAutoSubmit", () => {
   test("never fires for a non-4-digit value, even a longer numeric one", () => {
     const onSubmit = mock(() => {});
     const { rerender } = renderHook(
-      ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected: { id: "p1" }, busy: false, onSubmit }),
+      ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected: { id: "p1" }, pinDigits: 4, busy: false, onSubmit }),
       { initialProps: { secret: "" } },
     );
     rerender({ secret: "12345" });
@@ -36,7 +36,7 @@ describe("usePinAutoSubmit", () => {
     const selected = { id: "p1" };
     const { rerender } = renderHook(
       ({ secret, busy }: { secret: string; busy: boolean }) =>
-        usePinAutoSubmit({ secret, selected, busy, onSubmit }),
+        usePinAutoSubmit({ secret, selected, pinDigits: 4, busy, onSubmit }),
       { initialProps: { secret: "1234", busy: false } },
     );
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -52,7 +52,7 @@ describe("usePinAutoSubmit", () => {
     const onSubmit = mock(() => {});
     const { rerender } = renderHook(
       ({ selected }: { selected: { id: string } | null }) =>
-        usePinAutoSubmit({ secret: "1234", selected, busy: false, onSubmit }),
+        usePinAutoSubmit({ secret: "1234", selected, pinDigits: 4, busy: false, onSubmit }),
       { initialProps: { selected: { id: "p1" } as { id: string } | null } },
     );
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -78,7 +78,7 @@ describe("usePinAutoSubmit", () => {
     const selected = { id: "p1" };
     const { rerender } = renderHook(
       ({ secret, busy }: { secret: string; busy: boolean }) =>
-        usePinAutoSubmit({ secret, selected, busy, onSubmit }),
+        usePinAutoSubmit({ secret, selected, pinDigits: 4, busy, onSubmit }),
       { initialProps: { secret: "1234", busy: false } },
     );
     expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -91,5 +91,29 @@ describe("usePinAutoSubmit", () => {
     rerender({ secret: "5678", busy: false });
 
     expect(onSubmit).toHaveBeenCalledTimes(2);
+  });
+
+  test("a 6-digit PIN never fires at 4 digits and fires once at 6", () => {
+    const onSubmit = mock(() => {});
+    const { rerender } = renderHook(
+      ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected: { id: "p1" }, pinDigits: 6, busy: false, onSubmit }),
+      { initialProps: { secret: "" } },
+    );
+    for (const v of ["1", "12", "123", "1234", "12345"]) rerender({ secret: v });
+    expect(onSubmit).not.toHaveBeenCalled();
+    rerender({ secret: "123456" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+  });
+
+  test("an unknown length (null, undefined or 0) never auto-submits, at any length", () => {
+    for (const pinDigits of [null, undefined, 0]) {
+      const onSubmit = mock(() => {});
+      const { rerender } = renderHook(
+        ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected: { id: "p1" }, pinDigits, busy: false, onSubmit }),
+        { initialProps: { secret: "" } },
+      );
+      for (const v of ["1234", "123456", "12345678"]) rerender({ secret: v });
+      expect(onSubmit).not.toHaveBeenCalled();
+    }
   });
 });

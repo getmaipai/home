@@ -27,7 +27,7 @@ import { useTabItem } from "@/shell/tabIdentity";
  * profile has one) onto the template's primitives instead. Reuses
  * `usePinAutoSubmit` (a plain hook, no UI, called inside
  * `useProfileSignIn` below) rather than reimplementing the phone-lock-
- * style 4-digit auto-submit.
+ * style auto-submit.
  *
  * Dropped, no counterpart: the template's own social sign-in buttons,
  * "Remember this device" checkbox, "Forgot password" and "Create an
@@ -36,14 +36,16 @@ import { useTabItem } from "@/shell/tabIdentity";
  * admin resets another person's secret), and no self-service account
  * creation (profiles are created in Settings -> Household -> Users).
  *
- * The credential step (MOBILE-LIVE-01) is a four-slot numeric PIN entry
- * (the kit's `InputOTP`: the phone's numeric keypad, one slot per digit),
- * not a text box. The hub stores no record of whether a credential is a PIN
- * or a password (`GET /api/auth/profiles` only says `hasSecret`), and a
- * credential may be 4 to 128 characters of anything, so nobody is locked
- * out: an explicit "Use a password instead" link swaps the keypad for the
- * text field, and "Use a PIN instead" swaps back. `usePinAutoSubmit` still
- * submits the instant a fourth digit lands.
+ * The credential step (MOBILE-LIVE-01) sizes itself to the account: when
+ * `GET /api/auth/profiles` reports `pinDigits` (the digit count of an
+ * all-digit PIN, stored non-secretly beside the hash), the kit's `InputOTP`
+ * shows exactly that many slots and `usePinAutoSubmit` submits only at that
+ * exact length, so a 6-digit passcode is never tried at 4 digits (each wrong
+ * try counts toward the five-failure lockout). When `pinDigits` is null (a
+ * password, or an account not yet classified: the next successful sign-in
+ * classifies it) the screen shows the password field with a Sign in button
+ * and never auto-submits. A PIN account can still choose "Use a password
+ * instead" and back.
  *
  * The tap/select/verify state machine itself is `useProfileSignIn`
  * (a code review, SHELL-08), kept out of this page so the profiles-fetch
@@ -51,9 +53,13 @@ import { useTabItem } from "@/shell/tabIdentity";
 export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   useTabItem("Sign in");
   const profilesQuery = useQuery<Roster[]>({ queryKey: ["auth-profiles"], queryFn: () => api.profiles() });
-  const [usePassword, setUsePassword] = useState(false);
+  const [wantsPassword, setUsePassword] = useState(false);
   const { selected, secret, setSecret, secretError, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
     useProfileSignIn(onSignedIn);
+
+  // pinDigits null/absent: length unknown or a password, so no keypad.
+  const pinDigits = selected?.pinDigits ?? null;
+  const usePassword = wantsPassword || pinDigits === null;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-accent px-4">
@@ -109,7 +115,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       </Label>
                       <InputOTP
                         id="secret"
-                        maxLength={4}
+                        maxLength={pinDigits ?? 4}
                         inputMode="numeric"
                         pattern="^[0-9]*$"
                         value={secret}
@@ -119,35 +125,34 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                         autoFocus
                       >
                         <InputOTPGroup>
-                          <InputOTPSlot index={0} />
-                          <InputOTPSlot index={1} />
-                          <InputOTPSlot index={2} />
-                          <InputOTPSlot index={3} />
+                          {Array.from({ length: pinDigits ?? 4 }, (_, i) => (
+                            <InputOTPSlot key={i} index={i} />
+                          ))}
                         </InputOTPGroup>
                       </InputOTP>
                     </div>
                   )}
                   {secretError ? <p className="text-sm text-destructive">{secretError}</p> : null}
                   {secretError && !usePassword ? (
-                    <p className="text-sm text-muted-foreground">
-                      Sign in with a password longer than 4 characters? Tap "Use a password instead".
-                    </p>
+                    <p className="text-sm text-muted-foreground">Sign in with a password? Tap "Use a password instead".</p>
                   ) : null}
                   {usePassword ? (
                     <Button type="submit" size="lg" disabled={busy}>
                       {busy ? "Signing in…" : "Sign in"}
                     </Button>
                   ) : null}
-                  <Button
-                    type="button"
-                    variant="link"
-                    onClick={() => {
-                      setUsePassword(!usePassword);
-                      setSecret("");
-                    }}
-                  >
-                    {usePassword ? "Use a PIN instead" : "Use a password instead"}
-                  </Button>
+                  {pinDigits !== null ? (
+                    <Button
+                      type="button"
+                      variant="link"
+                      onClick={() => {
+                        setUsePassword(!wantsPassword);
+                        setSecret("");
+                      }}
+                    >
+                      {usePassword ? "Use a PIN instead" : "Use a password instead"}
+                    </Button>
+                  ) : null}
                   <Button
                     type="button"
                     variant="ghost"

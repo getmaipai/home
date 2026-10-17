@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { Person } from "@maipai/spec/gen/ts/person.js";
 import { app } from "@/app";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { people, personCredentials } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
@@ -543,5 +543,49 @@ describe("change-secret (self-service PIN/password change)", () => {
       newSecret: "newpassword123",
     });
     expect(locked.status).toBe(429);
+  });
+});
+
+describe("pinDigits hint (sign-in length class, 2026-10-17)", () => {
+  type P = { id: string; pinDigits: number | null };
+  const hintFor = async (id: string) =>
+    ((await (await app.request("/api/auth/profiles")).json()) as P[]).find((p) => p.id === id)!.pinDigits;
+  const attempts = (id: string) =>
+    db.select().from(personCredentials).where(eq(personCredentials.personId, id)).get()!;
+
+  test("a 6-digit owner passcode reports 6; a 4-digit one 4; a password null", async () => {
+    const c6 = new TestClient();
+    const { person } = await setUpOwner(c6, "Sage", "123456");
+    expect(await hintFor(person.id as string)).toBe(6);
+    const me = (await (await c6.get("/api/auth/me")).json()) as P;
+    expect(me.pinDigits).toBe(6);
+
+    const ch = await c6.post("/api/auth/change-secret", { currentSecret: "123456", newSecret: "4321" });
+    expect(ch.status).toBe(200);
+    expect(await hintFor(person.id as string)).toBe(4);
+
+    await c6.post("/api/auth/change-secret", { currentSecret: "4321", newSecret: "correct horse" });
+    expect(await hintFor(person.id as string)).toBeNull();
+  });
+
+  test("a created 4-digit child profile reports 4", async () => {
+    const owner = new TestClient();
+    await setUpOwner(owner);
+    const res = await owner.post("/api/people", { displayName: "Pippa", role: "child", secret: "2468", birthdate: "2018-01-01" });
+    expect(res.status).toBe(201);
+    const kid = (await res.json()) as { id: string };
+    expect(await hintFor(kid.id)).toBe(4);
+  });
+
+  test("a legacy row (column NULL) reports null, then is classified by one successful sign-in with zero failures", async () => {
+    const owner = new TestClient();
+    const { person } = await setUpOwner(owner, "Sage", "123456");
+    db.update(personCredentials).set({ secretDigits: null }).where(eq(personCredentials.personId, person.id as string)).run();
+    expect(await hintFor(person.id as string)).toBeNull();
+
+    const res = await new TestClient().post("/api/auth/verify-secret", { personId: person.id, secret: "123456" });
+    expect(res.status).toBe(200);
+    expect(attempts(person.id as string).failedAttempts).toBe(0);
+    expect(await hintFor(person.id as string)).toBe(6);
   });
 });

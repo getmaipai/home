@@ -61,6 +61,12 @@ export const personCredentials = sqliteTable("person_credentials", {
     .primaryKey()
     .references(() => people.id),
   secretHash: text("secret_hash"),
+  // Non-secret length class of the PIN/password, so the sign-in screen
+  // knows how many digits to expect and when (not) to auto-submit.
+  // NULL = unknown (a row written before this column existed; set on the
+  // next successful sign-in), 0 = a password / non-numeric secret,
+  // 4..10 = an all-digit PIN of exactly that many digits.
+  secretDigits: integer("secret_digits"),
   failedAttempts: integer("failed_attempts").notNull().default(0),
   lockedUntil: text("locked_until"),
   createdAt: text("created_at").notNull(),

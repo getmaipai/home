@@ -12,12 +12,19 @@ import { ROLE_REQUIRES_CREDENTIAL } from "../../../shared/personCredentialRoles"
 
 export interface AuthMethods {
   hasSecret: boolean;
+  /** Digit count of an all-digit PIN, or null (a password, or not yet known). */
+  pinDigits: number | null;
   hasPasskeys: boolean;
+}
+
+/** The wire hint: a positive digit count, else null (password, unknown, or no secret). */
+export function pinDigitsHint(secretDigits: number | null | undefined): number | null {
+  return secretDigits != null && secretDigits > 0 ? secretDigits : null;
 }
 
 export function getAuthMethods(personId: string): AuthMethods {
   const cred = db
-    .select({ secretHash: personCredentials.secretHash })
+    .select({ secretHash: personCredentials.secretHash, secretDigits: personCredentials.secretDigits })
     .from(personCredentials)
     .where(eq(personCredentials.personId, personId))
     .get();
@@ -26,7 +33,7 @@ export function getAuthMethods(personId: string): AuthMethods {
     .from(passkeyCredentials)
     .where(eq(passkeyCredentials.personId, personId))
     .all().length;
-  return { hasSecret: cred?.secretHash != null, hasPasskeys: passkeyCount > 0 };
+  return { hasSecret: cred?.secretHash != null, pinDigits: cred?.secretHash != null ? pinDigitsHint(cred.secretDigits) : null, hasPasskeys: passkeyCount > 0 };
 }
 
 /** True if a bare-tap /select must be refused for this person because
