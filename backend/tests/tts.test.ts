@@ -6,6 +6,8 @@ import { synthesizeSpeech } from "@/lib/tts";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { __setStackClientForTests, __resetStackEngineForTests } from "@/lib/stackEngine";
 import { __setTtsTagsForTests } from "@/lib/ttsCapabilities";
+import { __setOfferedVoicesForTests } from "@/lib/voiceResolve";
+import type { StackVoice } from "@/lib/stack/types";
 import { turnAllowsVoiceCues } from "@/routes/turn";
 import { listIssues } from "@/lib/issues";
 import { startStackFixture, IDENTITY_HEADERS, offlineResponse, type StackFixture } from "./stackFixture";
@@ -89,13 +91,13 @@ describe("POST /api/tts", () => {
       __resetStackEngineForTests();
     });
 
-    test("sends the registry default (alba) when the person never chose a voice", async () => {
+    test("sends no voice (the engine's own default) when the person never chose one", async () => {
       const owner = new TestClient();
       await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
 
       const res = await owner.post("/api/tts", { text: "hi" });
       expect(res.status).toBe(200);
-      expect(receivedVoiceUrls).toEqual(["alba"]);
+      expect(receivedVoiceUrls).toEqual([null]);
     });
 
     test("sends the person's own chosen voice, not the default", async () => {
@@ -135,6 +137,45 @@ describe("POST /api/tts", () => {
       await owner.post("/api/tts", { text: "hi" });
       await childClient.post("/api/tts", { text: "hi" });
       expect(receivedVoiceUrls).toEqual(["estelle", "alba"]);
+    });
+
+    // VOICE-PICK-01: the live bug. Javert was saved while Pocket spoke; Chatterbox offers one voice.
+    describe("a saved voice the engine in use does not offer", () => {
+      const chatterbox = [{ id: "chatterbox-turbo-voice-default", name: "Chatterbox default", description: "unknown", language: "en", country: "unknown", gender: "unknown", source: "preset", engine: "chatterbox-turbo", onDisk: true, licence: null, revision: "r" }] as StackVoice[];
+      afterEach(() => __setOfferedVoicesForTests(undefined));
+      async function ownerWithVoice(value: string) {
+        const owner = new TestClient();
+        const { person } = (await (await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" })).json()) as { person: { id: string } };
+        const put = await owner.request("/api/settings", { method: "PUT", body: { scope: `person:${person.id}`, key: "tts.voice_id", value } });
+        expect(put.status).toBe(200);
+        return owner;
+      }
+      test("javert is not sent to Chatterbox; the next reply is spoken with the engine default", async () => {
+        __setOfferedVoicesForTests(chatterbox);
+        const owner = await ownerWithVoice("javert");
+        expect((await owner.post("/api/tts", { text: "hi" })).status).toBe(200);
+        expect(receivedVoiceUrls).toEqual([null]);
+      });
+      test("choosing the default voice saves and is spoken as the engine default", async () => {
+        __setOfferedVoicesForTests(chatterbox);
+        const owner = await ownerWithVoice("default");
+        await owner.post("/api/tts", { text: "hi" });
+        expect(receivedVoiceUrls).toEqual([null]);
+      });
+      test("a voice the engine offers is still sent by name", async () => {
+        __setOfferedVoicesForTests([{ ...chatterbox[0]!, id: "pocket-tts-voice-javert", engine: "pocket" }]);
+        const owner = await ownerWithVoice("javert");
+        await owner.post("/api/tts", { text: "hi" });
+        expect(receivedVoiceUrls).toEqual(["javert"]);
+      });
+      test("a reference voice id the Stack offers can be saved and is sent; an address cannot be saved", async () => {
+        __setOfferedVoicesForTests([...chatterbox, { ...chatterbox[0]!, id: "chatterbox-ref-nova" }]);
+        const owner = await ownerWithVoice("chatterbox-ref-nova");
+        await owner.post("/api/tts", { text: "hi" });
+        expect(receivedVoiceUrls).toEqual(["chatterbox-ref-nova"]);
+        const bad = await owner.request("/api/settings", { method: "PUT", body: { scope: "person:x", key: "tts.voice_id", value: "http://192.0.2.1/x.wav" } });
+        expect(bad.status).not.toBe(200);
+      });
     });
   });
 });

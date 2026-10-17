@@ -170,7 +170,7 @@ describe("deleteClonedVoice()", () => {
 
   test("deleting a voice leaves an UNRELATED person's own selection untouched", () => {
     const jesse = makePerson("Jesse", "owner");
-    const nova = makePerson("Nova", "child");
+    const nova = makePerson("Nova", "adult");
     const saved = saveClonedVoice(jesse, "Dad's voice", WAV_BYTES, "audio/wav");
     if (!saved.ok) throw new Error("setup failed");
     setPersonTtsVoiceUnchecked(nova, "alba");

@@ -25,7 +25,7 @@ function renderPage(voices: StackVoice[], options = ["alba", "mira"], settings: 
   const actor = { ...person((settings.role as Roster["role"] | undefined) ?? "adult"), id: "person-1" };
   spyOn(api, "people").mockResolvedValue([actor] as never);
   spyOn(api, "settingsValues").mockResolvedValue([{ key: "tts.voice_id", value: settings.voice ?? "alba", source: "default", label: "Speaking voice", level: "basic", secret: false, locked: settings.locked as boolean | undefined, reason: settings.reason as string | undefined }]);
-  spyOn(api, "setSetting").mockResolvedValue({ key: "tts.voice_id", value: "alba", source: "user", label: "Speaking voice", level: "basic", secret: false });
+  spyOn(api, "setSetting").mockImplementation(async (_scope: string, key: string, value: unknown) => ({ key, value, source: "user", label: "Speaking voice", level: "basic", secret: false }) as never);
   return renderWithQueryClient(<VoiceBrowserSection person={actor} />);
 }
 
@@ -44,17 +44,31 @@ describe("VoiceBrowserSection", () => {
     const view = renderPage([...three(), voice("c", { name: "Community", source: "community" }), voice("k", { name: "Cloned", source: "cloned" })], ["alba", "javert", "mira"]);
     fireEvent.click(await trigger(view));
     const names = (await view.findAllByRole("option")).map((option) => option.textContent);
-    expect(names).toEqual(["Alba", "Javert", "Mira"]);
+    expect(names).toEqual(["Default voice", "Alba", "Javert", "Mira"]);
   });
   test("the dropdown shows the stored voice", async () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "javert" });
     expect((await trigger(view)).textContent).toBe("Javert");
   });
-  test("a stored voice that is not on the list shows with its name and a note, never blank", async () => {
-    const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "vera" });
-    expect((await trigger(view)).textContent).toBe("Vera (not on this home's list)");
-    expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(true);
-    view.getByText("This voice is not on this home yet, so it cannot be tested.");
+  test("a stored voice the engine does not offer falls back to the default with one plain line, never a dead select", async () => {
+    const view = renderPage(three(), ["default", "alba", "javert", "mira"], { voice: "vera" });
+    expect((await trigger(view)).textContent).toBe("Default voice");
+    view.getByText("Vera is not available with this engine, using the default voice.");
+    expect((view.getByRole("button", { name: "Test" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+  test("one built-in voice (the Chatterbox shape): a saved Javert shows the default voice, the select works, Test plays the engine voice, the stale choice is moved to default once", async () => {
+    const view = renderPage([voice("chatterbox-turbo-voice-default", { name: "Chatterbox default", engine: "chatterbox-turbo" })], ["default", "alba", "javert"], { voice: "javert" });
+    const box = await trigger(view);
+    expect(box.textContent).toBe("Default voice");
+    expect(box.hasAttribute("disabled") || box.getAttribute("data-disabled") !== null).toBe(false);
+    view.getByText("Javert is not available with this engine, using the default voice.");
+    const start = spyOn(voicePreviewPlayer, "start").mockImplementation(async () => {});
+    fireEvent.click(view.getByRole("button", { name: "Test" }));
+    expect(start).toHaveBeenCalledWith("chatterbox-turbo-voice-default");
+    // The page moves the unavailable saved voice to the default once, and keeps the line.
+    await waitFor(() => expect(api.setSetting).toHaveBeenCalledWith("person:person-1", "tts.voice_id", "default"));
+    await waitFor(() => view.getByText("Javert is not available with this engine, using the default voice."));
+    expect(document.body.textContent).not.toMatch(/chatterbox/i);
   });
   test("choosing another voice saves at once and confirms quietly", async () => {
     const view = renderPage(three(), ["alba", "javert", "mira"], { voice: "alba" });

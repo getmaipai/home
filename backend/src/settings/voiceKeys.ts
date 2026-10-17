@@ -42,6 +42,10 @@
 // fetch whatever it's given.
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 
+/** The engine's own default voice (2026-10-17, VOICE-PICK-01). Follows whichever engine is speaking: Chatterbox's built-in
+ * voice, Pocket's "alba". Nothing is sent to the engine for it, so it stays valid when the engine changes. */
+export const VOICE_ENGINE_DEFAULT = "default";
+
 export const VOICE_PRESET_NAMES = [
   "alba",
   "cosette",
@@ -76,10 +80,10 @@ export const VOICE_SETTINGS_KEYS: SettingsKey[] = [
     key: "tts.voice_id",
     scope: "person",
     selector: "select",
-    range: { options: [...VOICE_PRESET_NAMES] },
-    default: "alba",
+    range: { options: [VOICE_ENGINE_DEFAULT, ...VOICE_PRESET_NAMES] },
+    default: VOICE_ENGINE_DEFAULT,
     label: "Speaking voice",
-    help: "The voice MaiPai uses when it reads its replies aloud to you.",
+    help: "The voice MaiPai uses when it reads its replies aloud to you. \"default\" is the voice built into the speech engine now in use.",
     level: "basic",
     lives_in: "person.voice",
     honoured_by: ["home"],

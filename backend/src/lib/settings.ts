@@ -17,7 +17,7 @@ import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { safeSearchDefaultFor, safeSearchStrictness, type SafeSearchLevel } from "@/lib/safeSearch";
 import { PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import { WAKEWORD_SETTING_KEY } from "@/settings/wakewordKeys";
-import { VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
+import { VOICE_ENGINE_DEFAULT, VOICE_PRESET_NAMES } from "@/settings/voiceKeys";
 import type { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { BLOCKLIST_KEYS } from "@/lib/blocklists/policy";
 import { blocklistStatusNote } from "@/lib/blocklists/status";
@@ -229,6 +229,9 @@ function validateSelectorValue(keyDef: SettingsKey, value: unknown): SettingsOpR
       // static list. Its declared default remains a valid choice (for
       // example `engines.chat.choice` defaults to `auto`).
       if (range?.options_from && value === keyDef.default) break;
+      // A Stack voice id (a reference voice the engine offers) is a plain token, never a URL: no ":" or "/", so it cannot
+      // point the speech engine at an address. The speech path drops an id the engine in use does not offer.
+      if (keyDef.key === "tts.voice_id" && typeof value === "string" && /^[a-z0-9][a-z0-9_-]{0,79}$/.test(value)) break;
       if (!options || !options.includes(value)) {
         return { ok: false, status: 400, error: `must be one of ${JSON.stringify(options ?? [])}` };
       }
@@ -713,7 +716,7 @@ export function setValue(
           : assertCanAccessScope(actor, parsed, "write");
   if (!auth.ok) return auth;
 
-  if (key === "tts.voice_id" && parsed.kind === "person" && getPersonRole(parsed.id!) === "child" && isOwnerOrAdmin(actor) && !VOICE_PRESET_NAMES.includes(value as typeof VOICE_PRESET_NAMES[number])) {
+  if (key === "tts.voice_id" && parsed.kind === "person" && getPersonRole(parsed.id!) === "child" && isOwnerOrAdmin(actor) && value !== VOICE_ENGINE_DEFAULT && !VOICE_PRESET_NAMES.includes(value as typeof VOICE_PRESET_NAMES[number])) {
     return { ok: false, status: 403, error: "A parent chooses your voice. Ask the person who manages Home to pick a preset voice for you." };
   }
 

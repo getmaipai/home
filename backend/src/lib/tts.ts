@@ -5,6 +5,7 @@
 // right status code for.
 import { getTtsTags } from "@/lib/ttsCapabilities";
 import { sanitizeSpeechTags } from "@/lib/voiceCues";
+import { getOfferedVoices, resolveVoice } from "@/lib/voiceResolve";
 import { getStackClient, isStackConfigured, resolveStackOffline, stackFailureResult } from "@/lib/stackEngine";
 
 const TTS_UNAVAILABLE_COPY = "Home can't speak right now because its voice engine is not running. Read the reply on screen and try again in a minute. If it keeps happening, an owner or admin can check Repairs.";
@@ -59,7 +60,8 @@ export async function synthesizeSpeech(rawText: string, voiceUrl?: string): Prom
   }
 
   try {
-    const result = await synthesizeViaStack(text, voiceUrl);
+    // VOICE-PICK-01: a saved voice the engine in use does not offer, or "default", is not sent; the engine speaks its own default.
+    const result = await synthesizeViaStack(text, resolveVoice(voiceUrl, await getOfferedVoices()).voiceUrl);
     return result.ok ? result : { ...result, error: TTS_UNAVAILABLE_COPY };
   } catch {
     return { ok: false, status: 503, code: "unavailable", error: TTS_UNAVAILABLE_COPY };

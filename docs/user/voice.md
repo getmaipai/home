@@ -30,7 +30,9 @@ To hear one reply read aloud, tap **Listen** under it. To have every reply read 
 
 ## Choose your voice
 
-Open **Settings**, the **Me** tab, then **Voices**. Choose a voice in the **Voice for you** list and press **Test** to hear it. Press **Stop** to end the sample. Your pick is saved when you choose it.
+Open **Settings**, the **Me** tab, then **Voices**. Choose a voice in the **Voice for you** list and press **Test** to hear it. Press **Stop** to end the sample. Your pick is saved when you choose it. The first choice is **Default voice**, the voice built into the speaking engine Home uses now. Home always lists the voice it is speaking with.
+
+If you saved a voice the current engine does not have (for example a name from the smaller engine), the page says so in one line, for example "Javert is not available with this engine, using the default voice." Home switches you to **Default voice** and speaks with it, so what you hear matches what the page shows.
 
 An owner or admin can choose a voice for a child. A teen or adult chooses their own. If a voice service is not ready, the page says "Voices are still getting ready" (this takes a minute after setup) or "Home can't reach its voice service", with **Try again**.
 

@@ -377,12 +377,12 @@ describe("PUT /api/settings for tts.voice_id (the registry's first real person-s
     expect(voice?.source).toBe("user");
   });
 
-  test("resolves to the registry default (alba) when nothing is stored", async () => {
+  test("resolves to the registry default (the engine's own voice) when nothing is stored", async () => {
     const { childClient, childId } = await ownerAndChild();
     const res = await childClient.get(`/api/settings?scope=person:${childId}`);
     const body = (await res.json()) as Array<{ key: string; value: unknown; source: string }>;
     const voice = body.find((s) => s.key === "tts.voice_id");
-    expect(voice?.value).toBe("alba");
+    expect(voice?.value).toBe("default");
     expect(voice?.source).toBe("default");
   });
 
@@ -400,7 +400,7 @@ describe("PUT /api/settings for tts.voice_id (the registry's first real person-s
     const adultId = db.select().from(people).where(eq(people.displayName, "Sage")).get()!.id;
     const res = await owner.request("/api/settings", {
       method: "PUT",
-      body: { scope: `person:${adultId}`, key: "tts.voice_id", value: "not-a-real-voice" },
+      body: { scope: `person:${adultId}`, key: "tts.voice_id", value: "http://192.0.2.1/not-a-real-voice.wav" },
     });
     expect(res.status).toBe(400);
   });
@@ -662,7 +662,7 @@ describe("PUT /api/settings for security.session_lock_required/timeout (owner/ad
 describe("lib/settings.ts getPersonSettingValue()", () => {
   test("resolves the registry default when nothing is stored", async () => {
     const { childPerson } = await ownerAndChild();
-    expect(getPersonSettingValue(childPerson, "tts.voice_id")).toBe("alba");
+    expect(getPersonSettingValue(childPerson, "tts.voice_id")).toBe("default");
   });
 
   test("resolves a stored value once one exists", async () => {

@@ -57,7 +57,9 @@ function loadRegistry(): SettingsKey[] {
   const raw = JSON.parse(readFileSync(REGISTRY_PATH, "utf-8")) as unknown[];
   // KS-MODE-01: spec-v0.1.116 still declares the retired search.wikipedia_fallback.
   // Nothing reads it any more, so it must not show or be settable until a commons tag drops it.
-  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY);
+  // VOICE-PICK-01: Home's tts.voice_id (default "default", the engine's own voice) supersedes the spec's (default "alba",
+  // Pocket's name) until a commons spec tag carries the same declaration; then this line goes.
+  const parsed = raw.map((entry) => SettingsKey.parse(entry)).filter((entry) => entry.key !== RETIRED_WIKIPEDIA_FALLBACK_KEY && entry.key !== "tts.voice_id");
   // AI declarations ship with Home's backend, while the shared settings
   // snapshot is pinned independently. Include newly added Home AI keys
   // until the shared snapshot is advanced.
