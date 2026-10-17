@@ -124,6 +124,23 @@ Honest limits of these numbers:
   temperature Muse uses does not hurt the draft.
 - b10797 is enough. The newer Metal few-row kernels (b11404+) were not tried; no pin bump is needed to ship.
 
+### Quality check with and without the draft (2026-10-17)
+
+The same three benches against a separate llama-server on port 18998 (Stack flags, 32k context, `--seed` 1, 2, 3 per run, restarted per
+run; lock held; live Stack untouched), draft against no draft, three seeds each:
+
+| Bench | No draft (seeds 1, 2, 3) | Draft (seeds 1, 2, 3) | Verdict |
+|---|---|---|---|
+| Tool calling: `tool-calling.ts`, 2 repeats, corpus rows plus the budget-offered pass (58 runs per seed) | 43, 42, 43 correct (128/174, 73.6%) | 43, 41, 45 correct (129/174, 74.1%) | Same. Corpus false calls 0 in every run; budget-pass false calls 2 in every run. |
+| Search decision: `search-recency-02.ts`, plain arm, 4 stable and 4 recency adult rows | stable 50, 50, 50%; recency 50, 100, 75% | stable 100, 50, 75%; recency 75, 100, 25% | Inside the bench's noise (4 rows per cell, 25 points per row). Pooled over 24 row runs: 15/24 (62.5%) against 17/24 (70.8%). No signal either way. |
+| Reasoning: 20 short arithmetic and logic questions, own scorer, temperature 1.0, 1,500 token cap | 20/20 each seed; 2,639, 2,546, 2,734 tokens | 20/20 each seed; 2,558, 2,518, 2,700 tokens | Same answers; the draft does not change how long the model reasons. |
+
+Reading: quality holds within the benches' noise. Seeds differ per run, so each cell is also an independent sample of the model's own
+sampling variance, which is the wider of the two spreads (the tool bench moves by 2 to 4 correct between seeds in both arms). The
+search bench is the weak instrument here: 8 rows cannot see a few points, and the three seeds only bound a large loss. Speculative decoding
+is lossless in distribution, and nothing here contradicts that. The reasoning set is at its ceiling (20/20) so it can only catch a
+collapse, which did not occur. Not run: the 120-row KS-BENCH-01 set (hours at 26 tok/s) and ARCH-MEASURE-01's 50-repeat budget pass.
+
 ### How to ship it (CHAT-TPS-02 plan)
 
 1. **Pin the draft in the model record**, the same way the projector is pinned (VISION-03b): `draft: { url, revision, sha256,
@@ -139,9 +156,9 @@ Honest limits of these numbers:
    beyond the memory number.
 5. **Thinking tokens and tool calls behave the same:** the drafter only proposes tokens; the main model accepts or replaces each,
    so reasoning, tool-call JSON and stop tokens come from the main model's distribution. Structured output gains most (JSON 1.84x).
-6. **Verification before the catalog change:** run the existing search, tool and reasoning benches once with and once without the
-   draft and require equal scores within run noise (byte equality is not expected, see above). Architect verdict first, since the
-   record shape and `engineArgs.ts` change.
+6. **Verification before the catalog change: done above** (equal within noise). Still to run before the installed Stack changes:
+   the draft together with the Muse projector in one launch (the projector file was not on disk for this run), and the p32 Q4_K_M
+   file with the draft (only the Q4_K_XL file was tested). Architect verdict first, since the record shape and `engineArgs.ts` change.
 
 **Not done:** the installed Stack was not changed. The approval needed is to add the pinned draft to the Muse Glimmer 30B record (p32
 and larger) and the flags to `engineArgs.ts`; see the CHAT-TPS-02 row.
