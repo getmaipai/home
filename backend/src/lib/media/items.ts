@@ -7,7 +7,7 @@ import { mediaItems, mediaSources } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import { allowedBandsFor, bandAllows } from "./band";
-import { sourceVisibleTo } from "./access";
+import { readableItem, sourceVisibleTo } from "./access";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaItemRow } from "./model";
 import { matchKey } from "./parsers/text";
 import { archivePath, TRASH_DAYS } from "./sources";
@@ -112,7 +112,7 @@ export function linkedItems(actor: PersonRow, row: MediaItemRow): MediaItem[] {
   return candidates
     .filter((other) => other.id !== row.id && other.kind !== row.kind && other.locPath !== null && dirname(other.locPath) === folder && matchKey(other.title) === wantTitle && other.subtitle !== null && matchKey(other.subtitle) === wantSubtitle)
     .map(itemFromRow)
-    .filter((item) => bandAllows(actor, item));
+    .filter((item) => readableItem(actor, item.id) !== null);
 }
 
 export function itemDetail(actor: PersonRow, item: MediaItem): ItemDetail {
@@ -124,7 +124,7 @@ export function itemDetail(actor: PersonRow, item: MediaItem): ItemDetail {
     .orderBy(asc(mediaItems.trackNo))
     .all()
     .map(itemFromRow)
-    .filter((part) => bandAllows(actor, part));
+    .filter((part) => readableItem(actor, part.id) !== null);
   return { item, parts, linked: linkedItems(actor, row), page_count: row.pages };
 }
 

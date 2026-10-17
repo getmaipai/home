@@ -4,6 +4,8 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
+import { getPersonSettingValue } from "@/lib/settings";
+import { MEDIA_ALLOWLIST_KEY } from "@/settings/mediaKeys";
 import { bandAllows } from "./band";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
 
@@ -11,10 +13,17 @@ export function isMediaAdmin(actor: PersonRow): boolean {
   return actor.role === "owner" || actor.role === "admin";
 }
 
-export function sourceVisibleTo(source: Pick<MediaSource, "visible_to" | "deleted_at" | "scope" | "owner_person_id">, actor: PersonRow): boolean {
+/** App routes use this before assembling discovery shelves or chips. Library search still uses the access gate. */
+export function discoveryAllowed(actor: PersonRow): boolean {
+  return getPersonSettingValue(actor, MEDIA_ALLOWLIST_KEY) !== true;
+}
+
+export function sourceVisibleTo(source: Pick<MediaSource, "kind" | "visible_to" | "deleted_at" | "scope" | "owner_person_id">, actor: PersonRow): boolean {
   if (source.deleted_at) return false;
   if (source.scope === "person" && source.owner_person_id !== actor.id) return false;
-  return source.visible_to === "household" || source.visible_to.includes(actor.id);
+  const named = Array.isArray(source.visible_to) && source.visible_to.includes(actor.id);
+  if (!discoveryAllowed(actor) && !(source.kind === "root" && source.scope === "household") && !named) return false;
+  return source.visible_to === "household" || named;
 }
 
 export function liveSourceById(id: string): MediaSource | null {

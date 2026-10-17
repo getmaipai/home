@@ -19,6 +19,7 @@ import { HOME_ASSISTANT_SETTINGS_KEYS } from "../src/settings/homeAssistantKeys.
 import { SEARCH_SETTINGS_KEYS } from "../src/settings/searchKeys.js";
 import { NOTIFICATION_SETTINGS_KEYS } from "../src/settings/notificationKeys.js";
 import { UI_SETTINGS_KEYS } from "../src/settings/uiKeys.js";
+import { MEDIA_SETTINGS_KEYS } from "../src/settings/mediaKeys.js";
 import { ALLOWANCE_SETTINGS_KEYS } from "../src/settings/allowanceKeys.js";
 import { STORAGE_SETTINGS_KEYS } from "../src/settings/storageKeys.js";
 import { REFERENCE_SETTINGS_KEYS } from "../src/settings/referenceKeys.js";
@@ -43,6 +44,7 @@ const sorted = [
   ...NOTIFICATION_SETTINGS_KEYS,
   ...UI_SETTINGS_KEYS,
   ...ALLOWANCE_SETTINGS_KEYS,
+  ...MEDIA_SETTINGS_KEYS,
   ...STORAGE_SETTINGS_KEYS,
   ...REFERENCE_SETTINGS_KEYS,
   ...PICTURE_SETTINGS_KEYS,

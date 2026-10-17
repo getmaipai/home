@@ -23,6 +23,7 @@ import { REFERENCE_SETTINGS_KEYS } from "@/settings/referenceKeys";
 import { PICTURE_SETTINGS_KEYS } from "@/settings/pictureKeys";
 import { VIDEO_SETTINGS_KEYS } from "@/settings/videoKeys";
 import { LIKENESS_SETTINGS_KEYS } from "@/settings/likenessKeys";
+import { MEDIA_SETTINGS_KEYS } from "@/settings/mediaKeys";
 import { VOICE_SETTINGS_KEYS } from "@/settings/voiceKeys";
 import { AUDIO_SETTINGS_KEYS } from "@/settings/audioKeys";
 
@@ -68,6 +69,8 @@ function loadRegistry(): SettingsKey[] {
   // THIN-4H: search.brave_api_key likewise rides here until a commons spec tag carries it.
   const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...LIKENESS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...AUDIO_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
   return combined.map(withPersonGuardFacts);
+  const combined = [...parsed, ...[...AI_SETTINGS_KEYS, ...HOSTED_SEARCH_SETTINGS_KEYS, ...MINOR_DDGS_SETTINGS_KEYS, ...NOTIFICATION_SETTINGS_KEYS, ...REFERENCE_SETTINGS_KEYS, ...PICTURE_SETTINGS_KEYS, ...VIDEO_SETTINGS_KEYS, ...LIKENESS_SETTINGS_KEYS, ...VOICE_SETTINGS_KEYS, ...MEDIA_SETTINGS_KEYS, ...PLACE_SETTINGS_KEYS, ...bundledPackageKeys()].filter((entry) => !keys.has(entry.key))];
+  return combined.map((key) => withPersonGuardFacts(key.key === "allowance.media.daily_minutes" ? { ...key, control: { child: "guardian", teen: "guardian", adult: "self" } } : key));
 }
 
 // INITIATIVE-01: person.robot.may_address is guardian-set for a child too (assertCanSetRobotMayAddress in settings.ts).

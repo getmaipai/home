@@ -562,6 +562,18 @@ function assertCanSetSessionLock(actor: PersonRow, targetPersonId: string): Sett
 // otherwise let anyone raise their OWN cap just by writing their own
 // person-scope setting, which defeats the whole point of an admin-set
 // override.
+/** Media protections are guardian-held for both minor bands. An admin can set one person's controls,
+ * without gaining access to that person's progress or activity. Set and reset share this gate. */
+function assertCanSetMediaProtection(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
+  const target = db.select().from(people).where(and(eq(people.id, targetPersonId), isNull(people.deletedAt))).get();
+  if (!target) return { ok: false, status: 403, error: "That person was not found. Open People and pick them again." };
+  if (isOwnerOrAdmin(actor)) return assertOwnerAdminLadder(actor, targetPersonId, "You cannot change these media controls. Ask the person who manages Home.");
+  if (actor.id === targetPersonId && speakerAgeBand(actor, new Date()) === "adult" && actor.role !== "guest") return { ok: true, value: true };
+  return { ok: false, status: 403, error: "A grown-up sets your media controls. Ask a grown-up to change them." };
+}
+
+const isMediaProtection = (key: string) => key === "media.allowlist_only" || key === "allowance.media.daily_minutes";
+
 function assertCanSetPersonStorageCap(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
   return assertOwnerAdminLadder(actor, targetPersonId, "only owner or admin may change a person's storage cap");
 }
@@ -685,7 +697,9 @@ export function setValue(
     return written.ok ? { ok: true, value: { ...written.value, layer: "person", locked: gate.setBy !== "self" } } : written;
   }
 
-  const auth = key === COMPANIONS_ALLOWED_KEY
+  const auth = isMediaProtection(key) && parsed.kind === "person"
+    ? assertCanSetMediaProtection(actor, parsed.id!)
+    : key === COMPANIONS_ALLOWED_KEY
       ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
         ? { ok: true as const, value: true as const }
         : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
@@ -948,7 +962,9 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
     return { ok: true, value: { ...resolveForResponse(keyDef, layered.value, layered.layer === "person" ? "user" : "default", responseContext(actor, subject, parsed.kind)), layer: layered.layer, locked: false } };
   }
 
-  const auth = key === COMPANIONS_ALLOWED_KEY
+  const auth = isMediaProtection(key) && parsed.kind === "person"
+    ? assertCanSetMediaProtection(actor, parsed.id!)
+    : key === COMPANIONS_ALLOWED_KEY
     ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
       ? { ok: true as const, value: true as const }
       : { ok: false as const, status: 403 as const, error: COMPANIONS_PERMISSION_ERROR })
@@ -968,7 +984,7 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
   db.delete(settingsValues).where(and(eq(settingsValues.scope, scope), eq(settingsValues.key, key))).run();
   settingsCache.delete(settingsCacheKey(scope, key));
   if (likenessBeforeReset) afterLikenessWrite(actor, parsed.id!, key, false, likenessBeforeReset);
-  const restored = key === COMPANIONS_ALLOWED_KEY && parsed.kind === "person" && parsed.id
+  const restored = isLayeredScalar(keyDef) && parsed.kind === "person" && parsed.id
     ? resolveLayeredScalar(keyDef, parsed.id, speakerAgeBand(responseSubject(actor, parsed), new Date()))
     : { value: keyDef.default, layer: "default" as const };
   return { ok: true, value: resolveForResponse(keyDef, restored.value, restored.layer === "person" || restored.layer === "household" ? "user" : "default", responseContext(actor, responseSubject(actor, parsed), parsed.kind)) };
