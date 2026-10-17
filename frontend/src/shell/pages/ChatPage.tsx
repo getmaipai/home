@@ -25,7 +25,7 @@ import { CanvasSplit, CanvasSplitBody, CanvasSplitDocument, CanvasSplitHeader, C
 import { Alert, AlertDescription, AlertTitle } from "@maipai/ui/src/dashboard/components/ui/alert";
 import { Button } from "@maipai/ui/src/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@maipai/ui/src/ui/sheet";
-import { Dialog, DialogContent } from "@maipai/ui/src/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@maipai/ui/src/ui/dialog";
 import { VoiceConversation } from "@maipai/ui/src/elements/voice-conversation";
 import { TooltipIconButton } from "@maipai/ui/src/elements/tooltip-icon-button";
 import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
@@ -49,6 +49,7 @@ import "@/shell/pages/chatReplyMarkdown.css";
 import { WakeWordController } from "@/apps/chat/WakeWordController";
 import { useSetChatHeaderData } from "@/apps/chat/chatHeaderData";
 import { ChatHeaderBar } from "@/apps/chat/chatHeaderBar";
+import { micHelp, useMicGate } from "@/lib/media/micGate";
 import { VoiceSessionProvider } from "@/apps/chat/voiceSessionContext";
 import { DictationLevelMeterProvider } from "@/apps/chat/composerDictationWaveform";
 import { ChatAvailabilityContext, useChatAvailability, useChatComposerNotice, useVoiceAvailable } from "@/apps/chat/useChatAvailability";
@@ -1044,10 +1045,15 @@ export function ChatPage({ person }: { person: Roster }) {
   // it) and useLiveVoiceSession read the identical state.
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [voiceOpenedByWake, setVoiceOpenedByWake] = useState(false);
+  const micGate = useMicGate(() => setVoiceOpen(true));
+  const micGateRequest = micGate.request;
   const closeAwareSetVoiceOpen = useCallback((open: boolean) => {
     if (!open) setVoiceOpenedByWake(false);
+    // VOICE-LIVE-02b: a tap asks the browser for the mic once, before the
+    // call overlay opens; a block shows the help dialog instead.
+    if (open) { void micGateRequest(); return; }
     setVoiceOpen(open);
-  }, []);
+  }, [micGateRequest]);
   const openVoiceFromWake = useCallback(() => {
     setVoiceOpenedByWake(true);
     setVoiceOpen(true);
@@ -1300,7 +1306,7 @@ export function ChatPage({ person }: { person: Roster }) {
     open: voiceOpen,
     onOpenChange: closeAwareSetVoiceOpen,
     installationNotice: chatAvailability === "unavailable" && composerNotice?.text.startsWith("The AI is still installing.") === true,
-    onProblem: (kind: VoiceFailureKind) => toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" }),
+    onProblem: (kind: VoiceFailureKind) => kind === "microphone_blocked" ? void micGate.request() : toast.error(voiceFailureLine(kind, { minor: person.age_band !== "adult", canOpenRepairs: isOwnerOrAdminRole(person.role) }), { id: "voice-problem" }),
     idleCloseMs: voiceOpenedByWake ? WAKE_SESSION_IDLE_CLOSE_MS : null,
     turnSchedulerRef,
     liveVoiceActiveRef,
@@ -1430,6 +1436,26 @@ export function ChatPage({ person }: { person: Roster }) {
         <ChatHeaderDataBridge autoReadReplies={autoReadReplies} setAutoReadReplies={setAutoReadReplies} ttsAvailable={ttsAvailable} />
         <ProjectResultReload />
         {settingsDialog}
+        <Dialog open={micGate.problem !== null} onOpenChange={(open) => { if (!open) micGate.dismiss(); }}>
+          <DialogContent aria-label="Microphone help">
+            {micGate.problem ? (() => {
+              const help = micHelp(micGate.problem);
+              return (
+                <>
+                  <DialogHeader>
+                    <DialogTitle>{help.title}</DialogTitle>
+                    <DialogDescription>{help.cause}</DialogDescription>
+                  </DialogHeader>
+                  {help.steps.length ? <ol className="list-decimal space-y-1 pl-5 text-sm">{help.steps.map((step) => <li key={step}>{step}</li>)}</ol> : null}
+                  <DialogFooter>
+                    <Button variant="outline" onClick={micGate.dismiss}>Close</Button>
+                    <Button onClick={() => void micGate.request()}>Try again</Button>
+                  </DialogFooter>
+                </>
+              );
+            })() : null}
+          </DialogContent>
+        </Dialog>
         <Dialog open={voiceOpen} onOpenChange={closeAwareSetVoiceOpen}>
           <DialogContent variant="call" showCloseButton={false} aria-label="Voice conversation">
             <VoiceConversation
