@@ -45,7 +45,7 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
         const next = await read();
         if (disposed) return;
         setStatus(next);
-        if (next.state === "downloading" || next.state === "starter_ready" || next.state === "installing_engine") delay = 2_000;
+        if (next.state === "downloading" || next.state === "starter_ready" || next.state === "installing_engine" || next.background?.state === "running") delay = 2_000;
       } catch { /* The strip is a courtesy; a missed poll is retried. */ }
       if (!disposed) timer = setTimeout(() => void poll(), delay);
     };
@@ -53,7 +53,41 @@ export function InstallStrip({ detailsHref = "/settings/home/ai", read = api.ins
     return () => { disposed = true; if (timer) clearTimeout(timer); };
   }, [read]);
 
-  if (!status || status.state === "none" || status.state === "ready") return null;
+  if (!status) return null;
+  // A part installed later from Settings (Models and storage) rides the same strip once the first install is out of the way.
+  if (status.state === "none" || status.state === "ready") {
+    const background = status.background;
+    if (!background) return null;
+    if (compact) {
+      const line = (
+        <div data-testid="install-strip" className="flex flex-col gap-1 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2">
+            <span className="min-w-0 flex-1 truncate">{background.label}</span>
+            <span className="shrink-0 tabular-nums">{background.percent}%</span>
+          </div>
+          <Progress mode="determinate" value={background.percent} label={`${background.label} progress`} />
+        </div>
+      );
+      return <>{frame ? frame(line) : line}</>;
+    }
+    return (
+      <>
+      <JobProgress
+        data-testid="install-strip"
+        variant="compact"
+        title={background.label}
+        stages={[{ name: "Download", weight: 1 }]}
+        stageIndex={0}
+        stageProgress={background.percent / 100}
+        completedBytes={background.completedBytes}
+        totalBytes={background.totalBytes}
+        {...(background.bytesPerSecond ? { bytesPerSecond: background.bytesPerSecond } : {})}
+        {...(background.etaSeconds ? { etaSeconds: background.etaSeconds } : {})}
+        downloadState={background.state === "stalled" ? "stalled" : "running"}
+      />
+      </>
+    );
+  }
   const problem = status.problem;
   const engineStep = status.state === "installing_engine" || status.state === "engine_failed";
   const title = installTitle(status);

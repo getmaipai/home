@@ -22,6 +22,20 @@ export interface InstallItem {
   reason: string | null;
 }
 
+/** A part installed later from Settings (Models and storage): Z-Image-Turbo, the video model, a voice. It rides beside the setup install and
+ * never changes `state`, `chatReady` or `complete`, which gate chat and voice while the first download runs. */
+export interface BackgroundInstall {
+  state: "running" | "stalled";
+  /** Plain words: "Downloading Pictures: Z-Image-Turbo". */
+  label: string;
+  percent: number;
+  completedBytes: number;
+  totalBytes: number;
+  bytesPerSecond: number | null;
+  etaSeconds: number | null;
+  count: number;
+}
+
 export interface InstallStatus {
   state: InstallState;
   /** Chat can answer: at least one chat model has landed. */
@@ -39,11 +53,13 @@ export interface InstallStatus {
   /** While the AI engine itself installs: the step (fetching, building, starting) and its plain label. */
   stage: string | null;
   stageLabel: string | null;
+  /** Component installs in flight (see BackgroundInstall); null when none. */
+  background: BackgroundInstall | null;
 }
 
 export const EMPTY_INSTALL: InstallStatus = {
   state: "none", chatReady: false, complete: false, percent: 0, completedBytes: 0, totalBytes: 0,
-  bytesPerSecond: null, etaSeconds: null, items: [], problem: null, stage: null, stageLabel: null,
+  bytesPerSecond: null, etaSeconds: null, items: [], problem: null, stage: null, stageLabel: null, background: null,
 };
 
 const OUT_OF_SPACE = /enospc|no space|not enough (disk )?space|disk (is )?full|out of (disk )?space/i;
@@ -63,6 +79,24 @@ function newestPerModel(jobs: StackJob[]): StackJob[] {
     if (!seen || job.createdAt > seen.createdAt) byModel.set(key, job);
   }
   return [...byModel.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+/** The component installs still moving. A finished or failed one is not shown here: a failure is a Repairs item with Try again (the Stack raises it). */
+export function summarizeBackground(allJobs: StackJob[]): BackgroundInstall | null {
+  const active = allJobs.filter((job) => job.kind === "component.install" && (job.state === "queued" || job.state === "running" || job.state === "stalled"));
+  if (active.length === 0) return null;
+  const completedBytes = active.reduce((sum, job) => sum + job.completedBytes, 0);
+  const totalBytes = active.reduce((sum, job) => sum + job.totalBytes, 0);
+  const speed = active.reduce((sum, job) => sum + (job.bytesPerSecond ?? 0), 0);
+  const left = Math.max(0, totalBytes - completedBytes);
+  const name = (job: StackJob): string => typeof job.input?.label === "string" ? job.input.label : "more AI";
+  const stalled = active.every((job) => job.state === "stalled");
+  return {
+    state: stalled ? "stalled" : "running",
+    label: stalled ? `A download stopped moving: ${name(active[0]!)}` : active.length === 1 ? `Downloading ${name(active[0]!)}` : `Downloading ${active.length} parts`,
+    percent: totalBytes > 0 ? Math.min(100, Math.floor((completedBytes / totalBytes) * 100)) : 0,
+    completedBytes, totalBytes, bytesPerSecond: speed > 0 ? Math.round(speed) : null, etaSeconds: speed > 0 && left > 0 ? Math.ceil(left / speed) : null, count: active.length,
+  };
 }
 
 export function summarizeInstall(allJobs: StackJob[]): InstallStatus {
@@ -104,7 +138,7 @@ export function summarizeInstall(allJobs: StackJob[]): InstallStatus {
     completedBytes, totalBytes,
     bytesPerSecond: speed > 0 ? Math.round(speed) : null,
     etaSeconds: speed > 0 && left > 0 ? Math.ceil(left / speed) : null,
-    items, problem, stage: null, stageLabel: null,
+    items, problem, stage: null, stageLabel: null, background: null,
   };
 }
 
@@ -119,7 +153,10 @@ export async function getInstallStatus(): Promise<InstallStatus> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.value;
   let value = EMPTY_INSTALL;
   if (isStackConfigured()) {
-    try { value = summarizeInstall(await getStackClient().jobs()); } catch { value = EMPTY_INSTALL; }
+    try {
+      const all = await getStackClient().jobs();
+      value = { ...summarizeInstall(all), background: summarizeBackground(all) };
+    } catch { value = EMPTY_INSTALL; }
   }
   // Model downloads are the later, bigger part. Until one exists, the
   // engine's own install (if the wizard started it) is what is happening.

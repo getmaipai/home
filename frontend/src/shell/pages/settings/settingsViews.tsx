@@ -11,6 +11,7 @@ import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
 import { InstallPlanSection } from "@/apps/settings/InstallPlanSection";
+import { ModelsAndStorageSection } from "@/apps/settings/ModelsAndStorageSection";
 import { UsersSection } from "@/apps/settings/UsersSection";
 import { EnginesConsole } from "@/shell/pages/EnginesPage";
 import { HuggingFaceTokenSection } from "@/apps/settings/HuggingFaceTokenSection";
@@ -67,7 +68,7 @@ function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("V
 // connection check, formerly /engines), the AI model list (formerly /models) and the Hugging Face token.
 function HomeEngineAdminSettings({ person }: SettingsViewProps) {
   const [removal, setRemoval] = useState<{ message: string; confirm: () => void } | null>(null);
-  return <><InstallPlanSection /><EngineLinkCredentialSection /><EnginesConsole person={person} /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><ModelsSection /><HuggingFaceTokenSection /></>;
+  return <><InstallPlanSection /><ModelsAndStorageSection /><EngineLinkCredentialSection /><EnginesConsole person={person} /><Card><CardHeader><CardTitle>Memory and model choices</CardTitle></CardHeader><CardContent><SizingPanel person={person} onRemoval={(message, confirm) => setRemoval({ message, confirm })} /></CardContent></Card><AlertDialog open={removal !== null} onOpenChange={(open) => { if (!open) setRemoval(null); }}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Turn this feature off?</AlertDialogTitle><AlertDialogDescription>{removal?.message}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={() => { const pending = removal; setRemoval(null); pending?.confirm(); }}>Confirm</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog><ModelsSection /><HuggingFaceTokenSection /></>;
 }
 // The user list, ready for the People section once the spec names this trail view (the report's commons order).
 function HomeUsersAdminSettings({ person }: SettingsViewProps) { return <UsersSection person={person} />; }

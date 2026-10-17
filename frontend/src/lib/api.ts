@@ -709,6 +709,8 @@ export interface InstallStatusView {
   bytesPerSecond: number | null; etaSeconds: number | null; problem: string | null;
   /** While the AI engine itself installs: the step and its plain label. */
   stage?: string | null; stageLabel?: string | null;
+  /** Parts installed later from Settings, Models and storage, still downloading. Never gates chat or voice. */
+  background?: { state: "running" | "stalled"; label: string; percent: number; completedBytes: number; totalBytes: number; bytesPerSecond: number | null; etaSeconds: number | null; count: number } | null;
   items: Array<{ id: string; model: string; role: string | null; label: string; state: string; completedBytes: number; totalBytes: number; reason: string | null }>;
 }
 

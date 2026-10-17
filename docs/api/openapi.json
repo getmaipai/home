@@ -22081,6 +22081,55 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "background": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "running",
+                            "stalled"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "percent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "completedBytes": {
+                          "type": "number"
+                        },
+                        "totalBytes": {
+                          "type": "number"
+                        },
+                        "bytesPerSecond": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "etaSeconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "count": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "label",
+                        "percent",
+                        "completedBytes",
+                        "totalBytes",
+                        "bytesPerSecond",
+                        "etaSeconds",
+                        "count"
+                      ],
+                      "description": "Parts installed later from Settings (Models and storage) that are still downloading. Never gates chat or voice."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -22138,6 +22187,7 @@
                     "problem",
                     "stage",
                     "stageLabel",
+                    "background",
                     "items"
                   ]
                 }
@@ -23872,6 +23922,55 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "background": {
+                      "type": "object",
+                      "nullable": true,
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "running",
+                            "stalled"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "percent": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100
+                        },
+                        "completedBytes": {
+                          "type": "number"
+                        },
+                        "totalBytes": {
+                          "type": "number"
+                        },
+                        "bytesPerSecond": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "etaSeconds": {
+                          "type": "number",
+                          "nullable": true
+                        },
+                        "count": {
+                          "type": "integer"
+                        }
+                      },
+                      "required": [
+                        "state",
+                        "label",
+                        "percent",
+                        "completedBytes",
+                        "totalBytes",
+                        "bytesPerSecond",
+                        "etaSeconds",
+                        "count"
+                      ],
+                      "description": "Parts installed later from Settings (Models and storage) that are still downloading. Never gates chat or voice."
+                    },
                     "items": {
                       "type": "array",
                       "items": {
@@ -23929,6 +24028,7 @@
                     "problem",
                     "stage",
                     "stageLabel",
+                    "background",
                     "items"
                   ]
                 }
@@ -24155,6 +24255,472 @@
           },
           "409": {
             "description": "There is nothing the AI can install on this computer",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/components": {
+      "get": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "Every installable part of the AI, its size and state",
+        "responses": {
+          "200": {
+            "description": "The Stack's component list. With the engine unreachable the list is empty and `message` says what to do.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unreachable"
+                      ]
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "tier": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "free_disk_bytes": {
+                      "type": "number",
+                      "nullable": true
+                    },
+                    "disk_margin_bytes": {
+                      "type": "number"
+                    },
+                    "installed_bytes": {
+                      "type": "number"
+                    },
+                    "components": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "summary": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "string",
+                            "enum": [
+                              "chat",
+                              "voice",
+                              "pictures",
+                              "video",
+                              "tools",
+                              "loras"
+                            ]
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "model",
+                              "lora"
+                            ]
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "installed",
+                              "installing",
+                              "notInstalled",
+                              "failed"
+                            ]
+                          },
+                          "size_bytes": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "download_bytes": {
+                            "type": "number"
+                          },
+                          "full_bytes": {
+                            "type": "number"
+                          },
+                          "required_free_bytes": {
+                            "type": "number"
+                          },
+                          "plan_need": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "required",
+                              "recommended",
+                              "optional",
+                              null
+                            ]
+                          },
+                          "requirement": {
+                            "type": "string",
+                            "enum": [
+                              "required",
+                              "optional",
+                              "unsupported"
+                            ]
+                          },
+                          "requirement_reason": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "last_used_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "used_by": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "depends_on": {
+                            "type": "array",
+                            "items": {
+                              "type": "string"
+                            }
+                          },
+                          "job": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "percent": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "failure": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "can_install": {
+                            "type": "boolean"
+                          },
+                          "install_block": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "can_uninstall": {
+                            "type": "boolean"
+                          },
+                          "uninstall_block": {
+                            "type": "string",
+                            "nullable": true
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "label",
+                          "summary",
+                          "group",
+                          "kind",
+                          "state",
+                          "size_bytes",
+                          "download_bytes",
+                          "full_bytes",
+                          "required_free_bytes",
+                          "plan_need",
+                          "requirement",
+                          "requirement_reason",
+                          "last_used_at",
+                          "used_by",
+                          "depends_on",
+                          "job",
+                          "percent",
+                          "failure",
+                          "can_install",
+                          "install_block",
+                          "can_uninstall",
+                          "uninstall_block"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "stack",
+                    "message",
+                    "tier",
+                    "free_disk_bytes",
+                    "disk_margin_bytes",
+                    "installed_bytes",
+                    "components"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/components/{id}/install": {
+      "post": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "Download and set up a part (progress on the install strip)",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Already installed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "nullable": true
+                    },
+                    "component": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "component"
+                  ]
+                }
+              }
+            }
+          },
+          "202": {
+            "description": "Started, or already running.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "job": {
+                      "type": "string"
+                    },
+                    "component": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "job",
+                    "component"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/components/{id}": {
+      "delete": {
+        "tags": [
+          "Components"
+        ],
+        "summary": "Remove a part and free its space",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Removed, with the bytes freed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "component": {
+                      "type": "string"
+                    },
+                    "freed_bytes": {
+                      "type": "number"
+                    },
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "component",
+                    "freed_bytes",
+                    "removed"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Admins only",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such component",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It cannot be installed or removed right now (the message says why)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "The engine is not answering",
             "content": {
               "application/json": {
                 "schema": {

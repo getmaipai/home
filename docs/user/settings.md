@@ -46,6 +46,14 @@ Children cannot change their own voice. An owner or admin opens **Voices**, uses
 
 If the page says "Voices are still getting ready", wait a minute. After setup the voice engine needs a short time to start. If it says "Home can't reach its voice service", open **Repairs**, then come back and press **Try again**. See [Talking to Home](voice.md) for natural speech sounds and microphone help.
 
+## Models and storage
+
+An owner or admin opens **Settings**, **Home settings**, **Engines and AI**, and scrolls to **Models and storage**. It lists every part of the AI on this computer, such as the chat models, the voices, the picture and video models and the picture tools. Each row shows how much space it uses, when it was last used and what uses it. The top line shows how much room is left.
+
+Press **Install** to download a part. A bar shows how far it has got, and you can keep using Home while it downloads. If there is not enough room, or this computer is too small to run it, the button is off and the row says why. Press **Uninstall** to remove a part. Home tells you how much space it frees and that you can install it again later. Chat keeps at least one model: the model chat is using, and the only chat model, cannot be removed.
+
+If a download stops, the row says why and offers **Try again**. The same item is also in **Repairs**.
+
 ## Pictures and videos
 
 An owner or admin opens **Settings**, **Home settings**, **Pictures and videos**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children and teens show as off. See [Pictures](pictures.md) and [Videos](videos.md).

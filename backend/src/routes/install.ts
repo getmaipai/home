@@ -23,6 +23,10 @@ export const InstallStatusSchema = z.object({
   problem: z.string().nullable(),
   stage: z.string().nullable(),
   stageLabel: z.string().nullable(),
+  background: z.object({
+    state: z.enum(["running", "stalled"]), label: z.string(), percent: z.number().int().min(0).max(100), completedBytes: z.number(), totalBytes: z.number(),
+    bytesPerSecond: z.number().nullable(), etaSeconds: z.number().nullable(), count: z.number().int(),
+  }).nullable().openapi({ description: "Parts installed later from Settings (Models and storage) that are still downloading. Never gates chat or voice." }),
   items: z.array(z.object({
     id: z.string(), model: z.string(), role: z.string().nullable(), label: z.string(),
     state: z.string(), completedBytes: z.number(), totalBytes: z.number(), reason: z.string().nullable(),

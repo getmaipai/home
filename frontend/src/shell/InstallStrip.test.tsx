@@ -37,6 +37,15 @@ describe("InstallStrip", () => {
     const view = show(status({ state: "out_of_space", problem: "This computer ran out of room for the AI models. Free some space, then try again." }));
     await view.findAllByText(/ran out of room/);
   });
+  test("a part installed from Settings shows on the strip once the first install is out of the way", async () => {
+    const background = { state: "running" as const, label: "Downloading Pictures: Z-Image-Turbo", percent: 29, completedBytes: 10_000_000_000, totalBytes: 34_000_000_000, bytesPerSecond: 1_000_000, etaSeconds: 24_000, count: 1 };
+    const view = show(status({ state: "ready", complete: true, chatReady: true, background }));
+    await view.findByText("Downloading Pictures: Z-Image-Turbo");
+    cleanup();
+    const compact = render(<MemoryRouter><InstallStrip compact read={async () => status({ state: "none", background })} /></MemoryRouter>);
+    await compact.findByText("Downloading Pictures: Z-Image-Turbo");
+    compact.getByText("29%");
+  });
   test("renders nothing when nothing is installing or all has landed", async () => {
     for (const state of ["none", "ready"] as const) {
       const view = show(status({ state }));

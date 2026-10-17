@@ -20,6 +20,8 @@ Chat moves to a faster engine, and the picture card looks better while a picture
 ### Pictures
 - While a picture is made, the chat shows a card with the prompt, a progress bar and a stop button.
 - Signed likeness proofs let an adult use a household photo for a picture, only with the person's consent.
+### Settings
+- New **Models and storage** section on Settings, Home settings, Engines and AI: every part of the AI (chat models, voices, pictures, video, picture tools, styles) with its size and last use, **Install** and **Uninstall** with a plain confirmation, and the room left on this computer. Z-Image-Turbo (a 33 GB picture model for the largest computers) can be installed here at any time. Chat can never be left with no model.
 
 ## [0.2.11] - 2026-10-17
 
