@@ -12,11 +12,15 @@ const CACHE_MS = 30_000;
 let cached: { at: number; tags: string[] } | null = null;
 let override: string[] | null = null;
 
-/** Reads the flag from a role or voice object: nested `tts.tags`, a flat
+/** Reads the flag from a role or voice object. Real shape (Stack fb93272):
+ * `{ tts: { engine, requested, tags: ["[laugh]", ...], fallback_reason } }`.
+ * Also accepts nested `tts.tags`, a flat
  * "tts.tags" key, or `tags`. Anything else is no tags. */
 export function readTtsTags(source: unknown): string[] {
   if (!source || typeof source !== "object") return [];
   const obj = source as Record<string, unknown>;
+  // The Stack fell back to another engine (Pocket): no tags, whatever else it says.
+  if (obj.tts && typeof obj.tts === "object" && (obj.tts as Record<string, unknown>).fallback_reason) return [];
   const nested = obj.tts && typeof obj.tts === "object" ? (obj.tts as Record<string, unknown>).tags : undefined;
   return normalizeTagList(nested ?? obj["tts.tags"] ?? obj.tags);
 }

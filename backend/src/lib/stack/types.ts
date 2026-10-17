@@ -158,7 +158,7 @@ export interface RoleInfo extends ChatRoleContext {
    * (its declared --image-max-tokens); null or absent when it reads none. */
   picture_tokens_max?: number | null;
   /** REG-02: the nonverbal tags the role's engine honors (`tts.tags`), tts role only; absent or empty means none. */
-  tts?: { tags?: string[] };
+  tts?: { engine?: string; requested?: string; tags?: string[]; fallback_reason?: string | null };
   check: {
     state: "not checked" | "passed" | "failed" | "skipped";
     at: string | null;

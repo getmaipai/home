@@ -23,10 +23,12 @@ export type CueBand = "child" | "teen" | "adult";
 export const HESITATION_LEVELS: readonly HesitationLevel[] = ["off", "light", "natural"];
 export const DEFAULT_HESITATION_LEVEL: HesitationLevel = "light";
 
-/** Every nonverbal tag name Home knows how to place. A tag outside this
- * list is never inserted, and only a name the active engine advertises is
- * kept on the way to it. */
-export const KNOWN_CUE_TAGS = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp", "groan", "sniff"] as const;
+/** Every nonverbal tag name Home knows how to place: only the tags verified
+ * by ear on Chatterbox Turbo (2026-10-17). "groan" sounds like speech and an
+ * unknown tag is read aloud as a word, so neither is ever inserted. A tag
+ * outside this list is never placed, and only a name the active engine
+ * advertises is kept on the way to it. */
+export const KNOWN_CUE_TAGS = ["laugh", "chuckle", "cough", "sigh", "clear throat", "gasp"] as const;
 
 export function normalizeTagName(tag: string): string {
   return tag.trim().replace(/^\[|\]$/g, "").trim().toLowerCase().replace(/\s+/g, " ");
@@ -126,12 +128,19 @@ export function isProtectedSentence(text: string): boolean {
 
 interface Trigger { pattern: RegExp; tags: string[]; place: "after" | "before" }
 
-// Emotional or humorous content only. Order is priority.
+// Tag to situation mapping. Emotional or humorous content only; order is
+// priority. laugh/chuckle after humor, sigh after weariness or sympathy,
+// gasp before a surprise. cough and clear throat are not here: they are rare
+// interjections at the start of a reply (see OPENER_TAGS).
 const TRIGGERS: Trigger[] = [
   { pattern: /\b(ha(?:ha)+|hehe+|lol|funny|hilarious|joke|silly|ridiculous|amusing|made me laugh|crack(?:ed)? me up)\b|\bha[,!.]/i, tags: ["laugh", "chuckle"], place: "after" },
   { pattern: /\b(wow|whoa|no way|oh my|oh my goodness|can't believe|what a surprise|unexpected)\b/i, tags: ["gasp"], place: "before" },
-  { pattern: /\b(oh well|bummer|ugh|what a day|long day|tired|exhausting|oh dear|that's a shame)\b/i, tags: ["sigh"], place: "before" },
+  { pattern: /\b(oh well|bummer|ugh|what a day|long day|tired|exhausting|oh dear|that's a shame|sounds (?:\w+ )?(?:hard|tough|rough|exhausting)|that's (?:tough|rough)|i understand)\b/i, tags: ["sigh"], place: "after" },
 ];
+
+/** Rare opener interjections for a long first sentence, in preference order:
+ * a clear throat before a long explanation, then a cough. Natural level only. */
+const OPENER_TAGS = ["clear throat", "cough"] as const;
 
 const FILLERS = ["Hmm,", "Well,"] as const;
 const LEADING_FILLER = /^\s*(hmm+|well|um+|uh+|er|oh|ah|so|okay|ok|right|let me think)\b/i;
@@ -177,7 +186,9 @@ export function planVoiceCues(input: CueInput): CueResult {
   if (state.insertedThisTurn === 0 && state.turnsSinceInsert < policy.cooldownTurns) return plain(text, state);
 
   const roll = input.roll ?? seededRoll(`${input.turnId}:${index}`);
-  const supported = normalizeTagList(input.supportedTags).filter((t) => (KNOWN_CUE_TAGS as readonly string[]).includes(t));
+  const advertised = normalizeTagList(input.supportedTags);
+  const advertisesTags = advertised.length > 0;
+  const supported = advertised.filter((t) => (KNOWN_CUE_TAGS as readonly string[]).includes(t));
 
   const commit = (nextText: string, inserted: CueResult["inserted"]): CueResult => {
     state.insertedThisTurn += 1;
@@ -198,12 +209,16 @@ export function planVoiceCues(input: CueInput): CueResult {
       }
       return commit(`[${name}] ${trimmed}`, { kind: "tag", name });
     }
-    if (policy.allowOpenerTag && index === 0 && supported.includes("clear throat") && roll < 0.12 && trimmed.length >= 40) {
-      return commit(`[clear throat] ${trimmed}`, { kind: "tag", name: "clear throat" });
+    if (policy.allowOpenerTag && index === 0 && roll < 0.12 && trimmed.length >= 80) {
+      const name = OPENER_TAGS.find((t) => supported.includes(t));
+      if (name) return commit(`[${name}] ${trimmed}`, { kind: "tag", name });
     }
   }
 
-  // 2. A spoken filler at the opener, plain text any engine can say.
+  // 2. A spoken filler at the opener, plain text any engine can say, only
+  // for an engine that advertises no tags (Pocket fallback). An engine that
+  // honors tags gets the verified tags and no opener (owner ruling 2026-10-17).
+  if (advertisesTags) return plain(text, state);
   if (index === 0 && trimmed.length >= 30 && !LEADING_FILLER.test(trimmed) && !trimmed.endsWith("?") && roll < policy.fillerChance) {
     const word = FILLERS[Math.floor(seededRoll(`${input.turnId}:filler`) * FILLERS.length)]!;
     const first = trimmed.split(/\s+/)[0]!.replace(/[^\w']/g, "");

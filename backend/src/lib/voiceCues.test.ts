@@ -176,6 +176,31 @@ describe("tts capability reader", () => {
     expect(readTtsTags({ "tts.tags": ["sigh"] })).toEqual(["sigh"]);
     expect(readTtsTags({ tags: ["gasp", 4] })).toEqual(["gasp"]);
     expect(readTtsTags({ id: "tts" })).toEqual([]);
+    // Copied from the live Stack (GET /stack/v1/roles, tts role, 2026-10-17).
+    const live = { id: "tts", wire: "speech", tts: { engine: "chatterbox-turbo", requested: "chatterbox-turbo", tags: ["[laugh]", "[chuckle]", "[cough]", "[sigh]", "[clear throat]", "[gasp]"], fallback_reason: null } };
+    expect(readTtsTags(live)).toEqual(TAGS);
+    // GET /stack/v1/voices entry.
+    expect(readTtsTags({ id: "chatterbox-turbo-voice-default", engine: "chatterbox-turbo", tts: { engine: "chatterbox-turbo", tags: ["[laugh]", "[gasp]"] } })).toEqual(["laugh", "gasp"]);
+    // Fell back to Pocket: no tags even if listed.
+    expect(readTtsTags({ ...live, tts: { ...live.tts, engine: "pocket", fallback_reason: "chatterbox failed to load" } })).toEqual([]);
     expect(readTtsTags(undefined)).toEqual([]);
+  });
+});
+
+describe("tag engines versus text openers (owner ruling 2026-10-17)", () => {
+  const OPENER = "The garden needs more sun than the porch gets.";
+  test("an engine that advertises tags gets no plain-text opener", () => {
+    expect(plan({ text: OPENER, supportedTags: TAGS, roll: 0 }).text).toBe(OPENER);
+  });
+  test("groan and sniff are never placed even when advertised", () => {
+    expect(plan({ supportedTags: ["groan", "sniff"], roll: 0 }).text).not.toContain("[");
+  });
+  test("sigh follows weariness or sympathy", () => {
+    expect(plan({ text: "That sounds really tough." }).text).toBe("That sounds really tough. [sigh]");
+  });
+  test("clear throat opens a long explanation at natural level only", () => {
+    const long = "There are a few reasons the garden struggles on that side of the porch over the summer.";
+    expect(plan({ text: long, level: "natural", roll: 0.05 }).text).toBe(`[clear throat] ${long}`);
+    expect(plan({ text: long, level: "light", roll: 0.05 }).text).toBe(long);
   });
 });

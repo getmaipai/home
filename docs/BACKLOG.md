@@ -1970,8 +1970,17 @@ invented for the roster's household, and added to
     Stack's tts role (absent means none, so Pocket TTS gets no tag, only an
     optional plain-text "Hmm," or "Well," opener). Setting `voice.hesitations`
     (off, light, natural; default light; household, so a minor never sees
-    it). Still open: the Stack must publish `tts.tags` on the tts role and
-    voice entry (STACK-TTS-02 / VOICE-STUDIO-01); the blind listening test;
+    it). **2026-10-17 Stack half live** (Chatterbox Turbo MLX; stack
+    fb93272): the real shape `tts: {engine, requested, tags, fallback_reason}`
+    on the tts role and `tts: {engine, tags}` on each voice is parsed and
+    pinned by a fixture copied from the live response; a `fallback_reason`
+    means no tags. Verified tags only (laugh, chuckle, cough, sigh, clear
+    throat, gasp; groan and unknown tags are never placed). An engine that
+    advertises tags gets no "Hmm,"/"Well," opener; only a tagless engine
+    (Pocket fallback) keeps it. Situation map: laugh/chuckle after humor,
+    sigh after weariness or sympathy, gasp before surprise, clear throat
+    (then cough) as a rare natural-level opener before a long first
+    sentence. Still open: the blind listening test;
     companion dials; a model-written tag in the live token stream is
     stripped only from the final stored reply, not from streamed deltas;
     Wyoming satellites get the tag drop but no cue insertion yet.
