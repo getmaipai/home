@@ -31,7 +31,7 @@ import { StoppedRun } from "@maipai/ui/src/elements/stopped-run";
 import { ContextDisplay } from "@maipai/ui/src/elements/context-display";
 import { BackgroundInbox } from "@maipai/ui/src/elements/background-inbox";
 import { TaskCard } from "@maipai/ui/src/elements/task-card";
-import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorValue, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
+import { ModelSelectorRoot, ModelSelectorTrigger, ModelSelectorContent, ModelSelectorEffort } from "@maipai/ui/src/elements/model-selector";
 // The Elements' own smaller `Button` (not the dashboard `Button` this
 // file otherwise uses), because this one renders as a sibling of Copy/
 // Reload/etc INSIDE the assistant-ui action bar itself (matching what
@@ -44,6 +44,7 @@ import { Badge } from "@maipai/ui/src/dashboard/components/ui/badge";
 import { getIcon } from "@maipai/ui/src/icons";
 import { api, type StatusAppsResponse, type TurnErrorDetail, type TurnStats } from "@/lib/api";
 import { CONTEXT_SEGMENT_KEYS, type ContextSegmentKey } from "@maipai/home-backend/src/wire";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@maipai/ui/src/ui/tooltip";
 import { StatusIndicator } from "@maipai/ui/src/ui/status";
 import { useStatusApps } from "@/shell/useStatusApps";
 import { appStatusToSidebar } from "@/shell/statusApps";
@@ -210,6 +211,8 @@ export function ChatMessageQueue() {
   );
 }
 
+const ALWAYS_THINKS_REASON = "This model thinks before every reply, so there is no Instant switch.";
+
 export const MODEL_EFFORTS = [{ id: "instant", name: "Instant" }, { id: "thinking", name: "Thinking" }] as const;
 
 /** ELT-MODE-01: the trailing composer slot contains the mode control only;
@@ -221,12 +224,18 @@ export function ComposerTrailingWithThinkingMode() {
     <>
       {capability === "always" ? (
         // INSTANT-01: a model that reasons on every turn has no Instant, so
-        // nothing here is a control or claims a choice; one plain line says
-        // what the model does. A model that never reasons (capability
-        // "none") has nothing to say, so it shows nothing at all.
-        <ModelSelectorRoot models={[{ id: "mode", name: "Thinks before every reply" }]} value="mode">
-          <ModelSelectorValue showEffort={false} />
-        </ModelSelectorRoot>
+        // nothing here is a control or claims a choice. The chip is the short
+        // word "Thinking" (it must fit unclipped); the reason is a tooltip and
+        // the accessible description. A model that never reasons (capability
+        // "none") shows nothing at all.
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Badge variant="outline" aria-description={ALWAYS_THINKS_REASON}>Thinking</Badge>
+            </TooltipTrigger>
+            <TooltipContent side="top">{ALWAYS_THINKS_REASON}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       ) : null}
       {capability === "switchable" ? (
         <ModelSelectorRoot

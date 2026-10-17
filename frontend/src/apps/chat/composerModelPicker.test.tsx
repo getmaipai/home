@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, mock, test } from "bun:test";
-import { cleanup } from "@testing-library/react";
+import { cleanup, fireEvent } from "@testing-library/react";
 import { AssistantRuntimeProvider, useLocalRuntime, type ChatModelAdapter } from "@assistant-ui/react";
 import { ComposerTrailingWithThinkingMode } from "@/apps/chat/chatThreadSlots";
 import { ChatAgeBandContext, ThinkingModeCapabilityContext, ThinkingModeContext } from "@/apps/chat/chatThreadContexts";
@@ -42,9 +42,21 @@ describe("composer mode control", () => {
 
   test("a model that always thinks shows one plain line and no choice (INSTANT-01)", () => {
     const view = renderWithQueryClient(<Harness band="adult" capability="always" />);
-    expect(view.getByText("Thinks before every reply")).toBeTruthy();
+    expect(view.getByText("Thinking")).toBeTruthy();
+    expect(view.queryByText("Thinks before every reply")).toBeNull();
     expect(view.queryByRole("combobox", { name: "Thinking mode" })).toBeNull();
+    expect(view.queryByRole("button")).toBeNull();
     expect(view.queryByText("Instant")).toBeNull();
+  });
+
+  test("the always-thinking chip explains itself as a tooltip and accessible description", async () => {
+    const reason = "This model thinks before every reply, so there is no Instant switch.";
+    const view = renderWithQueryClient(<Harness band="adult" capability="always" />);
+    const chip = view.getByText("Thinking").closest("[aria-description]");
+    expect(chip?.getAttribute("aria-description")).toBe(reason);
+    fireEvent.focus(chip as Element);
+    fireEvent.pointerMove(chip as Element);
+    expect((await view.findAllByText(reason)).length).toBeGreaterThan(0);
   });
 
   test("a model that never thinks shows no mode text at all (INSTANT-01)", () => {
