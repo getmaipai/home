@@ -7,6 +7,22 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-10-17
+
+The microphone works again, and apps show in the left column.
+
+### Voice
+- Conversation could say "could not start the microphone" in Safari and Chrome. The page's security rules blocked the code that listens to the mic. That code is now a real file, `/mic-worklet.js`. A new `/mic-test` page and a Copy details button help when the mic still fails.
+
+### Apps
+- Package apps appear in the left column. Weather is pinned there by default, and All apps lists the rest.
+
+### Pictures and videos
+- The safety line is clearer. Adults get adult content. Anything sexual that involves a child or a minor-looking person is always refused, and plain words like girl, boy or bikini alone are not a reason to refuse.
+- Chat control tokens that leaked into replies are removed.
+- If you ask for a picture or video, Home waits for the tool and does not claim a picture it never made. An empty reply is asked again once.
+- A wide or tall picture in the chat gallery keeps its shape.
+
 Apps now appear in the left column. Weather is pinned there for everyone who can open it, other apps sit under an All apps button at the bottom of the column, and each person can pin or unpin any of them (up to six show). The open app is highlighted.
 
 ## [0.2.10] - 2026-10-17
