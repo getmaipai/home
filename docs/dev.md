@@ -37161,6 +37161,14 @@ and bunfig's `timeout` key is ignored. The three ledger entries are removed.
 The gate run on this fix went red once more, on `frontend/src/apps/chat/liveVoiceSession.test.tsx`'s no_speech test: it asserted
 "Listening" 30 ms after a fixed sleep, and under full-gate load the first "Listening" arrived late enough that the 150 ms
 no_speech reconnect was still mid-flight ("Connecting"). It now waits for the second socket and then for the listening state.
+**Frontend leak (#218), 2026-10-17.** `EnginesPage.test.tsx`'s non-admin test counted 4 fetches it never made, and the shard log
+showed `rows.filter is not a function` from `chatThreadListAdapter.ts`. Both came from `ChatPage.test.tsx`: two of its fetch mocks
+matched the list URL with `url === "/api/conversations"`, so the real `/api/conversations?archived=include` request fell through
+to the `{}` fallback (the TypeError, a test artefact; the adapter is right to expect an array), and the page those tests left
+mounted kept fetching into whichever file ran next. Contained three ways: those mocks match the path before the `?`;
+`frontend/tests/preload.ts` unmounts the rendered tree after every test (RTL `cleanup`, imported after the DOM exists because the
+library reads `document` at load, which a hoisted static import would break); and the engines test counts only `/api/engines`
+requests. Resetting `globalThis.fetch` after every test was tried and rejected: many files install one mock per file.
 
 ## Muse Glimmer 30B is the chat model above 24 GB (STACK-MUSE-01, 2026-10-16)
 

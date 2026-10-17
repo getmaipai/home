@@ -5,7 +5,7 @@
 import "./runTemp";
 import { GlobalRegistrator } from "@happy-dom/global-registrator";
 import { plugin } from "bun";
-import { expect } from "bun:test";
+import { afterEach, expect } from "bun:test";
 import * as matchers from "@testing-library/jest-dom/matchers";
 
 // happy-dom's own ReadableStream/WritableStream/TransformStream are
@@ -46,4 +46,15 @@ plugin({
       loader: "js",
     }));
   },
+});
+
+// getmaipai/home#218: one bun process runs every test file of a shard, so a
+// component a test left mounted keeps polling and fetching, and those requests
+// land on the next file's global fetch mock (EnginesPage.test.tsx counted 4
+// calls it never made). After every test the rendered tree is unmounted.
+// Imported here, after the DOM above exists, because the library reads
+// `document` when it loads (a static import would be hoisted above the DOM).
+const { cleanup } = await import("@testing-library/react");
+afterEach(() => {
+  cleanup();
 });

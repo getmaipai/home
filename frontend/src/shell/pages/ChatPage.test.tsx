@@ -2954,7 +2954,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
         { id: "chat", label: "Chat", wire: "chat", residency: "resident", endpoints: [], quality: [], sharesModelWith: null, state: { state: "loaded", since: "2026-09-22T00:00:00.000Z" }, reason: null, model: { id: "family.gguf", sizeBytes: null, measuredFootprintBytes: null, measuredContextLength: 8192, estimated: false }, models: [{ id: "family.gguf", name: "Family" }, { id: "fast.gguf", name: "Fast" }], check: { state: "not checked", at: null, reason: null, stale: false } },
         { id: "tts", state: { state: "ready" } },
       ], engines: [], budget: null }));
-      if (url.endsWith("/api/conversations") && method === "GET") {
+      if (url.split("?")[0]?.endsWith("/api/conversations") && method === "GET") {
         return Promise.resolve(Response.json([{ ...saved, last_turn_at: null }, { ...other, last_turn_at: null }]));
       }
       if (url.endsWith(`/api/conversations/${other.id}/turns`)) return Promise.resolve(Response.json([]));
@@ -3161,7 +3161,7 @@ describe("ChatPage (ELT-MODE-01 / RESP-04 (f): the composer's mode picker)", () 
     globalThis.fetch = mock((input: RequestInfo | URL, init?: RequestInit) => {
       const url = typeof input === "string" ? input : input.toString();
       if (url === "/api/conversations" && init?.method === "POST") return Promise.resolve(Response.json(conversation));
-      if (url === "/api/conversations") return Promise.resolve(Response.json([{ ...conversation, created_at: "2026-09-27T00:00:00Z", pinned: false }]));
+      if (url.split("?")[0] === "/api/conversations") return Promise.resolve(Response.json([{ ...conversation, created_at: "2026-09-27T00:00:00Z", pinned: false }]));
       if (url.endsWith("/resume")) return Promise.resolve(Response.json(conversation));
       if (url.endsWith("/turns")) return Promise.resolve(Response.json(historyRows));
       if (url.includes("/api/conversations/conv-edit123")) return Promise.resolve(Response.json(conversation));

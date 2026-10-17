@@ -228,7 +228,9 @@ describe("EnginesConsole (the engines section of Home settings, ENGINES-AI-01)",
     try {
       renderWithQueryClient(<EnginesConsole person={makePerson({ role: "adult" })} />);
       await waitFor(() => expect(document.body.textContent).toContain("Only an owner or admin can manage engines."));
-      expect(fetchMock).not.toHaveBeenCalled();
+      // Only the engine routes count: a request another file left in flight can land on this global mock.
+      const engineCalls = fetchMock.mock.calls.filter((call) => String(call[0]).includes("/api/engines"));
+      expect(engineCalls).toHaveLength(0);
       expect(document.body.querySelector('[data-slot="data-table"]')).toBeNull();
     } finally {
       restore();
