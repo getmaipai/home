@@ -28,7 +28,7 @@ describe("SetupReviewPage", () => {
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
       expect(h.container.textContent).toContain("Choose where to store data");
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
-      expect(h.container.textContent).toContain("Checking your computers");
+      expect(h.container.textContent).toContain("Checking your computer");
       expect(h.container.textContent).toContain("Engine service");
       await fireEvent.click(h.getByRole("button", { name: "Continue" }));
       expect(h.container.textContent).toContain("Your setup plan");

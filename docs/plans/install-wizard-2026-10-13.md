@@ -442,7 +442,7 @@ Wizard (current = Your computers)
   ├ text (tip, changes per check): e.g. "Home runs in your house, so chat works even when
   │                                     your internet is down."
   ├ Alert (kit, new) only on amber or red: what is wrong, what to do, and an action Button
-  ├ Button (primary, only on amber): "Continue anyway"
+  ├ Button (primary): "Continue" (green or amber), "Try again" on red
   └ Button (link): "Restore from a backup instead"
 ```
 

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, describe, expect, test, mock } from "bun:test";
 import { act, cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
-import { SetupWizard } from "@/apps/setup/SetupWizard";
+import { SetupWizard, checksTitle, checksSummary } from "@/apps/setup/SetupWizard";
 import type { SetupState } from "@maipai/spec/gen/ts/setup-state.js";
 
 afterEach(cleanup);
@@ -88,10 +88,10 @@ describe("SetupWizard", () => {
         const rendered = view();
         await waitFor(() => expect(rendered.container.textContent).toContain("Choose where to store data"));
         await act(async () => { await new Promise((resolve) => setTimeout(resolve, 20)); });
-        await advanceTo(rendered, "Continue", supported ? "Tune this computer" : "Checking your computers");
+        await advanceTo(rendered, "Continue", supported ? "Tune this computer" : "Checking your computer");
         if (supported) {
           await waitFor(() => expect(rendered.container.textContent).toContain("Keep the Mac awake"));
-          await advanceTo(rendered, "Continue", "Checking your computers");
+          await advanceTo(rendered, "Continue", "Checking your computer");
           expect(h.posts).toEqual(["storage"]);
           await advanceTo(rendered, "Back", "Tune this computer");
         } else expect(h.posts).toEqual(["storage"]);
@@ -118,18 +118,37 @@ describe("SetupWizard", () => {
     } finally { globalThis.fetch = original; }
   });
 
-  test("Continue anyway sits in the footer beside Continue, not in the page body, and defers checks", async () => {
+  test("amber results show a plain summary and the normal Continue defers checks", async () => {
     const state = freshState();
     for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
     const h = harness(state, [{ id: "engine", title: "Engine service", state: "amber", text: "The engine is slow." }]);
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("The engine is slow."));
-      const button = rendered.getByRole("button", { name: "Continue anyway" });
-      expect(button.parentElement).toBe(rendered.getByRole("button", { name: "Continue" }).parentElement);
-      await advanceTo(rendered, "Continue anyway", "Your setup plan");
+      expect(rendered.container.textContent).toContain("1 thing to look at. You can continue, but it may not work.");
+      expect(rendered.queryByRole("button", { name: "Continue anyway" })).toBeNull();
+      await advanceTo(rendered, "Continue", "Your setup plan");
       expect(h.bodies["checks"]).toMatchObject({ status: "deferred" });
     } finally { h.restore(); }
+  });
+
+  test("all green stays on Checks, says so, and waits for Continue", async () => {
+    const state = freshState();
+    for (const id of ["welcome", "engine_location", "storage"] as const) state.steps.find((step) => step.id === id)!.status = "done";
+    const h = harness(state);
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.container.textContent).toContain("Everything looks ready."));
+      await new Promise((resolve) => setTimeout(resolve, 1800));
+      expect(rendered.container.textContent).toContain("Checking your computer");
+      expect(rendered.container.textContent).not.toContain("Your setup plan");
+    } finally { h.restore(); }
+  });
+
+  test("the Checks title is plural only for two computers", () => {
+    expect(checksTitle("this_computer")).toBe("Checking your computer");
+    expect(checksTitle("another_computer")).toBe("Checking your computers");
+    expect(checksSummary([{ id: "a", title: "A", state: "red", text: "x" }])).toContain("Try again");
   });
 
   test("resumes at the first pending step from server state and ignores browser storage", async () => {
@@ -193,7 +212,7 @@ describe("SetupWizard", () => {
       await advanceTo(rendered, "Set up my Home", "Before you start");
       await advanceTo(rendered, "I understand", "How should Home run?");
       await advanceTo(rendered, "Continue", "Choose where to store data");
-      await advanceTo(rendered, "Continue", "Checking your computers");
+      await advanceTo(rendered, "Continue", "Checking your computer");
       await advanceTo(rendered, "Continue", "Your setup plan");
       await waitFor(() => expect(rendered.getByRole("button", { name: "Install and continue" })).toBeTruthy());
       await advanceTo(rendered, "Install and continue", "Create your owner account");
@@ -278,7 +297,7 @@ describe("SetupWizard", () => {
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Before you start"));
-      await advanceTo(rendered, "I understand", "Checking your computers");
+      await advanceTo(rendered, "I understand", "Checking your computer");
       expect(h.posts).toEqual(["welcome"]);
     } finally { h.restore(); }
   });
@@ -318,7 +337,7 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.container.textContent).toContain("Choose where to store data"));
       await act(async () => { fireEvent.click(rendered.getAllByRole("button", { name: "Choose a folder" })[0]!); });
       await waitFor(() => expect(rendered.container.textContent).toContain("/Volumes/Big/home-data"));
-      await advanceTo(rendered, "Continue", "Checking your computers");
+      await advanceTo(rendered, "Continue", "Checking your computer");
       await advanceTo(rendered, "Back", "Choose where to store data");
       expect(rendered.container.textContent).toContain("/Volumes/Big/home-data");
     } finally { h.restore(); }
@@ -390,10 +409,10 @@ describe("SetupWizard", () => {
     try {
       const rendered = view();
       await waitFor(() => expect(rendered.container.textContent).toContain("Your setup plan"));
-      await advanceTo(rendered, "Back", "Checking your computers");
+      await advanceTo(rendered, "Back", "Checking your computer");
       await waitFor(() => expect(rendered.container.textContent).toContain("Engine service"));
       await new Promise((resolve) => setTimeout(resolve, 1800));
-      expect(rendered.container.textContent).toContain("Checking your computers");
+      expect(rendered.container.textContent).toContain("Checking your computer");
       await advanceTo(rendered, "Back", "Choose where to store data");
     } finally { h.restore(); }
   });
