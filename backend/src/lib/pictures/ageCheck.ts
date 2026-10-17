@@ -19,7 +19,7 @@ import type { PersonRow } from "@/types";
 import { toWireMessage, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
 import { getStackClient } from "@/lib/stackEngine";
-import { mentionsSexualWord, mentionsUnclothedPhrase } from "./minorLine";
+import { mentionsMinorCue, mentionsSexualWord, mentionsUnclothedPhrase } from "./minorLine";
 
 // ---------------------------------------------------------------- the lines the person reads
 
@@ -331,6 +331,39 @@ export async function checkImages(images: readonly Uint8Array[], kind: CheckedKi
     for (const image of images) checks.push(await checkOne(image));
     return checks;
   });
+}
+
+// ---------------------------------------------------------------- an uploaded image used as INPUT (edit, video, reference)
+
+export type InputScreen = { ok: true } | { ok: false; code: "input_minor_cue" | "input_minor_sexual" | "input_unchecked"; line: string };
+
+/** The line when words about a child come with a photo to change. Fixed wording; it names no term. */
+export const INPUT_MINOR_CUE_LINE = "I can't change a photo into a picture of a child. Describe a new picture from scratch instead.";
+export const INPUT_MINOR_SEXUAL_LINE = "I can't change that photo. A photo that may show a child is never changed that way.";
+
+/**
+ * The input-side floor, for a picture that this home did NOT make (an upload, a household photo, a reference): it is screened before
+ * it is sent to the picture or video engine. Same local vision model and same single pass as the finished-output check.
+ *  - the words carry a minor marker or an age under 18 (no sexual word needed): refused, whatever the photo shows; this is the
+ *    legacy rule that turning a photo toward a child is never done (a picture this home made is not screened here: a cartoon edit is ordinary);
+ *  - the photo may show a minor AND (the photo is nude or sexual, or the words ask for anything sexual, nude, or unclothed): refused;
+ *  - the photo is nude or sexual and the viewer is a teen or a child: refused;
+ *  - the check could not run: refused when the words ask for anything sexual or the viewer is a teen or a child (fails closed), otherwise allowed
+ *    (the likeness gate still requires a photo with no person, or one adult, by its own check).
+ */
+export async function screenInputImage(bytes: Uint8Array, prompt: string, viewer: Viewer = "adult"): Promise<InputScreen> {
+  if (mentionsMinorCue(prompt)) return { ok: false, code: "input_minor_cue", line: viewer === "adult" ? INPUT_MINOR_CUE_LINE : MINOR_VIEWER_LINE };
+  const sexualAsk = mentionsSexualWord(prompt) || mentionsUnclothedPhrase(prompt);
+  const [check] = await checkImages([bytes], "picture");
+  if (!check || !check.ok) {
+    if (sexualAsk || viewer !== "adult") return { ok: false, code: "input_unchecked", line: viewer === "adult" ? uncheckedRefusalLine("picture") : MINOR_VIEWER_LINE };
+    return { ok: true };
+  }
+  const v = check.verdict;
+  if ((showsPossibleMinor(v) && (v.is_nude_or_sexual || sexualAsk)) || (viewer !== "adult" && v.is_nude_or_sexual)) {
+    return { ok: false, code: "input_minor_sexual", line: viewer === "adult" ? INPUT_MINOR_SEXUAL_LINE : MINOR_VIEWER_LINE };
+  }
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------- the safety event

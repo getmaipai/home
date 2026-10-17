@@ -10,6 +10,7 @@ import { subjectEligibility } from "@/lib/likeness/consent";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import type { UseSource } from "@/lib/likeness/uses";
 import type { PictureAudience } from "./policy";
+import { screenInputImage, viewerOf } from "./ageCheck";
 
 export type EditImageSource = "generated" | "uploaded" | "household_photo";
 
@@ -35,6 +36,11 @@ export const SUBJECT_NOT_ALLOWED_LINE = "I can only change a photo of an adult w
 
 export async function prepareEditSource(input: PrepareEditSourceInput): Promise<EditSourcePrep> {
   const declared = input.rootLikeness ?? input.declaredSubjectId;
+  // A picture this home did not make is screened before anything else is asked of it (ageCheck.screenInputImage).
+  if (!input.generated && !input.rootLikeness) {
+    const screen = await screenInputImage(input.bytes, input.text, viewerOf(input.audience.actor, input.audience.band));
+    if (!screen.ok) return { ok: false, status: 422, code: screen.code, line: screen.line };
+  }
   if (!declared && input.generated) return { ok: true, imageSource: "generated", subjectId: null };
   if (!declared) {
     const verdict = await photoShowsNoPerson(input.bytes);

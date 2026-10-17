@@ -362,7 +362,11 @@ describe("picture editor routes", () => {
       const picture = await upload(client, conversation.value.id);
       const { __setAgeCheckRunnerForTests } = await import("@/lib/pictures/ageCheck");
       try {
-        __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 9, label: "child" as const, is_nude_or_sexual: true, confidence: 0.9 } })));
+        // The first run is the INPUT screen of the uploaded source (an empty picture); the second is the finished result.
+        let run = 0;
+        __setAgeCheckRunnerForTests(async (images) => images.map(() => (run++ === 0
+          ? { ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } }
+          : { ok: true as const, verdict: { people_count: 1, apparent_min_age_estimate: 9, label: "child" as const, is_nude_or_sexual: true, confidence: 0.9 } })));
         const started = (await (await commented(client, conversation.value.id, picture.id, { prompt: "Make the sky pink", region: null })).json()) as { job: string };
         let progress = (await (await client.get(`/api/image-edit/jobs/${started.job}`)).json()) as { state: string; error?: string; code?: string; preview?: unknown };
         for (let i = 0; i < 6 && progress.state !== "failed" && progress.state !== "done"; i += 1) progress = (await (await client.get(`/api/image-edit/jobs/${started.job}`)).json()) as typeof progress;
@@ -373,6 +377,27 @@ describe("picture editor routes", () => {
         expect(db.select().from(attachments).all()).toHaveLength(1);
       } finally {
         __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 } })));
+      }
+    });
+
+    test("the input floor: an uploaded photo is refused with words about a child, or when it may show a minor beside a sexual ask, before the engine is asked", async () => {
+      const { client, actor } = await owner();
+      const conversation = resolveOrCreateConversation(actor, "chat");
+      if (!conversation.ok) throw new Error("no conversation");
+      const picture = await upload(client, conversation.value.id);
+      const { __setAgeCheckRunnerForTests } = await import("@/lib/pictures/ageCheck");
+      const none = { people_count: 0, apparent_min_age_estimate: null, label: "none" as const, is_nude_or_sexual: false, confidence: 1 };
+      try {
+        __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: none })));
+        const cue = await commented(client, conversation.value.id, picture.id, { prompt: "make the person look like a child", region: null });
+        expect(cue.status).toBe(422);
+        expect(((await cue.json()) as { code: string }).code).toBe("input_minor_cue");
+        __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: { ...none, people_count: 1, apparent_min_age_estimate: 9, label: "child" as const } })));
+        const sexualAsk = await commented(client, conversation.value.id, picture.id, { prompt: "make it nude", region: null });
+        expect(sexualAsk.status).toBe(422);
+        expect(fake.edits).toHaveLength(0);
+      } finally {
+        __setAgeCheckRunnerForTests(async (images) => images.map(() => ({ ok: true as const, verdict: none })));
       }
     });
 

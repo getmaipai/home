@@ -15,6 +15,7 @@ import { CLIP_POSTER_NOTE, GENERATED_PICTURE_NOTE, latestTemporaryPosterId, load
 import { preparePhotoUse, prepareStyleUse } from "@/lib/likeness/apply";
 import { attestedAdult, WHO_IS_IN_PHOTO_LINE } from "@/lib/likeness/resolve";
 import { singleAdultPhoto } from "@/lib/likeness/inspector";
+import { screenInputImage, viewerOf } from "@/lib/pictures/ageCheck";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import type { JobLikeness } from "@/lib/likeness/guard";
 import { createHash } from "node:crypto";
@@ -124,6 +125,9 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     if (attached.length !== 1) return refuseWith("reference", PHOTO_ATTACH_LINE);
     const photo = loadUploadedPhoto(actor, state.conversationId, attached[0]!.id, temporary);
     if (!photo.ok) return refuseWith("reference", photo.line);
+    // The input-side floor: words about a child with a photo, a photo that may show a minor beside a sexual ask, or a check that could not run on a minor's turn.
+    const screened = await screenInputImage(photo.bytes, prompt, viewerOf(actor, audience.band));
+    if (!screened.ok) return refuseWith("reference", screened.line);
     // The model's `photo_subject` is a proposal: only the person's own message (a name, or a claim that it is them) attests who is in the photo.
     const { proposed, attested: declared } = attestedAdult(args.photo_subject, state.utterance, actor, { photoKeys: [createHash("sha256").update(photo.bytes).digest("hex"), photo.id], on: !peoplePromptsOn() });
     if (!declared) return refuseWith("likeness", proposed ? WHO_IS_IN_PHOTO_LINE : PHOTO_SUBJECT_LINE);
