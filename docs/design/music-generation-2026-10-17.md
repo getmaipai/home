@@ -304,6 +304,38 @@ A failed job is the kit `ErrorState` with Try again; the model says in its own w
 | MUSIC-GEN-15 | The sung-words check: the household's speech-to-text on a finished sung song, against the minor line |
 | MUSIC-STUDIO-01 | Later: the music studio app (design stub in section 10) |
 
+## 15. As built and verified end to end (2026-10-17)
+
+Landed: commons `spec-v0.1.165` (`d89db1a`) and `ui-v0.5.260` (`MusicTrack`, `192bd49`); Stack `e14e3a8`, `d216374` (engine, job API,
+admission 33 GB) and the directory-model download fix below; Home MUSIC-GEN-03 to -06 (the tools, jobs, gates, card, settings).
+
+**Verified on the Studio** with a scratch Stack (own data folder, port 8895, the music component installed through the Components route,
+`qwen3-8b` as its chat model) and a throwaway Home (own data folder, port 8896, its Stack address set to the scratch Stack):
+
+- "Make me a song: a cheerful folk song about Saturday pancakes ..." in chat: the model called `generate_music` with its own lyrics, the turn
+  answered in 29 to 42 s (the 8B chat model writing the lyrics), and the Stack made the 40 s song in 45 s on a cold worker. Home stored it as
+  `audio/mp4` (1.34 MB, AAC-LC 48 kHz stereo), served it with Range (206), and the commercial export answered 200 (ACE-Step cleared).
+- In the built-in browser at phone width the card showed the title, the description line, the kit Player (play, back and ahead 15 s, speed,
+  Download, Share), Lyrics and "Version 2 of 2"; Previous switched the player to the original file, which played (time advancing), and Use this
+  version appeared. The sung words of the original matched the lyrics (local transcription).
+- "Keep the song ... edit only its chorus so the words are about Rover chasing a red ball": `edit_music` with `rewrite_section`, a new version
+  whose chorus sings "Oh, Rover chasing a red ball in garden light" (transcribed) while the verse stays.
+
+**Real failures found, each fixed with a regression test:**
+1. The Stack's component install asked for `acestep-v15-turbo/Qwen3-Embedding-0.6B/added_tokens.json` (404): a directory model's sibling
+   files were resolved from the weights' folder, not the repository root (Stack `modelStore.ts`).
+2. Home read `GET /stack/v1/music` flat while the Stack wraps it as `{ music }`, so a real, installed engine looked "not ready" and the tool was
+   never offered (`lib/music/stack.ts`).
+3. The chat model sent the whole revised song as `lyrics` with `section: "chorus"`; splicing it into the chorus duplicated the verse and the
+   repainted part sang no clear words. A whole song now replaces the words; a bare fragment still replaces one section.
+4. While this slice was in review, main opened pictures to teens and a child cartoon lane (owner ruling 2026-10-17). Music reused the picture
+   gate, so it would have opened to minors too; music now checks its own adult lane (section 9 stands: adults only).
+
+**Open, not code bugs:** with the small 8B chat model the edit was sometimes answered with lyrics alone or a fresh `generate_music` instead of
+`edit_music`, one call came back with a namespaced argument (`generate_music.lyrics`, refused as bad arguments and retried by the model), and
+the reply to an edit said "I've updated the song" before the song existed. These are model behaviour on the 8B scratch model; the household's
+Muse model and the tool bench rows (MUSIC-GEN-07) are where they are measured.
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s music table rows marked `(?)`: ACE-Step 1.5 runs on Apple silicon through its official MLX path, with
