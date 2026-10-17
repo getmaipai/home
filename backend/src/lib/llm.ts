@@ -248,9 +248,36 @@ function toolCallFromWire(wire: ToolCallWire): ToolCall {
 // envelope call is normalized identically to a real wire one.
 const ENVELOPE_TAG_RE = /^<([a-zA-Z_][\w-]*)>([\s\S]*)<\/\1>$/;
 
+// CF-SEARCH-01 (live, 2026-10-17, Muse Glimmer on oMLX): in about one search turn in five the engine's
+// own tool parser took the call's opening tags and left the rest as plain content, so the person saw
+// `<ns:parameter name="expression">cloudflare down</ns:parameter> ... </ns:invoke>` as the reply and no
+// search ran. The text is a call and nothing else: parameter blocks, optionally inside an `invoke`
+// (which names the tool), then closing tags and stray punctuation. The opener is gone in the live
+// shape, so a call carrying `expression` is the search call (the one tool with that field).
+const MARKUP_PARAM_RE = /<([a-zA-Z_][\w-]*):parameter\s+name="([\w-]+)"\s*>([\s\S]*?)<\/\1:parameter>/g;
+const MARKUP_INVOKE_RE = /<([a-zA-Z_][\w-]*):invoke\s+name="([\w-]+)"\s*>/;
+function markupToolCall(trimmed: string): ToolCall | undefined {
+  if (!trimmed.startsWith("<") || !trimmed.includes(":parameter")) return undefined;
+  const args: Record<string, string> = {};
+  let rest = trimmed;
+  for (const m of trimmed.matchAll(MARKUP_PARAM_RE)) {
+    args[m[2]!] = m[3]!.trim();
+    rest = rest.replace(m[0], "");
+  }
+  const invoke = rest.match(MARKUP_INVOKE_RE);
+  if (invoke) rest = rest.replace(invoke[0], "");
+  // Anything left must be closing tags and punctuation; prose beside the markup is an ordinary answer.
+  if (rest.replace(/<\/?[a-zA-Z_][\w-]*(?::[\w-]+)?[^>]*>/g, "").replace(/[\s.,;]/g, "").length > 0) return undefined;
+  const name = invoke?.[2] ?? ("expression" in args ? "websearch" : undefined);
+  if (!name || Object.keys(args).length === 0) return undefined;
+  return toolCallFromWire({ id: "", type: "function", function: { name, arguments: JSON.stringify(args) } });
+}
+
 export function envelopeToolCall(text: string): ToolCall | undefined {
   const trimmed = text.trim();
   if (!trimmed) return undefined;
+  const markup = markupToolCall(trimmed);
+  if (markup) return markup;
   const tagged = trimmed.match(ENVELOPE_TAG_RE);
   const candidate = tagged ? tagged[2]!.trim() : trimmed;
   let parsed: unknown;

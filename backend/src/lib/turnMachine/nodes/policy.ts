@@ -137,8 +137,40 @@ interface GroundingCheck {
   arg?: string;
 }
 
+/** CF-SEARCH-01 (live, 2026-10-17): "is cloud flare down right now" made the model write the query
+ * "Cloudflare outage status October 17 2026". The person typed two words ("cloud flare"), the model
+ * wrote the one real name, and exact-term overlap saw nothing in common, so a correct search call was
+ * refused as ungrounded and the fixed "I won't guess" line replaced the answer. Two terms are the same
+ * name when they differ only by spacing ("cloud flare" / "cloudflare", "git hub" / "github") or by one
+ * typo letter. Both need a term of 6 or more letters, so a short word never matches loosely. */
+const LOOSE_MATCH_MIN = 6;
+function withinOneEdit(a: string, b: string): boolean {
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  if (i === a.length && i === b.length) return true;
+  const restA = a.slice(a.length === b.length ? i + 1 : a.length > b.length ? i + 1 : i);
+  const restB = b.slice(a.length === b.length ? i + 1 : a.length > b.length ? i : i + 1);
+  return restA === restB;
+}
+function wordsOf(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
+}
+function termGrounded(term: string, sourceTerms: ReadonlySet<string>, sourceSquashed: string, queryTerms: readonly string[]): boolean {
+  if (sourceTerms.has(term)) return true;
+  if (term.length >= LOOSE_MATCH_MIN) {
+    if (sourceSquashed.includes(term)) return true;
+    for (const s of sourceTerms) if (s.length >= LOOSE_MATCH_MIN && withinOneEdit(term, s)) return true;
+  }
+  // The person typed the one word, the model wrote it as two ("cloudflare" typed, "cloud flare" queried).
+  const queryJoined = queryTerms.join("");
+  for (const s of sourceTerms) if (s.length >= LOOSE_MATCH_MIN && queryJoined.includes(s)) return true;
+  return false;
+}
+
 function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly string[], schema: ArgSchema | undefined, conversationTexts: readonly string[] = []): GroundingCheck {
   const sourceTerms = tokenize(sourceTexts.join(" "));
+  const sourceSquashed = wordsOf(sourceTexts.join(" ")).join("");
   // SEARCH-ANSWER-05: only a field the manifest marks `grounded: "conversation"` also grounds on the
   // recent assistant turns (a follow-up like "show me the poster" names no film; the last reply did).
   const hasWidened = conversationTexts.length > 0 && Object.values(schema?.properties ?? {}).some((p) => p.grounded === "conversation");
@@ -161,7 +193,8 @@ function checkGrounding(args: Record<string, unknown>, sourceTexts: readonly str
     const terms = [...tokenize(value)].filter((t) => !PURE_NUMBER_RE.test(t));
     if (terms.length === 0) continue; // nothing left but numbers/stopwords - never counts against it
     const widened = prop?.grounded === "conversation";
-    if (!terms.some((t) => sourceTerms.has(t) || (widened && conversationTerms.has(t)))) return { ok: false, arg: key };
+    const queryTerms = wordsOf(value);
+    if (!terms.some((t) => termGrounded(t, sourceTerms, sourceSquashed, queryTerms) || (widened && conversationTerms.has(t)))) return { ok: false, arg: key };
   }
   return { ok: true };
 }

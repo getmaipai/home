@@ -168,3 +168,34 @@ Back to llama-server everywhere if: ENGINE-MLX-02 shows a quality or tool-call r
 quiet for a release cycle while mlx moves (the ABI pin would then strand us); or llama.cpp's Metal path closes the 23 percent gap
 (a newer build than b10797 is measured faster in some reports; a b11404 pin is the first thing to retest). Move to Rapid-MLX if its
 cache and parser faults are fixed upstream and oMLX stalls.
+
+## CF-SEARCH-01: "is cloud flare down right now" answered "I won't guess" (2026-10-17)
+
+Live report, Safari, v0.2.13, Muse Glimmer on oMLX. Search was offered and the model did call it. Replay through a scratch Home pointed at
+the live Stack (reasoning text and generation records kept): the model wrote `{"expression":"Cloudflare outage status October 17 2026","scope":"web"}`;
+`policy` refused it as `ungrounded_args` (the person typed "cloud flare", the query shares no exact word), and the fixed refusal line
+"I don't actually have that in this conversation, so I won't guess." replaced the answer. That line is `policyRefusalLine` (GROUND-01), not the
+picture prompt floor commits; no prompt change taught the model to refuse. A second failure in the same replay: about one search turn in five the
+engine's tool parser dropped the call's opening tags and the person saw `<atem:parameter name="expression">...` as the reply with no search.
+
+Fixes, none of which reads the person's words (rule 1):
+
+1. Grounding treats "cloud flare" and "cloudflare" as one name, and one typo letter in a name of 6 or more letters as the same word (`policy.ts`).
+2. `envelopeToolCall` recovers a call whose opening tags the engine dropped (a parameter block with `expression` is the search call) (`llm.ts`).
+3. The date line in the stable prefix tells the model that news, scores, prices, outages, whether a service is up and who holds an office are looked up
+   before answering, never answered from memory (`context.ts`).
+
+Measured, 20 current-events prompts (outages, scores, prices, news, weather, "right now", "today", "latest"), one new conversation each,
+exact production prompt and tools, Glimmer on oMLX, same ddgs. The model is not deterministic, so read these as rates, not exact counts.
+
+| | before | after |
+|---|---|---|
+| Search or lookup executed | 10 of 20 | 14 of 20 |
+| Refused as `ungrounded_args` ("I won't guess") | 2 | 1 |
+| Raw call markup shown as the reply | 4 | 0 |
+| Answered current state from memory, no call (election, "is the internet down") | 2 | 0 |
+| Other: news shelf and weather answered by their own tools (designed); after, also one ambiguous "score of the game" that asked which game | 2 | 3 |
+
+Still open: a query with no word in common with the person's (for example "sports results October 16 2026" for "who won last night") is refused
+by design (rule 6 keeps ungrounded arguments as policy refusals), and a model-invented tool name gives the same line (2 of 20 after). Changing
+either needs Jesse's ruling on rule 6 (proposed: search the person's own words instead).

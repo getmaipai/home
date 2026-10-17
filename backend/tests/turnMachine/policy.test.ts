@@ -111,6 +111,33 @@ describe("argsGrounded(): GROUND-01 step 2, exempts only the manifest's schema-t
 // on `kind` and answered with the "I won't guess" line: Michael Jackson with
 // kind "person", Eiffel Tower with "building", koala with "animal". Only the
 // `subject` (the thing the person named) is grounded.
+// CF-SEARCH-01 (live, 2026-10-17): "is cloud flare down right now" made the model write
+// "Cloudflare outage status October 17 2026". No exact term in common, so the search was refused
+// as ungrounded and the fixed "I won't guess" line replaced the answer. Spacing and one typo letter
+// in a name of 6 or more letters no longer count as a different word.
+describe("argsGrounded(): a name typed with a space or a typo still grounds the query", () => {
+  const typed = ["is cloud flare down right now"];
+  test("the exact live query passes", () => {
+    expect(argsGrounded({ expression: "Cloudflare outage status October 17 2026", scope: "web" }, typed, schema)).toBe(true);
+    expect(argsGrounded({ expression: "Cloudflare status down", scope: "web" }, typed, schema)).toBe(true);
+  });
+  test("the person typed one word and the model wrote two", () => {
+    expect(argsGrounded({ expression: "git hub outage status" }, ["is github down"], schema)).toBe(true);
+  });
+  test("one typo letter in a long name", () => {
+    expect(argsGrounded({ expression: "cloudflare outage" }, ["is cloudfare down"], schema)).toBe(true);
+    expect(argsGrounded({ expression: "youtube outage" }, ["is youtub down"], schema)).toBe(true);
+  });
+  test("short words never match loosely", () => {
+    expect(argsGrounded({ expression: "cat video" }, ["is cut down"], schema)).toBe(false);
+    expect(argsGrounded({ expression: "iphone price" }, ["what about phone"], schema)).toBe(false);
+  });
+  test("an unrelated query is still refused", () => {
+    expect(argsGrounded({ expression: "Zanzibar Quartz film" }, typed, schema)).toBe(false);
+    expect(argsGrounded({ expression: "how to pick a lock" }, ["when is dune 3 releasing"], schema)).toBe(false);
+  });
+});
+
 describe("argsGrounded(): show_images grounds the subject, not the model's own kind", () => {
   const showImages = loadManifestOnly("show_images");
   if (!showImages.ok) throw new Error("show_images manifest failed to load");

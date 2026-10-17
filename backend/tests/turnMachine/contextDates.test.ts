@@ -63,6 +63,8 @@ describe("KS-02E: the prefix's three date lines", () => {
     expect(text).toContain("Your training ends around June 30, 2025.");
     expect(text).toContain("The home library's Wikipedia snapshot is September 14, 2026.");
     expect(text).toContain("Your own knowledge is reliable for well-known, stable facts; the reference library confirms specifics; the web is for anything that may have changed since your training.");
+    // CF-SEARCH-01: a live-state question is searched, not answered from memory.
+    expect(text).toContain("is looked up with the search tool before you answer, never answered from memory.");
     expect(text).not.toContain("The model's training knowledge may be older than today.");
   });
 

@@ -284,6 +284,27 @@ describe("lib/llm.ts complete() with tools (Fix E: native tool calling)", () => 
 // below verbatim before this existed.
 const LUNA_ENVELOPE = '<function_call> {"name": "websearch", "arguments": {"expression": "when will chatgpt 6 luna be released"}} </function_call>';
 
+// CF-SEARCH-01 (live, 2026-10-17): the engine's parser dropped a call's opening tags and the person
+// saw the rest as the reply. The exact leaked strings, captured from the live Stack.
+const LEAKED_CALL = '<atem:parameter name="expression">discord down status</atem:parameter>\n<atem:parameter name="scope">web</atem:parameter>\n</atem:invoke>\n</atem:function_calls>.';
+describe("lib/llm.ts envelopeToolCall(): a call whose opening tags the engine dropped (CF-SEARCH-01)", () => {
+  test("the live leak becomes a websearch call", () => {
+    const call = envelopeToolCall(LEAKED_CALL);
+    expect(call?.tool).toBe("websearch");
+    expect(call?.args).toEqual({ expression: "discord down status", scope: "web" });
+  });
+  test("an intact invoke names its tool", () => {
+    const call = envelopeToolCall('<x:function_calls><x:invoke name="weather"><x:parameter name="place">Oslo</x:parameter></x:invoke></x:function_calls>');
+    expect(call?.tool).toBe("weather");
+    expect(call?.args).toEqual({ place: "Oslo" });
+  });
+  test("prose beside the markup, or markup with no parameters, stays text", () => {
+    expect(envelopeToolCall(`Let me check.\n${LEAKED_CALL}`)).toBeUndefined();
+    expect(envelopeToolCall("</atem:invoke></atem:function_calls>.")).toBeUndefined();
+    expect(envelopeToolCall('<atem:parameter name="scope">web</atem:parameter>')).toBeUndefined();
+  });
+});
+
 describe("lib/llm.ts envelopeToolCall() (ENGINE-CONTRACT-03)", () => {
   test("the Luna string becomes a websearch call with that expression", () => {
     const call = envelopeToolCall(LUNA_ENVELOPE);
