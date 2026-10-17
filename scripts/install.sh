@@ -505,9 +505,11 @@ build_app() {
   fetch_home_commons "$dir" || die "could not fetch the Commons packages Home needs. Read the message above, fix what it names, then run the installer again."
   log "Installing dependencies and building the frontend (this can take a minute)..."
   # A fresh Mac has no system node, and dependency install scripts (ssh2) run
-  # `node`. Put a `node` that is Bun on PATH for these commands only.
+  # `node`, and package scripts (the frontend prebuild) run `bun` from a child shell
+  # that has no Bun on PATH under sudo. Put `node` and `bun`, both the resolved
+  # Bun, on PATH for these commands only.
   local shim
-  shim=$(mktemp -d) && ln -s "$bun_bin" "${shim}/node" \
+  shim=$(mktemp -d) && ln -s "$bun_bin" "${shim}/node" && ln -s "$bun_bin" "${shim}/bun" \
     || die "could not create the temporary node shim. Check that the temp folder is writable, then run the installer again."
   (cd "$dir/backend" && PATH="${shim}:${PATH}" "$bun_bin" install --production) \
     || { rm -rf "$shim"; return 1; }
@@ -594,6 +596,7 @@ After=network.target
 Type=simple
 User=${SERVICE_USER}
 WorkingDirectory=${dir}/backend
+Environment=PATH=$(dirname "$bun_bin"):/usr/local/bin:/usr/bin:/bin
 Environment=NODE_ENV=production
 Environment=PORT=${port}
 Environment=MAIPAI_STACK_PORT=${stack_port}
@@ -652,6 +655,7 @@ install_launchd_daemon() {
   <key>WorkingDirectory</key><string>${dir}/backend</string>
   <key>EnvironmentVariables</key>
   <dict>
+    <key>PATH</key><string>$(dirname "$bun_bin"):/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
     <key>NODE_ENV</key><string>production</string>
     <key>PORT</key><string>${port}</string>
     <key>MAIPAI_STACK_PORT</key><string>${stack_port}</string>
