@@ -44,7 +44,8 @@ design that queues work, resumes something or keeps a collection cites that sect
 | [notifications-and-asks-2026-10-17.md](notifications-and-asks-2026-10-17.md) | new 2026-10-17, no code | MEM-PUSH-01, NOTIFY-SOUND-01, BRAKES-02, PKG-ASK-01, PKG-RESULT-01 |
 | [packages-apps-and-integrations-2026-10-17.md](packages-apps-and-integrations-2026-10-17.md) | new 2026-10-17, no code | APPSTORE-DESIGN-01, SKILLS-PAGE-02, APP-STATE-01, PKG-EXPOSE-01, RUNTIME-01, SERVICE-WALL-01, PRESENCE-FIND-01, NOTES-01, SELF-KNOW-01, MEDIA-INT-06 |
 | [chat-engine-and-model-records-2026-10-17.md](chat-engine-and-model-records-2026-10-17.md) | new 2026-10-17, no code | THIN-2B, MODEL-RECORD-1.7B-01, THIN-6A, MODEL-VET-01, STACK-CATALOG-01, ENGINE-CANARY-01, STACK-LIGHT-PROFILE-01, GROUND-A-01, SEARCH-DDGS-01c, OWUI-ADOPT-06, TOOL-RESULT-TRUST-01, REVIEW-01, ACT-02, EVAL-05, IMG-PIPE-INTENT-01, IMG-VISION-SHADOW-01, IMG-VISION-VETO-01, IMG-REVERSE-01 |
-| news app, kid mode voice (2026-10-17) | written by other sessions the same day; listed here when they land | their own rows |
+| [kid-mode-app-voice-2026-10-17.md](kid-mode-app-voice-2026-10-17.md) | new 2026-10-17, no code; the look, copy, hides and asks of every app on Child controls | KID-MODE-01 to -07 (Kid mode) |
+| [news-app-2026-10-17.md](news-app-2026-10-17.md) | new 2026-10-17, no code; a child's News waits on its decision 1 | NEWS-00 to NEWS-08 (News app) |
 
 ## Current design records in `docs/plans/`
 
