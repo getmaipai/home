@@ -367,7 +367,10 @@ S2. **Each app area emulates its native app.** Everything to the right of
     player stay where that app puts them. Global things (switching apps,
     Home, Search everywhere, profile, settings, notifications, status)
     live only in the main navigation, and an app never draws a second
-    copy of them.
+    copy of them. A search scoped to the app's own content (chat's
+    thread search; News's search over its stories, topics, sources and
+    saved items) is part of that app's own native layout, not a second
+    copy of Search everywhere, and is allowed beside it.
 S3. **A test holds the rail.** A test fails when the main navigation does
     not render on an app page: the rail at 640 and up, the menu button and
     its drawer below 640, with accessible names, at 360, 402, 874 x 402,
