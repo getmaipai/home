@@ -2,7 +2,10 @@
 // folders) are admin-only to add, remove or rescan; reads are for everyone signed in, filtered by the person's band (a child reads
 // only `band_ok: child` items) and by each source's `visible_to`. lib/media/ holds the rules; this file is only the wire.
 import { createRoute, z } from "@hono/zod-openapi";
+import type { Context } from "hono";
+import { getCookie } from "hono/cookie";
 import { and, eq, isNull } from "drizzle-orm";
+import { hashSessionToken } from "@/lib/session";
 import { db, sqlite } from "@/db";
 import { mediaItems, mediaSources, people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
@@ -302,6 +305,12 @@ const duplicatesRoute = createRoute({
 mediaRoutes.openapi(duplicatesRoute, (c) => c.json(findDuplicates(), 200));
 
 
+/** The metering cursor key: the authenticated session cookie (hashed). requireAuth guarantees it; never read from the body. */
+function meterKeyOf(c: Context): string {
+  const session = getCookie(c, "session");
+  return session ? `s:${hashSessionToken(session)}` : "-";
+}
+
 // ---- private daily media budget ----
 const BudgetSchema = z.object({ limit_min: z.number(), used_min: z.number(), left_min: z.number(), exhausted: z.boolean() });
 const budgetRoute = createRoute({
@@ -341,7 +350,6 @@ const PositionSchema = z.union([
 const MarkSchema = z.object({ at_s: z.number().min(0), label: z.string().max(200).nullable().optional() });
 const WriteBody = z.object({
   position: PositionSchema,
-  session_id: z.string().min(1).max(100).optional().describe("A token for this player run; use a new one on the next run."),
   playing: z.boolean().optional().describe("False on a pause; true on playing ticks and resume."),
   seeking: z.boolean().optional().describe("True on a seek: saves the place without counting the jump as playing time."),
   duration_s: z.number().min(0).nullable().optional(),
@@ -358,7 +366,7 @@ type WriteBodyType = z.infer<typeof WriteBody>;
 
 function writeFrom(body: WriteBodyType, serverNow: Date): ProgressWrite {
   return {
-    position: body.position as ProgressWrite["position"], session_id: body.session_id, playing: body.playing, seeking: body.seeking, duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
+    position: body.position as ProgressWrite["position"], playing: body.playing, seeking: body.seeking, duration_s: body.duration_s, completed: body.completed, counts: body.counts, marks: body.marks?.map((m) => ({ at_s: m.at_s, label: m.label ?? null })),
     events: body.event ? { [body.event]: true } : undefined, device_id: body.device_id ?? null, stamp: correctedStamp({ sampledAt: body.sampled_at, clientNow: body.client_now, serverNow }),
   };
 }
@@ -387,7 +395,7 @@ mediaRoutes.openapi(putProgressRoute, (c) => {
   const item = readableItem(actor, c.req.valid("param").media_id);
   if (!item) return c.json({ error: REFUSAL_LINES.no_such_title }, 404);
   const now = new Date();
-  const outcome = writeProgress(actor, item, writeFrom(body, now), { now, immediate: body.immediate });
+  const outcome = writeProgress(actor, item, writeFrom(body, now), { now, immediate: body.immediate, meterKey: meterKeyOf(c) });
   if (!outcome.ok) return c.json({ error: REFUSAL_LINES[outcome.refusal] }, outcome.refusal === "other_persons_device" ? 403 : 422);
   return c.json({ progress: outcome.progress, applied: outcome.positionApplied, budget: outcome.budget! }, 200);
 });
@@ -414,7 +422,7 @@ mediaRoutes.openapi(batchRoute, (c) => {
   const results = writes.map((entry) => {
     const item = readableItem(actor, entry.media_id);
     if (!item) return { media_id: entry.media_id, status: "unknown_title" as const, reason: REFUSAL_LINES.no_such_title, progress: null };
-    const outcome = writeProgress(actor, item, writeFrom({ ...entry, client_now: entry.client_now ?? client_now }, now), { now, immediate: true });
+    const outcome = writeProgress(actor, item, writeFrom({ ...entry, client_now: entry.client_now ?? client_now }, now), { now, immediate: true, meterKey: meterKeyOf(c) });
     if (!outcome.ok) return { media_id: entry.media_id, status: "refused" as const, reason: REFUSAL_LINES[outcome.refusal], progress: null };
     return { media_id: entry.media_id, status: outcome.positionApplied ? ("applied" as const) : ("older" as const), reason: null, progress: outcome.progress, budget: outcome.budget };
   });

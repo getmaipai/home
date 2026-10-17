@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { mediaItems, mediaSources, people, notificationDeliveries, notificationHolds } from "@/db/schema";
 import { getSettingValueForPerson } from "@/lib/settings";
 import { discoveryAllowed } from "@/lib/media/access";
-import { mediaBudget, mediaDay, extendMediaBudget, MEDIA_KID_COPY } from "@/lib/media/watchTime";
+import { mediaBudget, mediaDay, extendMediaBudget, MEDIA_KID_COPY, SESSION_ROW_CAP } from "@/lib/media/watchTime";
 import { createDevice } from "@/lib/devices";
 import { erasePersonData } from "@/lib/personLifecycle";
 import { lintSettingCopy } from "@maipai/spec/interpreters/ts/describeSetting.js";
@@ -107,8 +107,9 @@ function timeUpRows() {
 // The injected clock keeps elapsed-time assertions deterministic, with no server, service or waits.
 function clock() { const date = new Date(); date.setHours(12, 0, 0, 0); return date; }
 function at(base: Date, seconds: number) { return new Date(base.getTime() + seconds * 1000); }
-function tick(person: Awaited<ReturnType<typeof setup>>["child"], mediaId: string, now: Date, seconds: number, options: Partial<Parameters<typeof writeProgress>[2]> = {}, kind: "video" | "track" | "audiobook" | "chapter" | "podcast_episode" | "book" = "video") {
-  return writeProgress(person.row, { id: mediaId, kind }, { position: { seconds }, stamp: now.toISOString(), session_id: "run", ...options }, { now, immediate: true });
+function tick(person: Awaited<ReturnType<typeof setup>>["child"], mediaId: string, now: Date, seconds: number, options: Partial<Parameters<typeof writeProgress>[2]> & { meterKey?: string } = {}, kind: "video" | "track" | "audiobook" | "chapter" | "podcast_episode" | "book" = "video") {
+  const { meterKey, ...write } = options;
+  return writeProgress(person.row, { id: mediaId, kind }, { position: { seconds }, stamp: now.toISOString(), ...write }, { now, immediate: true, meterKey: meterKey ?? "run" });
 }
 
 test("discovery follows the allowlist, and both new settings pass the copy lint", async () => {
@@ -151,13 +152,13 @@ test("sessions and devices are separate baselines; a foreign device adds no usag
   tick(child, video, at(start, 10), 10, { device_id: a.id });
   tick(child, video, at(start, 11), 500, { device_id: b.id });
   tick(child, video, at(start, 21), 510, { device_id: b.id });
-  tick(child, video, at(start, 22), 900, { device_id: a.id, session_id: "new-run" });
-  tick(child, video, at(start, 32), 910, { device_id: a.id, session_id: "new-run" });
+  tick(child, video, at(start, 22), 900, { device_id: a.id, meterKey: "new-run" });
+  tick(child, video, at(start, 32), 910, { device_id: a.id, meterKey: "new-run" });
   expect(tick(child, video, at(start, 42), 920, { device_id: foreign.id })).toEqual({ ok: false, refusal: "other_persons_device" });
   expect(mediaBudget(child.id, start).used_min).toBe(0.5);
   expect(getProgress(child.id, video)?.position).toEqual({ seconds: 910 });
   __resetProgressForTests(); // cursor is persisted, no in-memory reset can forget usage or baseline
-  tick(child, video, at(start, 42), 920, { device_id: a.id, session_id: "new-run" });
+  tick(child, video, at(start, 42), 920, { device_id: a.id, meterKey: "new-run" });
   expect(mediaBudget(child.id, start).used_min).toBeCloseTo(40 / 60);
 });
 
@@ -167,8 +168,33 @@ test("coalescing never drops metered ticks, and switching items starts a baselin
   for (let n = 0; n <= 10; n++) writeProgress(child.row, { id: video, kind: "video" }, { position: { seconds: n }, stamp: at(start, n).toISOString() }, { now: at(start, n), coalesceMs: 100000 });
   expect(mediaBudget(child.id, start).used_min).toBeCloseTo(10 / 60);
   expect(getProgress(child.id, video)?.position).toEqual({ seconds: 10 });
-  tick(child, other, at(start, 20), 1000, { session_id: undefined });
+  tick(child, other, at(start, 20), 1000, { meterKey: "-" });
   expect(mediaBudget(child.id, start).used_min).toBeCloseTo(10 / 60);
+});
+
+test("a client rotating session_id and device_id on every write still reaches the daily budget", async () => {
+  const { child, video, set, put } = await setup(); const start = clock();
+  await set(`person:${child.id}`, "allowance.media.daily_minutes", 1);
+  const devices = Array.from({ length: 7 }, (_, n) => createDevice("browser", `Tablet ${n}`, child.id));
+  for (let n = 0; n <= 6; n++) {
+    // The metering key is the server's (here one authenticated session); every field the client varies is ignored for it.
+    tick(child, video, at(start, n * 10), n * 10, { device_id: devices[n]!.id, session_id: `fresh-${n}` } as never, "video");
+  }
+  expect(mediaBudget(child.id, start)).toEqual({ limit_min: 1, used_min: 1, left_min: 0, exhausted: true });
+  // Over HTTP an unknown session_id field is simply not part of the request any more.
+  expect((await put(child.client, video, { position: { seconds: 80 }, session_id: "rotating" })).status).toBe(200);
+});
+
+test("cursor rows are pruned after two days and capped per person", async () => {
+  const { child, adult, video } = await setup(); const start = clock();
+  const old = new Date(start.getTime() - 3 * 86_400_000);
+  tick(child, video, old, 0, { meterKey: "ancient" });
+  for (let n = 0; n < SESSION_ROW_CAP + 20; n++) tick(child, video, at(start, n), 0, { meterKey: `k${n}` });
+  const mine = db.select().from(mediaWatchSessions).where(eq(mediaWatchSessions.personId, child.id)).all();
+  expect(mine.length).toBe(SESSION_ROW_CAP);
+  expect(mine.some((row) => row.sessionKey.includes("ancient"))).toBe(false);
+  tick(adult, video, start, 0, { meterKey: "adult-key" });
+  expect(db.select().from(mediaWatchSessions).where(eq(mediaWatchSessions.personId, adult.id)).all()).toHaveLength(1);
 });
 
 test("every media kind counts across devices; the admin audio switch excludes only music and audiobooks", async () => {
@@ -193,7 +219,7 @@ test("a minor saves a place after exhaustion; an admin extends today; notificati
   await set(`person:${child.id}`, "allowance.media.daily_minutes", 1);
   for (let n = 0; n <= 6; n++) tick(child, video, at(start, n * 10), n * 10);
   expect(mediaBudget(child.id, start)).toEqual({ limit_min: 1, used_min: 1, left_min: 0, exhausted: true });
-  const saved = await put(child.client, video, { position: { seconds: 70 }, session_id: "other-run" });
+  const saved = await put(child.client, video, { position: { seconds: 70 } });
   expect(saved.status).toBe(200);
   expect(await saved.json()).toMatchObject({ progress: { position: { seconds: 70 } }, budget: { exhausted: true } });
   await Promise.resolve();

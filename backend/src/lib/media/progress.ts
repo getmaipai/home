@@ -43,8 +43,6 @@ export interface ProgressState {
 
 export interface ProgressWrite {
   position: Position;
-  /** A player-run token, stable across this playback's writes; not a person or media id. */
-  session_id?: string;
   playing?: boolean;
   seeking?: boolean;
   duration_s?: number | null;
@@ -232,6 +230,8 @@ export interface WriteOptions {
   /** Store at once: a pause, a seek, an unload, a finish, an offline batch. The 10-second cadence of a playing title is coalesced. */
   immediate?: boolean;
   coalesceMs?: number;
+  /** Server-derived identity of the authenticated session or device token; the metering cursor key. Never a request field. */
+  meterKey?: string;
 }
 
 const isPlainTick = (write: ProgressWrite): boolean => !write.events && write.completed === undefined && !write.counts && !write.marks;
@@ -241,7 +241,7 @@ export function writeProgress(person: Parameters<typeof mediaBandOf>[0] & { id: 
   if (!deviceMayWrite(person, write.device_id)) return { ok: false, refusal: "other_persons_device" };
   if ((item.kind === "book") !== ("locator" in write.position)) return { ok: false, refusal: "wrong_position_shape" };
   const now = options.now ?? new Date();
-  const budget = meterProgress(person, item, write, now);
+  const budget = meterProgress(person, item, write, now, options.meterKey);
   const key = `${person.id}|${item.id}`;
   const window = options.coalesceMs ?? COALESCE_MS;
   const held = pending.get(key);

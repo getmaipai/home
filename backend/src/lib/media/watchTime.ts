@@ -1,5 +1,5 @@
 // MEDIA-KID-01: the one daily media budget, private to the asking person. Totals and sample cursors survive restarts.
-import { and, eq, sql } from "drizzle-orm";
+import { and, asc, eq, lt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaWatchDays, mediaWatchSessions } from "@/db/schema";
 import { dailyMinutesAllowed } from "@/lib/allowance";
@@ -21,6 +21,9 @@ export const MEDIA_KID_COPY = {
 export interface MediaBudget { limit_min: number; used_min: number; left_min: number; exhausted: boolean }
 export const WRITE_INTERVAL_S = 10;
 export const WRITE_SLACK_S = 2;
+/** Per-person cursor rows: dropped after two days of silence, and never more than this many. */
+export const SESSION_ROW_TTL_MS = 2 * 86_400_000;
+export const SESSION_ROW_CAP = 200;
 
 /** Household host local midnight, as in statusHistory/stackSelfHeal's daily limits. Calendar dates handle DST. */
 export function mediaDay(now: Date): string {
@@ -48,6 +51,15 @@ export function extendMediaBudget(personId: string, minutes: number, now = new D
   return mediaBudget(personId, now);
 }
 
+/** Called when a new cursor row is about to be added: old rows go, then the oldest beyond the cap. */
+function pruneCursors(personId: string, now: Date): void {
+  db.delete(mediaWatchSessions).where(and(eq(mediaWatchSessions.personId, personId), lt(mediaWatchSessions.sampledAt, new Date(now.getTime() - SESSION_ROW_TTL_MS).toISOString()))).run();
+  const rows = db.select({ key: mediaWatchSessions.sessionKey }).from(mediaWatchSessions).where(eq(mediaWatchSessions.personId, personId)).orderBy(asc(mediaWatchSessions.sampledAt)).all();
+  for (const row of rows.slice(0, Math.max(0, rows.length - (SESSION_ROW_CAP - 1)))) {
+    db.delete(mediaWatchSessions).where(and(eq(mediaWatchSessions.personId, personId), eq(mediaWatchSessions.sessionKey, row.key))).run();
+  }
+}
+
 function addSeconds(personId: string, day: string, seconds: number, audio: boolean): void {
   if (seconds <= 0) return;
   db.insert(mediaWatchDays).values({ personId, day, usedS: seconds, audioS: audio ? seconds : 0 }).onConflictDoUpdate({
@@ -57,13 +69,14 @@ function addSeconds(personId: string, day: string, seconds: number, audio: boole
 }
 
 /** Called only after the progress device/shape guards, before coalescing can discard a tick.
- * session_id is a player-run token. Older clients use a device cursor (or the signed-in browser cursor).
+ * `meterKey` is derived by the server from the authenticated session or device token, never from a request field, so a client
+ * cannot start a fresh baseline by rotating anything it sends. The cursor is per (key, media item).
  * A new play, item/device change, pause, seek, replayed or older stamp establishes a baseline, never extra time.
  * Position jumps beyond the actual write interval plus slack are seeks; only elapsed playing time is counted.
  */
-export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "kind">, write: ProgressWrite, now: Date): MediaBudget {
+export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "kind">, write: ProgressWrite, now: Date, meterKey = "-"): MediaBudget {
   db.transaction(() => {
-    const sessionKey = JSON.stringify([write.device_id ?? null, write.session_id ?? "default"]);
+    const sessionKey = JSON.stringify([meterKey, item.id]);
     const previous = db.select().from(mediaWatchSessions).where(and(eq(mediaWatchSessions.personId, person.id), eq(mediaWatchSessions.sessionKey, sessionKey))).get();
     const sampled = Math.min(Date.parse(write.stamp), now.getTime());
     if (!Number.isFinite(sampled)) return;
@@ -95,6 +108,7 @@ export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "k
         start = end;
       }
     }
+    if (!previous) pruneCursors(person.id, now);
     const values = { mediaId: item.id, deviceId: write.device_id ?? null, positionS: position, sampledAt: new Date(sampled).toISOString(), playing: write.playing !== false };
     db.insert(mediaWatchSessions).values({ personId: person.id, sessionKey, ...values }).onConflictDoUpdate({ target: [mediaWatchSessions.personId, mediaWatchSessions.sessionKey], set: values }).run();
   });
