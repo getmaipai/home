@@ -17,8 +17,12 @@ function rosterEntry(id: string, role: string, display_name: string): PersonRost
   return { id, role, display_name, age_band: role === "child" ? "child" : role === "teen" ? "teen" : "adult" } as PersonRosterEntry;
 }
 
+// The blocked-sites panel under the person editor loads its own view; stub it so these tests never reach the network.
+const noSiteBlocks = () => spyOn(api, "siteBlocks").mockResolvedValue({ label: "Blocked sites", rows: [], setBy: {}, defaults: [], mine: [], locked: [], resetLabel: "Reset" } as never);
+
 test("the add form's companions box defaults to the household value", async () => {
   const people = spyOn(api, "people").mockResolvedValue([rosterEntry("kid", "child", "Robin")] as never);
+  const siteBlocks = noSiteBlocks();
   const registry = spyOn(api, "settingsRegistry").mockResolvedValue([companionKey] as never);
   const values = spyOn(api, "settingsValues").mockImplementation(async (scope, key) => {
     if (scope === "household") return [{ key: "companions.allowed", value: false, source: "user", label: "AI companions", help: companionKey.help, level: "basic", secret: false }];
@@ -31,7 +35,7 @@ test("the add form's companions box defaults to the household value", async () =
     await waitFor(() => expect(view.getAllByRole("checkbox", { name: "AI companions" }).length).toBe(1));
     expect(view.getByRole("checkbox", { name: "AI companions" }).getAttribute("aria-checked")).toBe("false");
     expect(view.getAllByRole("switch", { name: "AI companions" })).toHaveLength(2);
-  } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); }
+  } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
 
 test("the person-editor switch is shown to owner and admin for every role, including child and teen", async () => {
@@ -41,6 +45,7 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
     rosterEntry("child-one", "child", "Robin"), rosterEntry("guest-one", "guest", "Guest"),
   ];
   const people = spyOn(api, "people").mockResolvedValue(rows as never);
+  const siteBlocks = noSiteBlocks();
   const registry = spyOn(api, "settingsRegistry").mockResolvedValue([companionKey] as never);
   const values = spyOn(api, "settingsValues").mockImplementation(async (scope, key) => {
     if (key === "companions.allowed") return [{ key, value: true, source: "default", label: companionKey.label, help: companionKey.help, level: "basic", secret: false }];
@@ -54,5 +59,5 @@ test("the person-editor switch is shown to owner and admin for every role, inclu
       await waitFor(() => expect(view.getAllByRole("switch", { name: "AI companions" }).length).toBe(rows.length + 1));
       view.unmount();
     }
-  } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); }
+  } finally { people.mockRestore(); registry.mockRestore(); values.mockRestore(); siteBlocks.mockRestore(); }
 });
