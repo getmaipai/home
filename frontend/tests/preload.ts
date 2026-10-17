@@ -55,8 +55,23 @@ plugin({
 // Imported here, after the DOM above exists, because the library reads
 // `document` when it loads (a static import would be hoisted above the DOM).
 const { cleanup } = await import("@testing-library/react");
+// One bun process runs every file of a shard, so a test that stubs a timer
+// global and restores only some of them breaks every later timer test
+// (micStream.test.ts restored setTimeout but not clearTimeout, and the gate
+// shard failed 5 timer tests in other files; one file alone passed). The
+// natives are captured here; any test that leaves one replaced is failed by
+// name, and the global is put back so the damage stops with that test.
+const nativeTimers = {
+  setTimeout: globalThis.setTimeout,
+  clearTimeout: globalThis.clearTimeout,
+  setInterval: globalThis.setInterval,
+  clearInterval: globalThis.clearInterval,
+};
 afterEach(() => {
   cleanup();
+  const leaked = (Object.keys(nativeTimers) as (keyof typeof nativeTimers)[]).filter((k) => globalThis[k] !== nativeTimers[k]);
+  for (const k of leaked) (globalThis as Record<string, unknown>)[k] = nativeTimers[k];
+  if (leaked.length > 0) throw new Error(`This test left ${leaked.join(", ")} replaced. Restore the real ${leaked.length > 1 ? "ones" : "one"} in afterEach (or call jest.useRealTimers()) so later test files get working timers.`);
 });
 
 // MEDIA-POLISH-01: the kit Player now draws on Home's media pages in tests (the watch page, the docked mini bar). Media Chrome's
