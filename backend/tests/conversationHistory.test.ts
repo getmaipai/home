@@ -2220,7 +2220,7 @@ describe("updateConversationTitle() validates through the spec (step 3, code rev
     // is still whatever it was before this call.
     const unchanged = getConversation(actor, id);
     if (!unchanged.ok) throw new Error(unchanged.error);
-    expect(unchanged.value.title).toMatch(/^Chat, /); // the provisional title the first message set (CHAT-TITLE-02)
+    expect(unchanged.value.title).toBe("New chat"); // the provisional title the first message set (CHAT-TITLE-02)
   });
 
   test("a real rename regenerates hlc, proving every write bumps the clock", async () => {

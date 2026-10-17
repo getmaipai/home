@@ -34,6 +34,18 @@ function scriptModel(content: string | (() => string)): void {
   setHouseholdSettingValue("engines.stack.url", fixture.url);
 }
 
+/** A Stack whose chat completions fail: the engine is down. */
+function scriptEngineDown(): void {
+  modelCalls = [];
+  fixture = startStackFixture({
+    "POST /v1/chat/completions": async () => Response.json({ error: { message: "down" } }, { status: 503, headers: IDENTITY_HEADERS }),
+    "GET /stack/v1/roles": async () => Response.json({ roles: [] }),
+    "GET /stack/v1/health": async () => Response.json({ health: [] }),
+  });
+  __setStackClientForTests(fixture.client);
+  setHouseholdSettingValue("engines.stack.url", fixture.url);
+}
+
 beforeEach(() => {
   resetDb();
   __resetThrottleForTests();
@@ -81,7 +93,7 @@ describe("generateConversationTitle() (CHAT-TITLE-01)", () => {
     expect(sent).toContain("tomato plants");
     expect(sent).toContain("Water them evenly");
     // Asked for a noun-phrase topic, not the message cut off.
-    expect(sent).toContain("noun-phrase topic title");
+    expect(sent).toContain("three to six words");
     expect(sent).toContain("never copy or truncate the first message");
   });
 
@@ -141,8 +153,7 @@ describe("generateConversationTitle() (CHAT-TITLE-01)", () => {
   });
 
   test("an unavailable model leaves the title empty and tries again on the next call", async () => {
-    __setStackClientForTests(null);
-    setHouseholdSettingValue("engines.stack.url", "");
+    scriptEngineDown();
     const { actor } = await household();
     const id = chatWithOneExchange(actor);
     expect(await generateConversationTitle(id)).toBe("unavailable");
@@ -270,8 +281,7 @@ describe("a chat is never left on the default title (CHAT-TITLE-02)", () => {
   const sourceOf = (id: string) => db.select().from(conversations).where(eq(conversations.id, id)).get()!;
 
   test("the first stored message sets a provisional title at once, with no model", async () => {
-    __setStackClientForTests(null);
-    setHouseholdSettingValue("engines.stack.url", "");
+    scriptEngineDown();
     const { actor } = await household();
     const id = chatWithOneExchange(actor, "## **How do I keep** my tomato plants from splitting in the heat? https://example.com/x");
     const row = sourceOf(id);
@@ -280,13 +290,64 @@ describe("a chat is never left on the default title (CHAT-TITLE-02)", () => {
     expect(row.title!.length).toBeLessThanOrEqual(40);
   });
 
-  test("a greeting, a one-word message and a blank message get a dated title, never the default", () => {
-    for (const text of ["hi", "Hello!", "?", "", "   "]) {
-      const title = provisionalTitleFrom(text, "2026-10-17T12:00:00.000Z");
-      expect(title).toBe("Chat, Oct 17");
+  test("a greeting, a short message and a blank message give no provisional title, and a date is never one", () => {
+    for (const text of ["hi", "Hello!", "?", "", "   ", "what time", "New chat", "my password is hunter2 [credential redacted]"]) {
+      expect(provisionalTitleFrom(text)).toBeNull();
     }
-    expect(provisionalTitleFrom("New chat", "2026-10-17T12:00:00.000Z")).toBe("Chat, Oct 17");
-    expect(provisionalTitleFrom("my password is hunter2 [credential redacted]", "2026-10-17T12:00:00.000Z")).toBe("Chat, Oct 17");
+  });
+
+  test("a chat opening with 'hi' shows the first later message with at least three words, else the default", async () => {
+    const { actor } = await household();
+    const conversation = createConversation(actor, { surface: "chat" });
+    if (!conversation.ok) throw new Error(conversation.error);
+    const id = conversation.value.id;
+    logTurn(actor, "chat", "hi", { reply: { text: "Hello!" }, source: "model", safety: SAFE, conversation_id: id, turn_id: "turn-hi-1" });
+    expect(sourceOf(id)).toMatchObject({ title: "New chat", titleSource: "provisional" });
+    // The placeholder is replaceable: the model title (judge role) takes it.
+    scriptModel("Tomato Plant Care");
+    expect(await generateConversationTitle(id)).toBe("titled");
+    expect(modelCalls[0]!.model).toBe("judge");
+    expect(sourceOf(id)).toMatchObject({ title: "Tomato Plant Care", titleSource: "model" });
+    const second = createConversation(actor, { surface: "chat" });
+    if (!second.ok) throw new Error(second.error);
+    logTurn(actor, "chat", "hi", { reply: { text: "Hello!" }, source: "model", safety: SAFE, conversation_id: second.value.id, turn_id: "turn-hi-2" });
+    expect(sourceOf(second.value.id).title).toBe("New chat");
+    logTurn(actor, "chat", "plan a birthday party for saturday", { reply: { text: "Sure." }, source: "model", safety: SAFE, conversation_id: second.value.id, turn_id: "turn-hi-3" });
+    db.update(conversations).set({ title: null, titleSource: null }).where(eq(conversations.id, second.value.id)).run();
+    expect(ensureProvisionalTitle(second.value.id)).toBe("Plan a birthday party for saturday");
+  });
+
+  test("reasoning text in the model output is stripped before the title is used", async () => {
+    scriptModel("<think>The user wants a title about tomatoes, so</think>\nTomato Plant Care");
+    const { actor } = await household();
+    const id = chatWithOneExchange(actor);
+    expect(await generateConversationTitle(id)).toBe("titled");
+    expect(sourceOf(id).title).toBe("Tomato Plant Care");
+    scriptModel("<think>never closed, still reasoning about tomatoes");
+    const other = chatWithOneExchange(actor);
+    expect(await generateConversationTitle(other)).toBe("refused");
+    expect(sourceOf(other).titleSource).toBe("provisional");
+  });
+
+  test("the sweep replaces a legacy 'Chat, Oct 17' provisional title with a model title", async () => {
+    scriptModel("Tomato Plant Care");
+    const { actor } = await household();
+    const id = chatWithOneExchange(actor);
+    db.update(conversations).set({ title: "Chat, Oct 17", titleSource: "provisional" }).where(eq(conversations.id, id)).run();
+    const result = await sweepConversationTitles();
+    expect(result.titled).toBe(1);
+    expect(sourceOf(id)).toMatchObject({ title: "Tomato Plant Care", titleSource: "model" });
+  });
+
+  test("one chat the model gives nothing usable for does not starve the rest of the sweep", async () => {
+    const { actor } = await household();
+    const ids = Array.from({ length: 7 }, () => chatWithOneExchange(actor));
+    let n = 0;
+    scriptModel(() => (n++ < 5 ? "" : "Tomato Plant Care"));
+    const result = await sweepConversationTitles(5);
+    expect(result.unavailable).toBe(false);
+    expect(result.titled).toBe(2);
+    expect(ids.length).toBe(7);
   });
 
   test("a failed first reply still leaves the chat titled from the person's message", async () => {
@@ -297,16 +358,15 @@ describe("a chat is never left on the default title (CHAT-TITLE-02)", () => {
     expect(sourceOf(conversation.value.id).title).toBe("Plan a birthday party for saturday");
   });
 
-  test("a child's provisional title passes the output gate: a refused message becomes the dated title", async () => {
+  test("a child's provisional title passes the output gate: a refused message falls back to the default", async () => {
     const { client } = await household();
     const sprout = await addPerson(client, "Sprout", "child");
     const id = chatWithOneExchange(sprout, "how to make a pipe bomb at home");
-    expect(sourceOf(id).title).toMatch(/^Chat, /);
+    expect(sourceOf(id).title).toBe("New chat");
   });
 
   test("engine unavailable: the provisional title stands, and a later call replaces it with the model title", async () => {
-    __setStackClientForTests(null);
-    setHouseholdSettingValue("engines.stack.url", "");
+    scriptEngineDown();
     const { actor } = await household();
     const id = chatWithOneExchange(actor);
     expect(await generateConversationTitle(id)).toBe("unavailable");
@@ -320,10 +380,10 @@ describe("a chat is never left on the default title (CHAT-TITLE-02)", () => {
     scriptModel('""');
     const { actor } = await household();
     const id = chatWithOneExchange(actor);
-    expect(await generateConversationTitle(id)).toBe("unavailable");
+    expect(await generateConversationTitle(id)).toBe("refused");
     expect(sourceOf(id).titleSource).toBe("provisional");
     scriptModel("New chat");
-    expect(await generateConversationTitle(id)).toBe("unavailable");
+    expect(await generateConversationTitle(id)).toBe("refused");
     expect(sourceOf(id).title).not.toBe("New chat");
   });
 
@@ -363,8 +423,7 @@ describe("a chat is never left on the default title (CHAT-TITLE-02)", () => {
   });
 
   test("the sweep stops after one call when the engine is down, and still leaves every chat titled", async () => {
-    __setStackClientForTests(null);
-    setHouseholdSettingValue("engines.stack.url", "");
+    scriptEngineDown();
     const { actor } = await household();
     const ids = [chatWithOneExchange(actor), chatWithOneExchange(actor)];
     db.update(conversations).set({ title: null, titleSource: null }).run();
