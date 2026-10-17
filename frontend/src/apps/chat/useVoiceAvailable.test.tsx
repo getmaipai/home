@@ -37,6 +37,6 @@ describe("engineDownReason", () => {
   test("ready has no reason; paused and starting each have a short one", () => {
     expect(engineDownReason("ready")).toBeUndefined();
     expect(engineDownReason("unavailable")).toBe("Chat is paused");
-    expect(engineDownReason("starting")).toBe("Chat is starting");
+    expect(engineDownReason("starting")).toBe("Getting ready, one moment");
   });
 });

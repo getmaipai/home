@@ -13,7 +13,11 @@ function useHealthQuery() {
     queryKey: ["health"],
     queryFn: () => api.health(),
     retry: false,
-    refetchInterval: (current) => chatAvailability(current.state.data?.engines?.chat) === "unavailable" ? 5_000 : 15_000,
+    // 2 s while the engine is warming so Send enables the moment it is ready; never faster.
+    refetchInterval: (current) => {
+      const state = chatAvailability(current.state.data?.engines?.chat);
+      return state === "starting" ? 2_000 : state === "unavailable" ? 5_000 : 15_000;
+    },
   });
 }
 
@@ -22,7 +26,7 @@ function useHealthQuery() {
  * to the kit Thread's `engineDown`; Home's own slots read it here, so the
  * controls never disagree about whether chat is up. */
 export function engineDownReason(availability: "ready" | "starting" | "unavailable"): string | undefined {
-  return availability === "ready" ? undefined : availability === "starting" ? "Chat is starting" : "Chat is paused";
+  return availability === "ready" ? undefined : availability === "starting" ? "Getting ready, one moment" : "Chat is paused";
 }
 
 export function useEngineDownReason(): string | undefined {

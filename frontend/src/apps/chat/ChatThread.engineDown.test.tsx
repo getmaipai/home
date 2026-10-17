@@ -85,7 +85,7 @@ describe("engine-dependent reply controls", () => {
     test(`Refresh, Edit and Retry are disabled while chat is ${state}, with the reason in their name`, async () => {
       const view = renderThread(state);
       const { assistant, user } = await rows(view);
-      const reason = state === "unavailable" ? "Chat is paused" : "Chat is starting";
+      const reason = state === "unavailable" ? "Chat is paused" : "Getting ready, one moment";
       for (const control of [button(assistant, "Refresh"), button(user, "Edit"), button(user, "Retry")]) {
         expect(isDisabled(control)).toBe(true);
         expect(control.textContent).toContain(reason);

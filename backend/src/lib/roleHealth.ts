@@ -1,4 +1,5 @@
 
+import { warmupInFlight } from "@/lib/stackWarmup";
 import { getStackClient, isStackConfigured, stackRefusal } from "@/lib/stackEngine";
 import type { EngineHealthEntry } from "@/wire";
 import type { ChatRoleContext } from "@maipai/spec/stack/ts/role-context.js";
@@ -51,6 +52,10 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     if (!row) return { availability: "unavailable", reason: "stack_unreachable" };
     const state = row.state.state;
     const status = role === "chat" ? { ...chatContextStatus(row), ...(row.model?.id ? { modelId: row.model.id } : {}) } : {};
+    // The Stack says a warm-up is still running: the role reads `installed`
+    // until it flips to `loaded`, but a message sent now would wait out the
+    // load, so Send is held ("starting") until the warm-up finishes.
+    if (role === "chat" && state === "installed" && warmupInFlight()) return { availability: "starting", reason: null, ...status };
     if (state === "ready" || state === "installed") return { availability: "ready", reason: null, ...status };
     if (state === "loaded") return { availability: row.state.reason === STACK_IDLE_REASON ? "ready" : "starting", reason: null, ...status };
     return { availability: "unavailable", reason: row.state.reason ?? row.reason ?? "failed_start" };
