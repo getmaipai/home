@@ -7,6 +7,11 @@ the evidence and the rollout. It supersedes row 5 of [chat-throughput-2026-10-17
 of llama.cpp: rejected; there is no MLX build of Muse"): that row was wrong on its premise, `mlx-community` hosts Muse Glimmer 30B in
 4, 5, 6 and 8 bits since 2026-08-10.
 
+Status: decided and built on the Stack side 2026-10-17 (Stack main `8226ef8` and `b17b34b`, row ENGINE-MLX-01); the live Studio runs
+it after the Home release that pins that Stack. The real engine was exercised through the Stack's own supervisor and public route on
+the Mac (environment from the hashed file, model hash check, completion with reasoning and timings, stream, tool call, json_schema,
+picture, token count, SIGKILL, clean stop).
+
 ## Decision
 
 **Cut the chat role over to oMLX 0.7.0 on Apple Silicon at the tiers whose memory fits it (p64 and p128), with llama-server kept
@@ -90,6 +95,7 @@ need the cut-over Stack): row ENGINE-MLX-02.
 | Health route, graceful exit, port | yes | `/health` (JSON), SIGTERM exits in 1 s, `--host 127.0.0.1 --port N` |
 | Prompt cache across turns | yes | In-session reuse on par with llama.cpp; plus a paged SSD cache that survives a restart (kept inside the Stack's data directory) |
 | Parallel requests | yes | Continuous batching; slower than Rapid-MLX at 30 concurrent, faster than llama.cpp |
+| `response_format` json_schema (follow-up suggestions, the memory and persona judges) | yes, with xgrammar (no torch needed) | 8 of 8 schema-valid replies, 2 to 3.5 s each; in the same harness llama-server b10797 returned prose in 8 of 8 (Muse reasons first and the grammar did not constrain the answer; worth its own check, it is how the live engine behaves today) |
 | `/tokenize` and `/apply-template` (the Stack's `/v1/tokenize`) | no | Not on the engine. The Stack counts tokens with a one-token chat request (the engine's own template, exact `usage.prompt_tokens`), which the prefix cache makes cheap |
 | `timings` object (tokens per second in turn stats) | no, but its `usage` carries `generation_tokens_per_second` | The Stack maps it into the stream's `timings` so Home's figure is unchanged |
 | `usage.prompt_tokens_details.cached_tokens` | present, not reliable on short prompts | Cosmetic (the cache-reuse figure in chat details) |
@@ -125,6 +131,9 @@ work for Muse anyway) are not used.
 Licences of the 150 transitive packages are not individually reviewed here; the Stack's components inventory
 (`componentsDoc.ts`) lists them from the compiled file after the build, which is the existing check for the other engines.
 
+Pictures: a solid-colour test at 16 and 32 pixels is answered "white" by both llama.cpp and oMLX (the model, not the engine); from 64 pixels up
+both read the colour correctly, and real photos matched in description.
+
 ## What was not verified
 
 - The repo's own quality benches against the MLX engine (row ENGINE-MLX-02, to run after the cut-over Stack is installed, never on the live one).
@@ -144,7 +153,7 @@ Licences of the 150 transitive packages are not individually reviewed here; the 
    `3e7677d7a40d348a3daba263a2b1c0aa41910710`. The GGUF stays installed and selected-by-engine, so fallback needs no download. The install
    plan adds the MLX record on p64 and p128; the Stack pulls declared parts for installed models at daemon start, so an upgraded Studio
    fetches the 19.4 GB in the background and keeps answering on llama-server until it is verified.
-3. **Launch.** Supervised like every spawned engine: loopback, a random API key, offline, `--max-concurrent-requests`, the record's
+3. **Launch.** Supervised like every spawned engine: loopback, a random API key, offline, `--max-concurrent-requests`, a prompt cache under the engine's own state folder that is emptied at every launch (the engine's turn-to-turn reuse needs a disk cache; with `--no-cache` every turn re-read the 3.7k-token prompt in 4.2 s), the record's
    `reasoning_strength` sent with each request, health and post-load checks, keep-warm, the memory governor with the measured peak.
 4. **Automatic fallback.** If the oMLX engine fails its start or post-load check twice in a row, the role starts llama-server for that
    process lifetime and raises a health row with one fix ("Use llama-server" / "Retry oMLX"). The setting is not rewritten.
