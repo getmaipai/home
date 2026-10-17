@@ -4,7 +4,7 @@
   "kind": "app",
   "category": "Media",
   "display": "Podcasts",
-  "description": "Listen to the shows your home follows: new episodes play right away from the show, and a copy saved on the hub plays with the internet off.",
+  "description": "Listen to the shows your home follows, streamed or saved on the hub for when the internet is off.",
   "routing": {
     "examples": [
       "open podcasts",
