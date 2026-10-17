@@ -51,6 +51,19 @@ export function usePlaceAdapter(scope: "household" | "person", options: { enable
           return false;
         }
       },
+      // A person's own saved place is deleted (a tombstone with its clock stamp) when they remove it from their list.
+      // The household home is never removed here: only a person-scope place, and the hub refuses the rest.
+      remove: async (id) => {
+        if (incognito || scope !== "person") return false;
+        if (rows.find((e) => e.id === id)?.scope !== "person") return false;
+        try {
+          await api.deleteEntity(id);
+          await queryClient.invalidateQueries({ queryKey: PLACES_KEY });
+          return true;
+        } catch {
+          return false;
+        }
+      },
       useCurrent: () =>
         new Promise<boolean>((resolve) => {
           if (incognito) return resolve(false);
