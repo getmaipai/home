@@ -18,7 +18,7 @@ import { listVersions } from "@/lib/imageEdit";
 import { __setPhotoInspectorForTests } from "@/lib/likeness/inspector";
 import { __setStackTrustForTests } from "@/lib/likeness/proof";
 import { likenessUseLog } from "@/lib/likeness/uses";
-import { __setPersonPickerForTests } from "@/lib/pictures/people";
+import { __setPersonPickerForTests, freezePeople, FreezeError } from "@/lib/pictures/people";
 import { __setPictureStatusForTests, readyStatusForTests } from "@/lib/pictures/ready";
 import { __resetStackEngineForTests, __setStackClientForTests } from "@/lib/stackEngine";
 import type { StackClient } from "@/lib/stack/client";
@@ -95,7 +95,7 @@ describe("a change in words", () => {
     expect(ok.status).toBe("succeeded");
     stack.edits.length = 0;
     __setPhotoInspectorForTests(async () => ({ people: 2, faces: 2, under18: "no" }));
-    const refused = await run(nadia, { prompt: "make the sky clear", change: "attached" }, [photo]);
+    const refused = await run(nadia, { prompt: "change her dress", change: "attached", affects_people: true }, [photo]);
     expect(refusedWith(refused)).toBe("photo_has_person");
     expect(stack.edits).toHaveLength(0);
     // The engine's own checker being down is a refusal too, never a guess.
@@ -271,5 +271,67 @@ describe("remove people", () => {
     switchOn(marlow);
     const allowed = await prepareEditSource({ audience, bytes: await testPng(), generated: true, rootLikeness: marlow.id, declaredSubjectId: null, text: "remove the dog", source: "chat" });
     expect(allowed).toMatchObject({ ok: true, imageSource: "household_photo" });
+  });
+});
+
+async function solid(r: number, g: number, b: number, size = 64): Promise<Uint8Array> {
+  return new Uint8Array(await sharp({ create: { width: size, height: size, channels: 3, background: { r, g, b } } }).png().toBuffer());
+}
+async function squareMask(x0: number, y0: number, x1: number, y1: number, size = 64): Promise<Uint8Array> {
+  const raw = Buffer.alloc(size * size);
+  for (let y = y0; y < y1; y += 1) for (let x = x0; x < x1; x += 1) raw[y * size + x] = 255;
+  return new Uint8Array(await sharp(raw, { raw: { width: size, height: size, channels: 1 } }).png().toBuffer());
+}
+async function pixels(png: Uint8Array): Promise<{ data: Buffer; width: number }> {
+  const { data, info } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  return { data, width: info.width };
+}
+
+describe("freezing the people (IMGEDIT-05)", () => {
+  test("every pixel inside a person's outline is the original's, the rest is the edit, and a mask that cannot be kept is an error", async () => {
+    const original = await solid(10, 20, 200);
+    const edited = await solid(240, 120, 30);
+    const kept = await freezePeople(original, edited, await squareMask(10, 10, 30, 40));
+    const { data, width } = await pixels(kept);
+    const at = (x: number, y: number) => [...data.subarray((y * width + x) * 3, (y * width + x) * 3 + 3)];
+    for (let y = 10; y < 40; y += 1) for (let x = 10; x < 30; x += 1) expect(at(x, y)).toEqual([10, 20, 200]);
+    expect(at(55, 55)).toEqual([240, 120, 30]);
+    await expect(freezePeople(original, edited, await squareMask(0, 0, 0, 0))).rejects.toBeInstanceOf(FreezeError);
+  });
+
+  test("a sky, colour or background edit of a photo that shows several people runs, with the people put back exactly; an edit about a person still needs the rules", async () => {
+    const photo = await put(nadia, "photo-1");
+    // The attached photo is a different picture from the engine's answer so the freeze is visible: blue photo, orange edit.
+    storeTemporaryChatImage({ id: "photo-1", turnId: "turn-1", conversationId: "conv-1", ownerPersonId: nadia.id, name: "photo.png", mediaType: "image/png", width: 64, height: 64, bytes: await solid(10, 20, 200) });
+    __setPhotoInspectorForTests(async () => ({ people: 3, faces: 3, under18: "yes" }));
+    const outline = Buffer.from(await squareMask(8, 8, 36, 60)).toString("base64");
+    const { client, forms } = toolsStub(async () => ({ kind: "done", job: "j", item: { b64_json: outline, width: 64, height: 64, content_type: "image/png", operation: "people_mask", people: TWO } }));
+    __setStackClientForTests(client);
+    const outcome = await run(nadia, { prompt: "make the sky clear and blue", change: "attached" }, [photo]);
+    expect(outcome.status).toBe("succeeded");
+    const job = await finished(nadia, outcome);
+    expect(job.state).toBe("done");
+    expect(forms.map((f) => f.get("operation"))).toEqual(["people_mask"]);
+    expect(stack.edits[0]).toMatchObject({ operation: "edit", image_source: "uploaded" });
+    expect(String(stack.edits[0]!.instruction)).toContain("Do not change any person");
+    const saved = (await import("@/lib/imageEdit")).readPicture(nadia, "conv-1", job.files[0]!.id);
+    const { data, width } = await pixels(saved.bytes);
+    for (let y = 8; y < 60; y += 1) for (let x = 8; x < 36; x += 1) expect([...data.subarray((y * width + x) * 3, (y * width + x) * 3 + 3)]).toEqual([10, 20, 200]);
+    // An edit that targets a person is refused for a photo that shows several people.
+    stack.edits.length = 0;
+    const about = await run(nadia, { prompt: "change her sweater to red", change: "attached", affects_people: true }, [photo]);
+    expect(refusedWith(about)).toBe("photo_has_person");
+    expect(stack.edits).toHaveLength(0);
+  });
+
+  test("when the person finder finds no one although the household's model saw people, nothing is changed", async () => {
+    const photo = await put(nadia, "photo-1");
+    __setPhotoInspectorForTests(async () => ({ people: 2, faces: 2, under18: "no" }));
+    const none = toolsStub(async () => { throw new StackError("unexpected", "No people were found in this picture.", { status: 422, body: JSON.stringify({ code: "no_people" }) }); });
+    __setStackClientForTests(none.client);
+    const job = await finished(nadia, await run(nadia, { prompt: "make the sky clear", change: "attached" }, [photo]));
+    expect(job.state).toBe("failed");
+    expect(job.error).toContain("won't change it");
+    expect(stack.edits).toHaveLength(0);
   });
 });

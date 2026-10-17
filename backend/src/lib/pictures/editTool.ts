@@ -23,7 +23,8 @@ import type { ToolExecutionOutcome, TurnState } from "@/lib/turnMachine/contract
 import { outcomeOf } from "@/lib/turnContext";
 import type { PersonRow } from "@/types";
 import { prepareEditSource, type EditImageSource } from "./editSources";
-import { choosePeople, erasePeople, findPeople, peopleMask, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
+import sharp from "sharp";
+import { choosePeople, erasePeople, findPeople, FreezeError, freezePeople, peopleMask, PeopleError, PEOPLE_UNSURE_LINE, runPictureTool } from "./people";
 import { asksToUndress, PROMPT_REFUSAL_LINE, type PictureAudience } from "./policy";
 import { startPictureJob, plainFailure } from "./jobs";
 import { pictureEngineStatus } from "./ready";
@@ -173,6 +174,45 @@ export async function runEditPicture(input: RunEditInput): Promise<ToolExecution
   const named = typeof args.photo_subject === "string" && args.photo_subject.trim() !== "";
 
   const basePrep = await prepareEditSource({ audience, bytes: base.bytes, generated, rootLikeness, declaredSubjectId: ref ? null : declared?.id ?? null, text: instruction, source: "chat" });
+  // IMGEDIT-05 (owner's ruling): a change that is not about a person (sky, colour, background, an object, the light) is allowed on a photo that
+  // shows people by freezing them: after the edit every pixel inside every person's outline is put back from the original and the result is
+  // proved identical there. People are never altered by it. A change that targets a person goes through the likeness rules below, as before.
+  if (!basePrep.ok && basePrep.code === "photo_has_person" && !ref && !declared && args.affects_people !== true) {
+    try {
+      const job = await startPictureJob({
+        actor, conversationId: state.conversationId, turnId: state.turnId, temporary, kind: "edit", prompt: instruction,
+        body: { prompt: instruction, audience: "all-ages" },
+        edit: { sourceId: base.id, label, method: "instruct" },
+        local: async (progress, signal) => {
+          progress("finding people", 10);
+          // The picture is read the way the tools read it (orientation applied) so the outlines and the pixels line up.
+          const upright = new Uint8Array(await sharp(base.bytes, { failOn: "error", limitInputPixels: 64_000_000 }).rotate().png().toBuffer());
+          const outline = await peopleMask(upright, "image/png", "all", signal).catch((error) => {
+            // The household's model saw people but the person finder found none: the people cannot be kept safe, so nothing is changed.
+            if (error instanceof PeopleError && error.code === "none") throw new PeopleError("failed", "I can't tell where the people are in this photo, so I won't change it. Open it with Edit and paint the part you want changed.");
+            throw error;
+          });
+          const form = new FormData();
+          form.append("image", new File([upright], "picture", { type: "image/png" }));
+          form.append("operation", "edit");
+          form.append("instruction", `${instruction}. Do not change any person: keep every person, face, hand, pose and piece of clothing exactly as it is.`);
+          form.append("image_source", "uploaded");
+          form.append("timeout_ms", "1");
+          const edited = await runStackEdit(form, progress, signal);
+          progress("keeping people", 96);
+          let kept: Uint8Array;
+          try { kept = await freezePeople(upright, edited.raw, outline); } catch (error) {
+            if (error instanceof FreezeError) throw new PeopleError("failed", "I couldn't keep the people exactly as they were, so I changed nothing. Try again.");
+            throw error;
+          }
+          return [{ b64_json: Buffer.from(kept).toString("base64"), model: edited.meta?.model, ms: edited.meta?.ms }];
+        },
+      });
+      return started(callId, args, job.id, "The change is being made, and the people in the picture are kept exactly as they are.");
+    } catch (error) {
+      return startFailure(callId, args, error);
+    }
+  }
   if (!basePrep.ok) return line(callId, args, basePrep.line, { refused: basePrep.code });
   let refPrep: Awaited<ReturnType<typeof prepareEditSource>> | null = null;
   let refGenerated = false;
@@ -235,6 +275,12 @@ async function maskedFill(base: SourcePicture, mask: Uint8Array, instruction: st
   form.append("instruction", instruction);
   form.append("image_source", "generated");
   form.append("timeout_ms", "1");
+  const done = await runStackEdit(form, progress, signal);
+  return [{ b64_json: Buffer.from(done.raw).toString("base64"), width: done.meta?.width, height: done.meta?.height, model: done.meta?.model, ms: done.meta?.ms }];
+}
+
+/** Submits an edit form and waits for the picture engine to finish it; returns the PNG bytes. */
+async function runStackEdit(form: FormData, progress: (phase: string, percent: number) => void, signal: AbortSignal): Promise<{ raw: Uint8Array; meta: StackPic | undefined }> {
   let job: string;
   try { job = (await submitEdit(form)).job; } catch (error) {
     if (error instanceof StackPicturesError && error.code === "reference_not_generated") { form.set("image_source", "uploaded"); job = (await submitEdit(form)).job; } else throw error;
@@ -244,11 +290,10 @@ async function maskedFill(base: SourcePicture, mask: Uint8Array, instruction: st
       const status = await getGenerationJob(job);
       if (status.state === "done") {
         const raw = await fetchPicture(job, 0);
-        const meta = status.data[0];
-        return [{ b64_json: Buffer.from(raw).toString("base64"), width: meta?.width, height: meta?.height, model: meta?.model, ms: meta?.ms }];
+        return { raw, meta: status.data[0] };
       }
       if (status.state === "failed" || status.state === "cancelled") throw new PeopleError("failed", status.error ?? "The picture model could not fill the place.");
-      progress("removing people", 40 + Math.max(0, Math.min(55, status.progress * 0.55)));
+      progress(form.get("operation") === "edit_masked" ? "removing people" : "changing", 40 + Math.max(0, Math.min(55, status.progress * 0.55)));
       await new Promise((resolve) => setTimeout(resolve, 600));
     }
     throw new PeopleError("failed", "It took longer than expected.");

@@ -123,3 +123,39 @@ async function modelPicker(overlay: Uint8Array, people: PersonBox[], who: string
     return parsed.numbers as number[];
   } catch { return null; }
 }
+
+// ---------------------------------------------------------------- freezing the people (IMGEDIT-05)
+
+export class FreezeError extends Error {}
+
+/**
+ * Puts every pixel inside the people's outline back from the original (a soft edge only on the outside), so an edit of the sky,
+ * a colour, the background or an object cannot change a person. `original` and `edited` are decoded at the original's size; the
+ * mask is white where a person is. Returns the composited PNG after proving that no pixel inside the outline differs from the
+ * original; the proof failing is an error, never a picture.
+ */
+export async function freezePeople(original: Uint8Array, edited: Uint8Array, maskPng: Uint8Array): Promise<Uint8Array> {
+  const base = sharp(original, { failOn: "error", limitInputPixels: 64_000_000 }).rotate();
+  const { data: before, info } = await base.removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  const { width, height } = info;
+  const after = await sharp(edited, { failOn: "error", limitInputPixels: 64_000_000 }).resize(width, height, { fit: "fill" }).removeAlpha().raw().toBuffer();
+  const hard = await sharp(maskPng, { failOn: "error" }).resize(width, height, { fit: "fill", kernel: "nearest" }).greyscale().raw().toBuffer();
+  const soft = await sharp(hard, { raw: { width, height, channels: 1 } }).blur(2).raw().toBuffer();
+  const out = Buffer.alloc(before.length);
+  let inside = 0;
+  for (let i = 0; i < width * height; i += 1) {
+    const frozen = hard[i]! > 127;
+    const alpha = frozen ? 1 : soft[i]! / 255;
+    for (let c = 0; c < 3; c += 1) {
+      const k = i * 3 + c;
+      out[k] = frozen ? before[k]! : alpha === 0 ? after[k]! : Math.round(before[k]! * alpha + after[k]! * (1 - alpha));
+    }
+    if (frozen) inside += 1;
+  }
+  if (inside === 0) throw new FreezeError("No person outline to keep.");
+  // The proof: every pixel inside the outline equals the original.
+  for (let i = 0; i < width * height; i += 1) {
+    if (hard[i]! > 127 && (out[i * 3] !== before[i * 3] || out[i * 3 + 1] !== before[i * 3 + 1] || out[i * 3 + 2] !== before[i * 3 + 2])) throw new FreezeError("A person's pixels changed.");
+  }
+  return new Uint8Array(await sharp(out, { raw: { width, height, channels: 3 } }).png().toBuffer());
+}

@@ -111,6 +111,11 @@
         "maxLength": 80,
         "grounded": false,
         "description": "Only with `change`: the name of the adult in this household who is in the photo, when a photo of a person is used (the second picture when there is one, else the one being changed). \"me\" for themselves. Home changes or uses a photo of a person only for an adult in this household who agreed; for anyone else, or a child, do not guess a name: leave it out."
+      },
+      "affects_people": {
+        "type": "boolean",
+        "grounded": false,
+        "description": "Only with `change`. true when the change is about a person: their look, clothes, face or pose, adding a person or removing one. Leave it out for a change to the sky, a colour, the background, an object or the light: the people in the picture are then kept exactly as they are."
       }
     }
   },

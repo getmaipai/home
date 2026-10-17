@@ -31,7 +31,7 @@ Ask in chat, in your own words. Attach a picture, or point at one already in the
 - "Add her to this picture." Attach the scene and a photo of the person (two pictures on one message) and say who is in the photo. Home uses a photo of a person only if that person lives in your home, is an adult, and has said yes in their own **Settings, Pictures and videos**. A child is never used. A photo of anyone else is not used.
 - "Remove the background" and "make it bigger" also work from chat.
 
-The original is never changed. The new picture is the next version of it: press **Edit** on it to see both and go back (**Undo**). A photo that shows people can be changed in words only if it shows exactly one adult in your home who said yes, or no one; to take someone out of a photo of several people, use "remove" above. Home never changes a photo of a real person into something sexual.
+The original is never changed. The new picture is the next version of it: press **Edit** on it to see both and go back (**Undo**). A change to the sky, a colour, the background, an object or the light also works on a photo with people in it: the people are kept exactly as they are, pixel for pixel. A change to a person (their clothes, face or look, or adding someone) works only on a photo of one adult in your home who said yes. To take someone out of a photo of several people, use "remove" above. Home never changes a photo of a real person into something sexual.
 
 ## Change a picture in the editor
 

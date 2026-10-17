@@ -79,8 +79,12 @@ decide (rule 1). In the editor, **Comment** now also takes a painted `mask` and 
   again when the job starts, and a proof is used once.
 - A photo of a real person is never changed into something sexual (`asksToUndress`, the existing rule).
 - The finished picture goes through the finished-picture age check before it is stored or shown.
-- Removing people (Vision plus LaMa) generates no person, so it is allowed on a photo that shows several people (the editor's Erase is already allowed on any picture). Open follow-up for Jesse:
-  a sky or colour edit of a photo that shows several people is refused by the rule above; a frozen-person mask (only the non-person pixels may change) would allow it. Not built, needs his ruling.
+- Removing people (Vision plus LaMa) generates no person, so it is allowed on a photo that shows several people (the editor's Erase is already allowed on any picture).
+- **Freezing the people (IMGEDIT-05, owner's ruling 2026-10-17):** a change that is not about a person (sky, colour, background, an object, the light) is allowed on a photo that shows people.
+  The Stack's `people_mask` outlines every person; the picture model edits the whole picture; every pixel inside every outline is then put back from the original (a soft edge only outside),
+  and the result is proved identical to the original inside the outlines (`freezePeople`: a pixel that differs is an error, never a picture). The model states in `affects_people` whether the
+  change is about a person; an edit that is (their look, clothes or face, adding a person) goes through the likeness rules above and the finished-picture age check, as before. If the person finder
+  finds no one although the household's model counted people, nothing is changed.
 - The original is never touched. The result is the next version of the picture (image-edit provenance), so **Edit** shows Original and Undo. Temporary and Incognito chats keep versions in memory.
 - No picture, mask or instruction is logged.
 
