@@ -271,7 +271,7 @@ describe("the routes", () => {
     expect(res.status).toBe(200);
     const body = await res.json() as { can_make: boolean; limits: string; styles: Array<{ id: string }> };
     expect(body.can_make).toBe(true);
-    expect(body.limits).toBe("Videos are 5 seconds at 480p and take about 2 minutes.");
+    expect(body.limits).toBe("Quick videos are 5 seconds at 480p with no sound and take about 2 minutes. Detailed videos have sound and speech, run up to 10 seconds and take a minute or two.");
     expect(body.styles.map((s) => s.id).sort()).toEqual(["lora-1111111111111111", "lora-2222222222222222"]);
     asRole(adult.actor.id, "child");
     invalidateSessionCacheForPerson(adult.actor.id);

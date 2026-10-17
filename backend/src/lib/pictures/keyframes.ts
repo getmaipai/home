@@ -71,7 +71,10 @@ async function run(cmd: string[], deadlineMs: number): Promise<number> {
   return code;
 }
 
-/** First, middle and last frames as JPEG bytes (at most 768 px a side), or null when this Mac cannot decode a clip. */
+/** How many frames a clip of this length gets: first, middle and last for a short one, five (a frame about every 2.5 seconds of a 10 second clip) past 6 seconds (VIDEO-LTX-01). */
+export const keyframeCount = (seconds: number | null): number => (seconds !== null && seconds > 6 ? 5 : 3);
+
+/** First, middle and last frames (five for a clip over 6 seconds) as JPEG bytes (at most 768 px a side), or null when this Mac cannot decode a clip. */
 export async function extractKeyframes(mp4: Uint8Array, seconds: number | null): Promise<Uint8Array[] | null> {
   if (forTests) return forTests(mp4, seconds);
   const dir = mkdtempSync(join(workRoot(), "clip-"));
@@ -80,17 +83,18 @@ export async function extractKeyframes(mp4: Uint8Array, seconds: number | null):
     writeFileSync(clip, mp4, { mode: 0o600 });
     const helper = await ensureKeyframeHelper();
     if (helper) {
-      if (await run([helper, clip, dir, String(FRAME_SIDE)], HELPER_DEADLINE_MS) === 0) return readFrames(dir, 3);
+      if (await run([helper, clip, dir, String(FRAME_SIDE), String(keyframeCount(seconds))], HELPER_DEADLINE_MS) === 0) return readFrames(dir, keyframeCount(seconds));
       return null;
     }
     const ffmpeg = Bun.which("ffmpeg");
     if (!ffmpeg || !seconds || seconds <= 0) return null;
-    const stamps = [0, seconds / 2, Math.max(0, seconds - 0.15)];
+    const count = keyframeCount(seconds);
+    const stamps = Array.from({ length: count }, (_, i) => (i === 0 ? 0 : i === count - 1 ? Math.max(0, seconds - 0.15) : (seconds * i) / (count - 1)));
     for (let i = 0; i < stamps.length; i += 1) {
       const code = await run([ffmpeg, "-loglevel", "error", "-y", "-ss", String(stamps[i]), "-i", clip, "-frames:v", "1", "-vf", `scale='min(${FRAME_SIDE},iw)':-2`, "-map_metadata", "-1", join(dir, `${i}.jpg`)], HELPER_DEADLINE_MS);
       if (code !== 0) return null;
     }
-    return readFrames(dir, 3);
+    return readFrames(dir, count);
   } catch {
     return null;
   } finally {

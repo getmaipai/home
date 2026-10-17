@@ -62,8 +62,19 @@ describe("Models and storage", () => {
   test("Install starts the install and the list reloads", async () => {
     const v = mount(overview([row({})]));
     fireEvent.click(await v.findByLabelText("Install Pictures: Z-Image-Turbo"));
-    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("z-image-turbo"));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("z-image-turbo", undefined));
     await waitFor(() => expect((componentsApi.list as ReturnType<typeof mock>).mock.calls.length).toBeGreaterThan(1));
+    v.restore();
+  });
+
+  test("a part with a licence of its own asks once: the points are shown, nothing installs until I accept, then it installs with that licence", async () => {
+    const licence = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null };
+    const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", licence })]));
+    fireEvent.click(await v.findByLabelText("Install Video: Detailed (LTX-2.3)"));
+    expect(await v.findByText("Free under $10 million a year.")).toBeTruthy();
+    expect(componentsApi.install).not.toHaveBeenCalled();
+    fireEvent.click(v.getByRole("button", { name: "I accept, get it" }));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", "ltx-2.x-community-2026-08-11"));
     v.restore();
   });
 

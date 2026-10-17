@@ -16,6 +16,7 @@ import { CHILD_CONTENT_LINE, TEEN_CONTENT_LINE, laneOf, type Lane } from "@/lib/
 
 export const VIDEO_ENABLED_KEY = "generation.video.enabled";
 export const VIDEO_ADULT_ADAPTERS_KEY = "generation.video.adult_adapters";
+export const VIDEO_QUALITY_KEY = "generation.video_quality";
 
 export type VideoAudience = PictureAudience;
 export type VideoDenial = "guest" | "minor" | "spoken" | "shared_screen" | "household_off";
@@ -37,6 +38,15 @@ export function householdAllowsVideo(): boolean {
     return getHouseholdSettingValue(VIDEO_ENABLED_KEY) !== false;
   } catch {
     return true;
+  }
+}
+
+/** `generation.video_quality`: "quick" (default) or "detailed". A read failure reads as quick, the fast one. */
+export function householdVideoQuality(): "quick" | "detailed" {
+  try {
+    return getHouseholdSettingValue(VIDEO_QUALITY_KEY) === "detailed" ? "detailed" : "quick";
+  } catch {
+    return "quick";
   }
 }
 

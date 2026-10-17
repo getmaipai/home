@@ -13,6 +13,8 @@ export interface StackComponent {
   requirement: "required" | "optional" | "unsupported"; requirement_reason: string | null;
   last_used_at: string | null; used_by: string[]; depends_on: string[];
   job: string | null; percent: number | null; failure: string | null;
+  /** A licence with terms of its own (the Detailed video model): accepted once by an admin before the first install. null for every other part. */
+  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null } | null;
   can_install: boolean; install_block: string | null; can_uninstall: boolean; uninstall_block: string | null;
 }
 export interface StackComponentList { tier: string | null; free_disk_bytes: number | null; disk_margin_bytes: number; installed_bytes: number; components: StackComponent[] }
@@ -46,8 +48,9 @@ export async function listStackComponents(): Promise<StackComponentList> {
   return await res.json() as StackComponentList;
 }
 
-export async function installStackComponent(id: string): Promise<{ job: string | null; component: string; joined?: boolean; already_installed?: boolean }> {
-  const res = await call(`/stack/v1/components/${encodeURIComponent(id)}/install`, { method: "POST" });
+export async function installStackComponent(id: string, consent: { acceptedLicence?: string; acceptedBy?: string } = {}): Promise<{ job: string | null; component: string; joined?: boolean; already_installed?: boolean }> {
+  const body = consent.acceptedLicence ? { accepted_licence: consent.acceptedLicence, ...(consent.acceptedBy ? { accepted_by: consent.acceptedBy } : {}) } : null;
+  const res = await call(`/stack/v1/components/${encodeURIComponent(id)}/install`, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { method: "POST" });
   if (!res.ok) return failure(res);
   return await res.json() as { job: string | null; component: string; joined?: boolean; already_installed?: boolean };
 }

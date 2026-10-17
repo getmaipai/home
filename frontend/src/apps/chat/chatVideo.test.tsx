@@ -14,7 +14,7 @@ let calls: Array<{ url: string; method: string }>;
 let card: VideoCard;
 
 function item(over: Partial<VideoItem>): VideoItem {
-  return { id: "vid-1", state: "running", percent: 40, label: "Drawing the frames", position: null, eta_seconds: null, step: null, steps: null, preview_url: null, started_at: Date.now() - 30_000, prompt: "a paper boat in the rain", kind: "generate", error: null, clip: null, ...over };
+  return { id: "vid-1", state: "running", percent: 40, label: "Drawing the frames", position: null, eta_seconds: null, step: null, steps: null, preview_url: null, started_at: Date.now() - 30_000, prompt: "a paper boat in the rain", kind: "generate", error: null, quality: "quick", switch_to: null, clip: null, ...over };
 }
 beforeEach(() => {
   calls = [];
@@ -38,7 +38,7 @@ describe("VideoToolRender", () => {
   test("while the clip is made it shows the step, the clock, the plain limits and Stop, and Stop calls the cancel route", async () => {
     const view = mount();
     await waitFor(() => expect(view.getByRole("status").textContent).toContain("Drawing the frames"));
-    expect(view.container.textContent).toContain("Videos are 5 seconds at 480p and take about 2 minutes.");
+    expect(view.container.textContent).toContain("Quick: about 2 minutes, no sound.");
     expect(view.container.textContent).toMatch(/0:3\d/);
     fireEvent.click(view.getByRole("button", { name: "Stop" }));
     await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/videos/jobs/vid-1/cancel")).toBe(true));
@@ -54,7 +54,7 @@ describe("VideoToolRender", () => {
       expect(view.container.textContent).toMatch(/0:3\d · 12% · about 2 minutes left/);
       expect(view.container.querySelector("[data-slot=video-player-stage]")!.textContent).toContain("a paper boat in the rain");
       expect(view.container.querySelectorAll("span.rounded-full").length).toBe(64);
-      expect(view.container.textContent).toContain("take about 2 minutes");
+      expect(view.container.textContent).toContain("about 2 minutes, no sound");
       expect(view.container.querySelector("img[data-slot=generation-preview]")).toBeNull();
       card.items = [item({ percent: 40, label: "Putting the frames together, 20 of 60", eta_seconds: 70, preview_url: "/api/videos/jobs/vid-1/preview?v=1" })];
       await waitFor(() => expect(view.container.querySelector("img[data-slot=generation-preview]")).not.toBeNull(), { timeout: 4000 });
@@ -113,6 +113,41 @@ describe("VideoToolRender", () => {
     fireEvent.click(view.getByRole("button", { name: "Share" }));
     // MemoryRouter has no /files route to draw; the click must not throw and no share sheet exists to call.
     expect(typeof (navigator as { share?: unknown }).share).not.toBe("function");
+  });
+
+  test("VIDEO-LTX-01: a Quick clip offers Make it Detailed (with sound and speech) and asks for that kind; a Detailed one says it has sound and offers Make it Quick", async () => {
+    const clip = { url: "/api/videos/jobs/vid-1/files/file-a", poster_url: "/api/videos/jobs/vid-1/files/file-b", width: 832, height: 480, seconds: 5, seed: 7, file_id: "file-a", poster_file_id: "file-b" };
+    card = { ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", quality: "quick", switch_to: "detailed", clip })] };
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
+    const button = view.getByRole("button", { name: "Make it Detailed" });
+    expect(button.getAttribute("title")).toBe("With sound and speech, up to 10 seconds");
+    let body = "";
+    const sending = globalThis.fetch;
+    globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => { if (String(input).endsWith("/another")) body = String(init?.body ?? ""); return sending(input, init); }) as typeof fetch;
+    fireEvent.click(button);
+    await waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/videos/jobs/vid-1/another")).toBe(true));
+    expect(JSON.parse(body)).toEqual({ quality: "detailed" });
+    cleanup();
+    card = { ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", quality: "detailed", switch_to: "quick", clip: { ...clip, has_sound: true } })] };
+    const detailed = mount();
+    await waitFor(() => expect(detailed.container.querySelector("video")).not.toBeNull());
+    expect(detailed.getByRole("button", { name: "Make it Quick" })).toBeTruthy();
+    expect(detailed.container.textContent).not.toMatch(/LTX|Wan|Gemma/);
+    cleanup();
+    // While it is made, the line under the card says which kind it is, in the same words as pictures.
+    card = { ...card, items: [item({ quality: "detailed", switch_to: null, eta_seconds: 200 })] };
+    const running = mount();
+    await waitFor(() => expect(running.container.textContent).toContain("Detailed: with sound and speech."));
+    expect(running.container.textContent).not.toMatch(/LTX|Wan|Gemma/);
+  });
+
+  test("a clip made with a style, or with no other kind on this computer, offers no switch", async () => {
+    const clip = { url: "/api/videos/jobs/vid-1/files/file-a", poster_url: "/api/videos/jobs/vid-1/files/file-b", width: 832, height: 480, seconds: 5, seed: 7, file_id: "file-a", poster_file_id: "file-b" };
+    card = { ...card, can_make_another: true, items: [item({ state: "done", percent: 100, label: "", quality: "quick", switch_to: null, clip })] };
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("video")).not.toBeNull());
+    expect(view.queryByRole("button", { name: /Make it (Detailed|Quick)/ })).toBeNull();
   });
 
   test("a failed clip shows the engine's plain line and Try again, never a player", async () => {

@@ -4,6 +4,7 @@ import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { VideoLibrary, videoStateLine } from "@/apps/settings/VideoLibrary";
 import { videosApi, type VideoAdapterRow, type VideoSettings } from "@/lib/videosApi";
+import { componentsApi, type ComponentRow } from "@/lib/componentsApi";
 
 afterEach(cleanup);
 
@@ -12,21 +13,32 @@ const settings = (over: Partial<VideoSettings> = {}): VideoSettings => ({
   state: "idle", available: true, reason: null, tier: "p128", model_installed: true, limits: "Videos are 5 seconds at 480p and take about 2 minutes.", enabled: true, adult_adapters: true,
   minors: "Videos are off for children and teens. No setting turns them on.", adapters: [style(), style({ id: "lora-b", name: "Boudoir Motion", classification: "adult-only", licence: "acknowledged" })], ...over,
 });
-function mount(data: VideoSettings) {
+const LICENCE = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence", summary: ["Free under $10 million a year.", "Never to harm or exploit children."], accepted_at: null as string | null };
+const detailedRow = (over: Partial<ComponentRow> = {}): ComponentRow => ({
+  id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", summary: "", group: "video", kind: "model", state: "notInstalled", size_bytes: null, download_bytes: 73_572_000_000, full_bytes: 73_572_000_000, required_free_bytes: 0,
+  plan_need: "optional", requirement: "optional", requirement_reason: null, last_used_at: null, used_by: [], depends_on: [], job: null, percent: null, failure: null, licence: LICENCE, can_install: true, install_block: null, can_uninstall: false, uninstall_block: null, ...over,
+});
+const withDetailed = (over: Partial<NonNullable<VideoSettings["detailed"]>> = {}): Partial<VideoSettings> => ({
+  quality: "quick", detailed: { installed: false, available: true, reason: null, download_bytes: 73_572_000_000, component: "ltx-2-3-distilled-mlx", licence: { id: LICENCE.id, name: LICENCE.name, url: LICENCE.url }, lora_base_model: "ltx-2.3", ...over },
+});
+function mount(data: VideoSettings, row: ComponentRow = detailedRow()) {
   const original = { ...videosApi };
+  const componentsOriginal = { ...componentsApi };
+  componentsApi.list = mock(async () => ({ stack: "ok" as const, message: null, tier: "p128", free_disk_bytes: 1e12, disk_margin_bytes: 5e9, installed_bytes: 0, components: [row] }));
+  componentsApi.install = mock(async (id: string) => ({ job: "job-1", component: id }));
   videosApi.settings = mock(async () => data);
   videosApi.setAdapter = mock(async (id: string, patch: { enabled?: boolean }) => ({ ...style({ id }), ...patch }));
   videosApi.removeAdapter = mock(async () => ({ ok: true as const }));
   videosApi.addAdapter = mock(async () => style({ id: "lora-new", enabled: false, needs_confirmation: true }));
   const view = renderWithQueryClient(<VideoLibrary />);
-  return { ...view, restore: () => Object.assign(videosApi, original) };
+  return { ...view, restore: () => { Object.assign(videosApi, original); Object.assign(componentsApi, componentsOriginal); } };
 }
 
 describe("video settings view", () => {
   test("states the model in plain words with the tier limits, locks children and teens off, and badges each style", async () => {
     const v = mount(settings());
-    await waitFor(() => expect(v.getByText("Wan 2.2 video model")).toBeTruthy());
-    expect(v.getByText(/Videos are 5 seconds at 480p and take about 2 minutes\./)).toBeTruthy();
+    await waitFor(() => expect(v.getByText("Quick and Detailed videos")).toBeTruthy());
+    expect(v.getByText(/5 seconds with no sound, in about 2 minutes\./)).toBeTruthy();
     expect(v.getByLabelText("Children can make videos")).toBeDisabled();
     expect(v.getByLabelText("Teens can make videos")).toBeDisabled();
     expect(v.getByLabelText("Adults can make videos").getAttribute("aria-checked")).toBe("true");
@@ -71,5 +83,41 @@ describe("video settings view", () => {
     expect(form.get("name")).toBe("Ink");
     expect(form.get("looks_like")).toBe("nobody");
     v.restore();
+  });
+
+  test("Detailed videos: the plain size on the button, the licence read and accepted once, then the install starts with that licence", async () => {
+    const v = mount(settings(withDetailed()));
+    const get = await v.findByRole("button", { name: /Get Detailed videos \(74 GB\)/ });
+    fireEvent.click(get);
+    expect(await v.findByText("Free under $10 million a year.")).toBeTruthy();
+    expect(v.getByText("Never to harm or exploit children.")).toBeTruthy();
+    expect(componentsApi.install).not.toHaveBeenCalled();
+    fireEvent.click(v.getByRole("button", { name: "I accept, get it" }));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", LICENCE.id));
+    v.restore();
+  });
+
+  test("once the licence was accepted the button installs at once; installed shows On this computer; model names stay under Details", async () => {
+    const accepted = mount(settings(withDetailed()), detailedRow({ licence: { ...LICENCE, accepted_at: "2026-10-17T12:00:00Z" } }));
+    fireEvent.click(await accepted.findByRole("button", { name: /Get Detailed videos/ }));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", undefined));
+    accepted.restore();
+    cleanup();
+    const done = mount(settings(withDetailed({ installed: true, download_bytes: 0 })), detailedRow({ state: "installed" }));
+    await waitFor(() => expect(done.getAllByText("On this computer").length).toBe(2));
+    expect(done.queryByRole("button", { name: /Get Detailed videos/ })).toBeNull();
+    expect(done.queryByText(/LTX/)).toBeNull();
+    done.restore();
+  });
+
+  test("Detailed chosen but not installed says chat makes Quick until it is; a computer without the memory shows no Get button", async () => {
+    const chosen = mount(settings({ ...withDetailed(), quality: "detailed" }));
+    await waitFor(() => expect(chosen.getByText("Detailed is chosen, but it is not ready")).toBeTruthy());
+    chosen.restore();
+    cleanup();
+    const small = mount(settings(withDetailed({ available: false, reason: "This computer does not have the memory for Detailed videos." })));
+    await waitFor(() => expect(small.getByText(/does not have the memory/)).toBeTruthy());
+    expect(small.queryByRole("button", { name: /Get Detailed videos/ })).toBeNull();
+    small.restore();
   });
 });

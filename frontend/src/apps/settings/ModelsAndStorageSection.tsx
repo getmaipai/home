@@ -46,11 +46,14 @@ function stateBadge(row: ComponentRow): { text: string; variant: "secondary" | "
 function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => void; setError: (message: string | null) => void }) {
   const [confirm, setConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [licenceOpen, setLicenceOpen] = useState(false);
   const badge = stateBadge(row);
   const installed = row.state === "installed";
-  async function install() {
+  // A part with a licence of its own asks once: the admin reads the points and accepts, then the install starts.
+  const needsLicence = !!row.licence && !row.licence.accepted_at;
+  async function install(accepted?: string) {
     setError(null); setBusy(true);
-    try { await componentsApi.install(row.id); refresh(); }
+    try { await componentsApi.install(row.id, accepted); refresh(); }
     catch (e) { setError(messageOf(e, `Could not start installing ${row.label}. Check that the engine is running, then try again.`)); }
     finally { setBusy(false); }
   }
@@ -80,13 +83,31 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
         </ItemContent>
         <ItemActions>
           {!installed && row.state !== "installing" ? (
-            <Button type="button" onClick={() => void install()} disabled={busy || !row.can_install} aria-label={`${row.state === "failed" ? "Try again: " : "Install "}${row.label}`}>{row.state === "failed" ? "Try again" : "Install"}</Button>
+            <Button type="button" onClick={() => (needsLicence ? setLicenceOpen(true) : void install())} disabled={busy || !row.can_install} aria-label={`${row.state === "failed" ? "Try again: " : "Install "}${row.label}`}>{row.state === "failed" ? "Try again" : "Install"}</Button>
           ) : null}
           {installed ? (
             <Button type="button" variant="outline" onClick={() => setConfirm(true)} disabled={busy || !row.can_uninstall} aria-label={`Uninstall ${row.label}`}>Uninstall</Button>
           ) : null}
         </ItemActions>
       </Item>
+      {row.licence && needsLicence ? (
+        <AlertDialog open={licenceOpen} onOpenChange={setLicenceOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Before you get {row.label}</AlertDialogTitle>
+              <AlertDialogDescription>It comes with its maker's licence ({row.licence.name}). Read these points, then accept to start the {sizeWords(row.download_bytes || row.full_bytes)} download. You only need to accept once for this computer.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex max-h-72 flex-col gap-3 overflow-y-auto text-sm">
+              <ul className="flex list-disc flex-col gap-2 pl-5">{row.licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
+              <p>The full licence: <span className="font-mono break-all">{row.licence.url}</span></p>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Not now</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setLicenceOpen(false); void install(row.licence!.id); }}>I accept, get it</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      ) : null}
       <AlertDialog open={confirm} onOpenChange={setConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -24824,6 +24824,39 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "licence": {
+                            "type": "object",
+                            "nullable": true,
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "url": {
+                                "type": "string"
+                              },
+                              "summary": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "accepted_at": {
+                                "type": "string",
+                                "nullable": true
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "name",
+                              "url",
+                              "summary",
+                              "accepted_at"
+                            ],
+                            "description": "A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."
+                          },
                           "can_install": {
                             "type": "boolean"
                           },
@@ -24951,6 +24984,23 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "accepted_licence": {
+                    "type": "string",
+                    "maxLength": 120,
+                    "description": "The id of the licence notice the admin read and accepted (the component's `licence.id`). Needed once, for a part that has one."
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Already installed.",
@@ -45201,6 +45251,24 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "quality": {
+                            "type": "string",
+                            "enum": [
+                              "quick",
+                              "detailed"
+                            ],
+                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                          },
+                          "switch_to": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "quick",
+                              "detailed",
+                              null
+                            ],
+                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -45230,6 +45298,10 @@
                               },
                               "poster_file_id": {
                                 "type": "string"
+                              },
+                              "has_sound": {
+                                "type": "boolean",
+                                "description": "The clip has a sound track the model made (speech included)."
                               }
                             },
                             "required": [
@@ -45240,7 +45312,8 @@
                               "seconds",
                               "seed",
                               "file_id",
-                              "poster_file_id"
+                              "poster_file_id",
+                              "has_sound"
                             ]
                           }
                         },
@@ -45258,6 +45331,8 @@
                           "prompt",
                           "kind",
                           "error",
+                          "quality",
+                          "switch_to",
                           "clip"
                         ]
                       }
@@ -45617,6 +45692,24 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "quality": {
+                            "type": "string",
+                            "enum": [
+                              "quick",
+                              "detailed"
+                            ],
+                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                          },
+                          "switch_to": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "quick",
+                              "detailed",
+                              null
+                            ],
+                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -45646,6 +45739,10 @@
                               },
                               "poster_file_id": {
                                 "type": "string"
+                              },
+                              "has_sound": {
+                                "type": "boolean",
+                                "description": "The clip has a sound track the model made (speech included)."
                               }
                             },
                             "required": [
@@ -45656,7 +45753,8 @@
                               "seconds",
                               "seed",
                               "file_id",
-                              "poster_file_id"
+                              "poster_file_id",
+                              "has_sound"
                             ]
                           }
                         },
@@ -45674,6 +45772,8 @@
                           "prompt",
                           "kind",
                           "error",
+                          "quality",
+                          "switch_to",
                           "clip"
                         ]
                       }
@@ -45764,7 +45864,7 @@
         "tags": [
           "Videos"
         ],
-        "summary": "Make another clip from the same words with a new seed (also Try again after a failed or stopped one)",
+        "summary": "Make another clip from the same words with a new seed (also Try again after a failed or stopped one, and Make it Detailed or Quick)",
         "parameters": [
           {
             "schema": {
@@ -45777,6 +45877,26 @@
             "in": "path"
           }
         ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "quality": {
+                    "type": "string",
+                    "enum": [
+                      "quick",
+                      "detailed"
+                    ],
+                    "description": "Make it again as this kind. Left out, the video keeps its own kind."
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "The card, with a new clip queued.",
@@ -45857,6 +45977,24 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "quality": {
+                            "type": "string",
+                            "enum": [
+                              "quick",
+                              "detailed"
+                            ],
+                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                          },
+                          "switch_to": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "quick",
+                              "detailed",
+                              null
+                            ],
+                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -45886,6 +46024,10 @@
                               },
                               "poster_file_id": {
                                 "type": "string"
+                              },
+                              "has_sound": {
+                                "type": "boolean",
+                                "description": "The clip has a sound track the model made (speech included)."
                               }
                             },
                             "required": [
@@ -45896,7 +46038,8 @@
                               "seconds",
                               "seed",
                               "file_id",
-                              "poster_file_id"
+                              "poster_file_id",
+                              "has_sound"
                             ]
                           }
                         },
@@ -45914,6 +46057,8 @@
                           "prompt",
                           "kind",
                           "error",
+                          "quality",
+                          "switch_to",
                           "clip"
                         ]
                       }
@@ -46126,6 +46271,24 @@
                             "type": "string",
                             "nullable": true
                           },
+                          "quality": {
+                            "type": "string",
+                            "enum": [
+                              "quick",
+                              "detailed"
+                            ],
+                            "description": "Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."
+                          },
+                          "switch_to": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "quick",
+                              "detailed",
+                              null
+                            ],
+                            "description": "The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."
+                          },
                           "clip": {
                             "type": "object",
                             "nullable": true,
@@ -46155,6 +46318,10 @@
                               },
                               "poster_file_id": {
                                 "type": "string"
+                              },
+                              "has_sound": {
+                                "type": "boolean",
+                                "description": "The clip has a sound track the model made (speech included)."
                               }
                             },
                             "required": [
@@ -46165,7 +46332,8 @@
                               "seconds",
                               "seed",
                               "file_id",
-                              "poster_file_id"
+                              "poster_file_id",
+                              "has_sound"
                             ]
                           }
                         },
@@ -46183,6 +46351,8 @@
                           "prompt",
                           "kind",
                           "error",
+                          "quality",
+                          "switch_to",
                           "clip"
                         ]
                       }
@@ -46302,6 +46472,70 @@
                     "limits": {
                       "type": "string"
                     },
+                    "quality": {
+                      "type": "string",
+                      "enum": [
+                        "quick",
+                        "detailed"
+                      ],
+                      "description": "The household's Video quality setting."
+                    },
+                    "detailed": {
+                      "type": "object",
+                      "properties": {
+                        "installed": {
+                          "type": "boolean"
+                        },
+                        "available": {
+                          "type": "boolean"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "download_bytes": {
+                          "type": "number",
+                          "description": "What getting Detailed videos would still download (0 when installed)."
+                        },
+                        "component": {
+                          "type": "string",
+                          "description": "The Models and storage id to install it with."
+                        },
+                        "licence": {
+                          "type": "object",
+                          "nullable": true,
+                          "properties": {
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "name",
+                            "url"
+                          ]
+                        },
+                        "lora_base_model": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "installed",
+                        "available",
+                        "reason",
+                        "download_bytes",
+                        "component",
+                        "licence",
+                        "lora_base_model"
+                      ],
+                      "description": "Detailed videos: sound and speech, up to 10 seconds."
+                    },
                     "enabled": {
                       "type": "boolean"
                     },
@@ -46407,6 +46641,8 @@
                     "tier",
                     "model_installed",
                     "limits",
+                    "quality",
+                    "detailed",
                     "enabled",
                     "adult_adapters",
                     "minors",

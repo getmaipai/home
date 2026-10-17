@@ -571,7 +571,7 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
       {...(etaLabel(item.eta_seconds) ? { etaLabel: etaLabel(item.eta_seconds)! } : {})}
       queuePosition={item.position}
       startedAt={item.started_at}
-      hint={card.limits}
+      hint={videoHint(item)}
       {...(item.error ? { error: item.error } : {})}
       downloadName={prepared.data?.name ?? "video.mp4"}
       onStop={() => { void videosApi.stop(item.id).then(refresh).catch(refresh); }}
@@ -580,9 +580,19 @@ export const VideoToolRender: ToolCallMessagePartComponent<Record<string, never>
         // Download saves the file a phone can text (a sound track, named after the prompt); the original stays one button away.
         onDownload: () => saveClip({ ...(prepared.data ? { blob: prepared.data.blob } : {}), url: videosApi.messagesUrl(item.id), name: prepared.data?.name ?? "video.mp4" }),
         onShare: () => { void shareClip({ prepared: prepared.data, title: item.prompt, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(clip.file_id)}`) }); },
-        actions: <Button type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
+        // VIDEO-LTX-01: the on-the-fly choice, the same two words as pictures. A Quick video offers Detailed (with sound and speech); a Detailed one offers Quick. No model names.
+        actions: [
+          ...(item.switch_to && card.can_make_another ? [<Button key="switch-quality" type="button" variant="ghost" size="sm" title={item.switch_to === "detailed" ? "With sound and speech, up to 10 seconds" : "No sound, up to 5 seconds, can start from a picture"} onClick={() => { void videosApi.another(item.id, item.switch_to!).then(refresh).catch(refresh); }}>{item.switch_to === "detailed" ? "Make it Detailed" : "Make it Quick"}</Button>] : []),
+          <Button key="original" type="button" variant="ghost" size="sm" onClick={() => saveClip({ url: clip.url, name: (prepared.data?.name ?? "video.mp4").replace(/\.mp4$/, "-original.mp4") })}>Download original</Button>,
+        ],
       } : {})}
       {...(card.can_make_another && status !== "failed" ? { onMakeAnother: () => { void videosApi.another(item.id).then(refresh).catch(refresh); } } : {})}
     />
   );
 };
+
+/** The line under a video: which kind it is, in the words pictures use. */
+function videoHint(item: { quality?: "quick" | "detailed"; clip: { has_sound?: boolean } | null }): string {
+  if (item.quality === "detailed") return "Detailed: with sound and speech.";
+  return "Quick: about 2 minutes, no sound. Ask for Detailed to add sound and speech.";
+}

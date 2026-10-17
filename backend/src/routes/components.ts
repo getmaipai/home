@@ -22,6 +22,7 @@ const ComponentSchema = z.object({
   plan_need: z.enum(["required", "recommended", "optional"]).nullable(), requirement: z.enum(["required", "optional", "unsupported"]), requirement_reason: z.string().nullable(),
   last_used_at: z.string().nullable(), used_by: z.array(z.string()), depends_on: z.array(z.string()),
   job: z.string().nullable(), percent: z.number().nullable(), failure: z.string().nullable(),
+  licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable() }).nullable().optional().describe("A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."),
   can_install: z.boolean(), install_block: z.string().nullable(), can_uninstall: z.boolean(), uninstall_block: z.string().nullable(),
 });
 const ListSchema = z.object({
@@ -55,12 +56,14 @@ componentsRoutes.openapi(listRoute, async (c) => {
 
 const installRoute = createRoute({
   method: "post", path: "/{id}/install", tags: ["Components"], summary: "Download and set up a part (progress on the install strip)", middleware: [requireRole("owner", "admin")] as const,
-  request: { params: idParams },
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ accepted_licence: z.string().max(120).optional().describe("The id of the licence notice the admin read and accepted (the component's `licence.id`). Needed once, for a part that has one.") }) } } } },
   responses: { 202: { content: { "application/json": { schema: z.object({ job: z.string(), component: z.string() }) } }, description: "Started, or already running." }, 200: { content: { "application/json": { schema: z.object({ job: z.null(), component: z.string() }) } }, description: "Already installed." }, ...refusals },
 });
 componentsRoutes.openapi(installRoute, async (c) => {
   try {
-    const started = await installStackComponent(c.req.valid("param").id);
+    const consent = (await c.req.json().catch(() => ({}))) as { accepted_licence?: unknown };
+    const person = c.get("person") as { id?: string } | undefined;
+    const started = await installStackComponent(c.req.valid("param").id, typeof consent.accepted_licence === "string" ? { acceptedLicence: consent.accepted_licence, ...(person?.id ? { acceptedBy: person.id } : {}) } : {});
     resetInstallStatusCache();
     return started.job ? c.json({ job: started.job, component: started.component }, 202) : c.json({ job: null, component: started.component }, 200);
   } catch (error) { return failure(c, error) as never; }

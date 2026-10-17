@@ -36,4 +36,25 @@ export const VIDEO_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.pictures",
     honoured_by: ["home"],
   }),
+  // VIDEO-LTX-01 (owner ruling 2026-10-17): the same plain choice as pictures. Quick is the silent five second clip and the
+  // default; Detailed makes a sound track with spoken words in the same pass, up to ten seconds, starting from words only.
+  SettingsKey.parse({
+    key: "generation.video_quality",
+    scope: "household",
+    selector: "select",
+    range: { options: ["quick", "detailed"] },
+    default: "quick",
+    label: "Video quality",
+    help: "Quick makes a short silent clip and can start from a picture. Detailed adds sound and spoken words, and makes longer clips from words. Anyone who can make videos can ask chat for the other one for a single video.",
+    level: "basic",
+    copy: {
+      does: "Decides how chat makes a video when nobody asks for a kind.",
+      options: {
+        quick: "5 seconds with no sound, in about two minutes. Can start from a picture.",
+        detailed: "Up to 10 seconds with sound and spoken words, in a minute or two. Starts from words, with many more styles.",
+      },
+    },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
 ];

@@ -17,8 +17,10 @@ import { getLive, liveCardFields } from "@/lib/genLive";
 import { videoEngineStatus, videoStatusReady, videoNotReadyReason } from "@/lib/videos/ready";
 import { hasAudioTrack, messagesCopyOf, videoFileName, videoTitle } from "@/lib/videos/messagesCopy";
 import { addVideoLora, removeVideoLora, StackVideoError, updateVideoLora } from "@/lib/videos/stack";
-import { latestGeneratedPictureId, VIDEO_SIZES } from "@/lib/videos/tool";
+import { latestGeneratedPictureId } from "@/lib/videos/tool";
 import { prepareVideoRerun } from "@/lib/videos/rerun";
+import { chooseVideoQuality, detailedVideoReady, isVideoQuality, quickVideoReady, VIDEO_SIZES_BY_QUALITY } from "@/lib/videos/quality";
+import { householdVideoQuality } from "@/lib/videos/policy";
 import { recordLikenessUse } from "@/lib/likeness/uses";
 import { declareStyleSubject, forgetStyleSubject } from "@/lib/likeness/adapters";
 import { checkStyleSubject, notifyStyleAdded, stackLikenessFields } from "@/lib/likeness/importStyle";
@@ -39,7 +41,7 @@ export function videoRouteAudience(actor: PersonRow): VideoAudience {
 /** The most clips one request's card holds (the first and each Make another). */
 export const MAX_CLIPS_PER_CARD = 8;
 
-export const VIDEO_LIMITS_LINE = "Videos are 5 seconds at 480p and take about 2 minutes.";
+export const VIDEO_LIMITS_LINE = "Quick videos are 5 seconds at 480p with no sound and take about 2 minutes. Detailed videos have sound and speech, run up to 10 seconds and take a minute or two.";
 
 const ItemSchema = z.object({
   id: z.string(),
@@ -54,7 +56,9 @@ const ItemSchema = z.object({
   prompt: z.string(),
   kind: z.enum(["generate", "animate"]),
   error: z.string().nullable(),
-  clip: z.object({ url: z.string(), poster_url: z.string(), width: z.number(), height: z.number(), seconds: z.number().nullable(), seed: z.number().nullable(), file_id: z.string(), poster_file_id: z.string() }).nullable(),
+  quality: z.enum(["quick", "detailed"]).describe("Which kind made it: Quick (about two minutes, no sound) or Detailed (with sound and speech)."),
+  switch_to: z.enum(["quick", "detailed"]).nullable().describe("The other kind this video can be made again as, or null (it uses a style made for one kind, or the other kind is not on this computer)."),
+  clip: z.object({ url: z.string(), poster_url: z.string(), width: z.number(), height: z.number(), seconds: z.number().nullable(), seed: z.number().nullable(), file_id: z.string(), poster_file_id: z.string(), has_sound: z.boolean().describe("The clip has a sound track the model made (speech included).") }).nullable(),
 });
 const CardSchema = z.object({ id: z.string(), conversation_id: z.string().nullable(), items: z.array(ItemSchema), can_make_another: z.boolean(), limits: z.string() });
 
@@ -69,7 +73,16 @@ function phaseLabel(job: VideoJob): string {
   return "Making your video";
 }
 
-function itemView(job: VideoJob, actor: PersonRow) {
+/** VIDEO-LTX-01: the card's kind and the other kind it can be made again as. A video made with a style is bound to the style's model, so it offers no switch. */
+function qualityFields(job: VideoJob, ready: { quick: boolean; detailed: boolean }): { quality: "quick" | "detailed"; switch_to: "quick" | "detailed" | null } {
+  const quality = job.request.quality ?? "quick";
+  // A video made with a style is bound to the style's model; one that started from a picture can only be Quick (Detailed starts from words).
+  if (job.request.loras.length > 0 || job.request.source_file_id) return { quality, switch_to: null };
+  if (quality === "detailed") return { quality, switch_to: ready.quick ? "quick" : null };
+  return { quality, switch_to: ready.detailed ? "detailed" : null };
+}
+
+function itemView(job: VideoJob, actor: PersonRow, ready: { quick: boolean; detailed: boolean }) {
   const file = job.state === "done" ? job.files[0] : undefined;
   return {
     id: job.id, state: job.state, percent: job.state === "done" ? 100 : job.percent,
@@ -77,19 +90,27 @@ function itemView(job: VideoJob, actor: PersonRow) {
     position: job.position,
     ...(job.state === "running" ? (({ eta_seconds, step, steps, preview_url }) => ({ eta_seconds, step, steps, preview_url: laneOfPerson(actor) === "adult" ? preview_url : null }))(liveCardFields(job.id, (version) => `/api/videos/jobs/${encodeURIComponent(job.id)}/preview?v=${version}`)) : { eta_seconds: null, step: null, steps: null, preview_url: null }), started_at: new Date(job.createdAt).getTime(), prompt: job.prompt, kind: job.kind,
     error: job.state === "failed" ? job.error : null,
-    clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id } : null,
+    ...qualityFields(job, ready),
+    clip: file ? { url: clipUrl(job, file), poster_url: posterUrl(job, file), width: file.width, height: file.height, seconds: file.seconds, seed: file.seed, file_id: file.id, poster_file_id: file.poster_id, has_sound: file.audio === true } : null,
   };
 }
 
 /** The card for a job: every clip made in the same turn (the first and each Make another), oldest first. */
-export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean) {
+export function videoCardView(actor: PersonRow, root: VideoJob, canMake: boolean, ready: { quick: boolean; detailed: boolean } = { quick: false, detailed: false }) {
   const group = root.turnId ? videoJobsForTurn(actor, root.turnId) : [root];
   const jobs = group.length > 0 ? group : [root];
   const active = jobs.some((j) => j.state === "queued" || j.state === "running");
   return {
-    id: root.id, conversation_id: root.conversationId, items: jobs.map((j) => itemView(j, actor)),
+    id: root.id, conversation_id: root.conversationId, items: jobs.map((j) => itemView(j, actor, ready)),
     can_make_another: canMake && !active && jobs.length < MAX_CLIPS_PER_CARD, limits: VIDEO_LIMITS_LINE,
   };
+}
+
+/** Which kinds can run now (read from the Stack's status, cached for a few seconds). */
+async function readyFlags(actor: PersonRow): Promise<{ quick: boolean; detailed: boolean }> {
+  const engine = await videoEngineStatus();
+  // A teen or a child is only ever on Quick (lane review): the card never offers them Detailed, and the job starter would override it anyway.
+  return { quick: quickVideoReady(engine), detailed: laneOfPerson(actor) === "adult" && detailedVideoReady(engine) };
 }
 
 const idParams = z.object({ id: z.string().min(1).max(80).openapi({ param: { name: "id", in: "path" } }) });
@@ -121,11 +142,11 @@ const getRoute = createRoute({
   request: { params: idParams },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card as its owner sees it." }, ...refusals },
 });
-videosRoutes.openapi(getRoute, (c) => {
+videosRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person");
   const job = getVideoJobFor(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That video isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(videoCardView(actor, job, videoDenial(videoRouteAudience(actor)) === null), 200);
+  return c.json(videoCardView(actor, job, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
 });
 
 const previewRoute = createRoute({
@@ -206,7 +227,7 @@ videosRoutes.openapi(cancelRoute, async (c) => {
   const live = (wanted.turnId ? videoJobsForTurn(actor, wanted.turnId) : [wanted]).filter((j) => j.state === "queued" || j.state === "running");
   for (const job of live) await cancelVideoJob(actor, job.id);
   const fresh = getVideoJobFor(actor, wanted.id) ?? wanted;
-  return c.json(videoCardView(actor, fresh, videoDenial(videoRouteAudience(actor)) === null), 200);
+  return c.json(videoCardView(actor, fresh, videoDenial(videoRouteAudience(actor)) === null, await readyFlags(actor)), 200);
 });
 
 async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 403 | 422 | 503; body: { error: string; code: string } } | null> {
@@ -221,8 +242,8 @@ async function gateRoute(actor: PersonRow, prompt: string): Promise<{ status: 40
 }
 
 const anotherRoute = createRoute({
-  method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed (also Try again after a failed or stopped one)", middleware: [requireAuth] as const,
-  request: { params: idParams },
+  method: "post", path: "/jobs/{id}/another", tags: ["Videos"], summary: "Make another clip from the same words with a new seed (also Try again after a failed or stopped one, and Make it Detailed or Quick)", middleware: [requireAuth] as const,
+  request: { params: idParams, body: { required: false, content: { "application/json": { schema: z.object({ quality: z.enum(["quick", "detailed"]).optional().describe("Make it again as this kind. Left out, the video keeps its own kind.") }) } } } },
   responses: { 200: { content: { "application/json": { schema: CardSchema } }, description: "The card, with a new clip queued." }, ...refusals },
 });
 videosRoutes.openapi(anotherRoute, async (c) => {
@@ -235,6 +256,13 @@ videosRoutes.openapi(anotherRoute, async (c) => {
   if (source.turnId && videoJobsForTurn(actor, source.turnId).length >= MAX_CLIPS_PER_CARD) return c.json({ error: "That chat already has eight videos from this request. Ask for a new one in a new message.", code: "too_many" }, 422) as never;
   const audience = videoRouteAudience(actor);
   const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
+  // VIDEO-LTX-01: Quick or Detailed again. Left out, the video keeps its own kind; a style made for one model decides.
+  const asked = (await c.req.json().catch(() => ({}))) as { quality?: unknown };
+  const engine = await videoEngineStatus();
+  const used = source.request.loras.flatMap((id) => { const found = adapters.find((a) => a.id === id); return found ? [found] : []; });
+  const choice = chooseVideoQuality({ requested: isVideoQuality(asked.quality) ? asked.quality : source.request.quality ?? "quick", style: used[0] ?? null, seconds: source.request.seconds, engine, hasPicture: source.request.source_file_id !== null, quickOnly: laneOf(audience) !== "adult" });
+  const portrait = (() => { const [w, h] = source.request.size.split("x").map(Number); return Boolean(w && h && h > w); })();
+  const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
   // Only LoRAs this person may still use ride along; one turned off since is dropped. A picture or style of a household adult is decided again, now (LIKENESS-01).
   const prep = await prepareVideoRerun({
     actor, audience, conversationId: source.conversationId, temporary: source.temporary, prompt: source.prompt, sourceFileId: source.request.source_file_id,
@@ -247,7 +275,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
     const started = await startVideoJob({
       actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, kind: source.kind, prompt: source.prompt, sourceFileId: source.request.source_file_id,
       body: {
-        prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size: source.request.size, seconds: laneOf(audience) === "child" ? Math.min(source.request.seconds, 3) : source.request.seconds, audience: prep.likeness ? "adult" : stackAudienceFor(audience),
+        prompt: laneOf(audience) === "child" ? forceCartoon(source.prompt) : source.prompt, size, seconds: laneOf(audience) === "child" ? Math.min(choice.seconds, 3) : choice.seconds, ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}), audience: prep.likeness ? "adult" : stackAudienceFor(audience),
         ...(laneOf(audience) === "adult" ? {} : { model: videoModelForLane(laneOf(audience)) }),
         ...(laneOf(audience) === "child" ? { negative_prompt: CHILD_NEGATIVE_PROMPT } : {}),
         ...(prep.image ? { image: prep.image, image_source: prep.imageSource ?? "generated", ...(prep.consentProof ? { consent_proof: prep.consentProof } : {}) } : {}),
@@ -256,7 +284,7 @@ videosRoutes.openapi(anotherRoute, async (c) => {
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
     if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
-    return c.json(videoCardView(actor, started, true), 200);
+    return c.json(videoCardView(actor, started, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
@@ -288,7 +316,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
   const adapters = await videoAdaptersFor(videoAdapterAudiencesFor(audience));
   const prep = await prepareVideoRerun({ actor, audience, conversationId: body.conversation_id, temporary: false, prompt, sourceFileId: fileId, declaredSubjectId: body.photo_subject_id ?? null, adapters, styleIds: [] });
   if (!prep.ok) return c.json({ error: prep.line, code: prep.code }, prep.code === "likeness" ? 403 : 422) as never;
-  const size = prep.width && prep.height && prep.height > prep.width ? VIDEO_SIZES.portrait! : VIDEO_SIZES.landscape!;
+  const size = prep.width && prep.height && prep.height > prep.width ? VIDEO_SIZES_BY_QUALITY.quick.portrait : VIDEO_SIZES_BY_QUALITY.quick.landscape;
   const slot = laneOf(audience) === "child" ? reserveKid(actor, "video", 1, prompt) : null;
   if (laneOf(audience) === "child" && !slot) return c.json({ error: CHILD_VIDEO_LIMIT_LINE, code: "daily_limit" }, 422) as never;
   try {
@@ -302,7 +330,7 @@ videosRoutes.openapi(animateRoute, async (c) => {
       ...(prep.likeness ? { likeness: prep.likeness } : {}),
     });
     if (prep.subject) await recordLikenessUse({ subjectPersonId: prep.subject.id, requesterPersonId: actor.id, medium: "video", way: prep.subject.way, adultContent: prep.subject.adultContent, source: "chat" });
-    return c.json(videoCardView(actor, job, true), 200);
+    return c.json(videoCardView(actor, job, true, await readyFlags(actor)), 200);
   } catch (error) {
     releaseKid(slot);
     const status = error instanceof StackVideoError && error.status === 422 ? 422 : 503;
@@ -321,6 +349,14 @@ const settingsRoute = createRoute({
   method: "get", path: "/settings", tags: ["Videos"], summary: "The video role's state, the household switches and the LoRA library", middleware: [requireAuth, requireRole("owner", "admin")] as const,
   responses: { 200: { content: { "application/json": { schema: z.object({
     state: z.string(), available: z.boolean(), reason: z.string().nullable(), tier: z.string().nullable(), model_installed: z.boolean(), limits: z.string(),
+    quality: z.enum(["quick", "detailed"]).describe("The household's Video quality setting."),
+    detailed: z.object({
+      installed: z.boolean(), available: z.boolean(), reason: z.string().nullable(),
+      download_bytes: z.number().describe("What getting Detailed videos would still download (0 when installed)."),
+      component: z.string().describe("The Models and storage id to install it with."),
+      licence: z.object({ id: z.string(), name: z.string(), url: z.string() }).nullable(),
+      lora_base_model: z.string(),
+    }).describe("Detailed videos: sound and speech, up to 10 seconds."),
     enabled: z.boolean(), adult_adapters: z.boolean(), minors: z.string(), adapters: z.array(AdapterSchema),
   }) } }, description: "Additive." }, ...errorResponses({ 401: "Not signed in", 403: "Admins only" }) },
 });
@@ -330,7 +366,16 @@ videosRoutes.openapi(settingsRoute, async (c) => {
   try { adapters = await allVideoAdapters(); } catch { adapters = []; }
   return c.json({
     state: engine?.state ?? "unavailable", available: engine?.available === true, reason: engine?.reason ?? (engine ? null : "The engine isn't answering."), tier: engine?.tier ?? null,
-    model_installed: engine?.model?.installed === true, limits: VIDEO_LIMITS_LINE,
+    model_installed: engine?.qualities ? engine.qualities.quick.installed : engine?.model?.installed === true, limits: VIDEO_LIMITS_LINE,
+    quality: householdVideoQuality(),
+    detailed: (() => {
+      const detailed = engine?.qualities?.detailed;
+      return {
+        installed: detailed?.installed === true, available: detailed?.available === true,
+        reason: detailed && !detailed.available ? detailed.memory.reason ?? engine?.reason ?? null : engine && !engine.qualities ? "The engine on this computer does not have Detailed videos yet. Update it from Settings, Engines and AI." : null,
+        download_bytes: detailed?.install.remaining_bytes ?? 0, component: "ltx-2-3-distilled-mlx", licence: detailed?.licence ?? null, lora_base_model: detailed?.lora_base_model ?? "ltx-2.3",
+      };
+    })(),
     enabled: householdAllowsVideo(), adult_adapters: adultVideoAdaptersAllowed(),
     minors: "Videos are off for children and teens. No setting turns them on.",
     adapters: adapters.map((a) => ({ id: a.id, name: a.name, classification: a.classification, enabled: a.enabled, needs_confirmation: a.needs_confirmation, sha256: a.sha256, base_model: a.base_model, trigger_words: a.trigger_words, licence: a.licence, strength_default: a.strength_default, bytes: a.bytes, source_url: a.source_url, added_at: a.added_at, looks_like: lookedLikeView("video", a.id, a.likeness_subject ?? null) })),

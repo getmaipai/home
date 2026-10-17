@@ -10,6 +10,8 @@ export interface ComponentRow {
   requirement: "required" | "optional" | "unsupported"; requirement_reason: string | null;
   last_used_at: string | null; used_by: string[]; depends_on: string[];
   job: string | null; percent: number | null; failure: string | null;
+  /** VIDEO-LTX-01: a licence with terms of its own, accepted once by an admin before the first install (null for every other part). */
+  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null } | null;
   can_install: boolean; install_block: string | null; can_uninstall: boolean; uninstall_block: string | null;
 }
 export interface ComponentsOverview {
@@ -26,6 +28,6 @@ async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const componentsApi = {
   list: () => send<ComponentsOverview>("/api/components"),
-  install: (id: string) => send<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST" }),
+  install: (id: string, acceptedLicence?: string) => send<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", ...(acceptedLicence ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ accepted_licence: acceptedLicence }) } : {}) }),
   uninstall: (id: string) => send<{ component: string; freed_bytes: number; removed: boolean }>(`/api/components/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

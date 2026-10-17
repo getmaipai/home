@@ -34,6 +34,9 @@ export interface VideoFile {
   model: string | null;
   ms: number | null;
   bytes: number;
+  /** VIDEO-LTX-01: which kind made the clip, and whether it has a sound track the model made (absent on a clip stored before: Quick, silent). */
+  quality?: "quick" | "detailed";
+  audio?: boolean;
 }
 
 /** What the person asked for, kept on their own job record (never in a log). */
@@ -45,6 +48,8 @@ export interface VideoRequest {
   /** The generated picture a clip starts from (an attachment id in this conversation), or null. */
   source_file_id: string | null;
   audience: "all-ages" | "adult";
+  /** VIDEO-LTX-01: Quick or Detailed (absent on a job stored before the choice existed: Quick). */
+  quality?: "quick" | "detailed";
   /** LIKENESS-01: set when the clip looks like a household adult. Checked again on every poll while the job waits. */
   likeness?: JobLikeness | null;
 }
@@ -294,7 +299,7 @@ export async function startVideoJob(input: StartVideoInput): Promise<VideoJob> {
   const job: VideoJob = {
     id: newVideoJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: "queued", stackJob: submitted.job,
     percent: 0, phase: "queued", position: null, prompt: input.prompt,
-    request: { size: input.body.size ?? "832x480", seconds: input.body.seconds ?? 5, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.likeness ? { likeness: input.likeness } : {}) },
+    request: { size: input.body.size ?? (model === "detailed" ? "768x448" : "832x480"), seconds: input.body.seconds ?? 5, quality: model === "detailed" ? "detailed" : "quick", seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? null, audience: input.body.audience, ...(input.likeness ? { likeness: input.likeness } : {}) },
     error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,
   };
   save(job);
@@ -442,14 +447,15 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
     if (!conversationId) throw new Error("no conversation");
     const width = clip.width ?? 832;
     const height = clip.height ?? 480;
-    const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height };
+    const quality = clip.quality === "detailed" ? "detailed" as const : "quick" as const;
+    const meta = { seed: clip.seed ?? null, model: clip.model ?? null, ms: clip.ms ?? null, seconds: clip.seconds ?? null, width, height, quality, audio: clip.audio === true };
     let file: VideoFile;
     if (job.temporary) {
       const id = newFileId();
       const posterId = newFileId();
       storeTemporaryClip({ id, conversationId, ownerPersonId: actor.id, mediaType: "video/mp4", bytes: video });
       storeTemporaryClip({ id: posterId, conversationId, ownerPersonId: actor.id, mediaType: "image/jpeg", bytes: poster, ...(job.request.likeness ? { noReference: true as const } : {}) });
-      file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
+      file = { id, poster_id: posterId, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     } else {
       if (!job.turnId || !(await waitForTurnRow(job.turnId))) throw new Error("turn row never appeared");
       if (signal.aborted) return;
@@ -457,7 +463,7 @@ async function finish(job: VideoJob, actor: PersonRow, clips: StackClip[], signa
       if (!made.ok) { job.state = "failed"; job.error = saveFailureLine(made.status); save(job); return; }
       const madePoster = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/jpeg", bytes: poster, provenance: `${CLIP_POSTER_NOTE}${JSON.stringify({ v: 1, job: job.id, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false });
       if (!madePoster.ok) { job.state = "failed"; job.error = saveFailureLine(madePoster.status); save(job); return; }
-      file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength };
+      file = { id: made.value.id, poster_id: madePoster.value.id, width, height, seconds: meta.seconds, seed: meta.seed, model: meta.model, ms: meta.ms, bytes: video.byteLength, quality, audio: meta.audio };
     }
     job.files = [file];
     job.state = "done";

@@ -26,6 +26,7 @@ const KID_MAX_SECONDS = 3;
 import { refuseVideoPrompt, stackAudienceFor, videoAdapterAudiencesFor, videoDenial, VIDEO_DENIAL_LINE, VIDEO_REFUSAL_LINE, type VideoAudience, type VideoDenial } from "./policy";
 import type { PromptRefusal } from "@/lib/pictures/policy";
 import { videoEngineStatus, videoStatusReady } from "./ready";
+import { chooseVideoQuality, detailedVideoReady, etaWords, isVideoQuality, qualityOfBase, VIDEO_QUALITY_NOTE_LINE, VIDEO_SIZES_BY_QUALITY } from "./quality";
 import { StackVideoError } from "./stack";
 
 export const GENERATE_VIDEO_TOOL_ID = "generate_video";
@@ -61,11 +62,6 @@ export function videoRefusalFor(audience: VideoAudience, args: Record<string, un
   const refused = refuseVideoPrompt(`${prompt} ${style}`, { depictsRealPerson: args.depicts_real_person === true && style.trim() === "" && !isAttached(args.from_picture), lane: laneOf(audience) });
   if (refused) return { kind: "prompt", why: refused, line: promptRefusalLineFor(refused, "video", audience.actor, audience.band, `${prompt} ${style}`, VIDEO_REFUSAL_LINE[refused]) };
   return null;
-}
-
-function clampSeconds(value: unknown): number {
-  const n = typeof value === "number" && Number.isFinite(value) ? Math.round(value) : 5;
-  return Math.max(1, Math.min(5, n));
 }
 
 /** The newest picture this conversation's Stack made for this person (a generated picture, else a clip's poster), or null. */
@@ -126,7 +122,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   let sourceFileId: string | null = null;
   let negativePrompt: string | null = null;
   let photoLikeness: Extract<Awaited<ReturnType<typeof preparePhotoUse>>, { kind: "likeness" }> | null = null;
-  let size = VIDEO_SIZES[typeof args.orientation === "string" ? args.orientation : "landscape"] ?? VIDEO_SIZES.landscape!;
+  let portrait = args.orientation === "portrait";
   const from = typeof args.from_picture === "string" ? args.from_picture.trim() : "";
   const refuseWith = (kind: "likeness" | "reference", line: string) => refused(callId, args, { kind: "likeness", why: kind, line });
   if (isAttached(from)) {
@@ -146,7 +142,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: declared.id, bytes: photo.bytes, text: prompt, source: "chat" });
     if (prep.kind === "refused") return refuseWith("likeness", prep.line);
     photoLikeness = prep; image = photo.base64; imageSource = "household_photo"; consentProof = prep.proof; sourceFileId = photo.id; negativePrompt = prep.negativePrompt;
-    if (photo.width && photo.height) size = photo.height > photo.width ? VIDEO_SIZES.portrait! : VIDEO_SIZES.landscape!;
+    if (photo.width && photo.height) portrait = photo.height > photo.width;
   } else if (from) {
     const id = /^(latest|last|this|that)$/i.test(from) ? (temporary ? latestTemporaryPosterId(actor, state.conversationId) : latestGeneratedPictureId(actor, state.conversationId)) : from;
     const ref = id ? loadGeneratedReference(actor, state.conversationId, id, temporary) : null;
@@ -158,7 +154,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     }
     image = ref.base64;
     sourceFileId = ref.id;
-    if (ref.width && ref.height) size = ref.height > ref.width ? VIDEO_SIZES.portrait! : VIDEO_SIZES.landscape!;
+    if (ref.width && ref.height) portrait = ref.height > ref.width;
     // A picture that was itself made to look like a person is animated only if that person still agrees, now.
     if (ref.likenessSubject) {
       const prep = await preparePhotoUse({ medium: "video", audience, declaredSubjectId: ref.likenessSubject, bytes: ref.bytes, text: prompt, source: "chat" });
@@ -172,7 +168,21 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
   const named = typeof args.style === "string" ? args.style.trim() : "";
   const adapter = named && !kid ? matchVideoAdapter(available, named) : null;
   const styleNote = named && !adapter ? " The style they named is not in the library, so the video was made without it; say so briefly." : "";
-  const seconds = kid ? Math.min(clampSeconds(args.seconds), KID_MAX_SECONDS) : clampSeconds(args.seconds);
+  // VIDEO-LTX-01: Quick or Detailed. A style made for one model decides; a length past five seconds needs Detailed; else what was asked for, else the household's setting.
+  const choice = chooseVideoQuality({ requested: isVideoQuality(args.quality) ? args.quality : undefined, style: adapter, seconds: typeof args.seconds === "number" ? args.seconds : undefined, engine, hasPicture: image !== undefined, quickOnly: lane !== "adult" });
+  // A style made for Detailed cannot be used without Detailed: say so rather than start a clip the Stack would refuse.
+  if (adapter && qualityOfBase(adapter.base_model) === "detailed" && !detailedVideoReady(engine)) {
+    return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, which are not on this computer yet. An admin can get them in Settings, Models and storage, or I can make the video without the style." }, data: { refused: "style_needs_detailed" }, actions: [] } });
+  }
+  if (image !== undefined && adapter && qualityOfBase(adapter.base_model) === "detailed") {
+    return outcomeOf({ callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0, result: { reply: { text: "No video was made. Say this to the person in your own words and keep its meaning: That style only works with Detailed videos, and a Detailed video cannot start from a picture yet. I can animate the picture without the style, or make a Detailed video in that style from words." }, data: { refused: "style_needs_detailed" }, actions: [] } });
+  }
+  const seconds = kid ? Math.min(choice.seconds, KID_MAX_SECONDS) : choice.seconds;
+  const size = VIDEO_SIZES_BY_QUALITY[choice.quality][portrait ? "portrait" : "landscape"];
+  const qualityNote = choice.note ? ` ${VIDEO_QUALITY_NOTE_LINE[choice.note]}` : choice.announce ? " This one is a Detailed video, with sound and speech; say so in one short sentence." : "";
+  const lengthNote = choice.shortened ? ` The most this kind makes is ${seconds} seconds, so it is ${seconds}; say so briefly.` : "";
+  const longSpeechNote = choice.quality === "detailed" && seconds > 5 ? " Spoken words are clearest in a clip of 5 seconds or less; if the person wanted a line spoken and it does not come out clearly, offer a 5 second one." : "";
+  const soundNote = choice.quality === "quick" ? " A Quick video has no sound; if they wanted sound or spoken words, offer to make a Detailed one." : "";
   // A style of a household adult is made only if they agreed; a real person with no such style or photo is refused (LIKENESS-01).
   const stylePrep = await prepareStyleUse({ medium: "video", audience, style: adapter, text: `${prompt} ${adapter?.name ?? named}`, depictsRealPerson: args.depicts_real_person === true && !photoLikeness, source: "chat" });
   if (stylePrep.kind === "refused") return stylePrep.why === "real_person" ? refused(callId, args, { kind: "prompt", why: "real_person", line: VIDEO_REFUSAL_LINE.real_person }) : refuseWith("likeness", stylePrep.line);
@@ -196,6 +206,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
         prompt: kid ? forceCartoon(prompt) : withVideoTriggerWords(prompt, adapter),
         size,
         seconds,
+        ...(choice.quality === "detailed" ? { model: "detailed" as const } : {}),
         audience: likeness ? "adult" as const : stackAudienceFor(audience),
         ...(lane === "adult" ? {} : { model: videoModelForLane(lane) }),
         ...(image ? { image, image_source: imageSource, ...(consentProof ? { consent_proof: consentProof } : {}) } : {}),
@@ -208,7 +219,7 @@ export async function runGenerateVideo(input: RunGenerateVideoInput): Promise<To
     return outcomeOf({
       callId, packageId: GENERATE_VIDEO_TOOL_ID, status: "succeeded", via: "tool_call", args, durationMs: 0,
       result: {
-        reply: { text: `A ${seconds} second video is being made from this description: ${prompt}. It takes about two minutes and appears below your reply when it is ready. You have not seen it: do not describe how it looks. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${peopleGuidanceSuffix(laneOf(audience))}` },
+        reply: { text: `A ${seconds} second ${choice.quality === "detailed" ? "Detailed " : ""}video is being made from this description: ${prompt}. It takes ${etaWords(choice.quality, seconds)} and appears below your reply when it is ready. You have not seen it or heard it: do not describe how it looks or sounds. Tell the person in one short sentence that it is on its way and about how long it takes.${styleNote}${peopleGuidanceSuffix(laneOf(audience))}${qualityNote}${lengthNote}${soundNote}${longSpeechNote}` },
         data: { videoJobId: job.id },
         actions: [],
       },

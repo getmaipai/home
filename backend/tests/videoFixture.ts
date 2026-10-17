@@ -21,6 +21,9 @@ export interface FakeVideoStack {
   live: { stage_label: string; eta_seconds: number } | null;
   previewFetches: number;
   loras: StackVideoLora[];
+  /** VIDEO-LTX-01: what the Stack says about Detailed videos (undefined: an older Stack with Quick only). */
+  detailed: "installed" | "missing" | undefined;
+  quickMissing: boolean;
   restore(): void;
 }
 
@@ -53,7 +56,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: [...TEST_VIDEO_LORAS],
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: [...TEST_VIDEO_LORAS], detailed: undefined, quickMissing: false,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
@@ -89,13 +92,13 @@ export function installFakeVideoStack(options: { pollsToFinish?: number } = {}):
       if (fake.failWith) { job.state = "failed"; return json({ job: job.id, state: "failed", phase: null, progress: 0, phase_progress: null, position: null, error: fake.failWith.error, code: fake.failWith.code, data: [] }); }
       if (job.polls >= fake.pollsToFinish) {
         job.state = "done";
-        return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", width: 832, height: 480, frames: 121, fps: 24, seconds: 5, seed: 77, model: "wan2.2-ti2v-5b-fastwan-mlx", mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
+        return json({ job: job.id, state: "done", phase: "ready", progress: 100, phase_progress: null, position: null, error: null, code: null, data: [{ url: `/v1/videos/generations/${job.id}/video.mp4`, poster_url: `/v1/videos/generations/${job.id}/poster.jpg`, content_type: "video/mp4", ...(job.body.model === "detailed" ? { width: 768, height: 448, frames: Number(job.body.seconds ?? 5) * 24 + 1, seconds: Number(job.body.seconds ?? 5), quality: "detailed", audio: true, model: "ltx-2-3-distilled-mlx" } : { width: 832, height: 480, frames: 121, seconds: 5, quality: "quick", audio: false, model: "wan2.2-ti2v-5b-fastwan-mlx" }), fps: 24, seed: 77, mode: "t2v", lora_ids: [], ms: 132000, bytes: 4096, poster_bytes: 512 }] });
       }
       job.state = job.polls === 1 ? "queued" : "running";
       const liveFields = fake.live && job.state === "running" ? { progress_fraction: job.polls / 4, stage: "frames", stage_label: fake.live.stage_label, step: null, steps: null, eta_seconds: fake.live.eta_seconds, preview_url: job.polls >= 3 ? `/v1/videos/generations/${job.id}/preview.jpg?v=1` : null } : {};
       return json({ job: job.id, state: job.state, phase: job.state === "queued" ? "waiting for memory" : "rendering", progress: job.polls * 25, phase_progress: null, position: job.state === "queued" ? 2 : null, error: null, code: null, data: [], ...liveFields });
     }
-    if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests() });
+    if (method === "GET" && path === "/stack/v1/video") return json({ video: readyVideoStatusForTests({ ...(fake.detailed ? { detailed: fake.detailed } : {}), ...(fake.quickMissing ? { quickMissing: true } : {}) }) });
     if (method === "GET" && path === "/stack/v1/video/loras") return json({ loras: fake.loras });
     if (method === "POST" && path === "/stack/v1/video/loras") {
       const form = init?.body as FormData;

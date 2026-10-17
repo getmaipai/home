@@ -1,6 +1,6 @@
 {
   "id": "generate_video",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
@@ -62,9 +62,18 @@
       "seconds": {
         "type": "integer",
         "minimum": 1,
-        "maximum": 5,
+        "maximum": 10,
         "grounded": false,
-        "description": "Optional length in seconds, 1 to 5. Leave it out for 5."
+        "description": "Optional length in seconds, 1 to 10. Leave it out for 5. A video longer than 5 seconds is made Detailed automatically."
+      },
+      "quality": {
+        "type": "string",
+        "enum": [
+          "quick",
+          "detailed"
+        ],
+        "grounded": false,
+        "description": "Optional. Leave it out for almost every request: Home then uses the household's setting. Use detailed when the person wants the people in the video to talk or speak words, wants sound, music or a sound track, wants it longer than 5 seconds, or wants a custom look; it makes a sound track and speech and starts from words only. Use quick when they want it to start from a picture, or ask for a silent one. When you choose detailed, say so in one short sentence. Spoken words are clearest in a clip of 5 seconds or less, so for a spoken line keep seconds at 5 unless the person asks for longer."
       },
       "style": {
         "type": "string",

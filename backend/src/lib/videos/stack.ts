@@ -20,6 +20,9 @@ export interface StackClip {
   model?: string;
   mode?: string;
   lora_ids?: string[];
+  /** VIDEO-LTX-01: which model made it, and whether it has a sound track the model made (absent on an older Stack: Quick, silent). */
+  quality?: "quick" | "detailed";
+  audio?: boolean;
   ms?: number;
   bytes?: number;
   poster_bytes?: number;
@@ -37,6 +40,19 @@ export interface StackVideoJob extends StackLiveFields {
   data: StackClip[];
 }
 
+/** VIDEO-LTX-01: one of the Stack's two video models, as `GET /stack/v1/video` reports it (absent on an older Stack). */
+export interface StackVideoQuality {
+  id: string;
+  installed: boolean;
+  available: boolean;
+  audio: boolean;
+  limits: Record<string, number | string>;
+  memory: { fits: boolean; reason: string | null; peak_gb: number };
+  install: { models: Array<{ id: string; approx_bytes: number; installed: boolean }>; remaining_bytes: number; download_bytes: number };
+  licence: { id: string; name: string; url: string } | null;
+  lora_base_model: string;
+}
+
 export interface StackVideoStatus {
   state: "unsupported" | "off" | "not-installed" | "needs-setup" | "building" | "idle" | "running";
   phase: string | null;
@@ -51,6 +67,8 @@ export interface StackVideoStatus {
   lora_count: number;
   audio: boolean;
   reference_images?: { generated: boolean; uploaded: boolean; household_photo?: boolean; reason: string };
+  /** VIDEO-LTX-01: the two models. An older Stack has none: Quick only, from the fields above. */
+  qualities?: { quick: StackVideoQuality; detailed: StackVideoQuality };
 }
 
 export interface StackVideoLora {
@@ -86,7 +104,7 @@ export interface VideoBody {
   consent_proof?: string;
   loras?: Array<{ id: string; strength: number; likeness_proof?: string }>;
   audience: "all-ages" | "adult";
-  /** The video model, when the caller picks one; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
+  /** The video model, when the caller picks one: "detailed" is the sound-and-speech model (VIDEO-LTX-01, adults only), left out is Quick; a teen or a child is always sent the Quick one (lib/pictures/lane.ts, videoModelForLane). */
   model?: string;
   timeout_ms: number;
 }

@@ -1,14 +1,14 @@
-// AGECHECK: three keyframes (first, middle, last) of a finished clip as small JPEGs, through Apple's own video
-// decoder (AVFoundation). No model, no network, no EXIF written. Usage: keyframes <clip.mp4> <out-dir> <max-side>
-// Writes <out-dir>/0.jpg, 1.jpg, 2.jpg and prints the number of frames written. Exit 1 when a frame cannot be read.
+// AGECHECK: keyframes (first, middle, last: three, or five for a long clip) of a finished clip as small JPEGs, through Apple's own video
+// decoder (AVFoundation). No model, no network, no EXIF written. Usage: keyframes <clip.mp4> <out-dir> <max-side> [count]
+// Writes <out-dir>/0.jpg, 1.jpg, ... and prints the number of frames written. Exit 1 when a frame cannot be read.
 import AVFoundation
 import Foundation
 import ImageIO
 import UniformTypeIdentifiers
 
 let args = CommandLine.arguments
-guard args.count == 4, let maxSide = Int(args[3]), maxSide > 0 else {
-    FileHandle.standardError.write(Data("usage: keyframes <clip.mp4> <out-dir> <max-side>\n".utf8))
+guard args.count == 4 || args.count == 5, let maxSide = Int(args[3]), maxSide > 0 else {
+    FileHandle.standardError.write(Data("usage: keyframes <clip.mp4> <out-dir> <max-side> [count]\n".utf8))
     exit(2)
 }
 let asset = AVURLAsset(url: URL(fileURLWithPath: args[1]))
@@ -24,7 +24,8 @@ guard duration.isFinite, duration > 0 else {
     exit(1)
 }
 // The last frame sits a little before the end: the final timestamp is often past the last sample.
-let times = [0.0, duration / 2, max(0.0, duration - 0.15)]
+let count = args.count == 5 ? max(3, min(9, Int(args[4]) ?? 3)) : 3
+let times = (0..<count).map { index -> Double in index == 0 ? 0.0 : (index == count - 1 ? max(0.0, duration - 0.15) : duration * Double(index) / Double(count - 1)) }
 var written = 0
 for (index, seconds) in times.enumerated() {
     do {

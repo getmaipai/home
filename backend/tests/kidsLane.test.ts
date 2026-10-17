@@ -365,6 +365,48 @@ describe("a child and a teen are only ever on the Quick video model", () => {
   });
 });
 
+describe("VIDEO-LTX-01: Detailed (LTX, sound and speech) is unreachable for a teen or a child, on the server", () => {
+  const sentModel = (i = -1) => (video.submitted.at(i) as { model?: string; size?: string; seconds?: number });
+  test("the tool: asking for Detailed, a long clip or the household's Detailed default still sends a child the Quick model at the Quick size and the child's length", async () => {
+    video.detailed = "installed";
+    setHouseholdSettingValue("generation.video_quality", "detailed");
+    const o = await vid(kid, { prompt: "a friendly dragon waving", quality: "detailed", seconds: 10 });
+    expect(o.status).toBe("succeeded");
+    expect(sentModel()).toMatchObject({ model: WAN_QUICK_VIDEO_MODEL, size: "832x480", seconds: 3 });
+    expect(text(o)).not.toContain("Detailed video");
+    setHouseholdSettingValue("generation.video_quality", "quick");
+  });
+  test("the job starter: a teen or a child asking for detailed (or the model's own id) is sent the Quick model; an adult's choice stands", async () => {
+    video.detailed = "installed";
+    const start = (actor: PersonRow, model: string) => startVideoJob({ actor, conversationId: null, turnId: null, temporary: true, kind: "generate", prompt: "a friendly dragon", body: { prompt: "a friendly dragon", audience: "all-ages", model } as never });
+    await start(teen, "detailed");
+    expect(sentModel().model).toBe(WAN_QUICK_VIDEO_MODEL);
+    __resetVideoJobsForTests();
+    await start(kid, "ltx-2-3-distilled-mlx");
+    expect(sentModel().model).toBe(WAN_QUICK_VIDEO_MODEL);
+    __resetVideoJobsForTests();
+    await start(bench.owner, "detailed");
+    expect(sentModel().model).toBe("detailed");
+    expect(videoModelForLane("teen", "detailed")).toBe(WAN_QUICK_VIDEO_MODEL);
+  });
+  test("the choice is forced to Quick for a teen or a child whatever was asked, and their card never offers Detailed", async () => {
+    video.detailed = "installed";
+    const { chooseVideoQuality } = await import("@/lib/videos/quality");
+    const { readyVideoStatusForTests } = await import("@/lib/videos/ready");
+    const { videoCardView } = await import("@/routes/videos");
+    const engine = readyVideoStatusForTests({ detailed: "installed" });
+    expect(chooseVideoQuality({ requested: "detailed", seconds: 10, engine, household: "detailed", quickOnly: true })).toMatchObject({ quality: "quick", seconds: 5, note: null });
+    expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, requested: "detailed", engine, quickOnly: true })).toMatchObject({ quality: "quick" });
+    const o = await vid(teen, { prompt: "a dragon flying over a castle", quality: "detailed", seconds: 8 });
+    expect(o.status).toBe("succeeded");
+    expect(sentModel()).toMatchObject({ model: WAN_QUICK_VIDEO_MODEL, size: "832x480", seconds: 5 });
+    const { getVideoJobFor } = await import("@/lib/videos/jobs");
+    const id = (o.result?.data as { videoJobId: string }).videoJobId;
+    const card = videoCardView(teen, getVideoJobFor(teen, id)!, true, { quick: true, detailed: false });
+    expect(card.items[0]).toMatchObject({ quality: "quick", switch_to: null });
+  });
+});
+
 describe("the child topic gate (lane review, 2026-10-17)", () => {
   const blocked = [
     "a knight with a sword", "a pirate with a cannon and a grenade", "a man with a chainsaw", "burning a village", "slaying the dragon", "a girl in a bikini", "a cartoon bong", "someone rolling a joint",

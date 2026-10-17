@@ -10,9 +10,12 @@ anywhere.
 - "make a clip of waves at sunset"
 - "animate this picture" (after chat made you a picture)
 
-Videos are 5 seconds at 480p and take about 2 minutes. A card shows how far
-along it is, with a Stop button. When it is done you can play it, download it
-or make another.
+There are two kinds. Quick is 5 seconds at 480p with no sound, takes about
+2 minutes and can start from a picture. Detailed adds sound and spoken words, runs up to 10 seconds from
+words and has many more styles. Ask for the one you want ("make it Detailed",
+"have him say something"), or leave it to chat. A card shows how far along it
+is, with a Stop button. When it is done you can play it, download it, make
+another, or make it again as the other kind.
 
 ## Who can make videos
 

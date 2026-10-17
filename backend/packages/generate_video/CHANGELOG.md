@@ -2,6 +2,13 @@
 
 All notable changes to the Make a Video package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.2.0] - 2026-10-17
+
+### Added
+
+- VIDEO-LTX-01: an optional `quality` argument, `quick` or `detailed`, the same two words as pictures. Left out, Home uses the household's Video quality setting (Quick by default). Detailed makes a sound track with spoken words in the same pass, up to 10 seconds, from words only for now. The model sets it when the person wants the people to speak, wants sound, wants it longer than 5 seconds, or wants the best quality, and says so in one line. A style made for one kind makes the video that kind on its own.
+- `seconds` now goes up to 10. A length past 5 seconds needs Detailed, which Home picks on its own.
+
 ## [0.1.1] - 2026-10-17
 
 ### Changed

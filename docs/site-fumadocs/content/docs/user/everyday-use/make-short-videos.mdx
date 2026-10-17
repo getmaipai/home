@@ -9,19 +9,21 @@ Home can make short videos on your own computer. Nothing is sent to anyone.
 
 A Mac with 128 GB of memory and the video model installed. On any other computer, Home says videos are not available and why.
 
+There are two kinds, the same two words as pictures. **Quick** is a short clip with no sound that can start from a picture. **Detailed** adds sound and spoken words and runs longer, but starts from your words only. Quick comes with video. Detailed is an extra download (about 74 GB) that an owner or admin gets once, in **Settings**.
+
 ## Ask in chat
 
 Type "make a short video of a paper boat in the rain". Home answers in a few words and shows a card. The card shows what Home is doing, how many seconds it has taken, and a bar. Press **Stop** on the card to cancel.
 
-Videos are 5 seconds at 480p and take about 2 minutes. If Home is busy making a picture or another video, the card says so and your video starts when the other one is done. You can have one video in the making at a time.
+A Quick video is 5 seconds at 480p with no sound and takes about 2 minutes. A Detailed video has sound and spoken words, runs up to 10 seconds, and takes about a minute or two. Chat picks the kind for you: it uses the one your home chose in **Settings**, and it picks Detailed when you ask for people to talk, for sound or music, or for more than 5 seconds. You can say it yourself too, for example "make a Detailed video where the hero says come with me". Spoken words come out clearest in a video of 5 seconds or less; in a longer one a line can come out garbled or not at all, so keep a spoken line short. If Home is busy making a picture or another video, the card says so and your video starts when the other one is done. You can have one video in the making at a time.
 
-When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words.
+When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words. **Make it Detailed** (or **Make it Quick**) makes the same words again as the other kind. A video made with a style cannot switch, because a style is made for one kind.
 
 ## Send a video in a text
 
 Press **Share** on the card. On an iPhone, iPad or Mac in Safari, your device's own share sheet opens with the video attached, so you can pick Messages, AirDrop or Mail. On a browser that cannot share a file, **Share** opens the video in your Library instead, where you can make a link.
 
-**Download** saves a copy made for texting, named after your words (for example `paper-boat-in-the-rain.mp4`). It has a silent sound track, which phones expect from a video. If you want the exact file the engine made, press **Download original**.
+**Download** saves a copy made for texting, named after your words (for example `paper-boat-in-the-rain.mp4`). A Quick video has a silent sound track, which phones expect from a video. A Detailed video keeps the sound it was made with. If you want the exact file the engine made, press **Download original**.
 
 If a video will not send from a file you saved, use **Share** on the card instead of dragging the file into Messages.
 
@@ -43,13 +45,14 @@ Open **Settings**, **Home settings**, **Pictures and videos**.
 
 - **Adults can make videos.** Turn it off to stop all video making.
 - **Adult-only video styles.** Choose whether styles marked adults only can be used.
-- **Video model.** Shows whether the model is ready and how long a video takes.
+- **Video quality.** Quick (the default) or Detailed. This is what chat makes when nobody asks for a kind. Anyone who can make videos can still ask chat for the other kind for one video.
+- **Quick and Detailed videos.** Shows what each kind is and whether it is on this computer. **Get Detailed videos** (with its size) downloads the extra model. First it shows the maker's licence in plain points: it is free for a household and for a business under $10 million a year, a business above that needs its own licence from the maker, and it may never be used to harm children or to make a video of a real person who has not agreed. You accept once. **What is the difference?** is a short table, and **Details** names the models.
 - **Video styles.** A style gives videos a look, like old colour film. Each has a switch, a note on who can use it, its licence and its size. Remove one to delete its file.
 
 ### Add a video style
 
 1. Open **Add a video style**.
-2. Give it a name and choose the file from this computer. It must be made for Wan 2.2 5B.
+2. Give it a name and choose the file from this computer. It must be made for Quick or Detailed videos; Home reads which from the file. A style for Detailed videos needs Detailed to be on this computer.
 3. Say what the licence is and tick the box to say you read it.
 4. Say if it is fine for all ages. If you are not sure, only adults can use it.
 5. Press **Add video style**. Check the fingerprint and licence it shows, then press **Turn it on**.
@@ -60,6 +63,8 @@ The video engine checks the file and refuses any style that puts a child in an a
 
 - **No video option.** Why: your Mac has less than 128 GB, you are not an adult, or videos are off. Fix: ask an owner or admin to check Settings.
 - **"No video model is installed".** Why: the video model is not downloaded. Fix: an owner or admin installs it in Settings.
+- **Chat says it made a Quick video when I asked for sound.** Why: Detailed videos are not on this computer yet. Fix: an owner or admin chooses **Get Detailed videos** in **Settings**, **Pictures and videos**, and accepts the licence.
+- **A Detailed video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. A 10 second one takes about two minutes, and the first one after a restart a little more.
 - **"Home is busy making another picture or video".** Why: Home does one job at a time. Fix: wait. It starts by itself.
 - **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.
 - **Home cannot reach the engine.** Why: the AI engine is restarting. Fix: wait a minute and ask again. Still stuck? Open **Repairs**.
