@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Video",
-  "description": "Make a short video on this computer when someone asks for a clip, a video or an animation. Call it first, in every chat; never say a clip is coming without calling it.",
+  "description": "Make a short video when someone asks for a clip, a video or an animation, and call it before you say so.",
   "offer": {
     "mode": "conditional",
     "gate": "videosAllowed",

@@ -13,7 +13,7 @@
     },
     "backend": {
       "name": "@maipai/home-backend",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "dependencies": {
         "@hono/zod-openapi": "^1.6.3",
         "@maipai/core": "file:../../commons-tags/core-core-v0.1.5/core",
@@ -56,7 +56,7 @@
     },
     "frontend": {
       "name": "@maipai/home-frontend",
-      "version": "0.2.13",
+      "version": "0.2.14",
       "dependencies": {
         "@assistant-ui/core": "0.3.20",
         "@assistant-ui/react": "0.15.21",

@@ -7,11 +7,29 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-Weather says why it has nothing to show, place search reads on one line, and every app is on one searchable page.
+## [0.2.14] - 2026-10-17
 
+Conversation mode speaks a real answer again. Pictures and videos can look like a household adult who agreed, and the AI engine restarts itself after a crash.
+
+### Fixes
+- Conversation mode on the Muse Glimmer chat engine only said "One sec" and then nothing. The model spent the whole spoken reply thinking before it wrote an answer. A spoken reply now skips that thinking, and the short "One sec" cue waits for a late answer instead of replacing it.
+- The Voice page always lists the voice in use as Default voice. A saved voice the speech engine does not offer is set aside with one plain line and moved to Default once, instead of being sent to the engine.
+
+### Reliability
+- When the AI engine stops by itself, it now restarts itself, with a short wait between tries and a stop after repeated crashes. Admins get one notification when that happens, and the Status page counts it.
+
+### Pictures and videos
+- A style, a picture or a video can look like an adult in the household, only when that adult turned on both likeness switches for themselves. Both switches are off for everyone until then. A child, teen or guest cannot turn them on, and a person who leaves the household or leaves the adult age band stops being usable. A photo you attach must show exactly one adult and nobody who looks under 18.
+- Settings, Pictures can add a style from a file path on this computer, because most community styles are larger than the upload form allows.
+- Z-Image Turbo stays an optional picture maker you choose by name; FLUX.2 Klein is the default on every computer.
+- Picture and video cards show the engine's stage, time left and a live preview.
+- Pictures can be made Quick or Detailed with one plain setting, and the chat can ask for the detailed one when the person wants the best quality.
+
+### Apps
+- Weather says why it has nothing to show, place search reads on one line, and every app is on one searchable page.
 - The Weather app no longer shows "Check your connection" when the real problem is that no place is chosen. It says "Choose a place" with **Add a place** and **Use my location** (and, in Safari, the exact steps to allow location), says when the weather source cannot be reached or is slow, and offers **Try again**. A saved place now answers when the default is Current location and the browser shares nothing.
 - **Add a place** results are one line each (town, then the state or region in grey), in a wider list with a clear highlight, a Searching state and "No places match". The Weather default place row stacks so nothing runs behind the list.
-- **All apps** (the grid button on the left rail) is now a full page with a search box, Favorites first, apps grouped by topic, and a star on each app. Pins: spec-v0.1.161, ui-v0.5.254. Weather 0.3.1.
+- **All apps** (the grid button on the left rail) is now a full page with a search box, Favorites first, apps grouped by topic, and a star on each app. Weather 0.3.1.
 
 ### Pictures
 - Two kinds of picture, in plain words. **Quick** (a few seconds) stays the default; **Detailed** (15 to 30 seconds, finer detail, many more styles) is the choice for people who want it. Chat uses Detailed when you ask for the best quality, photoreal or a custom look and says so; a style made for Detailed uses it on its own; a **Make it Detailed** or **Make it Quick** button on each picture makes it again the other way. Settings, Pictures and videos has a **Picture quality** row, a **What is the difference?** comparison and **Get Detailed pictures** when it is not installed. Model names appear only under **Details**.

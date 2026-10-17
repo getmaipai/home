@@ -153,7 +153,7 @@ describe("robot clip bundles", () => {
     await renderClipBundle(deviceId);
     const bundle = (await readBundle(deviceId))!;
     expect(bundle.clips.every((clip) => clip.voice_id !== "vera")).toBe(true);
-    expect(received.every((call) => call.voice === "alba")).toBe(true);
+    expect(received.every((call) => call.voice === null)).toBe(true);
   });
 
   test("adding an alarm area renders its line", async () => {

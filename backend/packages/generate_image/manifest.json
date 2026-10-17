@@ -4,7 +4,7 @@
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Picture",
-  "description": "Make a new picture when someone asks you to draw, paint, illustrate or design one; never for real photos. Call it first, in every chat; never say a picture is coming without calling it.",
+  "description": "Make a new picture when someone asks you to draw, paint, illustrate or design one, and call it before you say so.",
   "offer": {
     "mode": "conditional",
     "gate": "picturesAllowed",
