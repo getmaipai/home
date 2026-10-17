@@ -189,10 +189,10 @@ app.route("/api/scheduler", schedulerRoutes);
 // Needs-the-AI routes wait for the install (setup page B, install strip).
 app.use("/api/llm/*", installGate("chat"));
 app.use("/api/turn/*", installGate("chat"));
-app.use("/api/tts/*", installGate("all"));
-app.use("/api/stt/*", installGate("all"));
-app.use("/api/vision/*", installGate("all"));
-app.use("/api/answer-image/*", installGate("all"));
+app.use("/api/tts/*", installGate("all", undefined, ["tts"]));
+app.use("/api/stt/*", installGate("all", undefined, ["stt"]));
+app.use("/api/vision/*", installGate("all", undefined, ["vision", "chat"]));
+app.use("/api/answer-image/*", installGate("all", undefined, ["chat", "vision"]));
 app.route("/api/llm", llmRoutes);
 app.route("/api/tts", ttsRoutes);
 app.route("/api/turn", turnRoutes);

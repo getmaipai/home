@@ -7,7 +7,7 @@ let current: status.InstallStatus = status.EMPTY_INSTALL;
 
 function app(need: "chat" | "all") {
   const a = new Hono();
-  a.use("*", installGate(need, async () => current));
+  a.use("*", installGate(need, async () => current, undefined, async () => false));
   a.post("/x", (c) => c.json({ ok: true }));
   a.get("/x", (c) => c.json({ ok: true }));
   return a;
@@ -32,4 +32,22 @@ test("chat waits for chat, voice and pictures wait for everything", async () => 
   expect((await app("all").request("/x", { method: "POST" })).status).toBe(503);
   stub(make({ state: "ready", chatReady: true, complete: true }));
   expect((await app("all").request("/x", { method: "POST" })).status).toBe(200);
+});
+
+test("a download for a role that already answers never blocks it (ready role plus active job)", async () => {
+  stub(make({ state: "downloading", chatReady: false, percent: 40 }));
+  const gate = (usable: boolean, roles: readonly string[] = ["chat"]) => {
+    const a = new Hono();
+    a.use("*", installGate("chat", async () => current, roles, async (asked) => { expect(asked).toEqual(roles); return usable; }));
+    a.post("/x", (c) => c.json({ ok: true }));
+    return a;
+  };
+  expect((await gate(true).request("/x", { method: "POST" })).status).toBe(200);
+  const refused = await gate(false).request("/x", { method: "POST" });
+  expect(refused.status).toBe(503);
+  expect(((await refused.json()) as { error: string }).error).toContain("still downloading");
+  const all = new Hono();
+  all.use("*", installGate("all", async () => current, ["tts"], async () => true));
+  all.post("/x", (c) => c.json({ ok: true }));
+  expect((await all.request("/x", { method: "POST" })).status).toBe(200);
 });
