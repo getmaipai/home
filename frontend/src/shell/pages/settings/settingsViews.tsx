@@ -7,8 +7,6 @@ import { AwaySessionsSection } from "@/apps/settings/AwaySessionsSection";
 import { ChatSkillsSection } from "@/shell/pages/settings/ChatSkillsSection";
 import { ChatShortcutsView } from "@/shell/pages/settings/ChatShortcutsView";
 import { DeviceAppearanceControl } from "@/shell/pages/settings/DeviceAppearanceControl";
-import { VoiceCatalogSection } from "@/apps/settings/VoiceCatalogSection";
-import { ClonedVoicesSection } from "@/apps/settings/ClonedVoicesSection";
 import { VoiceBrowserSection } from "@/apps/settings/VoiceBrowserSection";
 import { EngineLinkCredentialSection } from "@/apps/settings/EngineLinkCredentialSection";
 import { ModelsSection } from "@/apps/settings/ModelsSection";
@@ -56,7 +54,7 @@ function DeviceAppearanceSettings() { return <DeviceAppearanceControl />; }
 function ChatSkillsSettings({ person }: SettingsViewProps) { return <ChatSkillsSection person={person} />; }
 function ChatShortcutsSettings() { return <ChatShortcutsView />; }
 function HomeCommandsSettings({ person }: SettingsViewProps) { return <CommandsSection person={person} management />; }
-function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("Voices"); return <><VoiceBrowserSection person={person} /><VoiceCatalogSection personId={person.id} householdManagement /></>; }
+function HomeVoiceCatalogSettings({ person }: SettingsViewProps) { useTabItem("Voices"); return <VoiceBrowserSection person={person} />; }
 
 // ADMIN-HOME-SETTINGS-01: the household admin sections that had no entry.
 // Each is a trail view of its Home settings section (spec/settings/areas.json),
@@ -96,5 +94,5 @@ export function SettingsView({ view, person, onPersonChange }: SettingsViewProps
 
 function AccountVoiceControls({ person }: SettingsViewProps) {
   useTabItem("Voice");
-  return <><VoiceBrowserSection person={person} /><ClonedVoicesSection person={person} /></>;
+  return <VoiceBrowserSection person={person} />;
 }

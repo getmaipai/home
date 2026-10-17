@@ -34,18 +34,13 @@ function mockApi() {
 }
 
 describe("Next personal management pages", () => {
-  test("personal voice sections remain available in Account", async () => {
+  test("the personal voice page is one voice choice, no cloning or catalog", async () => {
     const restore = mockApi();
     try {
       const view = renderWithQueryClient(<VoicesPage person={makePerson()} />);
-      await waitFor(() => expect(document.body.textContent).toContain("Cloned voices"));
-      expect(document.body.textContent).toContain("Voices");
-      expect(document.body.textContent).toContain("More voices");
-      // Ported from the retired old-shell VoicesPage test (NEXT-RETIRE-02C): the page has its own
-      // "Voices" heading, not only its two section headings.
+      await waitFor(() => expect(document.body.textContent).toContain("Choose a voice for you"));
       expect(view.getByText("Voices", { exact: true })).toBeTruthy();
-      expect(view.getByText("More voices", { exact: true })).toBeTruthy();
-      expect(view.getByText("Cloned voices", { exact: true })).toBeTruthy();
+      expect(document.body.textContent).not.toMatch(/Cloned voices|More voices|Chatterbox|Pocket/);
     } finally { restore(); }
   });
 

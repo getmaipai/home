@@ -40,7 +40,6 @@ import type {
   ChatCapabilities,
   EngineStatus,
   EngineStatsSample,
-  ClonedVoiceInfo,
   StackVoice,
   RoutingStats,
   PrivacyConnection,
@@ -191,7 +190,7 @@ export type ProjectView = Project & { posted_artifact: { id: string; version: nu
 // re-export the types here so the rest of the frontend imports from one
 // place.
 export type { TurnErrorDetail };
-export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, ClonedVoiceInfo, StackVoice, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
+export type { Roster, TurnValue, Media, TurnStreamEvent, StructuredPart, ConversationTurnRow, ConversationTurnWithMemoryIds, ConversationSummary, ResolvedSetting, BackupInfo, HardwareInfo, ModelFit, ChatModelOption, ChatModelsResponse, ChatCapabilities, EngineStatus, EngineStatsSample, StackVoice, RoutingStats, PrivacyConnection, PendingRestore, CommandRow, CommandAction, NotificationDeliveryView, HealthStatus, EngineHealthEntry, Dashboard, SetupChecklistItem, DashboardActivityRow, DashboardTurnsPerDay, DashboardEngineCounts, StackRoleId, StackRoleInfo, StackEngineInfo, StackBudget, StackHealthItem, EnginesOverview, EnginesHealth, BareCompareEvent, BareCompareTrace, TurnStats, Performance, PerformanceTurnDayStats, PerformanceEngineStats, PerformanceQueues, PerformanceLabels, PerformanceLayers, PerformanceLayerStats, PerformanceEngines, PerformanceHardware, PerformanceDisk, PersonStorageRow, StorageUsageOverview };
 export type { ReplyFeedback };
 export type { MemoryRecord };
 export type { Entity };
@@ -977,15 +976,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify({ scope, key, value, ...(confirmRemoval ? { confirmRemoval } : {}) }),
     }),
-  // The community voice catalog (2026-09-04): every real file in
-  // `kyutai/tts-voices`, not just the 26 bundled presets.
-  voiceCatalog: () => request<{ entries: { path: string; collection: string }[] }>("/api/voice/catalog"),
   stackVoices: () => request<{ voices: StackVoice[] }>("/api/voice/voices"),
-  selectVoiceFromCatalog: (path: string) =>
-    request<ResolvedSetting>("/api/voice/catalog/select", {
-      method: "POST",
-      body: JSON.stringify({ path }),
-    }),
   // Dedicated routes, not the generic setSetting/resetSetting: saving or
   // removing voice.hf_token updates the Stack speech service (see
   // routes/voice.ts's own comment on why the generic PUT route has no
@@ -996,27 +987,6 @@ export const api = {
       body: JSON.stringify({ token }),
     }),
   removeHfToken: () => request<ResolvedSetting>("/api/voice/hf-token/remove", { method: "POST" }),
-  // Voice cloning (2026-09-04): a household member's own uploaded audio
-  // sample. uploadClonedVoice sends real multipart/form-data, not JSON -
-  // request<T>() always JSON-encodes `body`, so this bypasses it and
-  // calls fetch directly, the same reason tests/client.ts grew its own
-  // postForm() alongside post().
-  clonedVoices: () => request<{ voices: ClonedVoiceInfo[] }>("/api/voice/cloned"),
-  uploadClonedVoice: async (file: File, label: string): Promise<ClonedVoiceInfo> => {
-    const form = new FormData();
-    form.set("label", label);
-    form.set("file", file);
-    const res = await fetch("/api/voice/cloned", { method: "POST", credentials: "include", body: form });
-    const body = await res.json().catch(() => ({}));
-    if (!res.ok) throw new ApiError(body.error ?? res.statusText, res.status, body.code);
-    return body as ClonedVoiceInfo;
-  },
-  selectClonedVoice: (id: string) =>
-    request<ResolvedSetting>(`/api/voice/cloned/${encodeURIComponent(id)}/select`, { method: "POST" }),
-  selectCatalogVoice: (path: string) =>
-    request<ResolvedSetting>("/api/voice/catalog/select", { method: "POST", body: JSON.stringify({ path }) }),
-  deleteClonedVoice: (id: string) =>
-    request<{ success: true }>(`/api/voice/cloned/${encodeURIComponent(id)}/delete`, { method: "POST" }),
   resetSetting: (scope: string, key: string) =>
     request<ResolvedSetting>("/api/settings/reset", {
       method: "POST",
