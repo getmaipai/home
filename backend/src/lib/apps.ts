@@ -1,0 +1,259 @@
+// APP-KIND-03: the hub side of the `app` kind (docs/plans/app-kind-2026-10-16.md). An app is an
+// installed package whose manifest lists `contributes.pages[]`. This file holds the rules; the HTTP
+// boundary is routes/apps.ts (the list) and routes/plugins.ts (one page, one data call).
+//
+// Nothing here is a second definition of anything: access is the package's own (`min_role`, smoke
+// status, capabilities, platforms), the page is a spec `page` document, the place is `resolvePlace`,
+// the data is the package's own recipe through `runPlugin`, and the blocks leave through
+// `filterAnswerBlocks` exactly as a chat turn's do.
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { join } from "node:path";
+import Ajv2020 from "ajv/dist/2020.js";
+import UI_SCHEMA from "@maipai/spec/ui/schema.json" with { type: "json" };
+import { checkAppPackage, type AppContributes, type AppDataEntry, type AppPageEntry } from "@maipai/spec/ui/app-check.js";
+import type { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { speakerAgeBand } from "@/lib/ageBand";
+import { filterAnswerBlocks } from "@/lib/answerBlocks";
+import { missingRequired, unavailableCapabilities } from "@/lib/capabilities";
+import { getEntity } from "@/lib/entities";
+import { listPackageIds, loadManifestOnly, meetsMinRole, runPlugin } from "@/lib/plugins";
+import { resolvePackageDir } from "@/lib/packageResolve";
+import { parseCurrentLocation, resolveWeatherPlace } from "@/lib/places";
+import { refusePackageReplyIfUnsafe } from "@/lib/safety";
+import { getPersonSettingValue } from "@/lib/settings";
+import { getPackageStatus, allPackageStatuses } from "@/lib/smoke";
+import type { PersonRow } from "@/types";
+
+const ajv = new Ajv2020({ strict: false });
+const validateUiPage = ajv.compile(UI_SCHEMA as object);
+
+import type { AppRow, AppSection } from "../wire";
+export type { AppRow, AppSection };
+
+export interface AppData {
+  as_of: string;
+  blocks?: unknown[];
+  rows?: Array<{ id: string; label: string }>;
+  degraded?: true;
+  /** The page has no place to show: nothing was chosen and the person has no default or household home. */
+  needs?: "place";
+}
+
+export type AppResult<T> = { ok: true; status: 200; value: T } | { ok: false; status: 404 | 400 | 502; error: string; kind?: "down" | "timed_out" | "found_nothing" };
+
+const NOT_FOUND = { ok: false, status: 404, error: "no such app" } as const;
+
+// ---- Loading and validating an app's pages -------------------------------------------------
+
+interface LoadedApp { manifest: PackageManifest; contributes: AppContributes; pages: Map<string, unknown>; problems: string[] }
+const loadCache = new Map<string, { stamp: string; app: LoadedApp }>();
+const warned = new Set<string>();
+
+function pageFile(dir: string, module: string): string {
+  return join(dir, "pages", `${module}.json`);
+}
+
+function readPage(dir: string, module: string): unknown {
+  // `module` is a plain name by the manifest schema (^[a-z][a-z0-9_-]*$), so the join cannot leave `pages/`.
+  if (!/^[a-z][a-z0-9_-]*$/.test(module)) return undefined;
+  const path = pageFile(dir, module);
+  if (!existsSync(path)) return undefined;
+  try {
+    return JSON.parse(readFileSync(path, "utf-8"));
+  } catch {
+    return null;
+  }
+}
+
+/** Reads and validates one package's pages. Cached on the manifest and every page file's size and mtime. */
+function loadApp(id: string): LoadedApp | null {
+  const loaded = loadManifestOnly(id);
+  if (!loaded.ok) return null;
+  const manifest = loaded.value;
+  const contributes = (manifest.contributes ?? {}) as AppContributes;
+  if (!contributes.pages || contributes.pages.length === 0) return null;
+  const dir = resolvePackageDir(id);
+  const stampParts = [manifest.version];
+  for (const page of contributes.pages) {
+    const path = pageFile(dir, page.module);
+    try {
+      const stat = statSync(path);
+      stampParts.push(`${page.module}:${stat.size}:${stat.mtimeMs}`);
+    } catch {
+      stampParts.push(`${page.module}:missing`);
+    }
+  }
+  const stamp = stampParts.join("|");
+  const cached = loadCache.get(id);
+  if (cached && cached.stamp === stamp) return cached.app;
+
+  const pages = new Map<string, unknown>();
+  const problems = checkAppPackage(id, contributes, (module) => {
+    const doc = readPage(dir, module);
+    if (doc === null) return { type: "unreadable" };
+    if (doc !== undefined) pages.set(module, doc);
+    return doc;
+  });
+  for (const [module, doc] of pages) {
+    if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
+  }
+  if (problems.length > 0 && !warned.has(`${id}|${stamp}`)) {
+    warned.add(`${id}|${stamp}`);
+    console.warn(`[apps] ${id}: app refused: ${problems.join("; ")}`);
+  }
+  const app: LoadedApp = { manifest, contributes, pages, problems };
+  loadCache.set(id, { stamp, app });
+  return app;
+}
+
+/** The plain-language problems with a package's app pages, or an empty list (also for a package that is not an app).
+ * Install calls this on the unpacked directory before the package becomes active. */
+export function appPackageProblems(manifest: PackageManifest, dir: string): string[] {
+  const contributes = (manifest.contributes ?? {}) as AppContributes;
+  if (!contributes.pages || contributes.pages.length === 0) return [];
+  const pages = new Map<string, unknown>();
+  const problems = checkAppPackage(manifest.id, contributes, (module) => {
+    const doc = readPage(dir, module);
+    if (doc === null) return { type: "unreadable" };
+    if (doc !== undefined) pages.set(module, doc);
+    return doc;
+  });
+  for (const [module, doc] of pages) {
+    if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
+  }
+  return problems;
+}
+
+// ---- Who may see an app --------------------------------------------------------------------
+
+/** The one gate for the app list, a page and a data call: the person's role clears the package's `min_role`,
+ * its last smoke test did not disable it, no required capability is missing, and it runs on `home`. A package
+ * that fails it is absent (404 on the routes), so its existence does not leak. Age and surface gates are not
+ * here and are not loosened: they stay on the data path (`resolvePlace` coarsening, `filterAnswerBlocks`). */
+export function appVisibleTo(
+  person: Pick<PersonRow, "role">,
+  manifest: PackageManifest,
+  status: { status: "enabled" | "disabled" } = getPackageStatus(manifest.id),
+  unavailable: Set<string> = unavailableCapabilities(),
+): boolean {
+  if (!meetsMinRole(person.role, manifest.min_role)) return false;
+  if (status.status !== "enabled") return false;
+  if (missingRequired(manifest, unavailable).length > 0) return false;
+  if (!manifest.platforms.includes("home")) return false;
+  return true;
+}
+
+function visibleApp(person: PersonRow, id: string): LoadedApp | null {
+  const app = loadApp(id);
+  if (!app || app.problems.length > 0) return null;
+  return appVisibleTo(person, app.manifest) ? app : null;
+}
+
+/** Every app the asking person may open, built from the manifests on disk (no network). */
+export function listApps(person: PersonRow): AppRow[] {
+  const statuses = allPackageStatuses();
+  const unavailable = unavailableCapabilities();
+  const rows: AppRow[] = [];
+  for (const id of listPackageIds()) {
+    const app = loadApp(id);
+    if (!app || app.problems.length > 0) continue;
+    const status = statuses.get(id) ?? { status: "enabled" as const };
+    if (!appVisibleTo(person, app.manifest, status, unavailable)) continue;
+    const index = app.contributes.pages!.find((page) => page.id === "index")!;
+    if (index.nav === false) continue;
+    const manifest = app.manifest;
+    rows.push({
+      package: id,
+      page: "index",
+      label: index.label ?? (typeof manifest.display === "string" && manifest.display.trim() ? manifest.display : id),
+      icon: index.icon ?? "layout-grid",
+      description: manifest.description,
+      category: manifest.category,
+      keywords: index.keywords ?? [],
+      sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
+      to: `/apps/${id}`,
+      incognito: manifest.incognito,
+    });
+  }
+  return rows.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** One page document of a visible app. */
+export function getAppPage(person: PersonRow, packageId: string, pageId: string): AppResult<unknown> {
+  const app = visibleApp(person, packageId);
+  if (!app) return NOT_FOUND;
+  const entry = app.contributes.pages!.find((page) => page.id === pageId);
+  const doc = entry ? app.pages.get(entry.module) : undefined;
+  if (!entry || doc === undefined) return { ok: false, status: 404, error: "no such page" };
+  return { ok: true, status: 200, value: doc };
+}
+
+// ---- The data call -------------------------------------------------------------------------
+
+function savedPlaceRows(person: PersonRow, surface: string): Array<{ id: string; label: string }> {
+  const raw = getPersonSettingValue(person, `${surface}.places`);
+  const ids = Array.isArray(raw) ? raw.filter((v): v is string => typeof v === "string") : [];
+  const rows: Array<{ id: string; label: string }> = [];
+  for (const id of ids) {
+    const found = getEntity(person, id);
+    if (found.ok && found.value?.kind === "place") rows.push({ id: found.value.id, label: found.value.name });
+  }
+  return rows;
+}
+
+function timedOut(code: string | undefined): boolean {
+  return code === "timeout" || code === "deadline_exceeded";
+}
+
+/** `POST /api/plugins/:id/data/:dataId`. `body.place` is a saved place id (from this person's rows), the word
+ * "current", or absent for the person's default; `body.current` is `{lat, lon, area?}`, used only with "current".
+ * Coordinates are consumed in this call: never stored, logged, cached by text or echoed. */
+export async function getAppData(person: PersonRow, packageId: string, dataId: string, body: unknown, run: typeof runPlugin = runPlugin): Promise<AppResult<AppData>> {
+  const app = visibleApp(person, packageId);
+  if (!app) return NOT_FOUND;
+  const entry: AppDataEntry | undefined = app.contributes.data?.find((d) => d.id === dataId);
+  if (!entry) return { ok: false, status: 404, error: "no such data" };
+  const asOf = new Date().toISOString();
+  if (entry.rows === "places") return { ok: true, status: 200, value: { as_of: asOf, rows: entry.surface ? savedPlaceRows(person, entry.surface) : [] } };
+
+  const input = body && typeof body === "object" ? (body as Record<string, unknown>) : {};
+  const chosen = typeof input.place === "string" && input.place.trim() ? input.place.trim() : null;
+  const current = chosen === "current" ? parseCurrentLocation(input.current) : null;
+  // A saved place is named by its id in the picker. Anything that is not a place this person can see is refused,
+  // so the id of another person's place is never a way to read it.
+  let named: string | null = null;
+  if (chosen && chosen !== "current") {
+    const found = getEntity(person, chosen);
+    if (!found.ok || found.value?.kind !== "place") return { ok: false, status: 400, error: "That place is not one of yours. Choose another." };
+    named = found.value!.name;
+  }
+  if (chosen === "current" && !current) return { ok: false, status: 400, error: "Location was not shared. Choose a saved place instead." };
+
+  const inputs: Record<string, unknown> = { ...((entry.inputs ?? {}) as Record<string, unknown>) };
+  let hostInputs: Record<string, unknown> | undefined;
+  let uncached = false;
+  if (entry.surface === "weather") {
+    const place = await resolveWeatherPlace({ person, named, current, preferCurrent: current !== null });
+    if (!place) return { ok: true, status: 200, value: { as_of: asOf, blocks: [], needs: "place" } };
+    inputs.place = place.place;
+    hostInputs = place.hostInputs;
+    uncached = place.uncached;
+  }
+  const result = await run(packageId, person, inputs, undefined, { ...(hostInputs ? { hostInputs, uncached } : {}) });
+  if (!result.ok) {
+    // Only the kind of failure reaches the page, never the raw error (rule 6, rule 6a).
+    if (timedOut((result as { code?: string }).code)) return { ok: false, status: 502, error: "The lookup took too long.", kind: "timed_out" };
+    return { ok: false, status: 502, error: "The lookup did not work right now.", kind: "down" };
+  }
+  // The one output boundary (CHAT-02): a package answer that fails it shows nothing, as in chat.
+  if (refusePackageReplyIfUnsafe(person, result.value)) return { ok: true, status: 200, value: { as_of: asOf, blocks: [] } };
+  if ((result.value.data as { needs?: string } | undefined)?.needs === "place") return { ok: true, status: 200, value: { as_of: asOf, blocks: [], needs: "place" } };
+  const raw = (result.value as typeof result.value & { blocks?: unknown }).blocks;
+  const blocks = Array.isArray(raw) ? filterAnswerBlocks(raw, packageId, app.manifest.returns_blocks ?? [], speakerAgeBand(person, new Date()), person) : [];
+  return { ok: true, status: 200, value: { as_of: asOf, blocks } };
+}
+
+export function __resetAppCachesForTests(): void {
+  loadCache.clear();
+  warned.clear();
+}

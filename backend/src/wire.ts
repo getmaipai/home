@@ -1193,3 +1193,21 @@ export type StatusAppNeedWire = { kind: "engine" | "service" | "internet"; id: s
 export type StatusAppWire = { id: string; name: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; reason: string | null; paused?: boolean; needs?: StatusAppNeedWire[]; history: Array<{ date: string; state: "operational" | "degraded" | "down" | "waiting_for_internet"; uptime: number; minutes: { operational: number; degraded: number; outage: number; maintenance: number } }>; uptimePercent: number };
 export type StatusAppsWire = StatusAppWire[];
 export interface SetupChecklistItem { id: string; title: string; reason: string; done: boolean; open: { label: string; href: string } }
+
+// APP-KIND-03: one launchable package app, as GET /api/apps returns it. Defined here, alias-free, so the
+// web shell types the response from the same declaration the hub builds it from.
+export interface AppSection { page: string; label: string; icon: string | null }
+export interface AppRow {
+  package: string;
+  page: "index";
+  label: string;
+  icon: string;
+  description: string;
+  category: string;
+  keywords: string[];
+  sections: AppSection[];
+  to: string;
+  /** The package's Incognito behaviour. The hub cannot see the browser's Incognito state, so the shell
+   * hides an app whose value is "blocked" while Incognito is on. */
+  incognito: "blocked" | "ephemeral" | "unaffected";
+}

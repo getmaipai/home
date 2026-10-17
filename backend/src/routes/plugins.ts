@@ -17,6 +17,7 @@ import { routingStats } from "@/lib/conversationHistory";
 import { allPackageStatuses, getPackageStatus, runSmoke } from "@/lib/smoke";
 import { refusePackageReplyIfUnsafe } from "@/lib/safety";
 import { filterAnswerBlocks } from "@/lib/answerBlocks";
+import { getAppData, getAppPage } from "@/lib/apps";
 
 export const pluginsRoutes = apiRouter();
 
@@ -175,6 +176,20 @@ pluginsRoutes.post("/:id/run", requireAuth, async (c) => {
   const loaded = loadManifestOnly(id);
   const blocks = filterAnswerBlocks(rawBlocks, id, loaded.ok ? loaded.value.returns_blocks ?? [] : [], speakerAgeBand(actor, new Date()), actor);
   return c.json(blocks.length > 0 ? { ...rest, blocks } : rest);
+});
+
+// APP-KIND-03: a package app's page document and its data. Both apply the one gate in lib/apps.ts
+// (appVisibleTo); a package the person may not use is a 404, so its existence does not leak.
+pluginsRoutes.get("/:id/pages/:pageId", requireAuth, (c) => {
+  const result = getAppPage(c.get("person"), c.req.param("id"), c.req.param("pageId"));
+  return result.ok ? c.json(result.value as Record<string, unknown>, 200) : c.json({ error: result.error }, result.status as 404);
+});
+
+pluginsRoutes.post("/:id/data/:dataId", requireAuth, async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const result = await getAppData(c.get("person"), c.req.param("id"), c.req.param("dataId"), body);
+  if (result.ok) return c.json(result.value, 200);
+  return c.json(result.kind ? { error: result.error, kind: result.kind } : { error: result.error }, result.status as 400);
 });
 
 // Owner/admin only: forces a re-check outside the daily job, e.g. right

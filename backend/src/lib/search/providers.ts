@@ -6,6 +6,7 @@
 // below is what actually enforces that; this file is just the list).
 import { listConversations } from "@/lib/conversationHistory";
 import { listActivePeople } from "@/lib/access";
+import { listApps } from "@/lib/apps";
 import { getRegistry } from "@/lib/settingsRegistry";
 import { placeSetting, settingHref, settingsViewerFor } from "@/lib/settingsAreas";
 import type { PersonRow } from "@/types";
@@ -128,4 +129,18 @@ const settingsProvider: SearchProvider = {
   },
 };
 
-export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, settingsProvider];
+// APP-KIND-03: installed package apps, found by name, description and the keywords their index page declares.
+// The same list and gate as GET /api/apps (listApps), so a person only ever finds an app they may open.
+const appsProvider: SearchProvider = {
+  kind: "app",
+  heading: "Apps",
+  async search(query, actor) {
+    const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return listApps(actor)
+      .filter((app) => words.every((word) => `${app.label} ${app.description} ${app.keywords.join(" ")}`.toLowerCase().includes(word)))
+      .slice(0, RESULT_CAP)
+      .map((app) => ({ kind: "app", id: app.package, title: app.label, subtitle: app.description, href: app.to }));
+  },
+};
+
+export const SEARCH_PROVIDERS: readonly SearchProvider[] = [conversationsProvider, peopleProvider, appsProvider, settingsProvider];

@@ -58,7 +58,7 @@ afterEach(() => {
  * package) or the same id ("weather" - an update to a bundled default,
  * this step's own acceptance scenario) are both real, tested cases. */
 async function buildInstallableFixture(
-  opts: { id: string; version?: string; permissions?: string[]; requires?: string[]; sourcePackageId?: string; pathPrefix?: string; dir?: string } = {
+  opts: { id: string; version?: string; permissions?: string[]; requires?: string[]; sourcePackageId?: string; pathPrefix?: string; dir?: string; mutateManifest?: (manifest: Record<string, unknown>) => void; files?: Record<string, string> } = {
     id: "weather",
   },
 ): Promise<{
@@ -73,7 +73,12 @@ async function buildInstallableFixture(
   manifest.id = opts.id;
   manifest.version = version;
   if (opts.requires) manifest.requires = opts.requires;
+  opts.mutateManifest?.(manifest);
   writeFileSync(join(stagingSrc, "manifest.json"), JSON.stringify(manifest));
+  for (const [name, content] of Object.entries(opts.files ?? {})) {
+    mkdirSync(join(stagingSrc, name, ".."), { recursive: true });
+    writeFileSync(join(stagingSrc, name), content);
+  }
 
   const targetPath = `${opts.pathPrefix ?? "plugins/utilities"}/${opts.id}/${version}`;
   const tarballName = `${targetPath.replace(/\//g, "_")}.tgz`;
@@ -132,6 +137,33 @@ async function buildInstallableFixture(
 function trust() {
   return { rootPublicKeysPem: [signer.publicKeyPem] };
 }
+
+describe("install, app pages (APP-KIND-03)", () => {
+  const indexDoc = JSON.stringify({ type: "page", id: "x", title: "X", body: [{ type: "empty_state", icon: "inbox", text: "Nothing." }] });
+  const withPages = (pages: unknown[]) => (m: Record<string, unknown>) => { m.contributes = { pages }; };
+  const page = { id: "index", label: "X", nav: true, kind: "schema", module: "index" };
+
+  test("a package whose pages conform installs", async () => {
+    const { targetPath } = await buildInstallableFixture({ id: "test-app-ok", mutateManifest: withPages([page]), files: { "pages/index.json": indexDoc } });
+    const result = await install({ id: "test-app-ok", targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+    expect(result.ok).toBe(true);
+  });
+
+  test("a kind: web page, a missing page file and a missing index are refused and nothing becomes active", async () => {
+    const cases: Array<[string, Parameters<typeof buildInstallableFixture>[0]]> = [
+      ["test-app-web", { id: "test-app-web", mutateManifest: withPages([{ ...page, kind: "web" }]), files: { "pages/index.json": indexDoc } }],
+      ["test-app-nofile", { id: "test-app-nofile", mutateManifest: withPages([page]) }],
+      ["test-app-noindex", { id: "test-app-noindex", mutateManifest: withPages([{ ...page, id: "front" }]), files: { "pages/index.json": indexDoc } }],
+    ];
+    for (const [id, fixture] of cases) {
+      const { targetPath } = await buildInstallableFixture(fixture);
+      const result = await install({ id, targetPath, source: { kind: "dir", dir: indexDir }, trust: trust() });
+      expect(result.ok).toBe(false);
+      if (!result.ok) expect(result.error).toContain("app pages were refused");
+      expect(getActiveInstall(id)).toBeNull();
+    }
+  });
+});
 
 describe("install", () => {
   test("installing a genuinely new id makes it resolve to the store copy, and passes smoke", async () => {

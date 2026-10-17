@@ -18,6 +18,8 @@ import { dataDir, installedPackageVersionDir, installStagingDir, isValidPackageI
 import { getActiveInstall } from "@/lib/packageResolve";
 import { runSmoke } from "@/lib/smoke";
 import { installRefusal } from "@/lib/capabilities";
+import { PackageManifest } from "@maipai/spec/gen/ts/manifest.js";
+import { appPackageProblems } from "@/lib/apps";
 import { killLiveProcessForInstallChange } from "@/lib/denoHost";
 import {
   fetchRawIndex,
@@ -258,6 +260,19 @@ async function installLocked(opts: InstallOptions): Promise<InstallResult> {
       ok: false,
       error: `manifest identity mismatch: target path ${opts.targetPath} does not end with unpacked version ${manifest.version}`,
     };
+  }
+
+  // APP-KIND-03: a package that lists app pages is refused here, before it can become active, when a page
+  // is missing, is not a schema page, uses a node a package page may not, binds to data the package does not
+  // declare, or reaches outside the package (a kind: "web" page never passes the manifest schema at all).
+  const appManifest = PackageManifest.safeParse(manifest);
+  const declaresPages = Array.isArray((manifest as { contributes?: { pages?: unknown } }).contributes?.pages);
+  if (appManifest.success || declaresPages) {
+    const problems = appManifest.success ? appPackageProblems(appManifest.data, staging) : [`the manifest failed validation: ${appManifest.error.message}`];
+    if (problems.length > 0) {
+      rmSync(staging, { recursive: true, force: true });
+      return { ok: false, error: `${opts.id}'s app pages were refused: ${problems.join("; ")}` };
+    }
   }
 
   const versionDir = installedPackageVersionDir(opts.id, manifest.version);

@@ -5398,6 +5398,116 @@
         }
       }
     },
+    "/api/apps": {
+      "get": {
+        "tags": [
+          "Apps"
+        ],
+        "summary": "Every installed package app the asking person may open",
+        "responses": {
+          "200": {
+            "description": "Apps at or below the person's role that are enabled, runnable here and have all their required capabilities.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "package": {
+                        "type": "string"
+                      },
+                      "page": {
+                        "type": "string",
+                        "enum": [
+                          "index"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "icon": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "category": {
+                        "type": "string"
+                      },
+                      "keywords": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "sections": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "page": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            },
+                            "icon": {
+                              "type": "string",
+                              "nullable": true
+                            }
+                          },
+                          "required": [
+                            "page",
+                            "label",
+                            "icon"
+                          ]
+                        }
+                      },
+                      "to": {
+                        "type": "string",
+                        "description": "The app's route in the web shell: /apps/<package id>."
+                      },
+                      "incognito": {
+                        "type": "string",
+                        "enum": [
+                          "blocked",
+                          "ephemeral",
+                          "unaffected"
+                        ],
+                        "description": "The package's Incognito behaviour; the shell hides a blocked app while Incognito is on."
+                      }
+                    },
+                    "required": [
+                      "package",
+                      "page",
+                      "label",
+                      "icon",
+                      "description",
+                      "category",
+                      "keywords",
+                      "sections",
+                      "to",
+                      "incognito"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/plugins/skills": {
       "get": {
         "tags": [

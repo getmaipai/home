@@ -93,6 +93,10 @@ export async function resolvePlace(input: {
   /** False leaves an unsaved name without coordinates, so the caller's own
    * lookup (the weather recipe's geocoding step) resolves it as before. */
   geocodeNamed?: boolean;
+  /** True when the person chose Current location on this very request (the weather app's picker):
+   * `current` is then used ahead of their saved default. Without it, `current` only stands in when the
+   * default place is Current location. */
+  preferCurrent?: boolean;
 }): Promise<ResolvedPlace> {
   const { person, surface } = input;
   const visible = person ? listEntities(person, "place") : db.select().from(entities).where(and(eq(entities.kind, "place"), eq(entities.scope, "household"), isNull(entities.deletedAt))).all().map((row) => {
@@ -111,7 +115,7 @@ export async function resolvePlace(input: {
 
   if (person) {
     const configured = getPersonSettingValue(person, `${surface}.default_place`);
-    const defaultPlace = configured ?? "current";
+    const defaultPlace = input.preferCurrent && input.current ? "current" : configured ?? "current";
     if (defaultPlace === "current" && input.current) {
       const current: ResolvedPlace = { label: input.current.area ?? "Current location", area: input.current.area ?? null, lat: input.current.lat, lon: input.current.lon, precision: "exact", from: "current" };
       return childSafe(current, person);
@@ -174,9 +178,10 @@ export async function resolveWeatherPlace(input: {
   person: PersonRow | null;
   named?: unknown;
   current?: CurrentCoordinates | null;
+  preferCurrent?: boolean;
 }): Promise<{ place: string; hostInputs: { latitude?: number; longitude?: number }; uncached: boolean } | null> {
   const named = typeof input.named === "string" && input.named.trim() ? input.named.trim() : null;
-  const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false });
+  const resolved = await resolvePlace({ person: input.person, surface: "weather", named, current: input.current, geocodeNamed: false, preferCurrent: input.preferCurrent });
   // The spoken name wins. A saved or household place is labelled by its own name (never its
   // stored area, which may be address-like); Current location by a broad area, if any.
   const currentArea = resolved.area ? childSafeAreaLabel(resolved.area) : null;
