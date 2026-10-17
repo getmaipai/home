@@ -5,7 +5,7 @@ import { AsyncState } from "@maipai/ui/src/primitives/AsyncState";
 import { Avatar } from "@maipai/ui/src/primitives/Avatar";
 import { Card, CardContent } from "@maipai/ui/src/dashboard/components/ui/card";
 import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
-import { InputOTP, InputOTPGroup, InputOTPSlot } from "@maipai/ui/src/dashboard/components/ui/input-otp";
+import { PasscodeInput } from "@maipai/ui/src/ui/passcode-input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import FullLogo from "@maipai/ui/src/dashboard/layouts/full/shared/logo/FullLogo";
@@ -54,7 +54,7 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
   useTabItem("Sign in");
   const profilesQuery = useQuery<Roster[]>({ queryKey: ["auth-profiles"], queryFn: () => api.profiles() });
   const [wantsPassword, setUsePassword] = useState(false);
-  const { selected, secret, setSecret, secretError, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
+  const { selected, secret, setSecret, secretError, locked, attempt, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker } =
     useProfileSignIn(onSignedIn);
 
   // pinDigits null/absent: length unknown or a password, so no keypad.
@@ -96,8 +96,11 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                         Password
                       </Label>
                       <Input
+                        key={attempt}
                         id="secret"
                         type="password"
+                        disabled={busy || locked}
+                        aria-invalid={Boolean(secretError) && secret === "" ? true : undefined}
                         value={secret}
                         onChange={(e) => setSecret(e.target.value)}
                         // The entire screen's content, not a field inside a
@@ -109,35 +112,33 @@ export function SignInPage({ onSignedIn }: { onSignedIn: () => void }) {
                       />
                     </div>
                   ) : (
-                    <div className="flex flex-col items-center gap-1.5">
-                      <Label htmlFor="secret" className="text-sm font-normal text-muted-foreground">
-                        Enter your PIN
-                      </Label>
-                      <InputOTP
+                    <div className="flex flex-col items-center gap-3">
+                      <p className="text-sm text-muted-foreground">Enter your {pinDigits ?? 4}-digit passcode</p>
+                      {/* key={attempt}: a wrong code remounts the boxes empty, focus on the first box, red with a shake. */}
+                      <PasscodeInput
+                        key={attempt}
                         id="secret"
-                        maxLength={pinDigits ?? 4}
-                        inputMode="numeric"
-                        pattern="^[0-9]*$"
+                        digits={pinDigits ?? 4}
                         value={secret}
                         onChange={setSecret}
-                        disabled={busy}
+                        invalid={Boolean(secretError) && secret === ""}
+                        disabled={busy || locked}
+                        // The whole screen is this one question.
                         // eslint-disable-next-line jsx-a11y/no-autofocus
                         autoFocus
-                      >
-                        <InputOTPGroup>
-                          {Array.from({ length: pinDigits ?? 4 }, (_, i) => (
-                            <InputOTPSlot key={i} index={i} />
-                          ))}
-                        </InputOTPGroup>
-                      </InputOTP>
+                      />
                     </div>
                   )}
-                  {secretError ? <p className="text-sm text-destructive">{secretError}</p> : null}
-                  {secretError && !usePassword ? (
-                    <p className="text-sm text-muted-foreground">Sign in with a password? Tap "Use a password instead".</p>
+                  {secretError ? (
+                    <p role="alert" className="text-center text-sm text-destructive">
+                      {secretError}
+                    </p>
+                  ) : null}
+                  {secretError && !usePassword && !locked ? (
+                    <p className="text-center text-sm text-muted-foreground">Using a password? Tap "Use a password instead".</p>
                   ) : null}
                   {usePassword ? (
-                    <Button type="submit" size="lg" disabled={busy}>
+                    <Button type="submit" size="lg" disabled={busy || locked}>
                       {busy ? "Signing in…" : "Sign in"}
                     </Button>
                   ) : null}

@@ -129,10 +129,12 @@ describe("SessionLockGate", () => {
         </SessionLockGate>,
       );
       const input = await waitFor(() => {
-        const el = document.body.querySelector('input[type="password"]');
+        const el = document.body.querySelector("input[data-input-otp]");
         if (!el) throw new Error("not locked yet");
         return el as HTMLInputElement;
       });
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-slot"]').length).toBe(6);
+      expect(document.body.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe("Enter your 6-digit passcode");
       for (const v of ["1", "12", "123", "1234", "12345"]) {
         await act(async () => {
           fireEvent.change(input, { target: { value: v } });
@@ -143,7 +145,7 @@ describe("SessionLockGate", () => {
       await act(async () => {
         fireEvent.change(input, { target: { value: "123456" } });
       });
-      await waitForGone(() => document.body.querySelector('input[type="password"]'));
+      await waitForGone(() => document.body.querySelector("input[data-input-otp]"));
       expect(calls).toBe(1);
     } finally {
       restore();
@@ -172,8 +174,33 @@ describe("SessionLockGate", () => {
       await act(async () => {
         fireEvent.click(button);
       });
-      await waitFor(() => expect(document.body.textContent).toContain("Invalid PIN or password"));
+      await waitFor(() => expect(document.body.textContent).toContain("That passcode is not right"));
       expect(document.body.querySelector('input[type="password"]')).not.toBeNull();
+    } finally {
+      restore();
+    }
+  });
+
+  test("a lockout on the lock screen disables the boxes and shows the time left", async () => {
+    const restore = stubFetch({
+      "/api/auth/verify-secret": () => Response.json({ error: "Too many attempts", retryAfter: 120 }, { status: 429 }),
+    });
+    try {
+      renderWithQueryClient(
+        <SessionLockGate person={makePerson({ pinDigits: 4, sessionLockRequired: true, sessionLockTimeoutMinutes: FAST_TIMEOUT_MINUTES })}>
+          <div>the app</div>
+        </SessionLockGate>,
+      );
+      const input = await waitFor(() => {
+        const el = document.body.querySelector("input[data-input-otp]");
+        if (!el) throw new Error("not locked yet");
+        return el as HTMLInputElement;
+      });
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "0000" } });
+      });
+      await waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("Try again in 2:00"));
+      expect((document.body.querySelector("input[data-input-otp]") as HTMLInputElement).disabled).toBe(true);
     } finally {
       restore();
     }

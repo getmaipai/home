@@ -117,3 +117,21 @@ describe("usePinAutoSubmit", () => {
     }
   });
 });
+
+describe("usePinAutoSubmit after a wrong code clears the boxes", () => {
+  test("the same code typed again submits again, and a shorter entry never does", () => {
+    const onSubmit = mock(() => {});
+    const selected = { id: "p1" };
+    const { rerender } = renderHook(
+      ({ secret }: { secret: string }) => usePinAutoSubmit({ secret, selected, pinDigits: 6, busy: false, onSubmit }),
+      { initialProps: { secret: "" } },
+    );
+    rerender({ secret: "123456" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    rerender({ secret: "" });
+    rerender({ secret: "12345" });
+    expect(onSubmit).toHaveBeenCalledTimes(1);
+    rerender({ secret: "123456" });
+    expect(onSubmit).toHaveBeenCalledTimes(2);
+  });
+});

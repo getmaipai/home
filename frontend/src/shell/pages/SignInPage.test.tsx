@@ -165,7 +165,7 @@ describe("SignInPage", () => {
       await act(async () => {
         fireEvent.change(input, { target: { value: "9999" } });
       });
-      await waitFor(() => expect(document.body.textContent).toContain("Invalid PIN or password"));
+      await waitFor(() => expect(document.body.textContent).toContain("That passcode is not right"));
       expect(document.body.textContent).toContain("Sage");
       expect(document.body.textContent).toContain("Back");
       // A person whose secret is longer than 4 characters is told where to go.
@@ -332,7 +332,7 @@ describe("SignInPage credential step is a numeric keypad (MOBILE-LIVE-01)", () =
     try {
       const otp = document.body.querySelector("input[data-input-otp]") as HTMLInputElement;
       expect(otp.getAttribute("inputmode")).toBe("numeric");
-      expect(document.body.querySelectorAll('[data-slot="input-otp-slot"]').length).toBe(4);
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-slot"]').length).toBe(4);
       expect(document.body.querySelector('input[type="password"]')).toBeNull();
       expect(document.body.querySelector('input[type="text"]:not([data-input-otp])')).toBeNull();
     } finally {
@@ -411,7 +411,7 @@ describe("SignInPage sizes the keypad to the account (pinDigits, 2026-10-17)", (
         if (!el) throw new Error("not yet rendered");
         return el as HTMLInputElement;
       });
-      expect(document.body.querySelectorAll('[data-slot="input-otp-slot"]').length).toBe(6);
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-slot"]').length).toBe(6);
       for (const partial of ["1", "12", "123", "1234", "12345"]) {
         await act(async () => {
           fireEvent.change(input, { target: { value: partial } });
@@ -461,3 +461,123 @@ describe("SignInPage sizes the keypad to the account (pinDigits, 2026-10-17)", (
     }
   });
 });
+
+describe("SignInPage passcode boxes (PasscodeInput, 2026-10-17)", () => {
+  async function open(person: Roster, verify: () => Response) {
+    const restore = stubFetch({ "/api/auth/profiles": [person], "/api/auth/verify-secret": verify });
+    const onSignedIn = mock(() => {});
+    renderSignIn(onSignedIn);
+    const button = await waitFor(() => {
+      const el = document.body.querySelector("button");
+      if (!el) throw new Error("not yet rendered");
+      return el;
+    });
+    await act(async () => {
+      fireEvent.click(button);
+    });
+    const input = await waitFor(() => {
+      const el = document.body.querySelector("input[data-input-otp]");
+      if (!el) throw new Error("not yet rendered");
+      return el as HTMLInputElement;
+    });
+    return { restore, onSignedIn, input };
+  }
+  const slots = () => document.body.querySelectorAll('[data-slot="passcode-input-slot"]');
+
+  test.each([4, 6])("%i-digit account: exactly that many boxes in one labelled group, masked, first box focused", async (n) => {
+    const { restore, input } = await open(makePerson({ pinDigits: n }), () => Response.json({ success: true }));
+    try {
+      expect(slots().length).toBe(n);
+      expect(document.body.querySelector('[role="group"]')?.getAttribute("aria-label")).toBe(`Enter your ${n}-digit passcode`);
+      expect(document.activeElement).toBe(input);
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "12" } });
+      });
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-dot"]').length).toBe(2);
+      expect(document.body.querySelector('[data-slot="passcode-input-group"]')?.textContent).not.toContain("1");
+    } finally {
+      restore();
+    }
+  });
+
+  test("a pasted full code fills every box and submits exactly once", async () => {
+    let calls = 0;
+    const { restore, onSignedIn, input } = await open(makePerson({ pinDigits: 6 }), () => {
+      calls += 1;
+      return Response.json({ success: true });
+    });
+    try {
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "246810" } });
+      });
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-dot"]').length).toBe(6);
+      await waitFor(() => expect(onSignedIn).toHaveBeenCalledTimes(1));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls).toBe(1);
+    } finally {
+      restore();
+    }
+  });
+
+  test("backspace removes the last digit and does not submit", async () => {
+    let calls = 0;
+    const { restore, input } = await open(makePerson({ pinDigits: 4 }), () => {
+      calls += 1;
+      return Response.json({ success: true });
+    });
+    try {
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "123" } });
+      });
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "12" } });
+      });
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-dot"]').length).toBe(2);
+      await new Promise((r) => setTimeout(r, 50));
+      expect(calls).toBe(0);
+    } finally {
+      restore();
+    }
+  });
+
+  test("a wrong code: red boxes, a plain alert, boxes emptied, focus back in the first box, and the same code can be tried again", async () => {
+    let calls = 0;
+    const { restore, input } = await open(makePerson({ pinDigits: 4 }), () => {
+      calls += 1;
+      return Response.json({ error: "Invalid PIN or password" }, { status: 401 });
+    });
+    try {
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "9999" } });
+      });
+      await waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("That passcode is not right. Try again."));
+      expect(document.body.querySelectorAll('[data-slot="passcode-input-dot"]').length).toBe(0);
+      slots().forEach((s) => expect(s.getAttribute("data-invalid")).toBe("true"));
+      const fresh = document.body.querySelector("input[data-input-otp]") as HTMLInputElement;
+      expect(fresh.value).toBe("");
+      expect(document.activeElement).toBe(fresh);
+      await act(async () => {
+        fireEvent.change(fresh, { target: { value: "9999" } });
+      });
+      await waitFor(() => expect(calls).toBe(2));
+    } finally {
+      restore();
+    }
+  });
+
+  test("a lockout disables the boxes and says how long to wait", async () => {
+    const { restore, input } = await open(makePerson({ pinDigits: 4 }), () =>
+      Response.json({ error: "Too many attempts", retryAfter: 272 }, { status: 429 }),
+    );
+    try {
+      await act(async () => {
+        fireEvent.change(input, { target: { value: "1111" } });
+      });
+      await waitFor(() => expect(document.body.querySelector('[role="alert"]')?.textContent).toContain("Try again in 4:3"));
+      expect((document.body.querySelector("input[data-input-otp]") as HTMLInputElement).disabled).toBe(true);
+    } finally {
+      restore();
+    }
+  });
+});
+

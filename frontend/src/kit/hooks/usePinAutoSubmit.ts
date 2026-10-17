@@ -54,6 +54,8 @@ export function usePinAutoSubmit({ secret, selected, pinDigits, busy, onSubmit }
     if (!selected || busy) return;
     if (lastTriedRef.current === secret) return;
     if (!pinDigits || pinDigits < 1) return;
+    // A cleared or shorter entry is a fresh attempt: the same wrong code typed again must submit again.
+    if (secret.length !== pinDigits) lastTriedRef.current = null;
     if (secret.length !== pinDigits || !/^\d+$/.test(secret)) return;
     lastTriedRef.current = secret;
     onSubmit();

@@ -5,8 +5,10 @@ import { Input } from "@maipai/ui/src/dashboard/components/ui/input";
 import { Label } from "@maipai/ui/src/dashboard/components/ui/label";
 import { Button } from "@maipai/ui/src/dashboard/components/ui/button";
 import { useIdleTimer } from "@/shell/useIdleTimer";
+import { PasscodeInput } from "@maipai/ui/src/ui/passcode-input";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
-import { api, ApiError, type SignedInPerson } from "@/lib/api";
+import { usePasscodeAttempt } from "@/kit/hooks/usePasscodeAttempt";
+import { api, type SignedInPerson } from "@/lib/api";
 
 /** INCOGNITO-07: session lock with PIN re-entry, a standalone capability
  * (the backlog item's own framing - "not Incognito-specific plumbing")
@@ -28,29 +30,32 @@ export function useSessionLocked() {
 export function SessionLockGate({ person, children }: { person: SignedInPerson | null; children: React.ReactNode }) {
   const [locked, setLocked] = useState(false);
   const [secret, setSecret] = useState("");
-  const [error, setError] = useState<string | null>(null);
+  const attemptState = usePasscodeAttempt();
+  const error = attemptState.message;
   const [busy, setBusy] = useState(false);
 
+  const pinDigits = person?.pinDigits ?? null;
   const timeoutMs = (person?.sessionLockTimeoutMinutes ?? 5) * 60 * 1000;
   useIdleTimer(timeoutMs, () => setLocked(true), person?.sessionLockRequired ?? false);
 
   async function handleUnlock(e?: FormEvent) {
     e?.preventDefault();
-    if (!person) return;
+    if (!person || attemptState.locked) return;
     setBusy(true);
-    setError(null);
+    attemptState.clear();
     try {
       await api.verifySecret(person.id, secret);
       setLocked(false);
       setSecret("");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Could not unlock.");
+      setSecret("");
+      attemptState.fail(err, "Could not unlock. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   }
 
-  usePinAutoSubmit({ secret, selected: locked, pinDigits: person?.pinDigits, busy, onSubmit: () => void handleUnlock() });
+  usePinAutoSubmit({ secret, selected: locked, pinDigits, busy: busy || attemptState.locked, onSubmit: () => void handleUnlock() });
 
   return (
     <SessionLockedContext.Provider value={locked}>
@@ -63,26 +68,51 @@ export function SessionLockGate({ person, children }: { person: SignedInPerson |
                 <div className="flex flex-col items-center gap-4">
                   <Avatar name={person.display_name} className="size-16 text-xl" />
                   <h1 className="text-lg font-semibold">{person.display_name}</h1>
-                  <p className="text-sm text-muted-foreground">Locked after inactivity. Enter your PIN to continue.</p>
+                  <p className="text-sm text-muted-foreground">Locked after inactivity. {pinDigits !== null ? `Enter your ${pinDigits}-digit passcode to continue.` : "Enter your PIN or password to continue."}</p>
                   <form onSubmit={handleUnlock} className="flex w-full flex-col gap-4">
-                    <div className="w-full space-y-1.5">
-                      <Label htmlFor="lock-secret" className="text-sm font-normal text-muted-foreground">
-                        PIN or password
-                      </Label>
-                      <Input
-                        id="lock-secret"
-                        type="password"
-                        value={secret}
-                        onChange={(e) => setSecret(e.target.value)}
-                        // eslint-disable-next-line jsx-a11y/no-autofocus
-                        autoFocus
-                        required
-                      />
-                    </div>
-                    {error ? <p className="text-sm text-destructive">{error}</p> : null}
-                    <Button type="submit" size="lg" disabled={busy}>
+                    {pinDigits !== null ? (
+                      <div className="flex flex-col items-center gap-3">
+                        <PasscodeInput
+                          key={attemptState.attempt}
+                          id="lock-secret"
+                          digits={pinDigits}
+                          value={secret}
+                          onChange={setSecret}
+                          invalid={Boolean(error) && secret === ""}
+                          disabled={busy || attemptState.locked}
+                          // The lock screen covers the whole app: the first box takes focus.
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
+                          autoFocus
+                        />
+                      </div>
+                    ) : (
+                      <div className="w-full space-y-1.5">
+                        <Label htmlFor="lock-secret" className="text-sm font-normal text-muted-foreground">
+                          PIN or password
+                        </Label>
+                        <Input
+                          key={attemptState.attempt}
+                          id="lock-secret"
+                          type="password"
+                          value={secret}
+                          disabled={busy || attemptState.locked}
+                          onChange={(e) => setSecret(e.target.value)}
+                          // eslint-disable-next-line jsx-a11y/no-autofocus
+                          autoFocus
+                          required
+                        />
+                      </div>
+                    )}
+                    {error ? (
+                      <p role="alert" className="text-center text-sm text-destructive">
+                        {error}
+                      </p>
+                    ) : null}
+                    {pinDigits === null ? (
+                    <Button type="submit" size="lg" disabled={busy || attemptState.locked}>
                       {busy ? "Unlocking…" : "Unlock"}
                     </Button>
+                    ) : null}
                   </form>
                 </div>
               </CardContent>

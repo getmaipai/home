@@ -491,6 +491,8 @@ export class ApiError extends Error {
     public code?: string,
     /** The routes' own "what to do next" sentence, when they send one. */
     public next?: string,
+    /** Seconds until a lockout (429) ends, when the route sends it. */
+    public retryAfter?: number,
   ) {
     super(message);
   }
@@ -556,7 +558,7 @@ export async function request<T>(path: string, init?: RequestInit & { timeoutMs?
     });
     const body = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined);
+      throw new ApiError(body.error ?? res.statusText, res.status, body.code, typeof body.next === "string" ? body.next : undefined, typeof body.retryAfter === "number" ? body.retryAfter : undefined);
     }
     return body as T;
   } catch (err) {

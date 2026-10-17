@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { api, ApiError, type Roster } from "@/lib/api";
 import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
+import { usePasscodeAttempt } from "@/kit/hooks/usePasscodeAttempt";
 
 /** The profile-tap -> secret-prompt -> verify state machine (a code
  * review, SHELL-08: selected/secret/secretError/tapError/busy plus both
@@ -10,22 +11,25 @@ import { usePinAutoSubmit } from "@/kit/hooks/usePinAutoSubmit";
 export function useProfileSignIn(onSignedIn: () => void) {
   const [selected, setSelected] = useState<Roster | null>(null);
   const [secret, setSecret] = useState("");
-  const [secretError, setSecretError] = useState<string | null>(null);
+  const attemptState = usePasscodeAttempt();
   const [tapError, setTapError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  usePinAutoSubmit({ secret, selected, pinDigits: selected?.pinDigits, busy, onSubmit: () => void handleSecretSubmit() });
+  usePinAutoSubmit({ secret, selected, pinDigits: selected?.pinDigits, busy: busy || attemptState.locked, onSubmit: () => void handleSecretSubmit() });
 
   async function handleSecretSubmit(e?: FormEvent) {
     e?.preventDefault();
     if (!selected) return;
+    if (attemptState.locked) return;
     setBusy(true);
-    setSecretError(null);
+    attemptState.clear();
     try {
       await api.verifySecret(selected.id, secret);
       onSignedIn();
     } catch (e) {
-      setSecretError(e instanceof ApiError ? e.message : "Sign-in failed");
+      // A wrong code empties the boxes so the next try starts clean.
+      setSecret("");
+      attemptState.fail(e, "Sign-in failed. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
@@ -55,9 +59,9 @@ export function useProfileSignIn(onSignedIn: () => void) {
 
   function backToPicker() {
     setSelected(null);
-    setSecretError(null);
+    attemptState.reset();
     setSecret("");
   }
 
-  return { selected, secret, setSecret, secretError, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker };
+  return { selected, secret, setSecret, secretError: attemptState.message, locked: attemptState.locked, attempt: attemptState.attempt, tapError, busy, handleSecretSubmit, handleProfileTap, backToPicker };
 }
