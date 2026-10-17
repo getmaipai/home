@@ -10,7 +10,7 @@
 // continuation handling does, before `safety`, per the state record).
 import { loadManifestOnly } from "@/lib/plugins";
 import { speakerNamedAny } from "@/lib/subjects";
-import { tokenize, isBarePronoun } from "@/lib/text";
+import { tokenize, wordsOf, isBarePronoun } from "@/lib/text";
 import { START_PROJECT_TOOL_ID, projectParamsOf, projectTypeForArgs, validateProjectParams, type StartProjectArgs } from "@/lib/projects/tool";
 import { sentenceInitial } from "@/lib/projects/projectTypes";
 import type { Node, ActionProposal, PolicyDecision, ToolCall, TurnState } from "../contract";
@@ -152,9 +152,6 @@ function withinOneEdit(a: string, b: string): boolean {
   const restA = a.slice(a.length === b.length ? i + 1 : a.length > b.length ? i + 1 : i);
   const restB = b.slice(a.length === b.length ? i + 1 : a.length > b.length ? i : i + 1);
   return restA === restB;
-}
-function wordsOf(text: string): string[] {
-  return text.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
 }
 function termGrounded(term: string, sourceTerms: ReadonlySet<string>, sourceSquashed: string, queryTerms: readonly string[]): boolean {
   if (sourceTerms.has(term)) return true;

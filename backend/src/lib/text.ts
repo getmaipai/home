@@ -11,6 +11,11 @@ const STOPWORDS = new Set([
   "what", "who", "when", "where", "how", "with", "about",
 ]);
 
+/** Every word of the text in order, lowercased, stopwords kept (tokenize() minus its filters). */
+export function wordsOf(text: string): string[] {
+  return text.toLowerCase().split(/[^a-z0-9']+/).filter((w) => w.length > 0);
+}
+
 export function tokenize(text: string): Set<string> {
   return new Set(
     text
