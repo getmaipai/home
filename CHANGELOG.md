@@ -7,6 +7,14 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-17
+
+The installer now works on a Mac that has Bun but no Node, and Home starts without Deno.
+
+### Fixed
+- Installer: Bun is put on the path as `node` while dependencies install, so packages with install scripts (ssh2) build on a Mac without Node. The background service units carry the same path.
+- Home no longer crash-loops when Deno is missing. The smoke checks that need Deno are skipped and the Deno-backed packages stay off until Deno is installed.
+
 ## [0.2.2] - 2026-10-17
 
 Computers with more than 24 GB of memory get a stronger chat model, and a fresh install starts with every built-in package on.
