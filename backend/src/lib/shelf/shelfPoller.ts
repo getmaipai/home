@@ -12,9 +12,12 @@
 //   - every address it touches (the feed, each redirect hop, each article
 //     link) passes the SSRF guard first. It never fetches an article page.
 // Request budget: at most MAX_FEEDS_PER_TICK feed requests per 15-minute
-// tick, so with the default 30-minute interval and the 2 bundled lists
-// (about 10 feeds) that is roughly 20 requests an hour, fewer when servers
-// answer 304.
+// tick, and one request per host at a time, at least a minute apart (a host
+// with several topic feeds is asked for them in turn, other hosts in parallel).
+// With the default 30-minute interval each feed is asked for about once per
+// 30 minutes, so the 2 bundled lists (about 45 feeds by topic) cost roughly 90
+// requests an hour, fewer when servers answer 304. A fresh install fills every
+// topic within two ticks.
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { parseFeed } from "feedsmith";
 import { feedImageAddress } from "./imageAddress";
@@ -34,7 +37,10 @@ import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS, queuePodc
 
 import { HOME_USER_AGENT } from "@/lib/outbound";
 export const MAX_BACKOFF_S = 86_400;
-export const MAX_FEEDS_PER_TICK = 10;
+export const MAX_FEEDS_PER_TICK = 24;
+/** Feeds one host may be asked for in one tick: they go one at a time, a minute apart (the host bucket), so a tick stays under its 15 minutes. */
+export const MAX_FEEDS_PER_HOST_PER_TICK = 8;
+const HOST_SPACING_MS = 61_000;
 const MAX_BYTES = 2 * 1024 * 1024;
 /** A podcast feed lists every episode ever made, so its cap is higher than a news feed's (MEDIA-PODCASTS-01). */
 const MAX_PODCAST_FEED_BYTES = 8 * 1024 * 1024;
@@ -47,6 +53,8 @@ const HOST_RATE = { capacity: 1, refillPerSecond: 1 / 60 };
 
 export interface PollDeps {
   fetch?: typeof fetch;
+  /** Waits between two feeds on one host; tests pass one that advances their clock. */
+  sleep?: (ms: number) => Promise<void>;
   dnsLookup?: DnsLookup;
   now?: () => number;
   store?: ShelfStore | null;
@@ -393,18 +401,27 @@ export async function pollDueFeeds(deps: PollDeps = {}, purposes: ReadonlyArray<
       .sort((a, b) => Date.parse(a.next_poll_at) - Date.parse(b.next_poll_at))
       .slice(0, MAX_FEEDS_PER_TICK);
     let polled = 0;
-    // One request per host per tick: the host bucket allows one a minute, so a second
-    // feed on the same host would only be turned away; it waits for the next tick.
-    const seenHosts = new Set<string>();
+    let skippedBusy = false;
+    // One request per host at a time and at least a minute apart (the host bucket): a host's feeds go in turn,
+    // spaced out, while different hosts go in parallel. A host's feeds past the per-tick limit wait for the next tick.
+    const byHost = new Map<string, FeedRecord[]>();
     for (const feed of due) {
       const host = new URL(feed.url).hostname.toLowerCase();
-      if (seenHosts.has(host)) continue;
-      seenHosts.add(host);
-      if (busy()) { bumpShelfCounter("skipped_busy"); return { polled, skippedBusy: true }; }
-      await pollFeed(feed, deps);
-      polled++;
+      const queue = byHost.get(host) ?? [];
+      if (queue.length < MAX_FEEDS_PER_HOST_PER_TICK) queue.push(feed);
+      byHost.set(host, queue);
     }
-    return { polled, skippedBusy: false };
+    const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)));
+    await Promise.all([...byHost.values()].map(async (queue) => {
+      for (const [index, feed] of queue.entries()) {
+        if (index > 0) await sleep(HOST_SPACING_MS);
+        if (skippedBusy) return;
+        if (busy()) { bumpShelfCounter("skipped_busy"); skippedBusy = true; return; }
+        await pollFeed(feed, deps);
+        polled++;
+      }
+    }));
+    return { polled, skippedBusy };
   } finally {
     running = false;
   }

@@ -7,6 +7,12 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Added News topic feeds (NPR, BBC, The Guardian, CBC News, Sports Illustrated, Popular Science, Fast Company, Inc., Variety, and TIME for Kids for children). Each feed carries the topics it covers, so every topic on the Following page now has stories. Teens and adults follow every topic until they unfollow one, and each household can change the starting topics for each user type in News settings. Local has no feed of its own; add your town's feed under Extra news feeds.
+
+- Changed how the shelf asks one publisher for several feeds: one at a time, a minute apart, in the same 15-minute check, so a new install fills every topic within about 30 minutes instead of hours.
+
+- Changed the News reader to open with the publisher's name in a banner and a centered article column.
+
 - Added private Library thumbnails with access-checked revalidation, a disposable WebP cache, stored video posters and song covers, and admin preview usage and clearing endpoints.
 
 - Added the backend Library listing and summary with cursor paging, filters, derived names, generation thumbnails, folded versions, sharing summaries, and audience checks. Storage and Library now classify PDFs and office files as documents.

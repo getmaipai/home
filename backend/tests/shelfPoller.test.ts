@@ -8,7 +8,7 @@ import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { canonicalUrl } from "@/lib/shelf/canonicalUrl";
 import { createFeed, getFeed, listFeeds, updateFeed } from "@/lib/shelf/feedStore";
-import { backoffSeconds, parseRetryAfter, pollDueFeeds, pollFeed, MAX_FEEDS_PER_TICK } from "@/lib/shelf/shelfPoller";
+import { backoffSeconds, parseRetryAfter, pollDueFeeds, pollFeed, MAX_FEEDS_PER_HOST_PER_TICK, MAX_FEEDS_PER_TICK } from "@/lib/shelf/shelfPoller";
 import { HOME_USER_AGENT } from "@/lib/outbound";
 import { openShelfStore, type ShelfStore } from "@/lib/shelf/shelfStore";
 import { __resetShelfCountersForTests, shelfCounters } from "@/lib/shelf/shelfCounters";
@@ -256,6 +256,36 @@ describe("pollDueFeeds", () => {
     expect(s.calls.map((c) => c.url)).not.toContain(first.url);
   });
 
+  test("a host's feeds are asked for in turn a minute apart, in one tick, while other hosts go in parallel", async () => {
+    for (let i = 0; i < 3; i++) mkFeed(`https://same.example.com/topic${i}.xml`);
+    mkFeed("https://other.example.com/feed.xml");
+    let clock = NOW;
+    const slept: number[] = [];
+    const s = stub(() => new Response(rss([])));
+    const out = await pollDueFeeds({ fetch: s.fetch, dnsLookup: publicDns, now: () => clock, store, busy: () => false, sleep: async (ms) => { slept.push(ms); clock += ms; } });
+    expect(out).toEqual({ polled: 4, skippedBusy: false });
+    expect(s.calls).toHaveLength(4);
+    expect(slept).toHaveLength(2);
+    expect(slept.every((ms) => ms >= 60_000)).toBe(true);
+  });
+
+  test("a host asks for no more than the per-host limit in one tick; the rest wait for the next tick", async () => {
+    for (let i = 0; i < MAX_FEEDS_PER_HOST_PER_TICK + 2; i++) mkFeed(`https://same.example.com/topic${i}.xml`);
+    let clock = NOW;
+    const s = stub(() => new Response(rss([])));
+    const out = await pollDueFeeds({ fetch: s.fetch, dnsLookup: publicDns, now: () => clock, store, busy: () => false, sleep: async (ms) => { clock += ms; } });
+    expect(out.polled).toBe(MAX_FEEDS_PER_HOST_PER_TICK);
+  });
+
+  test("a person starting to use the house during the wait stops the rest of a host's feeds", async () => {
+    for (let i = 0; i < 3; i++) mkFeed(`https://same.example.com/topic${i}.xml`);
+    let clock = NOW;
+    let busyNow = false;
+    const s = stub(() => new Response(rss([])));
+    const out = await pollDueFeeds({ fetch: s.fetch, dnsLookup: publicDns, now: () => clock, store, busy: () => busyNow, sleep: async (ms) => { clock += ms; busyNow = true; } });
+    expect(out).toEqual({ polled: 1, skippedBusy: true });
+  });
+
   test("a disabled feed is not polled", async () => {
     const feed = mkFeed();
     updateFeed(feed.id, { enabled: false }, nowIso);
@@ -308,12 +338,14 @@ describe("review fixes (KS-05a)", () => {
     expect(store.list([a.id], ["child"], 10)).toHaveLength(0);
     expect(store.list([a.id], ["adult"], 10)).toHaveLength(1);
   });
-  test("only one feed per host is polled in a tick", async () => {
+  test("a second feed on a host is never requested sooner than the host bucket allows", async () => {
     mkFeed("https://news.example.com/a.xml");
-    mkFeed("https://news.example.com/b.xml");
+    const second = mkFeed("https://news.example.com/b.xml");
     const s = stub(() => new Response(rss([])));
-    const out = await pollDueFeeds({ fetch: s.fetch, dnsLookup: publicDns, now: () => NOW, store, busy: () => false });
-    expect(out.polled).toBe(1);
+    // The wait does not move the clock, so the bucket has not refilled: the second request is turned away before it is sent.
+    await pollDueFeeds({ fetch: s.fetch, dnsLookup: publicDns, now: () => NOW, store, busy: () => false, sleep: async () => {} });
+    expect(s.calls).toHaveLength(1);
+    expect(Date.parse(getFeed(second.id)!.next_poll_at)).toBe(NOW + 60_000);
   });
   test("a feed that declares latin-1 is decoded as latin-1", async () => {
     const feed = mkFeed();
