@@ -72,10 +72,11 @@ export function musicJobIdsByTurn(actor: { id: string }, turnIds: readonly strin
 }
 // Finished Library songs and the metadata their player reads outlive the chat.
 // Job turn/conversation ids are provenance without foreign keys, so they can stay.
-function deleteUnlessKept(job: MusicJob): void {
-  // LIBRARY-REVAMP-02: a finished song outlives its chat whether it is pinned or follows the Library's storage rules.
+function deleteUnlessKept(job: MusicJob, fileIsLeaving = false): void {
+  // LIBRARY-REVAMP-02: a finished song outlives its chat whether it is pinned or follows the Library's storage rules. When the
+  // file itself is being removed (storage rules), only a pinned file keeps its job.
   const file = job.fileId ? db.select().from(attachments).where(eq(attachments.id, job.fileId)).get() : undefined;
-  if (file && (file.retention === "kept" || isGeneratedFile(file))) return;
+  if (file && (file.retention === "kept" || (!fileIsLeaving && isGeneratedFile(file)))) return;
   dropMusicJob(job);
   db.delete(musicJobs).where(eq(musicJobs.id, job.id)).run();
 }
@@ -107,5 +108,5 @@ export function deleteMusicJobsForFiles(fileIds: readonly string[]): void {
   if (!fileIds.length) return;
   const ids = new Set(fileIds);
   const jobs = [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(inArray(musicJobs.fileId, [...fileIds])).all().map(fromRow)];
-  for (const job of jobs) if (job.fileId && ids.has(job.fileId)) deleteUnlessKept(job);
+  for (const job of jobs) if (job.fileId && ids.has(job.fileId)) deleteUnlessKept(job, true);
 }
