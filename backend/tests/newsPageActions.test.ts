@@ -33,3 +33,16 @@ describe("the bundled News pages send a body with each call action", () => {
     });
   }
 });
+
+describe("a shelf's channel button has somewhere to go", () => {
+  for (const file of ["index.json", "mix.json"]) {
+    test(`${file}: open_channel navigates to the channel page with the channel's kind and key`, () => {
+      const page = JSON.parse(readFileSync(join(PAGES, file), "utf-8")) as unknown;
+      const maps = actionMaps(page).filter((actions) => actions.open !== undefined);
+      expect(maps.length).toBeGreaterThan(0);
+      for (const actions of maps) {
+        expect(actions.open_channel).toEqual({ navigate: { to: "/apps/news/channel", state: { kind: "{channel_kind}", key: "{channel_key}" } } });
+      }
+    });
+  }
+});

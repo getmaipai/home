@@ -39,6 +39,15 @@
               "on": "{on}"
             }
           }
+        },
+        "open_channel": {
+          "navigate": {
+            "to": "/apps/news/channel",
+            "state": {
+              "kind": "{channel_kind}",
+              "key": "{channel_key}"
+            }
+          }
         }
       },
       "empty_state": {

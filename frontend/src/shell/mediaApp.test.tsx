@@ -201,3 +201,12 @@ describe("media app helpers", () => {
     ]);
   });
 });
+
+describe("an app's first tab for the apps that are not media apps", () => {
+  test("News calls it Today and every other package app keeps Overview", async () => {
+    const { appHomeLabel } = await import("@/shell/mediaApps");
+    expect(appHomeLabel("news", false)).toBe("Today");
+    expect(appHomeLabel("weather", false)).toBe("Overview");
+    expect(appHomeLabel("music", true)).toBe("Listen now");
+  });
+});

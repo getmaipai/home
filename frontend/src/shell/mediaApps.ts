@@ -41,6 +41,13 @@ export function playPageOf(app: string): string | null {
 }
 
 /** The first tab of a media app: "Home" for Videos and Shows, "Listen now" for the audio apps (Apple's and Spotify's word), "Reading now" for Books. */
+/** The first tab of an app's own toolbar: a media app names it for what it does, News calls it Today (its index page is the day's
+ * stories), and any other package app keeps the generic "Overview". */
+export function appHomeLabel(app: string, media: boolean): string {
+  if (media) return homeLabelOf(app);
+  return app === "news" ? "Today" : "Overview";
+}
+
 export function homeLabelOf(app: string): string {
   if (app === "podcasts" || app === "music") return "Listen now";
   if (app === "books") return "Reading now";
