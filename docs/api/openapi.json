@@ -41563,6 +41563,109 @@
         }
       }
     },
+    "/api/library/upload": {
+      "post": {
+        "tags": [
+          "Library"
+        ],
+        "summary": "Add one file to my Library (one file per request)",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "nullable": true,
+                    "description": "The file. Pictures, videos, songs, PDF, office documents and plain text, up to 500 MB."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Added and kept until deleted. `duplicate` is true when the same file was already in the Library.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "kind": {
+                      "type": "string"
+                    },
+                    "media_type": {
+                      "type": "string"
+                    },
+                    "size_bytes": {
+                      "type": "number"
+                    },
+                    "duplicate": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "kind",
+                    "media_type",
+                    "size_bytes",
+                    "duplicate"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not a supported file, empty, or an unreadable picture",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Storage is full, or a child (ask a grown-up)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Larger than 500 MB",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/attachments/upload": {
       "post": {
         "tags": [

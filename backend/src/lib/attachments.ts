@@ -7,7 +7,7 @@ import { deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPic
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, normalize, relative, resolve } from "node:path";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 // Renamed from the `File` export to `FileRecordSchema` locally: `File` is a
 // Bun/Fetch global (the Web API type for a multipart upload), so importing
 // the spec's zod object under that bare name would shadow it everywhere in
@@ -161,7 +161,17 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
     )
     .get();
   if (!context) return { ok: false, status: 404, error: "conversation turn not found" };
+  return storeFile(actor, input);
+}
 
+export interface StoreFileInput extends Omit<CreateAttachmentInput, "conversationId" | "turnId"> {
+  conversationId: string | null;
+  turnId: string | null;
+}
+
+/** The one write path for a file record (chat upload, generated output, Library upload). Callers check their own context
+ * first: createAttachment above proves the turn is the actor's; lib/libraryUpload.ts has no chat at all. */
+export function storeFile(actor: PersonRow, input: StoreFileInput): AttachmentOpResult<FileRecord> {
   const mediaType = input.mediaType.trim().toLowerCase();
   const parsedMediaType = FileRecordSchema.shape.media_type.safeParse(mediaType);
   if (!parsedMediaType.success) return { ok: false, status: 400, error: "invalid attachment media type" };
@@ -178,7 +188,7 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   // vanish with the first.
   const mine = input.deduplicate === false
     ? undefined
-    : db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"), eq(attachments.ownerPersonId, actor.id))).get();
+    : db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"), eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).get();
   if (mine) return { ok: true, value: toRecord(mine) };
 
   // STORE-CAP-01: refused before anything is written to disk, in the person's own words. Bytes this person already

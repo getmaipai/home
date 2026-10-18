@@ -1,7 +1,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import { bodyLimit } from "hono/body-limit";
 import { requireAuth } from "@/middleware/auth";
 import { listLibrary, librarySummary, LibraryCursorError } from "@/lib/library";
+import { uploadToLibrary, MAX_LIBRARY_UPLOAD_BYTES } from "@/lib/libraryUpload";
 
 export const libraryRoutes = apiRouter();
 const kind = z.enum(["image", "video", "audio", "document", "story", "file"]);
@@ -30,3 +32,20 @@ libraryRoutes.openapi(createRoute({ method: "get", path: "/summary", tags: ["Lib
     200: { description: "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash counts the caller's own deleted files; expiring stays zero until the removal preview is wired.", content: { "application/json": { schema: totals.extend({ per_kind: z.record(z.string(),totals), trash: totals, expiring: totals }) } } },
     ...errorResponses({ 401: "Not signed in" }),
   } }), c => c.json(librarySummary(c.get("person"),c.req.valid("query")),200));
+
+libraryRoutes.openapi(createRoute({ method: "post", path: "/upload", tags: ["Library"], summary: "Add one file to my Library (one file per request)",
+  middleware: [requireAuth, bodyLimit({ maxSize: MAX_LIBRARY_UPLOAD_BYTES + 64 * 1024, onError: (c) => c.json({ error: "That file is bigger than 500 MB. Choose a smaller file." }, 413) })] as const,
+  request: { body: { content: { "multipart/form-data": { schema: z.object({ file: z.any().describe("The file. Pictures, videos, songs, PDF, office documents and plain text, up to 500 MB.") }) } } } },
+  responses: {
+    201: { description: "Added and kept until deleted. `duplicate` is true when the same file was already in the Library.", content: { "application/json": { schema: z.object({ id: z.string(), name: z.string(), kind: z.string(), media_type: z.string(), size_bytes: z.number(), duplicate: z.boolean() }) } } },
+    ...errorResponses({ 400: "Not a supported file, empty, or an unreadable picture", 401: "Not signed in", 403: "Storage is full, or a child (ask a grown-up)", 413: "Larger than 500 MB" }),
+  } }), async c => {
+  const form = await c.req.parseBody();
+  const file = form.file;
+  if (!(file instanceof File)) return c.json({ error: "Choose a file to add." }, 400);
+  // Refuse a declared size over the limit before the bytes are read into memory.
+  if (file.size > MAX_LIBRARY_UPLOAD_BYTES) return c.json({ error: "That file is bigger than 500 MB. Choose a smaller file." }, 413);
+  const result = await uploadToLibrary(c.get("person"), { name: file.name, bytes: new Uint8Array(await file.arrayBuffer()) });
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value, 201);
+});
