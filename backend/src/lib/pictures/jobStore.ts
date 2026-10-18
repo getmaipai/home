@@ -45,6 +45,7 @@ export interface PictureJob {
   personId: string;
   conversationId: string | null;
   turnId: string | null;
+  purpose?: "cover" | null;
   kind: PictureJobKind;
   state: PictureJobState;
   stackJob: string | null;
@@ -95,7 +96,7 @@ const TEMP_MAX_AGE_MS = 2 * 60 * 60 * 1000;
 type Row = typeof pictureJobs.$inferSelect;
 function fromRow(row: Row): PictureJob {
   return {
-    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
+    id: row.id, personId: row.personId, conversationId: row.conversationId, turnId: row.turnId, purpose: row.purpose as "cover" | null, kind: row.kind as PictureJobKind, state: row.state as PictureJobState,
     stackJob: row.stackJob, percent: row.percent, phase: row.phase, position: row.position, prompt: row.prompt, request: JSON.parse(row.request) as PictureRequest,
     error: row.error, files: JSON.parse(row.files) as PictureFile[], temporary: false, createdAt: row.createdAt, updatedAt: row.updatedAt,
   };
@@ -119,7 +120,7 @@ export function saveJob(job: PictureJob): void {
   lastSaved.set(job.id, sig);
   job.updatedAt = new Date().toISOString();
   const values = {
-    personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
+    personId: job.personId, conversationId: job.conversationId, turnId: job.turnId, purpose: job.purpose ?? null, kind: job.kind, state: job.state, stackJob: job.stackJob, percent: job.percent,
     phase: job.phase, position: job.position, prompt: job.prompt, request: JSON.stringify(job.request), error: job.error, files: JSON.stringify(job.files), updatedAt: job.updatedAt, hlc: nextHlc(),
   };
   db.insert(pictureJobs).values({ id: job.id, createdAt: job.createdAt, ...values }).onConflictDoUpdate({ target: pictureJobs.id, set: values }).run();
@@ -147,7 +148,7 @@ export function pictureJobsForTurn(actor: PersonRow, turnId: string): PictureJob
   const jobs = new Map<string, PictureJob>();
   for (const job of [...memory.values(), ...live.values()]) if (job.turnId === turnId && job.personId === actor.id) jobs.set(job.id, job);
   for (const row of db.select().from(pictureJobs).where(and(eq(pictureJobs.turnId, turnId), eq(pictureJobs.personId, actor.id))).all()) if (!jobs.has(row.id)) jobs.set(row.id, fromRow(row));
-  return [...jobs.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  return [...jobs.values()].filter((job) => job.purpose !== "cover").sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 /** The first job id of each of these turns, for the history list (one query). */
@@ -156,9 +157,9 @@ export function pictureJobIdsByTurn(actor: PersonRow, turnIds: readonly string[]
   if (turnIds.length === 0) return out;
   const firstAt = new Map<string, string>();
   const note = (turnId: string, id: string, at: string) => { const seen = firstAt.get(turnId); if (seen === undefined || at < seen) { firstAt.set(turnId, at); out.set(turnId, id); } };
-  for (const job of memory.values()) if (job.turnId && turnIds.includes(job.turnId) && job.personId === actor.id) note(job.turnId, job.id, job.createdAt);
-  const rows = db.select({ id: pictureJobs.id, turnId: pictureJobs.turnId, createdAt: pictureJobs.createdAt }).from(pictureJobs).where(and(eq(pictureJobs.personId, actor.id), inArray(pictureJobs.turnId, [...turnIds]))).all();
-  for (const row of rows) if (row.turnId) note(row.turnId, row.id, row.createdAt);
+  for (const job of memory.values()) if (job.purpose !== "cover" && job.turnId && turnIds.includes(job.turnId) && job.personId === actor.id) note(job.turnId, job.id, job.createdAt);
+  const rows = db.select({ purpose: pictureJobs.purpose, id: pictureJobs.id, turnId: pictureJobs.turnId, createdAt: pictureJobs.createdAt }).from(pictureJobs).where(and(eq(pictureJobs.personId, actor.id), inArray(pictureJobs.turnId, [...turnIds]))).all();
+  for (const row of rows) if (row.purpose !== "cover" && row.turnId) note(row.turnId, row.id, row.createdAt);
   return out;
 }
 

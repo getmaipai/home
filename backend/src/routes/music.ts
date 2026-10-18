@@ -104,12 +104,13 @@ musicRoutes.openapi(getRoute, (c) => {
   return c.json(musicCardView(actor, job), 200);
 });
 const coverRoute = createRoute({ method: "post", path: "/jobs/{id}/cover", tags: ["Music"], summary: "Make a new cover for the shown song", middleware,
-  request: { params }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals } });
+  request: { params }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals, ...errorResponses({ 409: "The song or its cover is still being made" }) } });
 musicRoutes.openapi(coverRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
   if (!root) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
   const current = musicVersions(actor, root).sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0] ?? root;
-  await startSongCover(actor, current);
+  if (current.state !== "done") return c.json({ error: "The song is still being made. Try New cover when it is ready." }, 409) as never;
+  if (await startSongCover(actor, current) === "busy") return c.json({ error: "A cover is already being made. It will show in a moment." }, 409) as never;
   return c.json(musicCardView(actor, getMusicJobFor(actor, root.id) ?? root), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },

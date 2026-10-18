@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { people } from "@/db/schema";
+import { attachments, people } from "@/db/schema";
 import { resetDb } from "./reset-db";
 import { TestClient } from "./client";
 import { installFakeMusicStack, musicState, waitForMusic, LYRICS } from "./musicFixture";
@@ -9,6 +9,9 @@ import { installFakeImageStack, until, testPng } from "./pictureFixture";
 import { runGenerateMusic } from "@/lib/music/tool";
 import { musicForOutcomes } from "@/lib/composer";
 import { getMusicJobFor } from "@/lib/music/jobs";
+import { listConversationTurns } from "@/lib/conversationHistory";
+import { pictureJobsForTurn, getPictureJob } from "@/lib/pictures/jobs";
+import { saveMusicJob } from "@/lib/music/store";
 import { coverPromptFor, startSongCover } from "@/lib/music/cover";
 import { listVersions, loadSource, saveVersion } from "@/lib/imageEdit";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -46,6 +49,42 @@ describe("song covers", () => {
     const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_url: string; cover_versions: { id: string; url: string }[] };
     expect(card.cover_url).toContain(done.coverFileId!); expect(card.cover_versions).toEqual([{ id: done.coverFileId!, url: card.cover_url }]);
     expect((await client.get(card.cover_url)).status).toBe(200);
+  });
+  test("a cover stays a conversation attachment without a chat picture card", async () => {
+    const { actor } = await owner(); const job = await song(actor); const done = await covered(actor, job.id);
+    const history = listConversationTurns(actor, job.conversationId!);
+    expect(history.ok).toBe(true);
+    if (!history.ok) throw new Error("history failed");
+    const row = history.value.find((row) => row.id === job.turnId);
+    expect(row).toBeDefined();
+    expect(row?.picture).toBeUndefined();
+    expect(pictureJobsForTurn(actor, job.turnId!)).toEqual([]);
+    expect(getPictureJob(actor, done.coverJobId!)).toMatchObject({ purpose: "cover" });
+    expect(db.select().from(attachments).where(eq(attachments.id, done.coverFileId!)).get()).toMatchObject({ conversationId: job.conversationId });
+  });
+  test("a stored real-person flag withholds the cover", async () => {
+    const { actor } = await owner(); setHouseholdSettingValue("generation.adults", false);
+    const job = await song(actor); setHouseholdSettingValue("generation.adults", true);
+    job.request = { ...job.request, imitates_real_voice: true };
+    saveMusicJob(job);
+    await startSongCover(actor, getMusicJobFor(actor, job.id)!);
+    expect(pictures.submitted).toHaveLength(0);
+    expect(getMusicJobFor(actor, job.id)?.coverJobId).toBeNull();
+  });
+  test("New cover explains when the song is still being made", async () => {
+    const { actor, client } = await owner(); music.pollsToFinish = 1000;
+    const outcome = await runGenerateMusic({ state: musicState(actor), args: { description: "folk", lyrics: LYRICS }, callId: "g", spoken: false });
+    const response = await client.post(`/api/music/jobs/${musicForOutcomes([outcome])!.id}/cover`, {});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "The song is still being made. Try New cover when it is ready." });
+  });
+  test("New cover explains when a cover is already being made", async () => {
+    const { actor, client } = await owner(); pictures.pollsToFinish = 1000;
+    const job = await song(actor); await until(() => Boolean(getMusicJobFor(actor, job.id)?.coverJobId));
+    const response = await client.post(`/api/music/jobs/${job.id}/cover`, {});
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ error: "A cover is already being made. It will show in a moment." });
+    expect(pictures.submitted).toHaveLength(1);
   });
   test("New cover changes the seed, keeps the version chain and includes editor versions", async () => {
     const { actor, client } = await owner(); const job = await song(actor); const first = await covered(actor, job.id);

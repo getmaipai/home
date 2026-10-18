@@ -12,18 +12,21 @@ import { installFakeMusicStack, waitForMusic } from "./musicFixture";
 import { __setMusicStatusForTests, readyMusicStatusForTests, settleMusicStatus } from "@/lib/music/ready";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
+import { installFakeImageStack, until } from "./pictureFixture";
+import { listConversationTurns } from "@/lib/conversationHistory";
 import { getMusicJobFor } from "@/lib/music/jobs";
 import { householdAllowsMusic } from "@/lib/music/policy";
 import { MEDIA_NOT_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 let people: ReturnType<typeof createBenchPeople>;
+let pictures: ReturnType<typeof installFakeImageStack>;
 let fake: ReturnType<typeof installFakeMusicStack>;
 beforeEach(() => {
   resetDb(); useDefaultScriptedStack(); __resetThrottleForTests(); __resetLlmSupervisorForTests(); __resetRateLimiterForTests();
-  people = createBenchPeople(); fake = installFakeMusicStack(); setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
+  people = createBenchPeople(); fake = installFakeMusicStack(); pictures = installFakeImageStack(); setHouseholdSettingValue("chat.model_id", "qwen3-8b-instruct-q4-k-m");
 });
-afterEach(() => { fake.restore(); __resetLlmSupervisorForTests(); __resetPortOwnershipForTests(); delete process.env.MAIPAI_LLAMA_SERVER_URL; });
+afterEach(() => { fake.restore(); pictures.restore(); __resetLlmSupervisorForTests(); __resetPortOwnershipForTests(); delete process.env.MAIPAI_LLAMA_SERVER_URL; });
 const isPhrasing = (request: ChatCompletionRequest) => request.messages.some((m) => m.role === "tool");
 const names = (request?: ChatCompletionRequest) => (request?.tools ?? []).map((t) => (t as { function: { name: string } }).function.name);
 test("an adult's first turn earns generation; a made-here song earns editing on the next turn", async () => {
@@ -35,6 +38,14 @@ test("an adult's first turn earns generation; a made-here song earns editing on 
     expect(names(seen.find((r) => (r.tools?.length ?? 0) > 0))).not.toContain("edit_music");
     const id = result.value.music?.id; expect(id).toBeDefined();
     await waitForMusic(() => getMusicJobFor(people.owner, id!)?.state === "done");
+    await until(() => Boolean(getMusicJobFor(people.owner, id!)?.coverFileId));
+    expect(result.value.picture).toBeUndefined();
+    const history = listConversationTurns(people.owner, result.value.conversation_id);
+    expect(history.ok).toBe(true);
+    if (!history.ok) throw new Error("history failed");
+    const row = history.value.find((row) => row.music?.id === id);
+    expect(row).toBeDefined();
+    expect(row?.picture).toBeUndefined();
     await withStub({ calls: () => undefined, reply: () => "Hello." }, async (nextSeen) => {
       await runTurnNext(people.owner, "chat", "hello", { conversationId: result.value.conversation_id });
       expect(names(nextSeen.find((r) => (r.tools?.length ?? 0) > 0))).toContain("edit_music");

@@ -180,7 +180,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     const value = parsed.data;
     const lyrics = value.instrumental ? "[Instrumental]" : value.lyrics;
     const length: SongLength = value.length ?? (value.seconds !== undefined && value.seconds >= 150 ? "full" : householdSongLength());
-    request = { description: value.description, lyrics, title: value.title,
+    request = { imitates_real_voice: value.imitates_real_voice, description: value.description, lyrics, title: value.title,
       instrumental: value.instrumental ?? false, seconds: songSecondsFor(length, value.seconds, value.instrumental ? undefined : value.lyrics, engine!.limits.max_seconds),
       bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: newSeed(), length };
     sizeSong(request, value.lyrics, engine!.limits, value.seconds);

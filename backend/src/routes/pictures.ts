@@ -4,9 +4,9 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
-import { speakerAgeBand } from "@/lib/ageBand";
+import { routeAudience } from "@/lib/pictures/audience";
 import { promptRefusalLineFor } from "@/lib/pictures/ageCheck";
-import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt, type PictureAudience } from "@/lib/pictures/policy";
+import { adapterAudiencesFor, adultAdaptersAllowed, pictureDenial, PICTURE_DENIAL_LINE, PROMPT_REFUSAL_LINE, refusePrompt } from "@/lib/pictures/policy";
 import { cancelPictureJob, fileUrl, getPictureJob, pictureJobsForTurn, plainFailure, startPictureJob, type PictureJob } from "@/lib/pictures/jobs";
 import { adaptersFor, withTriggerWords } from "@/lib/pictures/adapters";
 import { pictureEngineStatus, pictureEngineReady, pictureNotReadyReason } from "@/lib/pictures/ready";
@@ -46,10 +46,6 @@ const JobSchema = z.object({
   stop_id: z.string().describe("The id to POST to /jobs/{id}/cancel to stop what is being made now."),
 });
 
-/** The audience of a route call: the signed-in person on the web chat screen. */
-export function routeAudience(actor: PersonRow): PictureAudience {
-  return { actor, band: speakerAgeBand(actor, new Date()), surface: "chat", surfaceClass: "written", spoken: false };
-}
 
 function phaseLabel(job: PictureJob): string {
   if (job.state === "queued") return job.position && job.position > 1 ? `Waiting in line, number ${job.position}` : "Waiting for the picture engine";

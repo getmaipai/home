@@ -38,6 +38,7 @@ export interface StartPictureInput {
   conversationId: string | null;
   turnId: string | null;
   temporary: boolean;
+  purpose?: "cover";
   kind: PictureJobKind;
   prompt: string;
   body: Omit<GenerationBody, "timeout_ms">;
@@ -65,7 +66,7 @@ export async function startPictureJob(input: StartPictureInput): Promise<Picture
     const submitted = input.local ? null : input.submit ? await input.submit() : await submitGeneration({ ...input.body, timeout_ms: 1 });
     const now = new Date().toISOString();
     const job: PictureJob = {
-      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, kind: input.kind, state: input.local ? "running" : "queued", stackJob: submitted?.job ?? null,
+      id: newPictureJobId(), personId: input.actor.id, conversationId: input.conversationId, turnId: input.turnId, purpose: input.purpose ?? null, kind: input.kind, state: input.local ? "running" : "queued", stackJob: submitted?.job ?? null,
       percent: 0, phase: input.local ? "starting" : "queued", position: null, prompt: input.prompt,
       request: { size: input.body.size ?? "1024x1024", n: input.body.n ?? 1, seed: input.body.seed ?? null, loras: (input.body.loras ?? []).map((l) => l.id), source_file_id: input.sourceFileId ?? input.edit?.sourceId ?? null, audience: input.body.audience, quality: qualityOfModel(input.body.model) ?? "quick", ...(input.likeness ? { likeness: input.likeness } : {}), ...(input.edit ? { edit: { source_id: input.edit.sourceId, label: input.edit.label, method: input.edit.method } } : {}) },
       error: null, files: [], temporary: input.temporary, createdAt: now, updatedAt: now,

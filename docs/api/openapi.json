@@ -58316,6 +58316,19 @@
                     "stage_label": {
                       "type": "string"
                     },
+                    "cut": {
+                      "type": "string",
+                      "nullable": true,
+                      "enum": [
+                        "asked",
+                        "ceiling",
+                        null
+                      ]
+                    },
+                    "max_seconds": {
+                      "type": "number",
+                      "nullable": true
+                    },
                     "progress": {
                       "type": "number"
                     },
@@ -58411,6 +58424,8 @@
                     "state",
                     "stage",
                     "stage_label",
+                    "cut",
+                    "max_seconds",
                     "progress",
                     "eta_seconds",
                     "position",
@@ -58461,7 +58476,7 @@
             }
           },
           "409": {
-            "description": "Commercial export not allowed",
+            "description": "The song or its cover is still being made",
             "content": {
               "application/json": {
                 "schema": {

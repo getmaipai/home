@@ -1773,6 +1773,7 @@ export const pictureJobs = sqliteTable(
     conversationId: text("conversation_id"),
     turnId: text("turn_id"),
     kind: text("kind").notNull(),
+    purpose: text("purpose"),
     state: text("state").notNull(),
     stackJob: text("stack_job"),
     percent: integer("percent").notNull().default(0),
