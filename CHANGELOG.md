@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.22] - 2026-10-18
+
+A large release: music that is as long as its words with covers and sing-along lyrics, News search and a Today tab refresh, the content-protection foundation, kept Library files that survive chat deletion, role-only age bands (no birthdate is used), and a photo checker and short model calls that no longer run out of room for reasoning. Pins: spec-v0.1.183 and ui-v0.5.274. The engine is unchanged (Stack a89e7ff).
+
 - People creation and editing ignore legacy birthdate input, require no date, and never change roles on birthdays. (BIRTHDATE-REMOVE-01, first part)
 - Non-streaming completion budgets now reserve compulsory reasoning centrally, retry empty length stops once, and report exhaustion as a failure. (REASONING-RESERVE-01)
 
