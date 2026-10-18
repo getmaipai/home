@@ -9,7 +9,7 @@
 
 <p align="center"><a href="https://github.com/getmaipai/home/releases">Releases</a></p>
 
-Your own AI, music, videos, podcasts, maps, books, and more, on your own hardware, online or offline - for protection, privacy, and independence.
+Your own private AI at home, with chat, voice, pictures and videos, on your own hardware - for protection, privacy, and independence.
 
 Your chats, people and memories stay in your house. Home goes online only to do what you ask: downloads, updates and web searches.
 
