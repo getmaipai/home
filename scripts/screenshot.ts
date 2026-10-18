@@ -1018,8 +1018,10 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     }
 
     if (route.slug === "files") {
-      await page.getByRole("button", { name: "More actions" }).first().click();
-      await page.getByRole("menuitem", { name: "View details" }).click();
+      // force: the click's "stable" wait runs on animation frames, which a page in a background context (these
+      // visits run side by side) may never get. The button was just rendered and is on top; the click is reliable.
+      await page.getByRole("button", { name: "More actions" }).first().click({ force: true });
+      await page.getByRole("menuitem", { name: "View details" }).click({ force: true });
       await page.locator('[data-slot="file-root"]').waitFor();
       await page.evaluate(() => {
         document.querySelectorAll<HTMLElement>(".overflow-x-auto").forEach((element) => { element.scrollLeft = 0; });
@@ -1095,9 +1097,16 @@ async function visitRoute(context: BrowserContext, route: RouteSpec, viewport: V
     // across @axe-core/playwright bumps. Naming every tag this app is
     // actually held to - WCAG 2.2 AA plus axe's own best-practice set -
     // means an upgrade can only add coverage, never quietly drop it.
-    const axe = await new AxeBuilder({ page })
+    // Base UI renders every focus guard of an open Menu, Dialog or Sheet as a visually hidden, focusable,
+    // aria-hidden span (@base-ui/react FocusGuard): that is its focus trap, so axe's aria-hidden-focus would
+    // always flag it. The guards are not audited; the popup's own content is. Base UI also portals a popup onto
+    // <body>, outside any landmark, so the region rule is off only while an overlay is open.
+    const overlayOpen = (await page.locator('[role="menu"]:visible, [role="dialog"]:visible').count()) > 0;
+    let axeBuilder = new AxeBuilder({ page })
       .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"])
-      .analyze();
+      .exclude("[data-base-ui-focus-guard]");
+    if (overlayOpen) axeBuilder = axeBuilder.disableRules(["region"]);
+    const axe = await axeBuilder.analyze();
     const violations = axe.violations.map((v) => `${v.id} (${v.impact ?? "unknown"}): ${v.nodes.length} node(s) - ${v.help}: ${v.nodes.map((node) => node.target.join(" ")).join("; ")}`);
 
     // getmaipai/home BACKLOG.md "Enforce the kit's 48px touch-target
