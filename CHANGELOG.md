@@ -7,6 +7,10 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.24] - 2026-10-18
+
+The Library gets its engine: files are stored once, generated pictures, videos and songs stay in the Library when their chat goes, deleted files wait in Trash for 30 days, and files can be renamed, kept, uploaded and previewed as thumbnails through the API. The song card in chat shows its cover art. News gains topic feeds. Three database changes (stored-once files, Trash, file names), tested on a copy of the live database first. The Library page itself is not redesigned yet. Pins: spec-v0.1.183 and ui-v0.5.276. The engine is unchanged (Stack a89e7ff).
+
 - Added News topic feeds (NPR, BBC, The Guardian, CBC News, Sports Illustrated, Popular Science, Fast Company, Inc., Variety, and TIME for Kids for children). Each feed carries the topics it covers, so every topic on the Following page now has stories. Teens and adults follow every topic until they unfollow one, and each household can change the starting topics for each user type in News settings. Local has no feed of its own; add your town's feed under Extra news feeds.
 
 - Changed how the shelf asks one publisher for several feeds: one at a time, a minute apart, in the same 15-minute check, so a new install fills every topic within about 30 minutes instead of hours.
