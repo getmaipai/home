@@ -22787,6 +22787,9 @@
                           "accepted_at": {
                             "type": "string",
                             "nullable": true
+                          },
+                          "covered": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -22804,6 +22807,104 @@
                   },
                   "required": [
                     "wording"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/licences": {
+      "get": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "The licences Home lists with the wizard's internet item, and whether they were accepted",
+        "responses": {
+          "200": {
+            "description": "Each licensed part the AI engine lists (empty before the engine exists).",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unreachable"
+                      ]
+                    },
+                    "terms_version": {
+                      "type": "string"
+                    },
+                    "acknowledged": {
+                      "nullable": true
+                    },
+                    "licences": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    }
+                  },
+                  "required": [
+                    "stack",
+                    "terms_version",
+                    "licences"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/setup/licences/accept": {
+      "post": {
+        "tags": [
+          "Setup"
+        ],
+        "summary": "Record the wizard's acknowledgement, including the licences",
+        "responses": {
+          "200": {
+            "description": "Recorded for the household.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    }
+                  },
+                  "required": [
+                    "accepted"
+                  ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Home already has an owner: the admin prompt in Home settings does this instead.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "next": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }
@@ -24742,6 +24843,179 @@
         }
       }
     },
+    "/api/install/licences": {
+      "get": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "The licences of the AI parts Home installs, and whether the household accepted them",
+        "responses": {
+          "200": {
+            "description": "Each licensed part with its terms, the household acknowledgement, and whether to show the one admin prompt.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "stack": {
+                      "type": "string",
+                      "enum": [
+                        "ok",
+                        "unreachable"
+                      ]
+                    },
+                    "terms_version": {
+                      "type": "string"
+                    },
+                    "acknowledged": {
+                      "nullable": true
+                    },
+                    "needs_prompt": {
+                      "type": "boolean"
+                    },
+                    "licences": {
+                      "type": "array",
+                      "items": {
+                        "nullable": true
+                      }
+                    },
+                    "extras": {
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "stack",
+                    "terms_version",
+                    "needs_prompt",
+                    "licences"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin may do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/install/licences/accept": {
+      "post": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "Accept the licences of the AI parts Home installs, once for the household",
+        "responses": {
+          "200": {
+            "description": "Recorded. When the household policy install.recommended_auto_on_upgrade is on, the recommended extras start too.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "accepted": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "auto_install": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "accepted",
+                    "auto_install"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin may do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Home could not read the licence list",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/install/licences/install-extras": {
+      "post": {
+        "tags": [
+          "Install"
+        ],
+        "summary": "Install the recommended extras (after the licences are accepted)",
+        "responses": {
+          "202": {
+            "description": "The downloads started; the install strip shows progress.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "started": {
+                      "type": "boolean",
+                      "enum": [
+                        true
+                      ]
+                    },
+                    "models": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "started",
+                    "models"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an owner or admin may do this",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Not accepted yet, no room, or the engine is not ready (the message says which)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/components": {
       "get": {
         "tags": [
@@ -24908,6 +25182,9 @@
                               "accepted_at": {
                                 "type": "string",
                                 "nullable": true
+                              },
+                              "covered": {
+                                "type": "boolean"
                               }
                             },
                             "required": [
