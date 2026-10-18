@@ -13,6 +13,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 - Changed the News reader to open with the publisher's name in a banner and a centered article column.
 
+- Children can no longer share files, and an adult-only file cannot be shared with the whole home, a teen or a child. (LIBRARY-REVAMP-04)
 - Identical files are stored once. Two people who save the same picture each keep their own copy; Home keeps one file on disk and removes it only when the last copy, chat or share is gone. Storage counts identical files once. (LIBRARY-DEDUP-01)
 - Added private Library thumbnails with access-checked revalidation, a disposable WebP cache, stored video posters and song covers, and admin preview usage and clearing endpoints.
 

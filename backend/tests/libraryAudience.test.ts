@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, people, conversationTurns } from "@/db/schema";
+import { attachments, people, conversationTurns, shares } from "@/db/schema";
 import { createAttachment, getAttachment, readAttachment } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { nextHlc } from "@/lib/hlc";
-import { newConversationTurnId } from "@/lib/id";
+import { newConversationTurnId, newShareId } from "@/lib/id";
 import { startPictureJob, getPictureJob } from "@/lib/pictures/jobs";
 import { __resetAgeCheckForTests } from "@/lib/pictures/ageCheck";
 import { listFilesVisibleToActor } from "@/lib/shares";
@@ -59,6 +59,13 @@ for (const role of ["child", "teen"] as const) {
       const shareIds = new Map<string, string>();
       for (const id of [...ids, ...derivedIds]) {
         const shared = await owner.post(`/api/files/${id}/shares`, { to: "household" });
+        if (shared.status === 403) {
+          // LIBRARY-REVAMP-04 now refuses an adult-only file here; a share made before that rule must still stay hidden from a minor.
+          const legacy = { id: newShareId(), fileId: id, fromPersonId: ownerId, to: "household", provenance: "files-page:share", createdAt: new Date().toISOString(), hlc: nextHlc() };
+          db.insert(shares).values(legacy).run();
+          shareIds.set(id, legacy.id);
+          continue;
+        }
         expect(shared.status).toBe(201);
         shareIds.set(id, ((await shared.json()) as { id: string }).id);
       }

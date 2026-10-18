@@ -25,7 +25,8 @@ import { attachments, people, shares } from "@/db/schema";
 import { Share as ShareSchema, type Share } from "@maipai/spec/gen/ts/share.js";
 import { newShareId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { canAccessFile, canReadFileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
+import { canAccessFile, canReadFileAudience, fileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
+import { speakerAgeBand } from "@/lib/ageBand";
 import { toRecord } from "@/lib/attachments";
 import { syncFileReferences } from "@/lib/fileContent";
 import { trigger } from "@/lib/notifications";
@@ -62,6 +63,13 @@ function isValidShareTarget(to: string): boolean {
   return db.select({ id: people.id }).from(people).where(eq(people.id, to)).get() !== undefined;
 }
 
+/** "household" always includes minors; a person counts as an adult by role only, never by a birthdate (RULES rule 0). */
+function targetIsAdult(to: string): boolean {
+  if (to === "household") return false;
+  const row = db.select().from(people).where(eq(people.id, to)).get();
+  return row !== undefined && speakerAgeBand(row, new Date()) === "adult";
+}
+
 /** Create a share pointer. `actor` must already be able to see the file
  * (the owner, or a share.schema.json recipient re-sharing it onward -
  * decision 6); the target must be "household" or a real person (the
@@ -75,10 +83,17 @@ export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpR
     return { ok: false, status: 403, error: "you do not have access to this file" };
   }
 
+  // A file the child cannot see stays a 404 above. LIBRARY-REVAMP-04 (kid-mode note, F10): a child never shares; the page hides Share, and this is the rule behind it.
+  if (actor.role === "child") return { ok: false, status: 403, error: "Sharing is turned off for children. Ask a grown-up to share this for you." };
   if (file.origin === "fetched") return { ok: false, status: 403, error: "Saved media files cannot be shared through Files. Change the show's audience in Podcasts instead." };
   const to = input.to.trim();
   if (!isValidShareTarget(to)) {
     return { ok: false, status: 400, error: "the household does not have that person" };
+  }
+
+  // An adult-only file is never offered to the whole home (it includes children and teens) or to a child or a teen.
+  if (fileAudience(file.provenance) === "adult-only" && !targetIsAdult(to)) {
+    return { ok: false, status: 403, error: "That file is adult only, so it cannot be shared with the whole home or with a child or teen. Share it with an adult instead." };
   }
 
   const existing = db.select().from(shares).where(and(eq(shares.fileId, input.fileId), eq(shares.to, to))).get();

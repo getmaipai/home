@@ -177,17 +177,46 @@ describe("listPersonFilesVisibleToActor (PEOPLE-PROFILE-02)", () => {
 });
 
 describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", () => {
-  test("a child may share their own file with the household and with another person", () => {
+  test("a child cannot share (LIBRARY-REVAMP-04); a teen shares within the home", () => {
     const bramble = person("child", "Bramble");
     const lucia = person("adult", "Lucia");
     const file = uploadFile(bramble);
+    const refused = createShare(bramble, { fileId: file.id, to: lucia.id });
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) { expect(refused.status).toBe(403); expect(refused.error).toContain("Ask a grown-up"); }
+    expect(createShare(bramble, { fileId: file.id, to: "household" }).ok).toBe(false);
+    expect(db.select().from(shares).all()).toHaveLength(0);
+    const teen = person("teen", "Riff");
+    const teenFile = uploadFile(teen, "teen picture");
+    expect(createShare(teen, { fileId: teenFile.id, to: lucia.id }).ok).toBe(true);
+    expect(createShare(teen, { fileId: teenFile.id, to: "household" }).ok).toBe(true);
+  });
 
-    expect(createShare(bramble, { fileId: file.id, to: "household" }).ok).toBe(true);
-    expect(createShare(bramble, { fileId: file.id, to: lucia.id }).ok).toBe(true);
+  test("an adult-only file is never shared with the whole home, a teen or a child, but can go to another adult", async () => {
+    const ownerPerson = await owner();
+    const lucia = person("adult", "Lucia");
+    const teen = person("teen", "Riff");
+    const child = person("child", "Bramble");
+    const conversationId = conversationFor(ownerPerson);
+    const turnId = turnFor(ownerPerson, conversationId);
+    const made = createAttachment(ownerPerson, { conversationId, turnId, mediaType: "image/png", provenance: 'picture-gen:{"v":1,"audience":"adult-only"}', bytes: new TextEncoder().encode("adult picture") });
+    if (!made.ok) throw new Error(made.error);
+    for (const to of ["household", teen.id, child.id]) {
+      const refused = createShare(ownerPerson, { fileId: made.value.id, to });
+      expect(refused.ok).toBe(false);
+      if (!refused.ok) { expect(refused.status).toBe(403); expect(refused.error).toContain("adult only"); }
+    }
+    expect(db.select().from(shares).all()).toHaveLength(0);
+    expect(createShare(ownerPerson, { fileId: made.value.id, to: lucia.id }).ok).toBe(true);
+    // An unclassified upload may be shared, but a minor still cannot read it (BUG-LIBRARY-SHARE-CHILD-01).
+    const upload = createAttachment(ownerPerson, { conversationId, turnId, mediaType: "image/png", provenance: "composer:upload", bytes: new TextEncoder().encode("plain upload") });
+    if (!upload.ok) throw new Error(upload.error);
+    expect(createShare(ownerPerson, { fileId: upload.value.id, to: "household" }).ok).toBe(true);
+    expect(getAttachment(child, upload.value.id).ok).toBe(false);
   });
 
   test("sharing with a person the household does not have is refused - the household bound", () => {
-    const bramble = person("child", "Bramble");
+    const bramble = person("teen", "Riff");
     const file = uploadFile(bramble);
 
     expect(createShare(bramble, { fileId: file.id, to: newPersonId() })).toEqual({
@@ -212,7 +241,7 @@ describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", (
     expect(listFilesVisibleToActor(marlow).some((row) => row.file.id === file.id)).toBe(true);
   });
 
-  test("a child re-shares only within the household - a real household target succeeds", async () => {
+  test("a child cannot re-share a file shared with them", async () => {
     const ownerPerson = await owner();
     const bramble = person("child", "Bramble");
     const cosmo = person("child", "Cosmo");
@@ -220,8 +249,8 @@ describe("sharing bounds (household-storage-2026-09-23.md decisions 2 and 6)", (
 
     expect(createShare(ownerPerson, { fileId: file.id, to: bramble.id }).ok).toBe(true);
     const reshared = createShare(bramble, { fileId: file.id, to: cosmo.id });
-    expect(reshared.ok).toBe(true);
-    expect(listFilesVisibleToActor(cosmo).some((row) => row.file.id === file.id)).toBe(true);
+    expect(reshared.ok).toBe(false);
+    expect(listFilesVisibleToActor(cosmo).some((row) => row.file.id === file.id)).toBe(false);
   });
 
   test("someone with no access to a file cannot share it", async () => {
