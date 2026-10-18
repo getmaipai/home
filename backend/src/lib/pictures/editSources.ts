@@ -5,7 +5,7 @@
 // exactly one household adult who agreed (named by the person, checked, and given a signed proof). Anything else is
 // refused with a sentence that says what to do. Nothing here asks the Stack; the caller attaches the answer to its request.
 import { preparePhotoUse } from "@/lib/likeness/apply";
-import { inspectPhoto, PHOTO_LINES, photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
+import { inspectPhotoResult, PHOTO_LINES, photoShowsNoPerson, singleAdultPhoto } from "@/lib/likeness/inspector";
 import { asksToUndress } from "./policy";
 import { TEEN_CONTENT_LINE, laneOf, noteTeenPhotoEdit } from "./lane";
 import { subjectEligibility } from "@/lib/likeness/consent";
@@ -47,8 +47,8 @@ export async function prepareEditSource(input: PrepareEditSourceInput): Promise<
   // the teen said it is them; no proof and no household person is involved, and nobody else's likeness is ever made this way.
   if (input.declaredSubjectId && input.declaredSubjectId === input.audience.actor.id && laneOf(input.audience) === "teen") {
     if (asksToUndress(input.text)) return { ok: false, status: 422, code: "refused_real_person", line: TEEN_CONTENT_LINE };
-    const facts = await inspectPhoto(input.bytes);
-    if (!facts) return { ok: false, status: 422, code: "photo_check_unavailable", line: PHOTO_LINES.unavailable };
+    const { facts, line } = await inspectPhotoResult(input.bytes);
+    if (!facts) return { ok: false, status: 422, code: "photo_check_unavailable", line: line ?? PHOTO_LINES.unreadable };
     if (facts.people !== 1 || facts.faces !== 1) return { ok: false, status: 422, code: "photo_not_single_adult", line: PHOTO_LINES.count };
     // "It's me" is the teen's word, and a word is not a proof (lane review, 2026-10-17): the photo must also plausibly show someone of a teen's age, so a
     // stranger's adult photo cannot be claimed. "unsure" is not enough. Either way the edit is in the admins' activity list.

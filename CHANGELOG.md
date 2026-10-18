@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Photo checks reserve reasoning room, retry an empty or truncated answer once, and safely read JSON from models that do not enforce its schema. (PHOTO-CHECK-01)
+
 ### Content protections
 - Age bands now follow the person's role only; birthdate does not change the speaker's band. Remaining date uses are tracked in BIRTHDATE-REMOVE-01.
 - Added the shared content policy module, band defaults, reviewed data and offline tests. Consumer wiring follows in later slices. (CONTENT-POLICY-01)

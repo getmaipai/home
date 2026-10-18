@@ -13,6 +13,10 @@ decision history live in `docs/dev.md` and the records under `docs/plans/` and `
 - Rows that are done and verified, obsolete, duplicated or in conflict with `docs/design/RULES.md` move to
   `docs/BACKLOG-HISTORY.md` with the reason; nothing is deleted. The last sweep was 2026-10-17.
 
+## Photo checks
+
+- [x] **PHOTO-CHECK-01: photo inspector handles always-thinking models and unenforced JSON schemas** (S; built). Shared reasoning reserve, one larger retry, safe missing-age handling, and separate unreadable-photo copy.
+
 ## Birthdate removal
 
 - [ ] **BIRTHDATE-REMOVE-01: remove birthdate from decisions and ordinary People editing** (M; not started). Owner ruling, 2026-10-18: stop using the birthdate for anything. Speaker bands are role-only now. Remaining-use inventory below is from `git grep -n -i birthdate -- backend/src frontend/src` after that change, including comments, tests under src and migration history. Each location lists every matching line.

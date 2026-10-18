@@ -300,6 +300,8 @@ export function envelopeToolCall(text: string): ToolCall | undefined {
 }
 
 export interface LlmCompleteValue {
+  /** Engine stop reason, including a ceiling reached before visible text. */
+  finish_reason?: string | null;
   /** The engine's `content` only. Reasoning is never folded into it. */
   text: string;
   /** THIN-5A: the engine's own `reasoning_content`, as its own field
@@ -521,11 +523,11 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
   const { offering, body } = chatRequestBody(messages, opts);
   const result = await completeViaStackRequest(role, { ...body, model: opts.model ?? role });
   if (!result.ok) return result.failure;
-  const data = result.data as { choices?: Array<{ message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
+  const data = result.data as { choices?: Array<{ finish_reason?: string | null; message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
     const choice = data.choices?.[0];
     if (!choice) return { ok: false, status: 503, code: "unavailable", error: "chat model returned no choices" };
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), finish_reason: choice.finish_reason, ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
 }
 
 export async function complete(
@@ -571,7 +573,7 @@ export async function complete(
     // offered on this call at all," never conflated with "offered, and
     // declined."
     const tool_calls = offering ? (choice.message.tool_calls ?? []).map(toolCallFromWire) : undefined;
-    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), ...reasoningField(choice.message.reasoning_content, opts), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
+    return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), finish_reason: choice.finish_reason, ...reasoningField(choice.message.reasoning_content, opts), model: response.model, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
   } catch (err) {
     recoverFromDeadBackend(err);
     const message = err instanceof LlmClientError ? err.message : (err as Error).message;

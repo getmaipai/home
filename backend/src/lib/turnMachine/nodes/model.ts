@@ -1,3 +1,4 @@
+import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 // U2c, the `model` node (turn-machine-state-record-2026-09-22.md's
 // state table): one call, the fixed tool set from the budget, offered with
 // tool_choice "auto" (docs/design/RULES.md rule 1, THIN-2A: the model
@@ -227,7 +228,7 @@ export function __resetLearnedCeilingsForTests(): void {
 /** The extra room the one empty-reply retry gets after a generation spent its
  * whole ceiling without a visible character: the same ceiling would fail the
  * same way. */
-export const EMPTY_LENGTH_RETRY_EXTRA_TOKENS = 1024;
+export { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 
 interface GenerationAttempt {
   ok: true;
