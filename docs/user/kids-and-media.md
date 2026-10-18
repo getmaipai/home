@@ -10,7 +10,8 @@ midnight on the Home computer.
 Music and audiobooks count too. An owner or admin can turn on the home rule that leaves them out of the total. It starts off.
 Podcasts still count.
 
-When screen time runs out, Home keeps the last place and tells the player to pause. The child words are:
+When screen time runs out, Home keeps the last place and the player pauses within about 15 seconds, even if the video has already
+loaded. Pressing play again pauses it right away. The child sees these words once:
 
 > Screen time is done for today.
 > Ask a grown-up for more.
@@ -22,5 +23,5 @@ does not say what they watched, heard or read. An owner or admin can add minutes
 
 A child or teen with a time limit cannot keep media for offline use, because the Home computer cannot count time it cannot see.
 
-These safety checks and budget tools are ready for media apps to use. Each app still needs to connect its player to the budget.
-There is no new parent screen yet. Allowed hours and a button to ask a grown-up are still to come.
+This works in every media app: Videos, Music, Podcasts and the small player at the bottom of the screen. If a grown-up adds
+minutes, the next press of play works again. There is no new parent screen yet. Allowed hours and a button to ask a grown-up are still to come.

@@ -11,6 +11,8 @@ import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/
 import { api, request } from "@/lib/api";
 import { mediaAppOfPath, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
+import { toast } from "sonner";
+import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 
 /** The item loaded in the host's element: what it is, which app played it, and whether the person has started it. */
@@ -136,6 +138,12 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     current.el.addEventListener("ended", ended);
     return () => { live = false; current.el.removeEventListener("ended", ended); };
   }, [current, store]);
+  // MEDIA-KID-01: the daily media minutes pause the host's element (every media app, the mini bar, audio and video alike).
+  const element = current?.el ?? null;
+  useEffect(() => {
+    if (!element) return;
+    return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => toast(line), every: intervalEvery(BUDGET_CHECK_MS) });
+  }, [element]);
   const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear }), [current, store]);
   // The element is unloaded when the person signs out or the shell goes away.
   useEffect(() => () => store.clear(), [store]);

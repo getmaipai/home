@@ -735,7 +735,7 @@ export type HealthChecks = {
   checks: Array<{ id: string; name: string; group: string; state: "pass" | "fail" | "skipped" | "unknown"; at: string | null; duration_ms: number | null; first_token_ms: number | null; note: string | null }>;
 };
 
-export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean }
+export interface MediaBudgetResponse { limit_min: number; used_min: number; left_min: number; exhausted: boolean; /** The kid time-up words when time is up (GET /api/media/budget only). */ line?: string | null }
 
 export const api = {
   mediaBudget: () => request<MediaBudgetResponse>("/api/media/budget"),

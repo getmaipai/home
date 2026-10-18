@@ -19,6 +19,8 @@ export const MEDIA_KID_COPY = {
 } as const;
 
 export interface MediaBudget { limit_min: number; used_min: number; left_min: number; exhausted: boolean }
+/** The one time-up sentence a person sees: the refusal's error text and the player's notice (GET /api/media/budget `line`). */
+export const TIME_UP_LINE = `${MEDIA_KID_COPY.timeUp} ${MEDIA_KID_COPY.askForMore}`;
 export const WRITE_INTERVAL_S = 10;
 export const WRITE_SLACK_S = 2;
 /** A client may tick as rarely as once a minute (a background tab); forward movement that fits the clock counts up to this much. */
@@ -135,7 +137,7 @@ export function meterProgress(person: PersonRow, item: Pick<MediaItem, "id" | "k
 export function mediaTimeUpRefusal(person: PersonRow, now = new Date()): { error: string; code: "media_time_up" } | null {
   if (mediaBandOf(person) === "adult") return null;
   if (!mediaBudget(person.id, now).exhausted) return null;
-  return { error: `${MEDIA_KID_COPY.timeUp} ${MEDIA_KID_COPY.askForMore}`, code: "media_time_up" };
+  return { error: TIME_UP_LINE, code: "media_time_up" };
 }
 
 /** MEDIA-KID-01 item 4: offline copies play without the hub, so no server clock meters them. A minor with a daily media budget

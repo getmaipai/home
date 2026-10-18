@@ -93,8 +93,8 @@ test("only admins can extend, only the asking person reads a budget, and minors 
   expect((await new TestClient().get("/api/media/budget")).status).toBe(401);
   expect((await set(`person:${child.id}`, "allowance.media.daily_minutes", 5)).status).toBe(200);
   expect((await admin.client.post(`/api/media/budget/${child.id}/extend`, { minutes: 10 })).status).toBe(200);
-  expect(await (await child.client.get("/api/media/budget")).json()).toEqual({ limit_min: 15, used_min: 0, left_min: 15, exhausted: false });
-  expect(await (await owner.get("/api/media/budget")).json()).toEqual({ limit_min: 0, used_min: 0, left_min: 0, exhausted: false });
+  expect(await (await child.client.get("/api/media/budget")).json()).toEqual({ limit_min: 15, used_min: 0, left_min: 15, exhausted: false, line: null });
+  expect(await (await owner.get("/api/media/budget")).json()).toEqual({ limit_min: 0, used_min: 0, left_min: 0, exhausted: false, line: null });
 });
 
 test("budget routes reject invalid extensions and missing people", async () => {
@@ -228,6 +228,17 @@ test("every media kind counts across devices; the admin audio switch excludes on
   expect(mediaBudget(child.id, start).used_min).toBe(0.5);
   await set("household", "media.budget.exempt_bedtime_audio", false);
   expect(mediaBudget(child.id, start).used_min).toBe(1);
+});
+
+test("GET /api/media/budget carries the kid time-up line only when time is up, from the one copy definition", async () => {
+  const { child, video, set } = await setup(); const start = clock();
+  await set(`person:${child.id}`, "allowance.media.daily_minutes", 1);
+  const before = await (await child.client.get("/api/media/budget")).json() as { exhausted: boolean; line: string | null };
+  expect(before).toMatchObject({ exhausted: false, line: null });
+  for (let n = 0; n <= 6; n++) tick(child, video, at(start, n * 10), n * 10);
+  const after = await (await child.client.get("/api/media/budget")).json() as { exhausted: boolean; line: string | null };
+  expect(after.exhausted).toBe(true);
+  expect(after.line).toBe(`${MEDIA_KID_COPY.timeUp} ${MEDIA_KID_COPY.askForMore}`);
 });
 
 test("a minor saves a place after exhaustion; an admin extends today; notification is once per child/day", async () => {
