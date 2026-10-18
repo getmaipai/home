@@ -1082,6 +1082,42 @@ describe("createChatModelAdapter sources", () => {
 // discriminant from the rest of this stream (chatModelAdapter.ts's own
 // comment on why).
 describe("createChatModelAdapter tool timeline (TOOL-EVENTS-01, frontend half)", () => {
+  test("the song card streams before done and stays single when done names the same job", async () => {
+    const stream = staggeredNdjsonStream([
+      { type: "turn_meta", turn_id: "turn-song", conversation_id: "conv-song", resume_token: "resume-song" },
+      { type: "delta", text: "Making your song." },
+      { t: "tool_call", call_id: "call-song", package_id: "generate_music", args: {} },
+      { t: "tool_result", call_id: "call-song", package_id: "generate_music", outcome: { text: "Queued", musicJobId: "mus-1" } },
+    ], [
+      { type: "done", value: { turn_id: "turn-song", reply: { text: "Making your song." }, music: { id: "mus-1" }, source: "model", safety: SAFETY } },
+    ]);
+    const env = stubEnvironment(stream.stream);
+    try {
+      const adapter = createChatModelAdapter({ consumeThinking: () => false, consumeSupersedes: () => undefined, turnSchedulerRef: { current: null } });
+      const messages = [fakeUserMessage("Make a song")];
+      const options = { messages, runConfig: {}, abortSignal: new AbortController().signal, context: {}, unstable_getMessage: () => messages[0]! } as unknown as ChatModelRunOptions;
+      const run = runAdapter(adapter, options);
+      const song = { type: "tool-call" as const, toolCallId: "turn-song-song", toolName: "song", args: {}, argsText: "", result: { id: "mus-1" } };
+      // Read through the tool result while done is still withheld.
+      let streamed;
+      for (;;) {
+        const next = await run.next();
+        expect(next.done).toBe(false);
+        const timeline = next.value?.content?.find((part) => part.type === "tool-call" && part.toolName === "tool_timeline");
+        if (timeline?.type === "tool-call" && JSON.stringify(timeline.result).includes('"state":"ok"')) {
+          streamed = next.value?.content;
+          break;
+        }
+      }
+      expect(streamed?.at(-1)).toEqual(song);
+      expect(streamed?.findIndex((part) => part.type === "text")).toBeLessThan(streamed!.length - 1);
+      stream.release();
+      let final;
+      for await (const result of run) if (result.content) final = result.content;
+      expect(final?.filter((part) => part.type === "tool-call" && part.toolName === "song")).toEqual([song]);
+    } finally { stream.release(); env.restore(); }
+  });
+
   test("a tool_call followed by a tool_result becomes a tool_timeline part, before the text part", async () => {
     const env = stubEnvironment(
       ndjsonStream([

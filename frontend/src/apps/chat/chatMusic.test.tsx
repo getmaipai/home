@@ -41,6 +41,16 @@ function mount() {
 const cardOf = (view: ReturnType<typeof mount>) => view.container.querySelector("[data-slot=music-track]");
 
 describe("MusicToolRender", () => {
+  test("a pending first fetch shows the queued song card without progress", () => {
+    globalThis.fetch = (() => new Promise<Response>(() => {})) as unknown as typeof fetch;
+    const view = mount();
+    expect(cardOf(view)?.getAttribute("data-status")).toBe("queued");
+    expect(view.getByRole("status").textContent).toContain("Waiting its turn");
+    expect(view.container.textContent).toContain("Your song");
+    expect(view.getByRole("progressbar").hasAttribute("aria-valuenow")).toBe(false);
+    expect(view.container.textContent).not.toContain("%");
+  });
+
   test("the song part is bound once to the kit song card, beside the music-lookup spec sheet", () => {
     const song = TOOL_BINDINGS.filter((binding) => binding.toolName === "song");
     expect(song).toHaveLength(1);

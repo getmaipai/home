@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ChatModelAdapter, ChatModelRunOptions, ChatModelRunResult, ThreadAssistantMessagePart } from "@assistant-ui/react";
 import { offerCarry, withdrawCarry } from "./chatCarry";
 import { MAX_CHAT_IMAGES, CHAT_IMAGE_REFUSAL } from "@maipai/home-backend/src/wire";
@@ -19,6 +20,11 @@ import { ChatTurnError } from "@/apps/chat/chatTurnError";
 import { HUB_DOWN_LINE, isHubUnreachable } from "@/lib/hubReachability";
 import { failureLine } from "@maipai/home-backend/src/lib/failureCopy";
 import { randomUuid } from "@/lib/randomUuid";
+
+// The backend already emits the song job id; the pinned spec has not added it yet.
+const MusicToolResultEvent = ToolTurnStreamEvent.options[1].extend({
+  outcome: ToolTurnStreamEvent.options[1].shape.outcome.extend({ musicJobId: z.string().min(1).optional() }),
+});
 
 // Qwen3's hybrid thinking mode wraps its reasoning in a `<think>...</think>`
 // block ahead of the real answer when enabled (llm.ts's `thinking` option);
@@ -293,6 +299,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
       // there is no separate sequence field on these events.
       const toolCalls = new Map<string, { packageId: string; state: "running" | "ok" | "error"; failureKind?: string; sites?: { host: string; url: string }[] }>();
       let failedTool = false;
+      let music: { id: string } | undefined;
       // GENUI-03b: the answer blocks streamed so far, in arrival (tool-call)
       // order; the hub already validated them (GENUI-02).
       const streamedBlocks: unknown[] = [];
@@ -311,6 +318,10 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         );
       }
 
+      function songPart(turnId: string | undefined): ThreadAssistantMessagePart | undefined {
+        return turnId && music ? toolCallPart(`${turnId}-song`, "song", music) : undefined;
+      }
+
       // Every yield below replaces the whole message's content (this
       // file's own header comment), so the reasoning part has to ride
       // along on every yield once it exists, not just the ones a
@@ -326,6 +337,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
         if (timeline) parts.push(timeline);
         // GENUI-13c and GENUI-05: blocks (a picture gallery included) sit at their own paragraph of the text so far, as the hub placed them.
         if (visible || streamedBlocks.length) parts.push(...textWithAnswerParts(visible, { blocks: streamedBlocks }).filter((part) => part.type !== "text" || part.text));
+        const song = songPart(resumeTurnId);
+        if (song) parts.push(song);
         return parts;
       }
 
@@ -411,13 +424,14 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
           // the three tool events (nothing else on the wire has it), so
           // this skips the Zod parse entirely for the overwhelming
           // majority of events that can't possibly match.
-          const toolEvent = "t" in event ? ToolTurnStreamEvent.safeParse(event) : undefined;
+          const toolEvent = "t" in event ? (event.t === "tool_result" ? MusicToolResultEvent : ToolTurnStreamEvent).safeParse(event) : undefined;
           // GENUI-03b: a `t` event this client cannot read (a block of a kind it
           // does not know, a shape it does not parse) is dropped, never taken
           // for the stream's error event below; the reply carries on.
           if (toolEvent && !toolEvent.success) continue;
           if (toolEvent?.success) {
             const e = toolEvent.data;
+            if (e.t === "tool_result" && "musicJobId" in e.outcome && typeof e.outcome.musicJobId === "string") music = { id: e.outcome.musicJobId };
             if (e.t === "block") {
               streamedBlocks.push(e.block);
             } else if (e.t === "tool_call") {
@@ -634,7 +648,8 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
             // VIDEO-GEN-06: and the video job this turn started, drawn as the kit player card.
             const video = event.value.video;
             // MUSIC-GEN-04: and the song job (generate_music or edit_music), drawn as the kit song card.
-            const music = event.value.music;
+            music = event.value.music ?? music;
+            const musicPart = songPart(event.value.turn_id);
             // TOOL-EVENTS-01: `toolTimelinePart` (above) is the one
             // definition, used here and by `buildContent()` mid-stream -
             // computed once so both the array-spread check and the part
@@ -716,7 +731,7 @@ export function createChatModelAdapter(deps: ChatModelAdapterDeps): ChatModelAda
                 ...(project ? [toolCallPart(`${event.value.turn_id}-project`, "project", project)] : []),
                 ...(picture ? [toolCallPart(`${event.value.turn_id}-picture-progress`, "picture_progress", picture), toolCallPart(`${event.value.turn_id}-picture`, "picture", picture)] : []),
                 ...(video ? [toolCallPart(`${event.value.turn_id}-video`, "video", video)] : []),
-                ...(music ? [toolCallPart(`${event.value.turn_id}-song`, "song", music)] : []),
+                ...(musicPart ? [musicPart] : []),
                 ...sourceParts,
               ],
               ...(event.value.stats?.stop_reason === "length" ? { status: { type: "incomplete", reason: "length" as const } } : {}),

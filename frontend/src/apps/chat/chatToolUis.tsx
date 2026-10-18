@@ -663,7 +663,7 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
     retry: false,
   });
   if (!result) return null;
-  if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : null;
+  if (!card) return query.isError ? <ErrorState layout="inline" title="I couldn't check on that song" detail="Reload the chat to try again." retrying={false} /> : <MusicTrack status="queued" title="Your song" />;
   const refresh = () => { void query.refetch(); };
   const title = card.title ?? "Your song";
   const description = musicDescriptionOf(card);
