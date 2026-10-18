@@ -426,8 +426,64 @@ request and seed do not give the same song twice on MLX, so every number is per 
 `musicSafety.test.ts`). No child hears a song, so no child hears invented words. This fix adds a **hard precondition** to MUSIC-GEN-15:
 any future teen or child music lane must, before the song is offered, transcribe the finished song with this whisper model (measured: 4.9 s
 for a 60 s song cold, 3.7 s for a 3:30 song warm, about 2 GB) and run the music floors on what was sung. A hit, or a transcript that cannot
-be read, withholds the song. It must also use Quick songs only, with fitted lyrics. Until that exists, the adult check in `musicViewDenial`
+be read, withholds the song. It must also sing only the hook (Quick, note 18.1a), with the length following those words. Until that exists, the adult check in `musicViewDenial`
 is the floor, and a test pins it. An independent review checks this reasoning.
+
+### 18.1a The length follows the words (owner, 2026-10-18; replaces 18.1's points 1 and 3)
+
+Jesse, on the 22 lines that were too long for 60 s: "we don't have a hard requirement to time box it". So a song is no longer cut to a
+fixed length. **The length follows the words**, and Quick and Full say how much of the song is sung, not how many seconds it lasts.
+
+**Measured** on the scratch Stack (port 8895, bench lock held, the live request's 22 lines, seed 670964457, detailed):
+
+| Length | Wall time | Worker memory (RSS) | Last line at | Lines on one timestamp, gaps under 1 s | Words sung in order | Heard words not in the lyrics |
+|---|---:|---:|---:|---:|---:|---:|
+| 60 s (as on the live hub) | 45 s | not sampled | 0:58.6 (12 lines there) | 12 | 36 percent | 12 |
+| 120 s | 59 s (cold) | 20.5 GB | 1:46.4 | 0, 0 | 76 percent | 15 |
+| 140 s | 24 s | 20.8 GB | 2:17.8 | 0, 0 | 90 percent | 15 |
+| 160 s | 26 s | 21.2 GB | 2:16.1 | 0, 0 | 89 percent | 19 |
+| 240 s (the 128 GB ceiling) | 41 s | 21.7 GB | 3:53.1 | 0, 0 | 92 percent | 38 (the words spread thin, more filler between lines) |
+
+The engine sings about 3 to 9 s a line (median about 5 s) and needs room for an intro and an ending. The folk proof (section 16) sang its
+25 lines at 98 percent in 180 s and in 210 s. So the rate is **6 s a sung line plus 10 s**: 142 s for Jesse's 22 lines, 160 s for the folk
+song, 76 s for a hook of 11 lines. The 33 GB admission peak (section 4) is unchanged; the worker's own memory stays about 21 to 22 GB up to the 240 s ceiling.
+
+**The rules:**
+
+1. **Every word the model wrote is sung, and the length follows.** `secondsForWords(lyrics) = sung lines x 6 + 10`, at least 30 s. The
+   only ceiling is the Stack's own `limits.max_seconds` (240 s on a 128 GB Mac, 120 s on 64 GB), which is a memory limit, not a choice.
+   No fixed 45 s or 60 s default applies when there are words.
+2. **Quick and Full say how much of the song is sung.** **Full** sings every part. **Quick** sings the hook: the whole sections from the top
+   up to and including the first chorus (or the first two sections when there is no chorus). Either way the length follows the words that
+   are sung. The household setting `generation.music.length` keeps its one meaning, "the kind chat makes when nobody says which", and its
+   **default becomes `full`**, so a song's words are all sung unless someone asks for a quick one (the tool's `length`, which the model sets
+   when the person asks for a quick or short song or a jingle). **Make it full** sings every word and **Make it quick** sings the hook, each at
+   the length its words need. Without words (an instrumental), quick is about 45 s and full about 3 minutes, as before.
+   **This is a spec change, landed first** (MUSIC-SPEC-03): in commons `spec/settings/keys.json`, the entry's `default` becomes `"full"`, and
+   its `help`, `copy.does` and both `copy.options` lines say the new meaning (point 7). Then one Home pin, and Home's `musicKeys.ts`
+   declaration matches the entry exactly.
+3. **A length the person asks for is kept** ("make it 90 seconds", "make it shorter"). If the words do not fit that length, the song sings
+   the whole sections that fit (18.1's `fitLyricsToLength`). The tool's result states which sections are sung, and the model tells the person
+   in its own words. No fixed line goes into the reply.
+4. **Above the ceiling**, the song sings the whole sections that fit the ceiling. The tool's result states that the words are longer than the
+   longest song this computer makes (its `limits.max_seconds`), and the model says so in its own words. The card's hint can carry the plain
+   line "Longer than this computer's longest song (4 minutes), so it sings the first parts that fit." The person's words are kept for a later
+   Make it full on a bigger computer.
+5. **If the engine still squeezes lines** (two or more lines on one timestamp in the last 1.5 s, 18.1's signature), Home makes the song
+   once more, 30 percent longer, up to the ceiling, before it shows it. The retry is a new Stack job. It goes through normal admission with no
+   bypass, so the governor still waits for memory and ISOLATION-01 still pauses it while chat answers. The card's own stage line says "Making
+   it longer so every line fits" (rule S6: the job's own card). If the second try still squeezes, the card shows the sung lines only (18.1
+   point 2). Memory is measured up to the ceiling (the 240 s row above).
+6. **Effort is unchanged.** Both kinds use the Stack's default quality for this computer (detailed, the 1.7B planner, on 128 GB). Switching
+   planners between songs costs a model load (measured 23 s in section 16), so the effort setting stays the engine's, not the kind's.
+7. **Copy** (spec copy fields, rule S5, read through `describeSetting`): help "What chat makes when nobody says which. Anyone who can make
+   songs can still ask for the other kind. A song is as long as its words."; does "Picks whether chat sings every part or just the hook when
+   nobody says which."; quick "Quick: just the hook, the first verse and chorus."; full "Full: every part of the song." The computer's own longest song
+   (`limits.max_seconds`) goes in the card's hint, not the setting. The guide and the card's hint say the same. The phrases "Quick songs are about 45 seconds" and the 60 s default are gone,
+   except for instrumentals.
+
+The model is still given no line count (rule 5): it writes the song it wants, and Home sizes the length. The standing check in the music
+bench (18.1 point 4) is the proof that the length is long enough for every line: no lines on one timestamp, and words sung in order.
 
 ### 18.2 A card while the song is made (MUSIC-GEN-18)
 
@@ -503,6 +559,7 @@ wrapper). Rule 0 (music stays adults only; 18.1 adds a precondition and no new l
 - The backlog row "Verdicts for the features absent from both this file and the rebuild" (its "Music Studio, karaoke and stems" item): generation
   is this note, the studio is MUSIC-STUDIO-01 and stems are MUSIC-GEN-12; karaoke keeps its own verdict line there. The row is annotated.
   Section 18.5 now decides karaoke for songs made in chat (timed lyrics on the song card). That verdict line still covers karaoke for other music.
+- **Section 16's fixed lengths are replaced by 18.1a** (owner, 2026-10-18): with words, a song is as long as its words (6 s a sung line plus 10 s, up to the Stack's ceiling); Quick sings the hook and Full every part. The 45 s and 3-minute defaults remain only for instrumentals. 18.1's points 1 and 3 (fit the words to a fixed quick length) are replaced by 18.1a.
 - Section 5's guidance that a song without a given length is as long as its words is kept. Section 18.1 adds the reverse case: words that are
   too long for the length are fitted to whole sections, not sent whole.
 - Nothing in `RULES.md` changes.
