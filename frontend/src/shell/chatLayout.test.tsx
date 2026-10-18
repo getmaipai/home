@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import FullLayout from "@maipai/ui/src/dashboard/layouts/full/FullLayout";
 import RailProfileMenu from "@maipai/ui/src/dashboard/layouts/full/vertical/rail/RailProfileMenu";
@@ -19,7 +19,7 @@ afterEach(() => {
 function renderChat(width: number) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
   window.matchMedia = ((query: string) => ({
-    matches: query.includes("max-width") && width <= 768,
+    matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768,
     media: query,
     onchange: null,
     addListener: () => {},
@@ -55,22 +55,31 @@ describe("chat shell layout", () => {
     expect(tokens).toMatch(/\.aui-root\.aui-thread-root\s*\{\s*--thread-max-width:\s*52rem\s*!important;/);
   });
 
-  for (const width of [1440, 390]) {
-    test(`the app rail renders at ${width}px with every destination's accessible name`, async () => {
-      const view = renderChat(width);
-      const rail = view.getByRole("navigation", { name: "Primary navigation" });
-      // The rail is 56px at Standard targets and widens through --rail-width at Large (ui-v0.5.200).
-      expect(rail.className).toContain("w-[var(--rail-width,56px)]");
-      expect(rail.className).toContain("max-w-[var(--rail-width,56px)]");
-      for (const label of railLabels) {
-        await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
-      }
-      expect(view.getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
-      expect(view.getAllByRole("link", { name: "Home" })).toHaveLength(1);
-      expect(view.getByRole("button", { name: "Search" })).toBeTruthy();
-      expect(view.getByRole("button", { name: /Open profile menu for Sage/ })).toBeTruthy();
-    });
-  }
+  test("the app rail renders at 1440px with every destination's accessible name", async () => {
+    const view = renderChat(1440);
+    const rail = view.getByRole("navigation", { name: "Primary navigation" });
+    // The rail is 56px at Standard targets and widens through --rail-width at Large (ui-v0.5.200).
+    expect(rail.className).toContain("w-[var(--rail-width,56px)]");
+    expect(rail.className).toContain("max-w-[var(--rail-width,56px)]");
+    for (const label of railLabels) {
+      await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
+    }
+    expect(view.getByRole("link", { name: "Chat" }).getAttribute("aria-current")).toBe("page");
+    expect(view.getAllByRole("link", { name: "Home" })).toHaveLength(1);
+    expect(view.getByRole("button", { name: "Search" })).toBeTruthy();
+    expect(view.getByRole("button", { name: /Open profile menu for Sage/ })).toBeTruthy();
+  });
+
+  test("at 390px there is no rail: the menu button opens a drawer with every destination (design rule S1)", async () => {
+    const view = renderChat(390);
+    expect(view.queryByRole("navigation", { name: "Primary navigation" })).toBeNull();
+    fireEvent.click(await view.findByRole("button", { name: "Open menu" }));
+    const drawer = await view.findByRole("dialog");
+    for (const label of railLabels) {
+      await waitFor(() => expect(within(drawer).getByRole("link", { name: label })).toBeTruthy());
+    }
+    expect(within(drawer).getByRole("button", { name: /Open profile menu for Sage/ })).toBeTruthy();
+  });
 
   test("the rail never expands: it has no sidebar trigger", () => {
     const view = renderChat(1440);

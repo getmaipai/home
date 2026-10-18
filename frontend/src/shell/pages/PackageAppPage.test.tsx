@@ -75,7 +75,7 @@ afterEach(() => {
 function open(path: string, width = 1440) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
   window.matchMedia = ((query: string) => ({
-    matches: query.includes("max-width") && width <= 768,
+    matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768,
     media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   })) as typeof window.matchMedia;
   const client = createQueryClient();
@@ -119,11 +119,14 @@ describe("a package app at /apps/<id>", () => {
     expect(calls[0]).toBe("{}");
   });
 
-  test("the rail is present at 360, 402, 744 and 1440 (design rule S3)", async () => {
+  test("the rail is present at 744 and 1440; at 360 and 402 the menu button replaces it (design rule S1 and S3)", async () => {
     for (const width of [360, 402, 744, 1440]) {
       const view = open("/apps/demo", width);
       await waitFor(() => expect(view.container.querySelector('[data-slot="weather-card"]')).not.toBeNull());
-      expect(view.container.querySelector('nav[aria-label="Primary navigation"]')).not.toBeNull();
+      const rail = view.container.querySelector('nav[aria-label="Primary navigation"]');
+      const menu = view.container.querySelector('[data-slot="mobile-menu-button"]');
+      if (width < 640) { expect(rail).toBeNull(); expect(menu).not.toBeNull(); }
+      else { expect(rail).not.toBeNull(); expect(menu).toBeNull(); }
       cleanup();
     }
   });

@@ -35,7 +35,7 @@ function Where() {
 function setWidth(width: number) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
   window.matchMedia = ((query: string) => ({
-    matches: query.includes("max-width") && width <= 768,
+    matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768,
     media: query, onchange: null, addListener: () => {}, removeListener: () => {},
     addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false,
   })) as typeof window.matchMedia;
@@ -345,17 +345,25 @@ describe("what the page asks for", () => {
   });
 });
 
-describe("the rail on a settings route (RULES S3)", () => {
-  for (const width of [1440, 390]) {
-    test(`the main navigation renders on /settings/chat at ${width}px`, async () => {
-      const view = open(makePerson("adult"), width === 1440 ? "/settings/chat/general" : "/settings/chat", {}, width);
-      const rail = view.getByRole("navigation", { name: "Primary navigation" });
-      expect(rail.className).toContain("w-[var(--rail-width,56px)]");
-      for (const label of ["Home", "Chat", "Library", "Family"]) await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
-      expect(view.getByRole("button", { name: /Open profile menu for Adult/ })).toBeTruthy();
-      await waitFor(() => expect(column(view)).toBeTruthy());
-    });
-  }
+describe("the rail on a settings route (RULES S1 and S3)", () => {
+  test("the main navigation renders on /settings/chat at 1440px", async () => {
+    const view = open(makePerson("adult"), "/settings/chat/general", {}, 1440);
+    const rail = view.getByRole("navigation", { name: "Primary navigation" });
+    expect(rail.className).toContain("w-[var(--rail-width,56px)]");
+    for (const label of ["Home", "Chat", "Library", "Family"]) await waitFor(() => expect(view.getByRole("link", { name: label })).toBeTruthy());
+    expect(view.getByRole("button", { name: /Open profile menu for Adult/ })).toBeTruthy();
+    await waitFor(() => expect(column(view)).toBeTruthy());
+  });
+
+  test("at 390px the menu button opens the same destinations in a drawer", async () => {
+    const view = open(makePerson("adult"), "/settings/chat", {}, 390);
+    expect(view.queryByRole("navigation", { name: "Primary navigation" })).toBeNull();
+    fireEvent.click(await view.findByRole("button", { name: "Open menu" }));
+    const drawer = await view.findByRole("dialog");
+    for (const label of ["Home", "Chat", "Library", "Family"]) await waitFor(() => expect(within(drawer).getByRole("link", { name: label })).toBeTruthy());
+    expect(within(drawer).getByRole("button", { name: /Open profile menu for Adult/ })).toBeTruthy();
+    await waitFor(() => expect(column(view)).toBeTruthy());
+  });
 });
 
 describe("old URLs through the route", () => {

@@ -33,7 +33,7 @@ function start(pinnedApps?: string[]) {
 
 function open(path = "/", width = 1440) {
   Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
-  window.matchMedia = ((query: string) => ({ matches: query.includes("max-width") && width <= 768, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
+  window.matchMedia = ((query: string) => ({ matches: query.includes("639.98") ? width < 640 : query.includes("max-width") && width <= 768, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
   return render(
     <QueryClientProvider client={createQueryClient()}>
       <ToastProvider><TooltipProvider>
@@ -120,10 +120,19 @@ describe("the rail's apps", () => {
     expect(rail(view).queryByRole("link", { name: "All apps" })).toBeNull();
   });
 
-  test("at 390 the rail still shows the pinned app and the All apps link", async () => {
+  test("at 744 the rail still shows the pinned app and the All apps link", async () => {
     start();
-    const view = open("/", 390);
+    const view = open("/", 744);
     await rail(view).findByRole("link", { name: "Weather" });
     expect(rail(view).getByRole("link", { name: "All apps" })).toBeTruthy();
+  });
+
+  test("at 390 there is no rail: the menu button opens a drawer listing the installed app", async () => {
+    start();
+    const view = open("/", 390);
+    expect(view.queryByRole("navigation", { name: "Primary navigation" })).toBeNull();
+    await act(async () => { fireEvent.click(await view.findByRole("button", { name: "Open menu" })); });
+    const drawer = await view.findByRole("dialog");
+    await within(drawer).findByRole("link", { name: "Weather" });
   });
 });
