@@ -157,7 +157,7 @@ export async function generateConversationTitle(conversationId: string): Promise
           },
           { role: "user", content: exchange },
         ],
-        { thinking: false, dropReasoning: true, temperature: 0.3, max_tokens: 24 },
+        { thinking: false, dropReasoning: true, temperature: 0.3, max_tokens: 24 }, // answer-budget
       ),
       new Promise<{ ok: false; unavailable: true }>((resolve) => setTimeout(() => resolve({ ok: false, unavailable: true }), TITLE_DEADLINE_MS).unref?.()),
     ]);

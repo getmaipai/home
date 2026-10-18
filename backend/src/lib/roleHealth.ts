@@ -9,10 +9,16 @@ export type HealthRole = "chat" | "embed" | "background" | "voice";
  * when the Stack itself refused the role (a 503 with its reason), is
  * that reason in the household's wording - the same line the chat reply
  * carries. `reason` stays the short code the consumers switch on. */
-export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string };
+export type RoleHealth = { availability: "ready" | "starting" | "unavailable"; reason: string | null; /** CHAT-PAUSE-01: why it is unavailable, when known. */ cause?: "restarting" | "memory" | "not_installed"; detail?: string; contextLength?: number; slots?: number; contextPerSlot?: number; contextScope?: "total" | "per_slot"; /** VISION-02d: the model the Stack's chat role runs (or would start). */ modelId?: string; pictureTokensMax?: number };
 let roleHealthForTests: Partial<Record<HealthRole, RoleHealth>> = {};
-export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; }
+export function __setRoleHealthForTests(value: Partial<Record<HealthRole, RoleHealth>>): void { roleHealthForTests = value; cachedHealth.clear(); }
 
+const cachedHealth = new Map<HealthRole, { at: number; health: RoleHealth }>();
+/** Read-only generation metadata. Never refreshes on the first-word path. */
+export function cachedRoleHealth(role: HealthRole): RoleHealth | undefined {
+  const cached = cachedHealth.get(role);
+  return roleHealthForTests[role] ?? (cached && Date.now() - cached.at < 30_000 ? cached.health : undefined);
+}
 const STACK_ROLE_ID: Partial<Record<HealthRole, string>> = { embed: "embed", background: "judge", voice: "tts" };
 /** The role name each Stack call site passes to stackFailureResult()
  * (llm.ts, tts.ts, stt.ts) - what a remembered refusal is keyed by,
@@ -51,7 +57,8 @@ export async function roleHealth(role: HealthRole, opts: { live?: boolean } = {}
     const row = roles.find((item) => item.id === id);
     if (!row) return { availability: "unavailable", reason: "stack_unreachable", cause: "restarting" };
     const state = row.state.state;
-    const status = role === "chat" ? { ...chatContextStatus(row), ...(row.model?.id ? { modelId: row.model.id } : {}) } : {};
+    const status = { ...(row.picture_tokens_max ? { pictureTokensMax: row.picture_tokens_max } : {}), ...chatContextStatus(row), ...(row.model?.id ? { modelId: row.model.id } : {}) };
+    cachedHealth.set(role, { at: Date.now(), health: { availability: "ready", reason: null, ...status } });
     // The Stack says a warm-up is still running: the role reads `installed`
     // until it flips to `loaded`, but a message sent now would wait out the
     // load, so Send is held ("starting") until the warm-up finishes.

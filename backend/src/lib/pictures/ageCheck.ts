@@ -16,7 +16,7 @@ import { db } from "@/db";
 import { notificationDeliveries, people } from "@/db/schema";
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
-import { toWireMessage, type LlmMessage } from "@/lib/llm";
+import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
 import { trigger } from "@/lib/notifications";
 import { getStackClient } from "@/lib/stackEngine";
 import { mentionsMinorCue, mentionsSexualWord, mentionsUnclothedPhrase } from "./minorLine";
@@ -291,17 +291,17 @@ async function askModel(dataUrl: string, signal: AbortSignal): Promise<string> {
     { role: "system", content: AGE_CHECK_SYSTEM_PROMPT },
     { role: "user", content: AGE_USER_TEXT, images: [{ id: "agecheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
   ];
-  const result = await getStackClient().chat({
+  const result = await completeViaStackRequest("chat", {
     model: "chat",
-    messages: messages.map(toWireMessage),
+    messages,
     stream: false,
     temperature: 0,
-    max_tokens: 160,
+    max_tokens: 160, // answer-budget
     response_format: { type: "json_schema", json_schema: VERDICT_SCHEMA },
     // The smallest thinking budget there is: none. The answer is a label, not a reasoning problem.
     chat_template_kwargs: { enable_thinking: false },
-  }, { signal });
-  if ("stream" in result) throw new Error("the Stack streamed a non-streaming request");
+  }, signal);
+  if (!result.ok) throw new Error(result.failure.error);
   const data = result.data as { choices?: Array<{ message?: { content?: string | null } }> };
   const content = data.choices?.[0]?.message?.content;
   if (typeof content !== "string") throw new Error("no answer");

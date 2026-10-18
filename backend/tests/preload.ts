@@ -160,3 +160,6 @@ afterEach(async () => {
   delete process.env.MAIPAI_LLAMA_SERVER_URL;
   __setDefaultStackClientForTests(defaultScriptedStack.client);
 });
+
+const { __resetLearnedCeilingsForTests } = await import("@/lib/reasoningReserve");
+afterEach(__resetLearnedCeilingsForTests);

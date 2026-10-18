@@ -26,20 +26,19 @@ afterEach(() => {
   __setPhotoInspectorForTests(undefined);
   __setChatPictureCapabilityForTests(null);
 });
-test("empty length reply retries once with more reasoning room then fails closed", async () => {
+test("photo checker passes only the answer budget to the central wrapper", async () => {
   answers(reply("", "length"));
   expect(await inspectPhoto(bytes)).toBeNull();
-  expect(calls).toHaveLength(2);
-  expect(calls[0]!.max_tokens!).toBeGreaterThanOrEqual(1500);
-  expect(calls[1]!.max_tokens!).toBeGreaterThan(calls[0]!.max_tokens!);
+  expect(calls).toHaveLength(1);
+  expect(calls[0]!.max_tokens).toBe(120);
   expect(calls[0]!.temperature).toBe(0);
 });
-test("length with content and empty stop both retry and can recover", async () => {
+test("truncated or empty results from a replacement wrapper fail closed", async () => {
   for (const first of [reply('{"people":0,"faces":0}', "length"), reply("")]) {
     calls = [];
-    answers(first, reply('{"people":0,"faces":0}'));
-    expect(await photoShowsNoPerson(bytes)).toEqual({ ok: true });
-    expect(calls).toHaveLength(2);
+    answers(first);
+    expect((await photoShowsNoPerson(bytes)).ok).toBe(false);
+    expect(calls).toHaveLength(1);
   }
 });
 test("missing age is unsure and allows only a photo with no person", async () => {
@@ -82,5 +81,5 @@ test("caller seam preserves the age gate and allows an empty scene", async () =>
 test("exhausted retries use retry copy instead of engine setup copy", async () => {
   answers(reply("", "length"));
   expect(await singleAdultPhoto(bytes)).toEqual({ ok: false, reason: "unavailable", line: PHOTO_LINES.unreadable });
-  expect(calls).toHaveLength(2);
+  expect(calls).toHaveLength(1);
 });

@@ -37478,3 +37478,39 @@ or stop, and are paused through `AudioContext.suspend()` when media takes focus.
 `playbackRate`, so a faster reply also sounds higher. Settings: `backend/src/settings/audioKeys.ts` (person scope, number 0.5 to 3, default 1,
 `copy.does`, `lives_in: person.voice`, so they show in Settings, Voice through `SettingsShell`). They ride in `aheadOfSpec`
 (`scripts/check.sh`) until a spec tag carries them; a Playback section needs `areas.json` in `commons` first.
+
+### Reasoning reserve: one place
+
+REASONING-RESERVE-01 (2026-10-18). Non-streaming `complete()` and
+`completeViaStackRequest()` take answer budgets. An always-thinking catalog
+model, or an unknown model learned from an empty length stop, gets
+`max(1024, 2 * answer budget)` extra tokens, capped at 32768. Learning is keyed
+by model and engine identity and resets in tests/preload.ts. Planning uses
+cached role metadata only, with no additional roles request.
+
+Cached measured context and a conservative two-characters-per-token prompt
+estimate, including picture reservations, tools and schemas, lower only the
+reserve. The answer budget stays intact. If that budget itself cannot fit,
+the wrapper returns typed `context_too_large`, never a zero ceiling. Unknown
+context keeps the finite reserve. Non-thinking models keep their budgets.
+
+An empty visible length stop without native tool calls permits one retry with
+twice the reserve, only when its ceiling is strictly larger. Exhaustion returns
+typed `empty_length`. Nonempty replies never retry or undergo trimming. The
+wrapper logs `llm.empty_length_retry`; the existing health snapshot counts it.
+Documented smoke checks can use `exactCeiling: true`.
+
+Titles, follow-ups, news summaries, photo inspection, age checks, lane gates,
+people selection and background judge calls use the central boundary.
+Streaming turn ceilings stay local, with their measured spoken and minor
+reserves (VOICE-REPLY-01 and MINOR-CEILING-01). No second reserve is added.
+Streaming and outputGate retain their existing visible length contract and
+tool-call collection: character heuristics cannot bound visible tokens, and
+stopping on prose can discard a native tool call. Changing that boundary needs
+engine-native token accounting.
+
+The guard checks direct engine dispatch, including shorthand, computed
+properties, spreads and client aliases. Outside llm.ts and reasoningReserve.ts,
+ceilings declare `// answer-budget` for small blocking calls through the
+wrappers, `// exact-ceiling: <reason>` for probes, or
+`// stream-ceiling: <reason>` for streaming ceilings that own their reserve.

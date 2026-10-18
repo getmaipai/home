@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 - People creation and editing ignore legacy birthdate input, require no date, and never change roles on birthdays. (BIRTHDATE-REMOVE-01, first part)
+- Non-streaming completion budgets now reserve compulsory reasoning centrally, retry empty length stops once, and report exhaustion as a failure. (REASONING-RESERVE-01)
 
 - Photo checks reserve reasoning room, retry an empty or truncated answer once, and safely read JSON from models that do not enforce its schema. (PHOTO-CHECK-01)
 

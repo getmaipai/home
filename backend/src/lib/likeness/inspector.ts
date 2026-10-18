@@ -5,7 +5,6 @@
 // with the reason said plainly. The model is asked for counts and a yes, no or unsure; it never names anyone.
 import sharp from "sharp";
 import { chatModelReadsPictures } from "@/lib/chatPictures";
-import { EMPTY_LENGTH_RETRY_EXTRA_TOKENS } from "@/lib/reasoningReserve";
 import { complete } from "@/lib/llm";
 
 export interface PhotoFacts { people: number; faces: number; under18: "no" | "yes" | "unsure" }
@@ -42,25 +41,22 @@ async function modelInspector(bytes: Uint8Array): Promise<Inspection> {
   try {
     jpeg = await sharp(bytes, { failOn: "error", limitInputPixels: 64_000_000 }).rotate().resize({ width: 1024, height: 1024, fit: "inside", withoutEnlargement: true }).jpeg({ quality: 85 }).toBuffer();
   } catch { return unreadable(); }
-  // Two shared retry allowances leave room for compulsory reasoning before the small JSON answer.
-  for (let attempt = 0; attempt < 2; attempt++) {
-    const result = await completion("chat", [{
-      role: "user",
-      content: PROMPT,
-      images: [{ id: "likeness-check", name: "photo", url: `data:image/jpeg;base64,${jpeg.toString("base64")}`, reservedTokens: capability.pictureTokensMax }],
-    }], { temperature: 0, max_tokens: 120 + (2 + attempt) * EMPTY_LENGTH_RETRY_EXTRA_TOKENS, thinking: false, dropReasoning: true, response_format: { type: "json_schema", json_schema: SCHEMA } });
-    if (!result.ok) return unreadable();
-    if (result.value.finish_reason === "length" || !result.value.text.trim()) continue;
-    try {
-      const parsed = JSON.parse(firstObject(result.value.text)) as { people?: unknown; faces?: unknown; anyone_looks_under_18?: unknown };
-      const people = parsed.people;
-      const faces = parsed.faces;
-      const under = parsed.anyone_looks_under_18;
-      if (typeof people !== "number" || !Number.isInteger(people) || typeof faces !== "number" || !Number.isInteger(faces) || people < 0 || faces < 0) return unreadable();
-      return { facts: { people, faces, under18: under === "no" || under === "yes" ? under : "unsure" } };
-    } catch { return unreadable(); }
-  }
-  return unreadable();
+
+  const result = await completion("chat", [{
+    role: "user",
+    content: PROMPT,
+    images: [{ id: "likeness-check", name: "photo", url: `data:image/jpeg;base64,${jpeg.toString("base64")}`, reservedTokens: capability.pictureTokensMax }],
+  }], { temperature: 0, max_tokens: 120, thinking: false, dropReasoning: true, response_format: { type: "json_schema", json_schema: SCHEMA } }); // answer-budget
+  if (!result.ok) return unreadable();
+  if (result.value.finish_reason === "length" || !result.value.text.trim()) return unreadable();
+  try {
+    const parsed = JSON.parse(firstObject(result.value.text)) as { people?: unknown; faces?: unknown; anyone_looks_under_18?: unknown };
+    const people = parsed.people;
+    const faces = parsed.faces;
+    const under = parsed.anyone_looks_under_18;
+    if (typeof people !== "number" || !Number.isInteger(people) || typeof faces !== "number" || !Number.isInteger(faces) || people < 0 || faces < 0) return unreadable();
+    return { facts: { people, faces, under18: under === "no" || under === "yes" ? under : "unsure" } };
+  } catch { return unreadable(); }
 }
 
 type Inspection = { facts: PhotoFacts | null; line?: string };

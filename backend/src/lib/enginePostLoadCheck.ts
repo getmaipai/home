@@ -109,7 +109,7 @@ export async function runPostLoadCheck(
     client.chatComplete({
       model: "chat",
       messages: [{ role: "user", content: "Reply with just the word OK." }],
-      max_tokens: 16,
+      max_tokens: 16, // exact-ceiling: direct-engine capability smoke probe before role registration.
     }),
     // Fix E: one canned tool-calling round trip, `tool_choice: "required"`
     // so a genuine capability gap (declines every time) can't be
@@ -127,7 +127,7 @@ export async function runPostLoadCheck(
       .chatComplete({
         model: "chat",
         messages: [{ role: "user", content: "What is 2 plus 2?" }],
-        max_tokens: 64,
+        max_tokens: 64, // exact-ceiling: direct-engine capability smoke probe before role registration.
         tools: [
           {
             type: "function",

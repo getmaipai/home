@@ -13,6 +13,10 @@ decision history live in `docs/dev.md` and the records under `docs/plans/` and `
 - Rows that are done and verified, obsolete, duplicated or in conflict with `docs/design/RULES.md` move to
   `docs/BACKLOG-HISTORY.md` with the reason; nothing is deleted. The last sweep was 2026-10-17.
 
+## Reasoning reserve
+
+- [x] **REASONING-RESERVE-01: central reasoning room, one empty-length retry and ceiling guard** (S; built). Non-streaming calls share the reserve; streaming keeps its measured local ceilings.
+
 ## Photo checks
 
 - [x] **PHOTO-CHECK-01: photo inspector handles always-thinking models and unenforced JSON schemas** (S; built). Shared reasoning reserve, one larger retry, safe missing-age handling, and separate unreadable-photo copy.

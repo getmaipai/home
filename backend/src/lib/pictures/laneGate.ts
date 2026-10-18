@@ -10,7 +10,7 @@ import { decideAgeCheck, downscaleForCheck, recordWithheld, showsPossibleMinor, 
 import { speakerAgeBand } from "@/lib/ageBand";
 import type { PersonRow } from "@/types";
 import { getStackClient } from "@/lib/stackEngine";
-import { toWireMessage, type LlmMessage } from "@/lib/llm";
+import { completeViaStackRequest, type LlmMessage } from "@/lib/llm";
 import { CHILD_CONTENT_LINE, laneOf, markKidWithheld, type Lane } from "./lane";
 
 // ---------------------------------------------------------------- the child-safety question
@@ -111,11 +111,11 @@ async function askOne(bytes: Uint8Array): Promise<ChildSafetyCheck> {
       { role: "system", content: CHILD_SAFETY_SYSTEM_PROMPT },
       { role: "user", content: "Classify this image.", images: [{ id: "childcheck", name: "image", url: dataUrl, reservedTokens: 2560 }] },
     ];
-    const result = await getStackClient().chat({
-      model: "chat", messages: messages.map(toWireMessage), stream: false, temperature: 0, max_tokens: 160,
+    const result = await completeViaStackRequest("chat", {
+      model: "chat", messages, stream: false, temperature: 0, max_tokens: 160, // answer-budget
       response_format: { type: "json_schema", json_schema: CHILD_SAFETY_SCHEMA }, chat_template_kwargs: { enable_thinking: false },
-    }, { signal: controller.signal });
-    if ("stream" in result) return { ok: false, why: "unavailable" };
+    }, controller.signal);
+    if (!result.ok) return { ok: false, why: controller.signal.aborted ? "timeout" : "unavailable" };
     const content = (result.data as { choices?: Array<{ message?: { content?: string | null } }> }).choices?.[0]?.message?.content;
     const verdict = typeof content === "string" ? parseChildSafety(content) : null;
     return verdict ? { ok: true, verdict } : { ok: false, why: "unparsed" };

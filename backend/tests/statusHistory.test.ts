@@ -22,7 +22,7 @@ type EngineKind = HealthSnapshot["engines"]["chat"]["kind"];
 const kinds: EngineKind[] = ["url", "override", "selection", "stub", "stopped", "starting", "stalled", "none", "spawned", "restarting", "failed", "blocked"];
 const aliveValues: Array<boolean | null> = [true, false, null];
 const baseHealth = (): HealthSnapshot => ({
-  sidecars: [], brain: "none", voice: "none", ok: true, uptimeSeconds: 1,
+  llm: { empty_length_retry: 0 }, sidecars: [], brain: "none", voice: "none", ok: true, uptimeSeconds: 1,
   engines: Object.fromEntries(["chat", "embed", "background", "voice"].map((role) => [role, { kind: "none", alive: null, pid: null }])) as HealthSnapshot["engines"],
 });
 
@@ -200,12 +200,13 @@ test("fresh database migration creates the two status tables", () => {
   }
 });
 
-test("the existing health route keeps its current response shape", async () => {
+test("the existing health route includes the reasoning retry counter", async () => {
   const { TestClient } = await import("./client");
   const client = new TestClient();
   await client.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
   const res = await client.get("/api/health");
   expect(res.status).toBe(200);
   const body = await res.json() as Record<string, unknown>;
-  expect(Object.keys(body).sort()).toEqual(["brain", "engines", "ok", "sidecars", "uptimeSeconds", "voice"]);
+  expect(Object.keys(body).sort()).toEqual(["brain", "engines", "llm", "ok", "sidecars", "uptimeSeconds", "voice"]);
+  expect((body.llm as { empty_length_retry: number }).empty_length_retry).toBeGreaterThanOrEqual(0);
 });

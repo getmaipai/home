@@ -24,10 +24,14 @@ import type { ChatRole, ChatCompletionRequest, ChatCompletionChunk, ToolDefiniti
 import { validateToolMessages } from "@maipai/spec/llm/ts/types.js";
 import { readTextLines } from "@maipai/spec/streaming/ts/lineReader.js";
 import { seedFields } from "@/lib/benchSampling";
-import { feedThinkSplit, flushThinkSplit, newThinkSplitState, type ThinkSpan } from "@/lib/wellFormed";
+import { feedThinkSplit, flushThinkSplit, newThinkSplitState, visibleText, type ThinkSpan } from "@/lib/wellFormed";
 import { isStackRoleEnabled, getStackClient, recordStackChatIdentity, stackFailureResult, stackFailureFacts, resolveStackOffline, type StackFailureResult, type StackFailureFacts } from "@/lib/stackEngine";
 import { identityFromHeaders } from "@/lib/stack/client";
 import type { RoleRequest } from "@/lib/stack/types";
+
+import { cachedRoleHealth } from "@/lib/roleHealth";
+import { getActiveChatEngineIdentity } from "@/lib/stackEngine";
+import { availableAnswerTokens, ContextTooLargeError, setCeilingEngineIdentity, reasoningReserveFor, rememberCeilingSpentInvisibly, EmptyLengthError, logEmptyLengthRetry, type ReasoningContext } from "@/lib/reasoningReserve";
 
 // Session C step 0 (wave-2.md): a person every couple of seconds, burst
 // of a few - Session A's own per-person limit (its step 11) hadn't
@@ -108,7 +112,11 @@ export interface LlmCompleteOptions {
    * keeps the existing role-based selection. */
   model?: string;
   temperature?: number;
+  /** Non-streaming answer budget; streaming callers own their total ceiling. */
   max_tokens?: number;
+  signal?: AbortSignal;
+  /** Hard engine ceiling, only for a documented smoke check. */
+  exactCeiling?: boolean;
   /** Off by default (Jesse, 2026-09-04: "thinking mode off by default
    * with the ability to enable in chats when needed"): a household
    * member turns it on per message, not a standing mode, since the
@@ -320,7 +328,7 @@ export interface LlmCompleteValue {
 
 export type LlmOpResult =
   | { ok: true; value: LlmCompleteValue }
-  | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string };
+  | { ok: false; status: 400 | 503; code: "unsupported_role" | "invalid_input" | "unavailable"; error: string; reason?: "empty_length" | "context_too_large" };
 
 const VALID_MESSAGE_ROLES: ReadonlySet<string> = new Set(["system", "user", "assistant", "tool"]);
 
@@ -431,7 +439,7 @@ export function toWireMessage(message: LlmMessage): Omit<LlmMessage, "images" | 
 }
 
 function chatRequestBody(messages: LlmMessage[], opts: LlmCompleteOptions) {
-  const { thinking, dropReasoning, returnReasoning: _returnReasoning, tools, tool_choice, ...rest } = opts;
+  const { thinking, dropReasoning, returnReasoning: _returnReasoning, exactCeiling: _exactCeiling, signal: _signal, tools, tool_choice, ...rest } = opts;
   const offering = !!tools && tools.length > 0;
   return {
     offering,
@@ -496,15 +504,15 @@ function reasoningField(reasoning: string | null | undefined, opts: LlmCompleteO
  * differently-sized model can answer it there. */
 export type StackChatResult =
   | { ok: true; data: Record<string, unknown> }
-  | { ok: false; failure: StackFailureResult };
+  | { ok: false; failure: StackFailureResult & { reason?: "empty_length" | "context_too_large" } };
 
 /** Shared non-streaming Stack chat call for ordinary chat and the
  * background worker's judge request. Keeps identity and Repairs handling
  * in the same path for every caller. */
-export async function completeViaStackRequest(role: string, request: RoleRequest): Promise<StackChatResult> {
+async function stackRequestOnce(role: string, request: RoleRequest, signal?: AbortSignal): Promise<StackChatResult> {
   try {
     const client = getStackClient();
-    const result = await client.chat(request);
+    const result = await client.chat(request, { signal });
     if ("stream" in result) {
       // complete() never asks for stream: true; a Stack that streamed
       // anyway is a contract break worth a loud, distinct failure rather
@@ -519,9 +527,70 @@ export async function completeViaStackRequest(role: string, request: RoleRequest
   }
 }
 
+interface CeilingPlan { model?: string; answer?: number; context: ReasoningContext; ceiling?: number; failure?: boolean }
+function ceilingPlan(role: string, messages: LlmMessage[], opts: LlmCompleteOptions): CeilingPlan {
+  const health = cachedRoleHealth(role === "background" || role === "judge" ? "background" : "chat");
+  setCeilingEngineIdentity(getActiveChatEngineIdentity());
+  const model = opts.model && !["chat", "judge"].includes(opts.model) ? opts.model : health?.modelId ?? (role === "chat" ? getActiveChatEngineIdentity()?.model ?? undefined : undefined);
+  // Estimate only prompt material, never the encoded picture bytes. Picture
+  // token reservations come from the role's measured image limit.
+  const promptTokens = messages.reduce((total, message) => {
+    const { images, ...text } = message;
+    const chars = JSON.stringify(text, (key, value) => key === "url" ? "[picture]" : value).length;
+    const pictures = (images ?? []).reduce((n, image) => n + image.reservedTokens, 0) + (Array.isArray(message.content) ? message.content.filter((part) => part.type === "image_url").length * (health?.pictureTokensMax ?? health?.contextPerSlot ?? 4096) : 0);
+    return total + Math.ceil(chars / 2) + 16 + pictures;
+  }, 32) + Math.ceil(JSON.stringify(opts.tools ?? []).length / 2);
+  const context = { contextTokens: (!opts.model || ["chat", "judge"].includes(opts.model) || opts.model === health?.modelId) ? health?.contextPerSlot : undefined, promptTokens: promptTokens + Math.ceil(JSON.stringify(opts.response_format ?? {}).length / 2) };
+  const answer = opts.max_tokens;
+  const ceiling = answer === undefined || answer <= 0 || opts.exactCeiling ? answer : answer + reasoningReserveFor(model, answer, context);
+  if (answer && reasoningReserveFor(model, answer) > 0 && availableAnswerTokens(context) < answer) return { model, answer, context, ceiling, failure: true };
+  return { model, answer, context, ceiling };
+}
+function retryCeiling(role: string, plan: CeilingPlan): number {
+  setCeilingEngineIdentity(getActiveChatEngineIdentity());
+  rememberCeilingSpentInvisibly(plan.model);
+  const answer = plan.answer && plan.answer > 0 ? plan.answer : 1024;
+  const reserve = reasoningReserveFor(plan.model ?? { thinking_mode: "always" }, answer, plan.context, 2);
+  const ceiling = answer + reserve;
+  if (ceiling > (plan.ceiling ?? answer)) logEmptyLengthRetry(role, plan.model, answer, plan.ceiling ?? answer, ceiling);
+  return ceiling;
+}
+export async function complete(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions = {}): Promise<LlmOpResult> {
+  const invalid = validate(role, messages);
+  if (invalid) return invalid;
+  const plan = ceilingPlan(role, messages, opts);
+  if (plan.failure) return { ok: false, status: 400, code: "invalid_input", reason: "context_too_large", error: new ContextTooLargeError().message };
+  let result = await completeOnce(role, messages, { ...opts, max_tokens: plan.ceiling });
+  const empty = (r: LlmOpResult) => r.ok && r.value.finish_reason === "length" && !visibleText(r.value.text).trim() && !r.value.tool_calls?.length;
+  if (!empty(result)) return result;
+  if (result.ok && !plan.model) plan.model = result.value.model;
+  const next = opts.exactCeiling || opts.signal?.aborted ? (plan.ceiling ?? 0) : retryCeiling(role, plan);
+  if (!opts.exactCeiling && !opts.signal?.aborted && next > (plan.ceiling ?? 0)) result = await completeOnce(role, messages, { ...opts, max_tokens: next });
+  return empty(result) ? { ok: false, status: 503, code: "unavailable", reason: "empty_length", error: new EmptyLengthError().message } : result;
+}
+
+/** Raw Stack consumers use the same answer-budget and retry boundary. */
+export async function completeViaStackRequest(role: string, request: RoleRequest, signal?: AbortSignal, options: Pick<LlmCompleteOptions, "exactCeiling"> = {}): Promise<StackChatResult> {
+  const messages = request.messages as LlmMessage[];
+  const plan = ceilingPlan(role, messages, { ...request, ...options } as LlmCompleteOptions);
+  const wire = { ...request, messages: messages.map(toWireMessage) };
+  if (plan.failure) return { ok: false, failure: { ok: false, status: 503, code: "unavailable", reason: "context_too_large", error: new ContextTooLargeError().message } };
+  let result = await stackRequestOnce(role, { ...wire, max_tokens: plan.ceiling }, signal);
+  const empty = (r: StackChatResult) => {
+    if (!r.ok) return false;
+    const choice = (r.data as { choices?: Array<{ finish_reason?: string; message?: { content?: string; tool_calls?: unknown[] } }> }).choices?.[0];
+    return choice?.finish_reason === "length" && !visibleText(stripChatTemplateTokens(choice.message?.content ?? "")).trim() && !choice.message?.tool_calls?.length;
+  };
+  if (!empty(result)) return result;
+  if (result.ok && !plan.model && typeof result.data.model === "string") plan.model = result.data.model;
+  const next = options.exactCeiling || signal?.aborted ? (plan.ceiling ?? 0) : retryCeiling(role, plan);
+  if (!options.exactCeiling && !signal?.aborted && next > (plan.ceiling ?? 0)) result = await stackRequestOnce(role, { ...wire, max_tokens: next }, signal);
+  return empty(result) ? { ok: false, failure: { ok: false, status: 503, code: "unavailable", reason: "empty_length", error: new EmptyLengthError().message } } : result;
+}
+
 async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: LlmCompleteOptions): Promise<LlmOpResult> {
   const { offering, body } = chatRequestBody(messages, opts);
-  const result = await completeViaStackRequest(role, { ...body, model: opts.model ?? role });
+  const result = await stackRequestOnce(role, { ...body, model: opts.model ?? role }, opts.signal);
   if (!result.ok) return result.failure;
   const data = result.data as { choices?: Array<{ finish_reason?: string | null; message: { content: string; reasoning_content?: string | null; tool_calls?: ToolCallWire[] } }>; model?: string };
     const choice = data.choices?.[0];
@@ -530,7 +599,7 @@ async function completeViaStack(role: LlmRole, messages: LlmMessage[], opts: Llm
     return { ok: true, value: { text: stripChatTemplateTokens(choice.message.content ?? ""), finish_reason: choice.finish_reason, ...reasoningField(choice.message.reasoning_content, opts), model: data.model ?? role, ...(tool_calls !== undefined ? { tool_calls } : {}) } };
 }
 
-export async function complete(
+async function completeOnce(
   role: LlmRole,
   messages: LlmMessage[],
   opts: LlmCompleteOptions = {},
@@ -927,9 +996,9 @@ export type BackgroundResult = { ok: true; text: string } | { ok: false; unavail
 /** Runs memory extraction and summaries through the configured Stack judge. */
 export async function completeBackground(messages: LlmMessage[], options: LlmCompleteOptions = {}): Promise<BackgroundResult> {
   const { body } = chatRequestBody(messages, options);
-  const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" });
+  const result = await completeViaStackRequest("background", { ...body, model: options.model ?? "judge" }, options.signal, { exactCeiling: options.exactCeiling });
   if (!result.ok) {
-    return { ok: false, unavailable: true, failureKind: result.failure.failureKind };
+    return { ok: false, unavailable: true, failureKind: result.failure.reason ?? result.failure.failureKind };
   }
   const data = result.data as { choices?: Array<{ message?: { content?: string } }> };
   const content = data.choices?.[0]?.message?.content;

@@ -202,7 +202,7 @@ async function warmChatPrefix(client: LlamaServerClient): Promise<void> {
         { role: "user", content: "hi" },
       ],
       ...(warmup.tools && warmup.tools.length > 0 ? { tools: warmup.tools } : {}),
-      max_tokens: 1,
+      max_tokens: 1, // exact-ceiling: prefix cache warmup discards the answer.
       cache_prompt: true,
       id_slot: 0,
       chat_template_kwargs: { enable_thinking: false },
