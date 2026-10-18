@@ -4,6 +4,19 @@
   "title": "Saved",
   "body": [
     {
+      "type": "search",
+      "state": "q",
+      "placeholder": "Search News",
+      "submit": {
+        "navigate": {
+          "to": "/apps/news/search",
+          "state": {
+            "q": "{q}"
+          }
+        }
+      }
+    },
+    {
       "type": "list",
       "bind": {
         "source": "package",

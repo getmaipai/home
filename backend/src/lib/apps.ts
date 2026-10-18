@@ -221,8 +221,10 @@ function pageReferences(doc: unknown, packageId: string): { data: Set<string>; a
     if (Array.isArray(node)) { node.forEach(walkNode); return; }
     if (typeof node !== "object" || node === null) return;
     const obj = node as Record<string, unknown>;
-    const bind = obj.bind;
-    if (typeof bind === "object" && bind !== null && (bind as Record<string, unknown>).source === "package" && typeof (bind as Record<string, unknown>).path === "string") data.add((bind as { path: string }).path);
+    // A node's `bind`, and a `search` node's `recents` (NEWS-LOOK-02: a package binding written straight on the node).
+    for (const bind of [obj.bind, obj.recents]) {
+      if (typeof bind === "object" && bind !== null && (bind as Record<string, unknown>).source === "package" && typeof (bind as Record<string, unknown>).path === "string") data.add((bind as { path: string }).path);
+    }
     const call = obj.call;
     if (typeof call === "object" && call !== null && typeof (call as Record<string, unknown>).target === "string") {
       const target = (call as { target: string }).target;

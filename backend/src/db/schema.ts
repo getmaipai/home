@@ -2142,6 +2142,21 @@ export const newsReads = sqliteTable(
   (table) => [index("news_reads_person_item_idx").on(table.personId, table.itemId)],
 );
 
+// NEWS-LOOK-02 (spec NewsSearchRecent): one search a person ran in News, kept so the Search page can offer it again. Person scope,
+// never created for a child or a guest, at most 20 per person (oldest pruned), one per person and lower-cased query.
+export const newsSearchRecents = sqliteTable(
+  "news_search_recents",
+  {
+    id: text("id").primaryKey(),
+    personId: text("person_id").notNull().references(() => people.id),
+    q: text("q").notNull(),
+    at: text("at").notNull(),
+    hlc: text("hlc").notNull(),
+    provenance: text("provenance").notNull(),
+  },
+  (table) => [uniqueIndex("news_search_recents_person_q_idx").on(table.personId, sql`lower(${table.q})`)],
+);
+
 // MEDIA-KID-01: internal, private metering. Not synced as media records or exposed to admins.
 export const mediaWatchDays = sqliteTable("media_watch_days", {
   personId: text("person_id").notNull().references(() => people.id),

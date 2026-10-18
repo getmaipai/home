@@ -12,7 +12,7 @@ const dir = join(import.meta.dir, "../packages/news");
 const read = (file: string) => JSON.parse(readFileSync(join(dir, file), "utf-8"));
 const manifest = read("manifest.json");
 
-test("News is a valid manifest and its six pages validate against the pinned spec", () => {
+test("News is a valid manifest and its seven pages validate against the pinned spec", () => {
   const ajv = new Ajv2020({ strict: false });
   expect(PackageManifest.safeParse(manifest).success).toBe(true);
   expect(checkAppPackage("news", manifest.contributes, (module) => read(`pages/${module}.json`), manifest.min_role)).toEqual([]);
@@ -24,7 +24,7 @@ test("News is a valid manifest and its six pages validate against the pinned spe
 
 test("News declares list rows, local person keys and the shelf matrix without premature widget fields", () => {
   expect(manifest.offline).toBe("degraded");
-  expect(manifest.contributes.data.filter((entry: { rows?: string }) => entry.rows === "list").map((entry: { id: string }) => entry.id)).toEqual(["topics", "sources", "saved"]);
+  expect(manifest.contributes.data.filter((entry: { rows?: string }) => entry.rows === "list").map((entry: { id: string }) => entry.id)).toEqual(["topics", "sources", "saved", "search-recents"]);
   for (const key of manifest.config) expect(SettingsKey.safeParse(key).success).toBe(true);
   expect(manifest.config.filter((key: { scope: string }) => key.scope === "person").map((key: { key: string }) => key.key)).toEqual(["news.my_mix", "news.reader_open", "news.digest"]);
   expect(manifest.contributes.settings_area.sections[1].min_role).toBe("admin");
@@ -34,7 +34,7 @@ test("News declares list rows, local person keys and the shelf matrix without pr
 
 test("page references declare every data id and keep Mix-only actions off child pages", () => {
   const references = new Map<string, Set<string>>();
-  const permitted = new Set(["page", "section", "answer_blocks", "tabs", "list", "picker", "empty_state"]);
+  const permitted = new Set(["page", "section", "answer_blocks", "tabs", "list", "picker", "empty_state", "search"]);
   function visit(value: unknown, found: Set<string>): void {
     if (!value || typeof value !== "object") return;
     if (Array.isArray(value)) { value.forEach((item) => visit(item, found)); return; }

@@ -2,6 +2,13 @@
 
 All notable changes to the News package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [Unreleased]
+
+### Added
+
+- A Search page (not in the tab strip) with a search box on every page that shows stories, topic chips on Today and My Mix, a date line, day headings and a line above each headline.
+- Recent searches, kept per person on this hub, never for a child.
+
 ## [0.3.0] - 2026-10-17
 
 ### Added

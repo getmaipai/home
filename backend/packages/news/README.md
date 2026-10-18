@@ -1,8 +1,8 @@
 # News
 
-News reads the household's local shelf in chat and at `/apps/news`. Today, Following, Saved, Channel and Story are available from the child role upward. My Mix requires the teen role. Guests cannot open the app or its data.
+News reads the household's local shelf in chat and at `/apps/news`. Today, Following, Saved, Channel, Search and Story are available from the child role upward. My Mix requires the teen role. Guests cannot open the app or its data.
 
-The six pages are schema data. The hub supplies `story_feed` and `article` answer blocks; topics, sources and saved stories use bare list rows. `household-today` is declared for a later shared-screen surface and is used by no page. No browser fetches a publisher's pictures directly.
+The seven pages are schema data (Search is reached from the search box, not from the tab strip). The hub supplies `story_feed` and `article` answer blocks; topics, sources, saved stories and recent searches use bare list rows. Today and My Mix pass the chosen topic chip to their data as the `topic` param (the answer_blocks node's `filter_state`); Search passes `q` and `topic` (`""` All, `__saved`, `__today`, or a topic id). `search_recent` and `search_recent_clear` are the two actions behind the search box; a child keeps no recents. `household-today` is declared for a later shared-screen surface and is used by no page. No browser fetches a publisher's pictures directly.
 
 The News gear holds reading choices and the admin's News shelf matrix and feed boxes. The package declares `news.my_mix`, `news.reader_open` and `news.digest` in `config[]`, which Home's registry loads. These declarations are spec-owed until a shared spec tag carries them. Their consumers arrive in NEWS-04 through NEWS-06. A child's reader stays inside News and has no inferred interests.
 

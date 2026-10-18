@@ -1,0 +1,79 @@
+{
+  "type": "page",
+  "id": "news-search",
+  "title": "Search",
+  "body": [
+    {
+      "type": "search",
+      "state": "q",
+      "label": "Search News",
+      "placeholder": "Search News",
+      "recents": {
+        "source": "package",
+        "path": "search-recents"
+      },
+      "submit": {
+        "call": {
+          "target": "/api/plugins/news/actions/search_recent",
+          "args": {
+            "q": "{q}"
+          }
+        }
+      },
+      "clear_recents": {
+        "call": {
+          "target": "/api/plugins/news/actions/search_recent_clear"
+        }
+      }
+    },
+    {
+      "type": "answer_blocks",
+      "bind": {
+        "source": "package",
+        "path": "search",
+        "params": {
+          "q": "$state.q",
+          "topic": "$state.topic"
+        }
+      },
+      "filter_state": "topic",
+      "kinds": [
+        "story_feed"
+      ],
+      "actions": {
+        "open": {
+          "navigate": {
+            "to": "/apps/news/story",
+            "state": {
+              "id": "{item_id}"
+            }
+          }
+        },
+        "save": {
+          "call": {
+            "target": "/api/plugins/news/actions/save",
+            "args": {
+              "item_id": "{item_id}",
+              "on": "{on}"
+            }
+          }
+        },
+        "follow": {
+          "call": {
+            "target": "/api/plugins/news/actions/follow",
+            "args": {
+              "kind": "{channel_kind}",
+              "key": "{channel_key}",
+              "on": "{on}"
+            }
+          }
+        }
+      },
+      "empty_state": {
+        "type": "empty_state",
+        "icon": "search",
+        "text": "No stories match your search. Try fewer words, or take off a filter."
+      }
+    }
+  ]
+}

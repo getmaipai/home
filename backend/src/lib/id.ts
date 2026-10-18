@@ -210,6 +210,11 @@ export function newNewsSaveId(): string {
   return `save-${randomSuffix(10)}`;
 }
 
+/** Matches spec/schemas/news-search-recent.schema.json's `^recent-[a-z0-9]{6,}$` (NEWS-LOOK-02). */
+export function newNewsSearchRecentId(): string {
+  return `recent-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/news-read.schema.json's `^read-[a-z0-9]{6,}$` (NEWS-02). */
 export function newNewsReadId(): string {
   return `read-${randomSuffix(10)}`;

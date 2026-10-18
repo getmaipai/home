@@ -4,10 +4,26 @@
   "title": "My Mix",
   "body": [
     {
+      "type": "search",
+      "state": "q",
+      "placeholder": "Search News",
+      "submit": {
+        "navigate": {
+          "to": "/apps/news/search",
+          "state": {
+            "q": "{q}"
+          }
+        }
+      }
+    },
+    {
       "type": "answer_blocks",
       "bind": {
         "source": "package",
-        "path": "mix"
+        "path": "mix",
+        "params": {
+          "topic": "$state.topic"
+        }
       },
       "kinds": [
         "story_feed"
@@ -73,7 +89,8 @@
         "type": "empty_state",
         "icon": "newspaper",
         "text": "No stories yet. Check back soon."
-      }
+      },
+      "filter_state": "topic"
     }
   ]
 }

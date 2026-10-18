@@ -26,6 +26,7 @@ import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } fr
 import { TOPICS, topicById, topicOfferedTo, topicsFor } from "./topics";
 import { bumpNewsCounter } from "./newsCounters";
 import { feedLabels } from "./feedLabels";
+import { datelineOf, dayGroupOf } from "./dayParts";
 
 export interface BlocksData { as_of: string; blocks: unknown[]; degraded?: true }
 export type RowsData = Array<Record<string, unknown>>;
@@ -38,19 +39,20 @@ const CANDIDATES = 500;
 const ROWS_PAGE = 20;
 const ROWS_MAX = 60;
 const SHELF_MAX = 8;
+const FILTERS_MAX = 9;
 
 export function viewerOf(person: PersonRow, now = new Date()): Viewer {
   return { personId: person.id, band: speakerAgeBand(person, now) };
 }
 
 /** The blocks a viewer may be shown: the manifest allowlist, the block schema, the band and the output floor. */
-function finishBlocks(person: Pick<PersonRow, "displayName">, band: AgeBand, raw: unknown[]): unknown[] {
+export function finishBlocks(person: Pick<PersonRow, "displayName">, band: AgeBand, raw: unknown[]): unknown[] {
   const loaded = loadManifestOnly("news");
   // No actor: publisher text is not the person's activity, so the filter never tells a parent about it.
   return filterAnswerBlocks(raw, "news", loaded.ok ? loaded.value.returns_blocks ?? [] : [], band, null);
 }
 
-const blockBase = (kind: string, alt: string, provenance: string) => ({
+export const blockBase = (kind: string, alt: string, provenance: string) => ({
   id: `blk-${randomSuffix(10)}`, kind, schema_version: 1, producer: "news", alt: alt.slice(0, 300), provenance, created_at: new Date().toISOString(), hlc: nextHlc(),
 });
 
@@ -64,6 +66,10 @@ interface FeedRequest {
   channel?: { kind: "topic" | "source"; key: string; followed: boolean };
   windowH: number;
   match?: (item: ShelfItem) => boolean;
+  /** The chosen topic chip (a topic id, or "" for All). The caller has already checked it against the band. */
+  topic?: string;
+  /** Whether the block carries the topic chip row (Today and My Mix, never a child's, never a channel). */
+  filters?: boolean;
   followed: { topics: Set<string>; sources: Set<string> };
   shelf: boolean;
   page: number;
@@ -79,8 +85,22 @@ function rankInputOf(item: ShelfItem, card: StoryCard): RankInput {
   };
 }
 
+/** The topic chip a page sent back: a topic id this band is offered, else "" (All). Never an error, never a topic the band is not shown. */
+export function topicParam(body: Record<string, unknown>, band: AgeBand): string {
+  const value = typeof body.topic === "string" ? body.topic.trim() : "";
+  return value && topicOfferedTo(value, band) ? value : "";
+}
+
+/** The line above a headline. A child is shown the topic name only: never "Top story", an outlet count, a time or a publisher address. */
+export function withKicker(card: StoryCard, band: AgeBand, hero = false): StoryCard {
+  const topic = card.topics[0] ? topicById(card.topics[0])?.label : undefined;
+  const kicker = band === "child" ? topic : hero && card.outlets >= 2 ? `Top story · ${card.outlets} outlets` : topic ?? card.publisher;
+  return kicker ? { ...card, kicker: kicker.slice(0, 80) } : card;
+}
+
 function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
-  const items = releaseShelfItems(env.viewer.band, CANDIDATES, env.store)
+  const band = env.viewer.band;
+  const items = releaseShelfItems(band, CANDIDATES, env.store)
     .filter((item) => ageMs(item, now) <= request.windowH * HOUR_MS && (!request.match || request.match(item)));
   const cards = new Map<string, StoryCard>();
   const byItem = new Map<string, ShelfItem>();
@@ -88,25 +108,34 @@ function feedBlock(env: CardEnv, request: FeedRequest, now: Date): unknown[] {
     const card = cardOf(item, env);
     if (card) { cards.set(item.id, card); byItem.set(item.id, item); }
   }
-  if (cards.size === 0) return [];
-  const ranked = rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
+  // The chips list the topics that have stories in this window (before the chosen chip narrows it), in the topic file's order.
+  const topic = request.topic ?? "";
+  const present = new Set([...cards.values()].flatMap((card) => card.topics));
+  const filters = request.filters && band !== "child"
+    ? [{ id: "", label: "All", selected: topic === "" }, ...topicsFor(band).filter((entry) => present.has(entry.id)).slice(0, FILTERS_MAX).map((entry) => ({ id: entry.id, label: entry.label, selected: topic === entry.id }))]
+    : undefined;
+  if (topic) for (const [id, card] of cards) if (!card.topics.includes(topic)) cards.delete(id);
+  if (cards.size === 0 && !(topic && filters)) return [];
+  const ranked = cards.size === 0 ? { hero: undefined, featured: [], rest: [] } : rankStories({ stories: [...cards.values()].map((card) => rankInputOf(byItem.get(card.item_id)!, card)), now, followed: request.followed, mode: request.signal ? "mix" : "today", signal: request.signal });
   const cardFor = (input: RankInput): StoryCard => cards.get(input.item_id)!;
-  const hero = ranked.hero ? cardFor(ranked.hero) : undefined;
-  const featured = ranked.featured.map(cardFor);
+  const hero = ranked.hero ? withKicker(cardFor(ranked.hero), band, true) : undefined;
+  const featured = ranked.featured.map(cardFor).map((card) => withKicker(card, band));
   const shown = new Set([hero?.item_id, ...featured.map((card) => card.item_id)]);
   const recent = ranked.rest.map(cardFor).filter((card) => now.getTime() - Date.parse(card.published_at) <= ROWS_WINDOW_H * HOUR_MS || request.layout === "channel");
   recent.sort((a, b) => b.published_at.localeCompare(a.published_at));
-  const rows = recent.slice(0, Math.min(ROWS_MAX, ROWS_PAGE * Math.max(1, request.page)));
-  const shelves = request.shelf ? channelShelf(env, request.followed, shown, now) : [];
+  const rows = recent.slice(0, Math.min(ROWS_MAX, ROWS_PAGE * Math.max(1, request.page)))
+    .map((card) => ({ ...withKicker(card, band), group: dayGroupOf(new Date(card.published_at), now) }));
+  const shelves = request.shelf && !topic ? channelShelf(env, request.followed, shown, now) : [];
   const total = (hero ? 1 : 0) + featured.length + rows.length + shelves.reduce((sum, shelf) => sum + shelf.stories.length, 0);
-  if (total === 0) return [];
+  if (total === 0 && !(topic && filters)) return [];
   const lead = hero ?? featured[0] ?? rows[0] ?? shelves[0]?.stories[0];
   const alt = `${request.title}: ${lead ? `${lead.title}, ${lead.publisher}` : "no stories"}${total > 1 ? `, and ${total - 1} more ${total - 1 === 1 ? "story" : "stories"}` : ""}.`;
   return [{
     ...blockBase("story_feed", alt, request.provenance),
     props: {
       layout: request.layout,
-      header: { title: request.title, ...(request.subtitle ? { subtitle: request.subtitle } : {}), ...(request.channel ? { channel: request.channel } : {}) },
+      header: { title: request.title, ...(request.subtitle ? { subtitle: request.subtitle } : {}), dateline: datelineOf(now), ...(request.channel ? { channel: request.channel } : {}) },
+      ...(filters ? { filters } : {}),
       ...(hero ? { hero } : {}), featured, shelves, rows, as_of: now.toISOString(),
     },
   }];
@@ -127,7 +156,7 @@ function channelShelf(env: CardEnv, followed: { topics: Set<string>; sources: Se
     const card = match ? cardOf(match, env) : null;
     if (card) { stories.push(card); used.add(card.item_id); }
   }
-  return stories.length > 0 ? [{ title: "From your channels", channels: channels.slice(0, 6), stories: stories.slice(0, 12) }] : [];
+  return stories.length > 0 ? [{ title: "From your channels", channels: channels.slice(0, 6), stories: stories.slice(0, 12).map((card) => withKicker(card, env.viewer.band)) }] : [];
 }
 
 const pageOf = (body: Record<string, unknown>): number => {
@@ -145,7 +174,7 @@ export function todayData(person: PersonRow, body: Record<string, unknown>, now 
   const viewer = viewerOf(person, now);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
-  const raw = feedBlock(env, { layout: "today", title: "Today", windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), provenance: "news data today" }, now);
+  const raw = feedBlock(env, { layout: "today", title: "Today", windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), topic: topicParam(body, viewer.band), filters: true, provenance: "news data today" }, now);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
@@ -156,7 +185,7 @@ export function mixData(person: PersonRow, body: Record<string, unknown>, now = 
   if (!shelfEnabled()) return emptyBlocks(false);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
-  const raw = feedBlock(env, { layout: "today", title: "My Mix", signal: recomputeMix(person.id, now), windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), provenance: "news data mix" }, now);
+  const raw = feedBlock(env, { layout: "today", title: "My Mix", signal: recomputeMix(person.id, now), windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), topic: topicParam(body, viewer.band), filters: true, provenance: "news data mix" }, now);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
@@ -193,7 +222,7 @@ export function channelData(person: PersonRow, body: Record<string, unknown>, no
   const followed = followedChannels(person.id);
   const raw = feedBlock(env, {
     layout: "channel", title, ...(subtitle ? { subtitle } : {}), channel: { kind, key, followed: isFollowing(person.id, kind, key) },
-    windowH: CHANNEL_WINDOW_H, match, followed, shelf: false, page: pageOf(body), provenance: "news data channel",
+    windowH: CHANNEL_WINDOW_H, match, followed, shelf: false, page: pageOf(body), topic: topicParam(body, viewer.band), provenance: "news data channel",
   }, now);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }

@@ -14,14 +14,14 @@ import { resetDb } from "./reset-db";
 const dir = join(PACKAGES_DIR, "news");
 const manifest = JSON.parse(readFileSync(join(dir, "manifest.json"), "utf-8")) as PackageManifest;
 const contributes = manifest.contributes as AppContributes;
-const pages = ["index", "mix", "following", "saved", "channel", "story"];
-const ids = ["today", "mix", "topics", "sources", "channel", "saved", "story", "household-today"];
-const actions = ["follow", "save", "read", "feedback", "reset_mix", "summarize"];
+const pages = ["index", "mix", "following", "saved", "channel", "story", "search"];
+const ids = ["today", "mix", "topics", "sources", "channel", "saved", "story", "household-today", "search", "search-recents"];
+const actions = ["follow", "save", "read", "feedback", "reset_mix", "summarize", "search_recent", "search_recent_clear"];
 const readPage = (module: string) => JSON.parse(readFileSync(join(dir, "pages", `${module}.json`), "utf-8"));
 
 beforeEach(() => { resetDb(); __resetAppCachesForTests(); });
 
-test("the pinned spec and Home accept all six News pages and the settings area", () => {
+test("the pinned spec and Home accept all seven News pages and the settings area", () => {
   expect(checkAppPackage("news", contributes, readPage, manifest.min_role)).toEqual([]);
   expect(appPackageProblems(manifest, dir)).toEqual([]);
   expect(contributes.data?.map((entry) => entry.id)).toEqual(ids);
@@ -64,7 +64,7 @@ function walk(value: unknown, visit: (node: Record<string, unknown>) => void): v
 
 test("every reference is declared and every Mix-only data id and action stays above a child", () => {
   const refs = new Map<string, { data: Set<string>; actions: Set<string> }>();
-  const nodes = new Set(["page", "section", "answer_blocks", "tabs", "list", "picker", "empty_state"]);
+  const nodes = new Set(["page", "section", "answer_blocks", "tabs", "list", "picker", "empty_state", "search"]);
   for (const page of pages) {
     const found = { data: new Set<string>(), actions: new Set<string>() };
     walk(readPage(page), (node) => {

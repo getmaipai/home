@@ -9,7 +9,7 @@ import type { PersonRow } from "@/types";
 import { loadContent } from "./article";
 import { releasedItem, storyIdOf, type Viewer } from "./cards";
 import { ensureAndPinNewsPicture, newsPictureCached, pinNewsPicture } from "./pictures";
-import { addSave, itemIsSaved, recordRead, removeSave, resetMix, recomputeMix, setFollow } from "./records";
+import { addSave, clearRecents, itemIsSaved, recordRecent, recordRead, removeSave, resetMix, recomputeMix, setFollow } from "./records";
 import { topicOfferedTo } from "./topics";
 import { viewerOf } from "./data";
 
@@ -17,7 +17,7 @@ import { summarizeStory, SUMMARY_SOURCE_NOTE } from "./summary";
 
 export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404; error: string };
 
-export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix", "summarize"] as const;
+export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix", "summarize", "search_recent", "search_recent_clear"] as const;
 export type NewsActionName = (typeof NEWS_ACTIONS)[number];
 
 const MAX_SAVE_BATCH = 20;
@@ -101,6 +101,16 @@ function resetMixAction(person: PersonRow, viewer: Viewer): ActionResult {
   return ok({ removed: resetMix(person.id).removed });
 }
 
+/** Keeps one search of the person's own, for the Search page to offer again. A child, a guest and an empty query keep nothing, and the answer is the same either way. */
+function searchRecent(person: PersonRow, viewer: Viewer, body: Record<string, unknown>): ActionResult {
+  if (person.role !== "guest" && typeof body.q === "string") recordRecent(person.id, viewer.band, body.q);
+  return ok();
+}
+
+function searchRecentClear(person: PersonRow): ActionResult {
+  return ok({ removed: person.role === "guest" ? 0 : clearRecents(person.id) });
+}
+
 export async function runNewsAction(person: PersonRow, action: NewsActionName, body: Record<string, unknown>, now = new Date()): Promise<ActionResult> {
   const viewer = viewerOf(person, now);
   switch (action) {
@@ -115,5 +125,7 @@ export async function runNewsAction(person: PersonRow, action: NewsActionName, b
     case "read": return read(person, viewer, body);
     case "feedback": return feedback(person, viewer, body);
     case "reset_mix": return resetMixAction(person, viewer);
+    case "search_recent": return searchRecent(person, viewer, body);
+    case "search_recent_clear": return searchRecentClear(person);
   }
 }

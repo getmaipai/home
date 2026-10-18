@@ -25,6 +25,10 @@ export interface StoryCard {
   saved: boolean;
   opened: boolean;
   open_url?: string;
+  /** The hub-built line above the headline (data.ts `withKicker`). */
+  kicker?: string;
+  /** The day heading of a row (data.ts, `dayGroupOf`). */
+  group?: string;
 }
 
 export interface Viewer { personId: string | null; band: AgeBand }

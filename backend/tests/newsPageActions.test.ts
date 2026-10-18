@@ -46,3 +46,31 @@ describe("a shelf's channel button has somewhere to go", () => {
     });
   }
 });
+
+describe("the search box (NEWS-LOOK-02)", () => {
+  const page = (name: string) => JSON.parse(readFileSync(join(PAGES, name), "utf-8")) as { body: Node[] };
+
+  test("every story page opens on a search box that navigates to the Search page with the query", () => {
+    for (const file of ["index.json", "mix.json", "following.json", "saved.json", "channel.json", "story.json"]) {
+      expect(page(file).body[0], file).toEqual({ type: "search", state: "q", placeholder: "Search News", submit: { navigate: { to: "/apps/news/search", state: { q: "{q}" } } } });
+    }
+  });
+
+  test("the Search page records a search with its text, clears with no body, and reads its results from q and the chip", () => {
+    const [field, results] = page("search.json").body as [Node, Node];
+    expect((field.submit as { call: { target: string; args: Node } }).call).toEqual({ target: "/api/plugins/news/actions/search_recent", args: { q: "{q}" } });
+    expect((field.clear_recents as { call: { target: string } }).call.target).toBe("/api/plugins/news/actions/search_recent_clear");
+    expect(field.recents).toEqual({ source: "package", path: "search-recents" });
+    expect(results.bind).toEqual({ source: "package", path: "search", params: { q: "$state.q", topic: "$state.topic" } });
+    expect(results.filter_state).toBe("topic");
+    expect(Object.keys(results.actions as Node).sort()).toEqual(["follow", "open", "save"]);
+  });
+
+  test("Today and My Mix pass the chosen topic chip to their data", () => {
+    for (const file of ["index.json", "mix.json"]) {
+      const feed = page(file).body.find((node) => node.type === "answer_blocks")!;
+      expect(feed.filter_state, file).toBe("topic");
+      expect((feed.bind as { params: Node }).params, file).toEqual({ topic: "$state.topic" });
+    }
+  });
+});

@@ -428,6 +428,14 @@
         "module": "channel"
       },
       {
+        "id": "search",
+        "label": "Search",
+        "icon": "search",
+        "nav": false,
+        "kind": "schema",
+        "module": "search"
+      },
+      {
         "id": "story",
         "label": "Story",
         "icon": "book-open",
@@ -470,6 +478,15 @@
       },
       {
         "id": "household-today",
+        "refresh_s": 300
+      },
+      {
+        "id": "search",
+        "refresh_s": 300
+      },
+      {
+        "id": "search-recents",
+        "rows": "list",
         "refresh_s": 300
       }
     ],

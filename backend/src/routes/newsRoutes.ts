@@ -11,13 +11,14 @@ import type { AppEnv } from "@/types";
 import { appImageAllowed, appRouteAllowed } from "@/lib/apps";
 import { NEWS_ACTIONS, runNewsAction, type NewsActionName } from "@/lib/news/actions";
 import { channelData, householdTodayData, mixData, savedRows, sourceRows, storyData, todayData, topicRows, viewerOf } from "@/lib/news/data";
+import { recentRows, searchData } from "@/lib/news/search";
 import { releasedItem } from "@/lib/news/cards";
 import { bumpNewsCounter } from "@/lib/news/newsCounters";
 import { NEWS_PICTURE_WIDTHS, newsPicture, type NewsPictureWidth } from "@/lib/news/pictures";
 
 export const newsRoutes = new Hono<AppEnv>();
 
-const DATA_IDS = ["today", "mix", "channel", "story", "household-today", "topics", "sources", "saved"] as const;
+const DATA_IDS = ["today", "mix", "channel", "story", "household-today", "topics", "sources", "saved", "search", "search-recents"] as const;
 type DataId = (typeof DATA_IDS)[number];
 const isDataId = (value: string): value is DataId => (DATA_IDS as readonly string[]).includes(value);
 const isAction = (value: string): value is NewsActionName => (NEWS_ACTIONS as readonly string[]).includes(value);
@@ -53,6 +54,8 @@ newsRoutes.post("/data/:dataId", requireAuth, async (c) => {
     case "topics": return c.json(topicRows(person), 200);
     case "sources": return c.json(sourceRows(person), 200);
     case "saved": return c.json(savedRows(person), 200);
+    case "search": return c.json(searchData(person, body), 200);
+    case "search-recents": return c.json(recentRows(person), 200);
   }
 });
 

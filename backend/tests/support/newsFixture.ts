@@ -55,13 +55,13 @@ export function installNewsApp(options: NewsAppOptions = {}): void {
   manifest.version = NEWS_VERSION;
   manifest.returns_blocks = ["story_feed", "article"];
   const roles = { mix: "teen", ...(options.pageRoles ?? {}) };
-  const page = (id: string, module: string) => ({ id, label: id, icon: "newspaper", nav: true, kind: "schema", module, ...(roles[id as keyof typeof roles] ? { min_role: roles[id as keyof typeof roles] } : {}) });
+  const page = (id: string, module: string) => ({ id, label: id, icon: "newspaper", nav: !["channel", "story", "search"].includes(id), kind: "schema", module, ...(roles[id as keyof typeof roles] ? { min_role: roles[id as keyof typeof roles] } : {}) });
   manifest.contributes = {
     ...manifest.contributes,
-    pages: [page("index", "news-today"), page("following", "news-following"), page("mix", "news-mix"), page("channel", "news-channel"), page("saved", "news-saved"), page("story", "news-story")],
+    pages: [page("index", "news-today"), page("following", "news-following"), page("mix", "news-mix"), page("channel", "news-channel"), page("saved", "news-saved"), page("story", "news-story"), page("search", "news-search")],
     data: [
       { id: "today" }, { id: "mix" }, { id: "channel" }, { id: "story" }, { id: "household-today" },
-      { id: "topics", rows: "list" }, { id: "sources", rows: "list" }, { id: "saved", rows: "list" },
+      { id: "topics", rows: "list" }, { id: "sources", rows: "list" }, { id: "saved", rows: "list" }, { id: "search" }, { id: "search-recents", rows: "list" },
     ],
   };
   writeFileSync(join(dir, "manifest.json"), JSON.stringify(manifest));
@@ -69,6 +69,7 @@ export function installNewsApp(options: NewsAppOptions = {}): void {
   const docs: Record<string, unknown> = {
     "news-today": specPage("news-today.json"), "news-following": specPage("news-following.json"), "news-story": specPage("news-story.json"),
     "news-mix": mixPage, "news-channel": channelPage, "news-saved": savedPage,
+    "news-search": JSON.parse(readFileSync(join(PACKAGES_DIR, "news", "pages", "search.json"), "utf-8")),
   };
   // The fixture story page also lists the household-today id and the read action so every id and action is owned by a page.
   for (const [module, doc] of Object.entries(docs)) writeFileSync(join(dir, "pages", `${module}.json`), JSON.stringify(doc));

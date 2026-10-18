@@ -3,16 +3,17 @@
 // is no listing across people, no admin read and no count that names a person (RULES 6a). Every write crosses the spec's
 // generated validator (a row is always the spec shape) and stamps a fresh hlc. A person's forget removes all three tables'
 // rows (lib/personLifecycle.ts).
-import { and, desc, eq, lt, isNull } from "drizzle-orm";
+import { and, desc, eq, lt, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { newsInterests, newsReads, newsSaves, people } from "@/db/schema";
+import { newsInterests, newsReads, newsSaves, newsSearchRecents, people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
-import { newNewsInterestId, newNewsReadId, newNewsSaveId } from "@/lib/id";
+import { newNewsInterestId, newNewsReadId, newNewsSaveId, newNewsSearchRecentId } from "@/lib/id";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { NewsInterest } from "@maipai/spec/gen/ts/news-interest.js";
 import { NewsRead } from "@maipai/spec/gen/ts/news-read.js";
 import { NewsSave } from "@maipai/spec/gen/ts/news-save.js";
-import { validateNewsInterest } from "@maipai/spec/records/ts/validate.js";
+import { NewsSearchRecent } from "@maipai/spec/gen/ts/news-search-recent.js";
+import { validateNewsInterest, validateNewsSearchRecent } from "@maipai/spec/records/ts/validate.js";
 import { computeAffinity, type MixActivity } from "./mixAffinity";
 import type { MixSignal } from "./rankStories";
 import { getPersonSettingValue } from "@/lib/settings";
@@ -177,6 +178,42 @@ export function recordRead(personId: string, input: { itemId: string; storyId: s
   return record;
 }
 
+// ---- Search recents (NewsSearchRecent) ---------------------------------------------------------
+
+export const RECENTS_KEEP = 20;
+export const RECENTS_SHOWN = 5;
+export const RECENT_MAX_CHARS = 120;
+
+/** The person's last searches, newest first. The query text is the person's own and is returned to nobody else. */
+export function listRecents(personId: string, limit = RECENTS_SHOWN): NewsSearchRecent[] {
+  return db.select().from(newsSearchRecents).where(eq(newsSearchRecents.personId, personId)).orderBy(desc(newsSearchRecents.at), desc(newsSearchRecents.id)).limit(limit).all().map((row) => NewsSearchRecent.parse({
+    id: row.id, person_id: row.personId, q: row.q, at: row.at, hlc: row.hlc, provenance: row.provenance, source: "hub",
+  }));
+}
+
+/** Records one search, or bumps the person's earlier identical one (same text ignoring case) to the top. A child keeps none
+ * (the spec's validator refuses the row); an empty query keeps none; past 20 the oldest go. Returns whether a row was kept. */
+export function recordRecent(personId: string, band: AgeBand, rawQuery: string, nowIso = new Date().toISOString()): boolean {
+  const q = rawQuery.replace(/\s+/g, " ").trim().slice(0, RECENT_MAX_CHARS).trim();
+  if (!q || band === "child") return false;
+  const draft = NewsSearchRecent.parse({ id: newNewsSearchRecentId(), person_id: personId, q, at: nowIso, hlc: nextHlc(), provenance: PROVENANCE, source: "hub" });
+  const problems = validateNewsSearchRecent(draft, band);
+  if (problems.length > 0) return false;
+  return db.transaction(() => {
+    const existing = db.select().from(newsSearchRecents).where(and(eq(newsSearchRecents.personId, personId), sql`lower(${newsSearchRecents.q}) = ${q.toLowerCase()}`)).get();
+    if (existing) db.update(newsSearchRecents).set({ q, at: nowIso, hlc: draft.hlc }).where(eq(newsSearchRecents.id, existing.id)).run();
+    else db.insert(newsSearchRecents).values({ id: draft.id, personId, q, at: nowIso, hlc: draft.hlc, provenance: draft.provenance }).run();
+    const rows = db.select({ id: newsSearchRecents.id }).from(newsSearchRecents).where(eq(newsSearchRecents.personId, personId)).orderBy(desc(newsSearchRecents.at), desc(newsSearchRecents.id)).all();
+    for (const old of rows.slice(RECENTS_KEEP)) db.delete(newsSearchRecents).where(eq(newsSearchRecents.id, old.id)).run();
+    return true;
+  });
+}
+
+/** Clear: every recent search of this person. */
+export function clearRecents(personId: string): number {
+  return db.delete(newsSearchRecents).where(eq(newsSearchRecents.personId, personId)).returning({ id: newsSearchRecents.id }).all().length;
+}
+
 /** The person-forget rule: every follow, save and read of this person goes, and a saved story no other person saved is let go of
  * (its pinned text and picture return to the ordinary prune and cache limits). */
 export function forgetNewsOfPerson(personId: string): void {
@@ -184,6 +221,7 @@ export function forgetNewsOfPerson(personId: string): void {
   db.delete(newsInterests).where(eq(newsInterests.personId, personId)).run();
   db.delete(newsSaves).where(eq(newsSaves.personId, personId)).run();
   db.delete(newsReads).where(eq(newsReads.personId, personId)).run();
+  db.delete(newsSearchRecents).where(eq(newsSearchRecents.personId, personId)).run();
   for (const itemId of new Set(itemIds)) {
     if (itemIsSaved(itemId)) continue;
     try { sharedShelfStore()?.pinContent(itemId, false); } catch { /* disposable cache */ }
