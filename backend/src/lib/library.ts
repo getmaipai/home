@@ -3,6 +3,7 @@ import { canReadFileAudience, fileAudience, fileVisibilitySql } from "@/lib/acce
 import { mediaKindSql } from "@/lib/storage/usage";
 import { libraryProvenanceSql } from "@/lib/libraryProvenance";
 import { trashTotals } from "@/lib/libraryTrash";
+import { expiringLibraryFiles } from "@/lib/libraryRetention";
 import type { PersonRow } from "@/types";
 
 export interface LibraryQuery { limit?: number; cursor?: string; type?: string; owner?: string; shared?: "with-me" | "by-me"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
@@ -81,10 +82,11 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   const more = rows.length > limit;
   const page = rows.slice(0,limit);
   const last = page.at(-1);
+  const expiring = expiringLibraryFiles(actor.id);
   return { items: page.filter(row => canReadFileAudience(actor, { ownerPersonId: row.owner_person_id, provenance: row.provenance })).map(row => ({ id: row.id, kind: row.kind, name: row.name, media_type: row.media_type, size_bytes: row.size, created_at: row.created_at,
     owner: { id: row.owner_person_id, display_name: row.display_name }, shared_with: { count: row.share_count, household: Boolean(row.household) },
     retention: row.retention, audience: fileAudience(row.provenance), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
-    thumb_url: `/api/files/${row.thumbnail}/thumb?w=320`, expires_at: null, version_count: row.versions })),
+    thumb_url: `/api/files/${row.thumbnail}/thumb?w=320`, expires_at: expiring.get(row.id)?.expiresAt ?? null, version_count: row.versions })),
     next_cursor: more && last ? Buffer.from(JSON.stringify({ v: 1, key: sort === "name" ? last.name : sort === "size" ? last.size : last.created_at, created: last.created_at, id: last.id, scope: scope(q) })).toString("base64url") : null };
 }
 export function librarySummary(actor: PersonRow, q: LibraryQuery) {
@@ -95,7 +97,8 @@ export function librarySummary(actor: PersonRow, q: LibraryQuery) {
     FROM (SELECT DISTINCT kind FROM filtered) f`).all(...b.params);
   const per_kind: Record<string, { items: number; bytes: number }> = Object.fromEntries(["image","video","audio","document","story","file"].map(kind => [kind,{ items: 0, bytes: 0 }]));
   for (const row of rows) per_kind[row.kind] = { items: row.items, bytes: row.bytes };
+  const expiring = expiringLibraryFiles(actor.id);
   // One total over the whole set, so identical bytes filed under two kinds are still counted once.
   const total = sqlite.query<{ bytes: number }, (string | number)[]>(`${b.sql} SELECT coalesce(sum(u.size),0) AS bytes FROM (SELECT max(size) AS size FROM filtered GROUP BY sha256) u`).get(...b.params)?.bytes ?? 0;
-  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: trashTotals(actor), expiring: { items: 0, bytes: 0 } };
+  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: trashTotals(actor), expiring: { items: expiring.size, bytes: [...expiring.values()].reduce((n, e) => n + e.size, 0) } };
 }

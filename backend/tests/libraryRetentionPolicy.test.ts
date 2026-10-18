@@ -10,7 +10,8 @@ import { existsSync } from "node:fs";
 import { createAttachment, readAttachment, attachmentFilePath } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
-import { previewLibraryRetention, runLibraryRetention } from "@/lib/libraryRetention";
+import { expiringLibraryFiles, previewLibraryRetention, runLibraryRetention } from "@/lib/libraryRetention";
+import { listLibrary, librarySummary } from "@/lib/library";
 import { LIBRARY_RETENTION_TYPES, retentionKeys } from "@/settings/libraryRetentionKeys";
 beforeEach(resetDb);
 const DAY = 86400000;
@@ -147,4 +148,24 @@ test("generated type inventory and documents opt-in; uploads stay", () => {
   expect(previewLibraryRetention().files.map((file) => file.type).sort()).toEqual(["pictures", "songs", "videos"]);
   setHouseholdSettingValue(retentionKeys("documents").mode, "until_storage_threshold");
   expect(previewLibraryRetention().files.map((file) => file.type).sort()).toEqual(["documents", "pictures", "songs", "videos"]);
+});
+
+test("expiring items and their expires_at appear only after the warning, only for the owner (LIBRARY-RETENTION-PREVIEW-01)", async () => {
+  const f = fixture();
+  const old = f.make("conversation");
+  f.make("kept");
+  f.make("conversation", false); // an upload: counts toward usage, never removed
+  db.update(attachments).set({ createdAt: "2020-01-01T00:00:00Z" }).where(eq(attachments.id, old.id)).run();
+  const now = Date.parse("2026-10-18T01:00:00Z");
+  expect(expiringLibraryFiles(f.actor.id, now).size).toBe(0); // over the threshold but nobody has been told yet
+  expect(librarySummary(f.actor, {}).expiring).toEqual({ items: 0, bytes: 0 });
+  await runLibraryRetention(now); // sends the warning
+  const expiring = expiringLibraryFiles(f.actor.id, now);
+  expect([...expiring.keys()]).toEqual([old.id]);
+  expect(expiring.get(old.id)!.expiresAt).toBe(new Date(now + DAY).toISOString());
+  expect(librarySummary(f.actor, {}).expiring).toEqual({ items: 1, bytes: 10 });
+  const item = listLibrary(f.actor, {}).items.find((entry) => entry.id === old.id)!;
+  expect(item.expires_at).not.toBeNull();
+  const stranger = db.insert(people).values({ id: newPersonId(), displayName: "Lucia", role: "adult", avatarSeed: "lucia", source: "hub", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() }).returning().get()!;
+  expect(expiringLibraryFiles(stranger.id, now).size).toBe(0);
 });

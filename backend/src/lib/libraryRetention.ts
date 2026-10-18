@@ -1,6 +1,6 @@
 // Library storage rules are independent of chat age. No migration or Trash
 // provider here: only generated, unpinned File records can be reclaimed.
-import { and, eq, asc, isNull, sql } from "drizzle-orm";
+import { and, eq, asc, inArray, isNull, sql } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { attachments, settingsValues } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -50,6 +50,29 @@ function signature(type: LibraryRetentionType, cap: number): string { return JSO
 function candidates() {
   return db.select().from(attachments).where(and(eq(attachments.retention, "conversation"), isNull(attachments.deletedAt))).orderBy(asc(attachments.createdAt), asc(attachments.id)).all().filter((row) => typeFor(row) !== null);
 }
+/** LIBRARY-RETENTION-PREVIEW-01: this person's own items the storage rules have warned about and will remove at the next
+ * nightly run once the 24-hour warning has passed. `expiresAt` is the end of that warning. Cheap when nothing is over a
+ * threshold (the Library page asks on every load). */
+export function expiringLibraryFiles(ownerId: string, now = Date.now()): Map<string, { expiresAt: string; size: number }> {
+  const out = new Map<string, { expiresAt: string; size: number }>();
+  const cap = householdCapBytes();
+  if (cap <= 0) return out;
+  const percent = householdUsageBytes() / cap * 100;
+  const lowest = Math.min(...LIBRARY_RETENTION_TYPES.filter((type) => type !== "trash" && rule(type).mode === "until_storage_threshold").map((type) => rule(type).threshold_percent));
+  if (!Number.isFinite(lowest) || percent <= lowest) return out;
+  const plan = previewLibraryRetention(now);
+  const mine = new Set(plan.files.length ? db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, ownerId), inArray(attachments.id, plan.files.map((file) => file.id)))).all().map((row) => row.id) : []);
+  for (const file of plan.files) {
+    if (!mine.has(file.id)) continue;
+    const t = plan.types.find((entry) => entry.type === file.type);
+    const state = t ? readState(t.type) : null;
+    // Only a warned type is expiring; an unwarned one has not been told yet and shows nothing.
+    if (!t || !t.over || !state || state.signature !== signature(t.type, plan.budgetBytes)) continue;
+    out.set(file.id, { expiresAt: new Date(state.warnedAt + DAY).toISOString(), size: file.size });
+  }
+  return out;
+}
+
 export function previewLibraryRetention(now = Date.now()) {
   const usageBytes = householdUsageBytes(), budgetBytes = householdCapBytes();
   const generatedRule = rule("generated");
