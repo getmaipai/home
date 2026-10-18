@@ -20,7 +20,7 @@
 // topic within two ticks.
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { parseFeed } from "feedsmith";
-import { feedImageAddress } from "./imageAddress";
+import { feedImageAddress, largerFeedImage } from "./imageAddress";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
 import { tryConsume } from "@/lib/rateLimiter";
 import { nextHlc } from "@/lib/hlc";
@@ -186,10 +186,12 @@ interface Entry { url: string; title: string; summary: string; published: string
  * Feed `image`, or else the first <img> in the feed's own content. Never read from a fetched page. Only a web address
  * is kept; the hub fetches it later, once, only when a screen shows the story. */
 function feedImage(e: Record<string, any>, links: { href?: string; rel?: string; type?: string }[] = []): string | undefined {
-  const media = e.media as { contents?: { url?: string; medium?: string; type?: string }[]; thumbnails?: { url?: string }[] } | undefined;
+  const media = e.media as { contents?: { url?: string; medium?: string; type?: string; width?: number }[]; thumbnails?: { url?: string; width?: number }[] } | undefined;
+  // The widest picture the entry names comes first (a feed may list a 140 px and a 460 px copy of one picture); entries with no width keep their order.
+  const widest = <T extends { width?: number }>(list: T[]): T[] => [...list].sort((a, b) => (b.width ?? 0) - (a.width ?? 0));
   const candidates: unknown[] = [
-    ...(media?.contents ?? []).filter((c) => c.medium === "image" || (c.type ?? "").startsWith("image/") || (!c.medium && !c.type)).map((c) => c.url),
-    ...(media?.thumbnails ?? []).map((t) => t.url),
+    ...widest((media?.contents ?? []).filter((c) => c.medium === "image" || (c.type ?? "").startsWith("image/") || (!c.medium && !c.type))).map((c) => c.url),
+    ...widest(media?.thumbnails ?? []).map((t) => t.url),
     ...((e.enclosures ?? []) as { url?: string; type?: string }[]).filter((c) => (c.type ?? "").startsWith("image/")).map((c) => c.url),
     ...links.filter((l) => l.rel === "enclosure" && (l.type ?? "").startsWith("image/")).map((l) => l.href),
     e.image, e.banner_image,
@@ -198,7 +200,7 @@ function feedImage(e: Record<string, any>, links: { href?: string; rel?: string;
   const inline = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i.exec(html)?.[1];
   for (const candidate of [...candidates, inline]) {
     const image = feedImageAddress(candidate);
-    if (image) return image;
+    if (image) return largerFeedImage(image);
   }
   return undefined;
 }

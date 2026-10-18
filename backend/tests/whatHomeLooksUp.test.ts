@@ -21,8 +21,6 @@ const SERVICE_NAMES: Record<string, string> = {
   "feed-www-cbc-ca": "CBC News",
   "feed-www-si-com": "Sports Illustrated",
   "feed-www-popsci-com": "Popular Science",
-  "feed-www-fastcompany-com": "Fast Company",
-  "feed-www-inc-com": "Inc.",
   "feed-variety-com": "Variety",
   "feed-www-timeforkids-com": "TIME for Kids",
   "icanhazdadjoke": "icanhazdadjoke.com",

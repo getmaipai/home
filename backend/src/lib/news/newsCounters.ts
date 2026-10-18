@@ -16,6 +16,7 @@ export const NEWS_COUNTER_NAMES = [
   "story_text_fetched",
   "story_text_teaser",
   "story_text_failed",
+  "story_text_paced",
   "story_gate_dropped",
   "route_refused",
 ] as const;

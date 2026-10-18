@@ -310,24 +310,6 @@
       ]
     },
     {
-      "url": "https://www.fastcompany.com/rss",
-      "title": "Fast Company",
-      "publisher": "Fast Company",
-      "lang": "en",
-      "topics_hint": [
-        "business"
-      ]
-    },
-    {
-      "url": "https://www.inc.com/rss/",
-      "title": "Inc.",
-      "publisher": "Inc.",
-      "lang": "en",
-      "topics_hint": [
-        "business"
-      ]
-    },
-    {
       "url": "https://variety.com/feed/",
       "title": "Variety",
       "publisher": "Variety",

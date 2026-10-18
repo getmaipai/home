@@ -8,6 +8,7 @@
 import { randomSuffix } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { pageHtml } from "@/lib/packageHost";
+import { HostError } from "@maipai/spec/emulators/ts/host-emulator.js";
 import { tripsMinorFloor } from "@/lib/retrieval/minorFloor";
 import { extractFullArticle, type ArticleBlock } from "@/lib/retrieval/extractArticle";
 import { sharedShelfStore, type ContentVariant, type ShelfItem, type ShelfStore, type StoredContent } from "@/lib/shelf/shelfStore";
@@ -23,6 +24,26 @@ let failures = createFailureMemory();
 export function __resetNewsArticleForTests(): void { failures = createFailureMemory(); }
 
 export type ContentSource = StoredContent["source"];
+
+// The page pace is one bucket for the whole hub (three pages, then one every two seconds), shared with the picture lookups a Today
+// page makes. A story opened while the bucket is empty waits a moment for a token; it is never remembered as a failure.
+const PACE_WAIT_MS = 2_500;
+const PACE_TRIES = 4;
+let paceWait: (ms: number) => Promise<void> = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+export function __setPaceWaitForTests(wait: ((ms: number) => Promise<void>) | null): void { paceWait = wait ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms))); }
+const isPaceLimit = (error: unknown): boolean => error instanceof HostError && error.code === "rate_limited";
+
+async function readPage(url: string, band: "child" | "teen" | "adult", background: boolean | undefined): Promise<Awaited<ReturnType<typeof pageHtml>>> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await pageHtml(url, undefined, band === "adult" ? undefined : band, { background });
+    } catch (error) {
+      // A background read never waits: it is the idle prefetch, and the person's own open comes first.
+      if (!isPaceLimit(error) || attempt >= PACE_TRIES || background) throw error;
+      await paceWait(PACE_WAIT_MS);
+    }
+  }
+}
 
 /** One stored copy per band: a teen is never served text an adult's fetch kept (the minor floor and the blocked-site check ran for the adult's rules, not the teen's). */
 function variantOf(band: "child" | "teen" | "adult"): ContentVariant {
@@ -92,7 +113,7 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
   if (options.retry) failures.forget(item.url);
   else if (failures.has(item.url)) return fallback();
   try {
-    const page = await pageHtml(item.url, undefined, band === "adult" ? undefined : band, { background: options.background });
+    const page = await readPage(item.url, band, options.background);
     const article = extractFullArticle(page.html, { book: "news", allowedBooks: new Set(), allowLinks: band !== "child", allowImages: false, mode: "news", baseUrl: item.url });
     const blocks = article.blocks.filter((block) => block.type !== "figure");
     const text = textOfBlocks(blocks);
@@ -108,7 +129,9 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
       store?.putContent(item.id, variant, { blocks, source: content.source, reading_s: content.reading_s, fetched_at: new Date().toISOString() });
     } catch { /* the cache is disposable: a failed write never fails the read */ }
     return content;
-  } catch {
+  } catch (error) {
+    // The hub's own page pace is not the publisher's fault: show the summary now and let the next open try again.
+    if (isPaceLimit(error)) { bumpNewsCounter("story_text_paced"); return fallback(); }
     failures.record(item.url);
     bumpNewsCounter("story_text_failed");
     return fallback();

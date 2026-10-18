@@ -2,6 +2,12 @@
 
 All notable changes to the Household news feeds package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.4.0] - 2026-10-18
+
+### Removed
+
+- Fast Company and Inc.: both refuse Home's page requests (HTTP 403), so their stories could only show the feed's short summary.
+
 ## [0.3.0] - 2026-10-18
 
 ### Added

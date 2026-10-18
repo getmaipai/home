@@ -1,15 +1,17 @@
-import { describe, expect, test } from "bun:test";
+import { beforeEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { FeedListPackage } from "@maipai/spec/gen/ts/feed-list-package.js";
 import { PACKAGES_DIR } from "@/lib/paths";
-import { topicsHintFor } from "@/lib/shelf/shelfFeeds";
+import { __resetTopicHintsForTests, topicsHintFor } from "@/lib/shelf/shelfFeeds";
 import { openShelfStore } from "@/lib/shelf/shelfStore";
 import { topicsFor } from "@/lib/news/topics";
 import { nextHlc } from "@/lib/hlc";
 import { newNewsItemId } from "@/lib/id";
 
 const list = (id: string) => FeedListPackage.parse(JSON.parse(readFileSync(join(PACKAGES_DIR, id, "feeds.json"), "utf8")));
+
+beforeEach(() => __resetTopicHintsForTests());
 
 describe("feed topic hints", () => {
   test("the bundled lists carry topics a reader of that user type is offered", () => {

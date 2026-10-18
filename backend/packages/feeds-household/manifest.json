@@ -1,6 +1,6 @@
 {
   "id": "feeds-household",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "kind": "module",
   "category": "Info",
   "display": "Household news feeds",
@@ -92,24 +92,6 @@
       "retention": "unknown, see the publisher's own policy"
     },
     {
-      "id": "feed-www-fastcompany-com",
-      "destination": "Fast Company's own public news feed (www.fastcompany.com)",
-      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
-      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
-      "who": "Fast Company",
-      "opt_in": true,
-      "retention": "unknown, see the publisher's own policy"
-    },
-    {
-      "id": "feed-www-inc-com",
-      "destination": "Inc.'s own public news feed (www.inc.com)",
-      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
-      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
-      "who": "Inc.",
-      "opt_in": true,
-      "retention": "unknown, see the publisher's own policy"
-    },
-    {
       "id": "feed-variety-com",
       "destination": "Variety's own public news feed (variety.com)",
       "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
@@ -128,8 +110,6 @@
     "net:www.cbc.ca",
     "net:www.si.com",
     "net:www.popsci.com",
-    "net:www.fastcompany.com",
-    "net:www.inc.com",
     "net:variety.com"
   ],
   "notifications": [],

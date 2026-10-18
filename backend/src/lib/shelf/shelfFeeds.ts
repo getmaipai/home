@@ -53,6 +53,7 @@ function readPackageFeeds(packagesDir: string): Desired[] {
 }
 
 let hintsByUrl: Map<string, readonly string[]> | null = null;
+export function __resetTopicHintsForTests(): void { hintsByUrl = null; }
 
 /** The topic ids a feed-list package says a feed covers (its `topics_hint`), by feed address; empty for any other feed. The poller
  * tags every story such a feed carries with them, so a topic's count and channel fill without a classifier. */

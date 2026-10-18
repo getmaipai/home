@@ -9,3 +9,16 @@ export function feedImageAddress(candidate: unknown): string | undefined {
   } catch { /* not an address */ }
   return undefined;
 }
+
+/** BBC's picture server serves the same picture at several widths and its feed names the 240 px one, which looks blurry on a hero.
+ * Ask for 976 px (a width it publishes) instead. Any other address is returned unchanged. */
+export function largerFeedImage(address: string): string {
+  try {
+    const url = new URL(address);
+    if (url.hostname === "ichef.bbci.co.uk") {
+      const upgraded = url.pathname.replace(/\/ace\/standard\/(\d+)\//, (whole, width: string) => (Number(width) < 976 ? "/ace/standard/976/" : whole));
+      if (upgraded !== url.pathname) { url.pathname = upgraded; return url.href; }
+    }
+  } catch { /* not an address: leave it */ }
+  return address;
+}

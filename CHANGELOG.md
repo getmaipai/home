@@ -7,6 +7,14 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Fixed News pictures that were far too big: a tall portrait picture no longer stretches its card (Safari drew it at its own height). Pictures are cropped to their frame, the hero is wider and shorter, and every picture has a height cap (ui-v0.5.278).
+
+- Fixed blurry News pictures: when a feed lists the same picture at several widths Home now uses the widest, and BBC pictures are asked for at 976 pixels instead of the feed's 240.
+
+- Fixed News stories that showed only the feed's short summary ("Continue reading...") when you opened them. Home's page requests share one pace, and a story opened while Today was still looking up pictures was refused and then remembered as failed for 30 minutes. It now waits a moment for its turn and tries again on the next open.
+
+- Removed Fast Company and Inc. from the News feeds: both refuse Home's page requests, so their stories could only show the summary.
+
 ## [0.2.24] - 2026-10-18
 
 The Library gets its engine: files are stored once, generated pictures, videos and songs stay in the Library when their chat goes, deleted files wait in Trash for 30 days, and files can be renamed, kept, uploaded and previewed as thumbnails through the API. The song card in chat shows its cover art. News gains topic feeds. Three database changes (stored-once files, Trash, file names), tested on a copy of the live database first. The Library page itself is not redesigned yet. Pins: spec-v0.1.184 and ui-v0.5.277. The engine is unchanged (Stack a89e7ff).
