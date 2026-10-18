@@ -41343,6 +41343,15 @@
                           "retention": {
                             "type": "string"
                           },
+                          "chat_id": {
+                            "type": "string",
+                            "nullable": true,
+                            "description": "The chat that made or received this item, while it exists and only for the owner."
+                          },
+                          "can_edit": {
+                            "type": "boolean",
+                            "description": "A picture the owner can open in the picture editor (it lives in its chat); false once the chat is gone."
+                          },
                           "audience": {
                             "type": "string",
                             "nullable": true,
@@ -41378,6 +41387,8 @@
                           "owner",
                           "shared_with",
                           "retention",
+                          "chat_id",
+                          "can_edit",
                           "audience",
                           "duration_seconds",
                           "thumb_url",

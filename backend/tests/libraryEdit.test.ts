@@ -2,7 +2,7 @@
 import { beforeEach, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, people } from "@/db/schema";
+import { attachments, conversations, conversationTurns, people } from "@/db/schema";
 import { createAttachment, deleteAttachmentsForTurns } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { createShare } from "@/lib/shares";
@@ -28,7 +28,7 @@ async function setup() {
     db.insert(conversationTurns).values({ id: turnId, personId: sageId, surface: "chat", conversationId: conversation.value.id, userText: "x", replyText: "y", source: "model", safetyAction: "allow", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
     const created = createAttachment(actor, { conversationId: conversation.value.id, turnId, mediaType: "image/png", bytes: new TextEncoder().encode(text), provenance, retention, deduplicate: false });
     if (!created.ok) throw new Error(created.error);
-    return { ...created.value, turnId };
+    return { ...created.value, turnId, conversationId: conversation.value.id };
   };
   return { sage, sageId, actor, luciaClient, luciaId, file };
 }
@@ -81,4 +81,19 @@ test("a file in Trash cannot be renamed", async () => {
   const boat = s.file("trashed", 'picture-gen:{"v":1,"audience":"all-ages"}', "kept");
   await s.sage.request(`/api/files/${boat.id}`, { method: "DELETE" });
   expect((await patch(s.sage, boat.id, { name: "late" })).status).toBe(404);
+});
+
+test("a picture links to its chat for editing while the chat exists, only for its owner", async () => {
+  const s = await setup();
+  const boat = s.file("editable boat", 'picture-gen:{"v":1,"audience":"all-ages","prompt":"a boat"}', "kept");
+  const note = s.file("a plain upload", "composer:upload", "kept");
+  createShare(s.actor, { fileId: boat.id, to: s.luciaId });
+  const mine = (await list(s.sage)) as unknown as Array<{ id: string; chat_id: string | null; can_edit: boolean }>;
+  expect(mine.find((i) => i.id === boat.id)).toMatchObject({ chat_id: boat.conversationId, can_edit: true });
+  expect(mine.find((i) => i.id === note.id)).toMatchObject({ can_edit: false });
+  const theirs = (await list(s.luciaClient)) as unknown as Array<{ id: string; chat_id: string | null; can_edit: boolean }>;
+  expect(theirs.find((i) => i.id === boat.id)).toMatchObject({ chat_id: null, can_edit: false });
+  db.update(conversations).set({ status: "deleted" }).where(eq(conversations.id, boat.conversationId)).run();
+  const after = (await list(s.sage)) as unknown as Array<{ id: string; chat_id: string | null; can_edit: boolean }>;
+  expect(after.find((i) => i.id === boat.id)).toMatchObject({ chat_id: null, can_edit: false });
 });
