@@ -39928,6 +39928,50 @@
         }
       }
     },
+    "/api/library/retention/preview": {
+      "get": {
+        "tags": [
+          "Storage"
+        ],
+        "summary": "Preview Library storage cleanup without changing files",
+        "responses": {
+          "200": {
+            "description": "Storage budget, candidate counts and bytes, and warning grace status.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {},
+                  "additionalProperties": {
+                    "nullable": true
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign in to view cleanup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Ask an owner or admin to view cleanup.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/files": {
       "get": {
         "tags": [
