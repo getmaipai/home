@@ -124,6 +124,16 @@ the surface gate stay fixed, and no setting, including `generation.people_prompt
    the model. Policy refusals (consent, crisis, temporary mode,
    ungrounded arguments) are not tool failures and keep their own
    replies. A robot with no hub and no network answers the same way.
+   A second exception (owner-approved 2026-10-17, CF-SEARCH-02): an
+   ungrounded search argument is not a dead end for a read-only lookup.
+   Policy replaces the model's expression with a query built from the
+   person's own words (filler stripped, nouns, names and dates kept,
+   capped at 120 characters) and runs the search once, through policy
+   again, so the age and surface gates, the household-name gate, the
+   child search rules and the safety floor apply to the new query exactly
+   as to the original. The trace records `retried_with_user_words`. It
+   never loops, and the refusal line stays for every other ungrounded
+   tool call (anything that writes or has a side effect).
    One narrow exception (owner-approved 2026-10-17, SEARCH-DOWN-EMPTY-01):
    when the only web source is down and the model's one retry after the
    failed lookup also came back with no visible words, the reply may be
