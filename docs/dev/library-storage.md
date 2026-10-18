@@ -59,3 +59,11 @@ and `pragma integrity_check`.
   cap, even if the bytes turn out to be already stored. The hash is unknown before the fetch and the storage rule is to refuse a
   download that would not fit before it starts; duplicate-aware checks apply wherever the bytes are in hand (chat and Library
   uploads, small fetched assets).
+## Trash (LIBRARY-REVAMP-10)
+
+`lib/libraryTrash.ts`. `attachments.deleted_at` and `trash_until` (ahead of the spec): both set means in the owner's Trash; only
+`deleted_at` set means a chat-only copy (the Library item was purged but a chat still shows the file). Neither state is listed,
+shared, served or thumbnailed through the Library: `fileAccessSql` requires `deleted_at IS NULL` for everyone. Chat reads use
+their own conversation check and are unchanged. Delete takes the item's companions along (edit versions, poster, cover).
+Purge and expiry drop the owner reference; the record and its jobs go unless a chat still shows the file, and bytes go only at
+zero references. A chat deleted while its file is in Trash does not take the file with it.

@@ -143,7 +143,9 @@ function fileAccessSql(actor: PersonRow, file: string, shared: string): string {
   const audience = `(json_extract(${meta},'$.writer') IN ('picture-gen','video-gen','video-poster','image-edit') AND (SELECT value FROM json_each(${meta}) WHERE key = 'audience' ORDER BY id DESC LIMIT 1) = 'all-ages')`;
   const gate = speakerAgeBand(actor, new Date()) === "adult" ? "1=1" : audience;
   const granted = `CASE WHEN ${file}.origin = 'fetched' THEN ${isOwnerOrAdmin(actor) ? "1" : "0"} ELSE (${shared}) END`;
-  return `(${file}.owner_person_id = ? OR ((${granted}) = 1 AND (${gate})))`;
+  // LIBRARY-REVAMP-10: a file in Trash (or kept only as a chat copy) is out of the Library for everyone, its owner included;
+  // shares stay on the record but give no access until Restore, as unshare takes effect at once.
+  return `(${file}.deleted_at IS NULL AND (${file}.owner_person_id = ? OR ((${granted}) = 1 AND (${gate}))))`;
 }
 
 export function fileVisibilitySql(actor: PersonRow, file: string, shared: string): string {

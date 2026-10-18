@@ -19,7 +19,7 @@
 // adult alike. When PEOPLE-EXPAND-01 lands a known person without
 // household membership, `isValidShareTarget` below is the one place
 // that needs a membership check added, not a second parallel rule.
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, shares } from "@/db/schema";
 import { Share as ShareSchema, type Share } from "@maipai/spec/gen/ts/share.js";
@@ -287,7 +287,7 @@ export interface VisibleFile {
  * acceptance ("a shared file appears in each recipient's Library under
  * the owner's name"). */
 export function listFilesVisibleToActor(actor: PersonRow): VisibleFile[] {
-  const owned = db.select().from(attachments).where(eq(attachments.ownerPersonId, actor.id)).all();
+  const owned = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, actor.id), isNull(attachments.deletedAt))).all();
   const allShares = db.select().from(shares).where(eq(shares.to, actor.id)).all().concat(db.select().from(shares).where(eq(shares.to, "household")).all());
 
   const result: VisibleFile[] = owned.map((row) => ({ file: toRecord(row), ownerPersonId: row.ownerPersonId, shared: false, household: false, formerOwnerName: null }));

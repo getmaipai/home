@@ -28,7 +28,9 @@ export function ensureContent(sha256: string, storagePath: string, size: number)
 export function expectedReferences(fileId: string): Array<{ kind: FileReferenceKind; holderId: string }> {
   const row = db.select().from(attachments).where(eq(attachments.id, fileId)).get();
   if (!row) return [];
-  const expected: Array<{ kind: FileReferenceKind; holderId: string }> = [{ kind: "owner", holderId: row.ownerPersonId }];
+  // The owner holds the record while it is in the Library or in Trash (LIBRARY-REVAMP-10); a chat-only copy has no owner reference.
+  const expected: Array<{ kind: FileReferenceKind; holderId: string }> = [];
+  if (row.deletedAt === null || row.trashUntil !== null) expected.push({ kind: "owner", holderId: row.ownerPersonId });
   if (row.turnId && row.conversationId) expected.push({ kind: "chat", holderId: row.conversationId });
   for (const share of db.select({ id: shares.id }).from(shares).where(eq(shares.fileId, fileId)).all()) expected.push({ kind: "share", holderId: share.id });
   for (const item of db.select({ id: mediaItems.id }).from(mediaItems).where(eq(mediaItems.locFileId, fileId)).all()) expected.push({ kind: "collection", holderId: item.id });

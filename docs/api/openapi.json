@@ -40621,6 +40621,81 @@
             }
           }
         }
+      },
+      "delete": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Move one of my own Library files to Trash",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "In Trash until trash_until; Restore from Trash brings it back with its sharing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "deleted_at": {
+                      "type": "string"
+                    },
+                    "trash_until": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "deleted_at",
+                    "trash_until"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the person who owns a file can delete it",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file in your Library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/files/{id}/content": {
@@ -41296,7 +41371,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash and expiring remain zero until their providers exist.",
+            "description": "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash counts the caller's own deleted files; expiring stays zero until the removal preview is wired.",
             "content": {
               "application/json": {
                 "schema": {

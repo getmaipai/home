@@ -205,6 +205,8 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
     provenance,
     origin: "sent",
     mediaSourceId: null,
+    deletedAt: null,
+    trashUntil: null,
     createdAt: new Date().toISOString(),
     hlc: nextHlc(),
   };
@@ -273,14 +275,18 @@ export function readAttachmentForConversation(actor: PersonRow, conversationId: 
   return { ok: true, value: { record: toRecord(row), bytes: new Uint8Array(bytes) } };
 }
 
-/** Keep Library files, detaching their turn before it is deleted. */
+/** Keep Library files, detaching their turn before it is deleted. A file in Trash keeps its record until its keep window
+ * ends (LIBRARY-REVAMP-10); a chat-only copy (its Library item was purged) goes with its chat. */
 export function deleteAttachmentsForTurns(turnIds: string[]): number {
   if (turnIds.length === 0) return 0;
   deleteMusicJobsForTurns(turnIds);
   deletePictureJobsForTurns(turnIds);
   const rows = db.select().from(attachments).where(inArray(attachments.turnId, turnIds)).all();
+  let purged = 0;
   for (const row of rows) {
-    if (row.retention === "kept") {
+    const chatOnly = row.deletedAt !== null && row.trashUntil === null;
+    const inTrash = row.deletedAt !== null && row.trashUntil !== null;
+    if (!chatOnly && (row.retention === "kept" || inTrash)) {
       // Conversations are tombstoned, not removed. Keep that provenance for
       // conversation reads; only the turn FK must be cleared before deletion.
       db.update(attachments).set({ turnId: null }).where(eq(attachments.id, row.id)).run();
@@ -288,9 +294,10 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
     } else {
       const blob = purgeFileRecord(row);
       if (blob) removeFile(blob);
+      purged += 1;
     }
   }
-  return rows.filter((row) => row.retention !== "kept").length;
+  return purged;
 }
 
 /** Remove one File record for good: its share pointers first (shares.file_id

@@ -6,6 +6,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { getAttachment, readAttachment } from "@/lib/attachments";
+import { trashFile } from "@/lib/libraryTrash";
 import { createShare, deleteShare, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
 import { File as FileSchema } from "@maipai/spec/gen/ts/file.js";
 import { Share as ShareSchema } from "@maipai/spec/gen/ts/share.js";
@@ -246,4 +247,24 @@ filesRoutes.openapi(thumbnailRoute, (c) => {
   const { w } = c.req.valid("query");
   if (w !== "320" && w !== "640") return c.text("Use w=320 or w=640.",400);
   return fileThumbnail(c.get("person"),c.req.valid("param").id,Number(w) as 320 | 640,c.req.header("If-None-Match"));
+});
+
+const deleteFileRoute = createRoute({
+  method: "delete", path: "/{id}", tags: ["Files"], summary: "Move one of my own Library files to Trash",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "file-a1b2c3") },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ id: z.string(), deleted_at: z.string(), trash_until: z.string() }) } }, description: "In Trash until trash_until; Restore from Trash brings it back with its sharing." },
+    ...errorResponses({ 401: "Not signed in", 403: "Only the person who owns a file can delete it", 404: "No such file in your Library" }),
+  },
+});
+filesRoutes.openapi(deleteFileRoute, (c) => {
+  const actor = c.get("person");
+  const { id } = c.req.valid("param");
+  const found = getAttachment(actor, id);
+  if (!found.ok) return c.json({ error: "That file is not in your Library. Refresh the page and try again." }, 404);
+  if (found.value.owner_person_id !== actor.id) return c.json({ error: "Only the person who added this file can delete it. You can stop seeing it by asking them to unshare." }, 403);
+  const result = trashFile(actor, id);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value, 200);
 });

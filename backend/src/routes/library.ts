@@ -27,6 +27,6 @@ libraryRoutes.openapi(createRoute({ method: "get", path: "/", tags: ["Library"],
 });
 libraryRoutes.openapi(createRoute({ method: "get", path: "/summary", tags: ["Library"], summary: "Visible Library counts and stored bytes by kind",
   middleware: [requireAuth] as const, request: { query: query.omit({ cursor: true, limit: true, sort: true }) }, responses: {
-    200: { description: "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash and expiring remain zero until their providers exist.", content: { "application/json": { schema: totals.extend({ per_kind: z.record(z.string(),totals), trash: totals, expiring: totals }) } } },
+    200: { description: "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash counts the caller's own deleted files; expiring stays zero until the removal preview is wired.", content: { "application/json": { schema: totals.extend({ per_kind: z.record(z.string(),totals), trash: totals, expiring: totals }) } } },
     ...errorResponses({ 401: "Not signed in" }),
   } }), c => c.json(librarySummary(c.get("person"),c.req.valid("query")),200));

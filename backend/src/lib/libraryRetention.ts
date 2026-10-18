@@ -1,6 +1,6 @@
 // Library storage rules are independent of chat age. No migration or Trash
 // provider here: only generated, unpinned File records can be reclaimed.
-import { and, eq, asc, sql } from "drizzle-orm";
+import { and, eq, asc, isNull, sql } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { attachments, settingsValues } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -48,7 +48,7 @@ function clearState(type: LibraryRetentionType) {
 }
 function signature(type: LibraryRetentionType, cap: number): string { return JSON.stringify([rule(type), rule("generated"), cap]); }
 function candidates() {
-  return db.select().from(attachments).where(eq(attachments.retention, "conversation")).orderBy(asc(attachments.createdAt), asc(attachments.id)).all().filter((row) => typeFor(row) !== null);
+  return db.select().from(attachments).where(and(eq(attachments.retention, "conversation"), isNull(attachments.deletedAt))).orderBy(asc(attachments.createdAt), asc(attachments.id)).all().filter((row) => typeFor(row) !== null);
 }
 export function previewLibraryRetention(now = Date.now()) {
   const usageBytes = householdUsageBytes(), budgetBytes = householdCapBytes();

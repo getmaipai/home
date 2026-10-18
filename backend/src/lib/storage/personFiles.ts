@@ -45,6 +45,8 @@ import { pruneUnreachableShares } from "@/lib/shares";
  * the old same-bytes pointers.) The one definition both the preview and the
  * step read, so what the confirmation says is what the delete does. */
 function hasLiveShareBeyond(fileId: string, departingPersonId: string): boolean {
+  // A file in Trash is hidden from everyone it was shared with (LIBRARY-REVAMP-10), so its shares keep nothing alive.
+  if (db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, fileId), isNotNull(attachments.deletedAt))).get()) return false;
   const targets = db.select({ to: shares.to }).from(shares).where(eq(shares.fileId, fileId)).all();
   return targets.some((share) => {
     if (share.to === departingPersonId) return false;

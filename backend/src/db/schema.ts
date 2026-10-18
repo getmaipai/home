@@ -703,10 +703,16 @@ export const attachments = sqliteTable(
     provenance: text("provenance").notNull(),
     origin: text("origin").notNull().default("sent"), // MEDIA-PODCASTS-01: sent | fetched (a copy the hub fetched for a media source)
     mediaSourceId: text("media_source_id"), // set when origin is fetched
+    // LIBRARY-REVAMP-10, ahead of the spec (the file record has no trash envelope yet, LIBRARY-REVAMP-03): deleted_at set with
+    // trash_until set is in the owner's Trash; deleted_at set with trash_until null is a chat-only copy (the Library item was
+    // removed for good while a chat still shows the file). Neither is listed, shared or served through the Library.
+    deletedAt: text("deleted_at"),
+    trashUntil: text("trash_until"),
     createdAt: text("created_at").notNull(),
     hlc: text("hlc").notNull(),
   },
   (table) => [
+    index("attachments_trash_until_idx").on(table.trashUntil),
     index("attachments_owner_person_id_idx").on(table.ownerPersonId),
     index("attachments_conversation_id_idx").on(table.conversationId),
     index("attachments_turn_id_idx").on(table.turnId),

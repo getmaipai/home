@@ -2,6 +2,7 @@ import { sqlite } from "@/db";
 import { canReadFileAudience, fileAudience, fileVisibilitySql } from "@/lib/access";
 import { mediaKindSql } from "@/lib/storage/usage";
 import { libraryProvenanceSql } from "@/lib/libraryProvenance";
+import { trashTotals } from "@/lib/libraryTrash";
 import type { PersonRow } from "@/types";
 
 export interface LibraryQuery { limit?: number; cursor?: string; type?: string; owner?: string; shared?: "with-me" | "by-me"; search?: string; sort?: "newest" | "oldest" | "name" | "size" }
@@ -23,7 +24,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
   let filter = "1=1";
   if (q.type) { filter += " AND kind = ?"; params.push(q.type); }
   if (q.owner === "me") { filter += " AND owner_person_id = ?"; params.push(actor.id); }
-  else if (q.owner === "household") filter += " AND deleted_at IS NOT NULL";
+  else if (q.owner === "household") filter += " AND owner_deleted_at IS NOT NULL";
   else if (q.owner) { filter += " AND owner_person_id = ?"; params.push(q.owner); }
   if (q.shared === "with-me") { filter += " AND owner_person_id != ?"; params.push(actor.id); }
   if (q.shared === "by-me") { filter += " AND owner_person_id = ? AND share_count > 0"; params.push(actor.id); }
@@ -31,7 +32,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
   // Companion relations only fold files when their parent passes the same viewer boundary.
   return { params, sql: `WITH meta AS (
     SELECT a.*, ${libraryProvenanceSql("a.provenance")} AS meta, ${mediaKindSql("a.media_type")} AS kind,
-      p.display_name, p.deleted_at, coalesce(s.share_count,0) AS share_count, coalesce(s.household,0) AS household,
+      p.display_name, p.deleted_at AS owner_deleted_at, coalesce(s.share_count,0) AS share_count, coalesce(s.household,0) AS household,
       pj.prompt AS picture_prompt, vj.prompt AS video_prompt, vj.request AS video_request,
       mj.request AS music_request, mj.duration_s, mj.cover_file_id
     FROM attachments a JOIN people p ON p.id = a.owner_person_id
@@ -96,5 +97,5 @@ export function librarySummary(actor: PersonRow, q: LibraryQuery) {
   for (const row of rows) per_kind[row.kind] = { items: row.items, bytes: row.bytes };
   // One total over the whole set, so identical bytes filed under two kinds are still counted once.
   const total = sqlite.query<{ bytes: number }, (string | number)[]>(`${b.sql} SELECT coalesce(sum(u.size),0) AS bytes FROM (SELECT max(size) AS size FROM filtered GROUP BY sha256) u`).get(...b.params)?.bytes ?? 0;
-  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } };
+  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: trashTotals(actor), expiring: { items: 0, bytes: 0 } };
 }

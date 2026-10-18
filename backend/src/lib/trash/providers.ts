@@ -11,6 +11,7 @@ import { discardItemProgress } from "@/lib/media/progress";
 import { archivePath } from "@/lib/media/sources";
 import type { PersonRow } from "@/types";
 import { registerTrashProvider, type TrashRow } from "./registry";
+import { listTrashedFiles, purgeExpiredFiles, purgeTrashedFile, restoreFile } from "@/lib/libraryTrash";
 
 type Item = typeof mediaItems.$inferSelect;
 function mayManage(person: PersonRow, row: Item): boolean {
@@ -94,4 +95,14 @@ registerTrashProvider({
   purgeExpired(now) {
     db.delete(mediaCollections).where(and(isNotNull(mediaCollections.deletedAt), lte(mediaCollections.trashUntil, now.toISOString()))).run();
   },
+});
+
+// LIBRARY-REVAMP-10: a person's own deleted Library files (pictures, videos, songs, documents, uploads). Only the owner sees,
+// restores or purges them; the household Trash page and the Library's Trash section read this one provider.
+registerTrashProvider({
+  kind: "file", label: "Library files",
+  list: (person) => listTrashedFiles(person).map((row) => ({ kind: "file", id: row.id, title: row.title, deleted_at: row.deleted_at, trash_until: row.trash_until, can_restore: row.can_restore, can_purge: true })),
+  restore: (person, id) => restoreFile(person, id),
+  purge: (person, id) => purgeTrashedFile(person, id),
+  purgeExpired: (now) => { purgeExpiredFiles(now); },
 });

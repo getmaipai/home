@@ -41,7 +41,7 @@ function storeRow(owner: PersonRow, input: Metadata, id: string, size: number, s
   const reuse = stored !== undefined && storedFileIntact(filePath, size, sha256);
   const row = {
     id, ownerPersonId: owner.id, conversationId: null, turnId: null, mediaType: normalizedType(input.mediaType), size, sha256, storagePath, retention: "kept" as const,
-    provenance: input.note, origin: "fetched", mediaSourceId: input.mediaSourceId, createdAt: new Date().toISOString(), hlc: nextHlc(),
+    provenance: input.note, origin: "fetched", mediaSourceId: input.mediaSourceId, deletedAt: null, trashUntil: null, createdAt: new Date().toISOString(), hlc: nextHlc(),
   };
   const record = toRecord(row);
   if (!reuse) { ensureDataDir(dirname(filePath)); write(filePath); }
