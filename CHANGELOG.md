@@ -7,6 +7,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- **Quick and full songs.** Songs now come in two kinds, like pictures and videos. Quick songs are about 45 seconds and take under a minute; full songs are about 3 minutes with an intro, verses, chorus, bridge and ending, and take a minute or two (a Mac with 128 GB). Chat makes a quick song unless you ask for a whole or full song; the card has **Make it full** and **Make it quick**, and **Settings** has a **Song length** choice.
 ## [0.2.19] - 2026-10-17
 
 A child-safety fix for media, songs made in chat, and a fix for chat answers that were cut off before the first word.

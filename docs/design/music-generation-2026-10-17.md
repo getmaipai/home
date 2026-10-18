@@ -336,6 +336,33 @@ admission 33 GB) and the directory-model download fix below; Home MUSIC-GEN-03 t
 the reply to an edit said "I've updated the song" before the song existed. These are model behaviour on the 8B scratch model; the household's
 Muse model and the tool bench rows (MUSIC-GEN-07) are where they are measured.
 
+## 16. Quick and Full songs (owner, 2026-10-17)
+
+Jesse: "We probably need quick songs and full songs like videos", then, of the 40 s end-to-end song: "Forty seconds is not full." The same plain
+words as pictures and video. **Quick**: about 45 s (10 to 60 s by default, an exact length the person names is kept up to 149 s), for a jingle, a
+hook or trying words. **Full**: about 3 minutes (150 to 240 s), the whole structure. Chat makes Quick unless the person asks for a whole or full
+song or a long piece (the tool's `length`, or a length of 150 s or more); the household default is `generation.music.length` (quick). The card
+offers **Make it full** / **Make it quick** (the same words, description and seed made again at the other length, a new version on the same card).
+Full needs a Stack that allows 150 s or more (p128); on p64 a Full request makes a Quick song and the reply says why. Both lengths use the tier's
+own planning model (1.7B on p128), because switching planning models between songs costs a model load (measured: a quick song right after a full
+one on the 0.6B model took 53 s, 23 s of it loading).
+
+**Measured on a scratch Stack on the Studio (port 8895, its own data, GPU lock held, the live Stack serving chat), one structured lyric (intro,
+two verses, chorus three times, bridge, outro; 173 words), transcribed with `whisper-large-v3-turbo` and scored as in-order word recall:**
+
+| Song | Duration (ffprobe) | Wall time | Worker peak | Words sung in order | Sections heard |
+|---|---:|---:|---:|---:|---|
+| Full, cold worker | 3:30 | 90 s | 31 GB | 98.8 percent | verse 1 96, chorus 100, verse 2 96, bridge 100, outro 100 |
+| Full, warm | 3:00 | 31 s | 30 GB | 98.3 percent | verse 1 100, chorus 96, verse 2 100, bridge 100, outro 100 |
+| Quick, right after | 0:45 | 53 s (includes the 0.6B model switch, now removed) | 30 GB | 52.6 percent of the whole lyric: verse 1 and the chorus, all that fits in 45 s | verse 1 100, chorus 100 |
+
+**Full holds structure and sung words on this Mac**, so both kinds ship together. A Quick song sings the start of a long lyric; the tool tells the
+model to write a short lyric for a quick song and every part for a full one.
+
+**A real failure found and fixed (Stack):** a second song while the worker was still warm was refused "not enough free memory" with 50 GB free:
+the admission asked for the whole 33 GB peak again although the warm worker already held about 21 GB of it. A song on a warm worker now asks for
+the rest of its peak (12 GB); regression test in the Stack.
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s music table rows marked `(?)`: ACE-Step 1.5 runs on Apple silicon through its official MLX path, with

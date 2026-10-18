@@ -9,11 +9,20 @@ Home can write and sing a song on your own computer. Nothing is sent to anyone.
 
 A Mac with 64 GB of memory or more, and the music model. An owner or admin gets the model once in **Settings**, **Models and storage**, under **Music** (about 11 GB). On a smaller computer, Home says songs are not available and why.
 
+## Quick and full songs
+
+There are two kinds, like pictures and videos.
+
+- **Quick** songs are about 45 seconds. They are good for a jingle, a hook or trying out words. They take under a minute.
+- **Full** songs are about 3 minutes, with every part: an intro, verses, a chorus, a bridge and an ending. They take a minute or two. Full songs need a Mac with 128 GB of memory.
+
+Chat makes a quick song unless you ask for a whole song, a full song or a long piece. You can also say it yourself, for example "make a full song". The card has **Make it full** or **Make it quick** to make the same song again as the other kind.
+
 ## Ask in chat
 
-Type "write us a cheerful folk song about Saturday pancakes, about a minute long". Chat writes the words and starts the song. A card shows what Home is doing, a clock and a bar. Press **Stop** on the card to cancel.
+Type "write us a cheerful folk song about Saturday pancakes". Chat writes the words and starts the song. A card shows what Home is doing, a clock and a bar. Press **Stop** on the card to cancel.
 
-A one minute song takes about 15 to 30 seconds. The first song after a restart takes about a minute more, while the model loads. If Home is busy making a picture, a video or another song, the card says so and your song starts after it. You can have one song in the making at a time.
+The first song after a restart takes about a minute more, while the model loads. If Home is busy making a picture, a video or another song, the card says so and your song starts after it. You can have one song in the making at a time.
 
 When it is done, the song plays on the card. Press **Lyrics** to see the words. Press **Download** to save it or **Share** to send it.
 
@@ -54,7 +63,7 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 
 ## Choose how it works (owner and admin)
 
-- **Settings**, **Home settings**, **Pictures, videos and music**: **Adults can make music**. Turn it off to stop all song making.
+- **Settings**, **Home settings**, **Pictures, videos and music**: **Adults can make music**. Turn it off to stop all song making. **Song length** picks quick (the default) or full songs when nobody says which.
 - **Settings**, **Models and storage**, **Music**: get the music model, or remove it to free space.
 
 ## Something not working?
@@ -63,6 +72,7 @@ Songs are made with a model whose makers say its songs may be used for money, fo
 - **"Home is busy making another picture, video or song".** Why: Home does one job at a time. Fix: wait. It starts by itself.
 - **"Not enough free memory for music right now".** Why: another big job has the memory. Fix: wait a few minutes, then ask again.
 - **The end of a song has no real words.** Why: the words were shorter than the song. Fix: ask for more words, or a shorter song.
+- **I asked for a full song and got a quick one.** Why: full songs need a Mac with 128 GB of memory. Fix: none on this computer; quick songs still work.
 - **"I can only change a song that was made here".** Why: you asked to change a song Home did not make. Fix: ask for a new song.
 - **Home cannot reach the engine.** Why: the AI engine is restarting. Fix: wait a minute and ask again. Still stuck? Open **Repairs**.
 
