@@ -148,6 +148,8 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
       task = "fade"; stackTask = "edit"; request.edit = { op: "fade", seconds: args.seconds ?? 3, where: args.where ?? "out" }; break;
     case "loudness": task = "loudness"; stackTask = "edit"; request.edit = { op: "loudness", lufs: args.lufs ?? -14 }; break;
   }
+  // New words (or none, for an instrumental) replace the person's kept words: Make it full must sing what this version sings.
+  if (args.change !== "make_full" && args.change !== "make_quick" && (args.lyrics !== undefined || request.instrumental)) delete request.written_lyrics;
   const duration = source.durationS ?? source.request.seconds;
   const from = request.edit?.op === "trim" ? request.edit.from_s : request.from_s;
   const to = request.edit?.op === "trim" ? request.edit.to_s : request.to_s;

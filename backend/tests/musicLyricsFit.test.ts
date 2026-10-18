@@ -88,4 +88,38 @@ describe("the tool fits the words and keeps them for Make it full", () => {
     expect(full.status).toBe("succeeded");
     expect(fake.submitted.at(-1)).toMatchObject({ duration_s: FULL_SONG.default, lyrics: BANANA });
   });
+
+  test("new words on a remake replace the kept words, so Make it full sings the new ones", async () => {
+    const state = musicState(people.owner);
+    const quick = await runGenerateMusic({ state, args: { description: "modern heavy metal", lyrics: BANANA, seconds: 60 }, callId: "q2", spoken: false });
+    const id = musicForOutcomes([quick])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const fresh = "[Verse]\nA brand new line\n[Chorus]\nSing the new chorus";
+    const remade = await runEditMusic({ state, args: { track: "latest", change: "remake", lyrics: fresh }, callId: "r", spoken: false });
+    expect(remade.status).toBe("succeeded");
+    expect(remade.result?.reply?.text).not.toContain("Make it full");
+    const remadeId = musicForOutcomes([remade])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, remadeId)?.state === "done");
+    expect(getMusicJobFor(people.owner, remadeId)!.request.written_lyrics).toBeUndefined();
+    await runEditMusic({ state, args: { track: "latest", change: "make_full" }, callId: "f2", spoken: false });
+    expect(fake.submitted.at(-1)!.lyrics).toBe(fresh);
+  });
+
+  test("words kept for Make it full pass the floor again before they are sung", async () => {
+    const { refuseMusicPrompt } = await import("@/lib/music/policy");
+    const banned = ["kids", "naked"].join(" ");
+    expect(refuseMusicPrompt(banned)).not.toBeNull();
+    const state = musicState(people.owner);
+    const quick = await runGenerateMusic({ state, args: { description: "modern heavy metal", lyrics: BANANA, seconds: 60 }, callId: "q3", spoken: false });
+    const id = musicForOutcomes([quick])!.id;
+    await waitForMusic(() => getMusicJobFor(people.owner, id)?.state === "done");
+    const { saveMusicJob } = await import("@/lib/music/store");
+    const job = getMusicJobFor(people.owner, id)!;
+    job.request.written_lyrics = `${BANANA}\n\n[Outro]\n${banned}`;
+    saveMusicJob(job);
+    const before = fake.submitted.length;
+    const full = await runEditMusic({ state, args: { track: "latest", change: "make_full" }, callId: "f3", spoken: false });
+    expect(full.result?.reply?.text).toContain("No song was made");
+    expect(fake.submitted.length).toBe(before);
+  });
 });
