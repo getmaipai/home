@@ -18,6 +18,14 @@ There are two kinds, like pictures and videos.
 
 Chat makes a quick song unless you ask for a whole song, a full song or a long piece. You can also say it yourself, for example "make a full song". The card has **Make it full** or **Make it quick** to make the same song again as the other kind.
 
+## Try it in five steps
+
+1. An owner or admin opens **Settings**, **Models and storage**, finds **Music** and presses **Install**. Wait until it says installed.
+2. Open a new chat and type "write us a quick song about our dog chasing bubbles".
+3. When the card shows the player, press play. Press **Lyrics** to read the words.
+4. Type "change the chorus so it is about a red ball". A new version plays. Use the arrows to hear the first one again.
+5. Press **Make it full** on the card. In a minute or two, a full song of about 3 minutes plays.
+
 ## Ask in chat
 
 Type "write us a cheerful folk song about Saturday pancakes". Chat writes the words and starts the song. A card shows what Home is doing, a clock and a bar. Press **Stop** on the card to cancel.
