@@ -227,15 +227,16 @@ describe("IMGGEN-HOME-01: jobs that are stopped, forgotten or broken", () => {
     expect(fake.jobs[0]!.deleted).toBe(true);
   });
 
-  test("forgetting a turn removes its picture job and the prompt with it", async () => {
+  test("forgetting a turn keeps a picture job whose picture is kept in the Library (BUG-LIBRARY-KEPT-01)", async () => {
     await withStub(script(FOX), async () => {
       const { value } = await streamValue(people.owner, "make me a picture of a red fox");
       await until(() => getPictureJob(people.owner, value.picture!.id)?.state === "done");
       const row = db.select().from(pictureJobs).where(eq(pictureJobs.id, value.picture!.id)).get()!;
       expect(row.prompt).toContain("red fox");
       deleteAttachmentsForTurns([row.turnId!]);
-      expect(db.select().from(pictureJobs).where(eq(pictureJobs.id, value.picture!.id)).get()).toBeUndefined();
-      expect(getPictureJob(people.owner, value.picture!.id)).toBeNull();
+      // Generated pictures are Library items that outlive their chat (Jesse, 2026-10-18): the job stays as the picture's provenance.
+      expect(db.select().from(pictureJobs).where(eq(pictureJobs.id, value.picture!.id)).get()).toBeDefined();
+      expect(getPictureJob(people.owner, value.picture!.id)?.state).toBe("done");
     });
   });
 

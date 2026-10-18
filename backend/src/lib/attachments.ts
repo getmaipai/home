@@ -13,7 +13,7 @@ import { and, eq, inArray } from "drizzle-orm";
 // the spec's zod object under that bare name would shadow it everywhere in
 // this module.
 import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
-import { db, sqlite } from "@/db";
+import { db } from "@/db";
 import { attachments, conversationTurns, conversations, shares } from "@/db/schema";
 import { newFileId, newShareId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
@@ -296,15 +296,23 @@ export function readAttachmentForConversation(actor: PersonRow, conversationId: 
   return { ok: true, value: { record: toRecord(row), bytes: new Uint8Array(bytes) } };
 }
 
-/** Delete records and their files before the owning turn is deleted. */
+/** Keep Library files, detaching their turn before it is deleted. */
 export function deleteAttachmentsForTurns(turnIds: string[]): number {
   if (turnIds.length === 0) return 0;
   deleteMusicJobsForTurns(turnIds);
-  deletePictureJobsForTurns(turnIds); // IMGGEN-HOME-01: the picture jobs (and their prompts) of these turns go with them
+  deletePictureJobsForTurns(turnIds);
   const rows = db.select().from(attachments).where(inArray(attachments.turnId, turnIds)).all();
-  for (const row of rows) removeFile(row.storagePath);
-  sqlite.query(`DELETE FROM attachments WHERE turn_id IN (${turnIds.map(() => "?").join(",")})`).run(...turnIds);
-  return rows.length;
+  for (const row of rows) {
+    if (row.retention === "kept") {
+      // Conversations are tombstoned, not removed. Keep that provenance for
+      // conversation reads; only the turn FK must be cleared before deletion.
+      db.update(attachments).set({ turnId: null }).where(eq(attachments.id, row.id)).run();
+    } else {
+      const blob = purgeFileRecord(row);
+      if (blob) removeFile(blob);
+    }
+  }
+  return rows.filter((row) => row.retention !== "kept").length;
 }
 
 /** Remove one File record for good: its share pointers first (shares.file_id

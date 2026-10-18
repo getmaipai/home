@@ -1,7 +1,7 @@
 // MUSIC-GEN-03: the one job store and deletion boundary. No attachment imports: forget can stop watchers before deleting files.
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { musicJobs } from "@/db/schema";
+import { attachments, musicJobs } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { cancelOrDeleteMusic } from "./stack";
 import type { MusicJob, GenerationProvenance } from "./types";
@@ -69,18 +69,23 @@ export function musicJobIdsByTurn(actor: { id: string }, turnIds: readonly strin
   for (const job of jobs.sort((a, b) => a.createdAt.localeCompare(b.createdAt))) if (job.turnId && !ids.has(job.turnId)) ids.set(job.turnId, job.id);
   return ids;
 }
+// Finished Library songs and the metadata their player reads outlive the chat.
+// Job turn/conversation ids are provenance without foreign keys, so they can stay.
+function deleteUnlessKept(job: MusicJob): void {
+  if (job.fileId && db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, job.fileId), eq(attachments.retention, "kept"))).get()) return;
+  dropMusicJob(job);
+  db.delete(musicJobs).where(eq(musicJobs.id, job.id)).run();
+}
 export function deleteMusicJobsForTurns(turnIds: string[]): void {
   if (!turnIds.length) return;
-  for (const job of [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(inArray(musicJobs.turnId, turnIds)).all().map(fromRow)]) if (job.turnId && turnIds.includes(job.turnId)) dropMusicJob(job);
-  db.delete(musicJobs).where(inArray(musicJobs.turnId, turnIds)).run();
+  for (const job of [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(inArray(musicJobs.turnId, turnIds)).all().map(fromRow)]) if (job.turnId && turnIds.includes(job.turnId)) deleteUnlessKept(job);
 }
 export function deleteMusicJobsForPerson(personId: string): void {
   for (const job of [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(eq(musicJobs.personId, personId)).all().map(fromRow)]) if (job.personId === personId) dropMusicJob(job);
   db.delete(musicJobs).where(eq(musicJobs.personId, personId)).run();
 }
 export function deleteMusicJobsForConversation(conversationId: string): void {
-  for (const job of [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(eq(musicJobs.conversationId, conversationId)).all().map(fromRow)]) if (job.conversationId === conversationId) dropMusicJob(job);
-  db.delete(musicJobs).where(eq(musicJobs.conversationId, conversationId)).run();
+  for (const job of [...memory.values(), ...liveJobs.values(), ...db.select().from(musicJobs).where(eq(musicJobs.conversationId, conversationId)).all().map(fromRow)]) if (job.conversationId === conversationId) deleteUnlessKept(job);
 }
 export function dropTemporaryMusicConversation(conversationId: string): void {
   for (const job of [...memory.values(), ...liveJobs.values()]) if (job.temporary && job.conversationId === conversationId) dropMusicJob(job);

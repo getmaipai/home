@@ -1,10 +1,10 @@
 // IMGGEN-HOME-01: where picture jobs live. A temporary or Incognito chat's jobs are memory only (and go with the chat,
 // the person or two hours); every other job is a `picture_jobs` row, written only when what the card shows changed.
 // No import of lib/attachments here: attachments.ts calls the delete helpers below when a turn, a chat or a person is
-// forgotten, so a deleted chat takes its picture prompts with it.
+// forgotten, so only jobs without kept output go with a deleted chat.
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { pictureJobs } from "@/db/schema";
+import { attachments, pictureJobs } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import type { PersonRow } from "@/types";
 import type { JobLikeness } from "@/lib/likeness/guard";
@@ -177,12 +177,17 @@ export function unfinishedStoredJobs(): PictureJob[] {
 
 // ---------------------------------------------------------------- forgetting
 
-/** A turn is deleted (or expires): its picture jobs go with it, prompts included. */
+/** A turn is deleted (or expires): jobs with kept Library output survive.
+ * Job turn/conversation ids have no foreign keys and stay as provenance. */
 export function deletePictureJobsForTurns(turnIds: readonly string[]): void {
   if (turnIds.length === 0) return;
-  db.delete(pictureJobs).where(inArray(pictureJobs.turnId, [...turnIds])).run();
-  for (const [id, job] of memory) if (job.turnId && turnIds.includes(job.turnId)) memory.delete(id);
-  for (const [id, job] of live) if (job.turnId && turnIds.includes(job.turnId)) live.delete(id);
+  const kept = new Set(db.select({ id: attachments.id }).from(attachments).where(eq(attachments.retention, "kept")).all().map((row) => row.id));
+  const survives = (job: PictureJob) => job.files.some((file) => kept.has(file.id));
+  for (const row of db.select().from(pictureJobs).where(inArray(pictureJobs.turnId, [...turnIds])).all()) {
+    if (!survives(fromRow(row))) db.delete(pictureJobs).where(eq(pictureJobs.id, row.id)).run();
+  }
+  for (const [id, job] of memory) if (job.turnId && turnIds.includes(job.turnId) && !survives(job)) memory.delete(id);
+  for (const [id, job] of live) if (job.turnId && turnIds.includes(job.turnId) && !survives(job)) live.delete(id);
 }
 
 /** A person is forgotten or deleted: every job of theirs goes. */

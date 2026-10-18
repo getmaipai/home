@@ -269,7 +269,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     return { id, url: pictureUrl(source.conversationId, id), label: provenance.label, created_at: new Date().toISOString(), op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
   }
   if (!source.turnId) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
-  const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false });
+  const created = createAttachment(actor, { conversationId: source.conversationId, turnId: source.turnId, mediaType: "image/png", bytes, provenance: `${EDIT_NOTE}${JSON.stringify(provenance)}`, deduplicate: false, retention: "kept" });
   if (!created.ok) throw new ImageEditError(created.status === 403 ? 403 : created.status === 404 ? 404 : 500, created.status === 403 ? created.error : "The edited picture could not be saved. Try again.", created.status === 403 ? "storage_full" : "save_failed");
   return { id: created.value.id, url: pictureUrl(source.conversationId, created.value.id), label: provenance.label, created_at: created.value.created_at, op: meta.op, width: info.width, height: info.height, media_type: "image/png", source: source.id, source_sha256: source.sha256 };
 }

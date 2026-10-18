@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Library
+- Kept files and their music and picture records survive chat deletion and nightly retention. New generated pictures and videos stay in the Library. (BUG-LIBRARY-KEPT-01)
+
 ### Music
 - **A song is as long as its words.** Full sings every part and is the default; Quick sings the hook. You can ask for a length. Words are cut only to that length or the computer's limit, and a squeezed ending gets one longer try. (MUSIC-GEN-21)
 - **The song card shows while the song is made.** It appears as soon as chat starts the song, with its stage, time left, a bar and Stop, and "Paused while chat is working" while chat answers. It used to appear only when chat finished its reply. (MUSIC-GEN-18)
