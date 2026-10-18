@@ -6,6 +6,7 @@
 // feeds that carried it are kept in a link table, so a story two feeds
 // both link is one row with two links (canonical-URL dedupe).
 import { Database } from "bun:sqlite";
+import { enrichmentStore, ENRICHMENT_SCHEMA, type Enrichment } from "@/lib/news/enrichmentStore";
 import { prefetchBudget, PREFETCH_SCHEMA } from "@/lib/news/prefetchBudget";
 import { existsSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -40,6 +41,7 @@ CREATE TABLE IF NOT EXISTS shelf_item_feed (
 CREATE INDEX IF NOT EXISTS shelf_item_feed_feed ON shelf_item_feed (feed_id);
 CREATE INDEX IF NOT EXISTS shelf_item_id ON shelf_item (id);
 ${PREFETCH_SCHEMA}
+${ENRICHMENT_SCHEMA}
 -- NEWS-02: the cleaned article of an item a person opened (spec NewsItem.content_ref is the item id). One row per item
 -- and band: each band keeps its own copy (a child's holds no links, a teen's and an adult's keep them). A pinned row belongs
 -- to a saved story and is never pruned while the save exists.
@@ -87,6 +89,8 @@ export interface ShelfStore {
   /** Atomically reserve one background attempt, including failed fetches. Rolling 24 hour site cap, global pace. */
   claimPrefetch(url: string, site: string, nowMs: number): boolean;
   prefetchOutcome(ok: boolean, nowMs: number): void;
+  getEnrichment(itemId: string, band: AgeBand): Enrichment | null;
+  putEnrichment(itemId: string, band: AgeBand, value: Enrichment): void;
   count(): number;
   close(): void;
 }
@@ -153,6 +157,7 @@ export function openShelfStore(path: string): ShelfStore {
   );
   const pin = sqlite.query("UPDATE news_content SET pinned = ?2 WHERE item_id = ?1");
   const pruneContent = sqlite.query("DELETE FROM news_content WHERE pinned = 0 AND item_id NOT IN (SELECT id FROM shelf_item)");
+  const pruneEnrichment = sqlite.query("DELETE FROM news_enrichment WHERE item_id NOT IN (SELECT id FROM shelf_item)");
   const link = sqlite.query("INSERT OR IGNORE INTO shelf_item_feed (canonical_url, feed_id) VALUES (?1, ?2)");
   const pruneItems = sqlite.query("DELETE FROM shelf_item WHERE fetched_at < ?1 AND id NOT IN (SELECT item_id FROM news_content WHERE pinned = 1)");
   const pruneLinks = sqlite.query("DELETE FROM shelf_item_feed WHERE canonical_url NOT IN (SELECT canonical_url FROM shelf_item)");
@@ -195,6 +200,7 @@ export function openShelfStore(path: string): ShelfStore {
       const removed = pruneItems.run(cutoffIso).changes;
       pruneLinks.run();
       pruneContent.run();
+      pruneEnrichment.run();
       return removed;
     },
     get(id) {
@@ -230,9 +236,13 @@ export function openShelfStore(path: string): ShelfStore {
     forgetFeed(feedId) {
       dropLinks.run(feedId);
       reattribute.run(feedId);
-      return dropOrphans.run().changes;
+      const removed = dropOrphans.run().changes;
+      pruneContent.run();
+      pruneEnrichment.run();
+      return removed;
     },
     ...prefetchBudget(sqlite),
+    ...enrichmentStore(sqlite),
     count() {
       return total.get()?.n ?? 0;
     },

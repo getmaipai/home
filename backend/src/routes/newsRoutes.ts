@@ -34,14 +34,14 @@ newsRoutes.post("/data/:dataId", requireAuth, async (c) => {
   if (!isDataId(id) || !appRouteAllowed(person, "news", "data", id)) { bumpNewsCounter("route_refused"); return c.json({ error: "no such data" }, 404); }
   const body = await bodyOf(c);
   switch (id) {
-    case "today": return c.json(todayData(person, body), 200);
+    case "today": return c.json(await todayData(person, body), 200);
     case "mix": {
-      const result = mixData(person, body);
+      const result = await mixData(person, body);
       if (!result) { bumpNewsCounter("route_refused"); return c.json({ error: "no such data" }, 404); }
       return c.json(result, 200);
     }
     case "channel": {
-      const result = channelData(person, body);
+      const result = await channelData(person, body);
       if (!result) return c.json({ error: "That channel is not available." }, 404);
       return c.json(result, 200);
     }
@@ -77,7 +77,7 @@ newsRoutes.get("/images/:item", requireAuth, async (c) => {
   // The item must be one this person's band is released: a guessed id is a 404, never a fetch.
   const item = releasedItem(viewerOf(person), c.req.param("item"));
   if (!item) return c.json({ error: "no such picture" }, 404);
-  const picture = await newsPicture(item, width as NewsPictureWidth);
+  const picture = await newsPicture(item, width as NewsPictureWidth, viewerOf(person).band);
   if (!picture) return c.json({ error: "no such picture" }, 404);
   c.header("Content-Type", "image/webp");
   c.header("Cache-Control", "private, max-age=86400");

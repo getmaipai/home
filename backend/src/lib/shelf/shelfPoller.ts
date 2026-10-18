@@ -17,6 +17,7 @@
 // answer 304.
 import { assertNotPrivateHost, guardedFetch, SsrfBlockedError, type DnsLookup } from "@maipai/core/src/ssrfGuard";
 import { parseFeed } from "feedsmith";
+import { feedImageAddress } from "./imageAddress";
 import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
 import { tryConsume } from "@/lib/rateLimiter";
 import { nextHlc } from "@/lib/hlc";
@@ -187,13 +188,8 @@ function feedImage(e: Record<string, any>, links: { href?: string; rel?: string;
   const html = [text(e.content?.encoded), text(e.content), text(e.content_html), text(e.description), text(e.summary)].join(" ");
   const inline = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/i.exec(html)?.[1];
   for (const candidate of [...candidates, inline]) {
-    if (typeof candidate !== "string") continue;
-    const value = candidate.trim().replace(/&amp;/g, "&");
-    if (value.length > 2000) continue;
-    try {
-      const url = new URL(value);
-      if ((url.protocol === "https:" || url.protocol === "http:") && !url.username && !url.password) return url.href;
-    } catch { /* not an address: try the next */ }
+    const image = feedImageAddress(candidate);
+    if (image) return image;
   }
   return undefined;
 }

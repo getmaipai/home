@@ -20,7 +20,7 @@ import { sharedShelfStore, type ShelfItem } from "@/lib/shelf/shelfStore";
 import { FEED_LISTS, shelfEnabled } from "@/lib/shelf/shelfPolicy";
 import type { PersonRow } from "@/types";
 import { articleBlock } from "./article";
-import { cardEnv, cardOf, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, type CardEnv, type StoryCard, type Viewer } from "./cards";
+import { cardEnv, cardOf, enrichLeadCards, hostOf, itemIdFrom, pictureAlt, publishedAtOf, storyIdOf, type CardEnv, type StoryCard, type Viewer } from "./cards";
 import { rankStories, type RankInput } from "./rankStories";
 import { followedChannels, isFollowing, listSaves, recomputeMix, recordRead } from "./records";
 import { TOPICS, topicById, topicOfferedTo, topicsFor } from "./topics";
@@ -169,28 +169,30 @@ function emptyBlocks(degraded: boolean): BlocksData {
 }
 
 /** `today`: the person's Today. A child's holds the Kids' lists only (the shelf's release path), follows of kid channels, nothing inferred. */
-export function todayData(person: PersonRow, body: Record<string, unknown>, now = new Date()): BlocksData {
+export async function todayData(person: PersonRow, body: Record<string, unknown>, now = new Date()): Promise<BlocksData> {
   if (!shelfEnabled()) return emptyBlocks(false);
   const viewer = viewerOf(person, now);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
   const raw = feedBlock(env, { layout: "today", title: "Today", windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), topic: topicParam(body, viewer.band), filters: true, provenance: "news data today" }, now);
+  await enrichLeadCards(raw, env);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
 /** My Mix uses only this person's reading and follows. A child, guest or opted-out person never gets it. */
-export function mixData(person: PersonRow, body: Record<string, unknown>, now = new Date()): BlocksData | null {
+export async function mixData(person: PersonRow, body: Record<string, unknown>, now = new Date()): Promise<BlocksData | null> {
   const viewer = viewerOf(person, now);
   if (person.role === "guest" || viewer.band === "child" || getPersonSettingValue(person, "news.my_mix") === false) return null;
   if (!shelfEnabled()) return emptyBlocks(false);
   const env = cardEnv(viewer);
   if (!env) return emptyBlocks(true);
   const raw = feedBlock(env, { layout: "today", title: "My Mix", signal: recomputeMix(person.id, now), windowH: TODAY_WINDOW_H, followed: followedChannels(person.id), shelf: true, page: pageOf(body), topic: topicParam(body, viewer.band), filters: true, provenance: "news data mix" }, now);
+  await enrichLeadCards(raw, env);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 
 /** `channel {kind, key}`: one topic or one source, in the `channel` layout. Null when the channel does not exist for this band. */
-export function channelData(person: PersonRow, body: Record<string, unknown>, now = new Date()): BlocksData | null {
+export async function channelData(person: PersonRow, body: Record<string, unknown>, now = new Date()): Promise<BlocksData | null> {
   const viewer = viewerOf(person, now);
   const kind = body.kind === "topic" || body.kind === "source" ? body.kind : null;
   const key = typeof body.key === "string" ? body.key : "";
@@ -224,6 +226,7 @@ export function channelData(person: PersonRow, body: Record<string, unknown>, no
     layout: "channel", title, ...(subtitle ? { subtitle } : {}), channel: { kind, key, followed: isFollowing(person.id, kind, key) },
     windowH: CHANNEL_WINDOW_H, match, followed, shelf: false, page: pageOf(body), topic: topicParam(body, viewer.band), provenance: "news data channel",
   }, now);
+  await enrichLeadCards(raw, env);
   return { as_of: now.toISOString(), blocks: finishBlocks(person, viewer.band, raw) };
 }
 

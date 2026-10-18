@@ -9,6 +9,7 @@ import { sharedShelfStore, type ShelfItem, type ShelfStore } from "@/lib/shelf/s
 import { openedItemIds, savedItemIds } from "./records";
 import { gateFor, type Gate } from "./childGate";
 import { newsImagesOn } from "./pictures";
+import { enrichItem, enrichmentFresh } from "./enrich";
 import { topicOfferedTo } from "./topics";
 
 export interface StoryCard {
@@ -96,7 +97,7 @@ export function pictureAlt(title: string, publisher: string): string {
 }
 
 export function imageOf(item: ShelfItem, title: string, publisher: string, env: CardEnv): StoryCard["image"] | undefined {
-  if (!env.imagesOn || !item.image_url) return undefined;
+  if (!env.imagesOn || (!item.image_url && env.store.getEnrichment(item.id, env.viewer.band)?.status === "none")) return undefined;
   return { w480: `/api/plugins/news/images/${item.id}?w=480`, w1280: `/api/plugins/news/images/${item.id}?w=1280`, alt: pictureAlt(title, publisher) };
 }
 
@@ -119,7 +120,8 @@ export function cardOf(item: ShelfItem, env: CardEnv): StoryCard | null {
   if (!publisher) return null;
   const title = band === "child" ? env.gate.text(item.title) : item.title;
   if (!title || (band === "child" && !env.gate.passes(publisher))) return null;
-  const dekText = band === "child" ? env.gate.text(item.summary) : item.summary;
+  const description = item.summary.trim() || env.store.getEnrichment(item.id, band)?.description || "";
+  const dekText = band === "child" ? env.gate.text(description) : description;
   const dek = dekText ? clampDek(dekText) : "";
   const image = imageOf(item, title, publisher, env);
   return {
@@ -134,4 +136,44 @@ export function cardOf(item: ShelfItem, env: CardEnv): StoryCard | null {
 export function releasedItem(viewer: Viewer, idValue: unknown, store: ShelfStore | null = sharedShelfStore()): ShelfItem | null {
   const id = itemIdFrom(idValue);
   return id ? releaseShelfItem(viewer.band, id, store) : null;
+}
+
+/** Only the existing hero/featured slots, never rows or shelf tiles. Late work may populate the next request's cache. */
+export async function enrichLeadCards(raw: unknown[], env: CardEnv): Promise<void> {
+  type Feed = { props: { hero?: StoryCard; featured?: StoryCard[] } };
+  const feeds = raw.filter((block): block is Feed => !!block && typeof block === "object" && "props" in block);
+  const leads = feeds.flatMap(({ props }) => [props.hero, ...(props.featured ?? []).slice(0, 4)])
+    .filter((card): card is StoryCard => !!card);
+  const selected = [...new Map(leads.map((card) => [card.item_id, card])).values()].slice(0, 5);
+  const deadlineAt = Date.now() + 2500;
+  let index = 0;
+  const worker = async (): Promise<void> => {
+    while (index < selected.length && Date.now() < deadlineAt) {
+      const card = selected[index++]!;
+      const item = releaseShelfItem(env.viewer.band, card.item_id, env.store);
+      if (!item) continue;
+      const stored = env.store.getEnrichment(item.id, env.viewer.band);
+      if (!card.dek || (env.imagesOn && !item.image_url && !enrichmentFresh(stored))) {
+        await enrichItem(item, env.viewer.band, { store: env.store, deadlineAt });
+      }
+    }
+  };
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.all([worker(), worker()]),
+      new Promise<void>((resolve) => { timer = setTimeout(resolve, Math.max(0, deadlineAt - Date.now())); }),
+    ]);
+  } catch { /* enrichment never fails a response */ }
+  finally { clearTimeout(timer); }
+  // Rebuild only these slots from what finished in budget. Do not let a late worker mutate a released response.
+  const refresh = (card: StoryCard): StoryCard => {
+    const item = releaseShelfItem(env.viewer.band, card.item_id, env.store);
+    const updated = item ? cardOf(item, env) : null;
+    return updated ? { ...updated, ...(card.kicker ? { kicker: card.kicker } : {}) } : card;
+  };
+  for (const feed of feeds) {
+    if (feed.props.hero) feed.props.hero = refresh(feed.props.hero);
+    if (feed.props.featured) feed.props.featured = feed.props.featured.map(refresh);
+  }
 }

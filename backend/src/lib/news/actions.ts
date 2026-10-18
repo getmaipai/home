@@ -61,7 +61,8 @@ async function save(person: PersonRow, viewer: Viewer, body: Record<string, unkn
     const store = sharedShelfStore();
     const textKept = content.stored && content.source !== "teaser";
     if (textKept) store?.pinContent(item.id, true);
-    const pictureKept = item.image_url ? await ensureAndPinNewsPicture(item) : true;
+    const hasPicture = item.image_url || store?.getEnrichment(item.id, viewer.band)?.image_url || newsPictureCached(item.id);
+    const pictureKept = hasPicture ? await ensureAndPinNewsPicture(item, viewer.band) : true;
     addSave(person.id, { itemId: item.id, storyId: storyIdOf(item), canonicalUrl: item.canonical_url, title: item.title, publisher: item.publisher, offline: textKept && pictureKept });
     results.push(item.id);
   }

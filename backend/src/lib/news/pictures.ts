@@ -1,4 +1,4 @@
-// NEWS-02 (docs/design/news-app-2026-10-17.md section 8, step 2): the News picture route's cache and its one fetch.
+// The News picture route's cache and guarded download, with a story-page fallback for a missing or failed feed picture.
 //
 // Nothing here runs in the background. `newsPicture` is called only from `GET /api/plugins/news/images/:item`, i.e. when a
 // person's screen shows that story. The first request for an item fetches the feed's own `image_url` once, through the SSRF
@@ -8,6 +8,10 @@
 //
 // The cache is LRU to `news.image_cache_mb` and drops a picture nobody has looked at for 14 days. A picture a saved story
 // pinned is kept (and skipped by both) until the save goes. The index holds item ids and byte counts only (RULES 6a).
+import type { AgeBand } from "@/lib/ageBand";
+import { urlAllowedFor } from "@/lib/blocklists/hostLists";
+import { enrichItem } from "./enrich";
+import { newsHostQuiet, quietNewsHost, __resetNewsHostBackoffForTests } from "./hostBackoff";
 import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -28,7 +32,6 @@ const FETCH_TIMEOUT_MS = 10_000;
 const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_REDIRECTS = 3;
 const UNUSED_EXPIRY_MS = 14 * 86_400_000;
-const QUIET_MS = 60 * 60 * 1000;
 const FAILURE_MEMORY_MS = 30 * 60 * 1000;
 // A person's pace: one screen asks for a hero, four featured, a shelf of eight and twenty rows; past that, one a second.
 const HOST_RATE = { capacity: 60, refillPerSecond: 1 };
@@ -78,12 +81,11 @@ let deps: PictureDeps = {};
 export function __setNewsPictureDepsForTests(next: PictureDeps | null): void {
   deps = next ?? {};
 }
-const quietHosts = new Map<string, number>();
 const failed = new Map<string, number>();
 const inFlight = new Map<string, Promise<boolean>>();
 const hostQueues = new Map<string, Promise<unknown>>();
 export function __resetNewsPicturesForTests(): void {
-  quietHosts.clear();
+  __resetNewsHostBackoffForTests();
   failed.clear();
   inFlight.clear();
   hostQueues.clear();
@@ -119,12 +121,12 @@ function perHost<T>(host: string, task: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function downloadOnce(imageUrl: string): Promise<Uint8Array | null> {
+async function downloadOnce(imageUrl: string, band: AgeBand): Promise<Uint8Array | null> {
   let url: URL;
   try { url = new URL(imageUrl); } catch { return null; }
-  if (!/^https?:$/.test(url.protocol) || url.username || url.password) return null;
+  if (!/^https?:$/.test(url.protocol) || url.username || url.password || !urlAllowedFor(band, imageUrl)) return null;
   const host = url.hostname.toLowerCase();
-  if ((quietHosts.get(host) ?? 0) > clock()) { bumpNewsCounter("picture_host_quiet"); return null; }
+  if (newsHostQuiet(host, clock())) { bumpNewsCounter("picture_host_quiet"); return null; }
   try {
     await assertNotPrivateHost(host, deps.dnsLookup);
   } catch (error) {
@@ -132,17 +134,29 @@ async function downloadOnce(imageUrl: string): Promise<Uint8Array | null> {
     return null;
   }
   return perHost(host, async () => {
-    if ((quietHosts.get(host) ?? 0) > clock()) { bumpNewsCounter("picture_host_quiet"); return null; }
+    if (newsHostQuiet(host, clock())) { bumpNewsCounter("picture_host_quiet"); return null; }
     if (!tryConsume(`net:${host}`, HOST_RATE, clock())) { bumpNewsCounter("picture_paced"); return null; }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
     try {
-      const response = await guardedFetch(url, {
-        method: "GET", redirect: "follow", maxRedirects: MAX_REDIRECTS, signal: controller.signal,
-        headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
-      }, deps.dnsLookup, deps.request);
+      let current = url;
+      let response: Response;
+      for (let hop = 0; ; hop++) {
+        if (!/^https?:$/.test(current.protocol) || current.username || current.password || !urlAllowedFor(band, current.href)) return null;
+        if (newsHostQuiet(current.hostname.toLowerCase(), clock())) return null;
+        response = await guardedFetch(current, {
+          method: "GET", redirect: "manual", signal: controller.signal,
+          headers: { "User-Agent": HOME_USER_AGENT, Accept: "image/avif,image/webp,image/jpeg,image/png" },
+        }, deps.dnsLookup, deps.request);
+        if (response.status === 403 || response.status === 429) quietNewsHost(current.hostname.toLowerCase(), clock());
+        const location = response.status >= 300 && response.status < 400 ? response.headers.get("location") : null;
+        if (!location) break;
+        await response.body?.cancel().catch(() => undefined);
+        if (hop >= MAX_REDIRECTS) return null;
+        current = new URL(location, current);
+      }
       if (response.status === 429 || response.status === 403) {
-        quietHosts.set(host, clock() + QUIET_MS);
+        quietNewsHost(host, clock());
         bumpNewsCounter("picture_host_backoff");
         await response.body?.cancel().catch(() => undefined);
         return null;
@@ -222,27 +236,35 @@ export function newsPictureCached(itemId: string): boolean {
   return readIndex()[pictureRefOf(itemId)] !== undefined;
 }
 
-/** One fetch per item at a time, shared by the picture route and a save. */
-function ensureShared(item: ShelfItem): Promise<boolean> {
-  let pending = inFlight.get(item.id);
+/** One download per item and band at a time, shared by the picture route and a save. */
+function ensureShared(item: ShelfItem, band: AgeBand): Promise<boolean> {
+  const key = `${item.id}:${band}`;
+  let pending = inFlight.get(key);
   if (!pending) {
-    pending = ensure(item).finally(() => inFlight.delete(item.id));
-    inFlight.set(item.id, pending);
+    pending = ensure(item, band).finally(() => inFlight.delete(key));
+    inFlight.set(key, pending);
   }
   return pending;
 }
 
 /** Fetches, resizes and stores an item's picture if it is not cached yet. True when the cache holds it afterwards. */
-async function ensure(item: ShelfItem): Promise<boolean> {
+async function ensure(item: ShelfItem, band: AgeBand): Promise<boolean> {
   const ref = pictureRefOf(item.id);
   const index = readIndex();
   if (index[ref] && NEWS_PICTURE_WIDTHS.every((width) => existsSync(fileOf(ref, width)))) return true;
-  if (!item.image_url) return false;
-  if ((failed.get(item.id) ?? 0) > clock()) return false;
-  const bytes = await downloadOnce(item.image_url);
-  const sizes = bytes ? await resizeBoth(bytes) : null;
+  const failureKey = `${item.id}:${band}`;
+  if ((failed.get(failureKey) ?? 0) > clock()) return false;
+  const bytes = item.image_url ? await downloadOnce(item.image_url, band) : null;
+  let sizes = bytes ? await resizeBoth(bytes) : null;
   if (!sizes) {
-    failed.set(item.id, clock() + FAILURE_MEMORY_MS);
+    const enriched = await enrichItem(item, band);
+    if (enriched?.image_url && enriched.image_url !== item.image_url) {
+      const fallback = await downloadOnce(enriched.image_url, band);
+      sizes = fallback ? await resizeBoth(fallback) : null;
+    }
+  }
+  if (!sizes) {
+    failed.set(failureKey, clock() + FAILURE_MEMORY_MS);
     return false;
   }
   mkdirSync(newsPictureDir(), { recursive: true });
@@ -262,10 +284,10 @@ async function ensure(item: ShelfItem): Promise<boolean> {
 
 /** The picture of an item at one width, from the cache; the first request for the item fetches it once. Null when the item
  * has no picture, the household turned pictures off, the host is backed off or the fetch failed (the card is then text only). */
-export async function newsPicture(item: ShelfItem, width: NewsPictureWidth): Promise<{ bytes: Uint8Array; etag: string } | null> {
+export async function newsPicture(item: ShelfItem, width: NewsPictureWidth, band: AgeBand = "adult"): Promise<{ bytes: Uint8Array; etag: string } | null> {
   if (!newsImagesOn()) return null;
   const ref = pictureRefOf(item.id);
-  if (!(await ensureShared(item))) return null;
+  if (!(await ensureShared(item, band))) return null;
   const path = fileOf(ref, width);
   if (!existsSync(path)) return null;
   const bytes = new Uint8Array(readFileSync(path));
@@ -275,8 +297,8 @@ export async function newsPicture(item: ShelfItem, width: NewsPictureWidth): Pro
 }
 
 /** For a saved story: make sure the picture is stored (text-only items have none) and pin it. */
-export async function ensureAndPinNewsPicture(item: ShelfItem): Promise<boolean> {
-  if (!newsImagesOn() || !item.image_url) return false;
-  if (!(await ensureShared(item))) return false;
+export async function ensureAndPinNewsPicture(item: ShelfItem, band: AgeBand = "adult"): Promise<boolean> {
+  if (!newsImagesOn()) return false;
+  if (!(await ensureShared(item, band))) return false;
   return pinNewsPicture(item.id, true);
 }

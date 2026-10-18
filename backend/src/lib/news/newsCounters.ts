@@ -1,6 +1,10 @@
 // NEWS-02, RULES 6a: News counters carry a fixed name and nothing else. Never an item, a title, an address, a host, a person or a
 // hash of any of them. The list is closed (a name outside it cannot be bumped), and the test that enumerates it is the row.
 export const NEWS_COUNTER_NAMES = [
+  "enrichment_attempts",
+  "enrichment_ok",
+  "enrichment_none",
+  "enrichment_blocked",
   "picture_fetched",
   "picture_failed",
   "picture_ssrf_blocked",

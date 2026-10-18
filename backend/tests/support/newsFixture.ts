@@ -17,6 +17,7 @@ import { NewsItem } from "@maipai/spec/gen/ts/news-item.js";
 import type { AgeBand } from "@/lib/ageBand";
 import { __setNewsPictureDepsForTests, __resetNewsPicturesForTests, newsPictureDir } from "@/lib/news/pictures";
 import { __resetNewsArticleForTests } from "@/lib/news/article";
+import { __resetNewsEnrichForTests } from "@/lib/news/enrich";
 import { __setPageFetchForTests, type AttemptResult } from "@/lib/packageHost";
 import { __setListsReadyForTests } from "@/lib/blocklists/listStore";
 
@@ -94,6 +95,7 @@ export function resetNewsState(): void {
   rmSync(newsPictureDir(), { recursive: true, force: true });
   __resetNewsPicturesForTests();
   __resetNewsArticleForTests();
+  __resetNewsEnrichForTests();
   __setListsReadyForTests(true);
 }
 
@@ -118,7 +120,7 @@ export function articleHtml(extra = "", link = `<a href="https://elsewhere.examp
   return `<html><head><title>Harbor</title></head><body><nav>Menu</nav><article><h1>Harbor plan</h1>${paragraphs.map((p) => `<p>${p}</p>`).join("")}<blockquote>A quoted line from the mayor.</blockquote></article><footer>Footer</footer></body></html>`;
 }
 
-export async function startPublisher(pages: Record<string, string> = {}): Promise<Publisher> {
+export async function startPublisher(pages: Record<string, string | ((req: Request) => Response | Promise<Response>)> = {}): Promise<Publisher> {
   const png = await sharp({ create: { width: 1600, height: 900, channels: 3, background: { r: 30, g: 90, b: 160 } } }).png().toBuffer();
   const requests: string[] = [];
   const hosts: string[] = [];
@@ -132,6 +134,7 @@ export async function startPublisher(pages: Record<string, string> = {}): Promis
       if (url.pathname.startsWith("/img/")) return new Response(png, { headers: { "content-type": "image/png" } });
       if (url.pathname.startsWith("/text/")) return new Response("not an image", { headers: { "content-type": "text/plain" } });
       const page = pages[url.pathname];
+      if (typeof page === "function") return page(req);
       return page !== undefined ? new Response(page, { headers: { "content-type": "text/html" } }) : new Response("missing", { status: 404 });
     },
   });
@@ -146,7 +149,7 @@ export async function startPublisher(pages: Record<string, string> = {}): Promis
       });
       __setPageFetchForTests(async (target): Promise<AttemptResult> => {
         const url = new URL(target);
-        if (url.pathname === "/robots.txt") return { ok: false, status: 404 };
+        if (url.pathname === "/robots.txt" && pages["/robots.txt"] === undefined) return { ok: false, status: 404 };
         const response = await fetchFromServer(url);
         return response.ok ? { ok: true, status: 200, value: await response.text() } : { ok: false, status: response.status, error: new Error(`HTTP ${response.status}`) as never };
       });
@@ -172,14 +175,14 @@ export function seedFeeds(): { kids: string; household: string } {
 }
 
 let counter = 0;
-export function putItem(feedId: string, host: string, over: Partial<{ title: string; summary: string; topics: string[]; image: string | null; ageHours: number; bandOk: AgeBand; path: string; id: string }> = {}): NewsItem {
+export function putItem(feedId: string, host: string, over: Partial<{ title: string; summary: string; topics: string[]; image: string | null; ageHours: number; bandOk: AgeBand; path: string; id: string; publisher: string }> = {}): NewsItem {
   counter += 1;
   const n = String(counter).padStart(5, "0");
   const path = over.path ?? `/story/${n}`;
   const published = new Date(Date.now() - (over.ageHours ?? 1) * 3_600_000).toISOString();
   const item = NewsItem.parse({
     id: over.id ?? `news-t${n}abcdef`, feed_id: feedId, url: `${host}${path}`, canonical_url: `${host}${path}`, title: over.title ?? `Headline ${n}`,
-    summary: over.summary ?? `A short summary of story ${n} in plain words.`, published_at: published, fetched_at: published, publisher: host === KIDS_HOST ? "Kids Daily" : "Example Wire",
+    summary: over.summary ?? `A short summary of story ${n} in plain words.`, published_at: published, fetched_at: published, publisher: over.publisher ?? (host === KIDS_HOST ? "Kids Daily" : "Example Wire"),
     lang: "en", band_ok: over.bandOk ?? "child", hlc: "1:0:abcdef", provenance: "test",
     ...(over.image === null ? {} : { image_url: over.image ?? `${host}/img/${n}.png` }), ...(over.topics ? { topics: over.topics } : {}),
   });

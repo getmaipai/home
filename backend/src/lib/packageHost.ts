@@ -1881,7 +1881,7 @@ export async function pageHtml(url: string, signal?: AbortSignal, minorBand?: Mi
   const robotsResult = await (pageFetchForTests ? pageFetchForTests(`${origin}/robots.txt`) : pageFetch(`${origin}/robots.txt`, false, signal, undefined, opts.background));
   if (!robotsResult.ok && robotsResult.status !== 404) pageFailure(robotsResult, `${origin}/robots.txt`);
   if (robotsResult.ok && typeof robotsResult.value === "string" && !robotsAllows(robotsResult.value, parsedUrl)) {
-    throw new HostError("network_unreachable", `The site's robots.txt declined the page request for ${url}.`);
+    throw new PageDeclinedError(`The site's robots.txt declined the page request for ${url}.`);
   }
   const result = await fetchOne(url);
   if (!result.ok) {

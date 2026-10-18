@@ -242,7 +242,7 @@ describe("the Search page's data", () => {
       const body = await response.text();
       expect(body).not.toContain("http");
       const data = JSON.parse(body) as { blocks: Array<{ props: Feed }> };
-      expect(data.blocks[0]?.props.shelves[0]?.channels ?? []).toEqual(channels);
+      expect(data.blocks[0]?.props.shelves[0]?.channels ?? []).toEqual([...channels]);
       for (const channel of data.blocks.flatMap((block) => block.props.shelves.flatMap((shelf) => shelf.channels ?? []))) {
         expect(channel.kind === "source" ? channel.key === feeds.kids : channel.key === "kids").toBe(true);
       }
