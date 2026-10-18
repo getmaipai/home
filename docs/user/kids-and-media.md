@@ -11,7 +11,8 @@ Music and audiobooks count too. An owner or admin can turn on the home rule that
 Podcasts still count.
 
 When screen time runs out, Home keeps the last place and the player pauses within about 15 seconds, even if the video has already
-loaded. Pressing play again pauses it right away. The child sees these words once:
+loaded. Pressing play again pauses it right away. Opening a video or song after time is up shows the words too. The child sees these
+words once:
 
 > Screen time is done for today.
 > Ask a grown-up for more.

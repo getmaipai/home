@@ -33,7 +33,7 @@ function setup(reads: Array<BudgetRead | Error>) {
 const left = (exhausted: boolean, limit = 1): BudgetRead => ({ limit_min: limit, used_min: exhausted ? 1 : 0.5, left_min: exhausted ? 0 : 0.5, exhausted, line: exhausted ? LINE : null });
 
 test("a person whose time runs out while the element keeps playing (a fully buffered video) is paused, and the kid line shows once", async () => {
-  const { el, shown } = setup([left(false), left(true)]);
+  const { el, shown } = setup([left(false), left(false), left(true)]); // attach, play, then the timer
   await el.play(); await flush();
   expect(el.paused).toBe(false);
   await tickTimers(); // the 15 s check finds the time is up
@@ -44,7 +44,7 @@ test("a person whose time runs out while the element keeps playing (a fully buff
 });
 
 test("pressing play after time is up is blocked at once, before any fetch answers", async () => {
-  const { el, shown } = setup([left(false), left(true)]);
+  const { el, shown } = setup([left(false), left(false), left(true)]);
   await el.play(); await flush();
   await tickTimers();
   expect(el.paused).toBe(true);
@@ -54,12 +54,13 @@ test("pressing play after time is up is blocked at once, before any fetch answer
 });
 
 test("each play checks the budget, and an extension a grown-up added lets the next play through", async () => {
-  const { el, calls } = setup([left(true), left(false)]);
+  const { el, calls } = setup([left(false), left(true), left(false)]);
+  await flush(); // the check on attach
   await el.play(); await flush();
-  expect(calls()).toBe(1);
+  expect(calls()).toBe(2);
   expect(el.paused).toBe(true);
   await el.play(); await flush(); // blocked, then the recheck sees the extension
-  expect(calls()).toBe(2);
+  expect(calls()).toBe(3);
   await el.play(); await flush();
   expect(el.paused).toBe(false);
 });
@@ -82,8 +83,10 @@ test("a failed budget read neither pauses nor throws", async () => {
 
 test("a check runs only while the element plays, and stopping the guard removes it", async () => {
   const { el, stop, calls } = setup([left(false)]);
+  await flush();
+  expect(calls()).toBe(1); // the check on attach
   await tickTimers();
-  expect(calls()).toBe(0); // paused: no polling
+  expect(calls()).toBe(1); // paused: no polling
   await el.play(); await flush();
   const afterPlay = calls();
   await tickTimers();
@@ -92,4 +95,20 @@ test("a check runs only while the element plays, and stopping the guard removes 
   expect(timers).toEqual([]);
   await el.play(); await flush();
   expect(calls()).toBe(afterPlay + 1);
+});
+
+test("opening a player when time is already up shows the kid line without any play (the file itself is refused)", async () => {
+  const { el, shown } = setup([left(true)]);
+  await flush();
+  expect(shown).toEqual([LINE]);
+  expect(el.paused).toBe(true);
+});
+
+test("a load error (the hub refused the file) checks the budget and shows the line", async () => {
+  const { el, shown } = setup([left(false), left(true)]);
+  await flush();
+  expect(shown).toEqual([]);
+  el.dispatchEvent(new Event("error"));
+  await flush();
+  expect(shown).toEqual([LINE]);
 });

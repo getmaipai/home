@@ -11,7 +11,7 @@ import { MediaHostContext, type MediaHost, type MediaItemRef } from "@maipai/ui/
 import { api, request } from "@/lib/api";
 import { mediaAppOfPath, playRoute } from "@/shell/mediaApps";
 import { MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
-import { toast } from "sonner";
+import { useToast } from "@maipai/ui/src/primitives/Toast";
 import { BUDGET_CHECK_MS, guardMediaBudget, intervalEvery } from "@/shell/mediaBudgetGuard";
 import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 
@@ -139,10 +139,14 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
     return () => { live = false; current.el.removeEventListener("ended", ended); };
   }, [current, store]);
   // MEDIA-KID-01: the daily media minutes pause the host's element (every media app, the mini bar, audio and video alike).
+  // The words go through the shell's one toast (the kit ToastProvider in App.tsx, the same one the notification bell uses).
   const element = current?.el ?? null;
+  const { push } = useToast();
+  const pushRef = useRef(push);
+  pushRef.current = push;
   useEffect(() => {
     if (!element) return;
-    return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => toast(line), every: intervalEvery(BUDGET_CHECK_MS) });
+    return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS) });
   }, [element]);
   const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear }), [current, store]);
   // The element is unloaded when the person signs out or the shell goes away.

@@ -7,7 +7,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- **Screen time now pauses the player.** When a child's or teen's daily media minutes run out, the player in Videos, Music, Podcasts and the small player now pauses within about 15 seconds, even for a video that has already loaded, and shows "Screen time is done for today. Ask a grown-up for more." once. Pressing play again pauses it right away until a grown-up adds minutes. (The 0.2.18 and 0.2.19 notes said this already happened; before this fix only new loading stopped.)
+- **Screen time now pauses the player.** When a child's or teen's daily media minutes run out, the player in Videos, Music, Podcasts and the small player now pauses within about 15 seconds, even for a video that has already loaded, and shows "Screen time is done for today. Ask a grown-up for more." once. Pressing play again pauses it right away until a grown-up adds minutes. (The 0.2.18 notes said this already happened; before this fix only new loading stopped.)
 - **Quick and full songs.** Songs now come in two kinds, like pictures and videos. Quick songs are about 45 seconds and take under a minute; full songs are about 3 minutes with an intro, verses, chorus, bridge and ending, and take a minute or two (a Mac with 128 GB). Chat makes a quick song unless you ask for a whole or full song; the card has **Make it full** and **Make it quick**, and **Settings** has a **Song length** choice.
 
 ### Reliability

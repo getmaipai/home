@@ -1,7 +1,7 @@
 // MEDIA-KID-01: the player side of the daily media minutes. The hub meters time and refuses new bytes once it is up, but a video
 // the browser already buffered would keep playing, so the shell watches the one host element (mediaHost.tsx: every media app's
 // player, the docked mini bar and audio-only players use it) and pauses it when the person's budget says time is up. The words come
-// from the hub (`line` on GET /api/media/budget, MEDIA_KID_COPY), shown once through the shell's toast.
+// from the hub (`line` on GET /api/media/budget, MEDIA_KID_COPY), shown once through the shell's toast (kit ToastProvider).
 import type { MediaBudgetResponse } from "@/lib/api";
 
 export type BudgetRead = MediaBudgetResponse & { line?: string | null };
@@ -20,7 +20,7 @@ export const intervalEvery = (ms: number) => (run: () => void) => {
   return () => clearInterval(id);
 };
 
-/** Watches one element: checks the budget on every play and every 15 s while it plays; once time is up it pauses the element,
+/** Watches one element: checks the budget when it attaches, on a load error, on every play and every 15 s while it plays; once time is up it pauses the element,
  * shows the kid line once, and pauses any later play at once until a check sees more minutes (a grown-up extended today).
  * A failed read changes nothing: it never pauses on its own and never throws. Returns a stop function. */
 export function guardMediaBudget(el: HTMLMediaElement, deps: GuardDeps): () => void {
@@ -40,11 +40,17 @@ export function guardMediaBudget(el: HTMLMediaElement, deps: GuardDeps): () => v
     if (exhausted) el.pause();
     void check();
   };
+  const onError = () => { void check(); };
   el.addEventListener("play", onPlay);
+  // A file the hub refuses (time already up) never plays, so check on attach and on a load error too: the child gets the words
+  // instead of a player that silently will not start.
+  el.addEventListener("error", onError);
+  void check();
   const stopTimer = deps.every(() => { if (!el.paused) void check(); });
   return () => {
     live = false;
     el.removeEventListener("play", onPlay);
+    el.removeEventListener("error", onError);
     stopTimer();
   };
 }
