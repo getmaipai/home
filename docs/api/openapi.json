@@ -1932,8 +1932,9 @@
                     "nullable": true
                   },
                   "birthdate": {
-                    "type": "string",
-                    "nullable": true
+                    "nullable": true,
+                    "deprecated": true,
+                    "description": "Ignored. Choose the person's role instead."
                   },
                   "role": {
                     "type": "string"
@@ -2251,8 +2252,9 @@
                     "nullable": true
                   },
                   "birthdate": {
-                    "type": "string",
-                    "nullable": true
+                    "nullable": true,
+                    "deprecated": true,
+                    "description": "Ignored. Choose the person's role instead."
                   },
                   "role": {
                     "type": "string"
@@ -2516,7 +2518,7 @@
             }
           },
           "400": {
-            "description": "Invalid role/displayName/bio/accent/birthdate/guestExpiresAt",
+            "description": "Invalid role/displayName/bio/accent/guestExpiresAt",
             "content": {
               "application/json": {
                 "schema": {

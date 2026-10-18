@@ -40,7 +40,6 @@ import {
   relationships,
   grants,
   approvals,
-  notificationDeliveries,
 } from "@/db/schema";
 import { clonedVoicesDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
@@ -55,7 +54,7 @@ import { ROLE_LADDER, invalidateSessionCacheForPerson, type Role } from "@/middl
 import { trigger } from "@/lib/notifications";
 import { forgetNewsOfPerson } from "@/lib/news/records";
 import { forgetLikenessOfPerson, likenessPersonGone } from "@/lib/likeness/history";
-import { roleRequiresCredential, requiresCredential } from "@/lib/personAuthMethods";
+import { roleRequiresCredential } from "@/lib/personAuthMethods";
 import { eraseChatFolderReferences } from "@/lib/chatFolders";
 import type { PersonRow } from "@/types";
 import type { personToDbValues } from "@/lib/personShape";
@@ -115,9 +114,8 @@ function lastOwnerGuardError(personId: string, wouldLeaveOwnerRole: boolean): Pe
 /** Everyone may edit their own name, nickname and avatar. Managing
  * somebody else needs the ladder above.
  *
- * Birthdate and localOnly are the exception (SEC-8, code review,
- * 2026-09-06): they're safety-adjacent, not cosmetic, so a self-edit of
- * either still needs owner/admin - checked separately in
+ * localOnly is safety-adjacent, so a self-edit still needs
+ * owner/admin, checked separately in
  * routes/people.ts's PATCH handler, not here, since this function has no
  * way to see WHICH fields a given request is touching. */
 export function canManage(actor: PersonRow, target: { id: string; role: string }): boolean {
@@ -669,94 +667,8 @@ export function disableExpiredGuests(): string[] {
   return expired.map((r) => r.id);
 }
 
-/** The age band a birthdate implies today, matching person.schema.json's
- * own role description ("Two minor bands (teen 13-17, child under 13) so
- * there is no thirteen-year cliff") and platform plan 4.2's adult
- * threshold. Only ever returns "child", "teen" or "adult" - the three
- * roles this sweep is allowed to move someone between; owner/admin/guest
- * are authorization roles, never age bands, and this function is never
- * consulted for them. */
-export function ageBandForBirthdate(birthdate: string, today: Date = new Date()): "child" | "teen" | "adult" {
-  const born = new Date(birthdate);
-  let age = today.getUTCFullYear() - born.getUTCFullYear();
-  const monthDay = (d: Date) => d.getUTCMonth() * 100 + d.getUTCDate();
-  if (monthDay(today) < monthDay(born)) age -= 1; // birthday hasn't happened yet this year
-  if (age >= 18) return "adult";
-  if (age >= 13) return "teen";
-  return "child";
-}
-
-/** BACKLOG.md: "the band change on a birthday with its passive
- * notification". Only ever touches people whose CURRENT role is "child"
- * or "teen" (an "adult" has no further band to age into, and
- * owner/admin/guest were never age-derived in the first place) - and
- * only those with a birthdate on file, since a role assigned by hand
- * with no birthdate has nothing for this to compute against. Fires
- * exactly one notification per person actually moved, never one for a
- * birthday that happens to land on a day this runs without crossing a
- * band boundary. A move INTO a role roleRequiresCredential() gates
- * (issues #35/#47: "adult") is held rather than applied when that
- * person has no credential yet - a different, time_sensitive
- * notification instead, and the person stays a sweep candidate on every
- * future run until it's resolved by hand. */
-export async function applyAgeBandChanges(today: Date = new Date()): Promise<string[]> {
-  const candidates = db
-    .select()
-    .from(people)
-    .where(and(isNull(people.deletedAt)))
-    .all()
-    .filter((p) => (p.role === "child" || p.role === "teen") && p.birthdate !== null);
-
-  const moved: string[] = [];
-  for (const person of candidates) {
-    const nextBand = ageBandForBirthdate(person.birthdate!, today);
-    if (nextBand === person.role) continue;
-    // Issues #35/#47: this write used to run unconditionally, the one
-    // path a code review (2026-09-06) found could still produce a
-    // credential-free "adult" - routes/people.ts's create and
-    // checkRoleChange's promotion guard both check this, but neither
-    // route runs here. Held at the current (safer) band rather than
-    // silently promoted: the household is notified and can promote by
-    // hand once a PIN, password, or passkey exists. This candidate stays
-    // in every future day's sweep (role never changed, so the filter
-    // above keeps matching) until that happens.
-    if (roleRequiresCredential(nextBand) && !requiresCredential(person.id)) {
-      // A review of the hold above (2026-09-06) found this re-fired on
-      // EVERY future run for as long as the hold lasts (the person's role
-      // never changes while held, so they never leave `candidates`) -
-      // unbounded daily notification/Telegram spam, breaking this
-      // scheduled job's own "every run is idempotent" contract. Skipped
-      // once an undismissed delivery for this exact person already
-      // exists; a fresh one fires again only once that's dismissed (or
-      // the hold resolves and this branch stops running for them at all).
-      //
-      // Keyed on subjectPersonId, not a LIKE match on the rendered
-      // displayName (a SECOND review, 2026-09-06, found that version
-      // silently merged two same-named people - no uniqueness constraint
-      // on displayName exists anywhere - and was vulnerable to unescaped
-      // LIKE metacharacters in a name).
-      const alreadyNotified = db
-        .select({ id: notificationDeliveries.id })
-        .from(notificationDeliveries)
-        .where(
-          and(
-            eq(notificationDeliveries.typeId, "person.adult_band_held_needs_secret"),
-            isNull(notificationDeliveries.dismissedAt),
-            eq(notificationDeliveries.subjectPersonId, person.id),
-          ),
-        )
-        .get();
-      if (!alreadyNotified) {
-        await trigger("person.adult_band_held_needs_secret", { displayName: person.displayName }, { subjectPersonId: person.id });
-      }
-      continue;
-    }
-    const now = new Date().toISOString();
-    db.update(people).set({ role: nextBand, updatedAt: now, hlc: nextHlc() }).where(eq(people.id, person.id)).run();
-    invalidateSessionCacheForPerson(person.id);
-    if (nextBand !== "adult") likenessPersonGone(person.id); // LIKENESS-01: no longer an adult, so no longer a subject
-    moved.push(person.id);
-    await trigger("person.band_changed", { displayName: person.displayName, newRole: nextBand });
-  }
-  return moved;
+/** Compatibility entry point for existing scheduled jobs. Roles are assigned
+ * explicitly and never change with a date, including a saved birthdate. */
+export async function applyAgeBandChanges(_today: Date = new Date()): Promise<string[]> {
+  return [];
 }

@@ -346,11 +346,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   "people.disable_expired_guests": () => {
     disableExpiredGuests();
   },
-  // Step 7: BACKLOG.md's "the band change on a birthday with its passive
-  // notification" - daily, not per-minute: a birthday only needs to be
-  // noticed once it has actually happened, and every run is idempotent
-  // (applyAgeBandChanges only moves someone whose CURRENT role no longer
-  // matches their age).
+  // Retired date-driven aging job: keep persisted schedules harmless.
   "people.apply_age_band_changes": async () => {
     await applyAgeBandChanges();
   },

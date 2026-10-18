@@ -140,6 +140,10 @@ describe("parsePersonCandidate", () => {
       memorialized_at: null,
     };
     expect(parsePersonCandidate(candidate).success).toBe(true);
+    const { birthdate: _birthdate, ...withoutBirthdate } = candidate;
+    const absent = parsePersonCandidate(withoutBirthdate);
+    expect(absent.success).toBe(true);
+    if (absent.success) expect(absent.data.birthdate).toBeNull();
   });
 
   test("rejects a candidate with a missing field", () => {

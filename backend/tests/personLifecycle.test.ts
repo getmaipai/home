@@ -9,7 +9,6 @@ import { listPending } from "@/lib/notifications";
 import {
   memorializePerson,
   disableExpiredGuests,
-  ageBandForBirthdate,
   applyAgeBandChanges,
 } from "@/lib/personLifecycle";
 import type { PersonRow } from "@/types";
@@ -118,133 +117,19 @@ describe("disableExpiredGuests()", () => {
   });
 });
 
-describe("ageBandForBirthdate()", () => {
-  const today = new Date("2026-06-15T00:00:00.000Z");
-
-  test("under 13 is child", () => {
-    expect(ageBandForBirthdate("2015-01-01", today)).toBe("child"); // 11
-  });
-
-  test("13 to 17 is teen", () => {
-    expect(ageBandForBirthdate("2012-01-01", today)).toBe("teen"); // 14
-  });
-
-  test("18 or older is adult", () => {
-    expect(ageBandForBirthdate("2000-01-01", today)).toBe("adult"); // 26
-  });
-
-  test("the exact boundary respects whether the birthday has happened yet this year", () => {
-    // Turns 13 on 2026-06-20 - 5 days after `today` (2026-06-15): still 12.
-    expect(ageBandForBirthdate("2013-06-20", today)).toBe("child");
-    // Turned 13 on 2026-06-10 - 5 days before `today`: already 13.
-    expect(ageBandForBirthdate("2013-06-10", today)).toBe("teen");
-  });
-});
-
-describe("applyAgeBandChanges()", () => {
-  test("moves a child who turned 13 to teen, and notifies the adults", async () => {
-    const adult = insertPerson({ displayName: "Sage", role: "adult" });
-    const child = insertPerson({ displayName: "Bramble", role: "child", birthdate: "2013-01-01" });
-    const today = new Date("2026-06-15T00:00:00.000Z");
-
-    const moved = await applyAgeBandChanges(today);
-
-    expect(moved).toEqual([child.id]);
-    expect(db.select().from(people).where(eq(people.id, child.id)).get()!.role).toBe("teen");
-    const pending = listPending(adult);
-    expect(pending.some((n) => n.text.includes("Bramble") && n.text.includes("teen"))).toBe(true);
-  });
-
-  test("never touches someone with no birthdate on file", async () => {
-    const child = insertPerson({ displayName: "Bramble", role: "child", birthdate: null });
-    const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-    expect(moved).toEqual([]);
-    expect(db.select().from(people).where(eq(people.id, child.id)).get()!.role).toBe("child");
-  });
-
-  test("never touches owner, admin or guest, even with a qualifying birthdate", async () => {
-    const owner = insertPerson({ displayName: "Sage", role: "owner", birthdate: "2013-01-01" });
-    const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-    expect(moved).toEqual([]);
-    expect(db.select().from(people).where(eq(people.id, owner.id)).get()!.role).toBe("owner");
-  });
-
-  test("a person whose age already matches their role is left alone", async () => {
-    const teen = insertPerson({ displayName: "Bramble", role: "teen", birthdate: "2012-01-01" }); // 14 in 2026
-    const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-    expect(moved).toEqual([]);
-    expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("teen");
-  });
-
-  // Issues #35/#47: a code review of that fix found this was the one
-  // path left that could produce a credential-free "adult" - neither
-  // routes/people.ts's create nor checkRoleChange's promotion guard runs
-  // here, since this write skipped both routes entirely.
-  describe("a teen turning 18 with no credential (issues #35/#47)", () => {
-    test("is held at teen, not silently promoted to a credential-free adult", async () => {
-      const owner = insertPerson({ displayName: "Sage", role: "owner" });
-      const teen = insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" }); // 18 in 2026
-      const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-
-      expect(moved).toEqual([]);
-      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("teen");
-      const pending = listPending(owner);
-      expect(pending.some((n) => n.text.includes("Vincent") && n.text.includes("PIN"))).toBe(true);
-    });
-
-    // A review of the hold above (2026-09-06) found it re-notified on
-    // EVERY run for as long as the hold lasted, unbounded spam breaking
-    // the scheduled job's own "every run is idempotent" contract.
-    test("does not re-notify on every subsequent run while still held", async () => {
-      const owner = insertPerson({ displayName: "Sage", role: "owner" });
-      insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
-
-      await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-      await applyAgeBandChanges(new Date("2026-06-16T00:00:00.000Z"));
-      await applyAgeBandChanges(new Date("2026-06-17T00:00:00.000Z"));
-
-      const matching = listPending(owner).filter((n) => n.text.includes("Vincent") && n.text.includes("PIN"));
-      expect(matching.length).toBe(1);
-    });
-
-    // A second review of the dedup above (2026-09-06) found it keyed on
-    // a LIKE match against the rendered displayName in the notification
-    // text - displayName has no uniqueness constraint anywhere, so two
-    // same-named people held in the same sweep silently suppressed each
-    // other's notification. Fixed by keying on notificationDeliveries'
-    // own subjectPersonId column instead.
-    test("two same-named held people each get their own notification, not a merged one", async () => {
-      const owner = insertPerson({ displayName: "Sage", role: "owner" });
-      insertPerson({ id: "person-vincentone", displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
-      insertPerson({ id: "person-vincenttwo", displayName: "Vincent", role: "teen", birthdate: "2008-02-01" });
-
-      await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-
-      const matching = listPending(owner).filter((n) => n.text.includes("Vincent") && n.text.includes("PIN"));
-      expect(matching.length).toBe(2);
-    });
-
-    test("stays a candidate on the next run, and completes once a credential exists", async () => {
-      const teen = insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
-      await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("teen");
-
-      const now = new Date().toISOString();
-      db.insert(personCredentials).values({ personId: teen.id, secretHash: await hashSecret("theirpin1"), failedAttempts: 0, createdAt: now, updatedAt: now }).run();
-
-      const moved = await applyAgeBandChanges(new Date("2026-06-16T00:00:00.000Z"));
-      expect(moved).toEqual([teen.id]);
-      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("adult");
-    });
-
-    test("a teen who already has a credential is promoted immediately, same as before", async () => {
-      const teen = insertPerson({ displayName: "Vincent", role: "teen", birthdate: "2008-01-01" });
-      const now = new Date().toISOString();
-      db.insert(personCredentials).values({ personId: teen.id, secretHash: await hashSecret("theirpin1"), failedAttempts: 0, createdAt: now, updatedAt: now }).run();
-
-      const moved = await applyAgeBandChanges(new Date("2026-06-15T00:00:00.000Z"));
-      expect(moved).toEqual([teen.id]);
-      expect(db.select().from(people).where(eq(people.id, teen.id)).get()!.role).toBe("adult");
-    });
+describe("retired date-driven aging", () => {
+  test("never changes any role or notifies, even across birthdays with credentials", async () => {
+    const owner = insertPerson({ displayName: "Sage", role: "owner" });
+    for (const role of ["child", "teen", "adult", "admin", "owner", "guest"]) {
+      for (const birthdate of [null, "2013-01-01", "2008-01-01", "1990-01-01"]) {
+        const person = insertPerson({ role, birthdate });
+        const now = new Date().toISOString();
+        db.insert(personCredentials).values({ personId: person.id, secretHash: await hashSecret("1234"), failedAttempts: 0, createdAt: now, updatedAt: now }).run();
+        expect(await applyAgeBandChanges(new Date("2026-06-15T00:00:00Z"))).toEqual([]);
+        expect(await applyAgeBandChanges(new Date("2036-06-15T00:00:00Z"))).toEqual([]);
+        expect(db.select().from(people).where(eq(people.id, person.id)).get()).toEqual(person);
+      }
+    }
+    expect(listPending(owner)).toEqual([]);
   });
 });

@@ -321,9 +321,7 @@ styleRemovalInterval.unref();
 ensureCoreJob("householdCa.check_leaf_expiry", "every:1d");
 ensureCoreJob("tailscale.renew_certificate", "every:30d");
 syncTailscaleRenewalSetting();
-// Step 7: guest expiry and the age-band birthday sweep - see
-// lib/scheduler.ts's own CORE_JOBS entries for why daily is enough for
-// both.
+// Daily guest expiry and a compatibility no-op for retired birthday jobs.
 ensureCoreJob("people.disable_expired_guests", "every:1d");
 ensureCoreJob("people.apply_age_band_changes", "every:1d");
 // CHAT-TITLE-02: repair pass for chats found with no title or only a provisional one (small cap, backs off while the engine is down).

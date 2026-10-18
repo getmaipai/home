@@ -51,7 +51,6 @@ import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { speakerAgeBand } from "@/lib/ageBand";
-import { ageBandForBirthdate } from "@/lib/personLifecycle";
 import { remember } from "@/lib/memory";
 import { categoryToRecordKind, isCategory } from "@/lib/memoryJudge";
 import { listBackups } from "@/lib/backup";
@@ -78,30 +77,6 @@ function legacyTsToIso(raw: number | null | undefined): string | null {
   // stored integer.
   if (raw == null) return null;
   return new Date(raw * 1000).toISOString();
-}
-
-const ISO_DATE_PREFIX = /^\d{4}-\d{2}-\d{2}/;
-
-function normalizeLegacyBirthdate(raw: string): string {
-  // person.schema.json's birthdate is format:"date" (YYYY-MM-DD); legacy
-  // stores birthdate as plain text with no format guarantee recorded in
-  // its own schema comment. Every real legacy row is expected to
-  // already be in this shape (a text column an app itself only ever
-  // wrote ISO dates into) - taken directly, with no Date round-trip at
-  // all, which a code review (2026-09-06) found necessary: `new
-  // Date(raw).toISOString()` parses a NON-ISO string like "06/15/1985"
-  // at LOCAL midnight (unlike a bare "1985-06-15", which the spec
-  // guarantees is UTC midnight), so on a host east of UTC that fallback
-  // alone could silently shift such a birthdate back one day. Only a
-  // genuinely non-ISO value falls through to that best-effort (and
-  // still ambiguous - there is no way to know which zone the original
-  // writer intended) fallback below.
-  if (ISO_DATE_PREFIX.test(raw)) return raw.slice(0, 10);
-  const parsed = new Date(raw);
-  const yyyy = parsed.getUTCFullYear();
-  const mm = String(parsed.getUTCMonth() + 1).padStart(2, "0");
-  const dd = String(parsed.getUTCDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
 }
 
 function stableSuffix(input: string, length: number): string {
@@ -135,7 +110,6 @@ interface LegacyUserRaw {
   first_name: string;
   last_name: string;
   nickname: string;
-  birthdate: string;
   role: "admin" | "user";
   dicebear_seed: string | null;
 }
@@ -215,16 +189,10 @@ function emptyCounts(): LegacyImportCounts {
   };
 }
 
-/** Preserve the existing import-only parent-pick guard until BIRTHDATE-REMOVE-01
- * replaces it with explicit role selection. The speaker band is role-only. */
-function legacyUserAgeBand(birthdate: string) {
-  return ageBandForBirthdate(birthdate);
-}
-
 /** People matching (the plan: "matched by display name to existing
  * people, never auto-created for children without a parent's pick").
- * A legacy admin is imported as role "adult", the same as a legacy
- * "user" - promoting an imported profile to admin is left to the
+ * A legacy admin is imported as role "adult". A legacy "user" needs
+ * an existing Home profile with an explicit role. Promotion to admin is left to the
  * owner's own People settings after review, not something this import
  * grants on its own (an admin profile the route (routes/people.ts) would
  * otherwise require a secret for, which this background import never
@@ -234,7 +202,7 @@ function legacyUserAgeBand(birthdate: string) {
  * the new hub's single display_name field. */
 function resolvePeople(legacyDb: Database, dryRun: boolean, counts: LegacyImportCounts, errors: string[]): PersonResolution[] {
   const legacyUsers = legacyDb
-    .query("SELECT id, first_name, last_name, nickname, birthdate, role, dicebear_seed FROM users")
+    .query("SELECT id, first_name, last_name, nickname, role, dicebear_seed FROM users")
     .all() as LegacyUserRaw[];
 
   const existingByName = new Map<string, string>();
@@ -253,7 +221,10 @@ function resolvePeople(legacyDb: Database, dryRun: boolean, counts: LegacyImport
       continue;
     }
 
-    if (legacyUserAgeBand(u.birthdate) !== "adult") {
+    // Legacy "user" does not identify Child, Teen or Adult. Have an
+    // admin create a role-selected Home profile first, then match by name.
+    // Only the explicit legacy admin role permits automatic adult creation.
+    if (u.role !== "admin") {
       results.push({ legacyId: u.id, displayName, outcome: "skipped_needs_parent_pick", personId: null });
       counts.peopleSkippedMinor++;
       continue;
@@ -267,7 +238,7 @@ function resolvePeople(legacyDb: Database, dryRun: boolean, counts: LegacyImport
         id: newId,
         display_name: displayName,
         nickname: nickname && nickname.toLowerCase() !== key ? nickname : null,
-        birthdate: normalizeLegacyBirthdate(u.birthdate),
+        birthdate: null,
         role: "adult",
         avatar_seed: u.dicebear_seed ?? newId,
         source: "hub",

@@ -94,7 +94,7 @@ const createRoute_ = createRoute({
           schema: z.object({
             displayName: z.string().optional(),
             nickname: z.string().nullable().optional(),
-            birthdate: z.string().nullable().optional(),
+            birthdate: z.unknown().optional().openapi({ deprecated: true, description: "Ignored. Choose the person's role instead." }),
             role: z.string().optional(),
             avatarSeed: z.string().optional(),
             secret: z.string().optional(),
@@ -165,17 +165,12 @@ peopleRoutes.openapi(createRoute_, async (c) => {
   const now = new Date().toISOString();
   const id = newPersonId();
 
-  // Validate the full candidate against the spec BEFORE writing: a code
-  // review (2026-09-04) found this route inserting client-supplied
-  // birthdate/avatarSeed straight into SQLite with only ad hoc length
-  // checks, so an invalid birthdate corrupted the row and then crashed
-  // every later GET /api/people (toRoster's Person.parse throwing inside
-  // the .map()), not just the request that created it.
+  // Validate the spec shape before writing. Legacy birthdate input is inert.
   const candidate = parsePersonCandidate({
     id,
     display_name: displayName.value,
     nickname: body.nickname ?? null,
-    birthdate: body.birthdate ?? null,
+    birthdate: null,
     role,
     avatar_seed: body.avatarSeed ?? id,
     source: "hub",
@@ -228,7 +223,7 @@ const patchRoute = createRoute({
             // against) - no separate check needed, same as nickname above.
             bio: z.string().nullable().optional(),
             accent: z.string().nullable().optional(),
-            birthdate: z.string().nullable().optional(),
+            birthdate: z.unknown().optional().openapi({ deprecated: true, description: "Ignored. Choose the person's role instead." }),
             role: z.string().optional(),
             avatarSeed: z.string().optional(),
             localOnly: z.boolean().optional(),
@@ -247,7 +242,7 @@ const patchRoute = createRoute({
   },
   responses: {
     200: { content: { "application/json": { schema: RosterWithSecuritySchema } }, description: "Updated." },
-    ...errorResponses({ 400: "Invalid role/displayName/bio/accent/birthdate/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
+    ...errorResponses({ 400: "Invalid role/displayName/bio/accent/guestExpiresAt", 401: "Not signed in", 403: "Not allowed to edit this person", 404: "No such person" }),
   },
 });
 peopleRoutes.openapi(patchRoute, async (c) => {
@@ -280,20 +275,9 @@ peopleRoutes.openapi(patchRoute, async (c) => {
     return c.json({ error: "only owner or admin may change session lock settings" }, 403);
   }
 
-  // canManage() lets everyone edit their OWN profile (name, nickname,
-  // avatar) with no ladder check at all - birthdate and localOnly are
-  // safety-adjacent, not cosmetic, so a self-edit of either still needs
-  // the ladder. A code review (2026-09-06, SEC-8) found a child free to
-  // set their own birthdate to any adult year, which speakerAgeBand()
-  // (lib/ageBand.ts) used to read straight into "age band adult" for
-  // that same person's own turns - the classifier itself still gates on
-  // role, but the prompt's tone/content calibration and evaluateSafety()'s
-  // leniency both used to loosen on request. Owner/admin editing
-  // themselves is unaffected: they already sit at the top of the ladder.
+  // localOnly remains owner/admin-only, including self-edits. Legacy
+  // birthdate input is ignored for every actor.
   if (actor.id === id && actor.role !== "owner" && actor.role !== "admin") {
-    if (body.birthdate !== undefined) {
-      return c.json({ error: "birthdate can only be changed by an owner or admin" }, 403);
-    }
     if (body.localOnly !== undefined) {
       return c.json({ error: "localOnly can only be changed by an owner or admin" }, 403);
     }
@@ -327,17 +311,14 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   if (guestProblem) return c.json({ error: guestProblem }, 400);
 
   const now = new Date().toISOString();
-  // Validated as a whole spec Person before the write, the same reason
-  // POST does it: an invalid birthdate written straight to SQLite
-  // corrupts the row and then crashes every later GET /api/people, not
-  // just the request that caused it.
+  // Validate the whole Person, preserving the stored compatibility field.
   const candidate = parsePersonCandidate({
     id: target.id,
     display_name: displayName,
     nickname: body.nickname !== undefined ? body.nickname : target.nickname,
     bio: body.bio !== undefined ? body.bio : target.bio,
     accent: body.accent !== undefined ? body.accent : target.accent,
-    birthdate: body.birthdate !== undefined ? body.birthdate : target.birthdate,
+    birthdate: target.birthdate,
     role: nextRole,
     avatar_seed: body.avatarSeed ?? target.avatarSeed,
     source: target.source,
@@ -377,17 +358,8 @@ peopleRoutes.openapi(patchRoute, async (c) => {
   // already-cached session would keep authenticating a disabled person
   // for up to 10 more seconds after the admin who disabled them believes
   // it already took effect.
-  //
-  // A separate code review (2026-09-06, session-c-brain-and-voice.md
-  // step 7) found birthdate wasn't covered here either, despite mattering
-  // just as much once evaluateSafety()/notifications.ts's own audience
-  // filter both started reading the real age band instead of role: a
-  // corrected birthdate (a typo fix, say) wouldn't take effect for
-  // anyone already mid-session as that person until the cache expired.
-  // Both real, independent gaps found the same week against the same
-  // cache - checked together rather than as two separate conditionals.
   const candidateEnabled = candidate.data.enabled;
-  if (nextRole !== target.role || candidateEnabled !== target.enabled || candidate.data.birthdate !== target.birthdate || candidate.data.accent !== target.accent) {
+  if (nextRole !== target.role || candidateEnabled !== target.enabled || candidate.data.accent !== target.accent) {
     // accent: SETTINGS-APPEARANCE-01. The shell reads it back through
     // /api/auth/me, which is served from this same cached row.
     invalidateSessionCacheForPerson(id);

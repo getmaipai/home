@@ -15,7 +15,7 @@ export function toPerson(row: PersonRow): Person {
     nickname: row.nickname,
     bio: row.bio,
     accent: row.accent,
-    birthdate: row.birthdate,
+    birthdate: row.birthdate ?? null,
     role: row.role,
     avatar_seed: row.avatarSeed,
     source: row.source,
@@ -57,7 +57,12 @@ export type { Roster } from "@/wire";
 // whole roster (not just that request). safeParse here means a bad
 // candidate is rejected before any write happens.
 export function parsePersonCandidate(candidate: unknown) {
-  return Person.safeParse(candidate);
+  // The pinned spec allows an absent nullable key. Normalize absence to
+  // null for the retained database column until the later removal.
+  const value = candidate !== null && typeof candidate === "object" && !Array.isArray(candidate)
+    ? { ...candidate, birthdate: (candidate as { birthdate?: unknown }).birthdate ?? null }
+    : candidate;
+  return Person.safeParse(value);
 }
 
 export function personToDbValues(person: Person) {

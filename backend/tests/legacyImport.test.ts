@@ -34,7 +34,7 @@ function buildLegacyFixture(): string {
       first_name TEXT NOT NULL,
       last_name TEXT NOT NULL,
       nickname TEXT NOT NULL,
-      birthdate TEXT NOT NULL,
+      birthdate TEXT,
       role TEXT NOT NULL DEFAULT 'user',
       dicebear_seed TEXT
     );
@@ -180,6 +180,20 @@ describe("runLegacyImport()", () => {
     expect(() => runLegacyImport(ownerRow, { dbPath, dryRun: false })).toThrow(/no backup/);
   });
 
+  test("import accepts absent or malformed dates and never uses them to choose a role", async () => {
+    const { ownerRow } = await ownerAndMatch();
+    const dbPath = buildLegacyFixture();
+    for (const birthdate of [null, "not-a-date", "2099-01-01"]) {
+      const legacy = new Database(dbPath);
+      legacy.query("UPDATE users SET birthdate = ? WHERE id = 'user-bramble'").run(birthdate);
+      legacy.query("UPDATE users SET birthdate = '1990-01-01' WHERE id = 'user-clover'").run();
+      legacy.close();
+      const result = runLegacyImport(ownerRow, { dbPath, dryRun: true });
+      expect(result.people.find((p) => p.legacyId === "user-bramble")!.outcome).toBe("created");
+      expect(result.people.find((p) => p.legacyId === "user-clover")!.outcome).toBe("skipped_needs_parent_pick");
+    }
+  });
+
   test("dry run reports counts and makes no writes", async () => {
     const { ownerRow, willowId } = await ownerAndMatch();
     const dbPath = buildLegacyFixture();
@@ -238,6 +252,7 @@ describe("runLegacyImport()", () => {
     expect(brambleRow.displayName).toBe("Bramble Rivet");
     // Legacy role 'admin' never auto-promotes to hub role "admin".
     expect(brambleRow.role).toBe("adult");
+    expect(brambleRow.birthdate).toBeNull();
 
     // Willow's memory: person-scoped under her EXISTING id, not a new one.
     const willowMem = db.select().from(memoryRecords).where(eq(memoryRecords.source, "import:legacy:memory:mem-willow-pref")).get()!;

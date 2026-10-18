@@ -11,6 +11,23 @@ function renderForm(actorRole: Role, onSubmit = mock(() => {})) {
 }
 
 describe("NewPersonForm", () => {
+  test("Child, Teen and Adult submit with only role as the age signal", () => {
+    for (const [label, role] of [["Child", "child"], ["Teen", "teen"], ["Adult", "adult"]] as const) {
+      const view = renderForm("owner");
+      fireEvent.click(view.getByRole("combobox", { name: "Role" }));
+      fireEvent.click(view.getByRole("option", { name: label }));
+      expect(view.queryByLabelText(/birth|date of birth|age|how old/i)).toBeNull();
+      expect(view.container.querySelector('input[type="date"], input[type="number"]')).toBeNull();
+      fireEvent.change(view.getByLabelText("Name"), { target: { value: "Quill" } });
+      if (role === "adult") {
+        fireEvent.change(view.getByLabelText("PIN or password"), { target: { value: "1234" } });
+        fireEvent.change(view.getByLabelText("Confirm passcode"), { target: { value: "1234" } });
+      }
+      fireEvent.submit(view.getByLabelText("Name").closest("form")!);
+      expect(view.onSubmit).toHaveBeenCalledWith({ displayName: "Quill", role, ...(role === "adult" ? { secret: "1234" } : {}) });
+      view.unmount();
+    }
+  });
   test("owner role shows Admin checked and disabled and it cannot be unchecked by click or keyboard", () => {
     const view = renderForm("owner");
     fireEvent.click(view.getByRole("combobox", { name: "Role" }));

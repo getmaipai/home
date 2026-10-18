@@ -18,6 +18,8 @@ Account management lives in Settings, not on the People page itself.
 3. To change someone's role or details, tap **Edit** next to their name.
 4. To remove someone, tap **Remove** next to their name. You can't remove the owner's own account.
 
+Choose **Child**, **Teen**, or **Adult** for the controls the person needs. Home does not ask for an age or birthdate. A birthday never changes the role. An owner or admin changes it when needed.
+
 Only an owner or admin can add, edit, or remove people.
 
 ### What happens to their files

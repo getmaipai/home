@@ -155,22 +155,20 @@ describe("creating people", () => {
     expect(res.status).toBe(400);
   });
 
-  test("an invalid birthdate is rejected before it reaches the database", async () => {
-    // A code review (2026-09-04) found this used to insert an invalid
-    // birthdate straight into SQLite (only displayName/secret were
-    // checked), which then crashed every later GET /api/people. Proving
-    // the 400 here isn't enough on its own; the next test proves the
-    // roster survives.
+  test("every role can be created without a birthdate and ignores legacy input", async () => {
     const owner = await ownerClient();
-    const res = await owner.post("/api/people", {
-      displayName: "Bramble",
-      role: "child",
-      birthdate: "09/03/2026",
-    });
-    expect(res.status).toBe(400);
+    for (const role of ["child", "teen", "adult", "guest", "admin", "owner"]) {
+      for (const legacy of [{}, { birthdate: "1990-01-01" }, { birthdate: "2099-01-01" }, { birthdate: "not-a-date" }, { birthdate: 12 }]) {
+        const res = await owner.post("/api/people", { displayName: "Quill", role, secret: "1234", ...legacy });
+        expect(res.status).toBe(201);
+        const body = await res.json() as { id: string; age_band: string };
+        expect(body.age_band).toBe(role === "child" || role === "teen" ? role : "adult");
+        expect(db.select().from(people).all().find((p) => p.id === body.id)!.birthdate).toBeNull();
+      }
+    }
   });
 
-  test("a rejected candidate never corrupts the roster for later reads", async () => {
+  test("ignored legacy input never corrupts the roster for later reads", async () => {
     const owner = await ownerClient();
     await owner.post("/api/people", {
       displayName: "Bramble",
@@ -300,51 +298,23 @@ describe("PATCH /api/people/:id", () => {
     expect(body.bio).toBe("Loves dinosaurs, from Mom");
   });
 
-  // SEC-8 (code review, 2026-09-06): canManage() lets anyone edit their
-  // own profile with no ladder check at all, which used to cover
-  // birthdate too - a child could set their own birthdate to any adult
-  // year and read as "age band adult" in their own prompt (lib/ageBand.ts
-  // speakerAgeBand()). Birthdate and localOnly are safety-adjacent, not
-  // cosmetic, so self-edits of either now need the same ladder as editing
-  // someone else.
-  test("a child cannot change their own birthdate or localOnly", async () => {
-    const ownerClient = await ownerSession();
-    const child = await addPerson(ownerClient, "Bramble", "child");
-    const childClient = await sessionFor(child.id);
-
-    const birthdateRes = await childClient.request(`/api/people/${child.id}`, {
-      method: "PATCH",
-      body: { birthdate: "1990-01-01" },
-    });
-    expect(birthdateRes.status).toBe(403);
-
-    const localOnlyRes = await childClient.request(`/api/people/${child.id}`, {
-      method: "PATCH",
-      body: { localOnly: true },
-    });
-    expect(localOnlyRes.status).toBe(403);
-
-    // Name/nickname in the SAME request as the refused field still goes
-    // nowhere, same "whole request refused together" rule as a rejected
-    // role change above.
-    const combined = await childClient.request(`/api/people/${child.id}`, {
-      method: "PATCH",
-      body: { displayName: "Renamed", birthdate: "1990-01-01" },
-    });
-    expect(combined.status).toBe(403);
-    const roster = (await (await ownerClient.get("/api/people")).json()) as Array<{ id: string; display_name: string }>;
-    expect(roster.find((p) => p.id === child.id)?.display_name).toBe("Bramble");
+  test("a child's birthdate input is ignored while localOnly remains protected", async () => {
+    const owner = await ownerSession();
+    const child = await addPerson(owner, "Bramble", "child");
+    const client = await sessionFor(child.id);
+    const res = await client.request(`/api/people/${child.id}`, { method: "PATCH", body: { birthdate: "1990-01-01", displayName: "Clover" } });
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ display_name: "Clover", role: "child", age_band: "child" });
+    expect(db.select().from(people).all().find((p) => p.id === child.id)!.birthdate).toBeNull();
+    expect((await client.request(`/api/people/${child.id}`, { method: "PATCH", body: { localOnly: true } })).status).toBe(403);
   });
 
-  test("an owner or admin editing their own profile may still change their own birthdate and localOnly", async () => {
-    const ownerClient = await ownerSession();
-    const ownerId = ((await (await ownerClient.get("/api/auth/me")).json()) as { id: string }).id;
-
-    const res = await ownerClient.request(`/api/people/${ownerId}`, {
-      method: "PATCH",
-      body: { birthdate: "1980-01-01", localOnly: true },
-    });
+  test("an owner can change localOnly while legacy birthdate input is ignored", async () => {
+    const owner = await ownerSession();
+    const { id } = await (await owner.get("/api/auth/me")).json() as { id: string };
+    const res = await owner.request(`/api/people/${id}`, { method: "PATCH", body: { birthdate: "1980-01-01", localOnly: true } });
     expect(res.status).toBe(200);
+    expect(db.select().from(people).all().find((p) => p.id === id)!).toMatchObject({ birthdate: null, localOnly: true });
   });
 
   test("a child cannot edit somebody else's profile", async () => {
@@ -472,7 +442,7 @@ describe("PATCH /api/people/:id", () => {
     expect(roster.find((p) => p.id === child.id)?.display_name).toBe("Bramble");
   });
 
-  test("an invalid birthdate is refused rather than written", async () => {
+  test("an invalid birthdate is ignored rather than written", async () => {
     const ownerClient = await ownerSession();
     const child = await addPerson(ownerClient, "Bramble", "child");
 
@@ -480,7 +450,8 @@ describe("PATCH /api/people/:id", () => {
       method: "PATCH",
       body: { birthdate: "not-a-date" },
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    expect(db.select().from(people).all().find((p) => p.id === child.id)!.birthdate).toBeNull();
     // The roster still loads, which is the real regression this guards:
     // a bad row used to crash every later GET, not just its own write.
     expect((await ownerClient.get("/api/people")).status).toBe(200);
