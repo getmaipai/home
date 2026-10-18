@@ -35,7 +35,7 @@ describe("the bundled News pages send a body with each call action", () => {
 });
 
 describe("a shelf's channel button has somewhere to go", () => {
-  for (const file of ["index.json", "mix.json"]) {
+  for (const file of ["index.json", "mix.json", "search.json"]) {
     test(`${file}: open_channel navigates to the channel page with the channel's kind and key`, () => {
       const page = JSON.parse(readFileSync(join(PAGES, file), "utf-8")) as unknown;
       const maps = actionMaps(page).filter((actions) => actions.open !== undefined);
@@ -63,7 +63,7 @@ describe("the search box (NEWS-LOOK-02)", () => {
     expect(field.recents).toEqual({ source: "package", path: "search-recents" });
     expect(results.bind).toEqual({ source: "package", path: "search", params: { q: "$state.q", topic: "$state.topic" } });
     expect(results.filter_state).toBe("topic");
-    expect(Object.keys(results.actions as Node).sort()).toEqual(["follow", "open", "save"]);
+    expect(Object.keys(results.actions as Node).sort()).toEqual(["follow", "open", "open_channel", "save"]);
   });
 
   test("Today and My Mix pass the chosen topic chip to their data", () => {

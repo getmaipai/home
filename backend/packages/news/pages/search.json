@@ -41,6 +41,15 @@
         "story_feed"
       ],
       "actions": {
+        "open_channel": {
+          "navigate": {
+            "to": "/apps/news/channel",
+            "state": {
+              "kind": "{channel_kind}",
+              "key": "{channel_key}"
+            }
+          }
+        },
         "open": {
           "navigate": {
             "to": "/apps/news/story",

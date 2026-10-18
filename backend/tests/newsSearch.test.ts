@@ -218,6 +218,37 @@ describe("the Search page's data", () => {
     expect(harbor.rows.slice(1).map((r) => r.title)).toEqual(["Harbor council votes", "Harbor adult only"]);
   });
 
+  test("a matching topic has a channel button action in the served Search page", async () => {
+    const { who } = await seed();
+    const feed = (await feedOf(who.adult, "search", { q: "Science" }))!;
+    expect(feed.shelves[0]!.channels).toContainEqual({ kind: "topic", key: "science", label: "Science" });
+    const response = await who.adult.get("/api/plugins/news/pages/search");
+    expect(response.status).toBe(200);
+    const page = await response.json() as { body: Array<{ type: string; actions?: Record<string, unknown> }> };
+    expect(page.body.find((node) => node.type === "answer_blocks")!.actions!.open_channel).toEqual({
+      navigate: { to: "/apps/news/channel", state: { kind: "{channel_kind}", key: "{channel_key}" } },
+    });
+  });
+
+  test("a child's search channels offer only Kids' sources and child topics, with no http in the body", async () => {
+    const { who } = await seed();
+    for (const [q, channels] of [
+      ["kids", [{ kind: "topic", key: "kids", label: "Kids" }, { kind: "source", key: feeds.kids, label: "Kids Daily" }]],
+      ["science", []],
+      ["example wire", []],
+    ] as const) {
+      const response = await post(who.child, "data/search", { q });
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).not.toContain("http");
+      const data = JSON.parse(body) as { blocks: Array<{ props: Feed }> };
+      expect(data.blocks[0]?.props.shelves[0]?.channels ?? []).toEqual(channels);
+      for (const channel of data.blocks.flatMap((block) => block.props.shelves.flatMap((shelf) => shelf.channels ?? []))) {
+        expect(channel.kind === "source" ? channel.key === feeds.kids : channel.key === "kids").toBe(true);
+      }
+    }
+  });
+
   test("the one chip row is All, Saved only, Today, then the matching topics, and each chip narrows", async () => {
     const { who, b } = await seed();
     addSave(who.adultId, { itemId: b.id, storyId: storyIdOf(b), canonicalUrl: b.canonical_url, title: b.title, publisher: b.publisher, offline: false });
