@@ -383,9 +383,9 @@ one small landing each: 18.1, 18.2, 18.3 (verify), 18.4, 18.5.
 
 ### 18.1 Sung words that are not in the lyrics (MUSIC-GEN-17)
 
-**What happened.** The lyrics were a whole song (24 sung lines, about 106 s by the tool's own estimate of 4 s a line plus 10 s), but a Quick
+**What happened.** The lyrics were a whole song (22 sung lines, about 98 s by the tool's own estimate of 4 s a line plus 10 s), but a Quick
 song is at most 60 s. ACE-Step sang the intro, verse, pre-chorus and most of the first chorus. Its own timed lyrics (`lrc`) then put the rest
-of the chorus, the second verse, the bridge, the second chorus and the outro all at 0:59.92: about 13 lines squeezed into the last second.
+of the chorus, the second verse, the bridge, the second chorus and the outro all at 0:59.92: 12 sung lines squeezed into the last second.
 Jesse heard garbled words there ("eleven bytes", then "peel and bites": the outro line "Peel, bite, bleed yellow" squeezed into the end).
 
 **Reproduced** on a scratch Stack (port 8895, its own data, GPU lock held) with the live request and seed 670964457. The file is within 0.5
@@ -394,7 +394,7 @@ percent of the live size, and the timed lyrics squeeze the same lines into the l
 
 | Run (60 s, seed) | Lyrics | Words sung in order | Heard words not in the lyrics | Where |
 |---|---|---:|---:|---|
-| live request, 670964457 | 24 lines (whole song) | 36 percent of the lyrics | 12 | "heated", "I should" in the last 7 s, where the engine squeezed 13 lines; the rest misheard growls |
+| live request, 670964457 | 22 lines (whole song) | 36 percent of the lyrics | 12 | "heated", "I should" in the last 7 s, where the engine squeezed 12 lines; the rest misheard growls |
 | fitted to the length, 670964457, two runs | 11 lines (intro to first chorus) | 44 and 64 percent | 12 and 25 | none squeezed; one run has "I don't know" in the long intro gap |
 | fitted, seed 22 | 11 lines | 81 percent | 19 | misheard growls, "thank you" at the end |
 | fitted, seed 11 | 11 lines | 36 percent | 21 | "we'll be right back" in the last 3 s |
@@ -409,17 +409,18 @@ request and seed do not give the same song twice on MLX, so every number is per 
 
 1. **Fit the words to the length.** Before a song is sent, `fitLyricsToLength` keeps whole sections from the top while their estimated time
    (4 s a sung line plus 10 s, the measured rate: 11 lines filled 55 s) fits the song's length. The song's `lyrics` are the fitted words, so
-   the card shows only what is sung. The person's full words are kept as `written_lyrics`, and **Make it full** sings all of them. A song
-   always keeps its first section, even when that one section runs long.
-2. **Trust the engine's timing after the song.** When the engine puts two or more lines in the last 1.5 s of the song, those lines
-   were squeezed in and were not really sung. The card's lyrics and the karaoke list (18.5) leave such lines out. A regression test reads the live `lrc` from this song.
+   the card shows only what is sung. The person's full words are kept as `written_lyrics`, and **Make it full** sings all of them. When even
+   the first section is too long, the song keeps that section's lines that fit, at least one.
+2. **Trust the engine's timing after the song.** When the engine puts two or more lines on one timestamp in the last 1.5 s of the song,
+   those lines (and every line after the first of them) were squeezed in and were not really sung. The card shows the person's words without
+   them. The card's lyrics and the karaoke list (18.5) leave such lines out. A regression test reads the live `lrc` from this song.
 3. **Quick and Full scale the words, in code.** Fitting (point 1) cuts the words to the length, so the model is given no line count (rule
    5: no instruction tells the model how many words to write). The tool's own result text states the fact: a quick song sings the first
    sections that fit, and Make it full sings every part.
 4. **A standing check in the music proof.** `scripts/bench/music-sung-words.py` (Stack, bench lane, on demand) makes a song, transcribes it
    with the settings above and reports, next to each other, words sung in order and heard words not in the lyrics with where they fall. The
-   pass or fail signal is deterministic: the check fails when the engine's `lrc` puts two or more lines in the last 1.5 s (the squeezed
-   ending, which Jesse's song shows). The extra-word count is reported but does not fail the check: whisper mishears growls.
+   pass or fail signal is deterministic: the check fails when the engine's `lrc` puts two or more lines on one timestamp in the last 1.5 s
+   (the squeezed ending, which Jesse's song shows). The extra-word count is reported but does not fail the check: whisper mishears growls.
 
 **Children.** Music stays adults only: `musicViewDenial` refuses a teen or child before any picture lane is consulted (rule 0, tests in
 `musicSafety.test.ts`). No child hears a song, so no child hears invented words. This fix adds a **hard precondition** to MUSIC-GEN-15:

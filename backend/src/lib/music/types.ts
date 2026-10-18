@@ -5,7 +5,7 @@ export type { GenerationProvenance };
 export type SongLength = "quick" | "full";
 export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness";
 export interface MusicRequest {
-  description: string; lyrics?: string; title?: string; instrumental: boolean; seconds: number;
+  description: string; lyrics?: string; written_lyrics?: string; title?: string; instrumental: boolean; seconds: number;
   bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];

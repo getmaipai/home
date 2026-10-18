@@ -7,7 +7,7 @@ import { turnAgeBand } from "@/lib/turnMachine/speaker";
 import { musicDenial, MUSIC_DENIAL_LINE, MUSIC_REFUSAL_LINE, refuseMusicPrompt, type MusicAudience } from "./policy";
 import { musicEngineStatus, musicStatusReady } from "./ready";
 import { plainMusicFailure, readMusicFile, sourceMusicJob, startMusicJob } from "./jobs";
-import { resolveMusicSection, replaceMusicSection } from "./sections";
+import { resolveMusicSection, replaceMusicSection, fitLyricsToLength } from "./sections";
 import { StackMusicError, type MusicBody } from "./stack";
 import type { MusicJob, MusicRequest, MusicTask, SongLength } from "./types";
 import { householdSongLength } from "./policy";
@@ -83,9 +83,16 @@ export function songOnItsWay(request: MusicRequest, downgraded = false): string 
   const length = lengthOf(request, null);
   const kind = length === "full" ? `A full song of about ${Math.round(request.seconds / 60 * 2) / 2} minutes` : `A quick ${request.seconds} second song`;
   const wait = length === "full" ? "about a minute or two" : "under a minute";
-  const note = downgraded ? " Full songs need a computer with 128 GB of memory, so this one is quick; say so in one short sentence." : "";
+  const note = (downgraded ? " Full songs need a computer with 128 GB of memory, so this one is quick; say so in one short sentence." : "")
+    + (request.written_lyrics ? " The words are longer than this song, so it sings the first parts that fit and Make it full on the player sings them all; say so in one short sentence." : "");
   const title = request.title ? ` called "${request.title}"` : "";
   return `${kind}${title} is on its way. It takes ${wait} and the player appears below your reply when it is ready. Reply in one or two short sentences: say the song is on its way and about how long it takes. Do not say it is ready, do not describe it, and do not repeat the lyrics, style or tempo: the player shows the words and the person has not heard it yet.${note}`;
+}
+/** MUSIC-GEN-17: the song sings the whole sections of `words` that fit its length; the person's whole words are kept for Make it full. */
+export function fitWords(request: MusicRequest, words: string): void {
+  const fitted = fitLyricsToLength(words, request.seconds);
+  request.lyrics = fitted.lyrics;
+  if (fitted.cut) request.written_lyrics = words; else delete request.written_lyrics;
 }
 export const SECTION_LINE = "Which part should I change? Give its start and end in seconds.";
 export const WHICH_PART_LINE = "Tell me which part the new words replace, for example the chorus or verse 2.";
@@ -106,7 +113,9 @@ export function prepareMusicEdit(source: MusicJob, args: z.infer<typeof editMusi
       // The same song made again at the other length: same words, description and seed.
       task = "remake"; stackTask = "text2music";
       const length: SongLength = args.change === "make_full" ? "full" : "quick";
-      request.length = length; request.seconds = songSecondsFor(length, undefined, request.instrumental ? undefined : request.lyrics, FULL_SONG.max);
+      const words = request.written_lyrics ?? request.lyrics;
+      request.length = length; request.seconds = songSecondsFor(length, undefined, request.instrumental ? undefined : words, FULL_SONG.max);
+      if (!request.instrumental && words) fitWords(request, words);
       break;
     }
     case "variation": task = "variation"; stackTask = "text2music"; request.seed = newSeed(source.seed); if (args.seconds !== undefined) request.seconds = args.seconds; break;
@@ -185,14 +194,15 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
     request = { description: value.description, lyrics, title: value.title,
       instrumental: value.instrumental ?? false, seconds: songSecondsFor(length, value.seconds, value.instrumental ? undefined : value.lyrics, engine!.limits.max_seconds),
       bpm: value.bpm, key: value.key, language: value.language, quality: defaultQualityOf(engine!), seed: newSeed(), length };
+    if (!request.instrumental && value.lyrics) fitWords(request, value.lyrics);
     task = "text2music"; body = musicBody(request, "text2music");
   }
   // A request stored before the Stack named a default (or an edit of an older song) takes the Stack's default now.
   request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
   // Check the effective request, including inherited words and a section replacement, before any job exists.
-  const inherited = refuseMusicPrompt([request.description, request.lyrics, request.title, request.key, request.language].join(" "), { imitatesRealVoice: args.imitates_real_voice === true });
+  const inherited = refuseMusicPrompt([request.description, request.lyrics, request.written_lyrics, request.title, request.key, request.language].join(" "), { imitatesRealVoice: args.imitates_real_voice === true });
   if (inherited) return refused(MUSIC_REFUSAL_LINE[inherited], inherited);
-  if ((request.lyrics?.length ?? 0) > 4000) return failed("bad_arguments", "bad_arguments");
+  if ((request.lyrics?.length ?? 0) > 4000 || (request.written_lyrics?.length ?? 0) > 4000) return failed("bad_arguments", "bad_arguments");
   if (request.seconds > engine!.limits.max_seconds || (body.task === "text2music" && request.seconds < Math.max(10, engine!.limits.min_seconds))) return failed("too_long_or_short", "bad_arguments");
   try {
     const job = await startMusicJob({ actor, conversationId: state.conversationId, turnId: state.turnId, temporary, task, request, body, parentFileId });

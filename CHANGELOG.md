@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Music
+- **A quick song sings only the words that fit.** Long words used to be squeezed into the last second of a quick song and sung as nonsense. Now a quick song sings the first whole parts that fit, the card shows just those words, and **Make it full** sings every part. Lines the engine squeezed into an older song are left off its card. (MUSIC-GEN-17)
+
 ## [0.2.21] - 2026-10-18
 
 A small News release: a shelf's channel button now opens the channel, News's first tab reads Today, and the guides are refreshed. The engine is unchanged (Stack a89e7ff). Pins: spec-v0.1.179 and ui-v0.5.268 (News thumbnail rows keep their padding). Migrations: none since 0.2.20.

@@ -50,7 +50,7 @@ export async function startMusicJob(input: StartMusicInput): Promise<MusicJob> {
   // Charge storage before admission, then check actual bytes again when saving. Temporary audio is memory only.
   const cap = checkStorageCap(input.actor.role, input.actor.id, Math.ceil(input.request.seconds * 32_000));
   if (!cap.ok) throw new StackMusicError(403, "storage_full");
-  if (refuseMusicPrompt([input.request.description, input.request.lyrics, input.request.title, input.request.key, input.request.language].join(" "))) throw new StackMusicError(422, "minor_sexual");
+  if (refuseMusicPrompt([input.request.description, input.request.lyrics, input.request.written_lyrics, input.request.title, input.request.key, input.request.language].join(" "))) throw new StackMusicError(422, "minor_sexual");
   if (starting.has(input.actor.id) || activeMusicJobsFor(input.actor)) throw new StackMusicError(429, "already_making");
   starting.add(input.actor.id);
   const priorAt = jobsForConversation(input.actor, input.conversationId, input.temporary).reduce((at, j) => Math.max(at, Date.parse(j.chosenAt ?? j.createdAt)), 0);

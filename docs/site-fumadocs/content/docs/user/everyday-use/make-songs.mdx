@@ -14,6 +14,7 @@ A Mac with 64 GB of memory or more, and the music model. An owner or admin gets 
 There are two kinds, like pictures and videos.
 
 - **Quick** songs are about 45 seconds. They are good for a jingle, a hook or trying out words. They take under a minute.
+  If your words are longer than a quick song, it sings the first parts that fit. The card shows just those words. **Make it full** sings all of them.
 - **Full** songs are about 3 minutes, with every part: an intro, verses, a chorus, a bridge and an ending. They take a minute or two. Full songs need a Mac with 128 GB of memory.
 
 Chat makes a quick song unless you ask for a whole song, a full song or a long piece. You can also say it yourself, for example "make a full song". The card has **Make it full** or **Make it quick** to make the same song again as the other kind.

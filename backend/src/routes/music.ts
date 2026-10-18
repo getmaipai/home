@@ -16,6 +16,7 @@ import { cancelMusicJob, getMusicJobFor, musicVersions, openMusicFile, plainMusi
 import { fullSongsPossible, lengthOf, prepareMusicEdit } from "@/lib/music/tool";
 import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
 import { StackMusicError } from "@/lib/music/stack";
+import { sungLyricsFromLrc, withoutLastLines } from "@/lib/music/sections";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { busyLine } from "@/lib/videos/jobs";
 export const musicRoutes = apiRouter();
@@ -56,6 +57,14 @@ export function musicStageLabel(job: MusicJob): string {
     default: return "Making the song";
   }
 }
+/** MUSIC-GEN-17: the card shows the words the engine sang (its own `lrc`, squeezed lines left out), else the words sent. */
+function cardLyricsOf(job: MusicJob): string | null {
+  const words = job.request.lyrics ?? null;
+  if (!job.lrc || !words || job.request.instrumental) return words;
+  const sung = sungLyricsFromLrc(job.lrc, job.durationS);
+  const timed = sungLyricsFromLrc(job.lrc, null, { keepSqueezed: true });
+  return sung.length && sung.length < timed.length ? withoutLastLines(words, timed.length - sung.length) : words;
+}
 export function musicCardView(actor: PersonRow, root: MusicJob) {
   const versions = musicVersions(actor, root);
   const current = [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
@@ -65,7 +74,7 @@ export function musicCardView(actor: PersonRow, root: MusicJob) {
     versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),
     current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null, started_at: Date.parse(root.createdAt),
-    lyrics: current?.request.lyrics ?? root.request.lyrics ?? null, duration_s: current?.durationS ?? root.durationS,
+    lyrics: cardLyricsOf(current ?? root), duration_s: current?.durationS ?? root.durationS,
   };
 }
 const statusRoute = createRoute({ method: "get", path: "/status", tags: ["Music"], summary: "Whether this person can make songs now", middleware,
@@ -111,7 +120,7 @@ musicRoutes.openapi(lengthRoute, async (c) => {
   if (length === "full" && !fullSongsPossible(engine!)) return c.json({ error: "Full songs need a computer with 128 GB of memory. Quick songs work here." }, 422) as never;
   const plan = prepareMusicEdit(source, { track: source.fileId!, change: length === "full" ? "make_full" : "make_quick" } as never);
   if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
-  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
+  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.written_lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
   if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
   plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
   try {
