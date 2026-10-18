@@ -30,10 +30,13 @@ export interface FakeImageStack {
   restore(): void;
 }
 
-export const TEST_LORAS: StackLora[] = [
+// Frozen on purpose: the fake stack PATCHes its own copies (below), never these. A shallow copy once let picturesAdmin turn
+// "Boudoir Film" all-ages for every later file in the same process, which failed teenLane only in the gate's shard order.
+const TEST_LORA_SOURCE: StackLora[] = [
   { id: "lora-aaaaaaaaaaaaaaaa", name: "Pixel Art", sha256: "a".repeat(64), bytes: 100, base_model: "flux2-klein-4b", licence: "Apache-2.0", source_url: null, classification: "all-ages", trigger_words: ["pixelart"], strength_default: 0.8, added_at: "2026-10-17T00:00:00Z" },
   { id: "lora-bbbbbbbbbbbbbbbb", name: "Boudoir Film", sha256: "b".repeat(64), bytes: 100, base_model: "flux2-klein-4b", licence: null, source_url: null, classification: "adult-only", trigger_words: ["boudoirfilm"], strength_default: 0.9, added_at: "2026-10-17T00:00:00Z" },
 ];
+export const TEST_LORAS: readonly StackLora[] = TEST_LORA_SOURCE.map((l) => Object.freeze({ ...l, trigger_words: Object.freeze([...l.trigger_words]) as unknown as string[] }));
 
 let pngCache: Uint8Array | null = null;
 export async function testPng(): Promise<Uint8Array> {
@@ -45,7 +48,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeImageStack(options: { pollsToFinish?: number } = {}): FakeImageStack {
   const fake: FakeImageStack = {
-    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_LORAS.map((lora) => ({ ...lora })), loraAdds: [], loraRefusal: null,
+    jobs: [], submitted: [], edits: [], pollsToFinish: options.pollsToFinish ?? 2, failWith: null, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_LORAS.map((l) => ({ ...l, trigger_words: [...l.trigger_words] })), loraAdds: [], loraRefusal: null,
     restore() { __setPicturePollMsForTests(null); __setPicturesFetchForTests(null); __setPictureStatusForTests(undefined); __resetAdapterCacheForTests(); __resetPictureJobsForTests(); },
   };
   __setPictureStatusForTests(readyStatusForTests());
