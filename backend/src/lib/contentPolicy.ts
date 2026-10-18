@@ -48,10 +48,7 @@ const defaults = freeze({ child: ["minor_line", "real_person", "sexual", "sweari
 const fallback = Object.freeze({ kind: "minor_line" as const, line: "I couldn't check that safely. Try something different." });
 const ranks: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 function bandOf(person: Person): AgeBand {
-  if (!person?.id || !["child", "teen", "adult", "owner", "admin"].includes(person.role)) return "child";
-  // People creation permits absent adult birthdates. Only this policy uses the child
-  // floor for those adults; leave speakerAgeBand's existing callers unchanged.
-  if (!z.iso.date().safeParse(person.birthdate).success) return "child";
+  if (!person?.id || !["child", "teen", "adult", "owner", "admin", "guest"].includes(person.role)) return "child";
   return speakerAgeBand(person, new Date());
 }
 

@@ -61,7 +61,7 @@ export function filtersFor(person: Person): ReadonlySet<ProtectionKind>;
 
 `Person` and `Audience` above name existing shared person and resolved audience shapes, not new stored records.
 An audience carries actor, effective band, surface and resolved household subject context. Resolve the stricter actor/turn band;
-a shared audience unions all present people's filters and takes the youngest band. Unknown identity/age uses the child floor.
+a shared audience unions all present people's filters and takes the youngest band. Unknown identity or role uses the child floor. Age band comes from role; birthdate is optional and may only tighten it.
 `filtersFor` is exactly the person form's set. Resolution reads a validated in-memory settings snapshot; `check` does no I/O.
 Freeze policy data and expose a set that cannot be mutated at runtime, not merely a TypeScript readonly annotation.
 
@@ -198,7 +198,7 @@ Songs depend on 01 and 03 plus MUSIC-GEN-22's as-sung path, and on likeness simp
 surface, quota, ownership, fetch, crisis and finished-output gates remain in their existing owners.
 
 Required tests: fixed pass/block fixtures for every kind, field and band; teen mild/strong boundaries; adult opt-ins; minor
-add-only changes; youngest shared audience; unknown age and identity; immutable snapshots; fixed line precedence; error injection
+add-only changes; youngest shared audience; unknown identity or role; optional birthdates that only tighten; immutable snapshots; fixed line precedence; error injection
 in resolution, fold and matchers. Include safe substrings and safe context. Exercise chunk splits, reasoning, speech, whole
 answers, News sentences, retrieved rows/pages, answer images, route/tool/edit/regenerate paths, video frames, covers and sung transcripts.
 Use the shared fold obfuscation corpus: case, accents, width, confusables, zero-width characters, spaced/punctuated forms,
@@ -221,7 +221,7 @@ architect must rule before implementation. This docs-only change uses `bash scri
 ## Slice 01 as built, 2026-10-18
 
 `contentPolicy.ts` resolves immutable person filters and audience unions. The stricter actor or turn band wins.
-Unknown people and invalid ages use the child floor. Teen defaults block strong profanity; adding that filter blocks
+Unknown identity or role uses the child floor. Known roles set the band; an optional birthdate may only tighten it. Teen defaults block strong profanity; adding that filter blocks
 all listed profanity. Settings errors, invalid snapshots, bad policy data and invalid check inputs return the fixed fallback.
 Checks use one folded copy with the commons detector and the existing wider minor floor. No input is cut short.
 

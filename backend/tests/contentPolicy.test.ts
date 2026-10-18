@@ -12,7 +12,6 @@ import { foldForSafety } from "@maipai/spec/safety/ts/fold.js";
 import { lanesSchema, floorsSchema } from "@/lib/contentPolicy/dataSchema";
 import lanes from "@/lib/contentPolicy/data/lanes.v1.json";
 import floors from "@/lib/contentPolicy/data/floors.v1.json";
-import { speakerAgeBand } from "@/lib/ageBand";
 const person = (role: string): PersonRow => ({ id: `policy-${role}`, role, birthdate: role === "child" ? "2020-01-01" : role === "teen" ? "2011-01-01" : "1990-01-01" } as PersonRow);
 const corpus = rawCorpus as Array<{ id: string; kind: ProtectionKind; text: string; severity?: string }>;
 const fields = ["prompt", "lyrics", "title", "transcript"] as const;
@@ -44,34 +43,33 @@ describe("content policy", () => {
       expect([...resolver.filtersFor(person(band))]).toEqual([...resolver.contentPolicyFor(person(band)).filters]);
     }
   });
-  test("unknown identity and invalid ages use the child floor", () => {
-    for (const p of [person("guest"), person("unknown"), { ...person("adult"), id: "" }, { ...person("adult"), birthdate: "bad" }]) {
-      expect([...resolver.filtersFor(p)]).toEqual([...resolver.filtersFor(person("child"))]);
-    }
-  });
-  test("unknown ages always use child filters for every role", () => {
-    for (const role of ["child", "teen", "adult", "owner", "admin", "unknown"]) {
-      for (const birthdate of [null, undefined, "", "invalid", "2026-02-30"]) {
+  for (const role of ["adult", "owner", "admin", "guest", "teen", "child"]) {
+    test(`${role} keeps role defaults without a usable birthdate`, () => {
+      const expected = role === "child" ? ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"]
+        : role === "teen" ? ["minor_line", "real_person", "sexual", "swearing", "gore"] : ["minor_line", "real_person"];
+      for (const birthdate of [null, undefined, "", "invalid"]) {
         const p = { ...person(role), birthdate } as PersonRow;
         if (birthdate === undefined) delete (p as Partial<PersonRow>).birthdate;
-        expect([...resolver.filtersFor(p)]).toEqual([...resolver.filtersFor(person("child"))]);
-        expect(resolver.contentPolicyFor(p).check(corpus[2]!.text, "title")?.kind).toBe("drugs");
+        expect([...resolver.filtersFor(p)]).toEqual(expected);
       }
+    });
+  }
+  test("child birthdates cannot relax child defaults", () => {
+    for (const birthdate of ["1990-01-01", "2011-01-01", "2020-01-01", "2026-02-30"]) {
+      expect([...resolver.filtersFor({ ...person("child"), birthdate })]).toEqual([...resolver.filtersFor(person("child"))]);
     }
-    expect(resolver.contentPolicyFor(null as never).filters.size).toBe(7);
-    expect(resolver.contentPolicyFor(null as never).check(corpus[2]!.text, "title")?.kind).toBe("drugs");
   });
-  test("known ages keep the stricter role or age", () => {
-    for (const role of ["child", "teen", "adult", "owner", "admin"]) {
-      expect(resolver.filtersFor({ ...person(role), birthdate: "2020-01-01" }).size).toBe(7);
+  test("valid birthdates can tighten adult role defaults", () => {
+    const year = new Date().getUTCFullYear();
+    expect([...resolver.filtersFor({ ...person("adult"), birthdate: `${year - 10}-01-01` })]).toEqual([...resolver.filtersFor(person("child"))]);
+    expect([...resolver.filtersFor({ ...person("adult"), birthdate: `${year - 15}-01-01` })]).toEqual([...resolver.filtersFor(person("teen"))]);
+  });
+  test("unknown identity or role uses child defaults", () => {
+    const noId = { ...person("adult") } as Partial<PersonRow>;
+    delete noId.id;
+    for (const p of [null, noId, { ...person("adult"), id: "" }, person("unknown"), person("")]) {
+      expect([...resolver.filtersFor(p as PersonRow)]).toEqual([...resolver.filtersFor(person("child"))]);
     }
-    expect(resolver.filtersFor({ ...person("child"), birthdate: "1990-01-01" }).size).toBe(7);
-    expect(resolver.filtersFor({ ...person("adult"), birthdate: "2011-01-01" }).size).toBe(5);
-  });
-  test("adult missing-age policy is stricter without changing shared age derivation", () => {
-    const adult = { ...person("adult"), birthdate: null };
-    expect(speakerAgeBand(adult, new Date())).toBe("adult");
-    expect(contentPolicyFor(adult).check(corpus[2]!.text, "title")?.kind).toBe("drugs");
   });
   test("moved lists retain the independently reviewed order and bytes", () => {
     for (const [values, digest] of [
