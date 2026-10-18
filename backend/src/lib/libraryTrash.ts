@@ -48,6 +48,7 @@ function companionsOf(row: Row): Row[] {
 
 /** A readable name for the Trash list, built from the same notes the Library listing reads. */
 function titleOf(row: Row): string {
+  if (row.name) return row.name.slice(0, 80);
   const meta = libraryProvenance(row.provenance);
   const text = [meta.title, meta.prompt].find((value): value is string => typeof value === "string" && value.trim() !== "");
   if (text) return text.trim().slice(0, 80);

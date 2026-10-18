@@ -1,0 +1,1 @@
+ALTER TABLE `attachments` ADD `file_name` text;

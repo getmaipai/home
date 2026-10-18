@@ -35,6 +35,8 @@ export interface CreateAttachmentInput {
   bytes: Uint8Array;
   provenance?: string;
   deduplicate?: boolean;
+  /** LIBRARY-REVAMP-11/12: the file's own name (an upload) or the owner's name for it; ahead of the spec. */
+  name?: string | null;
 }
 
 /** Check whether bytes would fit before an expensive consumer (such as
@@ -207,6 +209,7 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
     mediaSourceId: null,
     deletedAt: null,
     trashUntil: null,
+    name: input.name ?? null,
     createdAt: new Date().toISOString(),
     hlc: nextHlc(),
   };

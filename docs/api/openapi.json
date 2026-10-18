@@ -40696,6 +40696,113 @@
             }
           }
         }
+      },
+      "patch": {
+        "tags": [
+          "Files"
+        ],
+        "summary": "Rename one of my own Library files, or Keep it (pin) so storage rules never remove it",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "file-a1b2c3"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "nullable": true,
+                    "maxLength": 1000,
+                    "description": "New name; empty or null goes back to the name Home derives."
+                  },
+                  "keep": {
+                    "type": "boolean",
+                    "description": "true pins the item; false lets a generated item follow the storage rules again."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The item as it now stands.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "retention": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "retention"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "No usable change, a name that is too long, or Keep off for a file the person added",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the owner can change a file",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such file in your Library",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/files/{id}/content": {

@@ -7,6 +7,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireAuth } from "@/middleware/auth";
 import { getAttachment, readAttachment } from "@/lib/attachments";
 import { trashFile } from "@/lib/libraryTrash";
+import { updateLibraryFile } from "@/lib/libraryEdit";
 import { createShare, deleteShare, listSharesForFile, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
 import { File as FileSchema } from "@maipai/spec/gen/ts/file.js";
 import { Share as ShareSchema } from "@maipai/spec/gen/ts/share.js";
@@ -265,6 +266,24 @@ filesRoutes.openapi(deleteFileRoute, (c) => {
   if (!found.ok) return c.json({ error: "That file is not in your Library. Refresh the page and try again." }, 404);
   if (found.value.owner_person_id !== actor.id) return c.json({ error: "Only the person who added this file can delete it. You can stop seeing it by asking them to unshare." }, 403);
   const result = trashFile(actor, id);
+  if (!result.ok) return c.json({ error: result.error }, result.status);
+  return c.json(result.value, 200);
+});
+
+const patchFileRoute = createRoute({
+  method: "patch", path: "/{id}", tags: ["Files"], summary: "Rename one of my own Library files, or Keep it (pin) so storage rules never remove it",
+  middleware: [requireAuth] as const,
+  request: {
+    params: idParamSchema("id", "file-a1b2c3"),
+    body: { content: { "application/json": { schema: z.object({ name: z.string().max(1000).nullable().optional().describe("New name; empty or null goes back to the name Home derives."), keep: z.boolean().optional().describe("true pins the item; false lets a generated item follow the storage rules again.") }) } } },
+  },
+  responses: {
+    200: { content: { "application/json": { schema: z.object({ id: z.string(), name: z.string().nullable(), retention: z.string() }) } }, description: "The item as it now stands." },
+    ...errorResponses({ 400: "No usable change, a name that is too long, or Keep off for a file the person added", 401: "Not signed in", 403: "Only the owner can change a file", 404: "No such file in your Library" }),
+  },
+});
+filesRoutes.openapi(patchFileRoute, (c) => {
+  const result = updateLibraryFile(c.get("person"), c.req.valid("param").id, c.req.valid("json"));
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json(result.value, 200);
 });

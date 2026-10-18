@@ -708,6 +708,9 @@ export const attachments = sqliteTable(
     // removed for good while a chat still shows the file). Neither is listed, shared or served through the Library.
     deletedAt: text("deleted_at"),
     trashUntil: text("trash_until"),
+    // LIBRARY-REVAMP-12, ahead of the spec (`file.name`, LIBRARY-REVAMP-03): the owner's name for the item, or the uploaded file's
+    // own name. Null means the Library derives a name from the prompt or title.
+    name: text("file_name"),
     createdAt: text("created_at").notNull(),
     hlc: text("hlc").notNull(),
   },

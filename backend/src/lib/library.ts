@@ -54,7 +54,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
             AND json_extract(parent.meta,'$.job') = json_extract(m.meta,'$.job')))) AS companion
     FROM meta m
   ), visible AS (
-    SELECT *, coalesce(nullif(title,''),nullif(prompt,''),(CASE kind WHEN 'image' THEN 'Picture' WHEN 'video' THEN 'Video' WHEN 'audio' THEN 'Audio' WHEN 'document' THEN 'Document' WHEN 'story' THEN 'Story' ELSE 'File' END || ', ' || CAST(strftime('%d',created_at) AS INTEGER) || ' ' || substr('JanFebMarAprMayJunJulAugSepOctNovDec',3*(CAST(strftime('%m',created_at) AS INTEGER)-1)+1,3))) AS name FROM named
+    SELECT *, coalesce(nullif(file_name,''),nullif(title,''),nullif(prompt,''),(CASE kind WHEN 'image' THEN 'Picture' WHEN 'video' THEN 'Video' WHEN 'audio' THEN 'Audio' WHEN 'document' THEN 'Document' WHEN 'story' THEN 'Story' ELSE 'File' END || ', ' || CAST(strftime('%d',created_at) AS INTEGER) || ' ' || substr('JanFebMarAprMayJunJulAugSepOctNovDec',3*(CAST(strftime('%m',created_at) AS INTEGER)-1)+1,3))) AS name FROM named
   ), filtered AS (SELECT * FROM visible WHERE ${filter}),
   tiles AS (SELECT * FROM filtered f WHERE coalesce(companion,0) = 0
     AND NOT (json_extract(meta,'$.writer') = 'image-edit' AND EXISTS(SELECT 1 FROM filtered r WHERE r.id = json_extract(f.meta,'$.root') AND coalesce(r.companion,0) = 0)))` };
