@@ -17,7 +17,7 @@ import * as llm from "@/lib/llm";
 import * as notifications from "@/lib/notifications";
 import { runStartProjectTool, startProjectToolSpec, paramsSummary, START_PROJECT_TOOL_ID, type StartProjectArgs } from "@/lib/projects/tool";
 import { registerProjectType, __resetProjectTypesForTests } from "@/lib/projects/projectTypes";
-import { registerAllPackageProjectTypes } from "@/lib/plugins";
+import { registerAllPackageProjectTypes, __resetPackageCachesForTests } from "@/lib/plugins";
 import { policyNode } from "@/lib/turnMachine/nodes/policy";
 import { toolNode } from "@/lib/turnMachine/nodes/tool";
 import { waitForSettled, cancel, __resetRunnerForTests } from "@/lib/projects/runner";
@@ -196,6 +196,7 @@ describe("runStartProjectTool(): the tool's own execution", () => {
 // fields instead of refusing them.
 describe("the live incident's own repro: the real bedtime-storybook package accepts the model's real params", () => {
   test("topic + audience + length (exactly what the model sent) succeeds, not invalid_params", async () => {
+    __resetPackageCachesForTests(); // an earlier file in the same process may have cached another manifest for this id
     registerAllPackageProjectTypes();
     const completeSpy = stubComplete();
     const outcome = runStartProjectTool({
