@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes as RouterRoutes, useLocation } from "react-router-dom";
 import { UpdatesPage } from "@/shell/pages/UpdatesPage";
@@ -88,7 +89,7 @@ describe("Routes appearance", () => {
     try {
       renderWithQueryClient(
         <MemoryRouter initialEntries={["/appearance-test"]}>
-          <Routes person={makePerson()} onSignedIn={() => {}} />
+          <ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>
         </MemoryRouter>,
       );
       await waitFor(() => {
@@ -140,7 +141,7 @@ describe("Routes appearance", () => {
     try {
       renderWithQueryClient(
         <MemoryRouter initialEntries={["/appearance-test"]}>
-          <Routes person={makePerson()} onSignedIn={() => {}} />
+          <ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>
         </MemoryRouter>,
       );
       // The fetch is still pending here - nothing should have written
@@ -180,7 +181,7 @@ describe("Routes status indicator", () => {
       const view = renderWithQueryClient(
         <TooltipProvider>
           <MemoryRouter initialEntries={["/status"]}>
-            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+            <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
           </MemoryRouter>
         </TooltipProvider>,
       );
@@ -208,7 +209,7 @@ describe("Routes status indicator", () => {
       const view = renderWithQueryClient(
         <TooltipProvider>
           <MemoryRouter initialEntries={[path]}>
-            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+            <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
           </MemoryRouter>
         </TooltipProvider>,
       );
@@ -243,7 +244,7 @@ describe("Routes notifications bell", () => {
       const view = renderWithQueryClient(
         <TooltipProvider>
           <MemoryRouter initialEntries={["/chat"]}>
-            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+            <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
           </MemoryRouter>
         </TooltipProvider>,
       );
@@ -292,7 +293,7 @@ describe("Routes Incognito toggle", () => {
       const view = renderWithQueryClient(
         <TooltipProvider>
           <MemoryRouter initialEntries={["/"]}>
-            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+            <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
           </MemoryRouter>
         </TooltipProvider>,
       );
@@ -357,7 +358,7 @@ describe("Routes sign-in redirect", () => {
         <TooltipProvider>
           <MemoryRouter initialEntries={["/sign-in"]}>
             <RouterRoutes>
-              <Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} />
+              <Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} />
             </RouterRoutes>
           </MemoryRouter>
         </TooltipProvider>,
@@ -426,7 +427,7 @@ describe("Routes retired Tools paths", () => {
       <TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
           <RouterRoutes>
-            <Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} />
+            <Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} />
           </RouterRoutes>
         </MemoryRouter>
       </TooltipProvider>,
@@ -533,7 +534,7 @@ describe("Routes settings areas", () => {
     try {
       const view = renderWithQueryClient(
         <MemoryRouter initialEntries={[path]}>
-          <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+          <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
         </MemoryRouter>,
       );
       await waitFor(() => expect(document.body.querySelector('[data-slot="settings-shell"]')).toBeTruthy());
@@ -566,7 +567,7 @@ describe("Routes notifications history page", () => {
       const view = renderWithQueryClient(
         <TooltipProvider>
           <MemoryRouter initialEntries={["/notifications"]}>
-            <RouterRoutes><Route path="/*" element={<Routes person={makePerson()} onSignedIn={() => {}} />} /></RouterRoutes>
+            <RouterRoutes><Route path="/*" element={<ToastProvider><Routes person={makePerson()} onSignedIn={() => {}} /></ToastProvider>} /></RouterRoutes>
           </MemoryRouter>
         </TooltipProvider>,
       );

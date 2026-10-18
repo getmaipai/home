@@ -2,6 +2,7 @@
 // applied) feeds a pinned section and an "All apps" page; Weather's manifest pins it by default; a person's own
 // saved pins always win.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { act, cleanup, fireEvent, render, waitFor, within } from "@testing-library/react";
 import { MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -35,11 +36,11 @@ function open(path = "/", width = 1440) {
   window.matchMedia = ((query: string) => ({ matches: query.includes("max-width") && width <= 768, media: query, onchange: null, addListener: () => {}, removeListener: () => {}, addEventListener: () => {}, removeEventListener: () => {}, dispatchEvent: () => false })) as typeof window.matchMedia;
   return render(
     <QueryClientProvider client={createQueryClient()}>
-      <TooltipProvider>
+      <ToastProvider><TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
           <RouterRoutes><Route path="/*" element={<Routes person={makePerson("owner")} onSignedIn={() => {}} />} /></RouterRoutes>
         </MemoryRouter>
-      </TooltipProvider>
+      </TooltipProvider></ToastProvider>
     </QueryClientProvider>,
   );
 }

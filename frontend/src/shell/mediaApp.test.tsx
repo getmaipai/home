@@ -2,6 +2,7 @@
 // its query as page state (so the item's data call has its id), the Home tab is named Home, `/media/<id>` resolves to its app, and the
 // Player's element is registered with the audio session while the play page shows it.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { cleanup, fireEvent, render, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { Link, MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
@@ -62,12 +63,12 @@ function open(path: string, extra: ReactNode = null) {
   const client = createQueryClient();
   return render(
     <QueryClientProvider client={client}>
-      <TooltipProvider>
+      <ToastProvider><TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
           <RouterRoutes><Route path="/*" element={<Routes person={makePerson("owner")} onSignedIn={() => {}} />} /></RouterRoutes>
           {extra}
         </MemoryRouter>
-      </TooltipProvider>
+      </TooltipProvider></ToastProvider>
     </QueryClientProvider>,
   );
 }

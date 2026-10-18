@@ -1,6 +1,7 @@
 // APP-KIND-04: a package app opens at /apps/<id> and /apps/<id>/<page> with no rebuild, inside the permanent
 // rail, from a fixture package the hub lists. Home has no per-package code: the page is schema data.
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { ToastProvider } from "@maipai/ui/src/primitives/Toast";
 import { act, cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { MemoryRouter, Route, Routes as RouterRoutes } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
@@ -80,11 +81,11 @@ function open(path: string, width = 1440) {
   const client = createQueryClient();
   const view = render(
     <QueryClientProvider client={client}>
-      <TooltipProvider>
+      <ToastProvider><TooltipProvider>
         <MemoryRouter initialEntries={[path]}>
           <RouterRoutes><Route path="/*" element={<Routes person={makePerson("owner")} onSignedIn={() => {}} />} /></RouterRoutes>
         </MemoryRouter>
-      </TooltipProvider>
+      </TooltipProvider></ToastProvider>
     </QueryClientProvider>,
   );
   return { ...view, client };
