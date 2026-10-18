@@ -13,6 +13,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 - Changed the News reader to open with the publisher's name in a banner and a centered article column.
 
+- Pictures, videos and songs Home makes stay in the Library when the chat they came from is deleted or expires; only the Library's storage rules can remove them. (LIBRARY-REVAMP-02)
 - Files can be added to the Library from the API without a chat (pictures, videos, songs, documents, text). Children are asked to get a grown-up. (LIBRARY-REVAMP-11)
 - Library files can be renamed and kept (pinned) through the API; a kept generated picture, video or song is never removed by storage rules. (LIBRARY-REVAMP-12)
 - Deleting a Library file now moves it to Trash for 30 days. While it is there nobody can open it, shared or not; Restore brings it and its sharing back. Another person's copy of the same file is never touched. (LIBRARY-REVAMP-10)

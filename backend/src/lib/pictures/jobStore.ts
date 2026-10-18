@@ -2,6 +2,7 @@
 // the person or two hours); every other job is a `picture_jobs` row, written only when what the card shows changed.
 // No import of lib/attachments here: attachments.ts calls the delete helpers below when a turn, a chat or a person is
 // forgotten, so only jobs without kept output go with a deleted chat.
+import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, pictureJobs } from "@/db/schema";
@@ -182,8 +183,10 @@ export function unfinishedStoredJobs(): PictureJob[] {
  * Job turn/conversation ids have no foreign keys and stay as provenance. */
 export function deletePictureJobsForTurns(turnIds: readonly string[]): void {
   if (turnIds.length === 0) return;
-  const kept = new Set(db.select({ id: attachments.id }).from(attachments).where(eq(attachments.retention, "kept")).all().map((row) => row.id));
-  const survives = (job: PictureJob) => job.files.some((file) => kept.has(file.id));
+  // LIBRARY-REVAMP-02: a generated picture outlives its chat (kept, or following the Library's storage rules), so the
+  // job that names it (prompt, files) stays while any of its files still has a record.
+  const stored = new Set(db.select({ id: attachments.id, retention: attachments.retention, origin: attachments.origin, provenance: attachments.provenance }).from(attachments).all().filter((row) => row.retention === "kept" || isGeneratedFile(row)).map((row) => row.id));
+  const survives = (job: PictureJob) => job.files.some((file) => stored.has(file.id));
   for (const row of db.select().from(pictureJobs).where(inArray(pictureJobs.turnId, [...turnIds])).all()) {
     if (!survives(fromRow(row))) db.delete(pictureJobs).where(eq(pictureJobs.id, row.id)).run();
   }

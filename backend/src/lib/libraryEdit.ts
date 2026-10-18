@@ -7,8 +7,7 @@ import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { canAccessFile } from "@/lib/access";
 import { nextHlc } from "@/lib/hlc";
-import { libraryProvenance } from "@/lib/libraryProvenance";
-import { generationOf } from "@/lib/music/types";
+import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { redactCredentials } from "@/lib/memoryContentPolicy";
 import type { PersonRow } from "@/types";
 
@@ -18,10 +17,6 @@ const MAX_NAME = 255;
 
 export function cleanFileName(raw: string): string {
   return redactCredentials(raw.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ")).trim();
-}
-
-export function isGeneratedFile(row: { origin: string; provenance: string }): boolean {
-  return row.origin === "made" || Boolean(libraryProvenance(row.provenance).writer) || generationOf(row.provenance) !== null;
 }
 
 export function updateLibraryFile(actor: PersonRow, id: string, patch: { name?: string | null; keep?: boolean }): EditResult {

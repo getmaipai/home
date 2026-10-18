@@ -3,10 +3,11 @@ import { beforeEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, fileContents, fileReferences, people, shares } from "@/db/schema";
+import { attachments, conversationTurns, fileContents, fileReferences, people, pictureJobs, shares } from "@/db/schema";
 import { attachmentFilePath, createAttachment, deleteAttachmentsForTurns } from "@/lib/attachments";
 import { referenceDrift, referenceKinds } from "@/lib/fileContent";
 import { purgeExpiredFiles } from "@/lib/libraryTrash";
+import { generatedLibraryReport } from "@/lib/libraryGenerated";
 import { createShare } from "@/lib/shares";
 import { purgeExpired } from "@/lib/trash/registry";
 import "@/lib/trash/providers";
@@ -219,5 +220,30 @@ describe("a picture and its edit versions travel together", () => {
     await h.sage.request(`/api/trash/file/${root.id}`, { method: "DELETE" });
     expect(row(root.id)).toBeUndefined();
     expect(row(version.id)).toBeUndefined();
+  });
+});
+
+describe("generated items outlive their chats (LIBRARY-REVAMP-02)", () => {
+  test("a generated item not pinned is detached from a deleted chat, stays in the Library, and a plain chat attachment still goes", async () => {
+    const h = await household();
+    const boat = file(h.sageRow(), "generated boat"); // generated, conversation retention
+    const upload = file(h.sageRow(), "plain chat photo", { provenance: "composer:photo.jpg" });
+    expect(deleteAttachmentsForTurns([boat.turnId, upload.turnId])).toBe(1);
+    expect(row(boat.id)?.turnId).toBeNull();
+    expect(row(upload.id)).toBeUndefined();
+    expect(referenceKinds(sha("generated boat"))).toEqual({ owner: 1 });
+    expect(existsSync(attachmentFilePath(boat.storage_path))).toBe(true);
+    expect((await library(h.sage)).items.map((i) => i.id)).toEqual([boat.id]);
+    const report = generatedLibraryReport();
+    expect(report.generated).toEqual({ items: 1, bytes: "generated boat".length });
+    expect(report.followingStorageRules.items).toBe(1);
+    expect(report.tiedToChat.items).toBe(0);
+  });
+  test("the job that names a generated picture survives its chat so the Library keeps the prompt", async () => {
+    const h = await household();
+    const boat = file(h.sageRow(), "jobbed boat");
+    db.insert(pictureJobs).values({ id: "picture-keepjob", personId: h.sageId, turnId: boat.turnId, kind: "generate", request: "{}", prompt: "a boat", state: "done", files: JSON.stringify([{ id: boat.id }]), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    deleteAttachmentsForTurns([boat.turnId]);
+    expect(db.select().from(pictureJobs).all()).toHaveLength(1);
   });
 });

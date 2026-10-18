@@ -1,4 +1,5 @@
 // MUSIC-GEN-03: the one job store and deletion boundary. No attachment imports: forget can stop watchers before deleting files.
+import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, musicJobs } from "@/db/schema";
@@ -72,7 +73,9 @@ export function musicJobIdsByTurn(actor: { id: string }, turnIds: readonly strin
 // Finished Library songs and the metadata their player reads outlive the chat.
 // Job turn/conversation ids are provenance without foreign keys, so they can stay.
 function deleteUnlessKept(job: MusicJob): void {
-  if (job.fileId && db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.id, job.fileId), eq(attachments.retention, "kept"))).get()) return;
+  // LIBRARY-REVAMP-02: a finished song outlives its chat whether it is pinned or follows the Library's storage rules.
+  const file = job.fileId ? db.select().from(attachments).where(eq(attachments.id, job.fileId)).get() : undefined;
+  if (file && (file.retention === "kept" || isGeneratedFile(file))) return;
   dropMusicJob(job);
   db.delete(musicJobs).where(eq(musicJobs.id, job.id)).run();
 }

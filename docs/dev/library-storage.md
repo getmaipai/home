@@ -67,3 +67,11 @@ shared, served or thumbnailed through the Library: `fileAccessSql` requires `del
 their own conversation check and are unchanged. Delete takes the item's companions along (edit versions, poster, cover).
 Purge and expiry drop the owner reference; the record and its jobs go unless a chat still shows the file, and bytes go only at
 zero references. A chat deleted while its file is in Trash does not take the file with it.
+
+## Generated items outlive chats (LIBRARY-REVAMP-02)
+
+`deleteAttachmentsForTurns` keeps (detaches from the turn) a file that is pinned, in Trash or generated (`isGeneratedFile` in
+`lib/libraryProvenance.ts`: origin made, or a picture-gen, video-gen, video-poster, image-edit or music-gen note). Only a plain
+chat attachment goes with its chat. The picture and music job records that name such a file survive too, so the Library keeps
+its prompt and title. `generatedLibraryReport()` (`lib/libraryGenerated.ts`) is the read-only dry run: items and bytes
+generated, pinned, following the storage rules, and still tied to a chat.

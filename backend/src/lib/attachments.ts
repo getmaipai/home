@@ -19,6 +19,7 @@ import { newFileId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { checkStorageCap, kindForMediaType } from "@/lib/storage/usage";
+import { isGeneratedFile } from "@/lib/libraryProvenance";
 import { contentFor, dropFileReferences, ensureContent, releaseContent, syncFileReferences } from "@/lib/fileContent";
 import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
 import type { PersonRow } from "@/types";
@@ -299,7 +300,9 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
   for (const row of rows) {
     const chatOnly = row.deletedAt !== null && row.trashUntil === null;
     const inTrash = row.deletedAt !== null && row.trashUntil !== null;
-    if (!chatOnly && (row.retention === "kept" || inTrash)) {
+    // LIBRARY-REVAMP-02: anything generated outlives its chat (it is a Library item; the Library's storage rules decide when it
+    // goes), as do pinned files and files in Trash. Only a plain chat attachment goes with its chat.
+    if (!chatOnly && (row.retention === "kept" || inTrash || isGeneratedFile(row))) {
       // Conversations are tombstoned, not removed. Keep that provenance for
       // conversation reads; only the turn FK must be cleared before deletion.
       db.update(attachments).set({ turnId: null }).where(eq(attachments.id, row.id)).run();
