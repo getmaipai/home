@@ -200,3 +200,24 @@ Studio; music is not installed here, so it is unmeasured).
 Self-assessed, pending the `architect` agent's ruling: APPROVED. It adds no rule and breaks none (S6 status through the existing
 job card, rule 5 no cap on adult chat is untouched, the Stack stays person-blind); the only governed edit is Home's job card
 copy.
+
+## ISOLATION-01 as built (Stack `31c16a0`, 2026-10-18)
+
+- **Where.** `backend/src/lib/heavyGate.ts` in the Stack. The routes count interactive requests (`/v1/chat/completions` on chat, coding, vision, router; transcription; speech; a transcript event on the speech session). The memory judge, embeddings and token counts do not count. A streamed reply counts until its last byte is read or the client leaves.
+- **What is paused.** Only the worker a service attached for a running job (video, picture, music, image tools), never the Stack and never an engine behind a role (the supervisor's pids are refused). The chat model runs in its own llama-server process; no heavy worker shares it.
+- **Safety.** Every exit resumes first (job end, cancel, watchdog cancel, kill, shutdown, process exit); a pause is bounded at 10 minutes, then a forced resume (`isolation.resume_forced`) and 60 s of running before it can be stopped again; a request in flight for 30 minutes stops counting; the pids of stopped workers are written to `isolation-paused.json` and continued at the next Stack start. The job deadline pauses with the process; the progress clock leaves the paused time out.
+- **Card.** `GET /stack/v1/jobs/{id}` status is `paused: chat`; the video, picture and music status routes say `stage_label` "Paused while chat is working" with `eta_seconds` null (music `stage` "paused", which Home maps in `musicStageLabel`). Home's video and picture cards already show the Stack's `stage_label`, so they needed no change.
+- **Counters.** `GET /stack/v1/memory` has an `isolation` block; log lines `isolation.paused`, `isolation.resumed`.
+- **Not in this slice.** Start rule (ISOLATION-02), fairness (-03), the Home credential (-04). One thing for -03: Home's video watcher gives up after 25 minutes (`MAX_WATCH_MS`), and paused time counts toward it, so a long run of chat could fail a clip Home would otherwise wait for.
+
+### Measured (scratch Stack, Studio, a real Quick clip, 100-token reply)
+
+Method: two chat turns alone, the clip submitted, three chat turns during its decode 15 s apart, two turns alone after. Same clip and prompt, isolation on and off (`STACK_ISOLATION=off`).
+
+| | First token | Tokens/s | Clip total |
+|---|---|---|---|
+| Chat alone (before and after) | 1.63 s | 24 to 25 | |
+| Isolation off, chat during the clip (3 turns) | 2.47 to 2.51 s | 10.6 to 11.6 | 156 s |
+| Isolation on, chat during the clip (3 turns) | 1.64 to 1.66 s | 24.4, 24.2, 14.2 | 177 s (85.7 s of it paused) |
+
+Chat is at baseline on two of three turns; the third kept the 1.64 s first token but ran at 14 tokens/s (cause not established; one Metal buffer already submitted when the pause lands is the likely one). The clip costs about 21 s over the unpaused run here because only 3 short turns paused it; its cost grows with how long people chat. An earlier ON run on a noisier machine (other sessions loading the GPU) showed 2.0 to 2.8 s and 8 to 13 tokens/s for chat, the same as the chats alone at that moment, so the pause cannot beat outside load. Not measured: pictures and music, and pause cycles of 60 s and 10 min (still open in the acceptance row).

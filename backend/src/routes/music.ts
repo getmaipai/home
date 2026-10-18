@@ -51,6 +51,8 @@ export function musicStageLabel(job: MusicJob): string {
     case "making": case "dit": case "music": case "generating": return "Making the music";
     case "mixing": case "vae": case "decoding": case "encoding": return "Mixing it down";
     case "loading": case "starting": return "Getting the music model ready";
+    // ISOLATION-01: the Stack stops the music worker while a chat or voice request runs; the existing stage string says so.
+    case "paused": return "Paused while chat is working";
     default: return "Making the song";
   }
 }

@@ -17,6 +17,8 @@ Type "make a short video of a paper boat in the rain". Home answers in a few wor
 
 A Quick video is 5 seconds at 480p with no sound and takes about 2 minutes. A Detailed video has sound and spoken words, runs up to 10 seconds, and takes about a minute or two. Chat picks the kind for you: it uses the one your home chose in **Settings**, and it picks Detailed when you ask for people to talk, for sound or music, or for more than 5 seconds. You can say it yourself too, for example "make a Detailed video where the hero says come with me". Spoken words come out clearest in a video of 5 seconds or less; in a longer one a line can come out garbled or not at all, so keep a spoken line short. If Home is busy making a picture or another video, the card says so and your video starts when the other one is done. You can have one video in the making at a time.
 
+If someone is chatting or talking to Home while a video is being made, the video pauses ("Paused while chat is working") and carries on after the reply, so chat is never slowed down. The wait is not counted against the video.
+
 When it is done, the video plays on the card. It repeats. Press **Download** to save it, **Share** to send it, or **Make another** for a new one from the same words. **Make it Detailed** (or **Make it Quick**) makes the same words again as the other kind. A video made with a style cannot switch, because a style is made for one kind.
 
 ## Send a video in a text

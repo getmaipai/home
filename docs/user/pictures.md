@@ -13,6 +13,8 @@ You can ask for up to 4 pictures at once ("give me three options") and for a sha
 
 When it is done, the picture appears in the chat. Tap it to see it bigger. A **Quick** picture takes a few seconds on a fast computer and longer on a slower one.
 
+Chat pauses long jobs, and they continue afterwards. If someone is chatting or talking to Home while a picture is being made, the picture waits ("Paused while chat is working") and carries on after the reply.
+
 ## Quick or Detailed
 
 Home makes two kinds of picture. **Quick** is the usual one: a few seconds, clean and sharp, and good for words in a picture. **Detailed** takes about 15 to 30 seconds and has finer detail, skin and fur that look real, and many more styles to add. Detailed needs a bigger download and a computer with 128 GB of memory.

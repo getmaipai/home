@@ -32,6 +32,8 @@ Type "write us a cheerful folk song about Saturday pancakes". Chat writes the wo
 
 The first song after a restart takes about a minute more, while the model loads. If Home is busy making a picture, a video or another song, the card says so and your song starts after it. You can have one song in the making at a time.
 
+Chat pauses long jobs, and they continue afterwards. If someone is chatting or talking to Home while your song is being made, the card says "Paused while chat is working" and the song carries on after the reply.
+
 When it is done, the song plays on the card. Press **Lyrics** to see the words. Press **Download** to save it or **Share** to send it.
 
 Tips for a good song:
