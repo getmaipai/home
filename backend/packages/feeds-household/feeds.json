@@ -23,7 +23,318 @@
       "url": "https://www.nasa.gov/news-release/feed/",
       "title": "NASA news releases",
       "publisher": "NASA",
-      "lang": "en"
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1004/rss.xml",
+      "title": "NPR World",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1006/rss.xml",
+      "title": "NPR Business",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1019/rss.xml",
+      "title": "NPR Technology",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1007/rss.xml",
+      "title": "NPR Science",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1128/rss.xml",
+      "title": "NPR Health",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "health"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1055/rss.xml",
+      "title": "NPR Sports",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://feeds.npr.org/1008/rss.xml",
+      "title": "NPR Culture",
+      "publisher": "NPR",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/world/rss.xml",
+      "title": "BBC World",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/business/rss.xml",
+      "title": "BBC Business",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/technology/rss.xml",
+      "title": "BBC Technology",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml",
+      "title": "BBC Science and Environment",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "science",
+        "environment"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/health/rss.xml",
+      "title": "BBC Health",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "health"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml",
+      "title": "BBC Entertainment and Arts",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://feeds.bbci.co.uk/sport/rss.xml",
+      "title": "BBC Sport",
+      "publisher": "BBC",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/environment/rss",
+      "title": "The Guardian Environment",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "environment"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/world/rss",
+      "title": "The Guardian World",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/business/rss",
+      "title": "The Guardian Business",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/uk/technology/rss",
+      "title": "The Guardian Technology",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/science/rss",
+      "title": "The Guardian Science",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "science"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/society/health/rss",
+      "title": "The Guardian Health",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "health"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/sport/rss",
+      "title": "The Guardian Sport",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/culture/rss",
+      "title": "The Guardian Culture",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://www.theguardian.com/environment/climate-crisis/rss",
+      "title": "The Guardian Climate crisis",
+      "publisher": "The Guardian",
+      "lang": "en",
+      "topics_hint": [
+        "environment"
+      ]
+    },
+    {
+      "url": "https://www.cbc.ca/webfeed/rss/rss-world",
+      "title": "CBC News World",
+      "publisher": "CBC News",
+      "lang": "en",
+      "topics_hint": [
+        "world"
+      ]
+    },
+    {
+      "url": "https://www.cbc.ca/webfeed/rss/rss-business",
+      "title": "CBC News Business",
+      "publisher": "CBC News",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.cbc.ca/webfeed/rss/rss-technology",
+      "title": "CBC News Technology",
+      "publisher": "CBC News",
+      "lang": "en",
+      "topics_hint": [
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.cbc.ca/webfeed/rss/rss-health",
+      "title": "CBC News Health",
+      "publisher": "CBC News",
+      "lang": "en",
+      "topics_hint": [
+        "health"
+      ]
+    },
+    {
+      "url": "https://www.cbc.ca/webfeed/rss/rss-sports",
+      "title": "CBC News Sports",
+      "publisher": "CBC News",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://www.cbc.ca/webfeed/rss/rss-arts",
+      "title": "CBC News Arts",
+      "publisher": "CBC News",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
+    },
+    {
+      "url": "https://www.si.com/feed",
+      "title": "Sports Illustrated",
+      "publisher": "Sports Illustrated",
+      "lang": "en",
+      "topics_hint": [
+        "sports"
+      ]
+    },
+    {
+      "url": "https://www.popsci.com/feed",
+      "title": "Popular Science",
+      "publisher": "Popular Science",
+      "lang": "en",
+      "topics_hint": [
+        "science",
+        "technology"
+      ]
+    },
+    {
+      "url": "https://www.fastcompany.com/rss",
+      "title": "Fast Company",
+      "publisher": "Fast Company",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://www.inc.com/rss/",
+      "title": "Inc.",
+      "publisher": "Inc.",
+      "lang": "en",
+      "topics_hint": [
+        "business"
+      ]
+    },
+    {
+      "url": "https://variety.com/feed/",
+      "title": "Variety",
+      "publisher": "Variety",
+      "lang": "en",
+      "topics_hint": [
+        "entertainment"
+      ]
     }
   ]
 }

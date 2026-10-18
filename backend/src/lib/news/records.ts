@@ -16,7 +16,8 @@ import { NewsSearchRecent } from "@maipai/spec/gen/ts/news-search-recent.js";
 import { validateNewsInterest, validateNewsSearchRecent } from "@maipai/spec/records/ts/validate.js";
 import { computeAffinity, type MixActivity } from "./mixAffinity";
 import type { MixSignal } from "./rankStories";
-import { getPersonSettingValue } from "@/lib/settings";
+import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
+import { topicOfferedTo } from "./topics";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
 import { newsPictureCached, pinNewsPicture } from "./pictures";
 
@@ -33,23 +34,48 @@ function interestOf(row: typeof newsInterests.$inferSelect): NewsInterest {
   });
 }
 
-/** The person's followed channels. A row that only holds an affinity (inferred) is not a follow. */
+/** The topics a household follows for everyone of a user type until that person says otherwise (`news.default_topics.<band>`). A topic
+ * the band is not offered never counts. A child's default is empty until the household sets one. */
+export function defaultTopicsFor(band: AgeBand): string[] {
+  const value = getHouseholdSettingValue(`news.default_topics.${band}`);
+  return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string" && topicOfferedTo(id, band)) : [];
+}
+
+function bandOfPerson(personId: string): AgeBand | null {
+  const person = db.select().from(people).where(eq(people.id, personId)).get();
+  return person && !person.deletedAt && person.role !== "guest" ? speakerAgeBand(person, new Date()) : null;
+}
+
+/** A row the person wrote by unfollowing: not followed, and not one only a reading affinity holds. For a topic the household
+ * follows by default it is the person's opt-out, and it is what keeps the default from coming back. */
+const isOptOut = (row: { followed: boolean; inferred: boolean }): boolean => !row.followed && !row.inferred;
+
+/** The person's followed channels: the topics they tapped Follow on, plus their user type's default topics less any they
+ * unfollowed. A row that only holds an affinity (inferred) is not a follow. */
 export function followedChannels(personId: string): { topics: Set<string>; sources: Set<string> } {
   const topics = new Set<string>();
   const sources = new Set<string>();
-  for (const row of db.select().from(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.followed, true))).all()) {
-    (row.kind === "topic" ? topics : sources).add(row.key);
+  const rows = db.select().from(newsInterests).where(eq(newsInterests.personId, personId)).all();
+  for (const row of rows) if (row.followed) (row.kind === "topic" ? topics : sources).add(row.key);
+  const band = bandOfPerson(personId);
+  if (band) {
+    const optedOut = new Set(rows.filter((row) => row.kind === "topic" && isOptOut(row)).map((row) => row.key));
+    for (const id of defaultTopicsFor(band)) if (!optedOut.has(id)) topics.add(id);
   }
   return { topics, sources };
 }
 
 export function isFollowing(personId: string, kind: InterestKind, key: string): boolean {
   const row = db.select().from(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.kind, kind), eq(newsInterests.key, key))).get();
-  return row?.followed === true;
+  if (row?.followed === true) return true;
+  if (kind !== "topic" || (row && isOptOut(row))) return false;
+  const band = bandOfPerson(personId);
+  return band !== null && defaultTopicsFor(band).includes(key);
 }
 
 /** Follow or unfollow one channel for the person. A follow is the person's own tap, never inferred. An unfollow removes the row
- * unless an affinity still holds it (then it stays as an inferred row, which a child never has). */
+ * unless an affinity still holds it (then it stays as an inferred row, which a child never has). Unfollowing a topic the household
+ * follows by default keeps a row marked as the person's opt-out instead, so the default does not return. */
 export function setFollow(personId: string, band: AgeBand, kind: InterestKind, key: string, on: boolean, nowIso = new Date().toISOString()): void {
   const existing = db.select().from(newsInterests).where(and(eq(newsInterests.personId, personId), eq(newsInterests.kind, kind), eq(newsInterests.key, key))).get();
   if (on) {
@@ -61,6 +87,13 @@ export function setFollow(personId: string, band: AgeBand, kind: InterestKind, k
     if (problems.length > 0) throw new Error(problems.join("; "));
     if (existing) db.update(newsInterests).set({ followed: true, affinity: draft.affinity, inferred: false, updatedAt: nowIso, hlc: draft.hlc }).where(eq(newsInterests.id, existing.id)).run();
     else db.insert(newsInterests).values({ id: draft.id, personId, kind, key, followed: true, affinity: draft.affinity, inferred: false, updatedAt: nowIso, hlc: draft.hlc, provenance: PROVENANCE }).run();
+    return;
+  }
+  if (kind === "topic" && defaultTopicsFor(band).includes(key)) {
+    const affinity = band === "child" ? 0 : (existing?.affinity ?? 0);
+    const hlc = nextHlc();
+    if (existing) db.update(newsInterests).set({ followed: false, affinity, inferred: false, updatedAt: nowIso, hlc }).where(eq(newsInterests.id, existing.id)).run();
+    else db.insert(newsInterests).values({ id: newNewsInterestId(), personId, kind, key, followed: false, affinity, inferred: false, updatedAt: nowIso, hlc, provenance: PROVENANCE }).run();
     return;
   }
   if (!existing) return;

@@ -13,7 +13,7 @@ Headlines: a title, the name of the news site, a link, a short summary and the a
 
 The headlines come from lists of news feeds. Two lists come with MaiPai:
 
-- **Household news feeds** are public news sites for teens and adults.
+- **Household news feeds** are public news sites for teens and adults, grouped by topic.
 - **Kids' news feeds** are news written for young readers, for children.
 
 Old headlines are cleared out after a while, so the shelf never grows without end.
@@ -38,6 +38,14 @@ Only an admin can change these.
 A dash instead of a box means the list is not offered to that group, and it cannot be turned on there. If a tick does not save, the card says so; check your connection and tick the box again.
 
 To turn the whole shelf off, open **Show advanced settings** under the card and clear **News shelf**. With the shelf off, the news answer goes back to fetching the news live from one public news site each time you ask.
+
+## Choose the topics people follow
+
+Teens and adults start out following every topic: World, Local, Business, Technology, Science, Health, Sports, Entertainment and Environment. Each person can unfollow any topic on their own **Following** page, and it stays unfollowed. Children start out following none.
+
+An admin can change the starting topics for each group. Open **News**, then its gear, and find **Topics followed by default for teen**, **for adult** and **for child**. Tick the topics that group should follow. A topic that a person already unfollowed stays unfollowed when you change this.
+
+Each topic fills from the feeds that cover it. Local has no feed of its own, because it depends on where you live. To fill Local, add your town's news feed in **Extra news feeds**, below.
 
 ## Add or remove your own feeds
 

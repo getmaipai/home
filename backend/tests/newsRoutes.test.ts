@@ -20,7 +20,7 @@ import { ensureAndPinNewsPicture, newsPicture, newsPictureCount, newsPictureCach
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
 import { TestClient } from "./client";
 import { child, owner, teen } from "./support/testAuth";
-import { ADULT_HOST, KIDS_HOST, ARTICLE_SENTENCES, articleHtml, installNewsApp, pictureFiles, putItem, removeNewsApp, resetNewsState, seedFeeds, startPublisher, type Publisher } from "./support/newsFixture";
+import { ADULT_HOST, KIDS_HOST, ARTICLE_SENTENCES, articleHtml, installNewsApp, pictureFiles, putItem, removeNewsApp, resetNewsState, seedFeeds, startPublisher, type Publisher, noDefaultTopics } from "./support/newsFixture";
 import { resetDb } from "./reset-db";
 
 let publisher: Publisher;
@@ -389,6 +389,7 @@ describe("the story", () => {
 
 describe("actions", () => {
   test("follow, unfollow, save (text and picture kept), unsave, read, feedback and reset for a teen", async () => {
+    noDefaultTopics();
     publisher.stop();
     publisher = await startPublisher({ "/story/page": articleHtml() });
     publisher.attach();
@@ -633,6 +634,7 @@ describe("My Mix learning and privacy", () => {
   });
 
   test("an admin's News page exposes no other person's follows, reads or saves", async () => {
+    noDefaultTopics();
     installNewsApp();
     const who = await household();
     const item = putItem(feeds.household, ADULT_HOST, { topics: ["science"] });

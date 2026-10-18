@@ -5,19 +5,37 @@
       "url": "https://feeds.bbci.co.uk/newsround/rss.xml",
       "title": "CBBC Newsround",
       "publisher": "BBC",
-      "lang": "en"
+      "lang": "en",
+      "topics_hint": [
+        "kids"
+      ]
     },
     {
       "url": "https://www.snexplores.org/feed",
       "title": "Science News Explores",
       "publisher": "Science News Explores",
-      "lang": "en"
+      "lang": "en",
+      "topics_hint": [
+        "kids"
+      ]
     },
     {
       "url": "https://www.nasa.gov/feeds/iotd-feed/",
       "title": "NASA Image of the Day",
       "publisher": "NASA",
-      "lang": "en"
+      "lang": "en",
+      "topics_hint": [
+        "kids"
+      ]
+    },
+    {
+      "url": "https://www.timeforkids.com/feed/",
+      "title": "TIME for Kids",
+      "publisher": "TIME for Kids",
+      "lang": "en",
+      "topics_hint": [
+        "kids"
+      ]
     }
   ]
 }

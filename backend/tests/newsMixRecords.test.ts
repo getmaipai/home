@@ -69,6 +69,8 @@ test("switching My Mix off hides its page and stops learning", () => {
 test("an admin page never exposes another person's interests, reads or saves", () => {
   installNewsApp();
   setHouseholdSettingValue("news.shelf.enabled", true);
+  // No default topics, so a follow in this test can only be somebody's own tap.
+  for (const band of ["teen", "adult"]) setHouseholdSettingValue(`news.default_topics.${band}`, []);
   const feeds = seedFeeds();
   const item = putItem(feeds.household, ADULT_HOST, { topics: ["science"], image: null });
   const t = person("teen"), admin = person("admin");

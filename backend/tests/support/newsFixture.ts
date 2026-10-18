@@ -1,3 +1,4 @@
+import { setHouseholdSettingValue } from "@/lib/settings";
 // NEWS-02 test support: the news package installed as an app (its pages and data declared over the bundled package, as the
 // apps test does for list-view), a shelf seeded with feeds and items, and a localhost fixture server standing in for a
 // publisher's picture host and article pages. Nothing here reaches a real network address (docs/THIRD-PARTY-SERVICES.md).
@@ -194,4 +195,9 @@ export function putItem(feedId: string, host: string, over: Partial<{ title: str
 export function pictureFiles(): string[] {
   const dir = newsPictureDir();
   return existsSync(dir) ? require("node:fs").readdirSync(dir).filter((name: string) => name.endsWith(".webp")) : [];
+}
+
+/** Switches the household's default followed topics off for every user type, so a test about follow mechanics sees only a person's own taps. */
+export function noDefaultTopics(): void {
+  for (const band of ["adult", "teen", "child"]) setHouseholdSettingValue(`news.default_topics.${band}`, []);
 }

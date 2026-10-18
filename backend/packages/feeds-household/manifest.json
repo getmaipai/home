@@ -1,10 +1,10 @@
 {
   "id": "feeds-household",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "module",
   "category": "Info",
   "display": "Household news feeds",
-  "description": "Fill the News shelf with public headlines, including NASA news releases, for teens and adults.",
+  "description": "Fill the News shelf with public headlines in every topic, from many mainstream publishers, for teens and adults.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -54,13 +54,83 @@
       "who": "NASA",
       "opt_in": true,
       "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-theguardian-com",
+      "destination": "The Guardian's own public news feed (www.theguardian.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "The Guardian",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-cbc-ca",
+      "destination": "CBC News's own public news feed (www.cbc.ca)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "CBC News",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-si-com",
+      "destination": "Sports Illustrated's own public news feed (www.si.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "Sports Illustrated",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-popsci-com",
+      "destination": "Popular Science's own public news feed (www.popsci.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "Popular Science",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-fastcompany-com",
+      "destination": "Fast Company's own public news feed (www.fastcompany.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "Fast Company",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-inc-com",
+      "destination": "Inc.'s own public news feed (www.inc.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "Inc.",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-variety-com",
+      "destination": "Variety's own public news feed (variety.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "Variety",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
     }
   ],
   "permissions": [
     "net:feeds.bbci.co.uk",
     "net:feeds.npr.org",
     "net:www.pbs.org",
-    "net:www.nasa.gov"
+    "net:www.nasa.gov",
+    "net:www.theguardian.com",
+    "net:www.cbc.ca",
+    "net:www.si.com",
+    "net:www.popsci.com",
+    "net:www.fastcompany.com",
+    "net:www.inc.com",
+    "net:variety.com"
   ],
   "notifications": [],
   "backup": "exclude",

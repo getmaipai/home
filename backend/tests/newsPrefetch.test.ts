@@ -14,7 +14,7 @@ import { platformConnections } from "@/lib/privacy";
 import { NEWS_SETTINGS_KEYS } from "@/settings/newsKeys";
 import { resetDb } from "./reset-db";
 import { owner, child, teen } from "./support/testAuth";
-import { ADULT_HOST, KIDS_HOST, articleHtml, installNewsApp, putItem, removeNewsApp, resetNewsState, seedFeeds, startPublisher, type Publisher } from "./support/newsFixture";
+import { ADULT_HOST, KIDS_HOST, articleHtml, installNewsApp, putItem, removeNewsApp, resetNewsState, seedFeeds, startPublisher, type Publisher, noDefaultTopics } from "./support/newsFixture";
 
 const NOW = Date.now();
 let publisher: Publisher | undefined;
@@ -116,6 +116,7 @@ test("privacy lists background text only while the setting and shelf are on", ()
 });
 
 test("followed channels add stories beyond Today, unfollow removes them, stale items add nothing", async () => {
+  noDefaultTopics();
   const { row } = await owner();
   const items = Array.from({ length: 10 }, (_, index) => putItem(feeds.household, ADULT_HOST, { ageHours: index + 1, topics: ["science"] }));
   const before = fullTextCandidates(row).map((item) => item.id);

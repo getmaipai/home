@@ -89,8 +89,8 @@ describe("the bundled feed-list packages", () => {
   test("the household list carries the NASA news-release feed and the kids' list carries the Image of the Day feed", () => {
     const household = FeedListPackage.parse(read("feeds-household", "feeds.json"));
     const children = FeedListPackage.parse(read("feeds-children", "feeds.json"));
-    expect(household.feeds).toContainEqual({ url: "https://www.nasa.gov/news-release/feed/", title: "NASA news releases", publisher: "NASA", lang: "en" });
-    expect(children.feeds).toContainEqual({ url: "https://www.nasa.gov/feeds/iotd-feed/", title: "NASA Image of the Day", publisher: "NASA", lang: "en" });
+    expect(household.feeds).toContainEqual({ url: "https://www.nasa.gov/news-release/feed/", title: "NASA news releases", publisher: "NASA", lang: "en", topics_hint: ["science"] });
+    expect(children.feeds).toContainEqual({ url: "https://www.nasa.gov/feeds/iotd-feed/", title: "NASA Image of the Day", publisher: "NASA", lang: "en", topics_hint: ["kids"] });
   });
 
   test("no feed address appears in two lists", () => {

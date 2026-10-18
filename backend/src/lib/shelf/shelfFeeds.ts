@@ -25,7 +25,7 @@ import { reportShelfEvent } from "./shelfEvents";
 
 const RANK: Record<AgeBand, number> = { child: 0, teen: 1, adult: 2 };
 
-interface Desired { url: string; title: string; publisher: string; band: AgeBand; packageId: string | null; provenance: string }
+interface Desired { url: string; title: string; publisher: string; band: AgeBand; packageId: string | null; provenance: string; topics?: readonly string[] }
 
 function youngestOffered(offered: readonly string[]): AgeBand {
   return offered.filter(isBand).sort((a, b) => RANK[a] - RANK[b])[0] ?? "adult";
@@ -46,10 +46,19 @@ function readPackageFeeds(packagesDir: string): Desired[] {
     for (const feed of parsed.feeds) {
       const checked = checkFeedAddress(feed.url);
       if (!checked.ok) continue;
-      out.push({ url: checked.url, title: feed.title, publisher: feed.publisher, band: youngestOffered(list.offered_for), packageId: list.package_id, provenance: `package:${list.package_id}` });
+      out.push({ url: checked.url, title: feed.title, publisher: feed.publisher, band: youngestOffered(list.offered_for), packageId: list.package_id, provenance: `package:${list.package_id}`, ...(feed.topics_hint?.length ? { topics: feed.topics_hint } : {}) });
     }
   }
   return out;
+}
+
+let hintsByUrl: Map<string, readonly string[]> | null = null;
+
+/** The topic ids a feed-list package says a feed covers (its `topics_hint`), by feed address; empty for any other feed. The poller
+ * tags every story such a feed carries with them, so a topic's count and channel fill without a classifier. */
+export function topicsHintFor(feedUrl: string, packagesDir: string = PACKAGES_DIR): readonly string[] {
+  hintsByUrl ??= new Map(readPackageFeeds(packagesDir).filter((feed) => feed.topics).map((feed) => [feed.url, feed.topics!] as const));
+  return hintsByUrl.get(feedUrl) ?? [];
 }
 
 /** The addresses in each admin box right now, valid ones only, by the band whose box wins. */
@@ -87,7 +96,9 @@ export function syncShelfFeeds(options: { nowIso?: string; store?: ShelfStore | 
     desired.set(url, { url, title: name, publisher: name, band, packageId: null, provenance: "admin" });
   }
   // A package's own feed wins over the same address typed by an admin.
-  for (const feed of readPackageFeeds(options.packagesDir ?? PACKAGES_DIR)) desired.set(feed.url, feed);
+  const packageFeeds = readPackageFeeds(options.packagesDir ?? PACKAGES_DIR);
+  for (const feed of packageFeeds) desired.set(feed.url, feed);
+  hintsByUrl = new Map(packageFeeds.filter((feed) => feed.topics).map((feed) => [feed.url, feed.topics!] as const));
 
   let created = 0;
   let removed = 0;

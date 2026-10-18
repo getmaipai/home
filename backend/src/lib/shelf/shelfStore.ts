@@ -146,6 +146,7 @@ export function openShelfStore(path: string): ShelfStore {
   const carriers = sqlite.query<{ feed_id: string }, [string]>("SELECT feed_id FROM shelf_item_feed WHERE canonical_url = ?1");
   const setRef = sqlite.query("UPDATE shelf_item SET image_ref = ?2 WHERE id = ?1");
   const setTopicList = sqlite.query("UPDATE shelf_item SET topics = ?2 WHERE id = ?1");
+  const topicsByCanonical = sqlite.query<{ id: string; topics: string | null }, [string]>("SELECT id, topics FROM shelf_item WHERE canonical_url = ?1");
   // A feed that gave no picture on the first poll may give one later: fill it in, never replace one.
   const fillImage = sqlite.query("UPDATE shelf_item SET image_url = ?2 WHERE canonical_url = ?1 AND image_url IS NULL");
   const readContent = sqlite.query<{ blocks: string; source: string; reading_s: number; fetched_at: string; pinned: number }, [string, string]>(
@@ -181,6 +182,13 @@ export function openShelfStore(path: string): ShelfStore {
       if (result.changes === 0) {
         stricten.run(item.canonical_url, item.band_ok);
         if (item.image_url) fillImage.run(item.canonical_url, item.image_url);
+        // A story two feeds carry keeps the topics of both (NPR's top stories and NPR's World feed).
+        if (item.topics && item.topics.length > 0) {
+          for (const row of topicsByCanonical.all(item.canonical_url)) {
+            const merged = [...new Set([...(topicsOf(row.topics) ?? []), ...item.topics])];
+            if (merged.length !== (topicsOf(row.topics) ?? []).length) setTopicList.run(row.id, JSON.stringify(merged));
+          }
+        }
       }
       return { inserted: result.changes > 0 };
     },

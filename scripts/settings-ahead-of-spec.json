@@ -1,4 +1,7 @@
 [
   "install.recommended_auto_on_upgrade",
-  "content.filters"
+  "content.filters",
+  "news.default_topics.adult",
+  "news.default_topics.teen",
+  "news.default_topics.child"
 ]

@@ -1,10 +1,10 @@
 {
   "id": "feeds-children",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "kind": "module",
   "category": "Info",
   "display": "Kids' news feeds",
-  "description": "Fill the News shelf with CBBC Newsround, Science News Explores and NASA Image of the Day for children.",
+  "description": "Fill the News shelf with CBBC Newsround, Science News Explores, NASA Image of the Day and TIME for Kids for children.",
   "author": "MaiPai",
   "license": "AGPL-3.0",
   "homepage": "https://github.com/getmaipai/home",
@@ -45,12 +45,22 @@
       "who": "NASA",
       "opt_in": true,
       "retention": "unknown, see the publisher's own policy"
+    },
+    {
+      "id": "feed-www-timeforkids-com",
+      "destination": "TIME for Kids's own public news feed (www.timeforkids.com)",
+      "when": "automatically, about every 30 minutes at most, only while nobody is using MaiPai, and only while the News shelf and this list are on in Settings",
+      "what": "a plain, unauthenticated request for the feed file, plus your home's internet address. No name, device ID or cookie goes with it. MaiPai reads only the feed file and never opens the articles. Nothing anyone in the house said, asked, or saved.",
+      "who": "TIME for Kids",
+      "opt_in": true,
+      "retention": "unknown, see the publisher's own policy"
     }
   ],
   "permissions": [
     "net:feeds.bbci.co.uk",
     "net:www.snexplores.org",
-    "net:www.nasa.gov"
+    "net:www.nasa.gov",
+    "net:www.timeforkids.com"
   ],
   "notifications": [],
   "backup": "exclude",

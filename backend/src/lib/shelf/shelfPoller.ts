@@ -29,6 +29,7 @@ import { bumpShelfCounter } from "./shelfCounters";
 import { feedIsWanted } from "./shelfPolicy";
 import { MIN_POLL_INTERVAL_S, listFeeds, updateFeed, type FeedRecord } from "./feedStore";
 import { sharedShelfStore, type ShelfStore } from "./shelfStore";
+import { topicsHintFor } from "./shelfFeeds";
 import { ingestPodcastFeed, podcastFeedIsWanted, podcastPollIntervalS, queuePodcastAutoRules, sourceRowForFeed } from "@/lib/media/podcasts";
 
 import { HOME_USER_AGENT } from "@/lib/outbound";
@@ -276,6 +277,7 @@ async function ingest(feed: FeedRecord, body: string, deps: PollDeps, nowMs: num
     // Tripped items stay on the shelf for adults and are never released to a minor.
     const trips = tripsMinorFloor(summary ? `${title}. ${summary}` : title);
     if (trips) bumpShelfCounter("floor_dropped_by_tier", "child");
+    const hint = topicsHintFor(feed.url);
     const parsed = NewsItem.safeParse({
       id: newNewsItemId(),
       feed_id: feed.id,
@@ -285,6 +287,7 @@ async function ingest(feed: FeedRecord, body: string, deps: PollDeps, nowMs: num
       summary,
       published_at: entry.published,
       ...(entry.image ? { image_url: entry.image } : {}),
+      ...(hint.length > 0 ? { topics: [...hint] } : {}),
       fetched_at: fetchedAt,
       publisher: feed.publisher,
       lang,

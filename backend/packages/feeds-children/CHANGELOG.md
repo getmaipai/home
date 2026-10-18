@@ -2,6 +2,12 @@
 
 All notable changes to the Kids' news feeds package, in [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+## [0.3.0] - 2026-10-18
+
+### Added
+
+- TIME for Kids. Every feed now carries the `kids` topic, so its stories fill the Kids topic.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added
