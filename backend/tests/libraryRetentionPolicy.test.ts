@@ -187,3 +187,33 @@ test("a generated file a live chat still shows is not removed by the storage rul
   deleteAttachmentsForTurns([f.turnId]); // the chat goes: a generated file outlives it and becomes a candidate
   expect(previewLibraryRetention(at + DAY).count).toBe(1);
 });
+
+test("the run plans only what it can remove now: a type still in its warning does not count as saving space (review round 2)", async () => {
+  const f = fixture();
+  const picture = f.make("conversation"); // older, but its type is only warned at the second run
+  const video = f.make("conversation", true, "video/mp4");
+  f.make("kept");
+  db.update(attachments).set({ createdAt: "2020-01-01T00:00:00Z" }).where(eq(attachments.id, picture.id)).run();
+  const t0 = Date.parse("2026-10-18T01:00:00Z");
+  setHouseholdSettingValue(retentionKeys("pictures").mode, "keep");
+  await runLibraryRetention(t0); // warns videos only
+  setHouseholdSettingValue(retentionKeys("pictures").mode, "until_storage_threshold");
+  const result = await runLibraryRetention(t0 + DAY); // videos are ready, pictures are only just warned
+  expect(result.deleted).toBe(1);
+  expect(db.select().from(attachments).where(eq(attachments.id, video.id)).get()).toBeUndefined();
+  expect(db.select().from(attachments).where(eq(attachments.id, picture.id)).get()).toBeDefined();
+});
+
+test("expiring bytes count identical content once (review round 2)", async () => {
+  const f = fixture();
+  const a = f.make("conversation");
+  const b = f.make("conversation");
+  f.make("kept");
+  f.make("conversation", false); // an upload, so the home is over its threshold even with the two identical files counted once
+  db.update(attachments).set({ sha256: a.sha256 }).where(eq(attachments.id, b.id)).run();
+  const now = Date.parse("2026-10-18T01:00:00Z");
+  await runLibraryRetention(now);
+  const summary = librarySummary(f.actor, {});
+  expect(summary.expiring.items).toBe(2);
+  expect(summary.expiring.bytes).toBe(10);
+});

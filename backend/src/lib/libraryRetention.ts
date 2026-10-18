@@ -54,27 +54,29 @@ function candidates() {
 /** LIBRARY-RETENTION-PREVIEW-01: this person's own items the storage rules have warned about and will remove at the next
  * nightly run once the 24-hour warning has passed. `expiresAt` is the end of that warning. Cheap when nothing is over a
  * threshold (the Library page asks on every load). */
-export function expiringLibraryFiles(ownerId: string, now = Date.now()): Map<string, { expiresAt: string; size: number }> {
-  const out = new Map<string, { expiresAt: string; size: number }>();
+export function expiringLibraryFiles(ownerId: string, now = Date.now()): Map<string, { expiresAt: string; size: number; sha256: string }> {
+  const out = new Map<string, { expiresAt: string; size: number; sha256: string }>();
   const cap = householdCapBytes();
   if (cap <= 0) return out;
   const percent = householdUsageBytes() / cap * 100;
   const lowest = Math.min(...LIBRARY_RETENTION_TYPES.filter((type) => type !== "trash" && rule(type).mode === "until_storage_threshold").map((type) => rule(type).threshold_percent));
   if (!Number.isFinite(lowest) || percent <= lowest) return out;
   const plan = previewLibraryRetention(now);
-  const mine = new Set(plan.files.length ? db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.ownerPersonId, ownerId), inArray(attachments.id, plan.files.map((file) => file.id)))).all().map((row) => row.id) : []);
+  const mine = new Map((plan.files.length ? db.select({ id: attachments.id, sha256: attachments.sha256 }).from(attachments).where(and(eq(attachments.ownerPersonId, ownerId), inArray(attachments.id, plan.files.map((file) => file.id)))).all() : []).map((row) => [row.id, row.sha256] as const));
   for (const file of plan.files) {
-    if (!mine.has(file.id)) continue;
+    const sha256 = mine.get(file.id);
+    if (sha256 === undefined) continue;
     const t = plan.types.find((entry) => entry.type === file.type);
     const state = t ? readState(t.type) : null;
     // Only a warned type is expiring; an unwarned one has not been told yet and shows nothing.
     if (!t || !t.over || !state || state.signature !== signature(t.type, plan.budgetBytes)) continue;
-    out.set(file.id, { expiresAt: new Date(state.warnedAt + DAY).toISOString(), size: file.size });
+    out.set(file.id, { expiresAt: new Date(state.warnedAt + DAY).toISOString(), size: file.size, sha256 });
   }
   return out;
 }
 
-export function previewLibraryRetention(now = Date.now()) {
+/** `executable` plans only what the next run can remove (types whose warning period has ended); the default also shows what is coming. */
+export function previewLibraryRetention(now = Date.now(), executable = false) {
   const usageBytes = householdUsageBytes(), budgetBytes = householdCapBytes();
   const generatedRule = rule("generated");
   const percent = budgetBytes > 0 ? usageBytes / budgetBytes * 100 : 0;
@@ -97,7 +99,7 @@ export function previewLibraryRetention(now = Date.now()) {
   for (const row of candidates()) {
     const t = types.find((entry) => entry.type === typeFor(row))!;
     // Each file is counted once under its display type; generated covers other made files.
-    if (!t.over || projected / budgetBytes * 100 <= t.effectiveThreshold) continue;
+    if (!t.over || (executable && !t.ready) || projected / budgetBytes * 100 <= t.effectiveThreshold) continue;
     const removed = (removedPerHash.get(row.sha256) ?? 0) + 1;
     removedPerHash.set(row.sha256, removed);
     const frees = removed === (holders.get(row.sha256) ?? 1) ? row.size : 0;
@@ -130,7 +132,7 @@ async function run(now: number) {
     db.insert(settingsValues).values({ scope: "household", key: stateKey(t.type), ...values }).onConflictDoUpdate({ target: [settingsValues.scope, settingsValues.key], set: values }).run();
   }
   // Re-read after asynchronous warning delivery: pins, rules and usage may change.
-  const plan = previewLibraryRetention(now);
+  const plan = previewLibraryRetention(now, true);
   const ready = new Set(plan.types.filter((t) => t.ready).map((t) => t.type));
   let deleted = 0, bytes = 0;
   const rows = plan.files.filter((file) => ready.has(file.type)).map((file) =>

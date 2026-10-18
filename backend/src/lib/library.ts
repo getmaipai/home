@@ -63,7 +63,7 @@ function base(actor: PersonRow, q: LibraryQuery) {
     AND NOT (json_extract(meta,'$.writer') = 'image-edit' AND EXISTS(SELECT 1 FROM filtered r WHERE r.id = json_extract(f.meta,'$.root') AND coalesce(r.companion,0) = 0)))` };
 }
 
-interface Row { chat_id: string | null; id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file"; name: string; media_type: string; size: number; created_at: string; owner_person_id: string; display_name: string; share_count: number; household: number; retention: string; provenance: string; duration: number | null; cover_file_id: string | null; thumbnail: string | null; versions: number }
+interface Row { chat_id: string | null; turn_id: string | null; id: string; kind: "image" | "video" | "audio" | "document" | "story" | "file"; name: string; media_type: string; size: number; created_at: string; owner_person_id: string; display_name: string; share_count: number; household: number; retention: string; provenance: string; duration: number | null; cover_file_id: string | null; thumbnail: string | null; versions: number }
 export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   const c = cursor(q);
   const b = base(actor,q);
@@ -88,7 +88,7 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
   return { items: page.filter(row => canReadFileAudience(actor, { ownerPersonId: row.owner_person_id, provenance: row.provenance })).map(row => ({ id: row.id, kind: row.kind, name: row.name, media_type: row.media_type, size_bytes: row.size, created_at: row.created_at,
     owner: { id: row.owner_person_id, display_name: row.display_name }, shared_with: { count: row.share_count, household: Boolean(row.household) },
     retention: row.retention, chat_id: row.owner_person_id === actor.id ? row.chat_id : null,
-    can_edit: row.owner_person_id === actor.id && row.chat_id !== null && row.kind === "image" && ['picture-gen','image-edit'].includes(String((libraryProvenance(row.provenance) as { writer?: string }).writer ?? '')),
+    can_edit: row.owner_person_id === actor.id && row.chat_id !== null && row.turn_id !== null && row.kind === "image" && ['picture-gen','image-edit'].includes(String((libraryProvenance(row.provenance) as { writer?: string }).writer ?? '')),
     audience: fileAudience(row.provenance), duration_seconds: row.kind === "audio" || row.kind === "video" ? row.duration : null,
     thumb_url: `/api/files/${row.thumbnail}/thumb?w=320`, expires_at: expiring.get(row.id)?.expiresAt ?? null, version_count: row.versions })),
     next_cursor: more && last ? Buffer.from(JSON.stringify({ v: 1, key: sort === "name" ? last.name : sort === "size" ? last.size : last.created_at, created: last.created_at, id: last.id, scope: scope(q) })).toString("base64url") : null };
@@ -104,5 +104,5 @@ export function librarySummary(actor: PersonRow, q: LibraryQuery) {
   const expiring = expiringLibraryFiles(actor.id);
   // One total over the whole set, so identical bytes filed under two kinds are still counted once.
   const total = sqlite.query<{ bytes: number }, (string | number)[]>(`${b.sql} SELECT coalesce(sum(u.size),0) AS bytes FROM (SELECT max(size) AS size FROM filtered GROUP BY sha256) u`).get(...b.params)?.bytes ?? 0;
-  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: trashTotals(actor), expiring: { items: expiring.size, bytes: [...expiring.values()].reduce((n, e) => n + e.size, 0) } };
+  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: trashTotals(actor), expiring: { items: expiring.size, bytes: [...new Map([...expiring.values()].map((e) => [e.sha256, e.size] as const)).values()].reduce((n, size) => n + size, 0) } };
 }

@@ -93,6 +93,9 @@ test("a picture links to its chat for editing while the chat exists, only for it
   expect(mine.find((i) => i.id === note.id)).toMatchObject({ can_edit: false });
   const theirs = (await list(s.luciaClient)) as unknown as Array<{ id: string; chat_id: string | null; can_edit: boolean }>;
   expect(theirs.find((i) => i.id === boat.id)).toMatchObject({ chat_id: null, can_edit: false });
+  deleteAttachmentsForTurns([boat.turnId]); // the source turn expires: the chat id stays for reading, but nothing can be edited
+  const expired = (await list(s.sage)) as unknown as Array<{ id: string; chat_id: string | null; can_edit: boolean }>;
+  expect(expired.find((i) => i.id === boat.id)).toMatchObject({ chat_id: boat.conversationId, can_edit: false });
   db.update(conversations).set({ status: "deleted" }).where(eq(conversations.id, boat.conversationId)).run();
   const after = (await list(s.sage)) as unknown as Array<{ id: string; chat_id: string | null; can_edit: boolean }>;
   expect(after.find((i) => i.id === boat.id)).toMatchObject({ chat_id: null, can_edit: false });
