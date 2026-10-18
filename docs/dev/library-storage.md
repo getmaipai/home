@@ -55,3 +55,7 @@ and `pragma integrity_check`.
   still names that record keeps a dangling id exactly as before this change. References protect bytes between records, not records.
 - Child and teen dedupe pointers from before migration 0117 stay pointers, so the first owner deleting the file still removes
   them; new uploads by a child or teen are separate records.
+- A large streamed download (a saved podcast episode) is refused on its raw size at the start when the person or home is at its
+  cap, even if the bytes turn out to be already stored. The hash is unknown before the fetch and the storage rule is to refuse a
+  download that would not fit before it starts; duplicate-aware checks apply wherever the bytes are in hand (chat and Library
+  uploads, small fetched assets).
