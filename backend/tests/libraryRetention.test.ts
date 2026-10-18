@@ -1,4 +1,5 @@
-import { afterEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, test } from "bun:test";
+import { resetDb } from "./reset-db";
 import { existsSync } from "node:fs";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -18,6 +19,7 @@ import { startVideoJob, getVideoJobFor } from "@/lib/videos/jobs";
 import { __resetAgeCheckForTests } from "@/lib/pictures/ageCheck";
 import { __setKeyframesForTests } from "@/lib/pictures/keyframes";
 
+beforeEach(() => resetDb()); // household shares from an earlier file must not show up in these listings
 afterEach(() => { __resetAgeCheckForTests(); __setKeyframesForTests(null); });
 
 function context(stale = false) {
