@@ -7,14 +7,22 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- Fixed News pictures that were far too big: a tall portrait picture no longer stretches its card (Safari drew it at its own height). Pictures are cropped to their frame, the hero is wider and shorter, and every picture has a height cap (ui-v0.5.278).
+## [0.2.25] - 2026-10-18
 
-- Fixed blurry News pictures: when a feed lists the same picture at several widths Home now uses the widest, and BBC pictures are asked for at 976 pixels instead of the feed's 240.
+News gets a sidebar on wide screens, its pictures are sized and sharper, and stories open to the full article more reliably. One database migration (0120) moves personal API tokens into a new key store. Pins: spec-v0.1.187 and ui-v0.5.281. The engine is unchanged (Stack a89e7ff).
 
-- Fixed News stories that showed only the feed's short summary ("Continue reading...") when you opened them. Home's page requests share one pace, and a story opened while Today was still looking up pictures was refused and then remembered as failed for 30 minutes. It now waits a moment for its turn and tries again on the next open.
+### News
+- **A sidebar on wide screens, like Chat's.** The left column holds the News search, Today, My Mix (teens and adults), Saved, every topic you can open, the sources you follow and a Manage link. Choose a topic or source to see its stories. The section tabs give way to it on wide screens; a phone keeps the tabs and the menu drawer. Children see only what their pages allow. The page's own search box hides beside it, except on the search results page.
+- **Pictures are the right size.** A tall portrait picture no longer stretches its card (Safari drew it at its own height). Pictures are cropped to their frame, the top story is wider and shorter, and every picture has a height cap.
+- **Pictures are sharper.** When a feed lists the same picture at several widths Home uses the widest, and BBC pictures are asked for at 976 pixels instead of 240.
+- **Stories open to the full article more reliably.** Home's page requests share one pace, and a story opened while Today was still looking up pictures was refused and then remembered as failed for 30 minutes, so it showed only the feed's summary ("Continue reading..."). It now waits a moment for its turn and tries again on the next open.
+- **Fast Company and Inc. are removed** from the News feeds: both refuse Home's page requests, so their stories could only show a summary.
 
-- Removed Fast Company and Inc. from the News feeds: both refuse Home's page requests, so their stories could only show the summary.
-- Added a sidebar to News on wide screens, like Chat's: the search box, Today, My Mix, Saved, every topic you can open, the sources you follow and a Manage link. Phones keep the section tabs and the menu drawer. Children see only what the Kids' lists and their own pages allow. (NEWS-SIDEBAR-01, spec-v0.1.187, ui-v0.5.280)
+### Keys
+- **One personal key store with scopes.** Personal API tokens now live in one `api_keys` table with scopes and peppered hashes, replacing `person_api_tokens`. The migration keeps each token's expiry, a voice token keeps its 365 days, and minors' limits apply. (CODE-KEYS-01)
+
+### Settings
+- The Coding settings sections stay hidden until they are built (CODE-SET-01).
 
 ## [0.2.24] - 2026-10-18
 
