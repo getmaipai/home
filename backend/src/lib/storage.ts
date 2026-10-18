@@ -1,3 +1,4 @@
+import { clearPreviews, previewStats } from "@/lib/fileThumbnails";
 // Step 9: storage, quotas, the disk-full policy (plan 4.15).
 //
 // "Caches first" is already real and automatic: lib/packageCache.ts's
@@ -90,6 +91,7 @@ export function storageSummary(): StorageSummary {
     { area: "voice_stt_vad", bytes: dirSizeBytes(sttDir) },
     { area: "voice_cloned", bytes: dirSizeBytes(clonedVoicesDir) },
     { area: "cache", bytes: dirSizeBytes(cacheDir) },
+    { area: "previews", bytes: previewStats().bytes },
     { area: "backups", bytes: dirSizeBytes(backupDir) },
     { area: "received_backups", bytes: dirSizeBytes(receivedBackupsDir) },
   ];
@@ -158,7 +160,8 @@ const ISSUE_KEY = "disk_full";
  * would otherwise risk. */
 export function checkDiskFull(): void {
   const criticalGb = (getHouseholdSettingValue("storage.critical_free_gb") as number | undefined) ?? 2;
-  const { freeBytes } = diskUsage();
+  let { freeBytes } = diskUsage();
+  if (freeBytes < criticalGb * 1024 * 1024 * 1024) { clearPreviews(); freeBytes = diskUsage().freeBytes; }
   if (freeBytes === Number.POSITIVE_INFINITY) return; // statfs unavailable here - nothing to check
   const freeGb = freeBytes / (1024 * 1024 * 1024);
   if (freeGb < criticalGb) {

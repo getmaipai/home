@@ -1,3 +1,4 @@
+import { fileThumbnail } from "@/lib/fileThumbnails";
 // STORE-SHARE-01: the Library's own HTTP boundary - lib/shares.ts and
 // lib/attachments.ts hold the rules, this is only the wire, the same
 // split routes/lists.ts already takes over lib/lists.ts.
@@ -227,4 +228,22 @@ sharesRoutes.openapi(deleteShareRoute, (c) => {
   const result = deleteShare(actor, c.req.valid("param").id);
   if (!result.ok) return c.json({ error: result.error }, result.status);
   return c.json(result.value, 200);
+});
+
+const thumbnailRoute = createRoute({
+  method: "get", path: "/{id}/thumb", tags: ["Files"], summary: "A private derived preview, revalidated through file access",
+  middleware: [requireAuth] as const,
+  request: { params: idParamSchema("id", "file-a1b2c3"), query: z.object({ w: z.string().optional() }) },
+  responses: {
+    200: { content: { "image/webp": { schema: z.string() } }, description: "A preview bounded to 320 or 640 pixels." },
+    304: { description: "Preview unchanged after checking access." },
+    400: { content: { "text/plain": { schema: z.string() } }, description: "Use w=320 or w=640." },
+    404: { content: { "text/plain": { schema: z.string() } }, description: "File unavailable or no preview." },
+    ...errorResponses({ 401: "Not signed in" }),
+  },
+});
+filesRoutes.openapi(thumbnailRoute, (c) => {
+  const { w } = c.req.valid("query");
+  if (w !== "320" && w !== "640") return c.text("Use w=320 or w=640.",400);
+  return fileThumbnail(c.get("person"),c.req.valid("param").id,Number(w) as 320 | 640,c.req.header("If-None-Match"));
 });

@@ -6,6 +6,18 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## LIBRARY-REVAMP-05 backend thumbnails (2026-10-18)
+
+`GET /api/files/{id}/thumb?w=320|640` checks `canAccessFile` before reading a cache or returning 304. A hidden file and an absent file both return plain `attachment not found`. A stored video poster or song cover must independently pass the same boundary. Missing previews return plain `no preview`, including videos without a stored poster. This backend slice does not call Stack `media.preview`.
+
+Sharp rotates images, bounds both dimensions, avoids enlargement, strips metadata and writes quality 75 WebP. Decoding is serialized and requests for one cache key share work. Inputs reuse the chat image byte limit and the existing 64 million pixel limit. Access is checked again after decoding. Originals are integrity checked before decoding. Cache files live at `data/thumbs/<source-sha256>-<width>.webp`, are declared as the disposable `previews` data class, have no database records and count toward neither file caps nor backups. Clear previews invalidates work in flight; disk pressure clears previews before raising a storage issue.
+
+`GET /api/storage/previews` reports count (`removed`) and bytes. `DELETE /api/storage/previews` clears previews. Both require owner or admin. The storage summary includes a `previews` area. The Settings UI is outside this backend-only slice.
+
+Verification: API docs regenerated and backend TypeScript passed. The requested test commands stop before tests in `tests/preload.ts`: this sandbox denies TCP binding, so `reserveFreePort` fails. No production or test port isolation was weakened. The full gate also stops at its worktree lock because the sandbox cannot write the main checkout metadata or gate statistics. An opt-in isolated bench is `backend/scripts/bench/library-thumbnails.ts`, which accepts local photo paths and reports cold encoding plus 100 warm reads at each width. The 32 by 32 JPEG fixture produced 424-byte previews and warm p95 below 0.11 ms, a smoke check only. Real-photo acceptance measurements remain pending: the available system photo samples are HEIC and this installed Sharp build cannot decode them. No real-photo performance claim is made.
+
+Changed files: `backend/src/lib/fileThumbnails.ts`, `backend/src/lib/dataClasses.ts`, `backend/src/lib/storage.ts`, `backend/src/routes/files.ts`, `backend/src/routes/storage.ts`, `backend/tests/fileThumbnails.test.ts`, `backend/tests/dataClasses.test.ts`, `backend/scripts/bench/library-thumbnails.ts`, `docs/api/openapi.json`, `docs/BACKLOG.md`, `docs/dev.md` and `CHANGELOG.md`.
+
 ## SETTINGS-S2
 
 Settings > Me now has Profile, Appearance, Voice and AI, Notifications, Privacy and data, and an admin-only Limits section. Desktop uses a vertical section list and phones use a select. The URL keeps `?tab=` and now reads and updates `?section=`. Status is inside Privacy and data with the existing Storage and Privacy destinations.

@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- Added private Library thumbnails with access-checked revalidation, a disposable WebP cache, stored video posters and song covers, and admin preview usage and clearing endpoints.
+
 - Added the backend Library listing and summary with cursor paging, filters, derived names, generation thumbnails, folded versions, sharing summaries, and audience checks. Storage and Library now classify PDFs and office files as documents.
 
 ## [0.2.23] - 2026-10-18

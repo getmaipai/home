@@ -1,3 +1,4 @@
+import { clearPreviews, previewStats } from "@/lib/fileThumbnails";
 // Step 9: storage, quotas, uninstall, factory reset, diagnostics (plan
 // 4.15). "A Storage page (E)" reads most of what's here; none of it has
 // a UI yet.
@@ -296,3 +297,13 @@ const diagnosticsRoute = createRoute({
   },
 });
 storageRoutes.openapi(diagnosticsRoute, (c) => c.json(generateDiagnostics(), 200));
+
+const previewsSchema = z.object({ removed: z.number(), bytes: z.number() });
+for (const method of ["get", "delete"] as const) {
+  const route = createRoute({
+    method, path: "/previews", tags: ["Storage"], summary: method === "get" ? "Previews disk usage" : "Clear previews",
+    middleware: [requireRole("owner", "admin")] as const,
+    responses: { 200: { content: { "application/json": { schema: previewsSchema } }, description: "Preview count and bytes." }, ...errorResponses({ 403: "Not owner/admin" }) },
+  });
+  storageRoutes.openapi(route, (c) => c.json(method === "get" ? previewStats() : clearPreviews(),200));
+}

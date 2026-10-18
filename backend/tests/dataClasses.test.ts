@@ -23,6 +23,7 @@ const EXPECTED_IDS = [
   "block-lists",
   "logs",
   "cache",
+  "previews",
   "favicons",
   "answer-images",
   "runtime",
@@ -71,7 +72,7 @@ describe("Home's class list", () => {
       ].sort(),
     );
     expect(level("expert")).toEqual(
-      ["cache", "favicons", "answer-images", "runtime", "labels"].sort(),
+      ["previews", "cache", "favicons", "answer-images", "runtime", "labels"].sort(),
     );
     expect(level("advanced")).toEqual(
       [
