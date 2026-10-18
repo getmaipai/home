@@ -1,3 +1,4 @@
+import { libraryRoutes } from "@/routes/library";
 import { musicRoutes } from "@/routes/music";
 import { serveStatic } from "hono/bun";
 import { apiReference } from "@scalar/hono-api-reference";
@@ -267,6 +268,7 @@ app.route("/api/store", storeRoutes);
 app.route("/api/storage", storageRoutes);
 app.route("/api/library/retention", libraryRetentionRoutes);
 app.route("/api/files", filesRoutes);
+app.route("/api/library", libraryRoutes);
 app.route("/api/attachments", attachmentsRoutes);
 app.route("/api/image-edit", imageEditRoutes);
 app.route("/api/pictures/admin", picturesAdminRoutes);

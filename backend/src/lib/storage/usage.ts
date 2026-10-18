@@ -1,3 +1,4 @@
+import { DOCUMENT_MEDIA_TYPES, isDocumentMediaType } from "@/lib/documentMediaTypes";
 // STORE-CAP-01 (docs/plans/household-storage-2026-09-23.md, "the two caps,
 // declared once" and "usage, computed from the records"). Two enforced
 // caps at the record API: a person's own cap (storage.person.cap_bytes,
@@ -31,25 +32,12 @@ import type { PersonRow } from "@/types";
 import type { PersonStorageRow, StorageUsageOverview } from "@/wire";
 export type { PersonStorageRow, StorageUsageOverview } from "@/wire";
 
-// STORE-SPEC-01: `kind` is a required field on the spec's `file` shape
-// (image/video/audio/document/story/other) the `attachments` table never
-// stores directly - it's derived from `media_type` at read time, here
-// rather than in lib/attachments.ts (this module already imports from
-// that one the other way - checkStorageCap - so this is the one place
-// both attachments.ts's toRecord() and this module's own personUsageByKind()
-// below can share it without a cycle). This module only ever sees origin
-// "sent" uploads, so it only needs image/video/audio/other; it deliberately
-// does not fold in documentExtraction.ts's own DOCUMENT_MEDIA_TYPES (a PDF
-// or office file currently lands in "other", not "document") since that
-// module already imports FROM lib/attachments.ts (readAttachment) -
-// reaching back for its list would be circular, and a second copy here
-// would drift. Flagged as a real, pre-existing gap, not silently guessed
-// past: "document" and "story" never appear in a per-kind breakdown today
-// because nothing in this codebase writes an attachment with either kind.
+// Shared media classification for File records, Library and Storage.
 export function kindForMediaType(mediaType: string): FileRecord["kind"] {
   if (mediaType.startsWith("image/")) return "image";
   if (mediaType.startsWith("video/")) return "video";
   if (mediaType.startsWith("audio/")) return "audio";
+  if (isDocumentMediaType(mediaType) || mediaType.startsWith("text/")) return "document";
   return "other";
 }
 
@@ -240,4 +228,9 @@ export function reconcileFileStore(): void {
     title: "Storage records and files on disk don't match",
     detail: `${parts.join(", ")}. Nothing was deleted; this needs a person to look.`,
   });
+}
+
+/** SQL classification from the same document inventory as the record reader. */
+export function mediaKindSql(column: string): string {
+  return `(CASE WHEN ${column} LIKE 'image/%' THEN 'image' WHEN ${column} LIKE 'video/%' THEN 'video' WHEN ${column} LIKE 'audio/%' THEN 'audio' WHEN ${column} LIKE 'text/%' OR ${column} IN (${[...DOCUMENT_MEDIA_TYPES].map(value => `'${value}'`).join(",")}) THEN 'document' ELSE 'file' END)`;
 }

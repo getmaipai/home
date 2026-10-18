@@ -40845,6 +40845,386 @@
         }
       }
     },
+    "/api/library": {
+      "get": {
+        "tags": [
+          "Library"
+        ],
+        "summary": "Visible Library items, paged and filtered",
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60,
+              "default": 60
+            },
+            "required": false,
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": false,
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image",
+                "video",
+                "audio",
+                "document",
+                "story",
+                "file"
+              ]
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "owner",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "with-me",
+                "by-me"
+              ]
+            },
+            "required": false,
+            "name": "shared",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "newest",
+                "oldest",
+                "name",
+                "size"
+              ],
+              "default": "newest"
+            },
+            "required": false,
+            "name": "sort",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page. The next cursor keeps the same filters and sort.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "image",
+                              "video",
+                              "audio",
+                              "document",
+                              "story",
+                              "file"
+                            ]
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "media_type": {
+                            "type": "string"
+                          },
+                          "size_bytes": {
+                            "type": "number"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "owner": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "string"
+                              },
+                              "display_name": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "display_name"
+                            ]
+                          },
+                          "shared_with": {
+                            "type": "object",
+                            "properties": {
+                              "count": {
+                                "type": "number"
+                              },
+                              "household": {
+                                "type": "boolean"
+                              }
+                            },
+                            "required": [
+                              "count",
+                              "household"
+                            ]
+                          },
+                          "retention": {
+                            "type": "string"
+                          },
+                          "audience": {
+                            "type": "string",
+                            "nullable": true,
+                            "enum": [
+                              "all-ages",
+                              "adult-only",
+                              null
+                            ]
+                          },
+                          "duration_seconds": {
+                            "type": "number",
+                            "nullable": true
+                          },
+                          "thumb_url": {
+                            "type": "string",
+                            "description": "Placeholder for LIBRARY-REVAMP-05; thumbnail serving is not built yet."
+                          },
+                          "expires_at": {
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "version_count": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "kind",
+                          "name",
+                          "media_type",
+                          "size_bytes",
+                          "created_at",
+                          "owner",
+                          "shared_with",
+                          "retention",
+                          "audience",
+                          "duration_seconds",
+                          "thumb_url",
+                          "expires_at",
+                          "version_count"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "type": "string",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid page address. Open the Library again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/library/summary": {
+      "get": {
+        "tags": [
+          "Library"
+        ],
+        "summary": "Visible Library counts and stored bytes by kind",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "image",
+                "video",
+                "audio",
+                "document",
+                "story",
+                "file"
+              ]
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": false,
+            "name": "owner",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "with-me",
+                "by-me"
+              ]
+            },
+            "required": false,
+            "name": "shared",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 1000
+            },
+            "required": false,
+            "name": "search",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Item counts fold companions and versions. Bytes include all visible stored references, matching Storage. Trash and expiring remain zero until their providers exist.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "items": {
+                      "type": "number"
+                    },
+                    "bytes": {
+                      "type": "number"
+                    },
+                    "per_kind": {
+                      "type": "object",
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "items": {
+                            "type": "number"
+                          },
+                          "bytes": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "items",
+                          "bytes"
+                        ]
+                      }
+                    },
+                    "trash": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "number"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "bytes"
+                      ]
+                    },
+                    "expiring": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "number"
+                        },
+                        "bytes": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "bytes"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "items",
+                    "bytes",
+                    "per_kind",
+                    "trash",
+                    "expiring"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/attachments/upload": {
       "post": {
         "tags": [

@@ -1,3 +1,4 @@
+import { isDocumentMediaType } from "@/lib/documentMediaTypes";
 // ATT-01b: bounded local document extraction. Apache Tika is the one
 // parser surface for PDF and office input; RapidOCR is the separate local
 // path for scanned images. Neither path accepts a URL or makes a network
@@ -19,19 +20,6 @@ export const LOCAL_PARSER_TIMEOUT_MS = 15_000;
 const TIKA_JAR_ENV = "MAIPAI_TIKA_JAR";
 const TIKA_SHA256_ENV = "MAIPAI_TIKA_SHA256";
 const RAPIDOCR_COMMAND_ENV = "MAIPAI_RAPIDOCR_COMMAND";
-
-const DOCUMENT_MEDIA_TYPES = new Set([
-  "application/pdf",
-  "application/msword",
-  "application/vnd.ms-excel",
-  "application/vnd.ms-powerpoint",
-  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-  "application/vnd.oasis.opendocument.text",
-  "application/vnd.oasis.opendocument.spreadsheet",
-  "application/vnd.oasis.opendocument.presentation",
-]);
 
 export interface DocumentPage {
   page: number;
@@ -68,7 +56,7 @@ function normalizeMediaType(mediaType: string): string | null {
 }
 
 function isSupportedDocument(mediaType: string): boolean {
-  return DOCUMENT_MEDIA_TYPES.has(mediaType);
+  return isDocumentMediaType(mediaType);
 }
 
 async function readLimited(stream: ReadableStream<Uint8Array>, maxBytes: number): Promise<Uint8Array> {
