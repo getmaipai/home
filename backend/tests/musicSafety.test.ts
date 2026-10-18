@@ -97,3 +97,25 @@ describe("the absolute lines before a job exists", () => {
     expect(result.status).toBe("failed"); expect(result.failureKind).toBe("unavailable"); expect(fake.submitted).toHaveLength(0);
   });
 });
+
+describe("free-text fields the music model reads (safety review finding 1)", () => {
+  test("key and language carry no free text past the minor line", async () => {
+    const state = musicState(people.owner, true);
+    for (const extra of [{ key: "nude girl age 9" }, { language: "naked child" }]) {
+      const out = await runGenerateMusic({ state, args: { description: "a folk song", ...extra }, callId: "k", spoken: false });
+      expect(out.status === "failed" || JSON.stringify(out.result).includes("minor_sexual")).toBe(true);
+    }
+    expect(fake.submitted).toHaveLength(0);
+  });
+  test("an ordinary key and language still reach the Stack", async () => {
+    const state = musicState(people.owner, true);
+    const out = await runGenerateMusic({ state, args: { description: "a folk song", key: "F# minor", language: "en" }, callId: "k2", spoken: false });
+    expect(out.status).toBe("succeeded");
+    expect(fake.submitted.at(-1)).toMatchObject({ key: "F# minor", language: "en" });
+  });
+  test("an adult role with a minor's birthdate is refused", () => {
+    const fifteen = new Date(); fifteen.setFullYear(fifteen.getFullYear() - 15);
+    const actor = { ...people.owner, role: "adult" as const, birthdate: fifteen.toISOString().slice(0, 10) };
+    expect(musicDenial(audience(actor, { band: "adult" }))).toBe("minor");
+  });
+});

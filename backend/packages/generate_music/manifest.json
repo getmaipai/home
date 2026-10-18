@@ -54,8 +54,9 @@
       "key": {
         "type": "string",
         "grounded": false,
-        "description": "Optional musical key.",
-        "maxLength": 40
+        "description": "Optional. A key such as C major or F# minor.",
+        "maxLength": 20,
+        "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$"
       },
       "imitates_real_voice": {
         "type": "boolean",
@@ -77,8 +78,9 @@
       "language": {
         "type": "string",
         "grounded": false,
-        "description": "Language of the lyrics.",
-        "maxLength": 80
+        "description": "Optional. A language code for the singing, such as en or es.",
+        "maxLength": 20,
+        "pattern": "^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$"
       },
       "title": {
         "type": "string",

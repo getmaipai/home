@@ -55,8 +55,9 @@
       "key": {
         "type": "string",
         "grounded": false,
-        "description": "Optional musical key.",
-        "maxLength": 40
+        "description": "Optional. A key such as C major or F# minor.",
+        "maxLength": 20,
+        "pattern": "^[A-G][#b]?\\s?(major|minor|maj|min|m)?$"
       },
       "imitates_real_voice": {
         "type": "boolean",

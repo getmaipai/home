@@ -18,10 +18,10 @@ export function musicAudienceOf(state: Pick<TurnState, "actor" | "surface" | "sp
 }
 const common = {
   description: z.string().trim().min(3).max(1200).optional(), lyrics: z.string().max(4000).optional(),
-  bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(40).optional(),
+  bpm: z.number().finite().min(20).max(300).optional(), key: z.string().max(20).regex(/^[A-G][#b]?\s?(major|minor|maj|min|m)?$/i).optional(),
   imitates_real_voice: z.boolean().optional(),
 };
-export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(80).optional(), title: z.string().max(200).optional() });
+export const generateMusicArgs = z.object({ ...common, description: common.description.unwrap(), instrumental: z.boolean().optional(), seconds: z.number().finite().min(10).optional(), language: z.string().max(20).regex(/^([a-z]{2,3}(-[A-Za-z]{2,4})?|unknown)$/).optional(), title: z.string().max(200).optional() });
 export const editMusicArgs = z.object({
   ...common, track: z.string().min(1).max(80), change: z.enum(["remake", "restyle", "instrumental", "rewrite_section", "extend", "variation", "trim", "fade", "loudness"]),
   section: z.string().max(80).optional(), from_s: z.number().finite().min(0).optional(), to_s: z.number().finite().positive().optional(),
@@ -31,7 +31,7 @@ export const editMusicArgs = z.object({
 export function musicRefusalFor(audience: MusicAudience, args: Record<string, unknown>) {
   const denied = musicDenial(audience);
   if (denied) return { kind: "denied" as const, why: denied, line: MUSIC_DENIAL_LINE[denied] };
-  const text = [args.description, args.lyrics, args.title].filter((s) => typeof s === "string").join(" ");
+  const text = [args.description, args.lyrics, args.title, args.key, args.language].filter((s) => typeof s === "string").join(" ");
   const refusal = refuseMusicPrompt(text, { imitatesRealVoice: args.imitates_real_voice === true });
   return refusal ? { kind: "prompt" as const, why: refusal, line: MUSIC_REFUSAL_LINE[refusal] } : null;
 }
@@ -145,7 +145,7 @@ async function runMusic(input: MusicToolInput, editing: boolean): Promise<ToolEx
   // A request stored before the Stack named a default (or an edit of an older song) takes the Stack's default now.
   request.quality ??= defaultQualityOf(engine!); body.quality = request.quality;
   // Check the effective request, including inherited words and a section replacement, before any job exists.
-  const inherited = refuseMusicPrompt([request.description, request.lyrics, request.title].join(" "), { imitatesRealVoice: args.imitates_real_voice === true });
+  const inherited = refuseMusicPrompt([request.description, request.lyrics, request.title, request.key, request.language].join(" "), { imitatesRealVoice: args.imitates_real_voice === true });
   if (inherited) return refused(MUSIC_REFUSAL_LINE[inherited], inherited);
   if ((request.lyrics?.length ?? 0) > 4000) return failed("bad_arguments", "bad_arguments");
   if (request.seconds > engine!.limits.max_seconds || (body.task === "text2music" && request.seconds < Math.max(10, engine!.limits.min_seconds))) return failed("too_long_or_short", "bad_arguments");
