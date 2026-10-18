@@ -466,12 +466,12 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
 <article class="how" id="how" hidden>
   <div class="wrap">
     <h1>Coding with Home's own AI</h1>
-    <p class="lede">Home can help the adults in the house write code. The AI runs on the home's own computer, so the code never goes to a cloud company.</p>
+    <p class="lede">Home can help people in the house write code: adults by default, and a teen or a child when an admin allows it. The AI runs on the home's own computer, so the code never goes to a cloud company.</p>
 
     <h2>The short version</h2>
     <ul>
       <li>An admin turns <b>Coding</b> on in Home settings. It is off until then.</li>
-      <li>Adults can use it. Guests never can. Kids and teens cannot in this version.</li>
+      <li>Adults can use it by default. A teen or a child can use it only when an admin grants it to them, with every protection still on. Guests never can.</li>
       <li>There are two ways to code: your own coding tool on your laptop, with a <b>personal key</b>, or the <b>Code app</b> in the browser.</li>
       <li>Family chat always comes first. Coding waits or slows down, never chat.</li>
       <li>Nothing goes on the internet unless you allow a site for a session.</li>
@@ -479,7 +479,7 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
 
     <h2>Three screens</h2>
     <div class="cards">
-      <div class="hc"><h3>Coding settings</h3><p>For admins. Turn coding on, pick who can use it, set how many sessions run at once, and stop everything with one button.</p><button class="see" data-goto="admin">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
+      <div class="hc"><h3>Coding settings</h3><p>For admins. Turn coding on, keep "Adults by default" or pick people, grant it to a teen or a child, set how many sessions run at once, and stop everything with one button.</p><button class="see" data-goto="admin">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
       <div class="hc"><h3>Your keys</h3><p>Make a key for your coding tool. You see the key once. Copy the setup lines for Claude Code, Codex and others.</p><button class="see" data-goto="keys">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
       <div class="hc"><h3>The Code app</h3><p>Pick a project, describe the change, and watch it work. See every command, every changed line, and approve the plan first.</p><button class="see" data-goto="session">See it <svg class="i sm"><use href="#i-right"/></svg></button></div>
     </div>
@@ -496,10 +496,20 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
     <h2>What it is good at</h2>
     <p>Clear, small jobs: fix this test, add this field, write tests for this file. It is slower than the big cloud models and it does not make design choices well. Give it exact steps and check its work.</p>
 
-    <h2>Still to decide</h2>
-    <div class="decide"><b>A. A second AI model for coding</b><span>It loads only while someone is coding and frees its memory after 15 quiet minutes (the plan), or coding shares the chat model and slows family chat down.</span></div>
-    <div class="decide"><b>B. Teens</b><span>Adults only now, with a "learn to code" version for teens later (the plan), or never.</span></div>
-    <div class="decide"><b>C. Away from home</b><span>Keys work away from home only through the home's own Tailscale, and only if an admin turns it on (the plan), or only at home.</span></div>
+    <h2>Teens and kids</h2>
+    <ul>
+      <li>An admin grants coding to one teen or child at a time. Every admin sees the grant and what it allows.</li>
+      <li>Their protections stay on: every answer is checked, they never see the AI's thinking, no family files, no internet unless the grant names a site, smaller limits, and no personal keys unless the grant allows them.</li>
+      <li>Their sessions stay private, like their chats. They can show a grown-up a session themselves.</li>
+    </ul>
+
+    <h2>Decided by Jesse, October 17</h2>
+    <div class="decide"><b>A. A second AI model for coding</b><span>It loads only while someone is coding and frees its memory after about 15 quiet minutes. The chat model stays loaded.</span></div>
+    <div class="decide"><b>B. Who</b><span>Anyone an admin allows, adults by default. Teens and kids only with an admin's grant.</span></div>
+    <div class="decide"><b>C. Away from home</b><span>Keys work away from home only through the home's own Tailscale, and only if an admin turns it on.</span></div>
+
+    <h2>Still open</h2>
+    <div class="decide"><b>D. A young person's coding log</b><span>Today nobody, admins included, sees another person's activity. Letting a grown-up read a teen's or a child's coding log needs Jesse to change that rule first.</span></div>
     <p style="color:var(--muted-foreground);font-size:14px;margin-top:28px">Design only. People, projects and addresses in the mockup are made up. Full design: docs/design/local-coding-2026-10-17.md.</p>
   </div>
 </article>
@@ -512,7 +522,7 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
   const esc = (t) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
   // ---------- placeholder data (people from the org persona roster; made-up repositories) ----------
-  const ADULTS = [["Nadia", "N", "var(--hue-teal)", "Admin"], ["Marlow", "M", "var(--hue-orange)", "Adult"], ["Iris", "I", "var(--hue-pink)", "Adult"], ["Atlas", "A", "var(--primary)", "Adult"]];
+  const PEOPLE = [["Nadia", "N", "var(--hue-teal)", "Admin", "adult"], ["Marlow", "M", "var(--hue-orange)", "Adult", "adult"], ["Iris", "I", "var(--hue-pink)", "Adult", "adult"], ["Atlas", "A", "var(--primary)", "Adult", "adult"], ["Pippa", "P", "var(--hue-green)", "Teen", "minor"], ["Sprout", "S", "var(--hue-orange)", "Child", "minor"]];
   const SESSIONS = [
     { id: "s1", t: "Add a due date to tasks", repo: "rivet/garage-planner", br: "maipai/due-date-qx4k", st: "you", stl: "Needs you", add: 64, del: 9, when: "Now" },
     { id: "s2", t: "Fix the flaky date test", repo: "rivet/garage-planner", br: "maipai/flaky-date-test-b7mr", st: "run", stl: "Working", add: 6, del: 4, when: "2 min" },
@@ -537,11 +547,11 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
   const PLAN = ["Add an optional dueDate field to the Task type", "Add a date input to the task form and save it", "Add a migration for the due_date column", "Show a small Overdue badge in the task list", "Write tests for isOverdue and the form, then run the test suite"];
 
   // ---------- state ----------
-  const S = { screen: "session", size: "fit", paused: false, coding: true, api: true, web: true, away: false, who: "all", picks: { Nadia: true, Marlow: true, Iris: false, Atlas: true },
+  const S = { screen: "session", size: "fit", paused: false, coding: true, api: true, web: true, away: false, adultsDefault: true, off: { Iris: true }, picks: { Nadia: true, Marlow: true, Atlas: true }, grants: { Pippa: { by: "Nadia", on: "Oct 17", keys: false, hosts: [] } }, grantFor: null, gKeys: false, gNpm: false,
     maxS: 2, perP: 2, rpm: 60, net: "none", hosts: { npm: true, PyPI: false, "crates.io": false, "Go proxy": false, RubyGems: false },
     tab: "chat", ptab: "changes", file: "src/tasks/task.ts", sid: "s1", mode: "ask", approved: false, planDone: false, stopped: false, queue: ["Also show the date on the phone layout"], snip: "claude", keys: 2, newKey: null, pr: false, openTools: { t2: true } };
   const SCREENS = [
-    ["admin", "Admin: Coding settings", "Home settings, <b>Coding</b>. An admin turns coding on, picks who may use it, shares the computer fairly, and can <b>Stop all coding now</b>. Admins see counts only, never whose session."],
+    ["admin", "Admin: Coding settings", "Home settings, <b>Coding</b>. An admin turns coding on, keeps <b>Adults by default</b> or picks people, grants it to a teen or a child (<b>tap Sprout's switch</b>), shares the computer fairly, and can <b>Stop all coding now</b>. Admins see counts only, never whose session."],
     ["keys", "Your keys", "Settings, <b>Coding</b>, for one person. Their keys, what each can do, when it expires and where it was last used (only they see that). <b>Tap Create a key.</b>"],
     ["newkey", "New key: copy once", "The key is shown <b>once</b>. Copy it, then copy the setup lines for your tool. Try the <b>Codex CLI</b> tab."],
     ["sessions", "Code: sessions", "The Code app, like Claude Code on the web. Your sessions with their state and changes, and a box to start a new one with a project, a branch, an environment and a mode."],
@@ -585,11 +595,14 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
         <div class="row"><div class="txt"><b>Stop all coding now</b><span>Stops every session and refuses every key until you resume. Work is kept.</span></div><button class="btn ${S.paused ? "outline" : "danger"} sm" data-kill ${d ? "disabled" : ""}>${S.paused ? "Resume coding" : "Stop all"}</button></div>
       </div>
       <div class="card"><div class="ch">${ic("users")}Who can code</div>
-        <div class="radios" role="radiogroup" aria-label="Who can code">
-          ${[["all", "Every adult", "Everyone on Adult controls."], ["admins", "Only admins", ""], ["chosen", "Only people I choose", ""]].map(([k, b, s]) => `<button class="radio" role="radio" aria-checked="${S.who === k}" data-who="${k}" ${d ? "disabled" : ""}><span class="rd"></span><span><b>${b}</b>${s ? `<span>${s}</span>` : ""}</span></button>`).join("")}
-        </div>
-        ${S.who === "chosen" ? `<div class="people">${ADULTS.map(([n, l, c, r]) => `<div class="p"><span class="avatar" style="background:${c}">${l}</span><b>${n} <span class="muted small">${r}</span></b>${sw(S.picks[n], `data-pick="${n}"`)}</div>`).join("")}</div>` : ""}
-        <div class="note">${ic("info")}<span>Coding is for adults. A version for teens is planned. Guests can never use it.</span></div>
+        ${row("Adults by default", S.adultsDefault ? "Everyone on Adult controls can code unless you turn them off below." : "Only the people you turn on below can code.", sw(S.adultsDefault && on, 'data-set="adultsDefault"', d), d)}
+        <div class="people">${PEOPLE.map(([n, l, c, r, band]) => {
+          const g = S.grants[n];
+          const allowed = band === "adult" ? (S.adultsDefault ? !S.off[n] : !!S.picks[n]) : !!g;
+          const sub = band === "adult" ? (S.adultsDefault ? (S.off[n] ? "Turned off by an admin" : "By default") : (S.picks[n] ? "Turned on by an admin" : "Off")) : g ? `Granted by ${g.by} on ${g.on}. ${g.keys ? "Code app and keys" : "Code app only"}, ${g.hosts.length ? g.hosts.join(", ") : "no internet"}.` : "Needs your grant. Their protections stay on.";
+          return `<div class="p"><span class="avatar" style="background:${c}">${l}</span><b>${n} <span class="muted small">${r}</span><span class="muted small" style="display:block;font-weight:400">${sub}</span></b>${sw(allowed && on, `data-person="${n}" data-band="${band}"`, d)}</div>`;
+        }).join("")}</div>
+        <div class="note">${ic("shield")}<span>A teen or a child codes only with your grant, and every admin can see it. Their answers are still checked, they never see the AI's thinking, they get no family files and no internet you did not name. Their sessions stay private, like their chats. Guests can never code.</span></div>
       </div>
       <div class="card"><div class="ch">${ic("cpu")}Sharing the computer</div>
         <div class="subtle" style="padding-top:2px">Chat always comes first. Coding waits or slows down, never chat. While busy, coding uses about 40 GB; one picture, video or music job can still run beside it.</div>
@@ -612,6 +625,15 @@ body[data-size="fit"] .frame { border-radius: 0; border-left: 0; border-right: 0
     </div></div></div>`;
   };
 
+  const grantDialog = () => {
+    const n = S.grantFor, kid = PEOPLE.find((x) => x[0] === n)[3] === "Child";
+    return `<div class="dlg" role="dialog" aria-modal="true" aria-labelledby="gh"><h2 id="gh">Let ${n} code?</h2><p>${n} is on ${kid ? "Child" : "Teen"} controls. They can use the Code app with these protections on. Every admin will see this grant.</p>
+      <p class="small"><b>What stays on</b></p>
+      <ul class="small" style="margin:0 0 12px;padding-left:18px;color:var(--muted-foreground)"><li>${kid ? "Every sentence is checked before they see it." : "Every answer is checked, the way your teen setting says."}</li><li>They never see the AI's thinking.</li><li>No family files, chats or photos. Only their own projects.</li><li>One session at a time, a smaller computer, a daily limit.</li><li>Their sessions are private, like their chats. They can show you one themselves.</li></ul>
+      ${row("Personal keys for coding tools", "A key reaches tools on their own computer that Home cannot see or control. Home still checks every answer.", sw(S.gKeys, 'data-gopt="gKeys"'))}
+      ${row("Package downloads from npm", S.hosts.npm ? "From your household list. Off means no internet." : "Add npm to the household list first.", sw(S.gNpm && S.hosts.npm, 'data-gopt="gNpm"', !S.hosts.npm), !S.hosts.npm)}
+      <div class="acts"><button class="btn outline" data-closedlg>Cancel</button><button class="btn accent" data-grantyes>Grant coding</button></div></div>`;
+  };
   const keyRow = (n, scope, made, exp, used, hint, extra = "") => `<div class="row"><span class="kicon">${ic(scope === "Coding" ? "code" : "chat")}</span><div class="txt"><b>${n} ${extra}</b><div class="kmeta"><span class="badge info">${scope}</span><span>Key ends&nbsp;<span class="mono">${hint}</span></span><span>Made ${made}</span><span>Expires ${exp}</span><span>Last used ${used}</span></div></div><button class="ibtn" aria-label="Key options" data-toast="Rename or Revoke">${ic("more")}</button></div>`;
   const keysCard = () => `<div class="card klist"><div class="ch">${ic("key")}Your keys<span class="badge">${S.keys} of 10</span></div>
       ${S.newKey ? keyRow("Laptop, Codex CLI", "Coding", "just now", "Jan 15, 2027", "never", "r7Qe", '<span class="badge ok">New</span>') : ""}
@@ -819,8 +841,14 @@ aider --model openai/maipai-coder`, "Continue and Cline use the same address and
     if (d.set) { S[d.set] = !S[d.set]; if (d.set === "coding" && !S.coding) S.paused = false; syncPause(); return render(); }
     if (d.kill !== undefined) { if (S.paused) { S.paused = false; syncPause(); toast("Coding resumed"); return render(); } $("#dlg").innerHTML = `<div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="kk"><h2 id="kk">Stop all coding now?</h2><p>Every running session stops and every key is refused until you resume. Nobody loses work.</p><div class="acts"><button class="btn outline" data-closedlg>Cancel</button><button class="btn danger" data-killyes>Stop all coding</button></div></div>`; $("#dlg").hidden = false; return; }
     if (d.killyes !== undefined) { S.paused = true; syncPause(); closeAll(); toast("Coding is paused for everyone"); return render(); }
-    if (d.who) { S.who = d.who; return render(); }
-    if (d.pick) { S.picks[d.pick] = !S.picks[d.pick]; return render(); }
+    if (d.person) {
+      const n = d.person;
+      if (d.band === "adult") { if (S.adultsDefault) S.off[n] = !S.off[n]; else S.picks[n] = !S.picks[n]; return render(); }
+      if (S.grants[n]) { delete S.grants[n]; toast(`Coding taken back from ${n}. Their work is kept.`); return render(); }
+      S.grantFor = n; S.gKeys = false; S.gNpm = false; $("#dlg").innerHTML = grantDialog(); $("#dlg").hidden = false; return;
+    }
+    if (d.gopt) { S[d.gopt] = !S[d.gopt]; $("#dlg").innerHTML = grantDialog(); return; }
+    if (d.grantyes !== undefined) { S.grants[S.grantFor] = { by: "Nadia", on: "Oct 17", keys: S.gKeys, hosts: S.gNpm ? ["npm"] : [] }; toast(`Coding granted to ${S.grantFor}`); S.grantFor = null; closeAll(); return render(); }
     if (d.net) { S.net = d.net; return render(); }
     if (d.host) { S.hosts[d.host] = !S.hosts[d.host]; return render(); }
     if (d.step) { const lim = { maxS: [1, 4], perP: [1, 4], rpm: [10, 600] }[d.step]; const inc = d.step === "rpm" ? 10 : 1; S[d.step] = Math.max(lim[0], Math.min(lim[1], S[d.step] + (+d.d) * inc)); return render(); }

@@ -96,6 +96,8 @@ estimate or an unverified Apple result.
 
 ### One model for chat, intelligence, and coding
 
+> **Superseded in part 2026-10-17** by [docs/design/local-coding-2026-10-17.md](../design/local-coding-2026-10-17.md) section 4.3 (owner-approved 2026-10-17): coding gets a second model in its own process, loaded only while someone is coding and unloaded after about 15 idle minutes; the chat model stays loaded as the one resident foreground model.
+
 The owner decision is one foreground model. There is no permanent 27B coding
 copy beside an intelligence model. The first-day bench runs each candidate in
 the owner's order: conversation quality, coding on Session C briefs, then

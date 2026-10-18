@@ -6,8 +6,15 @@ this." This note decides the household switch and its limits, personal API keys 
 web Code app and its per-session sandbox, the coding model per hardware tier, the safety model, the records, the screens and the
 slices. Design note only: no code, no spec tag, no setting changed, no GPU bench run. Architect item `CODE-DESIGN-01`.
 
+Jesse answered the open decisions in chat on 2026-10-17 (owner-approved 2026-10-17), and this revision (architect item
+`CODE-DESIGN-02`) records them: (1) **Who**: "for anyone permissioned, adults by default": every adult may code once an admin
+turns Coding on, and any other person (a teen or a child) only through an explicit per-person admin grant that keeps every
+minor protection (section 3.7). (2) **Keys away from home**: only through the household's Tailscale, only when an admin turns
+it on. (3) **The coding model**: a second model, its own process, loaded only while someone is coding and unloaded after about
+15 idle minutes; the chat model stays loaded (section 4.3). Section 12 lists what is still open.
+
 Plain-words summary: [local-coding-overview-2026-10-17.md](local-coding-overview-2026-10-17.md). Clickable mockup (admin
-settings, API keys with a copy-once key and connect snippets, the Code app on a phone and a desktop):
+settings with "Adults by default" and the per-person list, the grant dialog for a teen or a child, API keys with a copy-once key and connect snippets, the Code app on a phone and a desktop):
 [assets/local-coding-2026-10-17/index.html](assets/local-coding-2026-10-17/index.html), screenshots in its `shots/` folder.
 
 Numbers are marked: **measured** (ours, with the record named), **published** (a vendor card or a public benchmark, linked), or
@@ -35,9 +42,11 @@ No backlog row covers a coding product feature, a coding API key, a sandbox or a
 
 ## 2. Purpose and audience
 
-**Who.** Adults the admin allows. Coding is off for the household until an admin turns it on (like every heavy model that
-holds memory). When on, every person on Adult controls may use it by default, or only the people the admin picks. A guest never
-can. A person on Child or Teen controls cannot in this version; a teen variant is a stretch goal (section 9, CODE-TEEN-01).
+**Who.** Anyone an admin permits; adults by default. Coding is off for the household until an admin turns it on (like every
+heavy model that holds memory). When on, every person on Adult controls may use it by default (`coding.adults_by_default`,
+on), and an admin may turn any one adult off, or turn the default off and pick adults one by one. A person on Teen or Child
+controls may code only when an admin grants it to that one person, on a grant every admin can see, with the minor's
+protections of section 3.7 kept in full: age and surface gates outrank everything (rule 0). A guest never can.
 
 **Two doors, one engine.**
 
@@ -68,10 +77,15 @@ A new section in the `home` settings area, drawn by `SettingsShell` (rule S4), `
   memory for coding. It needs 64 GB." (the `unsupported` package state of the packages note, 4.1).
   Two child switches: `coding.web.enabled` ("The Code app", on) and `coding.api.enabled` ("Coding tools on people's own
   computers, with API keys", on).
-- **Card "Who can code"** (group `household.coding_people`): `coding.who`: Every adult (default), Only admins, Only people I
-  choose. "Only people I choose" lists the household's adults with a switch each; each switch writes or removes the grant
-  `use:code` (the existing grant mechanism). Teens and children are not listed; a line reads "Coding is for adults. A version
-  for teens is planned." Guests are never listed.
+- **Card "Who can code"** (group `household.coding_people`): the switch `coding.adults_by_default` ("Adults by default",
+  on: "Everyone on Adult controls can code unless you turn them off below"). Under it, the household's people, adults first,
+  then teens and children, each with a switch. A person's switch is the one grant `use:code` (the existing grant mechanism,
+  `lib/grants.ts`): for an adult the switch shows the default and turning it off writes a `deny` grant (turning it back on
+  removes it); with the default off, turning an adult on writes an `allow` grant. A teen's or a child's switch is off until an
+  admin grants it, and turning it on opens the minor grant dialog of section 3.7 (kit `Dialog`), never a bare toggle. Each
+  minor's row carries the guardian line "Needs your grant. Their protections stay on." and, once granted, "Granted by Nadia on
+  Oct 17" with what the grant allows. Guests are never listed. There is no "Only admins" choice: an admin turns the default
+  off and turns themselves on.
 - **Card "Sharing the computer"** (group `household.coding_limits`, level advanced): `coding.max_sessions` (Code app sessions
   running at once: p128 default 2, range 1 to 4; p64 default 1, range 1 to 2), `coding.max_streams_per_person` (2),
   `coding.requests_per_minute_per_key` (60), `coding.daily_tokens_per_person` (0 means no cap), `coding.keep_warm_minutes`
@@ -84,7 +98,8 @@ A new section in the `home` settings area, drawn by `SettingsShell` (rule S4), `
   npm, PyPI, crates.io, the Go module proxy, RubyGems, each off until the admin ticks it), `coding.network.people_may_approve`
   (on). A host outside the list needs an admin to add it.
 - **Card "Away from home"** (inside the Coding card, shown only when away access is set up): `coding.api.away` ("API keys work
-  away from home, through your Tailscale", off).
+  away from home, through your Tailscale", off). Decided by Jesse, 2026-10-17: the household's Tailscale is the only way a key
+  works away from home, and only after an admin turns this on; there is no public address and no other tunnel.
 - **Stop all coding now**: one destructive button (kit `AlertDialog` confirm) that sets `coding.paused`: every sandbox is
   stopped (work kept), every API call answers 503 with "Coding is paused by an admin. Try again later.", the Code app shows the
   paused line (S6, section 3.5). Resume clears it. Turning `coding.enabled` off does the same and also hides the app.
@@ -94,12 +109,15 @@ A new section in the `home` settings area, drawn by `SettingsShell` (rule S4), `
   git connections without any name, host or repository the person typed (rule 6a): for each, its kind (API key, GitHub,
   Gitea), status, created date, expiry and, for a key, the four-character hint; with "Revoke" per row and "Revoke all". This is
   CREDENTIALS.md's "a status, an expiry, and a one-click revoke in the admin UI". It shows no last-used time or usage, which
-  are the person's activity.
+  are the person's activity. For a teen or a child the same row leads with the coding grant: who granted it, when, and what
+  it allows (section 3.7), with Change and Take back; every admin sees it, which is what makes the grant guardian-visible.
 
 ### 3.2 A person's API keys (Settings, Coding)
 
-A new section in the `account` area, kind `view` (`account.coding_keys`), `min_role: adult`, shown only when coding is on and
-the person may code (`needs: ["coding.allowed_for_me"]`):
+A new section in the `account` area, kind `view` (`account.coding_keys`), `min_role: child` (the grant, not the role, decides), shown only when coding is on and
+the person may code (`needs: ["coding.allowed_for_me"]`). For a teen or a child it opens with a read-only "What your grant
+allows" card (granted by whom and when, the limits of section 3.7) and shows the keys parts below only when their grant allows
+API keys:
 
 - **Your keys**: a kit `Table` of name, what it can do ("Coding"), created, expires, last used ("Today, on the home network" or
   "Yesterday, away from home": a coarse place word, never the address in the list; the address is in the key's detail sheet,
@@ -188,7 +206,8 @@ Push, and, for a person whose own tool already uses a key, the note that the sam
 the terminal" (the agent's attach command) is a later slice, CODE-ATTACH-01, after it is verified.
 
 **Share.** A read-only snapshot shared with one other adult of the household, from the session's own menu (PRIVACY.md: "a person
-may share their own screen"). Never a public link. Later slice CODE-SHARE-01.
+may share their own screen"). Never a public link. A teen or a child may share a snapshot with a household admin the same
+way; it is their own act, never a view an admin opens on them. Later slice CODE-SHARE-01.
 
 ### 3.4 The sandbox, the agent and the session's workspace
 
@@ -229,7 +248,8 @@ person steers through the queue), every git command except local commit denied.
 **Filesystem.** The session's workspace is a folder on the hub (`<data>/coding/<person>/<session>/work`), the only mount, read
 and write. Nothing else from the hub is visible: no people, memory, photos, conversations or household storage. A person may add
 one of their own household storage folders read-only from the New session sheet ("Add a folder from Home"); it is listed in the
-session header and the transcript. Snapshots of the workspace beyond the agent's own checkpoints (before Push, on archive) are
+session header and the transcript. A teen's or a child's session never gets a household folder: "Add a folder from Home" is
+not offered to them, whatever their grant says (section 3.7). Snapshots of the workspace beyond the agent's own checkpoints (before Push, on archive) are
 APFS clones (`clonefile`), instant and space-sharing.
 
 **Network.** Default: none. The sandbox's only routes are (a) the gateway at a host-only address, with a session key scoped
@@ -254,7 +274,9 @@ visible to the agent.
 **Git connections.** In Settings, Coding, "Connect GitHub" or "Connect Gitea" (a fine-grained token for chosen repositories, or
 GitHub's device flow), stored per person as a write-only secret with status, expiry and Revoke, by the person and on the
 admin's "Coding access" row (section 3.1), the calendar precedent of the packages note, 4.7; a hub folder repository is a path under household storage that the person may read. The push target is
-only the session's own `maipai/...` branch: no force-push, no branch delete, no tag push, no push to the base branch.
+only the session's own `maipai/...` branch: no force-push, no branch delete, no tag push, no push to the base branch. A teen or
+a child connects GitHub or Gitea only when their grant allows git hosts (section 3.7); otherwise their projects are Empty or
+their own coding projects folder (`<data>/coding/<person>/projects`), never a path in household storage.
 
 **Resource limits and cleanup.** Per sandbox: 4 CPUs, 4 GB memory, 30 GB disk (settings `coding.sandbox.cpus`,
 `coding.sandbox.memory_gb`). A sandbox stops after 15 idle minutes and its VM is discarded; the workspace stays, and the next
@@ -289,8 +311,13 @@ session key. The gateway applies the same checks as for a personal key (section 
 | `POST /code/v1/responses` | OpenAI Responses | Codex CLI (its `wire_api = "chat"` was reportedly removed in 2026; unverified) | llama-server native if the pinned build serves it (verified first in CODE-API-02); otherwise Codex is listed as "not yet" |
 | `GET /code/v1/models` | OpenAI list | Pickers in Continue, Cline, OpenCode | Home answers from the Stack's coding record: `maipai-coder` and the real model id, with `context_length` |
 
-Rule 2 holds: templates, tool-call parsing, the reasoning split and token counts come from the engine; the gateway forwards bytes
-and never re-parses a tool call. Model names: the gateway accepts any `model` value and serves the coding role (Claude Code
+Rule 2 holds: templates, tool-call parsing, the reasoning split and token counts come from the engine; the gateway never
+re-wraps a template and never re-parses a tool call. For an adult it forwards the engine's bytes as they come. What the gateway
+does to a request or a stream is limited to: dropping client sampling, adding a system part (the band's topic block for a
+minor, section 3.7), reading the engine's own parsed fields (text, reasoning, tool-call arguments) to run the safety floor on
+them, dropping reasoning parts at the engine client for a minor (as rule 2 itself requires), adding the crisis resources as a
+text part, and, for a child, holding text to sentence boundaries and holding each tool call whole until its arguments pass the
+check (a JSON delta has no sentence boundary). Reading the engine's parsed arguments is not re-parsing. Model names: the gateway accepts any `model` value and serves the coding role (Claude Code
 sends its own names for background calls); responses carry the household's model id. Sampling fields from the client are
 dropped and the model record's own sampling applies (rule 3's principle: each model runs on its own settings; client defaults
 are tuned for other models); `max_tokens` passes as a ceiling. The context window is the engine's real one (128k on p64 and
@@ -301,15 +328,22 @@ tiers meet.
 on the home network (private ranges) or, with `coding.api.away` on, in the Tailscale ranges; anything else is refused, and a
 request through `home.public_url` or a reverse proxy is refused (no public URL, ever). The key (`Authorization: Bearer` or
 `x-api-key`) resolves to one key and one person. Then: the key is active and not expired, holds the `coding` scope, the
-person is not deleted, the person is on Adult controls **now**, coding is on and not paused, the person may code (`coding.who`
-or the `use:code` grant), the per-key rate and the per-person stream and token caps. A key never widens anything: it carries no
-permission of its own beyond its scope, and a person moved to Teen controls finds their keys suspended (not deleted) until moved
-back. Refusals are plain: 401 "This key is not valid. Make a new one in Settings, Coding.", 403 "Coding is not turned on for
+person is not deleted and not a guest, coding is on and not paused, and the person may code **now**, read from their current
+controls on every request: an adult by `coding.adults_by_default` unless a `deny` grant `use:code` names them, or by an `allow`
+grant when the default is off; a teen or a child only by an `allow` grant `use:code` an admin wrote for them, and for a
+personal key only when that grant allows API keys (`coding.person.api_keys`, section 3.7). Then the per-key rate and the
+per-person stream and token caps, the tighter minor caps for a teen or a child. A key never widens anything: it carries no
+permission of its own beyond its scope. A person whose controls change is re-checked on the next request: an adult moved to
+Teen controls finds their keys suspended (not deleted) unless a minor grant allowing keys exists, and from then on every
+minor protection of section 3.7 applies to them. Refusals are plain: 401 "This key is not valid. Make a new one in Settings, Coding.", 403 "Coding is not turned on for
 you. Ask an admin.", 429 with `retry-after` in seconds.
 
 **Safety floor.** The deterministic input and output floors of SAFETY.md apply to every coding request (the person's text in, the
-model's text out, checked as it streams, as for an adult's written chat, rule 10). They never read code for style, only the
-non-removable categories.
+model's text out). For an adult the output is checked as it streams, as for an adult's written chat (rule 10). For a teen or a
+child the grain, the reasoning rule and the topic block follow section 3.7. The floors never read code for style, only the
+non-removable categories. **Crisis resources, offer, never block, for every person** (SAFETY.md: not configurable off): when
+the floor sees self-harm intent, the Code app shows the crisis overlay beside the session, and on the API, where Home draws
+nothing, the gateway adds the crisis resources (988 and local equivalents) to the answer as a text part. Nothing is blocked.
 
 **TLS for tools.** Away from home the Tailscale address carries a publicly trusted certificate and needs nothing. On the home
 network the hub's household CA must be trusted by the tool: the connect screen offers "Download the home certificate" and adds
@@ -357,6 +391,90 @@ home AI" rather than offering a tunnel. GitHub Copilot's own models are out of s
 coding loop cannot queue a family member's chat turn. Inside coding, the engine holds 2 slots on p128 and 1 on p64; more
 requests wait in the gateway's queue (fair by person), and a full queue answers 429 with `retry-after`.
 
+### 3.7 Coding for a teen or a child, by grant
+
+Jesse, 2026-10-17: "for anyone permissioned, adults by default". A teen or a child is not excluded by design; they code only
+when an admin grants it to that one person. Rule 0 decides everything here: age and surface gates outrank every rule, and
+nothing in this section loosens a protection SAFETY.md calls non-removable. A grant opens a door with the minor's protections
+already on; it never chooses a looser mode.
+
+**The grant.** One `allow` grant `use:code` on the minor, written only by an admin (`use:<package>` is an admin-held grant
+action in `lib/grants.ts`). The mechanism is the existing one for "grants beside roles": coding's role floor is adult, and
+`requireRoleOrGrant` (`middleware/auth.ts`) widens it for exactly the person an admin's `allow` grant names. The grant
+vocabulary's cell stays `none` in every band for `code`, because an `approver` cell of `parent` would ask a parent before every
+request (`lib/gate/decide.ts` returns `ask_parent` for it whatever grant exists), which the API door has no surface for; the
+gate here is the standing grant, not a per-request approval. It is never inherited, never a default, never set by the setup
+wizard and never by the minor; `coding.adults_by_default` never reaches a teen or a child. Turning a minor's switch on opens the grant dialog (kit
+`Dialog`): "Let Pippa code?", the list "What stays on" (the floors below, in plain words), the choices below, and one
+confirmation, "Grant coding", which records `granted_by_person_id`, `acknowledged_at` and `acknowledged_by_person_id` on the
+grant (the admin's one confirmation when loosening, as for a person's controls). Take back removes the grant: running
+sessions stop with their work kept, keys suspend, and the Code app hides.
+
+**Who the guardian is.** A household admin. Person has no parent or guardian link in spec (`lib/notificationTypes.ts` says so),
+so every admin sees, changes and takes back a minor's coding grant, on the "Who can code" card and on the minor's Coding access
+row (section 3.1), and the minor sees what was granted and by whom in their own Settings, Coding.
+
+**What the grant lets an admin choose.** Person-scope settings keys, `layers: ["band", "person"]`, the same pattern as the
+media keys (`settings/mediaKeys.ts`). `coding.person.api_keys`, `coding.person.git_hosts` and `coding.person.network_hosts`
+take `control: {child: guardian, teen: guardian, adult: self}`. The four cap keys (`max_sessions`, `daily_tokens`,
+`sandbox_size`, `message_minutes`) are admin-held for every band (`control: {child: guardian, teen: guardian, adult:
+guardian}`), and the household cap of section 3.1 clamps any person value, so no adult raises their own share. The minor
+never changes any of them; an admin sets them in the grant dialog and later with Change.
+
+| Key | Child default | Teen default | Adult default | What it allows |
+|---|---|---|---|---|
+| `coding.person.api_keys` | false | false | true | Personal API keys. The dialog says: "A key reaches tools on their own computer that Home cannot see or control. Home still checks every answer." |
+| `coding.person.git_hosts` | false, fixed | false | true | Connecting GitHub or Gitea. Off means Empty projects and their own coding projects folder only. Never for a child (SAFETY.md: "A child sees no outbound links"): the dialog does not offer it, and a child's session renders no pull-request or repository link |
+| `coding.person.network_hosts` | empty | empty | the household list | Hosts from the household allowed list (section 3.1) the person may approve for a session. Empty means no internet |
+| `coding.person.max_sessions` | 1 | 1 | the household cap | Code app sessions running at once |
+| `coding.person.daily_tokens` | 100,000 `(?)` | 200,000 `(?)` | the household setting | Starting values; CODE-TEEN-01 sets them from CODE-BENCH-01's numbers |
+| `coding.person.sandbox_size` | small | small | standard | Small is 2 CPUs, 2 GB and 5 GB of storage; standard is section 3.4's 4 CPUs, 4 GB and the per-person storage cap |
+| `coding.person.message_minutes` | 15 | 15 | 30 | The agent's wall-clock budget per message |
+
+**What no grant, setting or admin reaches (the minor floors).** These are architecture, not choices in the dialog:
+
+1. **The output gate's grain follows the person** (SAFETY.md, rule 10). For a child every sentence is checked before it is
+   released, in the Code app and on the API: the gateway holds the model's stream to sentence boundaries before it forwards
+   them. For a teen, the household teen setting picks the child's mode (the default) or the adult's. The check covers the
+   agent's prose and the text of every file write and every command, before the write or the command happens.
+2. **No reasoning for a minor** (SAFETY.md, owner's ruling 2026-09-22). The hub never emits it: the gateway asks the engine for
+   no thinking and drops any reasoning part before forwarding (never a client-side hide); the Code app stores none; the
+   session record says reasoning was withheld and why.
+3. **The band's topic block** (SAFETY.md, sensitive subjects) is part of every model call for a minor, on both doors, rendered
+   from the one spec record and added by the gateway as the first system part. The hard lines are the same as for any minor
+   turn, and the agent answers within the band's content ceiling. The agent's prose to a minor keeps the band's own limits
+   (rule 5: "A child's or teen's chat ... keep their own limits", the band's `max_words` through `replyMaxTokensFor`); file
+   and command content is tool output, bounded only by the `max_tokens` ceiling.
+4. **Crisis resources, offer, never block.** The same offer every person gets (section 3.6, Safety floor); listed here so the
+   minor list is complete.
+5. **The real-danger parent alert.** `safety.flagged_turn` fires from a minor's coding session exactly as from chat: text
+   free, real danger only.
+6. **No household data.** No "Add a folder from Home", no repository folder in household storage, no memory, people,
+   photos or conversations. Only the session's own workspace is mounted.
+7. **No internet beyond the grant.** Only hosts the grant lists, and only hosts already on the household list; the minor
+   cannot approve any other host, and the adult-site host list and the V1 live video list stay locked (rule 0, rule V1).
+8. **No web fetch.** The agent's web fetch tool is off for everyone in this version; when a later slice adds it, fetched text
+   passes the deterministic floor before it reaches a minor's turn (SAFETY.md).
+9. **Keys stay short and tied to the grant.** At most 3 keys, expiry at most 30 days; each suspends at once when the grant
+   is changed to no keys or taken back, or when the person's controls change.
+10. **Re-checked every request.** The gateway reads the person's current controls each time; a minor's grant never turns
+    into an adult's default, and a person moved to Adult controls falls under the adult rules from their next request.
+
+**What a guardian sees, and what they do not.** Every admin sees the grant and its limits, the minor's keys and git
+connections on the Coding access row (kind, status, created, expiry, hint, Revoke), and the text-free real-danger alert. No
+admin sees the minor's sessions, transcripts, commands, repositories, hosts used or usage counts: rule 6a and
+NO-CROSS-USER-VISIBILITY-01 (owner, 2026-10-07: "if a parent wants to read a kid's chats they ask the kid to show them").
+A minor may share a session snapshot with an admin themselves (section 3.3, CODE-SHARE-01). The grant dialog tells the admin
+this, and the minor's "What your grant allows" card says: "Your sessions are yours. A grown-up can see what your grant
+allows, not what you build."
+
+**Not designed in: session logs for the guardian.** Jesse's 2026-10-17 answer also asked for "session logs visible to the
+guardian". Rule 6a ("details reach an admin only through a report the affected person previews and sends") and the owner
+decision NO-CROSS-USER-VISIBILITY-01 forbid an admin view of a person's activity, and only Jesse changes a rule. This note
+does not design it; section 12 lists it as a NEEDS-RULE-CHANGE question. If Jesse changes the rule, the smallest version is
+the minor's `coding-event` trail (commands, files written, hosts, approvals, pushes; never the transcript) readable by an
+admin on the Coding access row, said to the minor in the grant card.
+
 ## 4. Records and settings (spec first)
 
 All additive. Shared shapes land in `commons/spec` with fixtures (roster personas only) and a tag, then Home pins (PINNING.md),
@@ -373,7 +491,7 @@ There is no key record in spec today; the interim token is a hub table. One stor
 | `name` | string, 1 to 60 | "Laptop, Claude Code" |
 | `scopes` | list of `turn`, `coding`, `coding:session` | `turn` is today's voice and Home Assistant door; `coding:session` is only ever minted by Home for one Code app session and expires with it |
 | `created_at`, `expires_at`, `revoked_at` | timestamps | Expiry required: 7, 30, 90 (default) or 365 days |
-| `status` | `active`, `expired`, `revoked`, `suspended` | `suspended` while the person may not code (controls changed, coding off, `coding.who` excludes them) |
+| `status` | `active`, `expired`, `revoked`, `suspended` | `suspended` while the person may not code or may not hold keys (controls changed, coding off, a `deny` grant, a minor's grant taken back or set to no keys) |
 | `last_used_at`, `last_used_from` | timestamp; `home_network` or `away` plus the address | Owner only |
 | `limits` | `{requests_per_minute}` | Defaults from the household setting |
 | `hint` | string | The last four characters, to tell keys apart |
@@ -443,8 +561,11 @@ the existing busy line. Chat, voice, embeddings and the judge are residents and 
 Thinking runs at the model's low effort, set at the server (the org note: the highest effort spent the whole output budget
 thinking); the Stack's catalog record carries sampling from the model card with its source (rule 3).
 
-This changes the 2026-09-17 owner decision "one foreground model ... no permanent 27B coding copy beside an intelligence model"
-only in that a second model loads while coding is in use; it is never permanent. Decision 1 asks Jesse to confirm.
+**Decided by Jesse, 2026-10-17 (owner-approved 2026-10-17, in chat): the coding model loads only when needed.** It is a second
+model in its own process, loaded while someone is coding and unloaded after about 15 idle minutes (`coding.keep_warm_minutes`);
+the chat model stays loaded and never shares its slot with coding. This supersedes the 2026-09-17 owner decision "one
+foreground model ... no permanent 27B coding copy beside an intelligence model" for coding (see Supersedes): a second model
+now loads on demand while coding is in use; it is still never permanent, and chat stays the one resident foreground model.
 
 ### 4.4 Settings keys
 
@@ -458,7 +579,7 @@ noted:
 | `coding.web.enabled` | boolean, true | basic |
 | `coding.api.enabled` | boolean, true | basic |
 | `coding.api.away` | boolean, false | basic |
-| `coding.who` | select `all_adults`, `admins`, `chosen`; `all_adults` | basic |
+| `coding.adults_by_default` | boolean, true (every adult may code unless a `deny` grant names them; never reaches a teen or a child) | basic |
 | `coding.model` | select `fast`, `careful`; `fast` (p128 only; `honoured_by: ["stack"]` too) | advanced |
 | `coding.max_sessions` | number, tier default (p128 2, p64 1) | advanced |
 | `coding.max_streams_per_person` | number, 2 | advanced |
@@ -474,9 +595,10 @@ noted:
 
 Person scope: `coding.default_mode` (`plan`, `ask`, `auto_edit`; `ask`). Areas: `home` gains section `coding` (kind `keys`,
 `min_role: admin`, cards `household.coding`, `household.coding_people`, `household.coding_limits`, `household.coding_network`);
-`account` gains section `coding` (kind `view`, view `account.coding_keys`, `min_role: adult`, `needs:
-["coding.allowed_for_me"]`). The grant vocabulary's `use:<package>` gains a `by_parameter` cell for `code`: child `never`, teen
-`never` until CODE-TEEN-01, adult `none`. Three notification types: `coding.session_done` (passive, person),
+`account` gains section `coding` (kind `view`, view `account.coding_keys`, `min_role: child`, `needs:
+["coding.allowed_for_me"]`: the grant decides, not the role). The grant vocabulary is unchanged: `use:code` keeps the `none` cell in
+every band, and a teen's or a child's access is the admin-written `allow` grant over coding's adult role floor (section 3.7). Person scope also gains the seven guardian-held
+`coding.person.*` keys of section 3.7, with their band defaults. Three notification types: `coding.session_done` (passive, person),
 `coding.needs_you` (time sensitive, person) and `coding.workspace_expiring` (passive, person). One data class `coding` (holds workspaces, transcripts, environments; sensitive
 `personal`; backup: records and transcripts yes, workspaces no, since a pushed branch is the copy and an unpushed one shows
 "Push to keep this work safe"; size: per-person cap).
@@ -508,7 +630,7 @@ Those are the person's tools on the person's computer; Home cannot govern them a
 
 **Who sees what (rule 6a, NO-CROSS-USER-VISIBILITY-01).** A person sees their own sessions, transcripts, keys, key use and git
 connections. Nobody else does, admins included; an admin sees counts, health codes and memory, and can revoke a person's API keys
-and git connections from the Coding access row (kind, status, created, expiry, key hint; no names, hosts or use). A person may share one session snapshot with one household adult.
+and git connections from the Coding access row (kind, status, created, expiry, key hint; no names, hosts or use). A person may share one session snapshot with one household adult, and a teen or a child with one household admin.
 
 **Offline.** With the internet down, everything works except clone, push, pull requests and allowed hosts; those say "The internet
 is down. Your work is saved here; push when it is back." With the coding engine down, the Code app shows the paused or starting
@@ -545,18 +667,25 @@ the host-side git push and pull request calls, and the sandbox service's thin dr
 
 ## 7. Rule check
 
-- **Rule 0 (age and surface gates first)**: coding is adults only; a guest never; a child or teen never in this version, and a
-  key cannot widen it (checked per request against the person's current controls). Nothing loosens a minor's protection.
-- **Rule 2**: llama-server's own `/v1/messages`, `/v1/chat/completions`, `count_tokens` and tool parsing; the gateway forwards
-  and never re-parses or estimates.
+- **Rule 0 (age and surface gates first)**: adults by default; a guest never; a teen or a child only by an admin's per-person
+  `allow` grant over coding's adult role floor, and every minor floor of section 3.7 holds whatever the grant says: the output gate at the person's
+  grain, no reasoning, the band's topic block, the crisis offer, the real-danger alert, no household data, no internet beyond
+  the household list, the adult-site and V1 lists locked. A key cannot widen any of it (checked per request against the
+  person's current controls). Nothing loosens a minor's protection.
+- **Rule 2**: llama-server's own `/v1/messages`, `/v1/chat/completions`, `count_tokens` and tool parsing; the gateway never
+  re-wraps a template, re-parses a tool call or estimates tokens. It reads the engine's parsed fields to run the floor, adds a
+  system part for a minor and drops a minor's reasoning at the engine client (section 3.6).
 - **Rule 3**: the coding model's sampling comes from its catalog record with its source; client sampling is dropped.
 - **Rule 4**: the engine runs at the real window the tier can hold (128k); `/code/v1/models` reports it.
-- **Rule 5**: adults only; no length instruction; `max_tokens` is a ceiling.
+- **Rule 5**: no length instruction for an adult; a minor's prose keeps the band's own limits (section 3.7); file and command
+  content is bounded only by the `max_tokens` ceiling.
 - **Rule 6a**: household logs are typed events with no person, text, path or id; the admin sees counts and health; the session's
-  audit trail is the person's own record.
+  audit trail is the person's own record, a minor's included: an admin sees a minor's grant, limits and credentials, never
+  their sessions (section 3.7).
 - **Rule 7**: the agent's web fetch tool is off in this version; any fetched text in a later slice is data, never instructions.
 - **Rule 9 and 9b**: the transcript is Elements, settings are kit primitives; five named kit gaps land in `commons` first.
-- **Rule 10**: the safety floor checks every coding request in and out, streaming, as for an adult's written chat.
+- **Rule 10**: the safety floor checks every coding request in and out: streaming for an adult, each sentence before release
+  for a child, and the household teen setting (child's mode by default) for a teen.
 - **Rule 11**: the model runs only in the Stack's pinned llama-server; OpenCode and the person's tools are clients, not runners.
 - **Rules 1, 12, 13**: the chat turn is untouched. CODE-BENCH-01 measures chat's first-token time while a coding loop runs; the
   bar is no change beyond noise, so CHAT-AB-01's adult rows cannot move.
@@ -564,7 +693,8 @@ the host-side git push and pull request calls, and the sandbox service's thin dr
   the keys; status uses the existing composer line, notifications, Status and Repairs.
 - **V1**: the egress proxy's fixed deny list holds every live video service host; no session can reach one.
 
-No NEEDS-RULE-CHANGE.
+No NEEDS-RULE-CHANGE for this design. One owner ask is left out because it would need one: "session logs visible to the
+guardian" (section 3.7) conflicts with rule 6a and NO-CROSS-USER-VISIBILITY-01; it is listed in section 12 for Jesse.
 
 ## 8. Safety
 
@@ -577,18 +707,18 @@ No NEEDS-RULE-CHANGE.
 | A stolen key | Expiry required, owner-visible last use with the place word, one-click revoke by the person or an admin, LAN or tailnet only, rate limits; the key reaches coding only, never Home's API |
 | Coding starves the family | Separate engine process; residents never evicted; queue and caps; the kill switch |
 | Destructive actions in the real world | Only four: Push, Create pull request, allowing a host, deleting a session; each is a person's explicit action with a confirmation that names what happens |
-| A minor | Not offered; the grant cell is `never`; keys suspend if controls change |
+| A minor | Only by an admin's per-person `allow` grant over the adult role floor, every admin sees it; the ten floors of section 3.7 no grant reaches; keys short-lived, off unless granted, suspended when the grant or controls change; CODE-TEEN-01 and CODE-SAFE-01 test each floor on both doors |
 
-**The teen variant** (stretch, CODE-TEEN-01, worth doing after the adult version has run a month): the Code app only (no API
-keys), a parent's grant, network none, starter projects, the teen's gate on all prose, thinking off, and the transcript under
-the teen's privacy rules. Worth it because coding is a real skill families want to teach, and the sandbox makes it safe to
-experiment; not worth a key, which reaches tools Home cannot gate.
+**Why minors by grant is safe enough to offer.** Coding is a real skill families want to teach, and the sandbox makes it safe
+to experiment: a session sees only its own workspace and, by default, no internet. The open risk is the API key, which reaches
+tools on the minor's own computer that Home cannot gate; that is why keys are off in every minor's band default, short-lived
+when granted, and the dialog says so in plain words.
 
 ## 9. Slices (rows in `docs/BACKLOG.md`, "Local coding (2026-10-17)")
 
 | Id | Size | After | Exit check |
 |---|---|---|---|
-| CODE-SPEC-01 | S, `commons` | none | Records of section 4 with fixtures, keys, areas, grant cell, notification types, data class, schema nodes; commons check; tag; Home pin bump |
+| CODE-SPEC-01 | S, `commons` | none | Records of section 4 with fixtures, keys (the `coding.person.*` guardian-held keys included), areas, no grant-vocabulary change, notification types, data class, schema nodes; commons check; tag; Home pin bump |
 | CODE-BENCH-01 | M, bench on the GPU lock | none | The section 10 plan run on the Studio; report with numbers; the default model confirmed or flipped |
 | CODE-STACK-01 | M, `stack` | CODE-SPEC-01, CODE-BENCH-01 | Coding role bound per tier, own process, on demand with lease and idle unload, slots, `/v1/messages`, `count_tokens`, `/v1/responses` if served, `/v1/models` (closes STACK-60 and STACK-61); p16 and p32 `notAvailable`; Stack `check.sh` |
 | CODE-KEYS-01 | M, `home`, risky (credentials, migration) | CODE-SPEC-01 | One key store with scopes, pepper, expiry, migration from `person_api_tokens`, `requireApiKey(scope)`; full `check.sh`, `code-review` medium |
@@ -603,7 +733,8 @@ experiment; not worth a key, which reaches tools Home cannot gate.
 | CODE-NOTIFY-01 | S | CODE-AGENT-01 | Three notification types, the `coding` concern in `roleHealth`, the coding row on the Status page, Repairs from the Stack |
 | CODE-SAFE-01 | M, risky (safety) | CODE-AGENT-01 | Injection fixture, egress tests, minors and guests refused, key-never-widens, kill switch, floor on the API; `code-review` medium |
 | CODE-PRIVACY-01 | S | with each slice that adds a connection | Privacy page rows and user docs |
-| CODE-SHARE-01, CODE-ATTACH-01, CODE-LINUX-01, CODE-TEEN-01, CODE-NETSECRET-01 | S, S, M, M, M | later | Each named in section 3 or 8 |
+| CODE-TEEN-01 | M, `home`, risky (child and teen gates) | CODE-SET-01, CODE-API-01, CODE-AGENT-01 | Coding for a teen or a child by grant (section 3.7): the grant dialog and guardian lines, the `coding.person.*` keys honoured, the ten floors on both doors; tests per band per door; full `check.sh`, `code-review` medium |
+| CODE-SHARE-01, CODE-ATTACH-01, CODE-LINUX-01, CODE-NETSECRET-01 | S, S, M, M | later | Each named in section 3 or 8 |
 
 Relation to existing rows: CODE-STACK-01 carries the coding half of ENGINE-HOST-05 ("coding does not silently evict chat") and
 the Stack's STACK-60 and STACK-61; CODE-BENCH-01 reuses LOCALCODER-LIFT-01's brief set; STUDIO-LANE-01 may point its driver at
@@ -640,17 +771,32 @@ agent session per task, a wall-clock budget instead of a step cap, git denied ex
   `person_api_tokens` is migrated and dropped (CODE-KEYS-01); `requireApiToken` becomes `requireApiKey(scope)`.
 - The Stack's `coding` role as `sharesModelWith: "chat"` and resident on p16, p32 and p64 (`roles.ts`, `profiles.ts`): replaced by
   its own process and binding per tier, on demand, not available below p64 (4.3, CODE-STACK-01).
-- `docs/plans/hub-on-apple-silicon-2026-09-17.md`, "One model for chat, intelligence, and coding": the coding half, only in that a
-  second model loads on demand while coding is in use; pending Jesse's decision 1. Nothing in RULES.md.
+- The 2026-09-17 owner decision "one foreground model" (`docs/plans/hub-on-apple-silicon-2026-09-17.md`, "One model for chat,
+  intelligence, and coding", and its memory section's "no second permanent coding model"): superseded for coding by Jesse's
+  decision of 2026-10-17 (owner-approved 2026-10-17, in chat): a second coding model in its own process, loaded only while
+  someone is coding and unloaded after about 15 idle minutes, with the chat model staying loaded (4.3). Chat remains the one
+  resident foreground model. The plan carries a `> **Superseded in part` marker pointing here. Nothing in RULES.md.
 - ENGINE-HOST-05's coding provisioning ("the current 27B coder"): the per-tier choice of 4.3.
+- This note's own first version (architect item CODE-DESIGN-01): "adults only", `coding.who` (Every adult, Only admins, Only
+  people I choose), the `never` grant cell for teens and children, and the teen stretch goal. Replaced by "adults by default,
+  anyone by grant" (`coding.adults_by_default`, the per-person `use:code` grant over an adult role floor, section 3.7).
 
 ## 12. Decisions for Jesse
 
-1. **A second model for coding, loaded only while in use** (about 40 GB on the Studio, unloaded after 15 quiet minutes), as
-   recommended, or coding shares the chat model (no extra memory, but a coding loop then queues family chat on its one slot).
-2. **Teens**: adults only now, with the teen "learn to code" variant later (recommended), or never.
-3. **Away from home**: API keys work away only through the household's Tailscale and only when an admin turns it on
-   (recommended, off by default), or home network only.
+Decided by Jesse in chat on 2026-10-17 (owner-approved 2026-10-17):
+
+1. **The coding model**: a second model, loaded only while someone is coding and unloaded after about 15 idle minutes; the chat
+   model stays loaded (4.3).
+2. **Who**: anyone an admin permits, adults by default; a teen or a child only by an explicit per-person admin grant that keeps
+   every minor protection (3.7).
+3. **Away from home**: API keys work away only through the household's Tailscale and only when an admin turns it on (3.1).
+
+Still open, one question:
+
+4. **Session logs for a minor's guardian** (NEEDS-RULE-CHANGE, rule 6a and NO-CROSS-USER-VISIBILITY-01): keep a minor's
+   coding sessions private like every other activity (as designed), or change rule 6a so an admin can read a minor's
+   `coding-event` trail (commands, files written, hosts, approvals, pushes; never the transcript), with the minor told at grant
+   time (3.7).
 
 ## Architect verdict
 
@@ -663,3 +809,10 @@ Ruled by the `architect` agent on this note's text; the record is `data-scratch/
   CODE-NETSECRET-01; section 11 cites the legacy verdicts row.
 - Second pass: REJECTED on one leftover sentence in section 5 ("by name"). Fixed.
 - Third pass, 2026-10-17: APPROVED.
+- CODE-DESIGN-02 (the owner's answers of 2026-10-17: adults by default, minors by grant, Tailscale only away, the on-demand
+  coding model), record `data-scratch/architect/CODE-DESIGN-02.verdict`. First pass, 2026-10-18 UTC: REJECTED on the grant
+  vocabulary's `parent` cell (it asks a parent before every request), the crisis offer listed for minors only, rule 5 misstated
+  for a minor's prose, "forwards bytes" against the minor floors, and adults able to raise their own caps. Fixed: `use:code`
+  keeps `none` with a minor's access an admin's `allow` grant over an adult role floor, the crisis offer moved to section 3.6
+  for every person, rule 5's band limits kept for a minor's prose, section 3.6's rule 2 paragraph reworded, the cap keys
+  admin-held and clamped; a child gets no git hosts and no outbound links. Second pass, 2026-10-18 UTC: APPROVED.
