@@ -120,6 +120,18 @@ describe("one stored file, one record per owner", () => {
     expect(readAttachment(sage, first.id).ok).toBe(true);
   });
 
+  test("a fetched download repairs a damaged stored file instead of pointing at it", async () => {
+    const sage = person("owner", "Sage");
+    const lucia = person("adult", "Lucia");
+    const first = upload(sage, "episode audio bytes");
+    writeFileSync(attachmentFilePath(first.storage_path), "damaged");
+    const { createFetchedFile } = await import("@/lib/media/fetchedFiles");
+    const fetched = createFetchedFile(lucia, { mediaType: "image/png", mediaSourceId: "msrc-test001", note: "podcast:auto", bytes: new TextEncoder().encode("episode audio bytes") });
+    expect(fetched.ok).toBe(true);
+    expect(readFileSync(attachmentFilePath(first.storage_path), "utf8")).toBe("episode audio bytes");
+    expect(readAttachment(sage, first.id).ok).toBe(true);
+  });
+
   test("a missing stored file is written again from new bytes of the same hash", () => {
     const sage = person("owner", "Sage");
     const lucia = person("adult", "Lucia");
@@ -128,6 +140,20 @@ describe("one stored file, one record per owner", () => {
     const second = upload(lucia, "healing");
     expect(readFileSync(attachmentFilePath(second.storage_path), "utf8")).toBe("healing");
     expect(readAttachment(sage, first.id).ok).toBe(true);
+  });
+});
+
+describe("library summary agrees with storage", () => {
+  test("identical bytes held in two records count once in the summary bytes", async () => {
+    const { listLibrary, librarySummary } = await import("@/lib/library");
+    const sage = person("owner", "Sage");
+    upload(sage, "same job picture", { deduplicate: false });
+    upload(sage, "same job picture", { deduplicate: false });
+    expect(personUsageBytes(sage.id)).toBe("same job picture".length);
+    const summary = librarySummary(sage, {});
+    expect(summary.bytes).toBe("same job picture".length);
+    expect(summary.items).toBe(2);
+    expect(listLibrary(sage, {}).items).toHaveLength(2);
   });
 });
 
@@ -293,12 +319,14 @@ describe("migration 0117 on a database from before it", () => {
     insert(database, "people", { id: "person-sage000001", role: "owner", display_name: "Sage" });
     insert(database, "people", { id: "person-lucia00001", role: "adult", display_name: "Lucia" });
     insert(database, "people", { id: "person-gone000001", role: "adult", display_name: "Gone", deleted_at: "2026-10-01T00:00:00.000Z" });
+    insert(database, "people", { id: "person-teen000001", role: "teen", display_name: "Riff" });
     insert(database, "conversations", { id: "conv-1", person_id: "person-sage000001" });
     insert(database, "conversation_turns", { id: "turn-1", person_id: "person-sage000001", conversation_id: "conv-1" });
     // The first upload, and a dedupe pointer that gave Lucia no record of her own.
     attachment(database, "file-aaaaaaaaa1", "person-sage000001", "a".repeat(64), "people/person-sage000001/attachments/file-aaaaaaaaa1", { conversation_id: "conv-1", turn_id: "turn-1" });
     insert(database, "shares", { id: "share-dedupe0001", file_id: "file-aaaaaaaaa1", from_person_id: "person-sage000001", to: "person-lucia00001", provenance: "dedupe:same-bytes" });
     insert(database, "shares", { id: "share-dedupe0002", file_id: "file-aaaaaaaaa1", from_person_id: "person-sage000001", to: "person-gone000001", provenance: "dedupe:same-bytes" });
+    insert(database, "shares", { id: "share-dedupe0003", file_id: "file-aaaaaaaaa1", from_person_id: "person-sage000001", to: "person-teen000001", provenance: "dedupe:same-bytes" });
     insert(database, "shares", { id: "share-human00001", file_id: "file-aaaaaaaaa1", from_person_id: "person-sage000001", to: "household", provenance: "files-page:share" });
     // The same bytes stored twice by one person with different paths (two generated pictures), plus one unique file.
     attachment(database, "file-bbbbbbbbb1", "person-sage000001", "b".repeat(64), "people/person-sage000001/attachments/file-bbbbbbbbb1", { created_at: "2026-10-01T00:00:00.000Z" });
@@ -316,11 +344,13 @@ describe("migration 0117 on a database from before it", () => {
     const luciaCopy = database.query("SELECT * FROM attachments WHERE owner_person_id = 'person-lucia00001' AND sha256 = ?").get("a".repeat(64)) as { storage_path: string; retention: string; id: string };
     expect(luciaCopy.storage_path).toBe("people/person-sage000001/attachments/file-aaaaaaaaa1");
     expect(luciaCopy.retention).toBe("kept");
-    expect(database.query("SELECT id FROM shares ORDER BY id").all()).toEqual([{ id: "share-dedupe0002" }, { id: "share-human00001" }]);
+    // A teen's pointer is never converted (ownership would lift the audience gate): it stays exactly as it was.
+    expect(database.query("SELECT count(*) AS n FROM attachments WHERE owner_person_id = 'person-teen000001'").get()).toEqual({ n: 0 });
+    expect(database.query("SELECT id FROM shares ORDER BY id").all()).toEqual([{ id: "share-dedupe0002" }, { id: "share-dedupe0003" }, { id: "share-human00001" }]);
     const after = database.query("SELECT count(*) AS n, sum(size) AS bytes FROM attachments").get() as { n: number; bytes: number };
     expect(after.n).toBe(before.n + 1);
     const kinds = database.query("SELECT kind, count(*) AS n FROM file_references GROUP BY kind ORDER BY kind").all();
-    expect(kinds).toEqual([{ kind: "chat", n: 1 }, { kind: "owner", n: 5 }, { kind: "share", n: 2 }]);
+    expect(kinds).toEqual([{ kind: "chat", n: 1 }, { kind: "owner", n: 5 }, { kind: "share", n: 3 }]);
     expect(database.query("SELECT count(*) AS n FROM file_references r LEFT JOIN file_contents c ON c.sha256 = r.sha256 WHERE c.sha256 IS NULL").get()).toEqual({ n: 0 });
     expect((database.query("PRAGMA integrity_check").get() as { integrity_check: string }).integrity_check).toBe("ok");
     expect(database.query("PRAGMA foreign_key_check").all()).toEqual([]);

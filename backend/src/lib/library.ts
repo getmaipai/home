@@ -89,7 +89,9 @@ export function listLibrary(actor: PersonRow, q: LibraryQuery) {
 export function librarySummary(actor: PersonRow, q: LibraryQuery) {
   const b = base(actor,q);
   const rows = sqlite.query<{ kind: string; items: number; bytes: number }, (string | number)[]>(`${b.sql} SELECT kind,
-    (SELECT count(*) FROM tiles t WHERE t.kind = f.kind) AS items, sum(size) AS bytes FROM filtered f GROUP BY kind`).all(...b.params);
+    (SELECT count(*) FROM tiles t WHERE t.kind = f.kind) AS items,
+    (SELECT coalesce(sum(u.size),0) FROM (SELECT sha256, max(size) AS size FROM filtered g WHERE g.kind = f.kind GROUP BY sha256) u) AS bytes
+    FROM (SELECT DISTINCT kind FROM filtered) f`).all(...b.params);
   const per_kind: Record<string, { items: number; bytes: number }> = Object.fromEntries(["image","video","audio","document","story","file"].map(kind => [kind,{ items: 0, bytes: 0 }]));
   for (const row of rows) per_kind[row.kind] = { items: row.items, bytes: row.bytes };
   return { items: rows.reduce((n,r) => n+r.items,0), bytes: rows.reduce((n,r) => n+r.bytes,0), per_kind, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } };

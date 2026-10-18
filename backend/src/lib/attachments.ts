@@ -71,7 +71,7 @@ export function attachmentFilePath(storagePath: string): string {
 }
 
 /** True when the file at path has exactly the expected size and digest (read only on a duplicate hit, which is rare). */
-function storedFileIntact(path: string, size: number, sha256: string): boolean {
+export function storedFileIntact(path: string, size: number, sha256: string): boolean {
   try {
     if (!existsSync(path) || statSync(path).size !== size) return false;
     return createHash("sha256").update(readFileSync(path)).digest("hex") === sha256;

@@ -26,15 +26,18 @@ CREATE UNIQUE INDEX `file_references_holder_idx` ON `file_references` (`file_id`
 CREATE INDEX `file_references_sha256_idx` ON `file_references` (`sha256`);--> statement-breakpoint
 -- LIBRARY-DEDUP-01 backfill. 1) A person whose identical upload was once a share pointer to the first uploader's row gets
 -- their own file record for the same bytes (the pointer is dropped below), so deleting the first copy never takes theirs.
+-- Only an adult is converted: for a child or teen, ownership would lift the audience gate on an adult-only or unclassified file
+-- (an owner always reads their own), so their pointer stays exactly as it was and the gate keeps applying to it.
 INSERT INTO `attachments` (`id`, `owner_person_id`, `conversation_id`, `turn_id`, `media_type`, `size`, `sha256`, `storage_path`, `retention`, `provenance`, `origin`, `media_source_id`, `created_at`, `hlc`)
 SELECT 'file-' || lower(hex(randomblob(6))), s.`to`, NULL, NULL, a.`media_type`, a.`size`, a.`sha256`, a.`storage_path`, 'kept', a.`provenance`, 'sent', NULL, s.`created_at`, s.`hlc`
 FROM `shares` s
 JOIN `attachments` a ON a.`id` = s.`file_id`
-JOIN `people` p ON p.`id` = s.`to` AND p.`deleted_at` IS NULL
+JOIN `people` p ON p.`id` = s.`to` AND p.`deleted_at` IS NULL AND p.`role` IN ('owner', 'admin', 'adult')
 WHERE s.`provenance` = 'dedupe:same-bytes' AND s.`to` <> a.`owner_person_id`
   AND NOT EXISTS (SELECT 1 FROM `attachments` b WHERE b.`owner_person_id` = s.`to` AND b.`sha256` = a.`sha256` AND b.`origin` = 'sent');
 --> statement-breakpoint
 DELETE FROM `shares` WHERE `provenance` = 'dedupe:same-bytes'
+  AND `to` IN (SELECT `id` FROM `people` WHERE `role` IN ('owner', 'admin', 'adult'))
   AND EXISTS (SELECT 1 FROM `attachments` b JOIN `attachments` a ON a.`id` = `shares`.`file_id` WHERE b.`owner_person_id` = `shares`.`to` AND b.`sha256` = a.`sha256` AND b.`origin` = 'sent');
 --> statement-breakpoint
 -- 2) One content row per sha256, at the oldest record's path.

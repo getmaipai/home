@@ -38,7 +38,8 @@ household total for bytes the home already stores, so a second copy is never ref
 
 ## Migration 0117
 
-Backfill order: give a dedupe-pointer holder a record of their own (retention `kept`) and drop the pointer, create the content
+Backfill order: give an adult dedupe-pointer holder a record of their own (retention `kept`) and drop the pointer (a child's or
+teen's pointer is left as it was, because owning a record would lift the audience gate on an adult-only file), create the content
 rows at each hash's oldest record, point every record at that path and queue the other paths, then write owner, chat, share and
 collection references. Dry run on a copy of the live database before release:
 
@@ -47,3 +48,10 @@ collection references. Dry run on a copy of the live database before release:
 
 then compare `select count(*), sum(size) from attachments`, `from file_contents`, `file_references` by kind, `file_blob_removals`,
 and `pragma integrity_check`.
+
+## Known limits of this change
+
+- Purging a file record (for example a departing person's fetched copy) removes the record and its references; a media item that
+  still names that record keeps a dangling id exactly as before this change. References protect bytes between records, not records.
+- Child and teen dedupe pointers from before migration 0117 stay pointers, so the first owner deleting the file still removes
+  them; new uploads by a child or teen are separate records.

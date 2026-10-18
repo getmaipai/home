@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments } from "@/db/schema";
 import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
-import { attachmentFilePath, purgeFileRecord, removeFileBlobs, toRecord } from "@/lib/attachments";
+import { attachmentFilePath, purgeFileRecord, removeFileBlobs, storedFileIntact, toRecord } from "@/lib/attachments";
 import { contentFor, ensureContent, syncFileReferences } from "@/lib/fileContent";
 import { nextHlc } from "@/lib/hlc";
 import { newFileId } from "@/lib/id";
@@ -37,7 +37,8 @@ function storeRow(owner: PersonRow, input: Metadata, id: string, size: number, s
   const stored = contentFor(sha256);
   const storagePath = stored ? stored.storagePath : `people/${owner.id}/attachments/${id}`;
   const filePath = attachmentFilePath(storagePath);
-  const reuse = stored !== undefined && existsSync(filePath);
+  // Reuse the one stored file only when it is really intact; otherwise the download we just made repairs it.
+  const reuse = stored !== undefined && storedFileIntact(filePath, size, sha256);
   const row = {
     id, ownerPersonId: owner.id, conversationId: null, turnId: null, mediaType: normalizedType(input.mediaType), size, sha256, storagePath, retention: "kept" as const,
     provenance: input.note, origin: "fetched", mediaSourceId: input.mediaSourceId, createdAt: new Date().toISOString(), hlc: nextHlc(),
