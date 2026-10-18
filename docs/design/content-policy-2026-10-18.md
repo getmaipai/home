@@ -216,3 +216,44 @@ line; policy failure does not break the rest of the chat answer. Existing Repair
 
 All implementation slices need full `bash scripts/check.sh`, focused offline tests and independent minor-safety review; the
 architect must rule before implementation. This docs-only change uses `bash scripts/check.sh --docs` and leaves code untouched.
+
+
+## Slice 01 as built, 2026-10-18
+
+`contentPolicy.ts` resolves immutable person filters and audience unions. The stricter actor or turn band wins.
+Unknown people and invalid ages use the child floor. Teen defaults block strong profanity; adding that filter blocks
+all listed profanity. Settings errors, invalid snapshots, bad policy data and invalid check inputs return the fixed fallback.
+Checks use one folded copy with the commons detector and the existing wider minor floor. No input is cut short.
+
+Version 1 JSON files own kinds, fixed lines, severity, terms, reviewed boundary exceptions and the existing lane and
+Home-owned floor lists. The lane imports its lists from the module; its checks, cartoon rules, limits and results stay the same.
+The shared floor gains an adapter for folded input; its existing entry points keep their behavior.
+
+`createContentPolicyResolver` accepts a synchronous reader for an in-memory `content.filters` snapshot. The default resolver
+has no added filters. The key is declared in `settings/contentKeys.ts` and listed ahead of spec, but is not in the live registry.
+No new write path is enabled. Spec permissions, guardian writes, resets, imports and the Settings flow stay in slice 05.
+The existing settings permission checks were read; this slice does not bypass them or grant rights based on adult status.
+The injected reader validates and copies the added filters before any check runs.
+
+The current picture audience has no present-person list or resolved subject context. The module accepts that audience with
+an optional `present` list for union resolution. Its optional trusted subject-context reader captures a resolved household,
+outside, public or unresolved subject decision; outside, public and unresolved subjects block before optional filters.
+This reader must receive the existing identity decision and household option when consumers are wired. Text alone does not
+identify real people, and the default reader makes no identity claim. No likeness code changed.
+
+Offline tests cover every field and band, defaults, added filters, failure paths, runtime mutation, repeated calls, boundaries,
+folding and a 4,000-character timing check. The timing check includes a match at the end of the input. Child and teen lane tests
+and minor-line tests pass one file at a time without the standard port-opening preload. The picture safety file uses a stub
+server and was not run under the no-port constraint. The full gate cannot take its lock outside this worktree in the current
+sandbox. Independent safety review and the full gate remain release checks. Slices 02 to 05 remain open.
+
+
+Changed files in slice 01:
+
+- `.gitignore`, `CHANGELOG.md`, `docs/BACKLOG.md`, `docs/design/content-policy-2026-10-18.md`
+- `backend/src/lib/contentPolicy.ts`, `backend/src/lib/pictures/lane.ts`, `backend/src/lib/pictures/minorLine.ts`
+- `backend/src/lib/contentPolicy/data/kinds.v1.json`, `backend/src/lib/contentPolicy/data/terms.v1.json`,
+  `backend/src/lib/contentPolicy/data/lanes.v1.json`, `backend/src/lib/contentPolicy/data/floors.v1.json`
+- `backend/src/settings/contentKeys.ts`, `scripts/settings-ahead-of-spec.json`
+- `backend/tests/contentPolicy.test.ts`, `backend/tests/fixtures/contentPolicy/corpus.json`,
+  `backend/tests/fixtures/contentPolicy/boundaries.json`

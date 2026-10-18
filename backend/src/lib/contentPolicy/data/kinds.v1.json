@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "kinds": [
+    "swearing",
+    "drugs",
+    "gambling",
+    "gore",
+    "sexual",
+    "minor_line",
+    "real_person"
+  ],
+  "lines": {
+    "swearing": "I can't help with that content. Try something different.",
+    "drugs": "I can't help with that content. Try something different.",
+    "gambling": "I can't help with that content. Try something different.",
+    "gore": "I can't help with that content. Try something different.",
+    "sexual": "I can't help with that content. Try something different.",
+    "minor_line": "I can't help with that content. Try something different.",
+    "real_person": "I can't help with that content. Try something different."
+  },
+  "fallback": "I couldn't check that safely. Try something different."
+}

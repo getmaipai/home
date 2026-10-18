@@ -7,6 +7,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+### Content protections
+- Added the shared content policy module, band defaults, reviewed data and offline tests. Consumer wiring follows in later slices. (CONTENT-POLICY-01)
+
 ### Library
 - Kept files and their music and picture records survive chat deletion and nightly retention. New generated pictures and videos stay in the Library. (BUG-LIBRARY-KEPT-01)
 

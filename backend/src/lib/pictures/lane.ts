@@ -10,6 +10,8 @@
 // None of these lanes makes the absolute lines optional, and no setting reaches them. The one friction setting
 // (`generation.people_prompts`) touches only the adult lane: a teen or a child never gets hedging, lecturing, a clarifying question with a
 // safe default or an extra confirmation.
+import { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
+export { CHILD_UNSAFE_TERMS, CHILD_IP_NAMES } from "@/lib/contentPolicy";
 import { speakerAgeBand, type AgeBand } from "@/lib/ageBand";
 import { getHouseholdSettingValue, getPersonSettingValue } from "@/lib/settings";
 import { db } from "@/db";
@@ -67,34 +69,8 @@ export const CHILD_NO_PHOTOS_LINE = "I can make cartoons for you, but not from p
 
 // ---------------------------------------------------------------- the child-safe topic gate
 
-/** Whole words and phrases a child's request may not contain: violence and weapons, gore, scary or horror, romance, drugs and alcohol, hate, self-harm, and a few famous brands and characters (a real person or a brand is also checked on the finished picture). A list is a floor, not the judge: the finished picture is checked too and a doubt withholds it. */
-export const CHILD_UNSAFE_TERMS: readonly string[] = [
-  // violence and weapons
-  "kill", "kills", "killing", "killed", "murder", "murders", "murdered", "stab", "stabbing", "shoot", "shooting", "shot", "gun", "guns", "rifle", "pistol", "weapon", "weapons", "knife", "knives", "sword fight", "bomb", "bombs", "explosion", "blood", "bloody", "gore", "gory", "corpse", "dead body", "violence", "violent", "war", "battle", "fight", "fighting", "punch", "punching", "strangle", "torture", "execution", "hanging",
-  // scary
-  "horror", "scary", "creepy", "zombie", "zombies", "demon", "demons", "devil", "satan", "ghost", "haunted", "nightmare", "slasher", "skull", "skeleton", "monster attack", "vampire bite",
-  // romance and sexual
-  "romantic", "romance", "kissing", "making out", "boyfriend", "girlfriend", "lover", "seductive", "flirt", "flirting", "date night",
-  // drugs, alcohol, gambling
-  "drug", "drugs", "cocaine", "heroin", "weed", "marijuana", "cannabis", "meth", "vape", "vaping", "cigarette", "cigarettes", "smoking", "beer", "wine", "vodka", "whiskey", "alcohol", "drunk", "cocktail", "gambling", "casino",
-  // hate and self-harm
-  "nazi", "swastika", "racist", "racism", "slur", "terrorist", "suicide", "self harm", "self-harm", "cutting myself", "hang myself",
-  // weapons, fire and destruction (siblings of the above)
-  "sword", "swords", "dagger", "machete", "axe", "axes", "hatchet", "spear", "spears", "bayonet", "grenade", "grenades", "chainsaw", "bazooka", "missile", "missiles", "bullet", "bullets", "ammo", "firearm", "firearms", "handgun", "shotgun", "revolver", "machine gun", "gunfire", "gunman", "sniper", "dynamite", "tnt", "napalm", "nuke", "nukes", "bombing", "bomber", "explode", "exploding", "explosive", "explosives", "arson", "burning", "burn down", "burned down", "set fire", "slay", "slaying", "slayer", "slain", "slaughter", "massacre", "hostage", "kidnap", "kidnapping", "execution", "hanging", "noose",
-  // clothes and body that are not for a child's request
-  "bikini", "lingerie", "underwear", "panties", "bra", "topless", "cleavage", "stripper", "naked", "nude",
-  // more drugs and alcohol
-  "joint", "bong", "blunt", "spliff", "vapes", "e-cigarette", "cigar", "cigars", "tobacco", "opioid", "lsd", "ecstasy", "booze", "liquor", "tequila", "champagne", "hangover", "beers",
-  // brands, characters and celebrities that are somebody's likeness or trademark
-  "disney", "marvel", "pokemon", "nintendo", "mickey mouse", "spider-man", "spiderman", "batman", "superman", "taylor swift", "elon musk", "donald trump", "joe biden", "kardashian", "beyonce", "coca cola", "mcdonalds", "nike", "lego",
-];
-
 /** Famous characters and brands a child's request may not name: each is somebody's trademark, and a drawing of one is not a safe original cartoon. Small on purpose, and one place to add a name; the finished-picture check is the backstop for the rest. A teen is not held to this list. */
-export const CHILD_IP_NAMES: readonly string[] = [
-  "pikachu", "charizard", "pokemon", "mario", "luigi", "bowser", "zelda", "sonic", "minecraft", "roblox", "fortnite", "elsa", "olaf", "moana", "mulan", "simba", "winnie the pooh", "mickey", "minnie", "donald duck", "goofy",
-  "peppa pig", "bluey", "paw patrol", "spongebob", "hello kitty", "barbie", "shrek", "minions", "bugs bunny", "tom and jerry", "scooby doo", "elmo", "sesame street", "dora the explorer", "thomas the tank engine",
-  "star wars", "darth vader", "yoda", "harry potter", "hogwarts", "batman", "superman", "spider man", "spiderman", "iron man", "hulk", "thor", "captain america", "wonder woman", "joker", "avengers",
-];
+
 
 /** Whether a child's words stay inside the child-safe lane. Sexual and nudity words and minor-with-sexual wording are refused too (the absolute line runs separately and first). */
 export function childPromptUnsafe(text: string): boolean {

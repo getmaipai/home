@@ -1,0 +1,13 @@
+[
+  { "id": "KIND_A", "kind": "swearing", "text": "oh damn", "severity": "mild" },
+  { "id": "KIND_B", "kind": "swearing", "text": "oh shit", "severity": "strong" },
+  { "id": "KIND_C", "kind": "drugs", "text": "a beer" },
+  { "id": "KIND_D", "kind": "gambling", "text": "a casino" },
+  { "id": "KIND_E", "kind": "gore", "text": "gore" },
+  { "id": "KIND_F", "kind": "swearing", "text": "s h i t", "severity": "strong" },
+  { "id": "KIND_G", "kind": "swearing", "text": "sh1t", "severity": "strong" },
+  { "id": "KIND_H", "kind": "swearing", "text": "sh\u200bit", "severity": "strong" },
+  { "id": "KIND_I", "kind": "drugs", "text": "b e e r" },
+  { "id": "KIND_J", "kind": "drugs", "text": "b33r" },
+  { "id": "KIND_K", "kind": "drugs", "text": "be\u200ber" }
+]

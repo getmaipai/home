@@ -89,3 +89,6 @@ backend/scripts/train/out/
 /lane-health/
 /.claude/launch.json
 /.claude/settings.local.json
+
+# Reviewed policy source data, not household records.
+!backend/src/lib/contentPolicy/data/

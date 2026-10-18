@@ -1,3 +1,4 @@
 [
-  "install.recommended_auto_on_upgrade"
+  "install.recommended_auto_on_upgrade",
+  "content.filters"
 ]

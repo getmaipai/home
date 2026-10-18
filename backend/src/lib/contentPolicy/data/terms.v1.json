@@ -1,0 +1,307 @@
+{
+  "version": 1,
+  "terms": [
+    {
+      "kind": "swearing",
+      "term": "damn",
+      "severity": "mild"
+    },
+    {
+      "kind": "swearing",
+      "term": "hell",
+      "severity": "mild"
+    },
+    {
+      "kind": "swearing",
+      "term": "crap",
+      "severity": "mild"
+    },
+    {
+      "kind": "swearing",
+      "term": "fuck",
+      "severity": "strong"
+    },
+    {
+      "kind": "swearing",
+      "term": "shit",
+      "severity": "strong"
+    },
+    {
+      "kind": "swearing",
+      "term": "bullshit",
+      "severity": "strong"
+    },
+    {
+      "kind": "swearing",
+      "term": "motherfucker",
+      "severity": "strong"
+    },
+    {
+      "kind": "drugs",
+      "term": "drug",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "drugs",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cocaine",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "heroin",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "weed",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "marijuana",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cannabis",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "meth",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "vape",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "vaping",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cigarette",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cigarettes",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "smoking",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "beer",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "wine",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "vodka",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "whiskey",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "alcohol",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "drunk",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cocktail",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "joint",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "bong",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "blunt",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "spliff",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "vapes",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "e-cigarette",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cigar",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "cigars",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "tobacco",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "opioid",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "lsd",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "ecstasy",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "booze",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "liquor",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "tequila",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "champagne",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "hangover",
+      "severity": "mild"
+    },
+    {
+      "kind": "drugs",
+      "term": "beers",
+      "severity": "mild"
+    },
+    {
+      "kind": "gambling",
+      "term": "gambling",
+      "severity": "mild"
+    },
+    {
+      "kind": "gambling",
+      "term": "casino",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "blood",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "bloody",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "gore",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "gory",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "corpse",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "dead body",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "torture",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "execution",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "slaughter",
+      "severity": "mild"
+    },
+    {
+      "kind": "gore",
+      "term": "massacre",
+      "severity": "mild"
+    }
+  ],
+  "exceptions": [
+    {
+      "kind": "drugs",
+      "term": "joint",
+      "phrase": "a joint effort"
+    },
+    {
+      "kind": "drugs",
+      "term": "joint",
+      "phrase": "a joint project"
+    },
+    {
+      "kind": "drugs",
+      "term": "weed",
+      "phrase": "weed the garden"
+    }
+  ]
+}

@@ -1,0 +1,4 @@
+{
+  "safe": ["a joint effort", "a joint project", "weed the garden", "a classroom", "a bloodhound"],
+  "unsafe": ["a joint effort with beer", "a joint effort and a joint", "a disjoint effort with a joint"]
+}

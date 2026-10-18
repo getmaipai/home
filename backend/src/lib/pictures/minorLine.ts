@@ -5,46 +5,27 @@
 // only. "girl", "boy", "lady", "guy", "man", "woman", "young woman" and "young man" are NOT markers (adult
 // women are called girls); "young girl", "young boy", "little girl" and "little boy" ARE. A marker beside a
 // non-sexual wording ("a kids' birthday party", "a baby smiling") stays allowed, and "bikini" is swimwear,
-// not a sexual word. Update the lists here and nowhere else; tests/minorLine.test.ts pins both directions.
+// not a sexual word. Update the versioned floor data only; tests/minorLine.test.ts pins both directions.
+
+import { floorsSchema } from "../contentPolicy/dataSchema";
+import floorSource from "../contentPolicy/data/floors.v1.json";
+const floorData = floorsSchema.parse(floorSource);
+for (const values of Object.values(floorData)) if (Array.isArray(values)) Object.freeze(values);
+Object.freeze(floorData);
 
 /** Words and phrases that put a minor, or a minor-looking person, in the picture. Matched as whole words; a stem ending "-" is not used, list the plural. */
-export const MINOR_MARKERS: readonly string[] = [
-  // plain minors
-  "child", "children", "kid", "kids", "kiddo", "kiddos", "minor", "minors", "underage", "underaged", "under age", "under aged", "juvenile", "juveniles",
-  "toddler", "toddlers", "baby", "babies", "infant", "infants", "newborn", "newborns",
-  "preteen", "preteens", "pre teen", "pre teens", "tween", "tweens", "teen", "teens", "teenager", "teenagers", "teenage", "teenaged", "teen aged",
-  "pubescent", "prepubescent", "pre pubescent",
-  // gendered young phrases (the bare words girl and boy are NOT markers)
-  "little girl", "little girls", "little boy", "little boys", "young girl", "young girls", "young boy", "young boys",
-  "small girl", "small girls", "small boy", "small boys", "baby girl", "baby girls", "baby boy", "baby boys", "youngster", "youngsters",
-  // school
-  "schoolgirl", "schoolgirls", "schoolboy", "schoolboys", "school girl", "school girls", "school boy", "school boys", "schoolkid", "schoolkids", "schoolchild", "schoolchildren", "preschooler", "preschoolers", "under 18", "under eighteen", "below 18", "younger than 18",
-  "school uniform", "high school", "middle school", "elementary", "kindergarten", "grade school", "preschool",
-  // looks young
-  "childlike", "child like", "childish", "babyface", "baby face", "young looking", "youthful looking", "flat chest", "flat chested",
-  // coded terms
-  "loli", "lolis", "lolita", "lolitas", "lolicon", "shota", "shotacon", "jailbait", "barely legal", "just turned 18", "cp",
-];
+export const MINOR_MARKERS: readonly string[] = floorData.MINOR_MARKERS;
 
 /** Sexual or nudity words. A marker beside any of these refuses. "bikini" and other ordinary swimwear are deliberately absent. */
-export const SEXUAL_WORDS: readonly string[] = [
-  "nude", "naked", "nudity", "topless", "bottomless", "undress", "undressed", "undressing", "lingerie", "underwear", "panties", "bra", "thong", "cleavage", "breasts", "boobs", "nipples",
-  "genital", "genitals", "vagina", "penis", "cock", "pussy", "buttocks", "crotch", "groin",
-  "sex", "sexy", "sexual", "sexualized", "sexualised", "erotic", "erotica", "porn", "porno", "pornographic", "nsfw", "explicit", "lewd", "hentai", "ecchi", "fetish", "seductive", "provocative", "suggestive",
-  "nipple", "breast", "bare breast", "bare breasts", "nudes", "nakedness", "butt", "tits", "sensual", "horny", "anal", "orgy", "cum", "cumming", "dick",
-  "orgasm", "masturbat", "fellatio", "blowjob", "cumshot", "intercourse", "molest", "rape", "bondage", "kinky", "xxx", "r18", "uncensored", "spread legs", "legs spread",
-];
+export const SEXUAL_WORDS: readonly string[] = floorData.SEXUAL_WORDS;
 
 /** Plain ways to say no clothes without a word above ("two kids playing, no clothes"). Beside a marker they count as sexual; alone they are ordinary (a shirtless man at the beach passes). */
-export const UNCLOTHED_PHRASES: readonly string[] = [
-  "unclothed", "shirtless", "no clothes", "no clothing", "without clothes", "without clothing", "without a shirt", "clothes off", "clothing off", "stripped", "skinny dipping", "skinny dip",
-  "bare chested", "bare skin", "bare bottom", "bare butt", "birthday suit", "au naturel", "wearing nothing", "not wearing anything", "not wearing any clothes",
-];
+export const UNCLOTHED_PHRASES: readonly string[] = floorData.UNCLOTHED_PHRASES;
 
 // ---------------------------------------------------------------- matching: one normaliser, shared with the chat floor
 // All matching goes through commons' spec/safety/ts/fold.ts (the same folding `detectCsam` uses): invisible characters,
 // look-alike letters, leetspeak, dotted/spaced/masked/repeated letters, other languages and native scripts. This file keeps
-// only the English lists and the pairing rule. Update the lists here and nowhere else; the folding there and nowhere else.
+// only the English lists and the pairing rule. Update the versioned floor data only; the folding there and nowhere else.
 import {
   MINOR_AGE, MINOR_WORDS_I18N, NATIVE_MINOR, NATIVE_SEXUAL, SEXUAL_WORDS_I18N, TermSet, foldForSafety, hasMinorAge, type SafetyFold,
 } from "@maipai/spec/safety/ts/fold.js";
@@ -124,4 +105,11 @@ export function minorSexualMatch(text: string): boolean {
 export function mixedScriptMinorCue(text: string): boolean {
   const fold = foldedForLine(text);
   return fold.mixedScripts && minorCueIn(fold);
+}
+
+/** Shared checks over an already folded matching copy. Existing callers keep their own adapters. */
+export function contentChecksForFold(fold: SafetyFold): { minorLine: boolean; adultContent: boolean } {
+  const safeFold = { ...fold, forms: fold.forms.map(form => ({ ...form, text: form.text.replace(NEUTRAL_PHRASES, " ") })) };
+  const adultContent = sexualIn(safeFold) || UNCLOTHED_SET.matches(safeFold);
+  return { adultContent, minorLine: (adultContent || fold.mixedScripts) && minorCueIn(safeFold) };
 }
