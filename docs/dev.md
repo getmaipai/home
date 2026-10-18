@@ -6,6 +6,10 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## Music chat covers (2026-10-18)
+
+The chat song card passes stored cover art to MusicTrack and keeps its existing poll running while the cover picture is queued or running, with a 30 second startup grace and no wait for private chats or an absent picture engine.
+
 ## LIBRARY-REVAMP-05 backend thumbnails (2026-10-18)
 
 `GET /api/files/{id}/thumb?w=320|640` checks `canAccessFile` before reading a cache or returning 304. A hidden file and an absent file both return plain `attachment not found`. A stored video poster or song cover must independently pass the same boundary. Missing previews return plain `no preview`, including videos without a stored poster. This backend slice does not call Stack `media.preview`.

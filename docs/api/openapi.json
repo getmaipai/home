@@ -58490,6 +58490,9 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
                     "cover_url": {
                       "type": "string",
                       "nullable": true
@@ -58600,6 +58603,7 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_pending",
                     "cover_url",
                     "cover_versions",
                     "timed_lyrics",
@@ -58731,6 +58735,9 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
                     "cover_url": {
                       "type": "string",
                       "nullable": true
@@ -58841,6 +58848,7 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_pending",
                     "cover_url",
                     "cover_versions",
                     "timed_lyrics",
@@ -58974,6 +58982,9 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
                     "cover_url": {
                       "type": "string",
                       "nullable": true
@@ -59084,6 +59095,7 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_pending",
                     "cover_url",
                     "cover_versions",
                     "timed_lyrics",
@@ -59236,6 +59248,9 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
                     "cover_url": {
                       "type": "string",
                       "nullable": true
@@ -59346,6 +59361,7 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_pending",
                     "cover_url",
                     "cover_versions",
                     "timed_lyrics",
@@ -59505,6 +59521,9 @@
                       "type": "string",
                       "nullable": true
                     },
+                    "cover_pending": {
+                      "type": "boolean"
+                    },
                     "cover_url": {
                       "type": "string",
                       "nullable": true
@@ -59615,6 +59634,7 @@
                     "eta_seconds",
                     "position",
                     "error_line",
+                    "cover_pending",
                     "cover_url",
                     "cover_versions",
                     "timed_lyrics",

@@ -12,6 +12,7 @@ import { getMusicJobFor } from "@/lib/music/jobs";
 import { listConversationTurns } from "@/lib/conversationHistory";
 import { pictureJobsForTurn, getPictureJob } from "@/lib/pictures/jobs";
 import { saveMusicJob } from "@/lib/music/store";
+import { musicCardView } from "@/routes/music";
 import { coverPromptFor, startSongCover } from "@/lib/music/cover";
 import { listVersions, loadSource, saveVersion } from "@/lib/imageEdit";
 import { setHouseholdSettingValue } from "@/lib/settings";
@@ -46,9 +47,32 @@ describe("song covers", () => {
     expect(pictures.submitted[0]).toMatchObject({ model: "flux2-klein-4b", n: 1 });
     const prompt = String(pictures.submitted[0]!.prompt);
     expect(prompt).toContain("Pancakes"); expect(prompt).toContain("Morning light"); expect(prompt).toContain("Warm and bright"); expect(prompt).not.toContain("[Verse]"); expect(prompt).not.toContain("[Chorus]");
-    const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_url: string; cover_versions: { id: string; url: string }[] };
+    const card = await (await client.get(`/api/music/jobs/${job.id}`)).json() as { cover_pending: boolean; cover_url: string; cover_versions: { id: string; url: string }[] };
+    expect(card.cover_pending).toBe(false);
     expect(card.cover_url).toContain(done.coverFileId!); expect(card.cover_versions).toEqual([{ id: done.coverFileId!, url: card.cover_url }]);
     expect((await client.get(card.cover_url)).status).toBe(200);
+  });
+  test("cover pending follows the running picture and clears when its file is stored", async () => {
+    const { actor } = await owner(); pictures.pollsToFinish = 1000;
+    const job = await song(actor);
+    await until(() => Boolean(getMusicJobFor(actor, job.id)?.coverJobId));
+    await until(() => getPictureJob(actor, getMusicJobFor(actor, job.id)!.coverJobId!)?.state === "running");
+    expect((await musicCardView(actor, getMusicJobFor(actor, job.id)!)).cover_pending).toBe(true);
+    pictures.pollsToFinish = 0;
+    const done = await covered(actor, job.id);
+    expect(await musicCardView(actor, done)).toMatchObject({ cover_pending: false, cover_url: expect.stringContaining(done.coverFileId!) });
+  });
+  test("the startup grace expires and unavailable, private and failed songs never wait", async () => {
+    const { actor } = await owner();
+    const job = await song(actor, true);
+    const persistent = { ...job, temporary: false, conversationId: "conversation", turnId: "turn", coverJobId: null, updatedAt: new Date().toISOString() };
+    expect((await musicCardView(actor, persistent)).cover_pending).toBe(true);
+    expect((await musicCardView(actor, { ...persistent, updatedAt: new Date(Date.now() - 30_001).toISOString() })).cover_pending).toBe(false);
+    for (const state of ["failed", "cancelled"] as const) expect((await musicCardView(actor, { ...persistent, state })).cover_pending).toBe(false);
+    expect((await musicCardView(actor, job)).cover_pending).toBe(false);
+    expect((await musicCardView(actor, { ...persistent, conversationId: null })).cover_pending).toBe(false);
+    __setPictureStatusForTests(null);
+    expect((await musicCardView(actor, persistent)).cover_pending).toBe(false);
   });
   test("a cover stays a conversation attachment without a chat picture card", async () => {
     const { actor } = await owner(); const job = await song(actor); const done = await covered(actor, job.id);

@@ -15,6 +15,9 @@ export interface MusicCard {
   eta_seconds: number | null;
   position: number | null;
   error_line: string | null;
+  cover_url: string | null;
+  cover_versions: { id: string; url: string }[];
+  cover_pending: boolean;
   /** Oldest first. Each url is the owner's own audio, with Range support. */
   versions: MusicVersion[];
   current_id: string | null;

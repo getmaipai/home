@@ -611,7 +611,7 @@ function useMusicCard(id: string | undefined) {
     queryKey: ["music", id],
     queryFn: ({ signal }) => musicApi.card(id!, signal),
     enabled: id !== undefined,
-    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && MUSIC_SETTLED.has(q.state.data.state)) ? false : MUSIC_POLL_MS),
+    refetchInterval: (q) => (q.state.status === "error" || (q.state.data && MUSIC_SETTLED.has(q.state.data.state) && !(q.state.data.state === "done" && q.state.data.cover_pending)) ? false : MUSIC_POLL_MS),
   });
 }
 
@@ -674,6 +674,7 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
     <MusicTrack
       status={status}
       title={title}
+      {...(card.cover_url ? { cover: card.cover_url, coverAlt: `Cover art for ${title}` } : {})}
       {...(description ? { description } : {})}
       {...(ready ? { src: shown.url } : {})}
       progress={Math.round(card.progress * 100)}

@@ -18,7 +18,7 @@ let card: MusicCard;
 const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/files/file-one" };
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
-  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
+  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, cover_url: null, cover_versions: [], cover_pending: false, versions: [], current_id: null, length: "quick", cut: null, max_seconds: 240,
     title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, timed_lyrics: null, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
@@ -97,6 +97,26 @@ describe("MusicToolRender", () => {
     await waitFor(() => expect(view.container.textContent).toContain("Morning light"));
     expect(musicFileName("Pancakes: the \"sunny\" song/1")).toBe("Pancakes the sunny song 1.m4a");
     expect(musicFileName(null)).toBe("song.m4a");
+  });
+
+  test("a finished song shows its cover in the kit Player", async () => {
+    card = done({ cover_url: "/api/covers/pancakes" });
+    const view = mount();
+    const poster = await view.findByRole("img", { name: "Cover art for Pancakes" });
+    expect(poster.getAttribute("src")).toBe(card.cover_url);
+  });
+
+  test("a finished song polls until its cover arrives, then stops", async () => {
+    card = done({ cover_pending: true });
+    const view = mount();
+    await waitFor(() => expect(view.container.querySelector("audio")).not.toBeNull());
+    card = done({ cover_url: "/api/covers/pancakes" });
+    const poster = await view.findByRole("img", { name: "Cover art for Pancakes" }, { timeout: 3000 });
+    expect(poster.getAttribute("src")).toBe(card.cover_url);
+    const settled = calls.filter((c) => c.url === "/api/music/jobs/mus-1").length;
+    expect(settled).toBeGreaterThanOrEqual(2);
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+    expect(calls.filter((c) => c.url === "/api/music/jobs/mus-1").length).toBe(settled);
   });
 
   test("timed lyrics render as seek buttons in the Lyrics list", async () => {

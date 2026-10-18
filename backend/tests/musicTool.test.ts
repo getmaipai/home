@@ -212,7 +212,7 @@ describe("native music edits, versions and section timing", () => {
     const third = await edit(state, "restyle", { description: "a jazz version" });
     expect(third.parentFileId).toBe(original.fileId);
     expect(musicVersions(people.owner, original).map((j) => j.fileId)).toEqual([original.fileId, second.fileId, third.fileId]);
-    const card = musicCardView(people.owner, original);
+    const card = await musicCardView(people.owner, original);
     expect(card.versions.map((v) => v.label)).toEqual(["Version 1", "Version 2", "Version 3"]);
     expect(card.versions[2]!.url).toContain(`/api/music/jobs/${third.id}/files/${third.fileId}`);
     expect(card.current_id).toBe(third.fileId);

@@ -1,3 +1,6 @@
+import { getPictureJob } from "@/lib/pictures/jobs";
+import { pictureEngineReady } from "@/lib/pictures/ready";
+import { pictureDenial } from "@/lib/pictures/policy";
 import { startSongCover } from "@/lib/music/cover";
 import { listVersions } from "@/lib/imageEdit";
 import { and, eq } from "drizzle-orm";
@@ -44,7 +47,7 @@ const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   cut: z.enum(["asked", "ceiling"]).nullable(), max_seconds: z.number().nullable(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
-  cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
+  cover_pending: z.boolean(), cover_url: z.string().nullable(), cover_versions: z.array(z.object({ id: z.string(), url: z.string() })),
   timed_lyrics: z.array(z.object({ t: z.number(), line: z.string(), section: z.string().nullable() })).nullable(),
   versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
 });
@@ -71,7 +74,7 @@ function cardLyricsOf(job: MusicJob): string | null {
   const timed = sungLyricsFromLrc(job.lrc, null, { keepSqueezed: true });
   return sung.length && sung.length < timed.length ? withoutLastLines(words, timed.length - sung.length) : words;
 }
-export function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobId" | "coverFileId"> & Partial<Pick<MusicJob, "coverJobId" | "coverFileId">>) {
+export async function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobId" | "coverFileId"> & Partial<Pick<MusicJob, "coverJobId" | "coverFileId">>) {
   const root: MusicJob = { coverJobId: null, coverFileId: null, ...input };
   const versions = musicVersions(actor, root);
   const current = [...versions].sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0];
@@ -80,7 +83,15 @@ export function musicCardView(actor: PersonRow, input: Omit<MusicJob, "coverJobI
   if (shown.coverFileId && shown.conversationId) {
     try { covers = listVersions(actor, shown.conversationId, shown.coverFileId).map(({ id, url }) => ({ id, url })); } catch { /* A deleted cover leaves the song playable. */ }
   }
+  let coverPending = false;
+  if (root.state === "done" && shown.state === "done" && !shown.coverFileId && !shown.temporary && shown.conversationId && shown.turnId && !pictureDenial(musicRouteAudience(actor)) && await pictureEngineReady()) {
+    const picture = shown.coverJobId ? getPictureJob(actor, shown.coverJobId) : null;
+    coverPending = shown.coverJobId
+      ? picture?.state === "queued" || picture?.state === "running"
+      : Date.now() - Date.parse(shown.updatedAt) < 30_000;
+  }
   return {
+    cover_pending: coverPending,
     cover_url: covers.at(-1)?.url ?? null, cover_versions: covers,
     id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,
     cut: (current ?? root).request.cut ?? null, max_seconds: (current ?? root).request.max_seconds ?? null,
@@ -100,10 +111,10 @@ musicRoutes.openapi(statusRoute, async (c) => {
 });
 const getRoute = createRoute({ method: "get", path: "/jobs/{id}", tags: ["Music"], summary: "The owner's song card", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "Progress and versions." }, ...refusals } });
-musicRoutes.openapi(getRoute, (c) => {
+musicRoutes.openapi(getRoute, async (c) => {
   const actor = c.get("person"); const job = getMusicJobFor(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(musicCardView(actor, job), 200);
+  return c.json(await musicCardView(actor, job), 200);
 });
 const coverRoute = createRoute({ method: "post", path: "/jobs/{id}/cover", tags: ["Music"], summary: "Make a new cover for the shown song", middleware,
   request: { params }, responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The song card." }, ...refusals, ...errorResponses({ 409: "The song or its cover is still being made" }) } });
@@ -113,22 +124,22 @@ musicRoutes.openapi(coverRoute, async (c) => {
   const current = musicVersions(actor, root).sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt) || b.id.localeCompare(a.id))[0] ?? root;
   if (current.state !== "done") return c.json({ error: "The song is still being made. Try New cover when it is ready." }, 409) as never;
   if (await startSongCover(actor, current) === "busy") return c.json({ error: "A cover is already being made. It will show in a moment." }, 409) as never;
-  return c.json(musicCardView(actor, getMusicJobFor(actor, root.id) ?? root), 200);
+  return c.json(await musicCardView(actor, getMusicJobFor(actor, root.id) ?? root), 200);
 });
 const cancelRoute = createRoute({ method: "delete", path: "/jobs/{id}", tags: ["Music"], summary: "Stop a song being made", middleware: viewMiddleware, request: { params },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The stopped card." }, ...refusals } });
 musicRoutes.openapi(cancelRoute, async (c) => {
   const actor = c.get("person"); const job = await cancelMusicJob(actor, c.req.valid("param").id);
   if (!job) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
-  return c.json(musicCardView(actor, job), 200);
+  return c.json(await musicCardView(actor, job), 200);
 });
 const useRoute = createRoute({ method: "post", path: "/jobs/{id}/use", tags: ["Music"], summary: "Use a version for the next edit", middleware: viewMiddleware,
   request: { params, body: { content: { "application/json": { schema: z.object({ file_id: z.string().min(1).max(80) }) } } } },
   responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The selected version." }, ...refusals } });
-musicRoutes.openapi(useRoute, (c) => {
+musicRoutes.openapi(useRoute, async (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
   if (!root || !useMusicVersion(actor, root, c.req.valid("json").file_id)) return c.json({ error: "That version isn't available any more. Choose another version." }, 404) as never;
-  return c.json(musicCardView(actor, root), 200);
+  return c.json(await musicCardView(actor, root), 200);
 });
 
 // Make it full / Make it quick (owner, 2026-10-17): the same song made again at the other length, as a new version on the same card.
@@ -152,7 +163,7 @@ musicRoutes.openapi(lengthRoute, async (c) => {
   } catch (error) {
     return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never;
   }
-  return c.json(musicCardView(actor, root), 200);
+  return c.json(await musicCardView(actor, root), 200);
 });
 /** Audio seeking uses the same single-Range semantics as the video card. */
 function audioResponse(file: MusicFileHandle, rangeHeader?: string): Response {
