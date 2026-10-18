@@ -79,12 +79,12 @@ describe("setup (first-run owner creation)", () => {
 });
 
 describe("/api/auth/me age band", () => {
-  test("uses the backend band for both role and birthdate disagreements", async () => {
+  test("uses the role band regardless of birthdate", async () => {
     const owner = new TestClient();
     const { person } = await setUpOwner(owner);
     db.update(people).set({ birthdate: "2015-01-01" }).where(eq(people.id, String(person.id))).run();
     const ownerMe = (await (await owner.get("/api/auth/me")).json()) as { age_band: string };
-    expect(ownerMe.age_band).toBe("child"); // owner role, child birthdate
+    expect(ownerMe.age_band).toBe("adult"); // owner role, child-looking birthdate
 
     const created = await owner.post("/api/people", { displayName: "Bramble", role: "child", birthdate: "1990-01-01" });
     expect(created.status).toBe(201);

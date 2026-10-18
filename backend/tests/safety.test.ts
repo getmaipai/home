@@ -129,19 +129,14 @@ describe("POST /api/safety/check", () => {
     expect(body.notify_parent).toBe(true);
   });
 
-  // Session C step 7 (session-c-brain-and-voice.md): the real point of
-  // "the safety layer reads the ceiling through the band instead of the
-  // role proxy" - a birthdate on file, when present, must win over a
-  // stale or generic role label, not just agree with it by coincidence
-  // the way the test above does (a "child" role with no birthdate).
-  test("a real birthdate overrides a generic 'adult' role - a 15-year-old on an adult-labeled account still gets the minor context", async () => {
+  test("a teen role gets the minor context with a birthdate on file", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
     const fifteenYearsAgo = new Date();
     fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
     const created = await owner.post("/api/people", {
       displayName: "Marlow",
-      role: "adult",
+      role: "teen",
       secret: "0000",
       birthdate: fifteenYearsAgo.toISOString().slice(0, 10),
     });
@@ -159,18 +154,6 @@ describe("POST /api/safety/check", () => {
     expect(body.notify_parent).toBe(true);
   });
 
-  // SEC-8 (code review, 2026-09-06) reversed this test's own premise:
-  // "a birthdate on file must win over role" turned out to be a real
-  // safety hole read the other direction - routes/people.ts used to let
-  // anyone edit their OWN birthdate with no ladder check, so a "teen" or
-  // "child" role was never a reliable floor for anything if a birthdate
-  // could simply overrule it into "adult". Birthdate self-edits now need
-  // owner/admin, but lib/ageBand.ts's speakerAgeBand() no longer trusts
-  // the direction that mattered even as defense in depth: role is a
-  // FLOOR, so an account's "teen" role still gets the minor context here
-  // no matter what its birthdate says - only the OTHER direction (a
-  // birthdate that's YOUNGER than role, the test above) is still allowed
-  // to make the band stricter.
   test("a 'teen' role still triggers the minor context even when the birthdate on file says adult", async () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
@@ -303,9 +286,9 @@ describe("the crisis overlay is not configurable", () => {
     const owner = new TestClient();
     await owner.post("/api/auth/setup", { displayName: "Sage", secret: "correcthorse" });
 
-    const ages: { years: number; role: "adult" }[] = [
-      { years: 8, role: "adult" }, // birthdate wins: child band despite the role label
-      { years: 15, role: "adult" }, // teen band
+    const ages: { years: number; role: "child" | "teen" | "adult" }[] = [
+      { years: 8, role: "child" }, // child protection follows the role
+      { years: 15, role: "teen" }, // teen band
       { years: 40, role: "adult" },
     ];
     for (const { years, role } of ages) {

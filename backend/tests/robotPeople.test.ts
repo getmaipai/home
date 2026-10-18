@@ -97,9 +97,9 @@ describe("GET /api/devices/me/people", () => {
     expect((await rosterOf(robot)).people[0]!.follow_up).toBe(true);
   });
 
-  test("an adult-role person whose birthdate makes them a child cannot switch these on for themself", async () => {
+  test("a child role cannot switch these on for themself regardless of birthdate", async () => {
     const { ownerRow, add } = await setup();
-    const minor = await add("Pippa", "adult");
+    const minor = await add("Pippa", "child");
     db.update(people).set({ birthdate: `${new Date().getUTCFullYear() - 9}-01-01` }).where(eq(people.id, minor.id)).run();
     const row = db.select().from(people).where(eq(people.id, minor.id)).get()!;
     addPrint(minor.id);

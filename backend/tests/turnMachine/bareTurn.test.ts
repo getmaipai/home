@@ -124,10 +124,8 @@ describe("THIN-7C: bare mode on the default path", () => {
     await expect(runTurnNextStream(adult, "chat", "hello", { bare: true })).rejects.toBeInstanceOf(BareModeForbidden);
   });
 
-  test("an owner with a minor's birthdate on file is refused, and nothing is stored", async () => {
-    const fifteenYearsAgo = new Date();
-    fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
-    db.update(peopleTable).set({ birthdate: fifteenYearsAgo.toISOString().slice(0, 10) }).where(eq(peopleTable.id, people.owner.id)).run();
+  test("a teen role with an adult-looking birthdate is refused, and nothing is stored", async () => {
+    db.update(peopleTable).set({ role: "teen", birthdate: "1990-01-01" }).where(eq(peopleTable.id, people.owner.id)).run();
     const owner = db.select().from(peopleTable).where(eq(peopleTable.id, people.owner.id)).get()!;
     await expect(runTurnNextStream(owner, "chat", "hello", { bare: true })).rejects.toBeInstanceOf(BareModeForbidden);
     expect(db.select().from(conversationTurns).all()).toEqual([]);

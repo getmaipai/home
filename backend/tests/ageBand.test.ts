@@ -28,40 +28,20 @@ function actor(overrides: Partial<PersonRow> = {}): PersonRow {
 const NOW = new Date("2026-09-06T00:00:00.000Z");
 
 describe("speakerAgeBand()", () => {
-  test("no birthdate on file falls back to role", () => {
-    expect(speakerAgeBand(actor({ role: "child", birthdate: null }), NOW)).toBe("child");
-    expect(speakerAgeBand(actor({ role: "teen", birthdate: null }), NOW)).toBe("teen");
-    expect(speakerAgeBand(actor({ role: "adult", birthdate: null }), NOW)).toBe("adult");
-    expect(speakerAgeBand(actor({ role: "owner", birthdate: null }), NOW)).toBe("adult");
-  });
-
-  test("a real birthdate can make the band STRICTER than role, never looser", () => {
-    const fifteenYearsAgo = "2011-09-06";
-    expect(speakerAgeBand(actor({ role: "adult", birthdate: fifteenYearsAgo }), NOW)).toBe("teen");
-  });
-
-  // SEC-8 (code review, 2026-09-06): routes/people.ts lets anyone edit
-  // their OWN birthdate with no ladder check (fixed separately in
-  // routes/people.ts to require owner/admin), but that is a route-level
-  // permission, not a defense this function can rely on - a person who
-  // gets a birthdate onto their row some other way (an owner mistake, a
-  // future write path) must not be able to launder a child/teen role
-  // into a looser age band just because the birthdate says otherwise.
-  // Role is the floor.
-  test("role is a floor: an adult-looking birthdate never raises a child or teen role", () => {
-    const thirtyYearsAgo = "1996-09-06";
-    expect(speakerAgeBand(actor({ role: "teen", birthdate: thirtyYearsAgo }), NOW)).toBe("teen");
-    expect(speakerAgeBand(actor({ role: "child", birthdate: thirtyYearsAgo }), NOW)).toBe("child");
-  });
-
-  test("band boundaries: under 13 is child, 13-17 is teen, 18+ is adult", () => {
-    expect(speakerAgeBand(actor({ birthdate: "2013-09-07" }), NOW)).toBe("child"); // turns 13 tomorrow
-    expect(speakerAgeBand(actor({ birthdate: "2013-09-06" }), NOW)).toBe("teen"); // turns 13 today
-    expect(speakerAgeBand(actor({ birthdate: "2008-09-07" }), NOW)).toBe("teen"); // turns 18 tomorrow
-    expect(speakerAgeBand(actor({ birthdate: "2008-09-06" }), NOW)).toBe("adult"); // turns 18 today
-  });
-
-  test("a malformed birthdate never silently falls through to adult - falls back to role instead", () => {
-    expect(speakerAgeBand(actor({ role: "child", birthdate: "not-a-date" }), NOW)).toBe("child");
+  for (const role of ["child", "teen", "adult", "owner", "admin", "guest"] as const) {
+    test(`${role} uses only the role for every birthdate`, () => {
+      for (const birthdate of [null, undefined, "", "not-a-date", "2026-02-30", "1990-01-01", "2011-09-06", "2020-01-01", "2099-01-01"]) {
+        const person = actor({ role, birthdate });
+        if (birthdate === undefined) delete (person as Partial<PersonRow>).birthdate;
+        for (const now of [NOW, new Date("2100-01-01"), new Date(NaN)]) {
+          expect(speakerAgeBand(person, now)).toBe(role === "child" || role === "teen" ? role : "adult");
+        }
+      }
+    });
+  }
+  test("does not read birthdate", () => {
+    const person = actor({ role: "teen" });
+    Object.defineProperty(person, "birthdate", { get() { throw new Error("Birthdate must not be read"); } });
+    expect(speakerAgeBand(person, NOW)).toBe("teen");
   });
 });

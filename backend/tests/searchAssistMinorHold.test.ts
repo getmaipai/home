@@ -29,8 +29,14 @@ describe("the rescue branch in model.ts", () => {
   });
 
   test("no minor turn may hold, whatever its stored search assist record says", () => {
-    for (const state of [turn("child"), turn("teen"), turn("adult", "2012-01-01"), turn("adult", "2016-05-05")]) {
+    for (const state of [turn("child"), turn("teen"), turn("teen", "1990-01-01"), turn("child", "1990-01-01")]) {
       expect(searchAssistMayHold(state, tools)).toBe(false);
+    }
+  });
+
+  test("minor-looking birthdates leave adult rescue eligibility unchanged", () => {
+    for (const birthdate of ["2012-01-01", "2016-05-05"]) {
+      expect(searchAssistMayHold(turn("adult", birthdate), tools)).toBe(true);
     }
   });
 

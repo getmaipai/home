@@ -150,10 +150,10 @@ describe("POST/GET /api/conversations/turns/:id/feedback", () => {
     expect((await childClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down" })).status).toBe(200);
   });
 
-  test("ELEMENTS-ADOPT-02: a teen-role person whose birthdate makes them a child is refused reasons and a note", async () => {
+  test("ELEMENTS-ADOPT-02: a child role with an adult-looking birthdate is refused reasons and a note", async () => {
     const { client: ownerClient } = await owner();
-    const { client: youngClient, actor: young } = await childOf(ownerClient, "teen", "Pippa");
-    const birthdate = new Date(Date.now() - 9 * 365 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const { client: youngClient, actor: young } = await childOf(ownerClient, "child", "Pippa");
+    const birthdate = "1990-01-01";
     sqlite.query("UPDATE people SET birthdate = ? WHERE id = ?").run(birthdate, young.id);
     const id = turnFor(young, "turn-feedbackbirthdate");
     expect((await youngClient.post(`/api/conversations/turns/${id}/feedback`, { verdict: "down", note: "bad" })).status).toBe(400);

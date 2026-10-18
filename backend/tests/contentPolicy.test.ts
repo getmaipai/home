@@ -44,10 +44,10 @@ describe("content policy", () => {
     }
   });
   for (const role of ["adult", "owner", "admin", "guest", "teen", "child"]) {
-    test(`${role} keeps role defaults without a usable birthdate`, () => {
+    test(`${role} keeps role defaults for every birthdate`, () => {
       const expected: ProtectionKind[] = role === "child" ? ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"]
         : role === "teen" ? ["minor_line", "real_person", "sexual", "swearing", "gore"] : ["minor_line", "real_person"];
-      for (const birthdate of [null, undefined, "", "invalid"]) {
+      for (const birthdate of [null, undefined, "", "invalid", "1990-01-01", "2011-01-01", "2020-01-01", "2026-02-30", "2099-01-01"]) {
         const p = { ...person(role), birthdate } as PersonRow;
         if (birthdate === undefined) delete (p as Partial<PersonRow>).birthdate;
         expect([...resolver.filtersFor(p)]).toEqual(expected);
@@ -59,10 +59,10 @@ describe("content policy", () => {
       expect([...resolver.filtersFor({ ...person("child"), birthdate })]).toEqual([...resolver.filtersFor(person("child"))]);
     }
   });
-  test("valid birthdates can tighten adult role defaults", () => {
-    const year = new Date().getUTCFullYear();
-    expect([...resolver.filtersFor({ ...person("adult"), birthdate: `${year - 10}-01-01` })]).toEqual([...resolver.filtersFor(person("child"))]);
-    expect([...resolver.filtersFor({ ...person("adult"), birthdate: `${year - 15}-01-01` })]).toEqual([...resolver.filtersFor(person("teen"))]);
+  test("band resolution never reads birthdate", () => {
+    const p = person("adult");
+    Object.defineProperty(p, "birthdate", { get() { throw new Error("Birthdate must not be read"); } });
+    expect([...resolver.filtersFor(p)]).toEqual(["minor_line", "real_person"]);
   });
   test("unknown identity or role uses child defaults", () => {
     const noId = { ...person("adult") } as Partial<PersonRow>;

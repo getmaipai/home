@@ -1022,12 +1022,7 @@ describe("a role change takes effect immediately", () => {
     expect((await adminClient.get("/api/backups")).status).toBe(403);
   });
 
-  // A code review (2026-09-06, session-c-brain-and-voice.md step 7)
-  // found the identical staleness bug for birthdate: a cached session
-  // carries the whole PersonRow, so a corrected birthdate wouldn't take
-  // effect for evaluateSafety()'s own age-band accuracy (the whole point
-  // of that step) until the cache expired.
-  test("a corrected birthdate takes effect on the very next request, not after the cache expires", async () => {
+  test("a birthdate edit leaves the role band unchanged on the next request", async () => {
     const owner = await ownerSession();
     const adultLabeled = await addPerson(owner, "Rover", "adult", "roverpin1");
     const client = await sessionFor(adultLabeled.id, "roverpin1");
@@ -1044,8 +1039,8 @@ describe("a role change takes effect immediately", () => {
 
     const asTeen = await client.post("/api/safety/check", { text: "This is our secret, don't tell your parents" });
     const body = (await asTeen.json()) as Record<string, unknown>;
-    expect(body.flagged).toBe(true);
-    expect(body.notify_parent).toBe(true);
+    expect(body.flagged).toBe(false);
+    expect(body.notify_parent).not.toBe(true);
   });
 });
 

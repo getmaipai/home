@@ -61,7 +61,7 @@ describe("deterministic safety alarm path", () => {
     expect(alarm).toMatchObject({ area: "Kitchen", kind: "smoke", state: "active" });
     expect(db.select().from(notificationDeliveries).all().filter((row) => row.typeId === "safety.alarm").map((row) => row.recipientId)).toEqual([adult.id]);
     expect(db.select().from(deviceCommands).all().filter((row) => row.kind === "alarm")).toHaveLength(1);
-    db.update(people).set({ role: "adult", birthdate: `${new Date().getFullYear() - 8}-01-01` }).where(eq(people.id, childId)).run();
+    db.update(people).set({ role: "child", birthdate: `${new Date().getFullYear() - 8}-01-01` }).where(eq(people.id, childId)).run();
     expect(applyAlarmAction(childId, alarm.id, "acknowledge")).toMatchObject({ ok: false, status: 403 });
     expect(db.select().from(safetyAlarms).get()?.state).toBe("active");
     expect(applyAlarmAction(adult.id, alarm.id, "acknowledge")).toEqual({ ok: true, state: "cleared" });

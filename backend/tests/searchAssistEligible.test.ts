@@ -79,9 +79,9 @@ describe("search assist eligibility", () => {
     expect(cappedSearchAssistMode("adult", "rescue")).toBe("rescue");
   });
 
-  test("a birthdate under 18 outranks an adult role", () => {
+  test("a birthdate under 18 does not change an adult role", () => {
     const young = state({ actor: { id: "t", role: "adult", birthdate: "2012-01-01" } });
-    expect(searchAssistEligibility(young, "rescue", { now: NOW, modelToolCalls: 0 }).off_reason).toBe("gate_not_allow");
+    expect(searchAssistEligibility(young, "rescue", { now: NOW, modelToolCalls: 0 })).toEqual(searchAssistEligibility(state(), "rescue", { now: NOW, modelToolCalls: 0 }));
   });
 
   test("an unidentified robot speaker is anonymous and not scored", () => {

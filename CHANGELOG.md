@@ -8,6 +8,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 ## [Unreleased]
 
 ### Content protections
+- Age bands now follow the person's role only; birthdate does not change the speaker's band. Remaining date uses are tracked in BIRTHDATE-REMOVE-01.
 - Added the shared content policy module, band defaults, reviewed data and offline tests. Consumer wiring follows in later slices. (CONTENT-POLICY-01)
 
 ### Library

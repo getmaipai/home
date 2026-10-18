@@ -200,25 +200,13 @@ describe("trigger()", () => {
     expect(listPending(adult).length).toBe(1);
   });
 
-  // Session C step 7 (session-c-brain-and-voice.md): a code review found
-  // resolveRecipients()'s own "adults" filter used to share the same
-  // role proxy evaluateSafety() used before that step - the two agreed
-  // by construction. Once evaluateSafety() switched to the real
-  // birthdate-derived band, a role-only audience filter here could
-  // diverge from it: a minor mislabeled with an "adult" role would be
-  // excluded from evaluateSafety()'s own minor protections but still
-  // counted as an eligible "adults" recipient - for this exact
-  // notification type, a minor receiving their own (or a sibling's)
-  // flagged-turn notification, the precise leak notify_parent exists to
-  // prevent. Proves the fix: a real 15-year-old with a stale "adult"
-  // role label never receives this notification.
-  test("a minor with a stale 'adult' role label is never counted as an eligible \"adults\" recipient", async () => {
+  test("a teen role with a birthdate on file is never counted as an eligible \"adults\" recipient", async () => {
     const { client: ownerClient, row: ownerRow } = await owner();
     const fifteenYearsAgo = new Date();
     fifteenYearsAgo.setFullYear(fifteenYearsAgo.getFullYear() - 15);
     const created = await ownerClient.post("/api/people", {
       displayName: "Marlow",
-      role: "adult",
+      role: "teen",
       secret: "0000",
       birthdate: fifteenYearsAgo.toISOString().slice(0, 10),
     });

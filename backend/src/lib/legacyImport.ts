@@ -51,6 +51,7 @@ import { newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { parsePersonCandidate, personToDbValues } from "@/lib/personShape";
 import { speakerAgeBand } from "@/lib/ageBand";
+import { ageBandForBirthdate } from "@/lib/personLifecycle";
 import { remember } from "@/lib/memory";
 import { categoryToRecordKind, isCategory } from "@/lib/memoryJudge";
 import { listBackups } from "@/lib/backup";
@@ -214,14 +215,10 @@ function emptyCounts(): LegacyImportCounts {
   };
 }
 
-/** "Never auto-created for children without a parent's pick" (the plan's
- * own words): derives an age band from the legacy user's own birthdate
- * (legacy has no child/teen/adult concept, only admin|user) using the
- * exact same computation the safety layer and the prompt already share
- * (lib/ageBand.ts) - a fabricated PersonRow carrying only role/birthdate
- * is enough, since speakerAgeBand() only ever reads those two fields. */
+/** Preserve the existing import-only parent-pick guard until BIRTHDATE-REMOVE-01
+ * replaces it with explicit role selection. The speaker band is role-only. */
 function legacyUserAgeBand(birthdate: string) {
-  return speakerAgeBand({ role: "adult", birthdate } as unknown as PersonRow, new Date());
+  return ageBandForBirthdate(birthdate);
 }
 
 /** People matching (the plan: "matched by display name to existing

@@ -113,9 +113,9 @@ describe("free-text fields the music model reads (safety review finding 1)", () 
     expect(out.status).toBe("succeeded");
     expect(fake.submitted.at(-1)).toMatchObject({ key: "F# minor", language: "en" });
   });
-  test("an adult role with a minor's birthdate is refused", () => {
+  test("an adult role with a minor-looking birthdate keeps the adult band", () => {
     const fifteen = new Date(); fifteen.setFullYear(fifteen.getFullYear() - 15);
     const actor = { ...people.owner, role: "adult" as const, birthdate: fifteen.toISOString().slice(0, 10) };
-    expect(musicDenial(audience(actor, { band: "adult" }))).toBe("minor");
+    expect(musicDenial(audience(actor, { band: "adult" }))).toBeNull();
   });
 });
