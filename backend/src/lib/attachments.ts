@@ -5,7 +5,7 @@ import { deleteMusicJobsForPerson, deleteMusicJobsForTurns } from "@/lib/music/s
 // only by its validated relative storage_path.
 import { deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { createHash } from "node:crypto";
-import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, normalize, relative, resolve } from "node:path";
 import { and, eq, inArray } from "drizzle-orm";
 // Renamed from the `File` export to `FileRecordSchema` locally: `File` is a
@@ -68,6 +68,14 @@ export function attachmentFilePath(storagePath: string): string {
     throw new Error("invalid attachment storage path");
   }
   return filePath;
+}
+
+/** True when the file at path has exactly the expected size and digest (read only on a duplicate hit, which is rare). */
+function storedFileIntact(path: string, size: number, sha256: string): boolean {
+  try {
+    if (!existsSync(path) || statSync(path).size !== size) return false;
+    return createHash("sha256").update(readFileSync(path)).digest("hex") === sha256;
+  } catch { return false; }
 }
 
 function requireSeparator(): string {
@@ -180,8 +188,9 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   const stored = contentFor(sha256);
   const storagePath = stored ? stored.storagePath : storagePathFor(actor.id, id);
   const filePath = attachmentFilePath(storagePath);
-  // Write unless the one stored copy is really on disk (a missing copy is rewritten from these bytes).
-  const needsWrite = !stored || !existsSync(filePath);
+  // Write unless the one stored copy is really on disk and intact; a missing or damaged copy is rewritten from these
+  // bytes (they hash to the same digest), so a new record never inherits a broken file.
+  const needsWrite = !stored || !storedFileIntact(filePath, bytes.byteLength, sha256);
   if (needsWrite) ensureDataDir(dirname(filePath));
   const row = {
     id,

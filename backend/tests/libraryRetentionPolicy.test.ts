@@ -21,10 +21,11 @@ function fixture() {
   if (!chat.ok) throw new Error(chat.error);
   const turnId = newConversationTurnId();
   db.insert(conversationTurns).values({ id: turnId, personId: actor.id, surface: "chat", conversationId: chat.value.id, userText: "picture", replyText: "saved", source: "model", safetyAction: "allow", createdAt: now, hlc: nextHlc() }).run();
+  let distinct = 0; // LIBRARY-DEDUP-01: identical bytes are one stored file, so each fixture file gets its own bytes
   const make = (retention: "kept" | "conversation", generated = true, mediaType = "image/png") => {
     const cap = getHouseholdSettingValue("storage.household.cap_bytes");
     setHouseholdSettingValue("storage.household.cap_bytes", 0);
-    const f = createAttachment(actor, { conversationId: chat.value.id, turnId, mediaType, bytes: new Uint8Array(10), retention, deduplicate: false });
+    const f = createAttachment(actor, { conversationId: chat.value.id, turnId, mediaType, bytes: new Uint8Array(10).fill(++distinct), retention, deduplicate: false });
     setHouseholdSettingValue("storage.household.cap_bytes", cap);
     if (!f.ok) throw new Error(f.error);
     if (generated) db.update(attachments).set({ provenance: `picture-gen:${JSON.stringify({ v: 1 })}` }).where(eq(attachments.id, f.value.id)).run();

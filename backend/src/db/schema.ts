@@ -721,12 +721,16 @@ export const attachments = sqliteTable(
 // LIBRARY-DEDUP-01 (docs/design/library-2026-10-18.md section 3.16): single-instance storage. One stored blob per
 // sha256 (`file_contents`); every owner, chat, collection and share is a row in `file_references`. Bytes go only when the
 // last reference is gone. Home-internal bookkeeping, not a synced spec record, so there is no hlc.
-export const fileContents = sqliteTable("file_contents", {
-  sha256: text("sha256").primaryKey(),
-  storagePath: text("storage_path").notNull().unique(),
-  size: integer("size").notNull(),
-  createdAt: text("created_at").notNull(),
-});
+export const fileContents = sqliteTable(
+  "file_contents",
+  {
+    sha256: text("sha256").primaryKey(),
+    storagePath: text("storage_path").notNull(),
+    size: integer("size").notNull(),
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [index("file_contents_storage_path_idx").on(table.storagePath)],
+);
 
 export const fileReferences = sqliteTable(
   "file_references",

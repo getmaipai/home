@@ -1,6 +1,6 @@
 // Library storage rules are independent of chat age. No migration or Trash
 // provider here: only generated, unpinned File records can be reclaimed.
-import { and, eq, asc } from "drizzle-orm";
+import { and, eq, asc, sql } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { attachments, settingsValues } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -66,13 +66,20 @@ export function previewLibraryRetention(now = Date.now()) {
     const ready = over && state !== null && state.signature === signature(type, budgetBytes) && now - state.warnedAt >= DAY;
     return { type, ...r, effectiveThreshold: threshold, over, ready, count: 0, bytes: 0 };
   });
+  // LIBRARY-DEDUP-01: identical bytes are one stored file, so removing a record frees its bytes only when it is the
+  // last record holding them (or the other holders are removed in the same run).
+  const holders = new Map<string, number>(db.select({ sha256: attachments.sha256, n: sql<number>`count(*)` }).from(attachments).groupBy(attachments.sha256).all().map((r) => [r.sha256, Number(r.n)]));
+  const removedPerHash = new Map<string, number>();
   for (const row of candidates()) {
     const t = types.find((entry) => entry.type === typeFor(row))!;
     // Each file is counted once under its display type; generated covers other made files.
     if (!t.over || projected / budgetBytes * 100 <= t.effectiveThreshold) continue;
-    selected.push(row); t.count++; t.bytes += row.size; projected -= row.size;
+    const removed = (removedPerHash.get(row.sha256) ?? 0) + 1;
+    removedPerHash.set(row.sha256, removed);
+    const frees = removed === (holders.get(row.sha256) ?? 1) ? row.size : 0;
+    selected.push(row); t.count++; t.bytes += frees; projected -= frees;
   }
-  return { usageBytes, budgetBytes, budgetSource: "storage.household.cap_bytes" as const, configured: budgetBytes > 0, percent, count: selected.length, bytes: selected.reduce((n, r) => n + r.size, 0), types, files: selected.map((r) => ({ id: r.id, type: typeFor(r)!, size: r.size })) };
+  return { usageBytes, budgetBytes, budgetSource: "storage.household.cap_bytes" as const, configured: budgetBytes > 0, percent, count: selected.length, bytes: types.reduce((n, entry) => n + entry.bytes, 0), types, files: selected.map((r) => ({ id: r.id, type: typeFor(r)!, size: r.size })) };
 }
 let running: Promise<{ deleted: number; bytes: number }> | null = null;
 export function runLibraryRetention(now = Date.now()): Promise<{ deleted: number; bytes: number }> {
@@ -112,8 +119,8 @@ async function run(now: number) {
     deletePictureJobsForFiles(ids);
     for (const row of rows) {
       const blob = purgeFileRecord(row);
-      if (blob) blobs.push(blob);
-      deleted++; bytes += row.size;
+      if (blob) { blobs.push(blob); bytes += row.size; } // bytes are freed only when the last record of them goes
+      deleted++;
     }
   })();
   removeFileBlobs(blobs);

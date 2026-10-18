@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "6df2d9f7-0d5e-49c7-9341-9f9846539ade",
+  "id": "8f5dba09-cdc8-4ff9-a970-d71b9ca9785a",
   "prevId": "75584613-c6c5-4204-b0e5-f5933265c3fa",
   "tables": {
     "app_update_state": {
@@ -2749,12 +2749,12 @@
         }
       },
       "indexes": {
-        "file_contents_storage_path_unique": {
-          "name": "file_contents_storage_path_unique",
+        "file_contents_storage_path_idx": {
+          "name": "file_contents_storage_path_idx",
           "columns": [
             "storage_path"
           ],
-          "isUnique": true
+          "isUnique": false
         }
       },
       "foreignKeys": {},

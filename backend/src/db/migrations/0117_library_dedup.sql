@@ -10,7 +10,7 @@ CREATE TABLE `file_contents` (
 	`created_at` text NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `file_contents_storage_path_unique` ON `file_contents` (`storage_path`);--> statement-breakpoint
+CREATE INDEX `file_contents_storage_path_idx` ON `file_contents` (`storage_path`);--> statement-breakpoint
 CREATE TABLE `file_references` (
 	`id` text PRIMARY KEY NOT NULL,
 	`sha256` text NOT NULL,

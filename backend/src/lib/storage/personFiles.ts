@@ -39,11 +39,11 @@ import { pruneUnreachableShares } from "@/lib/shares";
 
 /** A pointer that still gives a living person other than the departing
  * one a way to see the file: to the household, or to an active person. A
- * pointer to someone deleted before this rule existed reaches nobody. A
- * same-bytes pointer (attachments.ts's grantDedupeShare) counts: the other
- * person's own upload IS this record, so purging it would take their
- * picture too. The one definition both the preview and the step read, so
- * what the confirmation says is what the delete does. */
+ * pointer to someone deleted before this rule existed reaches nobody.
+ * (Identical uploads are no longer pointers: LIBRARY-DEDUP-01 gives each
+ * person their own record on one stored file, and migration 0117 converted
+ * the old same-bytes pointers.) The one definition both the preview and the
+ * step read, so what the confirmation says is what the delete does. */
 function hasLiveShareBeyond(fileId: string, departingPersonId: string): boolean {
   const targets = db.select({ to: shares.to }).from(shares).where(eq(shares.fileId, fileId)).all();
   return targets.some((share) => {

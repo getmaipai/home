@@ -49,6 +49,7 @@ import { trigger, deliverHeldNotifications } from "@/lib/notifications";
 import { checkDiskFull } from "@/lib/storage";
 import { reconcileFileStore } from "@/lib/storage/usage";
 import { reclaimQueuedBlobs } from "@/lib/fileBlobs";
+import { syncAllFileReferences } from "@/lib/fileContent";
 import { checkForUpdates } from "@/lib/updates";
 import { runListSync } from "@/lib/blocklists/listSync";
 import { isStackConfigured } from "@/lib/stackEngine";
@@ -266,8 +267,9 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // STORE-CAP-01: bytes on disk with no File record, or a record with no
   // bytes - reported as a health item, never purged (lib/storage/usage.ts's
   // reconcileFileStore()).
-  "storage.reconcile_files": () => {
-    reclaimQueuedBlobs(); // LIBRARY-DEDUP-01: duplicate copies the migration folded into one stored file
+  "storage.reconcile_files": async () => {
+    await reclaimQueuedBlobs(); // LIBRARY-DEDUP-01: duplicate copies the migration folded into one stored file
+    syncAllFileReferences(); // and any reference row a write path missed
     reconcileFileStore();
   },
   // MINOR-SEARCH-01e-4: blocked-site lists. Hourly tick; the job itself keeps the daily (or hourly until the

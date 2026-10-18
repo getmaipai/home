@@ -14,14 +14,21 @@ Built 2026-10-18 as LIBRARY-DEDUP-01 (design: [library-2026-10-18.md](../design/
   `syncFileReferences(fileId)` recomputes them from the records that hold the file; call it after any change to the record, its
   shares or the media item. `referenceDrift()` reports rows that no record explains and records that lack a row.
 - `file_blob_removals`: duplicate copies the migration folded into one path, removed by `lib/fileBlobs.ts`
-  `reclaimQueuedBlobs()` at startup and in the daily storage job. The one stored file is confirmed on disk first; if it is
-  missing, a queued copy is moved into its place instead of deleted.
+  `reclaimQueuedBlobs()` in the background at startup and in the daily storage job (hashing is streamed, never on the boot
+  path). The one stored file must exist and hash to the content row's sha256 before a duplicate is deleted; if it is missing
+  or damaged, the duplicate with the right bytes is moved into its place instead. The daily job also repairs any reference row
+  a write path missed (`syncAllFileReferences`).
 
 ## Byte lifetime
 
 `purgeFileRecord(row)` drops the record, its shares and its references, then asks `releaseContent`. Bytes are returned for
 unlinking only when no reference and no other record names the hash. So deleting one person's copy, a chat, or a share never
 removes bytes that another owner, chat, collection or share still holds, in either order.
+
+## Retention and "inherited" usage
+
+Library retention frees a record's bytes only when it is the last record holding them, in the preview and in the run.
+"Inherited" household usage counts only bytes that no active person also holds.
 
 ## Usage and caps
 

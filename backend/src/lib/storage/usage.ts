@@ -13,9 +13,9 @@ import { DOCUMENT_MEDIA_TYPES, isDocumentMediaType } from "@/lib/documentMediaTy
 // there is no join through a share pointer here that could double it.
 import { statSync } from "node:fs";
 import { relative } from "node:path";
-import { eq, isNotNull, sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, sqlite } from "@/db";
-import { attachments, fileBlobRemovals, fileContents, people as peopleTable } from "@/db/schema";
+import { attachments, fileBlobRemovals, fileContents } from "@/db/schema";
 import { attachmentsDir, dataDir } from "@/lib/paths";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
@@ -63,12 +63,16 @@ export function householdUsageBytes(): number {
  * the design record's one household row for them, "shared by people no
  * longer here". */
 export function householdInheritedUsage(): { files: number; bytes: number } {
-  const row = db
-    .select({ files: sql<number>`count(*)`, bytes: sql<number>`coalesce(sum(${attachments.size}), 0)` })
-    .from(attachments)
-    .innerJoin(peopleTable, eq(attachments.ownerPersonId, peopleTable.id))
-    .where(isNotNull(peopleTable.deletedAt))
-    .get();
+  // LIBRARY-DEDUP-01: identical bytes are one stored file, so a departed person's bytes that an active person also holds
+  // are that person's usage already; only bytes held solely by departed owners are "inherited".
+  const row = sqlite
+    .query(
+      `select count(*) as files, coalesce(sum(size), 0) as bytes from (
+         select a.sha256, max(a.size) as size from attachments a join people p on p.id = a.owner_person_id
+         group by a.sha256
+         having sum(p.deleted_at is null) = 0)`,
+    )
+    .get() as { files: number; bytes: number } | null;
   return { files: Number(row?.files ?? 0), bytes: Number(row?.bytes ?? 0) };
 }
 

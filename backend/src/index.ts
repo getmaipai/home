@@ -32,7 +32,7 @@ import { raiseIssue } from "@/lib/issues";
 import { startWyomingServer } from "@/lib/wyomingServer";
 import { websocket } from "hono/bun";
 import { seedHlcFromDatabase } from "@/lib/hlc";
-import { reclaimQueuedBlobs } from "@/lib/fileBlobs";
+import { reclaimQueuedBlobsInBackground } from "@/lib/fileBlobs";
 import { recoverInterruptedJobsAtBoot } from "@/lib/modelDownloadJobs";
 import { startupUrls } from "@/lib/startupUrls";
 import { detectLanIps } from "@/lib/hubEndpoints";
@@ -92,8 +92,8 @@ setWarmupPrompt(turnWarmupPrompt);
 // module-load seeding, still there - see lib/hlc.ts's own header on why
 // the wider seed lives here instead of scattered per-table).
 seedHlcFromDatabase();
-// LIBRARY-DEDUP-01: remove duplicate copies of identical files the migration folded into one stored file.
-try { const reclaimed = reclaimQueuedBlobs(); if (reclaimed.removed + reclaimed.promoted > 0) console.log(`[storage] folded duplicate files: ${reclaimed.removed} removed, ${reclaimed.promoted} moved into place`); } catch (error) { console.error(`[storage] could not fold duplicate files yet: ${(error as Error).message}`); }
+// LIBRARY-DEDUP-01: remove duplicate copies of identical files the migration folded into one stored file (off the boot path).
+reclaimQueuedBlobsInBackground();
 ensureSetupState(restoreWasApplied ? "restore" : "wizard");
 // Remote Stack links are optional boot work. The state machine starts its
 // SSH/DNS/probe work asynchronously, so a missing or offline engine never

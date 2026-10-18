@@ -14,7 +14,7 @@ import { attachmentFilePath, createAttachment, deleteAttachmentsForTurns, getAtt
 import { contentFor, dedupReport, referenceCount, referenceDrift, referenceKinds, syncFileReferences } from "@/lib/fileContent";
 import { reclaimQueuedBlobs } from "@/lib/fileBlobs";
 import { createShare, deleteShare } from "@/lib/shares";
-import { personUsageBytes, householdUsageBytes } from "@/lib/storage/usage";
+import { personUsageBytes, householdInheritedUsage, householdUsageBytes } from "@/lib/storage/usage";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
@@ -110,6 +110,16 @@ describe("one stored file, one record per owner", () => {
     expect(remove(b.id)).toBe(a.storage_path);
   });
 
+  test("a damaged stored file is rewritten from new bytes of the same hash", () => {
+    const sage = person("owner", "Sage");
+    const lucia = person("adult", "Lucia");
+    const first = upload(sage, "damaged one");
+    writeFileSync(attachmentFilePath(first.storage_path), "damaged on");
+    const second = upload(lucia, "damaged one");
+    expect(readFileSync(attachmentFilePath(second.storage_path), "utf8")).toBe("damaged one");
+    expect(readAttachment(sage, first.id).ok).toBe(true);
+  });
+
   test("a missing stored file is written again from new bytes of the same hash", () => {
     const sage = person("owner", "Sage");
     const lucia = person("adult", "Lucia");
@@ -118,6 +128,19 @@ describe("one stored file, one record per owner", () => {
     const second = upload(lucia, "healing");
     expect(readFileSync(attachmentFilePath(second.storage_path), "utf8")).toBe("healing");
     expect(readAttachment(sage, first.id).ok).toBe(true);
+  });
+});
+
+describe("usage of a departed person's files", () => {
+  test("bytes an active person also holds are not counted as inherited", () => {
+    const sage = person("owner", "Sage");
+    const gone = person("adult", "Marsh");
+    const shared = upload(gone, "held by both");
+    upload(sage, "held by both");
+    const alone = upload(gone, "held by marsh only");
+    db.update(people).set({ deletedAt: new Date().toISOString() }).where(eq(people.id, gone.id)).run();
+    expect(householdInheritedUsage()).toEqual({ files: 1, bytes: alone.size });
+    expect(householdUsageBytes()).toBe(shared.size + alone.size);
   });
 });
 
@@ -207,24 +230,31 @@ describe("startup reclaim of the duplicate copies the migration queued", () => {
     db.insert(fileBlobRemovals).values({ storagePath: duplicatePath, queuedAt: new Date().toISOString() }).run();
     return { canonicalPath, duplicatePath };
   }
-  test("the duplicate is removed once the one stored file is confirmed on disk", () => {
+  test("the duplicate is removed once the one stored file is confirmed on disk and hashes right", async () => {
     const { canonicalPath, duplicatePath } = seed("duplicate A", true);
-    expect(reclaimQueuedBlobs()).toEqual({ removed: 1, promoted: 0, kept: 0, dropped: 0 });
+    expect(await reclaimQueuedBlobs()).toEqual({ removed: 1, promoted: 0, kept: 0, dropped: 0 });
     expect(existsSync(attachmentFilePath(canonicalPath))).toBe(true);
     expect(existsSync(attachmentFilePath(duplicatePath))).toBe(false);
     expect(db.select().from(fileBlobRemovals).all()).toHaveLength(0);
   });
-  test("when the one stored file is missing, the duplicate is moved into its place instead of deleted", () => {
+  test("when the one stored file is missing, the duplicate is moved into its place instead of deleted", async () => {
     const { canonicalPath, duplicatePath } = seed("duplicate B!", false);
-    expect(reclaimQueuedBlobs()).toEqual({ removed: 0, promoted: 1, kept: 0, dropped: 0 });
+    expect(await reclaimQueuedBlobs()).toEqual({ removed: 0, promoted: 1, kept: 0, dropped: 0 });
     expect(readFileSync(attachmentFilePath(canonicalPath), "utf8")).toBe("duplicate B!");
     expect(existsSync(attachmentFilePath(duplicatePath))).toBe(false);
   });
-  test("a path a record still names is never removed", () => {
+  test("when the one stored file is damaged, the good duplicate replaces it instead of being deleted", async () => {
+    const { canonicalPath, duplicatePath } = seed("duplicate D!!", true);
+    writeFileSync(attachmentFilePath(canonicalPath), "truncated");
+    expect(await reclaimQueuedBlobs()).toEqual({ removed: 0, promoted: 1, kept: 0, dropped: 0 });
+    expect(readFileSync(attachmentFilePath(canonicalPath), "utf8")).toBe("duplicate D!!");
+    expect(existsSync(attachmentFilePath(duplicatePath))).toBe(false);
+  });
+  test("a path a record still names is never removed", async () => {
     const { duplicatePath } = seed("duplicate C", true);
     const sage = db.select().from(people).get()!;
     db.insert(attachments).values({ id: "file-stillnamed", ownerPersonId: sage.id, conversationId: null, turnId: null, mediaType: "image/png", size: 3, sha256: sha("other"), storagePath: duplicatePath, retention: "kept", provenance: "composer:upload", createdAt: new Date().toISOString(), hlc: nextHlc() }).run();
-    expect(reclaimQueuedBlobs().dropped).toBe(1);
+    expect((await reclaimQueuedBlobs()).dropped).toBe(1);
     expect(existsSync(attachmentFilePath(duplicatePath))).toBe(true);
   });
 });

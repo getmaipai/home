@@ -53,9 +53,18 @@ export function syncFileReferences(fileId: string): void {
   for (const entry of have) if (!wantedKeys.has(key(entry.kind, entry.holderId)) || entry.sha256 !== row.sha256) db.delete(fileReferences).where(eq(fileReferences.id, entry.id)).run();
   const now = new Date().toISOString();
   for (const entry of wanted) {
-    if (haveKeys.has(key(entry.kind, entry.holderId)) && have.some((h) => h.kind === entry.kind && h.holderId === entry.holderId && h.sha256 === row.sha256)) continue;
+    if (haveKeys.has(key(entry.kind, entry.holderId)) && have.some((h) => h.kind === entry.kind && h.holderId === entry.holderId && h.sha256 === row.sha256)) continue; // already current
     db.insert(fileReferences).values({ id: newFileReferenceId(), sha256: row.sha256, fileId, kind: entry.kind, holderId: entry.holderId, createdAt: now }).onConflictDoNothing().run();
   }
+}
+
+/** The daily repair: recompute every record's references, so a write path that missed a sync cannot leave drift. */
+export function syncAllFileReferences(): number {
+  let repaired = 0;
+  const drift = referenceDrift();
+  const touched = new Set([...drift.missing, ...drift.extra].map((entry) => entry.split("|")[0]!));
+  for (const fileId of touched) { syncFileReferences(fileId); repaired += 1; }
+  return repaired;
 }
 
 export function dropFileReferences(fileId: string): void {
