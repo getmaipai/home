@@ -47,7 +47,7 @@ STACK_REPO="getmaipai/stack"
 # the Chatterbox Turbo voice engine (VOICE-STUDIO-01). A bump to this line
 # must be checked against every one of those: an old value silently rebuilds
 # the Stack without them.
-STACK_TAG="232221f1b07c93412d6400297d7285c70c1d0bb8"
+STACK_TAG="a89e7ffdd88eeb55f0f0bd63832362f885ff3609"
 # The Stack at STACK_TAG names its Commons packages in backend/package.json as
 # file:../../commons-tags/<package>-<tag>/<package> (core-v0.1.0 and spec-v0.1.136 today). Those
 # names are read from that file after the Stack is fetched (stack_commons_deps), so they cannot
@@ -1058,6 +1058,7 @@ commons_archive_sha256() {
     ui-v0.5.265) printf '%s\n' "3870aff8af85909daca142f31e70a3da7e32ac871e22658840ffab2c7256e5c8" ;;
     spec-v0.1.173) printf '%s\n' "642b52e8cad4e859db1c2d36204521c2e395c8381ce17bbe3979e4b3a2a19dd7" ;;
     spec-v0.1.175) printf '%s\n' "02dbd96aa478b811eeea04cf267de0067836414c8e9d609557e366a9b7a3a5ac" ;;
+    spec-v0.1.178) printf '%s\n' "e551ca0da659cd95416df4f7b47ad55d8fe35f3eaa4907f628c18d9a834cbec9" ;;
     *) return 1 ;;
   esac
 }

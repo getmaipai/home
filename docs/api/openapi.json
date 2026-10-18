@@ -26182,6 +26182,42 @@
                     ],
                     "description": "The effective local camera watch level the robot reports to the hub, using the strictest applicable person and device setting."
                   },
+                  "media": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "media_id": {
+                            "type": "string",
+                            "pattern": "^media-"
+                          },
+                          "position_s": {
+                            "type": "number",
+                            "minimum": 0
+                          },
+                          "playing": {
+                            "type": "boolean"
+                          },
+                          "updated_at": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "media_id",
+                          "position_s",
+                          "playing",
+                          "updated_at"
+                        ],
+                        "additionalProperties": false,
+                        "description": "A hub-local projection of timed media playback. It is never synced and carries no title, device name or person id. updated_at uses the hub clock."
+                      },
+                      {
+                        "nullable": true
+                      }
+                    ],
+                    "description": "HANDOFF-01: what this device is playing now, or null. Optional: a robot that never sends it is unchanged."
+                  },
                   "presence": {
                     "type": "string",
                     "enum": [
