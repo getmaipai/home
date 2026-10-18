@@ -5,9 +5,13 @@ import areasFile from "@maipai/spec/settings/areas.json";
 import type { SettingsAreaDef } from "@maipai/ui/src/settings/settingsAudience";
 
 // NEWS-03, spec-owed: the News package owns its shelf card; remove the pinned Search placement.
+// CODE-SET-01 builds the Coding screens. Until it lands, the spec's `coding` sections (home and account) stay hidden so nobody
+// sees switches and limits that do nothing yet. Remove this filter in that slice.
+const NOT_YET_BUILT_SECTIONS = new Set(["coding"]);
+
 export const SETTINGS_AREAS = (areasFile.areas as unknown as SettingsAreaDef[]).map((area) => ({
   ...area,
-  sections: area.sections.map((section) => ({
+  sections: area.sections.filter((section) => !NOT_YET_BUILT_SECTIONS.has(section.id)).map((section) => ({
     ...section,
     ...(section.cards ? { cards: section.cards.filter((card) => card.group !== "household.news") } : {}),
   })),

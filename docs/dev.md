@@ -36,6 +36,9 @@ Changed files: `backend/src/lib/apiKeys.ts` (was `apiToken.ts`), `backend/src/li
 `backend/src/db/schema.ts`, `backend/src/db/migrations/0120_api_keys.sql`, `backend/src/middleware/auth.ts`, `backend/src/routes/openai.ts`,
 `backend/src/routes/settings.ts`, `backend/src/lib/wyomingServer.ts`, `.gitleaks.toml`, `docs/api/openapi.json`.
 
+
+The spec pin 0.1.185 also declares `coding` sections in the home and account settings areas. Home hides them (`NOT_YET_BUILT_SECTIONS` in `frontend/src/shell/pages/settings/settingsAreas.ts`) until CODE-SET-01 builds the Coding screens, so no one sees switches that do nothing yet; the `coding.*` keys still exist in the registry and API.
+
 ## Music chat covers (2026-10-18)
 
 The chat song card passes stored cover art to MusicTrack and keeps its existing poll running while the cover picture is queued or running, with a 30 second startup grace and no wait for private chats or an absent picture engine.
