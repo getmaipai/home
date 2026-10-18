@@ -134,7 +134,7 @@ Did MaiPai save something you said? A **Memory updated** chip shows up under its
 
 ## Pictures Home makes
 
-Adults can ask chat to draw a picture or make a short video, and to animate a picture. See [Pictures](pictures.md) and [Videos](videos.md).
+Adults can ask chat to draw a picture or make a short video, and to animate a picture. See [Pictures](pictures.md) and [Videos](videos.md). Adults can also ask for a song and change it by asking. See [Songs](songs.md).
 
 ## Start a new conversation
 

@@ -288,6 +288,12 @@
         "settings"
       ]
     },
+    "user/everyday-use/make-songs": {
+      "areas": [
+        "chat",
+        "settings"
+      ]
+    },
     "user/everyday-use/use-the-weather-app": {
       "areas": [
         "chat"
