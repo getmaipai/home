@@ -179,6 +179,77 @@ Tests, all hermetic with a scripted engine (no live service): a chat engine that
 slow engine, a search that is blocked, the 2 in a row flapping guard, the no-residue snapshot, schedule and jitter, no checks
 during an install, a job or low memory, and the search quota.
 
+## Root causes seen 2026-10-17 and prevention
+
+Jesse, 2026-10-17: "Besides healing, you need to figure out why we get into this state and prevent it." Healing (the layers
+above) worked every time: each outage below ended in 2 to 15 seconds. This section names what caused each outage, from the
+Stack log (`stack/data/logs/stack.log`), the macOS unified log, the live hub database and the agent transcripts, and ranks the
+prevention. Times are UTC. The hub log (`hub.log`) is root-only and was not read.
+
+### The turn that showed "cancelled" (01:19:52Z)
+
+A hidden 60 second timer cancelled it, not an engine. `RESUME_TTL_MS = 60_000` (`backend/src/routes/turn.ts:61`) is meant to
+keep a finished turn's replay buffer for a reconnecting client, but its `setTimeout` is armed when the turn starts
+(`turn.ts:1054`) and aborts the turn if it is not finished (`controller.abort()`, `turn.ts:1060`). It is never re-armed or cleared.
+Every turn that runs longer than 60 s is cut: the row shows `total_time_ms` 60316, no generation record, and the stream sends
+`turn_cancelled`. That is a wall-clock cap on an adult written reply, which RULES.md rule 5 (DEADLINE-02) forbids, and it sits
+under the real first-token limit (90 s, `turnMachine/budget.ts:18`). The reply was slow because the chat engine, restarted at
+00:49 with a cold cache, shared the GPU with a 125 s video generation on the live Stack (01:19:17Z to 01:21:22Z) while the
+machine load average was 10. No Home `video_jobs` row exists for that job: a dev Home or a script pointed at the live Stack
+submitted it ("Cancelled by Home." on two more such jobs at 01:23).
+
+### Every unexpected stop, with its cause
+
+| When (UTC) | What stopped | Cause | Evidence |
+|---|---|---|---|
+| 05:51 to 21:52, 25 times | all five roles, the Stack itself ("The Stack is stopping.") | Agents restarting the live Stack: `launchctl kickstart -k gui/501/com.maipai.stack`, `launchctl bootstrap`, and `sudo maipai-install vX` (rollout smoke) | Stack log, 26 stop sequences; the matching Bash calls in agent transcripts at 05:20, 05:51, 05:54, 05:56, 06:13, 06:51, 14:01:52 (install v0.2.9), 14:41:45 (install v0.2.12), 17:40:06, 21:52. Fourteen of the 25 have no matching command that I could find |
+| 14:48:13 | chat and embed (reloaded 14:49:37 and 14:50:10) | A chat-pause test agent ran `pkill -f "bun src/index.ts" -u 501 --parent 1` | agent transcript 14:48:13Z; Stack log shows the reloads 84 s later. The Stack log has no `engine.exit` or self-heal line for it, so the match rests on the timing alone |
+| 19:00:55 | embed and judge (exit 0 after 68 s and 66 s), then chat "failed" and healed 19:01:24 | Probably `pkill -f "bun run src/index.ts" -n` run by a release agent at 19:00:53.7Z | Stack log lines 989 to 1006; the 2 s match is strong, the mechanism for `-n` is not proven |
+| 00:27:49 | chat ("Stopped by Home.", back 00:28:02) | `POST /stack/v1/engines/omlx/stop` from the coordinator session, the intended switch back to llama-server; the route stops the whole chat role | transcript 00:27:48.9Z; Stack log `role.state chat installed ... Stopped by Home.` at 00:27:49.062 |
+| 00:49:51 | stt, embed, judge, chat, all `exitCode 0`, `cause unknown`, healed in 2 to 11 s | `pkill -f "src/index.ts" -u 501` run by a kidsettings subagent at 00:49:48.862Z | macOS log: `launchd ... spotlightknowledged.updater exited due to SIGTERM \| sent by pkill[3633]` at 20:49:49.017 local; the dev llama-server 6172 died 108 ms later; Stack log lines 1140 to 1163 |
+| 14:50, 15:12, 15:38, 16:23, 17:40, 21:54, 23:36, 23:39 | memory `critical`: the voice engine unloaded, the judge evicted, video generation cancelled (21:54, 23:36) | Other programs held more than 30 GB (the Stack's own engines hold about 35 GB of 128 GB). Largest holders: a bun test process at 43.9 GB (`wt/home-keen-falcon-news-02b/backend`, 16:23), a python image-edit process at 29.4 GB (scratchpad `edit`, 15:38), four Vite dev servers at 8.5, 4.9, 3.8 and 1.3 GB (17:40), a musicland worktree stack at 6.2 GB (21:54, 23:36). Kernel level 4 with 19 GB of swap at 15:12 | `memory.dev-load` events in the Stack log, each listing pid, GB and cwd. At 16:23:15 and 16:23:52 the coordinator session also restarted the 17 GB MLX chat engine (`POST engines/omlx/restart`), landing exactly on the critical event; at 17:40:06 an agent ran `launchctl kickstart` and critical followed in 38 s |
+| 12:17 onward, still running | about 12 `bun ... data-test/run-*/engines/pocket-tts` and 5 `nodeshim ... e.js` processes | Test runs that exited without stopping their children | `ps` start times 12:17 to 19:45 local; they hold memory and ports for hours |
+
+No row is a real engine crash. Every engine exit was a signal or a stop from outside the Stack. The canary did not misfire: the
+Stack log has no `engine.restart_requested_by_canary` line, and no `requested_by_canary` self-heal event exists.
+
+### The mechanism of the two mass kills
+
+macOS `pkill` takes every operand after the first as another pattern. `pkill -f "src/index.ts" -u 501` is therefore three
+patterns, `src/index.ts`, `-u` and `501`, matched with `-f` against the full command line. `-u` is a substring of
+llama-server's `-ub` flag, `--user-data-dir` (Claude and Chrome helpers) and the Spotlight updater's own `-u`; `501` is in every `/private/tmp/claude-501/...` path. Reproduced read-only on 2026-10-18: `pgrep -f
+"src/index.ts" -u 501` matched 52 processes including all three live llama-servers, while `pgrep -u 501 -f "src/index.ts"`
+matched 3. Option order is the whole difference. The Stack's supervisor sees only `exit 0, no signal requested`, so it cannot tell
+this from a clean stop and records `cause unknown`.
+
+### Why Home's own tests are not the cause
+
+`backend/tests/preload.ts` gives every Home test a scripted Stack fixture (`stackFixture`), and the Home tests that mention
+`127.0.0.1:8770` only store the URL as a setting value. The live-port callers are ad hoc: dev Homes whose
+`engines.stack.url` was set to `http://127.0.0.1:8770` (08:22, 08:24, 15:38), a release smoke script with
+`STACK = "http://127.0.0.1:8770"` (21:05, including `POST /stack/v1/engines/self-heal/restart`), and agents using `curl -X
+POST` against `:8770` for installs, `settings/apply`, `engines/*/restart` and `engines/*/stop`. The Stack has no authentication
+for any of these: `stack/backend/src/app.ts` says "loopback is the whole authentication".
+
+### Prevention, ranked
+
+| # | Prevention | Stops | Cost | Where |
+|---|---|---|---|---|
+| 1 | Remove the 60 s turn timer: arm `RESUME_TTL_MS` only when the turn reaches a terminal state, and clear it on a fresh subscriber. A turn is never aborted by a wall clock the rules do not give it | The "cancelled" turn | S | `backend/src/routes/turn.ts:61,1054` |
+| 2 | Engines ignore stray signals. Start each engine child through `sh -c 'trap "" TERM INT HUP; exec ...'` (ignored signals survive `exec`), and let the supervisor stop it with SIGKILL after a drain (llama-server and the speech worker hold no state to flush). A stray `pkill` then does nothing | Both mass kills, any future `pkill` or `kill` | S | `stack/backend/src/lib/supervisor.ts` (spawn and `stopRole`) |
+| 3 | An agent guard, as a hook beside `origin-guard.sh`: deny `pkill` or `killall` with `-f` or with an operand after the first, `launchctl kickstart\|bootout\|bootstrap` on `com.maipai.*`, `sudo maipai-install` and any non-GET call to `:8770` or `:3000` unless the command carries `ALLOW_LIVE=1`; the denial names the rule and the safe form (`pkill -u 501 -f pattern`, or a pid file) | Agent kills, restarts and installs on the live machine | S | `.github` `standards/bin/live-guard.sh`, the shared plugin hooks |
+| 4 | The Stack's mutating routes need a Home credential: a random token the installer writes to a 0600 file in the Stack data directory and into Home's credential store; Home sends it as a header; GETs, `/healthz` and `/v1/*` generation calls stay open. Covers engine stop, start, restart, `settings` PUT and apply, components install and uninstall, updates, job cancel | A stray test, script or dev Home changing the live Stack over HTTP | M | `stack/backend/src/app.ts` (middleware), `routes/engines.ts:232`, `settings.ts`, `components.ts`, `updates.ts`, `jobs.ts`; Home `lib/stack/` client; `docs/CREDENTIALS.md` |
+| 5 | Dev Homes and scripts refuse the live port: Home's `stackUrl()` (`lib/ports.ts:20`) throws by name when the process data directory is not the live one and the URL resolves to 8770, unless `MAIPAI_ALLOW_LIVE_STACK=1`; `scripts/gate/shardTests.ts:247` and the proof scripts default to a stub | Dev Homes and smoke scripts reaching the live Stack | S | `backend/src/lib/ports.ts`, `lib/stackEngine.ts`, `scripts/gate/shardTests.ts` |
+| 6 | A turn that loses its engine mid-stream is retried once after the engine is back, instead of showing "cancelled": on `engine_unavailable` or "stream ended before the engine finished", wait for the role to be `ready` (the self-heal window is 2 to 15 s), then run the model node once more with the same context; the second failure shows the existing calm error | Visible failures during any heal | M | `backend/src/lib/turnMachine/nodes/model.ts` (`runOneGeneration`), `turnNext.ts:1055` |
+| 7 | Admission priorities in the memory governor: chat > voice > memory judge > picture and video. Never unload voice or the judge while a conversation was active in the last 5 minutes; a video or picture job waits (queued, Status shows why) while a chat request is in flight or the level is `warn` or worse, and the governor cancels a job only after pausing it fails | Voice and judge eviction, video starving chat | M | `stack/backend/src/lib/memoryWatchdog.ts`, `lib/supervisor.ts`, the job queue in `routes/jobs.ts` |
+| 8 | Name an outside stop: an `engine.exit` with exit code 0, no signal and no supervisor request, on two or more roles within 5 s, is recorded as `external_stop` (not `unknown`), does not count toward the circuit breaker, and raises one Repairs item "Something outside MaiPai stopped the engines" with the time; three `unknown` exits for one role in 30 minutes raise "engine keeps stopping" | Silent repeated exits | S | `stack/backend/src/lib/selfHeal.ts`, `supervisor.ts` exit classifier; Home Repairs mapping |
+| 9 | Dev-load discipline: the governor already reports `memory.dev-load`; add a reaper in `scripts/wt.sh` that lists, and after an hour kills, processes whose cwd is under `wt/*` or a scratchpad and that hold more than 12 GB or were left by a finished test run (`data-test/run-*`); the Stack test harness kills its children on exit through a process group | Memory `critical` from agent processes; leaked test processes | S | `.github` `standards/bin/wt.sh` (`reap`), `stack/backend/tests` harness |
+
+Order of work: 1, 2 and 3 together stop every failure seen tonight at low cost. 4 and 5 close the HTTP path. 6 is what Jesse
+sees when something still goes wrong. 7 to 9 reduce the memory pressure behind the critical events.
+
+Items 1 and 6 are Home. Items 2, 4, 7, 8 are the Stack repo. Items 3, 9 are `.github`. Item 5 is Home plus its scripts.
+
 ## Supersedes
 
 Nothing. It adds a layer and a schedule beside CHAT-PAUSE-01 and SELFHEAL-01 and changes none of their behaviour.
