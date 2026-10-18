@@ -7,13 +7,15 @@ description: Read stories from the feeds your home chose.
 
 Open **News** from your apps. It reads the same [news shelf](news-shelf.md) that MaiPai uses when you ask for headlines.
 
+On a wide screen News has a sidebar on the left, like the one in Chat. It holds the search box, **Today**, **My Mix** (teens and adults) and **Saved**, then every **Topic** you can open, then the sources you follow, with **Manage** at the end of that list. Choose a topic or a source to see its stories. On a phone the same choices are in the menu drawer.
+
 **Today** shows recent stories. Open a story to read its text. **Following** has Topics and Sources tabs: use **Follow** to keep a channel, or open its row to see stories from that channel. **Saved** holds stories you saved. Select saved stories and choose **Remove** to take them out of that list.
 
 Teens and adults also have **My Mix**. It picks stories from what you open and save, and from your More like this and Less like this choices. Open the menu on My Mix and choose **Reset My Mix** to start over, or turn My Mix off in News settings. Children get stories from the Kids' lists, and their reading is never used to learn interests. A child reads inside News, with no links to a publisher's site. Guests do not get News.
 
 ## Find a story
 
-Type in the **Search News** box at the top of any News page and press Enter. You get stories that have all of your words in the headline, the short summary, the source name or the topic. Matching topics and sources show first, then your saved stories, then the rest by day. Tap a chip under the box to see only your **Saved only** stories, only **Today**, or one topic. Tap **All** to take the chip off.
+Type in the **Search News** box at the top of the sidebar (on a phone, at the top of the page) and press Enter. You get stories that have all of your words in the headline, the short summary, the source name or the topic. Matching topics and sources show first, then your saved stories, then the rest by day. Tap a chip under the box to see only your **Saved only** stories, only **Today**, or one topic. Tap **All** to take the chip off.
 
 On the Today and My Mix pages, the topic chips under the title show only the stories on one topic. The line under the title tells you the day and when Home last checked the news.
 

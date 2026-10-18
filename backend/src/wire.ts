@@ -1210,6 +1210,21 @@ export interface SetupChecklistItem { id: string; title: string; reason: string;
 // APP-KIND-03: one launchable package app, as GET /api/apps returns it. Defined here, alias-free, so the
 // web shell types the response from the same declaration the hub builds it from.
 export interface AppSection { page: string; label: string; icon: string | null }
+/** NEWS-SIDEBAR-01: an app's sidebar column as GET /api/apps returns it for the asking person: the manifest's `contributes.sidebar`
+ * with every page entry resolved to its label and icon, and every entry, `manage` row or search whose target page the person
+ * cannot open already removed (a group left empty is gone too). The shell draws what is here and checks nothing itself. */
+export interface AppSidebarPage { page: string; label: string; icon: string | null }
+export interface AppSidebarRows {
+  bind: Record<string, unknown>;
+  item_key_field?: string;
+  item_label_field?: string;
+  item_media_field?: string;
+  only_followed?: boolean;
+  open: Record<string, unknown>;
+  manage?: { label: string; open: Record<string, unknown> };
+}
+export interface AppSidebarGroup { id: string; title?: string; pages?: AppSidebarPage[]; rows?: AppSidebarRows }
+export interface AppSidebar { search?: Record<string, unknown>; groups: AppSidebarGroup[] }
 export interface AppRow {
   package: string;
   page: "index";
@@ -1219,6 +1234,8 @@ export interface AppRow {
   category: string;
   keywords: string[];
   sections: AppSection[];
+  /** The app's own sidebar column (wide screens), when it declares one and anything in it is the person's to see. */
+  sidebar?: AppSidebar;
   to: string;
   /** The package's Incognito behaviour. The hub cannot see the browser's Incognito state, so the shell
    * hides an app whose value is "blocked" while Incognito is on. */

@@ -30,7 +30,7 @@ import type { PersonRow } from "@/types";
 const ajv = new Ajv2020({ strict: false });
 const validateUiPage = ajv.compile(UI_SCHEMA as object);
 
-import type { AppRow, AppSection } from "../wire";
+import type { AppRow, AppSection, AppSidebar, AppSidebarGroup, AppSidebarRows } from "../wire";
 export type { AppRow, AppSection };
 
 export interface AppData {
@@ -133,7 +133,7 @@ function loadApp(id: string): LoadedApp | null {
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
-  problems.push(...settingsAreaProblems(manifest), ...sharedModuleProblems(contributes));
+  problems.push(...settingsAreaProblems(manifest), ...sharedModuleProblems(contributes), ...sidebarSchemaProblems(contributes));
   if (problems.length > 0 && !warned.has(`${id}|${stamp}`)) {
     warned.add(`${id}|${stamp}`);
     console.warn(`[apps] ${id}: app refused: ${problems.join("; ")}`);
@@ -141,6 +141,67 @@ function loadApp(id: string): LoadedApp | null {
   const app: LoadedApp = { manifest, contributes, pages, problems };
   loadCache.set(id, { stamp, app });
   return app;
+}
+
+// NEWS-SIDEBAR-01: a sidebar's `search`, `bind` and `open` objects are defined by the UI schema, not by the manifest schema; they are
+// checked here, against the same compiled UI schema a page is, when the package loads.
+const UI_SCHEMA_ID = (UI_SCHEMA as { $id: string }).$id;
+function uiDef(name: "search" | "package_binding" | "action") {
+  return ajv.getSchema(`${UI_SCHEMA_ID}#/$defs/${name}`);
+}
+function sidebarSchemaProblems(contributes: AppContributes): string[] {
+  const sidebar = contributes.sidebar;
+  if (!sidebar) return [];
+  const out: string[] = [];
+  const check = (name: "search" | "package_binding" | "action", value: unknown, at: string): void => {
+    const validate = uiDef(name);
+    if (!validate) { out.push(`contributes.sidebar: the UI schema has no ${name} definition`); return; }
+    if (!validate(value)) out.push(`contributes.sidebar ${at} does not match the UI schema: ${ajv.errorsText(validate.errors, { dataVar: at })}`);
+  };
+  if (sidebar.search !== undefined) check("search", sidebar.search, "search");
+  for (const group of sidebar.groups) {
+    if (!group.rows) continue;
+    check("package_binding", group.rows.bind, `${group.id}.rows.bind`);
+    check("action", group.rows.open, `${group.id}.rows.open`);
+    if (group.rows.manage) check("action", group.rows.manage.open, `${group.id}.rows.manage.open`);
+  }
+  return out;
+}
+
+/** The page a `navigate` action opens inside this package: `/apps/<id>` is the index, `/apps/<id>/<page>` another page; anything else is null. */
+function navigateTargetPage(packageId: string, action: unknown): string | null {
+  const navigate = typeof action === "object" && action !== null ? (action as { navigate?: { to?: unknown } }).navigate : undefined;
+  const to = navigate?.to;
+  if (typeof to !== "string") return null;
+  const base = `/apps/${packageId}`;
+  if (to === base) return "index";
+  return to.startsWith(`${base}/`) ? (to.slice(base.length + 1).split("/")[0] ?? null) : null;
+}
+
+/** The sidebar this person may see: page entries resolved to their label and icon, and every entry, `manage` row or search whose
+ * target page the person cannot open removed through `pageVisibleTo`, the one visibility check; a group left empty is dropped. */
+export function sidebarFor(person: PersonRow, manifest: PackageManifest, contributes: AppContributes): AppSidebar | undefined {
+  const sidebar = contributes.sidebar;
+  if (!sidebar) return undefined;
+  const pages = contributes.pages ?? [];
+  const visible = (id: string | null): AppPageEntry | undefined => {
+    const entry = id === null ? undefined : pages.find((page) => page.id === id);
+    return entry && pageVisibleTo(person, manifest, entry) ? entry : undefined;
+  };
+  const actionVisible = (action: unknown): boolean => visible(navigateTargetPage(manifest.id, action)) !== undefined;
+  const groups: AppSidebarGroup[] = [];
+  for (const group of sidebar.groups) {
+    if (group.pages) {
+      const entries = group.pages.flatMap((id) => { const entry = visible(id); return entry ? [{ page: entry.id, label: entry.label ?? entry.id, icon: entry.icon ?? null }] : []; });
+      if (entries.length > 0) groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), pages: entries });
+    } else if (group.rows && actionVisible(group.rows.open)) {
+      const { manage, ...rest } = group.rows;
+      groups.push({ id: group.id, ...(group.title ? { title: group.title } : {}), rows: { ...rest, ...(manage && actionVisible(manage.open) ? { manage } : {}) } as AppSidebarRows });
+    }
+  }
+  if (groups.length === 0) return undefined;
+  const search = sidebar.search && typeof sidebar.search === "object" && actionVisible((sidebar.search as { submit?: unknown }).submit) ? (sidebar.search as Record<string, unknown>) : undefined;
+  return { ...(search ? { search } : {}), groups };
 }
 
 /** Two page entries may not name one module file: a second entry with a lower floor would serve the raised page's document. */
@@ -170,7 +231,7 @@ export function appPackageProblems(manifest: PackageManifest, dir: string): stri
   for (const [module, doc] of pages) {
     if (!validateUiPage(doc)) problems.push(`pages/${module}.json does not match the UI schema: ${ajv.errorsText(validateUiPage.errors, { dataVar: "page" })}`);
   }
-  problems.push(...settingsAreaProblems(manifest), ...sharedModuleProblems(contributes));
+  problems.push(...settingsAreaProblems(manifest), ...sharedModuleProblems(contributes), ...sidebarSchemaProblems(contributes));
   return problems;
 }
 
@@ -348,6 +409,7 @@ export function listApps(person: PersonRow): AppRow[] {
       description: manifest.description,
       category: manifest.category,
       keywords: index.keywords ?? [],
+      ...(sidebarFor(person, manifest, app.contributes) ? { sidebar: sidebarFor(person, manifest, app.contributes)! } : {}),
       sections: app.contributes.pages!.filter((page) => page.id !== "index" && page.nav && pageVisibleTo(person, manifest, page)).map((page: AppPageEntry) => ({ page: page.id, label: page.label ?? page.id, icon: page.icon ?? null })),
       to: `/apps/${id}`,
       incognito: manifest.incognito,

@@ -558,6 +558,94 @@
           ]
         }
       ]
+    },
+    "sidebar": {
+      "search": {
+        "type": "search",
+        "state": "q",
+        "label": "Search News",
+        "placeholder": "Search News",
+        "recents": {
+          "source": "package",
+          "path": "search-recents"
+        },
+        "submit": {
+          "navigate": {
+            "to": "/apps/news/search",
+            "state": {
+              "q": "{q}"
+            }
+          }
+        },
+        "clear_recents": {
+          "call": {
+            "target": "/api/plugins/news/actions/search_recent_clear"
+          }
+        }
+      },
+      "groups": [
+        {
+          "id": "library",
+          "pages": [
+            "index",
+            "mix",
+            "saved"
+          ]
+        },
+        {
+          "id": "topics",
+          "title": "Topics",
+          "rows": {
+            "bind": {
+              "source": "package",
+              "path": "topics"
+            },
+            "item_key_field": "key",
+            "item_label_field": "label",
+            "item_media_field": "icon",
+            "open": {
+              "navigate": {
+                "to": "/apps/news/channel",
+                "state": {
+                  "kind": "topic",
+                  "key": "{key}"
+                }
+              }
+            }
+          }
+        },
+        {
+          "id": "following",
+          "title": "Following",
+          "rows": {
+            "bind": {
+              "source": "package",
+              "path": "sources"
+            },
+            "item_key_field": "key",
+            "item_label_field": "label",
+            "item_media_field": "icon",
+            "only_followed": true,
+            "open": {
+              "navigate": {
+                "to": "/apps/news/channel",
+                "state": {
+                  "kind": "source",
+                  "key": "{key}"
+                }
+              }
+            },
+            "manage": {
+              "label": "Manage",
+              "open": {
+                "navigate": {
+                  "to": "/apps/news/following"
+                }
+              }
+            }
+          }
+        }
+      ]
     }
   },
   "min_app": "0.1.0",

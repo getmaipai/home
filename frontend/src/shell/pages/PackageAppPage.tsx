@@ -15,6 +15,8 @@ import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
 import { appHomeLabel, isMediaApp, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
 import { useMediaDock } from "@/shell/mediaHost";
+import { SectionSidebar } from "@maipai/ui/src/primitives/SectionSidebar";
+import { useAppSidebar } from "@/shell/useAppSidebar";
 
 /** APP-KIND-04: one route, `apps/*`, for every installed package app. `/apps/<package>` opens its `index` page and
  * `/apps/<package>/<page>` another of its pages. The page is a spec `page` document the hub serves
@@ -64,12 +66,16 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const docked = media && held !== null && held.started && !onItsPlayPage ? held : null;
   const CloseIcon = getIcon("x");
 
+  const sidebar = app?.sidebar;
+  const arrivedState = (location.state as { pageState?: Record<string, unknown> } | null)?.pageState ?? {};
+  const sidebarProps = useAppSidebar(app, sidebar, pageId, arrivedState);
+
   if (packageId === "" || (page.error instanceof ApiError && page.error.status === 404)) return <NotFoundPage />;
 
-  return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="package-app" data-package={packageId}>
+  const content = (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2" data-testid="package-app" data-package={packageId}>
       {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
+      {app ? <AppToolbar hideSectionsOnWide={sidebar !== undefined} person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -78,7 +84,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
         errorMessage="Could not open this app. Check your connection and try again."
         loadingLabel="Opening the app"
       >
-        {(doc) => (hasQuery && !sameQuery ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle />)}
+        {(doc) => (hasQuery && !sameQuery ? null : <SchemaPage key={`${packageId}/${pageId}`} page={doc} packageId={packageId} hideTitle sidebar={sidebarProps !== null} />)}
       </AsyncState>
       {docked ? (
         <Player
@@ -105,10 +111,18 @@ export function PackageAppPage({ person }: { person: Roster }) {
       ) : null}
     </div>
   );
+  // NEWS-SIDEBAR-01: an app that declares a sidebar gets its own column beside the content from wide screens up (the kit's one
+  // section sidebar); its section tabs give way to it there, and a phone keeps them.
+  return sidebarProps ? (
+    <div className="flex min-h-0 flex-1" data-testid="package-app-frame">
+      <SectionSidebar standalone {...sidebarProps} />
+      {content}
+    </div>
+  ) : content;
 }
 
 /** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
-function AppToolbar({ person, to, label, homeLabel, settingsArea, sections, current, familyHeader }: { person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
+function AppToolbar({ hideSectionsOnWide = false, person, to, label, homeLabel, settingsArea, sections, current, familyHeader }: { hideSectionsOnWide?: boolean; person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
   const pinned = isPinned(to);
@@ -147,14 +161,16 @@ function AppToolbar({ person, to, label, homeLabel, settingsArea, sections, curr
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       {sections.length > 0 ? (
-        <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
-          <TabsList variant="line" aria-label="Sections">
-            <TabsTrigger value="index">{homeLabel}</TabsTrigger>
-            {sections.map((section) => (
-              <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <div className={hideSectionsOnWide ? "lg:hidden" : undefined} data-slot="app-section-tabs">
+          <Tabs value={current} onValueChange={(value) => navigate(value === "index" ? to : `${to}/${String(value)}`)}>
+            <TabsList variant="line" aria-label="Sections">
+              <TabsTrigger value="index">{homeLabel}</TabsTrigger>
+              {sections.map((section) => (
+                <TabsTrigger key={section.page} value={section.page}>{section.label}</TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
+        </div>
       ) : <span />}
       <div className="flex items-center gap-1">
       {settingsArea ? (
