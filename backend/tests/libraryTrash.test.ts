@@ -262,3 +262,26 @@ describe("companions", () => {
     expect(db.select().from(pictureJobs).all()).toHaveLength(0);
   });
 });
+
+describe("review round 1", () => {
+  test("purging a generated item while its chat lives, then deleting the chat, leaves no job behind", async () => {
+    const h = await household();
+    const picture = file(h.sageRow(), "stale job picture");
+    db.insert(pictureJobs).values({ id: "picture-stale", personId: h.sageId, turnId: picture.turnId, kind: "generate", request: "{}", prompt: "a boat", state: "done", files: JSON.stringify([{ id: picture.id }]), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    await h.sage.request(`/api/files/${picture.id}`, { method: "DELETE" });
+    await h.sage.request(`/api/trash/file/${picture.id}`, { method: "DELETE" });
+    expect(db.select().from(pictureJobs).all()).toHaveLength(1); // the chat still shows the picture
+    deleteAttachmentsForTurns([picture.turnId]);
+    expect(row(picture.id)).toBeUndefined();
+    expect(db.select().from(pictureJobs).all()).toHaveLength(0);
+  });
+  test("sharing a file in Trash answers 404 like an unknown id, so its existence is not confirmed", async () => {
+    const h = await household();
+    const boat = file(h.sageRow(), "hidden trash", { retention: "kept", detach: true });
+    await h.sage.request(`/api/files/${boat.id}`, { method: "DELETE" });
+    const known = await h.lucia.client.post(`/api/files/${boat.id}/shares`, { to: "household" });
+    const unknown = await h.lucia.client.post(`/api/files/file-nothingtoseehere/shares`, { to: "household" });
+    expect(known.status).toBe(404);
+    expect(unknown.status).toBe(404);
+  });
+});

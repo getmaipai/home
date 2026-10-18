@@ -87,3 +87,7 @@ generated, pinned, following the storage rules, and still tied to a chat.
   follow-up if larger files are wanted.
 - New generated items still default to retention `kept` (pinned); moving that default to "follows the storage rules" waits for the
   Keep control on the page.
+
+- Storage rules never remove a file a live chat still shows (removing its Library reference would free nothing); it becomes a
+  candidate when its chat is gone and the generated-file rule has detached it. If a rule removal ever meets a chat-held record it
+  keeps the chat-only copy, like a Trash purge does.

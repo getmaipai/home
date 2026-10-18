@@ -137,16 +137,19 @@ export function restoreFile(person: PersonRow, id: string, now = new Date()): bo
 }
 
 /** Drop the owner's Library reference for these records: a record a chat still shows stays as a chat-only copy, the rest
- * are removed, and bytes go only at zero references. */
-function dropLibraryReference(rows: Row[]): void {
+ * are removed, and bytes go only at zero references. Used by Trash purge and expiry and by the storage-rule removal
+ * (lib/libraryRetention.ts). Returns what each record freed on disk. */
+export function dropLibraryReference(rows: Row[]): Array<{ id: string; size: number; freed: boolean }> {
   const blobs: string[] = [];
   const gone: string[] = [];
+  const result: Array<{ id: string; size: number; freed: boolean }> = [];
   db.transaction(() => {
     for (const row of rows) {
       if (row.turnId !== null && row.conversationId !== null) {
         db.delete(shares).where(eq(shares.fileId, row.id)).run();
         db.update(attachments).set({ deletedAt: row.deletedAt ?? new Date().toISOString(), trashUntil: null, hlc: nextHlc() }).where(eq(attachments.id, row.id)).run();
         syncFileReferences(row.id);
+        result.push({ id: row.id, size: row.size, freed: false });
         continue;
       }
       gone.push(row.id);
@@ -155,12 +158,14 @@ function dropLibraryReference(rows: Row[]): void {
     for (const row of doomed) {
       const blob = purgeFileRecord(row);
       if (blob) blobs.push(blob);
+      result.push({ id: row.id, size: row.size, freed: blob !== null });
     }
     // After the records are gone, so a pinned item's job (which a still-present pinned file would protect) goes with it.
     deleteMusicJobsForFiles(gone);
     deletePictureJobsForFiles(gone);
   });
   removeFileBlobs(blobs);
+  return result;
 }
 
 export function purgeTrashedFile(person: PersonRow, id: string): boolean {

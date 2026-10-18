@@ -5,13 +5,11 @@ import { db, sqlite } from "@/db";
 import { attachments, settingsValues } from "@/db/schema";
 import { getHouseholdSettingValue } from "@/lib/settings";
 import { householdCapBytes, householdUsageBytes } from "@/lib/storage/usage";
-import { purgeFileRecord, removeFileBlobs } from "@/lib/attachments";
+import { dropLibraryReference } from "@/lib/libraryTrash";
 import { generationOf } from "@/lib/music/types";
 import { nextHlc } from "@/lib/hlc";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { trigger } from "@/lib/notifications";
-import { deleteMusicJobsForFiles } from "@/lib/music/store";
-import { deletePictureJobsForFiles } from "@/lib/pictures/jobStore";
 import { LIBRARY_RETENTION_TYPES, retentionKeys, type LibraryRetentionType } from "@/settings/libraryRetentionKeys";
 const DAY = 86400000;
 const SOURCE = "library_retention";
@@ -48,7 +46,10 @@ function clearState(type: LibraryRetentionType) {
 }
 function signature(type: LibraryRetentionType, cap: number): string { return JSON.stringify([rule(type), rule("generated"), cap]); }
 function candidates() {
-  return db.select().from(attachments).where(and(eq(attachments.retention, "conversation"), isNull(attachments.deletedAt))).orderBy(asc(attachments.createdAt), asc(attachments.id)).all().filter((row) => typeFor(row) !== null);
+  return db.select().from(attachments).where(and(eq(attachments.retention, "conversation"), isNull(attachments.deletedAt))).orderBy(asc(attachments.createdAt), asc(attachments.id)).all()
+    // A file a live chat still shows keeps its bytes whatever the Library does, so removing its Library reference would free
+    // nothing: it becomes a candidate when its chat is gone (LIBRARY-REVAMP-02 detaches it then).
+    .filter((row) => typeFor(row) !== null && (row.turnId === null || row.conversationId === null));
 }
 /** LIBRARY-RETENTION-PREVIEW-01: this person's own items the storage rules have warned about and will remove at the next
  * nightly run once the 24-hour warning has passed. `expiresAt` is the end of that warning. Cheap when nothing is over a
@@ -131,22 +132,13 @@ async function run(now: number) {
   // Re-read after asynchronous warning delivery: pins, rules and usage may change.
   const plan = previewLibraryRetention(now);
   const ready = new Set(plan.types.filter((t) => t.ready).map((t) => t.type));
-  const blobs: string[] = [];
   let deleted = 0, bytes = 0;
-  sqlite.transaction(() => {
-    const rows = plan.files.filter((file) => ready.has(file.type)).map((file) =>
-      db.select().from(attachments).where(eq(attachments.id, file.id)).get(),
-    ).filter((row): row is FileRow => row !== undefined && row.retention !== "kept");
-    const ids = rows.map((row) => row.id);
-    deleteMusicJobsForFiles(ids);
-    deletePictureJobsForFiles(ids);
-    for (const row of rows) {
-      const blob = purgeFileRecord(row);
-      if (blob) { blobs.push(blob); bytes += row.size; } // bytes are freed only when the last record of them goes
-      deleted++;
-    }
-  })();
-  removeFileBlobs(blobs);
+  const rows = plan.files.filter((file) => ready.has(file.type)).map((file) =>
+    db.select().from(attachments).where(eq(attachments.id, file.id)).get(),
+  ).filter((row): row is FileRow => row !== undefined && row.retention !== "kept");
+  // The Library's reference goes; a file a chat still shows stays as that chat's copy (LIBRARY-REVAMP-10), and bytes are
+  // freed only when the last record of them goes.
+  for (const dropped of dropLibraryReference(rows)) { deleted++; if (dropped.freed) bytes += dropped.size; }
   for (const t of previewLibraryRetention(now).types) if (!t.over) clearState(t.type);
   return { deleted, bytes };
 }

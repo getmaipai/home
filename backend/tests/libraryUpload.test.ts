@@ -77,3 +77,13 @@ test("a full Library refuses before anything is stored; a child asks a grown-up"
   expect((await send(teen, "teen.txt", "hello", "text/plain")).status).toBe(201);
   expect((await new TestClient().postForm("/api/library/upload", new FormData())).status).toBe(401);
 });
+
+test("the same file again is accepted when storage is full, because it needs no more room", async () => {
+  const { sage } = await login();
+  expect((await send(sage, "a.txt", "hello", "text/plain")).status).toBe(201);
+  setHouseholdSettingValue("storage.household.cap_bytes", 5);
+  const again = await send(sage, "b.txt", "hello", "text/plain");
+  expect(again.status).toBe(201);
+  expect(((await again.json()) as { duplicate: boolean }).duplicate).toBe(true);
+  expect((await send(sage, "c.txt", "hello world", "text/plain")).status).toBe(403);
+});

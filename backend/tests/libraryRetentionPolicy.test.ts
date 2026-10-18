@@ -7,7 +7,7 @@ import { TestClient } from "./client";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { existsSync } from "node:fs";
-import { createAttachment, readAttachment, attachmentFilePath } from "@/lib/attachments";
+import { createAttachment, deleteAttachmentsForTurns, readAttachment, attachmentFilePath } from "@/lib/attachments";
 import { resolveOrCreateConversation } from "@/lib/conversationHistory";
 import { getHouseholdSettingValue, setHouseholdSettingValue } from "@/lib/settings";
 import { expiringLibraryFiles, previewLibraryRetention, runLibraryRetention } from "@/lib/libraryRetention";
@@ -23,13 +23,15 @@ function fixture() {
   const turnId = newConversationTurnId();
   db.insert(conversationTurns).values({ id: turnId, personId: actor.id, surface: "chat", conversationId: chat.value.id, userText: "picture", replyText: "saved", source: "model", safetyAction: "allow", createdAt: now, hlc: nextHlc() }).run();
   let distinct = 0; // LIBRARY-DEDUP-01: identical bytes are one stored file, so each fixture file gets its own bytes
-  const make = (retention: "kept" | "conversation", generated = true, mediaType = "image/png") => {
+  // A generated file is detached from its chat (as LIBRARY-REVAMP-02 does when the chat goes) unless `tied`: a file a live chat
+  // still shows is never a storage-rule candidate, since removing its Library reference would free nothing.
+  const make = (retention: "kept" | "conversation", generated = true, mediaType = "image/png", tied = false) => {
     const cap = getHouseholdSettingValue("storage.household.cap_bytes");
     setHouseholdSettingValue("storage.household.cap_bytes", 0);
     const f = createAttachment(actor, { conversationId: chat.value.id, turnId, mediaType, bytes: new Uint8Array(10).fill(++distinct), retention, deduplicate: false });
     setHouseholdSettingValue("storage.household.cap_bytes", cap);
     if (!f.ok) throw new Error(f.error);
-    if (generated) db.update(attachments).set({ provenance: `picture-gen:${JSON.stringify({ v: 1 })}` }).where(eq(attachments.id, f.value.id)).run();
+    if (generated) db.update(attachments).set({ provenance: `picture-gen:${JSON.stringify({ v: 1 })}`, ...(tied ? {} : { turnId: null }) }).where(eq(attachments.id, f.value.id)).run();
     return f.value;
   };
   setHouseholdSettingValue("storage.household.cap_bytes", 25);
@@ -168,4 +170,20 @@ test("expiring items and their expires_at appear only after the warning, only fo
   expect(item.expires_at).not.toBeNull();
   const stranger = db.insert(people).values({ id: newPersonId(), displayName: "Lucia", role: "adult", avatarSeed: "lucia", source: "hub", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() }).returning().get()!;
   expect(expiringLibraryFiles(stranger.id, now).size).toBe(0);
+});
+
+test("a generated file a live chat still shows is not removed by the storage rules; once its chat goes it is (independent review)", async () => {
+  const f = fixture();
+  const tied = f.make("conversation", true, "image/png", true);
+  f.make("kept");
+  const upload = f.make("conversation", false);
+  db.update(attachments).set({ turnId: null }).where(eq(attachments.id, upload.id)).run(); // an upload that no chat holds, so the chat going leaves the totals alone
+  db.update(attachments).set({ createdAt: "2020-01-01T00:00:00Z" }).where(eq(attachments.id, tied.id)).run();
+  const at = Date.parse("2026-10-18T01:00:00Z");
+  expect(previewLibraryRetention(at).count).toBe(0);
+  await runLibraryRetention(at);
+  expect((await runLibraryRetention(at + DAY)).deleted).toBe(0);
+  expect(readAttachment(f.actor, tied.id).ok).toBe(true);
+  deleteAttachmentsForTurns([f.turnId]); // the chat goes: a generated file outlives it and becomes a candidate
+  expect(previewLibraryRetention(at + DAY).count).toBe(1);
 });

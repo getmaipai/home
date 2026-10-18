@@ -1,7 +1,8 @@
 // LIBRARY-REVAMP-11 (docs/design/library-2026-10-18.md section 3.11): add a file to the Library without a chat. The file is
 // stored as a "sent" item kept until the person deletes it, with its own name. The type is read from the bytes, never from
 // what the browser claims. Pictures get the same cleaning a chat picture gets (HEIC to JPEG, orientation applied, every EXIF
-// tag dropped, longest edge 2000 px). The storage cap is checked before any byte is written. A child asks a grown-up (the
+// tag dropped, longest edge 2000 px). The storage cap is checked before any byte is written, on the bytes that would really be
+// stored (a copy the person already holds, or that the home already stores, costs nothing). A child asks a grown-up (the
 // kid-mode Ask is not built yet, so a child's upload is refused with that next step; nothing uploads silently).
 import { fileTypeFromBuffer } from "file-type";
 import { and, eq, isNull } from "drizzle-orm";
@@ -13,7 +14,6 @@ import { isDocumentMediaType } from "@/lib/documentMediaTypes";
 import { nextHlc } from "@/lib/hlc";
 import { cleanChatImage } from "@/lib/imageUpload";
 import { cleanFileName } from "@/lib/libraryEdit";
-import { checkStorageCap } from "@/lib/storage/usage";
 import type { PersonRow } from "@/types";
 
 export const MAX_LIBRARY_UPLOAD_BYTES = 500 * 1024 * 1024;
@@ -50,9 +50,6 @@ export async function uploadToLibrary(actor: PersonRow, upload: { name: string; 
   const size = upload.bytes.byteLength;
   if (size === 0) return { ok: false, status: 400, error: "That file is empty. Choose a file with something in it." };
   if (size > MAX_LIBRARY_UPLOAD_BYTES) return { ok: false, status: 413, error: "That file is bigger than 500 MB. Choose a smaller file." };
-  // Before anything is read further or written: the storage sentence a full Library already uses.
-  const room = checkStorageCap(actor.role, actor.id, size);
-  if (!room.ok) return { ok: false, status: 403, error: room.error! };
   const found = await detect(upload.name, upload.bytes);
   if (!found) return { ok: false, status: 400, error: UNSUPPORTED_UPLOAD };
   let bytes = upload.bytes;

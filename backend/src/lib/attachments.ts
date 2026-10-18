@@ -1,9 +1,9 @@
 import { generationOf } from "@/lib/music/types";
-import { deleteMusicJobsForPerson, deleteMusicJobsForTurns } from "@/lib/music/store";
+import { deleteMusicJobsForFiles, deleteMusicJobsForPerson, deleteMusicJobsForTurns } from "@/lib/music/store";
 // ATT-01a: local attachment storage. The database row is spec-shaped and
 // immutable; the file is a household-local implementation detail addressed
 // only by its validated relative storage_path.
-import { deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
+import { deletePictureJobsForFiles, deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, normalize, relative, resolve } from "node:path";
@@ -297,6 +297,7 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
   deletePictureJobsForTurns(turnIds);
   const rows = db.select().from(attachments).where(inArray(attachments.turnId, turnIds)).all();
   let purged = 0;
+  const purgedIds: string[] = [];
   for (const row of rows) {
     const chatOnly = row.deletedAt !== null && row.trashUntil === null;
     const inTrash = row.deletedAt !== null && row.trashUntil !== null;
@@ -311,8 +312,12 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
       const blob = purgeFileRecord(row);
       if (blob) removeFile(blob);
       purged += 1;
+      purgedIds.push(row.id);
     }
   }
+  // A job that named a removed file (a chat-only copy whose Library item was purged earlier) has nothing left to show.
+  deleteMusicJobsForFiles(purgedIds);
+  deletePictureJobsForFiles(purgedIds);
   return purged;
 }
 

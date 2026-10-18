@@ -77,7 +77,7 @@ function targetIsAdult(to: string): boolean {
  * target that already has a live pointer just returns it. */
 export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpResult<Share, 400 | 403 | 404> {
   const file = db.select().from(attachments).where(eq(attachments.id, input.fileId)).get();
-  if (!file || !canReadFileAudience(actor, file)) return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
+  if (!file || file.deletedAt !== null || !canReadFileAudience(actor, file)) return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
 
   if (!canAccessFile(actor, file.ownerPersonId, input.fileId)) {
     return { ok: false, status: 403, error: "you do not have access to this file" };
