@@ -7,10 +7,18 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.19] - 2026-10-17
+
+A child-safety fix for media, songs made in chat, and a fix for chat answers that were cut off before the first word.
+
+### Music
 - **Songs in chat.** Adults can ask chat to write and make a song (words, style, mood, length) and change it by asking: slower, a new chorus, instrumental, longer, another style, cut, fade, louder, or another take. Each change is a new version you can step back to, and the card plays the song with its lyrics, Download and Share. Songs are made on this computer with ACE-Step 1.5 (about 15 to 30 seconds for a minute of music) and nothing is sent anywhere. Children and teens cannot make songs. The music model is an optional download in **Settings**, **Models and storage**, on a Mac with 64 GB or more. See docs/user/songs.md.
-- Detailed videos (LTX-2.3, longer clips with sound and speech, about 74 GB) are now part of the Recommended plan on a Mac with 128 GB of memory. The setup wizard checks the row by default, shows the maker's licence (free under 10 million dollars of yearly revenue; the model's own markings stay) and waits for you to accept it before anything downloads. Untick the row to skip it; the total and the free-space check update at once. The Recommended free space on that Mac is 145 GB (was 61 GB). An upgrade never downloads it by itself: it shows as "Recommended, not installed" under Models and storage with an Install button. Teens and children still get Quick videos only.
-- Music app: derived albums and artists, songs, liked songs, local radio, your own queue and playlists (New playlist, Add to playlist). Album, artist and playlist pages open with a Play, Shuffle or Start radio header; lists use the kit's grid, round artist art and compact rows. Chat artist lookup is kept.
-- **Approved media only, fixed.** When a grown-up turns on "Approved media only" for a teen or an adult, the media apps now hide every suggestion row (Featured, New, Recently added, More from, Music radio picks) and the next-video suggestion, as they already did for a child. A guest now sees only the home library, as intended, and a child or teen never sees a shared playlist whose name is not for them.
+
+### Safety
+- **Child-safety fix: approved media only now holds everywhere (affects releases since v0.2.15).** When a grown-up turns on "Approved media only" for a person, the media apps hid the rows made for them, but the files and some lists could still be reached. Now every media read honours the approved list, not only the app pages: a guest sees only the home library, the next-video suggestion and every suggestion row (Featured, New, Recently added, More from, Music radio picks) are empty for a teen or an adult who has the switch on, as they already were for a child, and a child or teen never sees a shared playlist whose name is not for them. The list of media sources shows a child, a teen or a guest only the name, kind and a count of what they may open: no folder path, no archive of deleted titles, no scan details, no feed address and no creator.
+
+### Reliability
+- **A slow chat answer is no longer cancelled after a minute.** A hidden one-minute timer started when you sent a message and stopped the answer if the model had not finished, which cut off a slow first word. The timer now starts only after an answer ends, and never stops one that is running. If the chat engine drops out before the first word, an adult's written message waits up to a minute for it and tries once more.
 
 ## [0.2.18] - 2026-10-17
 
