@@ -45,7 +45,7 @@ describe("content policy", () => {
   });
   for (const role of ["adult", "owner", "admin", "guest", "teen", "child"]) {
     test(`${role} keeps role defaults without a usable birthdate`, () => {
-      const expected = role === "child" ? ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"]
+      const expected: ProtectionKind[] = role === "child" ? ["minor_line", "real_person", "sexual", "swearing", "drugs", "gambling", "gore"]
         : role === "teen" ? ["minor_line", "real_person", "sexual", "swearing", "gore"] : ["minor_line", "real_person"];
       for (const birthdate of [null, undefined, "", "invalid"]) {
         const p = { ...person(role), birthdate } as PersonRow;
