@@ -71,7 +71,13 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   const inline = (root: Element): ArticleInline[] => {
     const out: ArticleInline[] = [];
     const walk = (node: any, style: "text" | "emphasis" | "strong" = "text") => {
-      if (node.nodeType === 3) { const text = cleanText(node.nodeValue ?? ""); if (text) out.push({ type: style, text }); return; }
+      // A text node keeps one space at each edge it had, so "Read <a>the report</a>." does not run together; the ends of the run are trimmed below.
+      if (node.nodeType === 3) {
+        const raw = String(node.nodeValue ?? ""); const text = cleanText(raw);
+        if (text) out.push({ type: style, text: `${/^\s/.test(raw) && out.length ? " " : ""}${text}${/\s$/.test(raw) ? " " : ""}` });
+        else if (/\s/.test(raw) && out.length) out.push({ type: style, text: " " });
+        return;
+      }
       if (node.nodeType !== 1) return;
       const el = node as Element; const tag = el.tagName.toLowerCase();
       if (["script", "style", "iframe", "form", "svg", "img", "sup"].includes(tag) || el.hasAttribute("hidden") || el.hasAttribute("style") && /display\s*:\s*none/i.test(el.getAttribute("style") ?? "")) return;
@@ -95,7 +101,11 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
       for (const child of Array.from(el.childNodes)) walk(child, next);
     };
     for (const child of Array.from(root.childNodes)) walk(child);
-    return out;
+    // Merge the edge spaces: no double space between neighbours, none at either end of the run, no space-only entry left.
+    for (let i = 1; i < out.length; i++) if (out[i - 1]!.text.endsWith(" ") && out[i]!.text.startsWith(" ")) out[i] = { ...out[i]!, text: out[i]!.text.replace(/^ +/, "") };
+    if (out.length) out[0] = { ...out[0]!, text: out[0]!.text.replace(/^ +/, "") };
+    if (out.length) out[out.length - 1] = { ...out[out.length - 1]!, text: out[out.length - 1]!.text.replace(/ +$/, "") };
+    return out.filter((entry) => entry.text !== "");
   };
   const root = content;
   const disambig = root.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*='disambig']");

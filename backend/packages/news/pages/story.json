@@ -26,7 +26,11 @@
         },
         "save": {
           "call": {
-            "target": "/api/plugins/news/actions/save"
+            "target": "/api/plugins/news/actions/save",
+            "args": {
+              "item_id": "{item_id}",
+              "on": "{on}"
+            }
           }
         }
       },

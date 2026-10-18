@@ -247,15 +247,21 @@ export async function storyData(person: PersonRow, body: Record<string, unknown>
 
 // ---- List rows (the bare array the `list` node binds) -------------------------------------------
 
+/** "1 story today" and "3 stories today": the Following rows say the count in the right number (verification pass: "1 stories today"). */
+export function storiesTodayLabel(count: number): string {
+  return count === 1 ? "1 story today" : `${count} stories today`;
+}
+
 /** `topics`: the topics offered to this band, with today's story count and whether the person follows each. */
 export function topicRows(person: PersonRow, now = new Date()): RowsData {
   const viewer = viewerOf(person, now);
   const store = sharedShelfStore();
   const items = store && shelfEnabled() ? releaseShelfItems(viewer.band, CANDIDATES, store).filter((item) => ageMs(item, now) <= ROWS_WINDOW_H * HOUR_MS) : [];
   const followed = followedChannels(person.id).topics;
-  return topicsFor(viewer.band).map((topic) => ({
-    key: topic.id, id: topic.id, label: topic.label, icon: topic.icon, count: items.filter((item) => (item.topics ?? []).includes(topic.id)).length, followed: followed.has(topic.id),
-  }));
+  return topicsFor(viewer.band).map((topic) => {
+    const count = items.filter((item) => (item.topics ?? []).includes(topic.id)).length;
+    return { key: topic.id, id: topic.id, label: topic.label, icon: topic.icon, count, count_label: storiesTodayLabel(count), followed: followed.has(topic.id) };
+  });
 }
 
 /** `sources`: the feeds this band is shown, grouped by list, with the person's follow. A child's rows carry the list name, never an address. */

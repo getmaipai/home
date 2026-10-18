@@ -19,7 +19,7 @@
               },
               "item_key_field": "key",
               "item_label_field": "label",
-              "item_subtitle_field": "{count} stories today",
+              "item_subtitle_field": "{count_label}",
               "item_media_field": "icon",
               "row_toggle": {
                 "field": "followed",

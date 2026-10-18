@@ -80,3 +80,13 @@ describe("safeOutboundHref", () => {
     expect(safeOutboundHref("")).toBeNull();
   });
 });
+
+describe("inline whitespace around a link (verification pass: 'Readthe full report')", () => {
+  test("a space before and after an inline link survives, and the ends of a paragraph stay trimmed", () => {
+    const html = `<html><body><article><h1>T</h1><p>  Read <a href="https://elsewhere.example.org/more">the full report</a> now, and <b>bold</b> too.  </p><p>${"Filler sentence for the article quality rule. ".repeat(12)}</p></article></body></html>`;
+    const article = extractFullArticle(html, { ...base, allowLinks: true });
+    const first = article.blocks.find((block) => block.type === "paragraph");
+    const flat = first && first.type === "paragraph" ? first.inlines.map((inline) => inline.text).join("") : "";
+    expect(flat).toBe("Read the full report now, and bold too.");
+  });
+});

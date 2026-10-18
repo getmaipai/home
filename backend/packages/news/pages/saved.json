@@ -10,12 +10,12 @@
         "path": "saved"
       },
       "item_key_field": "item_id",
-      "item_label_field": "title",
+      "item_label_field": "label",
       "item_subtitle_field": "{publisher}",
       "item_media_field": "image",
       "row_action": {
-        "icon": "book-open",
-        "label": "Read {title}",
+        "icon": "chevron-right",
+        "label": "Read {label}",
         "action": {
           "navigate": {
             "to": "/apps/news/story",

@@ -4,40 +4,6 @@
   "title": "Channel",
   "body": [
     {
-      "type": "section",
-      "condition": "kind == 'source'",
-      "children": [
-        {
-          "type": "picker",
-          "state": "key",
-          "label": "Channel",
-          "bind": {
-            "source": "package",
-            "path": "sources"
-          },
-          "item_key_field": "key",
-          "item_label_field": "label"
-        }
-      ]
-    },
-    {
-      "type": "section",
-      "condition": "kind == 'topic'",
-      "children": [
-        {
-          "type": "picker",
-          "state": "key",
-          "label": "Channel",
-          "bind": {
-            "source": "package",
-            "path": "topics"
-          },
-          "item_key_field": "key",
-          "item_label_field": "label"
-        }
-      ]
-    },
-    {
       "type": "answer_blocks",
       "bind": {
         "source": "package",
@@ -61,12 +27,21 @@
         },
         "save": {
           "call": {
-            "target": "/api/plugins/news/actions/save"
+            "target": "/api/plugins/news/actions/save",
+            "args": {
+              "item_id": "{item_id}",
+              "on": "{on}"
+            }
           }
         },
         "follow": {
           "call": {
-            "target": "/api/plugins/news/actions/follow"
+            "target": "/api/plugins/news/actions/follow",
+            "args": {
+              "kind": "{channel_kind}",
+              "key": "{channel_key}",
+              "on": "{on}"
+            }
           }
         }
       },

@@ -23,17 +23,30 @@
         },
         "save": {
           "call": {
-            "target": "/api/plugins/news/actions/save"
+            "target": "/api/plugins/news/actions/save",
+            "args": {
+              "item_id": "{item_id}",
+              "on": "{on}"
+            }
           }
         },
         "follow": {
           "call": {
-            "target": "/api/plugins/news/actions/follow"
+            "target": "/api/plugins/news/actions/follow",
+            "args": {
+              "kind": "{channel_kind}",
+              "key": "{channel_key}",
+              "on": "{on}"
+            }
           }
         },
         "feedback": {
           "call": {
-            "target": "/api/plugins/news/actions/feedback"
+            "target": "/api/plugins/news/actions/feedback",
+            "args": {
+              "item_id": "{item_id}",
+              "kind": "{kind}"
+            }
           }
         },
         "reset_mix": {
