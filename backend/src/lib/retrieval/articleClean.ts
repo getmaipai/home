@@ -42,8 +42,89 @@ function holdsArticle(element: Element): boolean {
   return Array.from(element.querySelectorAll("p")).filter((p) => textOf(p).length > 120).length >= 3;
 }
 
+export interface ArticleMetadata { byline?: string; leadCaption?: string }
+
+function collectMetadata(document: Document): ArticleMetadata {
+  const names: string[] = [];
+  const addNames = (raw: string): void => {
+    for (const part of raw.replace(/^By\s+/i, "").split(/\s*(?:,|&|\band\b)\s*/i)) {
+      const name = part.replace(/\s+/g, " ").trim();
+      if (names.length < 6 && name.length >= 2 && name.length <= 60 && /^[\p{L} .'-]+$/u.test(name)
+        && !/^(?:by|and)$/i.test(name) && !names.some((found: string) => found.toLowerCase() === name.toLowerCase())) names.push(name);
+    }
+  };
+  const authorElements = new Set<Element>();
+  for (const selector of ['[rel~="author"]', '[itemprop~="author"]', 'meta[name="author"]']) {
+    for (const element of document.querySelectorAll(selector)) {
+      if (holdsArticle(element)) continue;
+      addNames(element.getAttribute("content") ?? textOf(element));
+      authorElements.add(element);
+    }
+  }
+  const readAuthor = (value: unknown): void => {
+    if (typeof value === "string") addNames(value);
+    else if (Array.isArray(value)) value.forEach((entry: unknown) => readAuthor(entry));
+    else if (value && typeof value === "object" && "name" in value) readAuthor(value.name);
+  };
+  const readJson = (value: unknown): void => {
+    if (Array.isArray(value)) value.forEach((entry: unknown) => readJson(entry));
+    else if (value && typeof value === "object") {
+      if ("author" in value) readAuthor(value.author);
+      for (const [key, child] of Object.entries(value)) if (key !== "author" && child && typeof child === "object") readJson(child);
+    }
+  };
+  for (const script of document.querySelectorAll('script[type="application/ld+json"]')) {
+    try { readJson(JSON.parse(script.textContent ?? "")); } catch { /* Malformed publisher metadata is optional. */ }
+  }
+  for (const element of document.querySelectorAll("[class]")) {
+    if (!/byline|author/i.test(element.getAttribute("class") ?? "") || holdsArticle(element)) continue;
+    const clone = element.cloneNode(true) as Element;
+    clone.querySelectorAll("p, br").forEach((child: Element) => child.append(" "));
+    addNames(textOf(clone));
+    authorElements.add(element);
+  }
+  for (const element of authorElements) element.remove();
+  for (const element of document.querySelectorAll("p, span, a, b, strong, i, em")) {
+    const text = textOf(element);
+    const byNames = /^By\s+(.+)$/i.exec(text);
+    const parts = byNames?.[1]?.split(/\s*(?:,|&|\band\b)\s*/i).filter(Boolean);
+    // A bare "and" is removed only as its own paragraph: inline, it may sit inside prose.
+    if ((element.tagName === "P" ? /^(?:By|,|and|&)$/i : /^(?:By|,|&)$/i).test(text) || element.tagName === "P" && parts?.length
+      && parts.every((name: string) => names.some((found: string) => found.toLowerCase() === name.toLowerCase()))) element.remove();
+  }
+  // Keep figure captions attached to their images, but never emit their nested paragraphs as prose.
+  let leadCaption: string | undefined;
+  for (const button of document.querySelectorAll("button")) button.remove();
+  for (const element of document.querySelectorAll("*")) {
+    for (const node of Array.from(element.childNodes) as Element[]) {
+      if (node.nodeType === 3) node.textContent = (node.textContent ?? "").replace(/\b(?:hide|show|toggle) caption\b/gi, "");
+    }
+  }
+  const captionSelector = 'figcaption, [class*="caption"], [class*="credit"]';
+  for (const caption of document.querySelectorAll(captionSelector)) {
+    if (holdsArticle(caption) || caption.parentElement?.closest(captionSelector)) continue;
+    const clone = caption.cloneNode(true) as Element;
+    const explicitCredit = clone.querySelector('[class*="credit"]');
+    const bold = Array.from(clone.querySelectorAll("strong, b")) as Element[];
+    const trailingBold = bold[bold.length - 1];
+    // Only a trailing bold run after caption text is a photographer credit.
+    const fullText = textOf(clone);
+    const boldText = trailingBold ? textOf(trailingBold) : "";
+    const credit = explicitCredit ?? (boldText && fullText.endsWith(boldText) && fullText !== boldText ? trailingBold : null);
+    const creditText = credit ? textOf(credit) : "";
+    if (creditText) credit?.remove();
+    clone.querySelectorAll("p, div, b, strong").forEach((element: Element) => element.append(" "));
+    const text = textOf(clone);
+    if (!leadCaption && (text || creditText)) leadCaption = [text, creditText].filter(Boolean).join(" · ");
+    if (!caption.closest("figure")) caption.remove();
+  }
+  const byline = names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}` : names[0];
+  return { ...(byline ? { byline } : {}), ...(leadCaption ? { leadCaption } : {}) };
+}
+
 /** Remove publisher chrome from a parsed document, with no I/O or external state. */
-export function cleanArticleDocument(document: Document): void {
+export function cleanArticleDocument(document: Document): ArticleMetadata {
+  const metadata = collectMetadata(document);
   for (const element of document.querySelectorAll("[data-component], [data-spacefinder-type], [data-print-layout='hide'], p[role='note'], [class]")) {
     if (holdsArticle(element)) continue;
     if (element.matches("[data-print-layout='hide'], p[role='note']")
@@ -78,4 +159,5 @@ export function cleanArticleDocument(document: Document): void {
   for (const element of document.querySelectorAll("p, li")) {
     if (/^(?:read more|related):\s*/i.test(textOf(element)) && onlyLink(element, /^(?:(?:read more|related):)?\s*$/i)) element.remove();
   }
+  return metadata;
 }

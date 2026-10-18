@@ -70,3 +70,24 @@ test("a wrapper class containing share or promo never removes the story", () => 
   const document = clean(`<div class="share-wrapper"><p>${long}</p><p>${long} Again.</p><p>${long} More.</p></div>`);
   expect(document.querySelectorAll("p").length).toBe(3);
 });
+
+test("author sources follow priority, validate, deduplicate and cap names", () => {
+  const { document } = parseHTML(`<html><head><meta name="author" content="Ember Stone"><script type="application/ld+json">{"author":["Iris Reed","bad/credit","Q","${"x".repeat(61)}","Quill Brook"]}</script></head><body><article><span class="author">Raven Lake</span><span itemprop="author">Nova Vale</span><a rel="author">Astro Hill</a><a rel="author">astro hill</a><span class="byline">Willow Park</span><p>By Astro Hill, Nova Vale and Ember Stone</p><p>By</p><span>,</span><p>and</p><span>&amp;</span><p>By the river, Nova Vale waited.</p></article></body></html>`);
+  expect(cleanArticleDocument(document).byline).toBe("Astro Hill, Nova Vale, Ember Stone, Iris Reed, Quill Brook and Raven Lake");
+  expect(document.querySelector("article")?.textContent).toBe("By the river, Nova Vale waited.");
+});
+test("caption credit and toggles are collected and cleaned while later figures survive", () => {
+  const { document } = parseHTML('<html><body><article><figure><figcaption><b>A deck</b><p>A fictional garden. <span class="credit">Nova Vale</span></p><button>Other button</button>SHOW CAPTION</figcaption></figure><figure><figcaption>Later view</figcaption></figure><p>toggle caption</p></article></body></html>');
+  expect(cleanArticleDocument(document).leadCaption).toBe("A deck A fictional garden. · Nova Vale");
+  expect(document.querySelectorAll("figcaption")).toHaveLength(2);
+  expect(document.body.textContent).not.toMatch(/caption|Other button/i);
+});
+test("author and caption wrappers retain the holdsArticle guard", () => {
+  const prose = "The garden opened after volunteers finished the paths and planted flowers along the fence, giving visitors a quiet place to explore.";
+  expect(clean(`<div class="author-caption"><p>${prose}</p><p>${prose}</p><p>${prose}</p></div>`).querySelectorAll("p")).toHaveLength(3);
+});
+
+test("an inline word and between emphasis in prose is never removed as a byline fragment", () => {
+  const document = clean("<p>Trees <em>and</em> paths opened today.</p>");
+  expect(document.querySelectorAll("em").length).toBe(1);
+});

@@ -27,7 +27,7 @@ export type ArticleBlock =
   | { type: "figure"; src: string; alt: string; caption: string }
   | { type: "note"; text: string }
   | { type: "quote"; inlines: ArticleInline[]; cite?: string };
-export interface FullArticle { title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; redirectTo?: string }
+export interface FullArticle { byline?: string; leadCaption?: string; title: string; blocks: ArticleBlock[]; toc: Array<{ id: string; title: string; level: 2 | 3 | 4 }>; redirectTo?: string }
 
 function plain(el: Element): string { return cleanText(el.textContent ?? ""); }
 
@@ -59,9 +59,9 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   const { document } = parseHTML(html);
   const detectedBeforeClean = document.querySelector(".dmbox-disambig, .disambig, #disambigbox, [class*=\"disambig\"]") !== null || /\bmay (?:also )?refer to\b/i.test(document.body?.textContent ?? "");
   const redirectTo = document.querySelector(".redirectMsg a, .redirectText a, #redirectedfrom a")?.getAttribute("href") ?? null;
+  const metadata = news ? cleanArticleDocument(document) : {};
   document.querySelectorAll(FULL_ARTICLE_DROP).forEach((n: Node) => n.remove());
   if (news) document.querySelectorAll(NEWS_DROP).forEach((n: Node) => n.remove());
-  if (news) cleanArticleDocument(document);
   document.querySelectorAll(".redirectMsg, .redirectText, #redirectedfrom").forEach((n: Node) => n.remove());
   document.querySelectorAll("[style*='display:none'],[style*='display: none'],[hidden]").forEach((n: Node) => n.remove());
   const title = cleanText((document.querySelector("h1") ?? document.querySelector("title"))?.textContent ?? "");
@@ -130,6 +130,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
       blocks.push({ type: "heading", level, id, text }); toc.push({ id, title: text, level }); continue;
     }
     if (skip || el.closest("table") && !/^table/.test(tag)) continue;
+    if (news && tag !== "figure" && el.closest("figure") && el.closest('figcaption, [class*="caption"], [class*="credit"]')) continue;
     if (news && tag !== "blockquote" && el.closest("blockquote")) continue;
     if (tag === "blockquote") {
       const citeEl = el.querySelector("cite, footer"); const cite = citeEl ? plain(citeEl) : ""; citeEl?.remove();
@@ -152,7 +153,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
     for (const child of children) { if (child.tagName === "DT") label = plain(child); else if (child.tagName === "DD" && label) { rows.push({ label, value: plain(child) }); label = ""; } }
     if (rows.length) blocks.push({ type: "rows", rows });
   }
-  return { title, blocks, toc, ...(redirectTo ? { redirectTo } : {}) };
+  return { title, blocks, toc, ...metadata, ...(redirectTo ? { redirectTo } : {}) };
 }
 
 /** Section headings that are never kept (their text is not read either). */

@@ -107,3 +107,32 @@ test("news deduplicates captions and drops related links and tail lists", () => 
   expect(news.blocks).toEqual([{ type: "figure", src: "https://example.com/a.jpg", alt: "", caption: "Garden view" }, { type: "figure", src: "https://example.com/b.jpg", alt: "", caption: "" }]);
   expect(news.toc).toEqual([]);
 });
+
+test("news collects the split byline and lead caption without emitting caption paragraphs", () => {
+  const html = `<html><body><article><div class="byline"><p>By</p><p><a rel="author" href="https://example.com/a">Ryan Benk</a></p><p>,</p><p><a rel="author" href="https://example.com/b">Ayesha Rascoe</a></p></div><figure><img src="https://example.com/photo.jpg"><div class="caption"><b>If you have the scratch, they have the scares</b><p>Chanthal Harris owns Long Dark House in Alexandria, Virginia. <strong>Ryan Benk/NPR News</strong></p><button>hide caption</button></div></figure><p>By the time the doors opened, the line ran down the block.</p><p>Ryan Benk wrote this fictional report.</p></article></body></html>`;
+  const out = extractFullArticle(html, { ...base, allowLinks: true });
+  expect(out.byline).toBe("Ryan Benk and Ayesha Rascoe");
+  expect(out.leadCaption).toContain("Chanthal Harris owns Long Dark House");
+  expect(out.leadCaption).toContain(" · Ryan Benk/NPR News");
+  expect(out.leadCaption).not.toContain("hide caption");
+  expect(out.blocks).toEqual([
+    { type: "paragraph", inlines: [{ type: "text", text: "By the time the doors opened, the line ran down the block." }] },
+    { type: "paragraph", inlines: [{ type: "text", text: "Ryan Benk wrote this fictional report." }] },
+  ]);
+  const reference = extractFullArticle(html, { ...base, mode: "reference", allowLinks: true });
+  expect(reference.byline).toBeUndefined();
+  expect(reference.leadCaption).toBeUndefined();
+  expect(JSON.stringify(reference.blocks)).toContain('"text":"By"');
+});
+
+for (const author of ['"Nova Vale"', '{"name":"Nova Vale"}', '["Nova Vale", {"name":"Iris Reed"}]']) {
+  test(`JSON-LD author variant ${author}`, () => {
+    const html = `<html><head><script type="application/ld+json">{"@graph":[{"author":${author}}]}</script></head><body><article><p>Story.</p></article></body></html>`;
+    expect(extractFullArticle(html, { ...base, allowLinks: true }).byline).toBe(author.startsWith("[") ? "Nova Vale and Iris Reed" : "Nova Vale");
+  });
+}
+test("meta author is news metadata only", () => {
+  const html = '<html><head><meta name="author" content="Nova Vale"></head><body><article><p>Story.</p></article></body></html>';
+  expect(extractFullArticle(html, { ...base, allowLinks: true }).byline).toBe("Nova Vale");
+  expect(extractFullArticle(html, { ...base, mode: "reference", allowLinks: true })).toEqual({ title: "", blocks: [{ type: "paragraph", inlines: [{ type: "text", text: "Story." }] }], toc: [] });
+});
