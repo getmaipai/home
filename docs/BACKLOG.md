@@ -404,6 +404,19 @@ From [music-generation-2026-10-17.md](design/music-generation-2026-10-17.md): AC
 - [ ] **MUSIC-GEN-15: check the sung words** (M, design in the note's section 5). ACE-Step invents half-sung words when the lyrics are shorter than the song; run the household's speech-to-text on a finished sung song and pass the transcript through the minor line before it is stored, withholding the song like a withheld picture with a fixed refusal line (a policy refusal, rule 6, never the model's words). The transcript is never stored or logged (rule 6a) and is dropped after the check. Bench rows with the 4.2 clips.
 - [ ] **MUSIC-STUDIO-01: music studio app** (L, later; design note first). Versions timeline, region repaint, stems, lyrics beside the waveform; reuses the music Stack API and records.
 
+## Voices (owner, 2026-10-17; queued after music)
+
+From [voices-2026-10-18.md](design/voices-2026-10-18.md): Jesse asked for more than the Default voice and for admins to add more. Chatterbox Turbo takes a reference clip (more than 5 s) but the Stack ignores `voice_url` today; a starter set comes from CC0 donated voices and synthetic Kokoro clips (no real person, no minors), a voice made from a recording is the speaker's own, live-recorded, private to them. Not started until MUSIC-GEN-06 is done.
+
+- [ ] **VOICES-01: honest list and one gate** (S, Stack `speech/voiceList.ts`, `routes/voices.ts`; Home `VoiceBrowserSection.tsx`, `routes/voice.ts`). Standard replaces "Chatterbox default"; the four named LibriVox Pocket presets (Bill Boerst, Caro Davy, Peter Yearsley, Stuart Bell) are hidden; options grouped; the child refusal becomes an `audience` flag; the preview cache keys on any voice id.
+- [ ] **VOICES-02: the starter voices** (L, Stack `modelCatalog.ts`, `speech/mlx_tts_server.py`, `routes/voices.ts`; catalog `voices/starter-voices`; Home Models and storage rows). Pin S3TokenizerV2 (472 MB) and prove it loaded; cache a `Conditionals` per clip sha256 and restore the default after a job; `POST/DELETE /v1/voices`; eleven voices (six CC0 donations, four Kokoro synthetic) passing the section 1.5 listening gate (WER, tags per voice, Jesse's ear); remove the community browser routes. Acceptance: cached first audio within 0.1 s of the default.
+- [ ] **VOICES-03: spec and the SAFETY line** (S, `commons` spec, `.github` SAFETY.md). `HouseholdVoice` record, `voice.*` copy fields; the new SAFETY.md voice line needs `Owner-approved: <date>`.
+- [ ] **VOICES-04: make a voice from my recording** (L, after VOICES-03). Adult-only, record or add 10 to 30 s of yourself reading the agreement phrase (STT-checked), Home-signed proof to the Stack, selectable only by the speaker, remove at any time, dated record, role gate on `POST /api/voice/cloned`, old `cloned_voices` rows hidden as needs-consent. A clone never speaks adult sexual sentences.
+- [ ] **VOICES-05: voice packs from the catalog** (S). Admin Install list; catalog check rejects non-commercial licences, missing attribution, a named person without a consent file.
+- [ ] **VOICES-06: voiceprint match on add** (S, optional). Reuse the enrolled speaker print.
+- [ ] **VOICES-07: verify end to end on the Studio** (M). Under the bench lock; screenshots at 1440 and 390, dark and light, child included; user and dev docs.
+- [ ] **VOICES-08: sharing a voice with other adults** (decision for Jesse). Needs `/api/tts` bound to the turn's own reply text first. Same family of question as MUSIC-GEN-14.
+
 ## Media apps (2026-10-17)
 
 Design: [docs/design/media-apps-blend-2026-10-17.md](design/media-apps-blend-2026-10-17.md) (Loki Doki's look and online and
