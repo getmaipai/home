@@ -9,7 +9,7 @@ Home can make short videos on your own computer. Nothing is sent to anyone.
 
 A Mac with 128 GB of memory and the video model installed. On any other computer, Home says videos are not available and why.
 
-There are two kinds, the same two words as pictures. **Quick** is a short clip with no sound that can start from a picture. **Detailed** adds sound and spoken words and runs longer, but starts from your words only. Quick comes with video. Detailed is an extra download (about 74 GB) that an owner or admin gets once, in **Settings**.
+There are two kinds, the same two words as pictures. **Quick** is a short clip with no sound that can start from a picture. **Detailed** adds sound and spoken words and runs longer, and can start from a picture when the engine supports it. Quick comes with video. Detailed is an extra download (about 74 GB) that an owner or admin gets once, in **Settings**.
 
 ## Ask in chat
 
@@ -37,17 +37,19 @@ Home animates pictures it made itself. It can also animate a photo you attach of
 
 ## Who can make videos
 
-Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual and only the everyday styles. Children can make short cartoon videos of safe things, up to 5 a day, switched on for every child unless you turn it off, with the same limits as pictures. A parent or admin can turn this off. Spoken answers, the TV and other shared screens never make videos. A guest cannot.
+Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual and only the everyday styles. Children can make short cartoon videos of safe things, up to 5 a day, switched on for every child unless you turn it off, with the same limits as pictures. An owner or admin can turn this off. Teens and children get Quick videos only. They never see a half-drawn frame. Spoken answers, the TV and other shared screens never make videos. A guest cannot.
+
+See [cartoon controls](people.md#cartoon-pictures-and-videos) for the home switch, daily limits and each child's switch.
 
 Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a video of a real person who has not agreed to it. An adult in your home can say yes for themselves in **Settings**, **Pictures and videos** on their own account; see Pictures for how that works. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
 
 ## Choose how it works (owner and admin)
 
-Open **Settings**, **Home settings**, **Pictures and videos**.
+Open **Settings**, **Home settings**, **Pictures, videos and music**.
 
 - **Adults can make videos.** Turn it off to stop all video making.
 - **Adult-only video styles.** Choose whether styles marked adults only can be used.
-- **Video quality.** Quick (the default) or Detailed. This is what chat makes when nobody asks for a kind. Anyone who can make videos can still ask chat for the other kind for one video.
+- **Video quality.** Quick (the default) or Detailed. This is what chat makes when nobody asks for a kind. Adults can ask chat for the other kind for one video. Teens and children get Quick videos only.
 - **Quick and Detailed videos.** Shows what each kind is and whether it is on this computer. **Get Detailed videos** (with its size) downloads the extra model. First it shows the maker's licence in plain points: it is free for a household and for a business under $10 million a year, a business above that needs its own licence from the maker, and it may never be used to harm children or to make a video of a real person who has not agreed. You accept once. **What is the difference?** is a short table, and **Details** names the models.
 - **Video styles.** A style gives videos a look, like old colour film. Each has a switch, a note on who can use it, its licence and its size. Remove one to delete its file.
 
@@ -63,9 +65,9 @@ The video engine checks the file and refuses any style that puts a child in an a
 
 ## Something not working?
 
-- **No video option.** Why: your Mac has less than 128 GB, you are not an adult, or videos are off. Fix: ask an owner or admin to check Settings.
+- **No video option.** Why: your Mac has less than 128 GB, your account cannot make videos, or videos are off. Fix: ask an owner or admin to check Settings.
 - **"No video model is installed".** Why: the video model is not downloaded. Fix: an owner or admin installs it in Settings.
-- **Chat says it made a Quick video when I asked for sound.** Why: Detailed videos are not on this computer yet. Fix: an owner or admin chooses **Get Detailed videos** in **Settings**, **Pictures and videos**, and accepts the licence.
+- **Chat says it made a Quick video when I asked for sound.** Why: Detailed videos are not on this computer yet. Fix: an owner or admin chooses **Get Detailed videos** in **Settings**, **Home settings**, **Pictures, videos and music**, and accepts the licence.
 - **A Detailed video is slow.** Why: it makes the sound and the picture together, and the first one after a restart loads a very large model. Fix: wait. A 10 second one takes about two minutes, and the first one after a restart a little more.
 - **"Home is busy making another picture or video".** Why: Home does one job at a time. Fix: wait. It starts by itself.
 - **"Waiting for memory to free up".** Why: another big job has the memory. Fix: wait a few minutes.

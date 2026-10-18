@@ -13,7 +13,7 @@ You can ask for up to 4 pictures at once ("give me three options") and for a sha
 
 When it is done, the picture appears in the chat. Tap it to see it bigger. A **Quick** picture takes a few seconds on a fast computer and longer on a slower one.
 
-Chat pauses long jobs, and they continue afterwards. If someone is chatting or talking to Home while a picture is being made, the picture waits ("Paused while chat is working") and carries on after the reply.
+If someone is chatting or talking to Home while a picture is being made, the card says "Paused while chat is working". It carries on after the reply. The wait is not counted against the picture.
 
 ## Quick or Detailed
 
@@ -44,17 +44,19 @@ The original is never changed. The new picture is the next version of it: press 
 
 ## Fewer questions and warnings about people
 
-By default Home makes what you ask for without extra questions or warnings about the people in it. If you want them back, an admin can turn on **Ask me before making pictures and videos of people** in Settings, Pictures and videos. The safety rules never turn off: children, nothing sexual involving a minor, and a real person who has not agreed. When Home needs to know who is in a photo, it asks once and remembers your answer for that photo.
+Home starts with extra questions and warnings about people turned off. To turn them on, an owner or admin opens **Settings**, **Home settings**, **Pictures, videos and music**. Turn on **Ask me before making pictures and videos of people**. Safety rules for children and real people never turn off. When Home needs to know who is in a photo, it asks once and remembers your answer for that photo.
 
 ## Who can make pictures
 
 Adults can, on their own screen, in a written chat. Teens can too, with nothing adult or sexual. They only get the everyday styles. A teen's own photo can be changed in ordinary ways, never into anything sexual. The photo has to look like it could be of a teen, and a parent can see these edits. A teen is never shown a picture that may be adult. Children can make cartoon pictures of safe things, up to 20 a day. Changing one of their own cartoons counts as one. Cartoon pictures are on for every child unless you turn them off. The look is always a cartoon, nothing scary or grown-up is made, and photos and real people are never used. A parent or admin can turn this off for the home or for one child. Spoken answers, the TV and other shared screens never make pictures. A guest cannot.
 
+See [cartoon controls](people.md#cartoon-pictures-and-videos) for the home switch, daily limits and each child's switch.
+
 Two things are never made, whatever the settings: anything sexual that shows a child or someone who looks like one, and a picture of a real person who has not agreed to it. If you ask, Home says it will not make that and what to change. Home checks finished pictures and videos and will not show anything that may show a child in a sexual situation. If that happens, the picture or video is deleted and an owner or admin gets a note without the picture. The check uses the chat model on this computer, so nothing leaves it. If Home cannot check a picture or video for an adult-only request, it does not show it; ask again in a minute.
 
 ## Choose how it works (owner and admin)
 
-Open **Settings**, **Home settings**, **Pictures and videos**.
+Open **Settings**, **Home settings**, **Pictures, videos and music**.
 
 - **Adults can make pictures.** Turn it off to stop all picture making.
 - **Adult-only styles.** Choose whether styles marked adults only can be used.
@@ -87,7 +89,7 @@ The page also lists every time someone made something that looks like them, and 
 | What you see | Why | What to do |
 |---|---|---|
 | Home says it cannot make pictures for you | You are a guest, or you are on a shared screen or a spoken chat, or a parent turned cartoon pictures off for you | Ask an adult, or use your own written chat |
-| "No picture model is installed" | The model is not on this computer | An owner or admin presses **Install the picture model** in Settings, Pictures and videos |
+| "No picture model is installed" | The model is not on this computer | An owner or admin presses **Install the picture model** in Settings, Home settings, Pictures, videos and music |
 | "The picture engine isn't answering", or Home says it cannot reach the engine | The AI engine is restarting or stopped | Wait a minute and ask again. If it stays, open **Repairs** |
 | "Waiting for memory to free up" | A video or another big job holds the memory | Wait. It starts by itself |
 | "Something went wrong while making it" | The job failed | Press **Try again**, or change the words |

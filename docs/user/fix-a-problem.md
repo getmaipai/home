@@ -23,6 +23,12 @@ If it shows up right after an update or a restart, the AI engine was probably st
 
 "Getting ready, one moment" means the AI is warming up. Pictures and videos wait when another big job holds the memory. Both clear by themselves. See [Pictures](pictures.md) and [Videos](videos.md).
 
+## Why is my picture, video or song slow?
+
+If the card says "Paused while chat is working", the job is waiting while someone chats or talks to Home. It carries on by itself after the reply. The wait is not counted against the job. You do not need to do anything.
+
+"Waiting for memory to free up" means another big job holds the memory. Wait for it to finish. Home makes one big job at a time, so your job may wait for another picture, video or song.
+
 ## If MaiPai looks out of date
 
 MaiPai updates itself the next time you open it. If a page still looks old after an update, reload it once. If it still looks old, close every MaiPai tab, then open it again. You will not lose anything; your chats and settings are saved on the hub, not in the browser.

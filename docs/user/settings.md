@@ -48,15 +48,19 @@ If the page says "Voices are still getting ready", wait a minute. After setup th
 
 ## Models and storage
 
-An owner or admin opens **Settings**, **Home settings**, **Engines and AI**, and scrolls to **Models and storage**. It lists every part of the AI on this computer, such as the chat models, the voices, the picture and video models and the picture tools. Each row shows how much space it uses, when it was last used and what uses it. The top line shows how much room is left. A part Home recommends but did not install, such as Detailed videos on a Mac that was upgraded, says "Recommended, not installed" and has an **Install** button. Home never downloads it for you after an upgrade. Detailed videos show the maker's licence first, and download only after you accept it.
+An owner or admin opens **Settings**, **Home settings**, **Engines and AI**, and scrolls to **Models and storage**. It lists every part of the AI on this computer, such as the chat models, the voices, the picture and video models and the picture tools. Each row shows how much space it uses, when it was last used and what uses it. The top line shows how much room is left. A part Home recommends but did not install, such as Detailed videos on a Mac that was upgraded, says "Recommended, not installed" and has an **Install** button. Home never downloads it for you after an upgrade. The LTX Detailed video model is optional. It needs a Mac with 128 GB of memory and about 74 GB of disk space. Before it downloads, you must accept the maker's licence. It is free under 10 million dollars of yearly revenue.
 
 Press **Install** to download a part. A bar shows how far it has got, and you can keep using Home while it downloads. If there is not enough room, or this computer is too small to run it, the button is off and the row says why. Press **Uninstall** to remove a part. Home tells you how much space it frees and that you can install it again later. Chat keeps at least one model: the model chat is using, and the only chat model, cannot be removed.
 
 If a download stops, the row says why and offers **Try again**. The same item is also in **Repairs**.
 
-## Pictures and videos
+## Pictures, videos and music
 
-An owner or admin opens **Settings**, **Home settings**, **Pictures and videos**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children and teens show as off. See [Pictures](pictures.md) and [Videos](videos.md).
+An owner or admin opens **Settings**, **Home settings**, **Pictures, videos and music**. It has the picture model (install or see it), who can make pictures, the style library, and the same for videos. Children can make cartoons by default. See [cartoon controls](people.md#cartoon-pictures-and-videos) to change this. See [Pictures](pictures.md) and [Videos](videos.md).
+
+**Ask me before making pictures and videos of people** is on this page. It starts off and never turns off the safety rules.
+
+**Picture quality** and **Video quality** choose Quick or Detailed when nobody asks for a kind. **Song length** chooses quick or full songs. Quick songs are about 45 seconds and take under a minute. Full songs are about 3 minutes and take a minute or two. See [Songs](songs.md).
 
 ## Web search settings
 
