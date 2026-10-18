@@ -9,7 +9,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [0.2.24] - 2026-10-18
 
-The Library gets its engine: files are stored once, generated pictures, videos and songs stay in the Library when their chat goes, deleted files wait in Trash for 30 days, and files can be renamed, kept, uploaded and previewed as thumbnails through the API. The song card in chat shows its cover art. News gains topic feeds. Three database changes (stored-once files, Trash, file names), tested on a copy of the live database first. The Library page itself is not redesigned yet. Pins: spec-v0.1.183 and ui-v0.5.276. The engine is unchanged (Stack a89e7ff).
+The Library gets its engine: files are stored once, generated pictures, videos and songs stay in the Library when their chat goes, deleted files wait in Trash for 30 days, and files can be renamed, kept, uploaded and previewed as thumbnails through the API. The song card in chat shows its cover art. News gains topic feeds. Three database changes (stored-once files, Trash, file names), tested on a copy of the live database first. The Library page itself is not redesigned yet. Pins: spec-v0.1.184 and ui-v0.5.277. The engine is unchanged (Stack a89e7ff).
 
 - Added News topic feeds (NPR, BBC, The Guardian, CBC News, Sports Illustrated, Popular Science, Fast Company, Inc., Variety, and TIME for Kids for children). Each feed carries the topics it covers, so every topic on the Following page now has stories. Teens and adults follow every topic until they unfollow one, and each household can change the starting topics for each user type in News settings. Local has no feed of its own; add your town's feed under Extra news feeds.
 
@@ -27,6 +27,10 @@ The Library gets its engine: files are stored once, generated pictures, videos a
 - Added private Library thumbnails with access-checked revalidation, a disposable WebP cache, stored video posters and song covers, and admin preview usage and clearing endpoints.
 
 - Added the backend Library listing and summary with cursor paging, filters, derived names, generation thumbnails, folded versions, sharing summaries, and audience checks. Storage and Library now classify PDFs and office files as documents.
+
+- Changed the News reader to open with the publisher's name in a banner and a centered article column (ui-v0.5.277).
+
+- Changed how the shelf asks one publisher for several feeds: one at a time, a minute apart, in the same 15-minute check, while other publishers go in parallel, so a new install fills every topic in about 30 minutes instead of hours.
 
 ## [0.2.23] - 2026-10-18
 
