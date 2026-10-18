@@ -1002,10 +1002,19 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
   // deadline, a dead engine) gets a real, fixed model_failed line, never
   // the empty string this used to deliver silently through `answer` as if
   // the model had genuinely said nothing.
+  // TURN-TTL-01 (rule 6): an adult's written turn whose engine was lost before any text reached the person
+  // waits up to ENGINE_HEAL_WAIT_MS for the engine to come back, then runs the generation once more; the
+  // person sees the ordinary thinking line meanwhile, never a "cancelled".
+  if (engineHealRetryAllowed(attempt, signal.aborted, replyIsUncapped(state)) && connectionLost(attempt)) {
+    console.error(`[model] the engine was lost before the first token; waiting for it, then retrying once`);
+    if (await waitForEngineHeal(signal, ENGINE_HEAL_WAIT_MS, ENGINE_HEAL_POLL_MS)) {
+      attempt = await runOneGeneration(state, messages, tools, tool_choice, thinkingOn, maxTokens, isPhrasingRound ? "phrasing" : "model", signal);
+    }
+  }
+  // (a retry may have succeeded; the narrowing below re-reads `attempt`)
   if (!attempt.ok) {
     settleFailedGate(gate, state, attempt.message, signal.aborted && !isDeadlineAbort(signal));
-    const failureMessage = attempt.message ?? "";
-    if ((await roleHealth("chat")).availability === "unavailable" || failureMessage.includes("could not reach") || failureMessage.includes("connection refused") || failureMessage.includes("ForeignPortHolderError")) {
+    if (await engineLost(attempt)) {
       state.engineUnavailable = true;
       return { outcome: { ok: false, code: "engine_unavailable", message: "MaiPai's AI isn't running right now." }, output: { kind: "model_failed" } };
     }
@@ -1214,6 +1223,42 @@ async function rescueSearch(state: TurnState, messages: LlmMessage[], utterance:
  * the picture would fail the same way). */
 export function pictureMayHaveFailed(kind: string): boolean {
   return kind === "other" || kind === "context_too_large" || kind === "slow";
+}
+
+/** TURN-TTL-01: how long an adult's written turn waits for a lost engine to come back, and how often it looks. */
+export const ENGINE_HEAL_WAIT_MS = 60_000;
+export const ENGINE_HEAL_POLL_MS = 2_000;
+
+/** TURN-TTL-01: the engine, not the request, is why a generation failed. */
+export async function engineLost(attempt: { ok: boolean; message?: string }): Promise<boolean> {
+  if (attempt.ok) return false;
+  return connectionLost(attempt) || (await roleHealth("chat")).availability === "unavailable";
+}
+
+/** TURN-TTL-01: the failure text says the connection to the engine dropped (not a refusal for memory or a bad request).
+ * Only this kind is waited out and retried; a role that is unavailable for another reason keeps its fixed line at once. */
+export function connectionLost(attempt: { ok: boolean; message?: string }): boolean {
+  const message = attempt.message ?? "";
+  return !attempt.ok && (message.includes("could not reach") || message.includes("connection refused") || message.includes("ForeignPortHolderError"));
+}
+
+/** TURN-TTL-01: one heal retry, only for an uncapped (adult written) reply, with nothing yet shown and the turn not stopped. */
+export function engineHealRetryAllowed(attempt: { ok: boolean; released?: boolean }, aborted: boolean, uncapped: boolean): boolean {
+  return !attempt.ok && !attempt.released && !aborted && uncapped;
+}
+
+/** TURN-TTL-01: polls the chat role until it is no longer unavailable; false when the wait ran out or the turn was stopped. */
+export async function waitForEngineHeal(signal: AbortSignal, maxMs: number, pollMs: number): Promise<boolean> {
+  const until = Date.now() + maxMs;
+  while (!signal.aborted && Date.now() < until) {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, pollMs);
+      signal.addEventListener("abort", () => { clearTimeout(timer); resolve(); }, { once: true });
+    });
+    if (signal.aborted) return false;
+    if ((await roleHealth("chat")).availability !== "unavailable") return true;
+  }
+  return false;
 }
 
 /** VISION-02c (rule 6): the one retry without the pictures runs only on

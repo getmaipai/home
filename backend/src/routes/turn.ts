@@ -58,7 +58,13 @@ export async function resolveTurnModel(requested: string | undefined, surface: S
 }
 
 export const turnRoutes = apiRouter();
-const RESUME_TTL_MS = 60_000;
+/** TURN-TTL-01: how long a FINISHED turn's stream stays buffered for a reconnecting client. It starts when the
+ * turn ends and never aborts a running turn: a running turn is bounded by its node deadlines and the stream
+ * watchdog (RULES.md rule 5, DEADLINE-02), and only a client Stop or the owner leaving cancels it. */
+export const RESUME_TTL_MS = 60_000;
+let resumeTtlMs = RESUME_TTL_MS;
+/** Tests only: a short TTL so expiry can be observed without waiting a minute. */
+export function __setResumeTtlForTests(ms: number | null): void { resumeTtlMs = ms ?? RESUME_TTL_MS; }
 
 interface StoredStreamEvent {
   event: TurnStreamEvent;
@@ -115,7 +121,8 @@ interface ResumeSession {
   releasedText: string;
   heardChars?: number;
   expired: boolean;
-  expiryTimer: ReturnType<typeof setTimeout>;
+  /** TURN-TTL-01: armed once, when the turn ends. */
+  expiryTimer?: ReturnType<typeof setTimeout>;
 }
 
 const resumeSessions = new Map<string, ResumeSession>();
@@ -423,10 +430,17 @@ function appendSessionEvent(session: ResumeSession, event: TurnStreamEvent): voi
       detachSubscriber(session, subscriber);
     }
   }
-  if (session.terminal && session.expired) {
+  if (session.terminal) armResumeExpiry(session);
+}
+
+/** TURN-TTL-01: the resume TTL starts when the turn ends, never when it starts. */
+function armResumeExpiry(session: ResumeSession): void {
+  if (session.expiryTimer) return;
+  session.expiryTimer = setTimeout(() => {
+    session.expired = true;
     resumeSessions.delete(session.token);
     inFlightTurns.delete(session.turnId);
-  }
+  }, resumeTtlMs);
 }
 
 function streamResponse(session: ResumeSession, resumeFrom: number | null, wire: Wire = "ndjson"): Response {
@@ -1051,15 +1065,6 @@ turnRoutes.post("/stream", requireAuth, streamTurnBodyLimit, async (c) => {
     cancelled: false,
     releasedText: "",
     expired: false,
-    expiryTimer: setTimeout(() => {
-      if (session.terminal) {
-        resumeSessions.delete(session.token);
-        inFlightTurns.delete(session.turnId);
-        return;
-      }
-      session.expired = true;
-      session.controller.abort();
-    }, RESUME_TTL_MS),
   };
   resumeSessions.set(session.token, session);
   inFlightTurns.set(session.turnId, session);
