@@ -144,9 +144,10 @@ export function MediaHostProvider({ children }: { children: ReactNode }) {
   const { push } = useToast();
   const pushRef = useRef(push);
   pushRef.current = push;
+  const budgetState = useRef({ told: false });
   useEffect(() => {
     if (!element) return;
-    return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS) });
+    return guardMediaBudget(element, { fetchBudget: () => api.mediaBudget(), notify: (line) => pushRef.current(line), every: intervalEvery(BUDGET_CHECK_MS), state: budgetState.current });
   }, [element]);
   const dock = useMemo<MediaDock>(() => ({ current, clear: store.clear }), [current, store]);
   // The element is unloaded when the person signs out or the shell goes away.

@@ -16,7 +16,7 @@ const every = (run: () => void) => { timers.push(run); return () => { timers = t
 beforeEach(() => { timers = []; });
 afterEach(() => { timers = []; });
 
-function setup(reads: Array<BudgetRead | Error>) {
+function setup(reads: Array<BudgetRead | Error>, state?: { told: boolean }) {
   const el = new FakeMedia();
   const shown: string[] = [];
   let calls = 0;
@@ -26,7 +26,7 @@ function setup(reads: Array<BudgetRead | Error>) {
     if (next instanceof Error) throw next;
     return next;
   };
-  const stop = guardMediaBudget(el as unknown as HTMLMediaElement, { fetchBudget, notify: (line) => shown.push(line), every });
+  const stop = guardMediaBudget(el as unknown as HTMLMediaElement, { fetchBudget, notify: (line) => shown.push(line), every, ...(state ? { state } : {}) });
   return { el, shown, stop, calls: () => calls };
 }
 
@@ -111,4 +111,40 @@ test("a load error (the hub refused the file) checks the budget and shows the li
   el.dispatchEvent(new Event("error"));
   await flush();
   expect(shown).toEqual([LINE]);
+});
+
+test("an exhausted budget with no line (an adult's advisory limit) never pauses", async () => {
+  const { el, shown } = setup([{ limit_min: 1, used_min: 1, left_min: 0, exhausted: true, line: null }]);
+  await el.play(); await flush();
+  await tickTimers();
+  expect(el.paused).toBe(false);
+  expect(shown).toEqual([]);
+});
+
+test("the next song or video (a new element) does not repeat the line; more minutes then running out again does", async () => {
+  const state = { told: false };
+  const first = setup([left(true)], state);
+  await flush();
+  expect(first.shown).toEqual([LINE]);
+  first.stop();
+  const second = setup([left(true)], state);
+  await flush();
+  expect(second.shown).toEqual([]);
+  second.stop();
+  const third = setup([left(false), left(true)], state); // a grown-up added minutes, then they ran out
+  await flush();
+  await third.el.play(); await flush();
+  expect(third.shown).toEqual([LINE]);
+});
+
+test("a slow answer that says time is left cannot undo a newer answer that says time is up", async () => {
+  const el = new FakeMedia();
+  const resolvers: Array<(read: BudgetRead) => void> = [];
+  const shown: string[] = [];
+  guardMediaBudget(el as unknown as HTMLMediaElement, { fetchBudget: () => new Promise<BudgetRead>((resolve) => resolvers.push(resolve)), notify: (line) => shown.push(line), every });
+  await el.play(); // second check
+  resolvers[1]!(left(true)); await flush();
+  resolvers[0]!(left(false)); await flush(); // the attach check answers last
+  void el.play();
+  expect(el.paused).toBe(true);
 });

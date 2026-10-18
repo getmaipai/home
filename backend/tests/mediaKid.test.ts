@@ -230,6 +230,14 @@ test("every media kind counts across devices; the admin audio switch excludes on
   expect(mediaBudget(child.id, start).used_min).toBe(1);
 });
 
+test("an adult at their own advisory limit gets no time-up line, so no player pauses them", async () => {
+  const { adult, video, set } = await setup(); const start = clock();
+  expect((await set(`person:${adult.id}`, "allowance.media.daily_minutes", 1)).status).toBe(200);
+  for (let n = 0; n <= 6; n++) tick(adult, video, at(start, n * 10), n * 10);
+  const read = await (await adult.client.get("/api/media/budget")).json() as { exhausted: boolean; line: string | null };
+  expect(read.line).toBeNull();
+});
+
 test("GET /api/media/budget carries the kid time-up line only when time is up, from the one copy definition", async () => {
   const { child, video, set } = await setup(); const start = clock();
   await set(`person:${child.id}`, "allowance.media.daily_minutes", 1);

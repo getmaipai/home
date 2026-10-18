@@ -11,6 +11,8 @@ export interface GuardDeps {
   notify: (line: string) => void;
   /** Runs `run` on a repeating timer and returns a stop function (an injected clock, so tests drive it). */
   every: (run: () => void) => () => void;
+  /** Shared across guards (the host keeps one), so the next song or video does not repeat the line; reset when time is left again. */
+  state?: { told: boolean };
 }
 
 export const BUDGET_CHECK_MS = 15_000;
@@ -24,17 +26,23 @@ export const intervalEvery = (ms: number) => (run: () => void) => {
  * shows the kid line once, and pauses any later play at once until a check sees more minutes (a grown-up extended today).
  * A failed read changes nothing: it never pauses on its own and never throws. Returns a stop function. */
 export function guardMediaBudget(el: HTMLMediaElement, deps: GuardDeps): () => void {
+  const state = deps.state ?? { told: false };
   let exhausted = false;
-  let told = false;
   let live = true;
+  let asked = 0;
+  let applied = 0;
   const check = async () => {
+    const mine = ++asked;
     let budget: BudgetRead;
     try { budget = await deps.fetchBudget(); } catch { return; }
-    if (!live) return;
-    exhausted = budget.limit_min > 0 && budget.exhausted;
-    if (!exhausted) return;
+    // An older answer never overrides a newer one (a slow "time left" after a fresh "time is up").
+    if (!live || mine < applied) return;
+    applied = mine;
+    // The hub sets `line` exactly when it refuses playback (a child or teen whose time is up; an adult's limit is advisory).
+    exhausted = budget.limit_min > 0 && budget.exhausted && !!budget.line;
+    if (!exhausted) { state.told = false; return; }
     if (!el.paused) el.pause();
-    if (!told && budget.line) { told = true; deps.notify(budget.line); }
+    if (!state.told && budget.line) { state.told = true; deps.notify(budget.line); }
   };
   const onPlay = () => {
     if (exhausted) el.pause();

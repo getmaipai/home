@@ -24,7 +24,7 @@ import { createRootSource, listSourcesFor, removeSource, ROOT_KINDS } from "@/li
 import { itemFromRow, sourceFromRow } from "@/lib/media/model";
 import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
-import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal, TIME_UP_LINE } from "@/lib/media/watchTime";
+import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal } from "@/lib/media/watchTime";
 import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
 import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedVisibleTo } from "@/lib/media/collections";
 
@@ -322,15 +322,16 @@ function meterKeyOf(c: Context): string {
 
 // ---- private daily media budget ----
 const BudgetSchema = z.object({ limit_min: z.number(), used_min: z.number(), left_min: z.number(), exhausted: z.boolean() });
-const BudgetReadSchema = BudgetSchema.extend({ line: z.string().nullable().describe("What the player shows when time is up (the kid words); null while time is left.") });
+const BudgetReadSchema = BudgetSchema.extend({ line: z.string().nullable().describe("What the player shows when time is up and the hub refuses playback (a child or teen); null otherwise. Players pause only when it is set.") });
 const budgetRoute = createRoute({
   method: "get", path: "/budget", tags: ["Media"], summary: "My daily media minutes across all screens",
   middleware: [requireAuth] as const,
   responses: { 200: { content: { "application/json": { schema: BudgetReadSchema } }, description: "Zero limit means unlimited." }, ...errorResponses({ 401: "Sign in to read your budget" }) },
 });
 mediaRoutes.openapi(budgetRoute, (c) => {
-  const budget = mediaBudget(c.get("person").id);
-  return c.json({ ...budget, line: budget.exhausted ? TIME_UP_LINE : null }, 200);
+  const person = c.get("person");
+  // The line is the refusal's own words, so it is set exactly when the hub refuses (a minor whose time is up; an adult's limit is advisory).
+  return c.json({ ...mediaBudget(person.id), line: mediaTimeUpRefusal(person)?.error ?? null }, 200);
 });
 
 const extendBudgetRoute = createRoute({

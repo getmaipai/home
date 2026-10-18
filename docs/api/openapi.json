@@ -53933,13 +53933,19 @@
                     },
                     "exhausted": {
                       "type": "boolean"
+                    },
+                    "line": {
+                      "type": "string",
+                      "nullable": true,
+                      "description": "What the player shows when time is up and the hub refuses playback (a child or teen); null otherwise. Players pause only when it is set."
                     }
                   },
                   "required": [
                     "limit_min",
                     "used_min",
                     "left_min",
-                    "exhausted"
+                    "exhausted",
+                    "line"
                   ]
                 }
               }
