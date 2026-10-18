@@ -1,3 +1,9 @@
+import { createHash } from "node:crypto";
+import { mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { dataDir } from "@/lib/paths";
+import { nextHlc } from "@/lib/hlc";
+import { canAccessFile } from "@/lib/access";
 import { beforeEach, expect, test } from "bun:test";
 import { db } from "@/db";
 import { attachments, people, shares, pictureJobs, videoJobs, musicJobs } from "@/db/schema";
@@ -18,7 +24,7 @@ async function fixture() {
   const id = result.person.id;
   function file(n: number, mediaType = "image/png", provenance = "composer:upload") {
     const key = `file-${n.toString(16).padStart(16, "0")}`;
-    db.insert(attachments).values({ id: key, ownerPersonId: id, conversationId: null, turnId: null, mediaType, size: n + 1, sha256: "a".repeat(64), storagePath: `people/${id}/attachments/${key}`, provenance, createdAt: "2026-10-14T12:00:00.000Z", hlc: "fixture" }).run();
+    db.insert(attachments).values({ id: key, ownerPersonId: id, conversationId: null, turnId: null, mediaType, size: n + 1, sha256: "a".repeat(64), storagePath: `people/${id}/attachments/${key}`, provenance, createdAt: "2026-10-14T12:00:00.000Z", hlc: nextHlc() }).run();
     return key;
   }
   return { client, id, file };
@@ -153,3 +159,142 @@ test("fetched rows preserve owner access and require both an admin and a share f
     expect((await page(reader.get("/api/library"))).items.map(row=>row.id)).toEqual(role === "admin" ? [shared] : []);
   }
 });
+
+async function minorFixture(role: "child" | "teen") {
+  const f = await fixture();
+  const made = await (await f.client.post("/api/people", { displayName: "Bramble", role, secret: "0000" })).json() as { id: string };
+  // The role remains authoritative even with an adult birthdate.
+  db.update(people).set({ birthdate: "1980-01-01" }).where(eq(people.id, made.id)).run();
+  const reader = new TestClient();
+  await reader.post("/api/auth/verify-secret", { personId: made.id, secret: "0000" });
+  function share(key: string, to = "household") {
+    db.insert(shares).values({ id: `share-${key}-${to}`, fileId: key, fromPersonId: f.id, to, provenance: "fixture", createdAt: "2026-10-14", hlc: "fixture" }).run();
+    return key;
+  }
+  return { ...f, reader, minorId: made.id, share };
+}
+
+for (const role of ["child", "teen"] as const) {
+  test(`${role} retains a shared all-ages cover of a private unclassified song`, async () => {
+    const { id, file, reader, share } = await minorFixture(role);
+    const cover = share(file(9, "image/png", 'picture-gen:{"audience":"all-ages","prompt":"Otters"}'));
+    const song = file(10, "audio/mp4", 'music-gen:{"job_id":"private-song"}');
+    db.insert(musicJobs).values({ id: "private-song", personId: id, state: "done", task: "text2music", request: "{}", fileId: song, coverFileId: cover, createdAt: "2026-10-14", updatedAt: "2026-10-14", hlc: "fixture" }).run();
+    expect((await page(reader.get("/api/library"))).items.map(x => x.id)).toEqual([cover]);
+    const totals = await summary(reader.get("/api/library/summary"));
+    expect(totals.items).toBe(1);
+    expect(totals.bytes).toBe(10);
+    expect(totals.per_kind.image).toEqual({ items: 1, bytes: 10 });
+    const path = join(dataDir, `people/${id}/attachments/${cover}`);
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, "0123456789");
+    db.update(attachments).set({ sha256: createHash("sha256").update("0123456789").digest("hex") }).where(eq(attachments.id, cover)).run();
+    expect((await reader.get(`/api/files/${cover}`)).status).toBe(200);
+    const content = await reader.get(`/api/files/${cover}/content`);
+    expect(content.status).toBe(200);
+    expect(await content.text()).toBe("0123456789");
+    expect((await reader.get(`/api/files/${song}`)).status).toBe(404);
+  });
+
+  test(`${role} counts only visible media and never exposes hidden derived ids`, async () => {
+    const { file, reader, share, minorId } = await minorFixture(role);
+    const safe = '"audience":"all-ages"';
+    const hidden = '"audience":"adult-only"';
+    const root = share(file(1, "image/png", `picture-gen:{${safe},"prompt":"Visible"}`), minorId);
+    const edit = share(file(2, "image/png", `image-edit:{${hidden},"root":"${root}"}`));
+    const video = share(file(3, "video/mp4", `video-gen:{${safe},"job":"visible-video"}`));
+    const poster = share(file(4, "image/png", `video-poster:{${hidden},"job":"visible-video"}`));
+    const privateVideo = file(5, "video/mp4", `video-gen:{${hidden},"job":"hidden-video"}`);
+    const orphanPoster = share(file(6, "image/png", `video-poster:{${safe},"job":"hidden-video"}`), minorId);
+    const orphanEdit = share(file(7, "image/png", `image-edit:{${safe},"root":"${privateVideo}"}`));
+    const rows = (await page(reader.get("/api/library"))).items;
+    expect(rows.map(x => x.id).sort()).toEqual([root, video, orphanPoster, orphanEdit].sort());
+    expect(rows.find(x => x.id === root)?.version_count).toBe(1);
+    expect(rows.find(x => x.id === root)?.thumb_url).toContain(root);
+    expect(rows.find(x => x.id === video)?.thumb_url).toContain(video);
+    expect(JSON.stringify(rows)).not.toContain(edit);
+    expect(JSON.stringify(rows)).not.toContain(poster);
+    const totals = await summary(reader.get("/api/library/summary"));
+    expect(totals.items).toBe(4);
+    expect(totals.bytes).toBe(21);
+    expect(totals.per_kind.image).toEqual({ items: 3, bytes: 17 });
+    expect(totals.per_kind.video).toEqual({ items: 1, bytes: 4 });
+    for (const kind of ["audio", "document", "story", "file"]) expect(totals.per_kind[kind]).toEqual({ items: 0, bytes: 0 });
+  });
+
+  test(`${role} provenance and hidden-row pagination preserve the visible set for every sort`, async () => {
+    const { file, reader, share, minorId } = await minorFixture(role);
+    const notes = [
+      'picture-gen:{"audience":"all-ages","prompt":"Needle A"}',
+      'picture-gen:{broken', 'picture-gen:{"prompt":"Needle 0"}', 'picture-gen:{"audience":"unknown","prompt":"Needle AB"}',
+      'picture-gen:{"nested":{"audience":"all-ages"}}',
+      'picture-gen:{"audience":"all-ages","audience":"adult-only","prompt":"Needle BC"}',
+      'picture-gen:{"audience":"adult-only","audience":"all-ages","prompt":"Needle B"}',
+      'music-gen:{"audience":"all-ages"}', 'composer:upload', 'fetched:{"audience":"all-ages"}',
+      'video-gen:{"audience":"all-ages","prompt":"Needle C"}',
+      'upload:{"audience":"all-ages"}', 'picture-gen:{"audience":"adult-only"}',
+      'image-edit:{"audience":"all-ages","prompt":"Needle D"}',
+    ];
+    const ids = notes.map((note, n) => share(file(100 + n, n === 10 ? "video/mp4" : "image/png", note), n % 2 ? minorId : "household"));
+    const visible = [ids[0]!, ids[6]!, ids[10]!, ids[13]!];
+    const fetched = share(file(200, "image/png", 'picture-gen:{"audience":"all-ages"}'));
+    db.update(attachments).set({ origin: "fetched" }).where(eq(attachments.id, fetched)).run();
+    for (const sort of ["newest", "oldest", "name", "size"]) {
+      for (const search of ["", "Needle"]) {
+        const query = `/api/library?sort=${sort}&search=${search}`;
+        const all = await page(reader.get(query));
+        expect(all.items.map(x => x.id).sort()).toEqual([...visible].sort());
+        for (const limit of [1, 3]) {
+          const seen: string[] = [];
+          let next: string | null = null;
+          do {
+            const result: Page = await page(reader.get(`${query}&limit=${limit}${next ? `&cursor=${next}` : ""}`));
+            seen.push(...result.items.map(x => x.id));
+            next = result.next_cursor;
+            if (next) {
+              const decoded = JSON.parse(Buffer.from(next, "base64url").toString()) as { id: string };
+              expect(visible).toContain(decoded.id);
+              expect(decoded.id).toBe(result.items.at(-1)!.id);
+            }
+            expect(seen.length).toBeLessThanOrEqual(visible.length);
+          } while (next);
+          expect(seen).toEqual(all.items.map(x => x.id));
+        }
+        const totals = await summary(reader.get(`/api/library/summary?sort=${sort}&search=${search}`));
+        expect(totals.items).toBe(4);
+        expect(totals.bytes).toBe(433);
+        expect(totals.per_kind.image).toEqual({ items: 3, bytes: 322 });
+        expect(totals.per_kind.video).toEqual({ items: 1, bytes: 111 });
+      }
+    }
+    const actor = db.select().from(people).where(eq(people.id, minorId)).get()!;
+    expect(canAccessFile(actor, minorId, visible[0]!)).toBe(false);
+    expect(canAccessFile(actor, minorId, "file-ffffffffffffffff")).toBe(false);
+    for (const hidden of [...ids.filter(id => !visible.includes(id)), fetched, "file-ffffffffffffffff"]) expect((await reader.get(`/api/files/${hidden}`)).status).toBe(404);
+  });
+}
+
+for (const role of ["child", "teen"] as const) {
+  for (const parentSafe of [false, true]) for (const derivedSafe of [false, true]) {
+    test(`${role} folds only visible video posters and image edits (${parentSafe}, ${derivedSafe})`, async () => {
+      const { file, reader, share } = await minorFixture(role);
+      const audience = (safe: boolean) => safe ? "all-ages" : "adult-only";
+      const root = share(file(1, "image/png", `picture-gen:{"audience":"${audience(parentSafe)}"}`));
+      const edit = share(file(2, "image/png", `image-edit:{"audience":"${audience(derivedSafe)}","root":"${root}"}`));
+      const video = share(file(3, "video/mp4", `video-gen:{"audience":"${audience(parentSafe)}","job":"clip"}`));
+      const poster = share(file(4, "image/png", `video-poster:{"audience":"${audience(derivedSafe)}","job":"clip"}`));
+      const rows = (await page(reader.get("/api/library"))).items;
+      expect(rows.map(x => x.id).sort()).toEqual((parentSafe ? [root, video] : derivedSafe ? [edit, poster] : []).sort());
+      if (parentSafe) {
+        expect(rows.find(x => x.id === root)?.version_count).toBe(derivedSafe ? 2 : 1);
+        expect(rows.find(x => x.id === root)?.thumb_url).toBe(`/api/files/${derivedSafe ? edit : root}/thumb?w=320`);
+        expect(rows.find(x => x.id === video)?.thumb_url).toBe(`/api/files/${derivedSafe ? poster : video}/thumb?w=320`);
+      }
+      const totals = await summary(reader.get("/api/library/summary"));
+      expect(totals.items).toBe(rows.length);
+      expect(totals.bytes).toBe((parentSafe ? 6 : 0) + (derivedSafe ? 8 : 0));
+      expect(totals.per_kind.image).toEqual({ items: parentSafe ? 1 : derivedSafe ? 2 : 0, bytes: (parentSafe ? 2 : 0) + (derivedSafe ? 8 : 0) });
+      expect(totals.per_kind.video).toEqual({ items: parentSafe ? 1 : 0, bytes: parentSafe ? 4 : 0 });
+    });
+  }
+}

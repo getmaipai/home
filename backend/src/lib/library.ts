@@ -28,12 +28,12 @@ function base(actor: PersonRow, q: LibraryQuery) {
   if (q.shared === "with-me") { filter += " AND owner_person_id != ?"; params.push(actor.id); }
   if (q.shared === "by-me") { filter += " AND owner_person_id = ? AND share_count > 0"; params.push(actor.id); }
   if (q.search) { filter += " AND (name LIKE ? ESCAPE '\\' OR prompt LIKE ? ESCAPE '\\' OR title LIKE ? ESCAPE '\\')"; const escaped = `%${q.search.replace(/[\\%_]/g, "\\$&")}%`; params.push(escaped, escaped, escaped); }
+  // Companion relations only fold files when their parent passes the same viewer boundary.
   return { params, sql: `WITH meta AS (
     SELECT a.*, ${libraryProvenanceSql("a.provenance")} AS meta, ${mediaKindSql("a.media_type")} AS kind,
       p.display_name, p.deleted_at, coalesce(s.share_count,0) AS share_count, coalesce(s.household,0) AS household,
       pj.prompt AS picture_prompt, vj.prompt AS video_prompt, vj.request AS video_request,
-      mj.request AS music_request, mj.duration_s, mj.cover_file_id,
-      EXISTS(SELECT 1 FROM music_jobs cm WHERE cm.cover_file_id = a.id) AS song_cover
+      mj.request AS music_request, mj.duration_s, mj.cover_file_id
     FROM attachments a JOIN people p ON p.id = a.owner_person_id
     LEFT JOIN (SELECT file_id, count(DISTINCT "to") AS share_count, max("to" = 'household') AS household,
       max("to" = ? OR "to" = 'household') AS visible FROM shares GROUP BY file_id) s ON s.file_id = a.id
@@ -45,8 +45,13 @@ function base(actor: PersonRow, q: LibraryQuery) {
     SELECT *, coalesce(picture_prompt,video_prompt,json_extract(meta,'$.prompt'),'') AS prompt,
       coalesce(json_extract(CASE WHEN json_valid(music_request) THEN music_request ELSE '{}' END,'$.title'),json_extract(meta,'$.title'),'') AS title,
       coalesce(duration_s,json_extract(meta,'$.duration_seconds'),json_extract(meta,'$.seconds'),json_extract(CASE WHEN json_valid(video_request) THEN video_request ELSE '{}' END,'$.seconds')) AS duration,
-      (song_cover OR json_extract(meta,'$.writer') = 'video-poster') AS companion
-    FROM meta
+      (EXISTS(SELECT 1 FROM music_jobs cm JOIN meta parent ON parent.id = cm.file_id
+        WHERE cm.cover_file_id = m.id)
+        OR (json_extract(meta,'$.writer') = 'video-poster' AND EXISTS(
+          SELECT 1 FROM meta parent WHERE parent.owner_person_id = m.owner_person_id
+            AND json_extract(parent.meta,'$.writer') = 'video-gen'
+            AND json_extract(parent.meta,'$.job') = json_extract(m.meta,'$.job')))) AS companion
+    FROM meta m
   ), visible AS (
     SELECT *, coalesce(nullif(title,''),nullif(prompt,''),(CASE kind WHEN 'image' THEN 'Picture' WHEN 'video' THEN 'Video' WHEN 'audio' THEN 'Audio' WHEN 'document' THEN 'Document' WHEN 'story' THEN 'Story' ELSE 'File' END || ', ' || CAST(strftime('%d',created_at) AS INTEGER) || ' ' || substr('JanFebMarAprMayJunJulAugSepOctNovDec',3*(CAST(strftime('%m',created_at) AS INTEGER)-1)+1,3))) AS name FROM named
   ), filtered AS (SELECT * FROM visible WHERE ${filter}),
