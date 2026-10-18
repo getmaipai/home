@@ -18,7 +18,7 @@ let card: MusicCard;
 const V1 = { id: "file-one", label: "Version 1", url: "/api/music/jobs/mus-1/files/file-one" };
 const V2 = { id: "file-two", label: "Version 2", url: "/api/music/jobs/mus-2/files/file-two" };
 function make(over: Partial<MusicCard>): MusicCard {
-  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, versions: [], current_id: null,
+  return { id: "mus-1", state: "running", stage: "planning", stage_label: "Planning the song", progress: 0.25, eta_seconds: 40, position: null, error_line: null, versions: [], current_id: null, length: "quick",
     title: "Pancakes", description: "a gentle folk song with an original voice", lyrics: "[Verse]\nMorning light\n[Chorus]\nPancakes rise", duration_s: 60, started_at: Date.now() - 30_000, ...over };
 }
 const done = (over: Partial<MusicCard> = {}): MusicCard => make({ state: "done", stage: "ready", stage_label: "", progress: 1, eta_seconds: 0, versions: [V1], current_id: V1.id, ...over });
@@ -162,5 +162,22 @@ describe("MusicToolRender", () => {
     // Same classes as the kit Element rendered bare: Home added none.
     const bare = render(<MusicTrack status="ready" title="Pancakes" src={V1.url} />);
     expect(cardOf(view)!.className).toBe(bare.container.querySelector("[data-slot=music-track]")!.className);
+  });
+});
+
+describe("Quick and Full songs on the card", () => {
+  test("a quick song says so, offers Make it full, and the button starts a full version", async () => {
+    card = done();
+    const { findByText } = mount();
+    expect(await findByText(/Quick song/)).toBeTruthy();
+    const button = await findByText("Make it full");
+    fireEvent.click(button);
+    await waitFor(() => expect(calls.some((c) => c.url === "/api/music/jobs/mus-1/length" && c.method === "POST" && c.body?.includes('"full"'))).toBe(true));
+  });
+  test("a full song offers Make it quick", async () => {
+    card = done({ length: "full", duration_s: 180 });
+    const { findByText } = mount();
+    expect(await findByText(/Full song/)).toBeTruthy();
+    expect(await findByText("Make it quick")).toBeTruthy();
   });
 });

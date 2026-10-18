@@ -14,6 +14,11 @@ export const MUSIC_DENIAL_LINE: Record<MusicDenial, string> = {
   household_off: "Making songs is switched off for adults in this home. An admin can switch it on in Settings, Pictures, videos and music.",
 };
 export const MUSIC_NOT_HERE_LINE = "I can't make a song here right now. It takes an adult on their own screen and a music model on this computer.";
+export const MUSIC_LENGTH_KEY = "generation.music.length";
+/** `generation.music.length`: what chat makes when nobody asks for a kind (quick, the default, or full). */
+export function householdSongLength(read: (key: string) => unknown = getHouseholdSettingValue): "quick" | "full" {
+  try { return read(MUSIC_LENGTH_KEY) === "full" ? "full" : "quick"; } catch { return "quick"; }
+}
 export function householdAllowsMusic(read: (key: string) => unknown = getHouseholdSettingValue): boolean {
   try { return read(MUSIC_ENABLED_KEY) !== false; } catch { return true; }
 }

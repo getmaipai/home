@@ -1,10 +1,12 @@
 // MUSIC-SPEC-01: the record shape is the pinned spec's (file.provenance.generation); no prompt, title or lyrics belong in it.
 import type { GenerationProvenance } from "@maipai/spec/gen/ts/generation-provenance.js";
 export type { GenerationProvenance };
+/** Quick: a short song (about 45 s) for a jingle, a hook or trying words. Full: a whole song (about 3 minutes) with its structure. */
+export type SongLength = "quick" | "full";
 export type MusicTask = "text2music" | "cover" | "repaint" | "extend" | "remake" | "variation" | "trim" | "fade" | "loudness";
 export interface MusicRequest {
   description: string; lyrics?: string; title?: string; instrumental: boolean; seconds: number;
-  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; seed?: number;
+  bpm?: number; key?: string; language?: string; quality?: "quick" | "detailed"; seed?: number; length?: SongLength;
   from_s?: number; to_s?: number; add_s?: number; at?: "start" | "end"; strength?: number;
   edit?: import("./stack").MusicBody["edit"];
 }

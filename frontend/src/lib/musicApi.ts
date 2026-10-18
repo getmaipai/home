@@ -18,6 +18,8 @@ export interface MusicCard {
   /** Oldest first. Each url is the owner's own audio, with Range support. */
   versions: MusicVersion[];
   current_id: string | null;
+  /** The kind of the version on show: quick (about 45 s) or full (about 3 minutes). */
+  length: "quick" | "full";
   title: string | null;
   description: string | null;
   /** The owner's own words; null when there are none. */
@@ -40,6 +42,8 @@ export const musicApi = {
   card: (id: string, signal?: AbortSignal) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}`, signal ? { signal } : {}),
   stop: (id: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }),
   /** Makes an older version the one the next edit starts from. The newer versions stay. */
+  /** Make it full / Make it quick: the same song made again at the other length, as a new version on this card. */
+  setLength: (id: string, length: "quick" | "full", fileId?: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/length`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ length, ...(fileId ? { file_id: fileId } : {}) }) }),
   useVersion: (id: string, fileId: string) => send<MusicCard>(`/api/music/jobs/${encodeURIComponent(id)}/use`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ file_id: fileId }) }),
   /** A personal download of one version (never the commercial purpose). */
   fileUrl: (fileId: string) => `/api/music/files/${encodeURIComponent(fileId)}`,

@@ -634,7 +634,12 @@ function musicDescriptionOf(card: MusicCard): string | undefined {
   const style = caption.length > 70 ? `${caption.slice(0, 67).trimEnd()}...` : caption;
   const seconds = card.duration_s;
   const length = typeof seconds === "number" && seconds > 0 ? `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}` : "";
-  return [style, length].filter(Boolean).join(", ") || undefined;
+  return [card.length === "full" ? "Full song" : "Quick song", style, length].filter(Boolean).join(", ") || undefined;
+}
+
+/** The plain line under a song while it is made: what each kind is and how long it takes (measured, music design note section 16). */
+export function musicHint(length: "quick" | "full"): string {
+  return length === "full" ? "Full songs are about 3 minutes and take a minute or two." : "Quick songs are about 45 seconds and take under a minute.";
 }
 
 export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>, { id: string }> = ({ result }) => {
@@ -682,6 +687,8 @@ export const MusicToolRender: ToolCallMessagePartComponent<Record<string, never>
       onSelectVersion={(id) => setPicked({ base: card.current_id, id })}
       onUseVersion={(id) => { void musicApi.useVersion(card.id, id).then(refresh).catch(refresh); }}
       onStop={() => { void musicApi.stop(card.id).then(refresh).catch(refresh); }}
+      hint={musicHint(card.length)}
+      {...(ready ? { actions: <Button type="button" variant="ghost" size="sm" onClick={() => { void musicApi.setLength(card.id, card.length === "full" ? "quick" : "full", shown.id).then(refresh).catch(refresh); }}>{card.length === "full" ? "Make it quick" : "Make it full"}</Button> } : {})}
       {...(ready ? { onShare: () => { void shareClip({ prepared: prepared.data, title, nav: navigator, fallback: () => navigate(`/files?file=${encodeURIComponent(shown.id)}`) }); } } : {})}
     />
   );

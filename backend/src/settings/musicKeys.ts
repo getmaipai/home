@@ -17,4 +17,23 @@ export const MUSIC_SETTINGS_KEYS: SettingsKey[] = [
     lives_in: "household.pictures",
     honoured_by: ["home"],
   }),
+  SettingsKey.parse({
+    key: "generation.music.length",
+    scope: "household",
+    selector: "select",
+    range: { options: ["quick", "full"] },
+    default: "quick",
+    label: "Song length",
+    help: "What chat makes when nobody asks for a kind. Anyone who can make songs can still ask for the other kind.",
+    level: "basic",
+    copy: {
+      does: "Picks quick or full songs when nobody says which.",
+      options: {
+        quick: "Quick songs: about 45 seconds, ready in under a minute.",
+        full: "Full songs: about 3 minutes with every part, ready in a minute or two.",
+      },
+    },
+    lives_in: "household.pictures",
+    honoured_by: ["home"],
+  }),
 ];

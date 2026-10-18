@@ -12,7 +12,10 @@ import type { PersonRow } from "@/types";
 import type { AppEnv } from "@/types";
 import { musicDenial, musicViewDenial, MUSIC_DENIAL_LINE } from "@/lib/music/policy";
 import { musicEngineStatus, musicStatusReady } from "@/lib/music/ready";
-import { cancelMusicJob, getMusicJobFor, musicVersions, openMusicFile, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
+import { cancelMusicJob, getMusicJobFor, musicVersions, openMusicFile, plainMusicFailure, startMusicJob, useMusicVersion, type MusicFileHandle, type MusicJob } from "@/lib/music/jobs";
+import { fullSongsPossible, lengthOf, prepareMusicEdit } from "@/lib/music/tool";
+import { refuseMusicPrompt, MUSIC_REFUSAL_LINE } from "@/lib/music/policy";
+import { StackMusicError } from "@/lib/music/stack";
 import { commercialUseOf, COMMERCIAL_REFUSAL_LINE } from "@/lib/music/commercial";
 import { busyLine } from "@/lib/videos/jobs";
 export const musicRoutes = apiRouter();
@@ -37,7 +40,7 @@ const versionSchema = z.object({ id: z.string(), label: z.string(), url: z.strin
 const cardSchema = z.object({
   id: z.string(), state: z.enum(["queued", "running", "done", "failed", "cancelled"]), stage: z.string().nullable(), stage_label: z.string(),
   progress: z.number(), eta_seconds: z.number().nullable(), position: z.number().nullable(), error_line: z.string().nullable(),
-  versions: z.array(versionSchema), current_id: z.string().nullable(), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
+  versions: z.array(versionSchema), current_id: z.string().nullable(), length: z.enum(["quick", "full"]), title: z.string().nullable(), description: z.string().nullable(), lyrics: z.string().nullable(), duration_s: z.number().nullable(), started_at: z.number(),
 });
 export function musicFileUrl(job: MusicJob): string { return `/api/music/jobs/${encodeURIComponent(job.id)}/files/${encodeURIComponent(job.fileId!)}`; }
 export function musicStageLabel(job: MusicJob): string {
@@ -58,7 +61,7 @@ export function musicCardView(actor: PersonRow, root: MusicJob) {
     id: root.id, state: root.state, stage: root.stage, stage_label: musicStageLabel(root), progress: root.progress,
     eta_seconds: root.etaSeconds, position: root.position, error_line: root.errorLine,
     versions: versions.map((job, index) => ({ id: job.fileId!, label: `Version ${index + 1}`, url: musicFileUrl(job) })),
-    current_id: current?.fileId ?? null, title: current?.request.title ?? root.request.title ?? null,
+    current_id: current?.fileId ?? null, length: lengthOf((current ?? root).request, (current ?? root).durationS), title: current?.request.title ?? root.request.title ?? null,
     description: current?.request.description ?? root.request.description ?? null, started_at: Date.parse(root.createdAt),
     lyrics: current?.request.lyrics ?? root.request.lyrics ?? null, duration_s: current?.durationS ?? root.durationS,
   };
@@ -89,6 +92,31 @@ const useRoute = createRoute({ method: "post", path: "/jobs/{id}/use", tags: ["M
 musicRoutes.openapi(useRoute, (c) => {
   const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id);
   if (!root || !useMusicVersion(actor, root, c.req.valid("json").file_id)) return c.json({ error: "That version isn't available any more. Choose another version." }, 404) as never;
+  return c.json(musicCardView(actor, root), 200);
+});
+
+// Make it full / Make it quick (owner, 2026-10-17): the same song made again at the other length, as a new version on the same card.
+const lengthRoute = createRoute({ method: "post", path: "/jobs/{id}/length", tags: ["Music"], summary: "Make the shown song again as a quick or a full song", middleware,
+  request: { params, body: { content: { "application/json": { schema: z.object({ length: z.enum(["quick", "full"]), file_id: z.string().min(1).max(80).optional() }) } } } },
+  responses: { 200: { content: { "application/json": { schema: cardSchema } }, description: "The card with the new version coming." }, 422: { description: "Full songs are not possible here." }, ...refusals } });
+musicRoutes.openapi(lengthRoute, async (c) => {
+  const actor = c.get("person"); const root = getMusicJobFor(actor, c.req.valid("param").id); const { length, file_id } = c.req.valid("json");
+  const versions = root ? musicVersions(actor, root).filter((j) => j.state === "done" && j.fileId) : [];
+  const source = (file_id ? versions.find((j) => j.fileId === file_id) : versions.sort((a, b) => (b.chosenAt ?? b.createdAt).localeCompare(a.chosenAt ?? a.createdAt))[0]) ?? null;
+  if (!root || !source || !source.conversationId || !source.turnId) return c.json({ error: "That song isn't available any more. Ask for it again." }, 404) as never;
+  const engine = await musicEngineStatus();
+  if (!musicStatusReady(engine)) return c.json({ error: plainMusicFailure("not_installed") }, 503) as never;
+  if (length === "full" && !fullSongsPossible(engine!)) return c.json({ error: "Full songs need a computer with 128 GB of memory. Quick songs work here." }, 422) as never;
+  const plan = prepareMusicEdit(source, { track: source.fileId!, change: length === "full" ? "make_full" : "make_quick" } as never);
+  if (!plan.ok) return c.json({ error: plan.line }, 422) as never;
+  const refusal = refuseMusicPrompt([plan.request.description, plan.request.lyrics, plan.request.title, plan.request.key, plan.request.language].join(" "));
+  if (refusal) return c.json({ error: MUSIC_REFUSAL_LINE[refusal] }, 403) as never;
+  plan.request.seconds = Math.min(plan.request.seconds, engine!.limits.max_seconds); plan.body.duration_s = plan.request.seconds;
+  try {
+    await startMusicJob({ actor, conversationId: source.conversationId, turnId: source.turnId, temporary: source.temporary, task: plan.task, request: plan.request, body: plan.body, parentFileId: source.fileId });
+  } catch (error) {
+    return c.json({ error: plainMusicFailure(error instanceof StackMusicError ? error.code : "failed") }, 503) as never;
+  }
   return c.json(musicCardView(actor, root), 200);
 });
 /** Audio seeking uses the same single-Range semantics as the video card. */

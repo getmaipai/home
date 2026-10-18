@@ -84,7 +84,9 @@
           "variation",
           "trim",
           "fade",
-          "loudness"
+          "loudness",
+          "make_full",
+          "make_quick"
         ]
       },
       "section": {

@@ -71,7 +71,7 @@
       "seconds": {
         "type": "number",
         "grounded": false,
-        "description": "Length in seconds, from 10 to the installed music model limit. Default 60.",
+        "description": "Optional exact length in seconds. Quick songs are 10 to 60, full songs 150 to 240.",
         "minimum": 10,
         "default": 60
       },
@@ -87,6 +87,15 @@
         "grounded": false,
         "description": "Short title for the person to see.",
         "maxLength": 200
+      },
+      "length": {
+        "type": "string",
+        "enum": [
+          "quick",
+          "full"
+        ],
+        "grounded": false,
+        "description": "quick (about 45 seconds) unless the person asks for a whole or full song or a long piece; then full (about 3 minutes) and write every part: intro, verses, chorus, bridge, outro."
       }
     }
   },
