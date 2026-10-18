@@ -572,6 +572,19 @@ function assertCanSetMediaProtection(actor: PersonRow, targetPersonId: string): 
   return { ok: false, status: 403, error: "A grown-up sets your media controls. Ask a grown-up to change them." };
 }
 
+/** CODE-KEYS-01: the coding.person.* keys are held by the band's declared `control` (local-coding design 3.7). Where it says
+ * guardian, only an owner or admin writes it (the person's own write is refused, so a child or teen cannot give themselves
+ * keys, hosts or a bigger share, and an adult cannot raise their own cap); where it says self, the ordinary person rule applies. */
+function assertCanSetCodingPersonKey(actor: PersonRow, targetPersonId: string, keyDef: { control?: Record<string, string> }): SettingsOpResult<true> {
+  const target = db.select().from(people).where(and(eq(people.id, targetPersonId), isNull(people.deletedAt))).get();
+  if (!target) return { ok: false, status: 403, error: "That person was not found. Open People and pick them again." };
+  const band = speakerAgeBand(target as PersonRow, new Date());
+  if (keyDef.control?.[band] !== "guardian") return assertCanAccessScope(actor, { kind: "person", id: targetPersonId }, "write");
+  if (!isOwnerOrAdmin(actor)) return { ok: false, status: 403, error: "An admin sets this for you. Ask the person who manages Home to change it." };
+  return assertOwnerAdminLadder(actor, targetPersonId, "You cannot change this person's coding access. Ask the person who manages Home.");
+}
+const isCodingPersonKey = (key: string) => key.startsWith("coding.person.");
+
 const isMediaProtection = (key: string) => key === "media.allowlist_only" || key === "allowance.media.daily_minutes";
 
 function assertCanSetPersonStorageCap(actor: PersonRow, targetPersonId: string): SettingsOpResult<true> {
@@ -701,6 +714,8 @@ export function setValue(
 
   const auth = isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
+    : isCodingPersonKey(key) && parsed.kind === "person"
+    ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
     : key === COMPANIONS_ALLOWED_KEY
       ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
         ? { ok: true as const, value: true as const }
@@ -966,6 +981,8 @@ export function resetValue(actor: PersonRow, scope: string, key: string): Settin
 
   const auth = isMediaProtection(key) && parsed.kind === "person"
     ? assertCanSetMediaProtection(actor, parsed.id!)
+    : isCodingPersonKey(key) && parsed.kind === "person"
+    ? assertCanSetCodingPersonKey(actor, parsed.id!, keyDef as { control?: Record<string, string> })
     : key === COMPANIONS_ALLOWED_KEY
     ? (isOwnerOrAdmin(actor) && (parsed.kind !== "person" || getPersonRole(parsed.id!) !== undefined)
       ? { ok: true as const, value: true as const }

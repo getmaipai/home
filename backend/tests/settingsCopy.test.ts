@@ -57,9 +57,23 @@ function writableValue(key: ReturnType<typeof getRegistry>[number], fallbackPers
     const multiple = (key.range as { multiple?: boolean } | undefined)?.multiple;
     return multiple ? [] : key.default ?? fallbackPersonId;
   }
-  if (key.selector === "text" && key.default == null) return "";
+  if (key.selector === "text" && key.default == null) return ""; // coding.person.network_hosts is a multiple text in the spec, but Home validates text as one string until CODE-SET-01 builds the list value.
+  // An unset-by-default number (the coding caps) is written at its minimum.
+  if (key.selector === "number" && key.default == null) return (key.range as { min?: number } | undefined)?.min ?? 1;
   return key.default;
 }
+
+// Spec 0.1.185 settings/keys.json: the coding.person.* band defaults (child, teen, and the adult value where the band default differs
+// from the key default). Written out here so a drift in the registry fails the test instead of being read back from itself.
+const CODING_PERSON_BAND_DEFAULTS: Record<string, { child: unknown; teen: unknown; adult?: unknown }> = {
+  "coding.person.api_keys": { child: false, teen: false },
+  "coding.person.git_hosts": { child: false, teen: false },
+  "coding.person.network_hosts": { child: [], teen: [] },
+  "coding.person.max_sessions": { child: 1, teen: 1 },
+  "coding.person.daily_tokens": { child: 100000, teen: 200000 },
+  "coding.person.sandbox_size": { child: "small", teen: "small", adult: "standard" },
+  "coding.person.message_minutes": { child: 15, teen: 15, adult: 30 },
+};
 
 describe("settings guard agreement metadata", () => {
   test("each person key describes the current write guard and band default", async () => {
@@ -93,6 +107,13 @@ describe("settings guard agreement metadata", () => {
         adult: key.key === "search.safe_search" ? resolveSafeSearchLevel("default", "adult") : key.default,
       };
       // Ease of use is comfort, not protection: only the preset and reading level differ for a child (EASE-OF-USE-01).
+      const coding = CODING_PERSON_BAND_DEFAULTS[key.key];
+      if (key.key.startsWith("coding.person.")) {
+        expect(coding, `${key.key} has an expected band default`).toBeDefined();
+        expectedDefaults.child = coding!.child as never;
+        expectedDefaults.teen = coding!.teen as never;
+        if ("adult" in coding!) expectedDefaults.adult = coding!.adult as never;
+      }
       if (key.key === "ease.preset") expectedDefaults.child = "simple";
       if (key.key === "ease.reading_level") expectedDefaults.child = "plain";
       expect(key.band_default, `${key.key} band default`).toEqual(expectedDefaults);

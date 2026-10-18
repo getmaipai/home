@@ -216,7 +216,7 @@ settingsRoutes.openapi(resetRoute, async (c) => {
 });
 
 // Session C step 8 (session-c-brain-and-voice.md): the interim per-person
-// API token (lib/apiToken.ts's own header has the full reasoning) that
+// API token (lib/apiKeys.ts keeps it as a compatibility key) that
 // authenticates POST /v1/chat/completions and the Wyoming satellite
 // server until F's real device tokens (session-f-platform-and-trust.md
 // step 6) land. Not modeled as a settings key despite the plan's own

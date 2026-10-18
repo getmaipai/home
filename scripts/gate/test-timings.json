@@ -4,7 +4,6 @@
   "tests/ageBand.test.ts": 0,
   "tests/allowance.test.ts": 0.21,
   "tests/almanacCompute.test.ts": 0,
-  "tests/apiToken.test.ts": 0.01,
   "tests/appNeeds.test.ts": 0.01,
   "tests/approvals.test.ts": 0.82,
   "tests/artifacts.test.ts": 0.54,
