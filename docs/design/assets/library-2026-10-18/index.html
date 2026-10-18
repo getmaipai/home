@@ -1,0 +1,580 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>MaiPai Library</title>
+<link rel="icon" href="data:,">
+<meta name="description" content="Design preview of the revamped MaiPai Home Library: a Dropbox-style files page with big thumbnails, list view, filters, selection, full-screen preview, sharing, Trash with Undo and a storage bar. Placeholder items only.">
+<style>
+/* Layout concept: a design bar on top, then one app frame that is the hub's shell (56 px rail from 640 px, none below it) with
+   the Library inside. The frame is a CSS container, so the same markup draws the desktop and the phone layouts.
+   Tokens: hex values copied by hand from commons/ui/src/tokens.css (Home's light and dark sets), as the media apps mockup does.
+   Placeholder content only: every thumbnail is a CSS gradient, every name a persona from the org roster. Nothing here is built. */
+:root {
+  color-scheme: dark;
+  --background: #07111f; --card: #102238; --card-2: #0b1a2c; --foreground: #f4f8ff;
+  --muted: #142a43; --muted-foreground: #a9bed7; --border: #294563; --scrim: rgba(4, 10, 20, 0.88);
+  --primary: #21a6ff; --primary-foreground: #07111f; --destructive: #ff4b62; --ok: #22c55e; --warn: #facc15;
+  --seg-image: #21a6ff; --seg-video: #a434ff; --seg-audio: #00e3ae; --seg-doc: #ff8a35; --seg-other: #7d93ad;
+  --radius-card: 14px; --radius-control: 10px; --radius-pill: 999px;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --target: 48px;
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --background: #f4f7fb; --card: #ffffff; --card-2: #eef3f9; --foreground: #0b1730;
+  --muted: #e3eaf3; --muted-foreground: #4a5f7a; --border: #c9d6e6; --scrim: rgba(11, 23, 48, 0.72);
+  --destructive: #c91f39; --ok: #15803d; --warn: #a16207;
+  --seg-image: #0b78c8; --seg-video: #7a1fd6; --seg-audio: #00856a; --seg-doc: #c2570c; --seg-other: #5b6f88;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { margin: 0; background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 15px; line-height: 1.45; -webkit-font-smoothing: antialiased; }
+button, select, input { font: inherit; color: inherit; }
+button { background: none; border: 0; padding: 0; cursor: pointer; }
+button:focus-visible, [tabindex]:focus-visible, select:focus-visible, input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+svg.i { width: 20px; height: 20px; flex: none; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+svg.i.fill { fill: currentColor; stroke: none; }
+
+/* design bar (outside the app) */
+.bar { position: sticky; top: 0; z-index: 60; background: color-mix(in srgb, var(--background) 92%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border);
+  padding: 10px max(16px, env(safe-area-inset-right)) 10px max(16px, env(safe-area-inset-left)); display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; }
+.bar .name { font-weight: 800; margin-right: auto; display: flex; gap: 8px; align-items: center; }
+.bar .name .dot { width: 22px; height: 22px; border-radius: 7px; background: linear-gradient(135deg, var(--primary), #a434ff); }
+.bar .name small { color: var(--muted-foreground); font-weight: 600; }
+.seg { display: inline-flex; background: var(--card-2); border: 1px solid var(--border); border-radius: var(--radius-pill); padding: 3px; gap: 2px; }
+.seg button { padding: 6px 12px; border-radius: var(--radius-pill); font-size: 13px; font-weight: 600; color: var(--muted-foreground); }
+.seg button[aria-pressed="true"] { background: var(--primary); color: var(--primary-foreground); }
+.note { max-width: 1100px; margin: 14px auto 0; padding: 0 16px; color: var(--muted-foreground); font-size: 13px; }
+
+.stage { padding: 14px max(16px, env(safe-area-inset-left)) 40px; display: flex; justify-content: center; }
+.frame { container-type: inline-size; container-name: frame; position: relative; width: 100%; max-width: 1440px; height: min(860px, calc(100vh - 150px)); min-height: 620px; background: var(--background); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; display: flex; }
+.frame.phone { width: 390px; max-width: 100%; height: min(844px, calc(100vh - 150px)); }
+
+/* shell rail (56 px, from 640) */
+.rail { width: 56px; flex: none; background: var(--card-2); border-right: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0; }
+.rail .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; color: var(--muted-foreground); }
+.rail .ic[aria-current="page"] { background: var(--muted); color: var(--foreground); }
+.rail .sp { flex: 1; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 700; color: #07111f; flex: none; border: 2px solid var(--card); }
+.a-sage { background: #21a6ff; } .a-marlow { background: #ff8a35; } .a-nova { background: #ff3e9a; } .a-bramble { background: #00e3ae; }
+@container frame (max-width: 639px) { .rail { display: none; } }
+
+/* left column (desktop only) */
+.side { width: 232px; flex: none; border-right: 1px solid var(--border); display: flex; flex-direction: column; padding: 14px 10px; gap: 4px; background: var(--background); }
+.side h2 { margin: 2px 8px 10px; font-size: 18px; }
+.side .sec { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: var(--radius-control); color: var(--muted-foreground); font-weight: 600; text-align: left; width: 100%; }
+.side .sec:hover { background: var(--card-2); }
+.side .sec[aria-current="true"] { background: var(--muted); color: var(--foreground); }
+.side .sec .n { margin-left: auto; font-size: 12px; font-weight: 600; opacity: .85; }
+.side hr { border: 0; border-top: 1px solid var(--border); margin: 8px 0; width: 100%; }
+.side .grow { flex: 1; }
+@container frame (max-width: 899px) { .side { display: none; } }
+
+.storage { padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-card); background: var(--card); display: grid; gap: 8px; }
+.storage .top { display: flex; justify-content: space-between; align-items: baseline; font-size: 13px; }
+.storage .top b { font-size: 15px; }
+.sbar { display: flex; height: 10px; border-radius: var(--radius-pill); overflow: hidden; background: var(--muted); }
+.sbar i { display: block; height: 100%; }
+.legend { display: grid; gap: 4px; font-size: 12px; color: var(--muted-foreground); }
+.legend span { display: flex; align-items: center; gap: 6px; }
+.legend em { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.legend b { margin-left: auto; color: var(--foreground); font-weight: 600; }
+.storage .hint { font-size: 12px; color: var(--muted-foreground); }
+
+/* main */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; position: relative; }
+.head { padding: 14px 18px 8px; display: grid; gap: 10px; }
+.head .row1 { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.head h1 { margin: 0; font-size: 22px; }
+.head .count { color: var(--muted-foreground); font-size: 14px; }
+.btn { min-height: 40px; padding: 0 14px; border-radius: var(--radius-control); border: 1px solid var(--border); background: var(--card); display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
+.btn:hover { background: var(--muted); }
+.btn.primary { background: var(--primary); color: var(--primary-foreground); border-color: var(--primary); }
+.btn.danger { color: var(--destructive); }
+.btn.ghost { border-color: transparent; background: transparent; }
+.btn.icon { width: 40px; padding: 0; justify-content: center; }
+.spacer { flex: 1; }
+.tools { padding: 4px 18px 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.search { position: relative; flex: 1 1 200px; max-width: 360px; }
+.search input { width: 100%; min-height: 40px; border-radius: var(--radius-control); border: 1px solid var(--border); background: var(--card); padding: 0 12px 0 38px; }
+.search svg { position: absolute; left: 11px; top: 10px; color: var(--muted-foreground); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { min-height: 32px; padding: 0 12px; border-radius: var(--radius-pill); border: 1px solid var(--border); background: var(--card); font-size: 13px; font-weight: 600; color: var(--muted-foreground); display: inline-flex; align-items: center; gap: 6px; }
+.chip[aria-pressed="true"] { background: var(--muted); color: var(--foreground); border-color: var(--primary); }
+.phone-chips { display: none; padding: 0 12px 6px; gap: 6px; overflow-x: auto; align-items: center; flex: none; }
+.phone-chips .chip { flex: none; }
+@container frame (max-width: 899px) { .phone-chips { display: flex; } }
+select.sel { min-height: 40px; border-radius: var(--radius-control); border: 1px solid var(--border); background: var(--card); padding: 0 10px; }
+
+.batch { margin: 0 18px 8px; padding: 8px 12px; border-radius: var(--radius-card); background: var(--muted); border: 1px solid var(--primary); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.batch b { margin-right: auto; }
+
+.scroll { flex: 1; overflow: auto; padding: 4px 18px 90px; }
+.grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); }
+@container frame (max-width: 639px) { .grid { grid-template-columns: repeat(2, 1fr); gap: 8px; } .scroll { padding: 4px 12px 90px; } .head { padding: 12px 12px 6px; } .tools { padding: 4px 12px 8px; } }
+.tile { position: relative; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-card); overflow: hidden; display: flex; flex-direction: column; text-align: left; content-visibility: auto; contain-intrinsic-size: 190px 220px; }
+.tile .th { aspect-ratio: 4 / 3; position: relative; display: grid; place-items: center; color: rgba(255,255,255,.92); }
+.tile .meta { padding: 8px 10px 10px; display: grid; gap: 2px; min-width: 0; }
+.tile .nm { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile .sub { font-size: 12px; color: var(--muted-foreground); display: flex; align-items: center; gap: 6px; }
+.tile .sub .sa { margin-left: auto; display: flex; }
+.tile .sub .sa .avatar { width: 20px; height: 20px; font-size: 10px; margin-left: -6px; border-width: 2px; }
+.tile[aria-selected="true"] { outline: 2px solid var(--primary); outline-offset: -2px; }
+.tile .open { position: absolute; inset: 0; }
+.badge { position: absolute; padding: 2px 7px; border-radius: 7px; font-size: 11px; font-weight: 700; background: rgba(4,10,20,.72); color: #fff; }
+.badge.br { right: 8px; bottom: 8px; } .badge.bl { left: 8px; bottom: 8px; } .badge.tr { right: 8px; top: 8px; }
+.tile .chk { position: absolute; left: 8px; top: 8px; width: 28px; height: 28px; border-radius: 8px; border: 2px solid #fff; background: rgba(4,10,20,.45); display: grid; place-items: center; opacity: 0; z-index: 2; color: transparent; }
+.tile:hover .chk, .selecting .tile .chk, .tile:focus-within .chk { opacity: 1; }
+.tile[aria-selected="true"] .chk { background: var(--primary); border-color: var(--primary); color: var(--primary-foreground); opacity: 1; }
+.tile .more { position: absolute; right: 6px; top: 6px; width: 32px; height: 32px; border-radius: 8px; background: rgba(4,10,20,.55); color: #fff; display: grid; place-items: center; opacity: 0; z-index: 2; }
+.tile:hover .more, .tile:focus-within .more { opacity: 1; }
+@container frame (max-width: 639px) { .tile .more { opacity: 1; } .tile .chk { width: 32px; height: 32px; } }
+.tile .shared-dot { position: absolute; right: 8px; top: 8px; }
+.tile .th.doc { background: var(--card-2); color: var(--muted-foreground); }
+.tile .th.doc .ext { position: absolute; bottom: 10px; left: 10px; font-size: 12px; font-weight: 800; letter-spacing: .04em; }
+.tile .th svg.big { width: 40px; height: 40px; }
+
+.list { width: 100%; border-collapse: collapse; font-size: 14px; }
+.list th { text-align: left; font-size: 12px; color: var(--muted-foreground); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--background); }
+.list td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; height: 56px; }
+.list tr:hover td { background: var(--card-2); }
+.list tr[aria-selected="true"] td { background: var(--muted); }
+.list .lth { width: 48px; height: 36px; border-radius: 8px; display: inline-grid; place-items: center; color: #fff; vertical-align: middle; margin-right: 10px; flex: none; }
+.list .nm { font-weight: 600; }
+.list .sa { display: inline-flex; } .list .sa .avatar { width: 22px; height: 22px; font-size: 10px; margin-left: -6px; }
+@container frame (max-width: 899px) { .list .hide-m { display: none; } }
+
+.empty { display: grid; place-items: center; text-align: center; gap: 10px; padding: 60px 20px; color: var(--muted-foreground); }
+.empty h3 { margin: 0; color: var(--foreground); font-size: 18px; }
+.empty .art { width: 72px; height: 72px; border-radius: 20px; background: var(--muted); display: grid; place-items: center; }
+.alert { margin: 12px 18px; padding: 12px 14px; border: 1px solid var(--destructive); border-radius: var(--radius-card); display: flex; gap: 12px; align-items: center; background: color-mix(in srgb, var(--destructive) 10%, var(--card)); }
+.alert p { margin: 0; flex: 1; }
+.skel { background: linear-gradient(90deg, var(--muted), var(--card-2), var(--muted)); background-size: 200% 100%; animation: sh 1.4s infinite; border-radius: var(--radius-card); aspect-ratio: 4 / 3.4; }
+@keyframes sh { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
+.drop { position: absolute; inset: 8px; border: 2px dashed var(--primary); border-radius: 16px; background: color-mix(in srgb, var(--primary) 12%, transparent); display: grid; place-items: center; z-index: 20; font-weight: 700; font-size: 18px; pointer-events: none; }
+.tray { position: absolute; right: 16px; bottom: 16px; width: 320px; max-width: calc(100% - 32px); border: 1px solid var(--border); background: var(--card); border-radius: var(--radius-card); padding: 10px 12px; display: grid; gap: 8px; z-index: 25; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.tray .u { display: grid; gap: 4px; font-size: 13px; }
+.tray .u div { display: flex; justify-content: space-between; gap: 8px; }
+.pb { height: 6px; background: var(--muted); border-radius: var(--radius-pill); overflow: hidden; }
+.pb i { display: block; height: 100%; background: var(--primary); }
+.fab { position: absolute; right: 16px; bottom: 16px; width: 56px; height: 56px; border-radius: 18px; background: var(--primary); color: var(--primary-foreground); display: none; place-items: center; z-index: 15; box-shadow: 0 8px 20px rgba(0,0,0,.35); }
+@container frame (max-width: 639px) { .head .btn.primary { display: none; } .chips { flex-wrap: nowrap; overflow-x: auto; max-width: 100%; } .chips .chip { flex: none; } .search { max-width: none; flex-basis: 100%; } .fab { display: grid; } .tray { bottom: 84px; } }
+
+.toast { position: absolute; left: 50%; transform: translateX(-50%); bottom: 18px; z-index: 40; background: var(--foreground); color: var(--background); border-radius: var(--radius-control); padding: 10px 12px 10px 16px; display: flex; gap: 14px; align-items: center; font-weight: 600; max-width: calc(100% - 24px); }
+.toast button { color: var(--primary); font-weight: 800; min-height: 36px; padding: 0 8px; }
+:root[data-theme="light"] .toast button { color: #0b78c8; }
+
+/* menus, sheet, dialogs */
+.menu { position: absolute; z-index: 45; min-width: 200px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 6px; box-shadow: 0 10px 30px rgba(0,0,0,.4); }
+.menu button { display: flex; width: 100%; align-items: center; gap: 10px; min-height: 40px; padding: 0 10px; border-radius: 8px; font-weight: 600; font-size: 14px; text-align: left; }
+.menu button:hover { background: var(--muted); }
+.menu button.danger { color: var(--destructive); }
+.menu hr { border: 0; border-top: 1px solid var(--border); margin: 4px 0; }
+.sheet { position: absolute; left: 0; right: 0; bottom: 0; z-index: 46; background: var(--card); border-top: 1px solid var(--border); border-radius: 18px 18px 0 0; padding: 8px 8px 16px; }
+.sheet .grab { width: 40px; height: 4px; border-radius: 4px; background: var(--border); margin: 4px auto 10px; }
+.sheet button { display: flex; width: 100%; align-items: center; gap: 14px; min-height: var(--target); padding: 0 14px; border-radius: 10px; font-weight: 600; }
+.sheet button.danger { color: var(--destructive); }
+.sheet .ttl { padding: 4px 14px 10px; font-weight: 700; }
+.scrim { position: absolute; inset: 0; background: var(--scrim); z-index: 44; display: grid; place-items: center; }
+.dlg { width: min(420px, calc(100% - 24px)); background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 18px; display: grid; gap: 12px; }
+.dlg h3 { margin: 0; font-size: 18px; } .dlg p { margin: 0; color: var(--muted-foreground); font-size: 14px; }
+.dlg .ppl { display: grid; gap: 4px; }
+.dlg label.who { display: flex; align-items: center; gap: 12px; min-height: var(--target); padding: 0 8px; border-radius: 10px; }
+.dlg label.who:hover { background: var(--muted); }
+.dlg label.who input { width: 20px; height: 20px; accent-color: var(--primary); }
+.dlg .acts { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.dlg .off { opacity: .5; }
+
+/* lightbox */
+.lb { position: absolute; inset: 0; z-index: 50; background: #03070e; color: #f4f8ff; display: flex; flex-direction: column; }
+.lb .top { display: flex; align-items: center; gap: 10px; padding: 10px 14px; min-height: 56px; }
+.lb .top .t { font-weight: 700; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb .btn { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); color: #f4f8ff; }
+.lb .btn:hover { background: rgba(255,255,255,.16); }
+.lb .btn.danger { color: #ff7a8c; }
+.lb .body { flex: 1; display: flex; min-height: 0; }
+.lb .stage2 { flex: 1; position: relative; display: grid; place-items: center; overflow: hidden; min-width: 0; }
+.lb .art { width: min(78%, 760px); aspect-ratio: 4 / 3; border-radius: 14px; display: grid; place-items: center; transition: transform .2s; color: rgba(255,255,255,.9); }
+.lb .art.sq { aspect-ratio: 1; width: min(52%, 380px); }
+.lb .nav { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; background: rgba(255,255,255,.12); display: grid; place-items: center; color: #fff; }
+.lb .nav.l { left: 12px; } .lb .nav.r { right: 12px; }
+.lb .ctl { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 10px; align-items: center; background: rgba(255,255,255,.1); padding: 8px 12px; border-radius: 14px; width: min(520px, calc(100% - 100px)); }
+.lb .ctl .pb { flex: 1; background: rgba(255,255,255,.2); }
+.lb .info { width: 300px; flex: none; border-left: 1px solid rgba(255,255,255,.12); padding: 14px 16px; overflow: auto; display: grid; gap: 14px; align-content: start; background: #060d18; }
+.lb .info h4 { margin: 0 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: #8da4c0; }
+.lb .info dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; font-size: 14px; }
+.lb .info dt { color: #8da4c0; } .lb .info dd { margin: 0; text-align: right; }
+.lb .who { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.lb .who .avatar { border-color: #060d18; }
+@container frame (max-width: 899px) { .lb .info { position: absolute; left: 0; right: 0; bottom: 0; width: auto; border-left: 0; border-top: 1px solid rgba(255,255,255,.12); border-radius: 18px 18px 0 0; max-height: 52%; z-index: 3; } }
+.lb .info[hidden] { display: none; }
+.lb .botbar { display: none; }
+@container frame (max-width: 639px) { .lb .top .btn .lbl { display: none; } }
+.help { font-size: 12px; color: #8da4c0; }
+.confirm { margin: 0 18px 8px; padding: 12px 14px; border: 1px solid var(--destructive); border-radius: var(--radius-card); display: grid; gap: 6px; background: var(--card); }
+.confirm span { color: var(--muted-foreground); font-size: 14px; } .confirm .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+@container frame (max-width: 639px) { .confirm { margin: 0 12px 8px; } }
+.kid-note { margin: 0 18px 8px; padding: 8px 12px; border-radius: var(--radius-control); background: var(--card-2); border: 1px solid var(--border); font-size: 13px; color: var(--muted-foreground); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+  <symbol id="i-upload" viewBox="0 0 24 24"><path d="M12 16V4m0 0-4 4m4-4 4 4M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></symbol>
+  <symbol id="i-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="17" cy="6" r="2.5"/><circle cx="17" cy="18" r="2.5"/><path d="m8.2 10.8 6.6-3.6M8.2 13.2l6.6 3.6"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-12M9 7V4h6v3"/></symbol>
+  <symbol id="i-edit" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-4-4L4 16z"/></symbol>
+  <symbol id="i-dl" viewBox="0 0 24 24"><path d="M12 4v12m0 0-4-4m4 4 4-4M4 20h16"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 5 5 9-10"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></symbol>
+  <symbol id="i-music" viewBox="0 0 24 24"><path d="M9 18V6l11-2v12"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/></symbol>
+  <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></symbol>
+  <symbol id="i-img" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></symbol>
+  <symbol id="i-vid" viewBox="0 0 24 24"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="m17 10 4-2v8l-4-2"/></symbol>
+  <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 5-7 7 7 7"/></symbol>
+  <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"/></symbol>
+  <symbol id="i-more" viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5h.01"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0M16 4.5a3.5 3.5 0 0 1 0 7M21.5 20a6.5 6.5 0 0 0-4-6"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></symbol>
+  <symbol id="i-zoom" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5M11 8v6M8 11h6"/></symbol>
+  <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14 4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/></symbol>
+  <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+  <symbol id="i-restore" viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8M3 3v5h5"/></symbol>
+</svg>
+
+<header class="bar">
+  <div class="name"><span class="dot"></span> Library <small>design preview, 2026-10-18, nothing is built</small></div>
+  <div class="seg" role="group" aria-label="Screen size"><button data-w="desktop" aria-pressed="true">Desktop 1440</button><button data-w="phone" aria-pressed="false">Phone 390</button></div>
+  <div class="seg" role="group" aria-label="Theme"><button data-t="dark" aria-pressed="true">Dark</button><button data-t="light" aria-pressed="false">Light</button></div>
+  <div class="seg" role="group" aria-label="Signed in as"><button data-u="sage" aria-pressed="true">Sage, owner</button><button data-u="nova" aria-pressed="false">Nova, child</button></div>
+  <div class="seg" role="group" aria-label="State"><button data-s="normal" aria-pressed="true">Normal</button><button data-s="loading" aria-pressed="false">Loading</button><button data-s="empty" aria-pressed="false">Empty</button><button data-s="error" aria-pressed="false">Error</button><button data-s="upload" aria-pressed="false">Uploading</button></div>
+</header>
+<p class="note">Try: open an item (arrow keys move, Esc closes, I toggles info), select with the corner box or press S for selection mode, share, delete then Undo, switch to list, filter chips, the sections on the left, the storage bar, and the child view (no Share, only own and shared-with-you items). The Download button, Share to another app and Copy link are shown as buttons; nothing leaves this page. The header total and the storage bar describe a larger sample home (97 items) than the 16 items drawn.</p>
+
+<main class="stage"><div class="frame" id="frame"></div></main>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var ICON = function (n, cls) { return '<svg class="i ' + (cls || "") + '" aria-hidden="true"><use href="#i-' + n + '"/></svg>'; };
+  var PEOPLE = { sage: { n: "Sage", c: "a-sage" }, marlow: { n: "Marlow", c: "a-marlow" }, nova: { n: "Nova", c: "a-nova" }, bramble: { n: "Bramble", c: "a-bramble" } };
+  var MB = 1048576, GB = 1073741824;
+  var GRAD = ["linear-gradient(135deg,#1d4ed8,#7c3aed)", "linear-gradient(135deg,#0f766e,#22d3ee)", "linear-gradient(135deg,#be185d,#f97316)", "linear-gradient(135deg,#4338ca,#06b6d4)", "linear-gradient(135deg,#166534,#a3e635)", "linear-gradient(135deg,#9a3412,#fbbf24)", "linear-gradient(135deg,#334155,#64748b)", "linear-gradient(135deg,#6d28d9,#f472b6)"];
+  var items = [
+    { id: 1, name: "A fox reading by a lantern", kind: "image", type: "PNG", size: 1.2 * MB, owner: "sage", made: "Made in chat with Pictures", date: "Oct 18", shared: [], g: 0, keep: false, expires: "Jan 16" },
+    { id: 2, name: "Otters in a kitchen", kind: "video", type: "MP4", size: 9.4 * MB, dur: "0:08", owner: "sage", made: "Made in chat with Videos", date: "Oct 17", shared: ["household"], g: 1, keep: true },
+    { id: 3, name: "Porch Light Lullaby", kind: "audio", type: "M4A", size: 3.2 * MB, dur: "2:14", owner: "sage", made: "Made in chat with Music", date: "Oct 17", shared: ["nova", "marlow"], g: 5, keep: true },
+    { id: 4, name: "Watercolor harbor at dawn", kind: "image", type: "PNG", size: 2.1 * MB, owner: "sage", made: "Made in chat with Pictures", date: "Oct 16", shared: ["marlow"], g: 2, keep: false, expires: "Jan 14" },
+    { id: 5, name: "Water bill October", kind: "doc", type: "PDF", size: 1.4 * MB, owner: "sage", made: "Sent in chat", date: "Oct 15", shared: [], g: 6, keep: true },
+    { id: 6, name: "Art project", kind: "image", type: "PNG", size: 0.5 * MB, owner: "marlow", made: "Sent in chat", date: "Oct 15", shared: ["household"], g: 3, keep: true },
+    { id: 7, name: "A purple dragon", kind: "image", type: "PNG", size: 0.4 * MB, owner: "nova", made: "Made in chat with Pictures", date: "Oct 14", shared: ["sage"], g: 7, keep: true },
+    { id: 8, name: "Rain on a window", kind: "video", type: "MP4", size: 16.4 * MB, dur: "0:06", owner: "sage", made: "Made in chat with Videos", date: "Oct 14", shared: [], g: 6, keep: false, expires: "Jan 12" },
+    { id: 9, name: "Soccer schedule", kind: "doc", type: "PDF", size: 0.4 * MB, owner: "sage", made: "Sent in chat", date: "Oct 13", shared: ["household"], g: 6, keep: true },
+    { id: 10, name: "Saturday Pancakes", kind: "audio", type: "M4A", size: 4.1 * MB, dur: "1:48", owner: "sage", made: "Made in chat with Music", date: "Oct 12", shared: [], g: 2, keep: true },
+    { id: 11, name: "Robot gardener with tomatoes", kind: "image", type: "PNG", size: 0.9 * MB, owner: "sage", made: "Made in chat with Pictures", date: "Oct 12", shared: [], g: 4, keep: false, expires: "Jan 10" },
+    { id: 12, name: "Trip plan", kind: "doc", type: "DOCX", size: 0.2 * MB, owner: "sage", made: "Written by Home in chat", date: "Oct 11", shared: ["bramble"], g: 6, keep: true },
+    { id: 13, name: "Paper boat on a puddle", kind: "image", type: "PNG", size: 1.6 * MB, owner: "sage", made: "Made in chat with Pictures", date: "Oct 10", shared: [], g: 1, keep: false, expires: "Jan 8" },
+    { id: 14, name: "Photo from chat", kind: "image", type: "JPG", size: 3.9 * MB, owner: "sage", made: "Sent in chat", date: "Oct 9", shared: [], g: 5, keep: false, expires: "Jan 7" },
+    { id: 15, name: "Snowy cabin, warm windows", kind: "image", type: "PNG", size: 1.8 * MB, owner: "bramble", made: "Made in chat with Pictures", date: "Oct 8", shared: ["household"], g: 0, keep: true },
+    { id: 16, name: "Bicycle on a hill", kind: "image", type: "PNG", size: 1.1 * MB, owner: "sage", made: "Made in chat with Pictures", date: "Oct 8", shared: [], g: 3, keep: false, expires: "Jan 6" }
+  ];
+  items.forEach(function (it, i) { it.ord = i; });
+  var trash = [{ id: 101, name: "Blurry photo", kind: "image", type: "JPG", size: 2.2 * MB, owner: "sage", made: "Sent in chat", date: "Oct 2", shared: [], g: 6, left: 21 }, { id: 102, name: "Test song", kind: "audio", type: "M4A", size: 2.8 * MB, dur: "0:30", owner: "sage", made: "Made in chat with Music", date: "Sep 30", shared: [], g: 2, left: 12 }];
+  var S = { w: "desktop", theme: "dark", user: "sage", state: "normal", section: "all", view: "grid", q: "", type: "all", own: "all", shr: "all", sort: "new", sel: {}, selecting: false, open: null, info: true, zoom: 1, menu: null, sheet: null, dlg: null, toast: null, drag: false };
+  var frame = $("#frame");
+
+  function fmt(b) { return b >= GB ? (b / GB).toFixed(1) + " GB" : b >= MB ? (b / MB).toFixed(1) + " MB" : Math.max(1, Math.round(b / 1024)) + " KB"; }
+  function av(k, extra) { var p = PEOPLE[k]; return '<span class="avatar ' + p.c + '" title="' + p.n + '">' + p.n[0] + '</span>'; }
+  function shareAv(it) { return it.shared.map(function (k) { return k === "household" ? '<span class="avatar" style="background:var(--muted);color:var(--foreground)" title="The whole home">' + ICON("users") + '</span>' : av(k); }).join(""); }
+  function kindIcon(k) { return { image: "img", video: "vid", audio: "music", doc: "file" }[k]; }
+  function isChild() { return S.user === "nova"; }
+  function visible() {
+    var me = S.user;
+    return items.filter(function (it) {
+      var mine = it.owner === me, sharedWithMe = !mine && (it.shared.indexOf(me) > -1 || it.shared.indexOf("household") > -1);
+      if (!(mine || sharedWithMe)) return false;
+      if (isChild() && !mine && !sharedWithMe) return false;
+      var sec = S.section;
+      if (sec === "image" && it.kind !== "image") return false;
+      if (sec === "video" && it.kind !== "video") return false;
+      if (sec === "audio" && it.kind !== "audio") return false;
+      if (sec === "doc" && it.kind !== "doc") return false;
+      if (sec === "with" && mine) return false;
+      if (sec === "by" && !(mine && it.shared.length)) return false;
+      if (S.type !== "all" && it.kind !== S.type) return false;
+      if (S.own === "me" && !mine) return false;
+      if (S.own === "others" && mine) return false;
+      if (S.shr === "shared" && !it.shared.length) return false;
+      if (S.shr === "private" && it.shared.length) return false;
+      if (S.q && (it.name + " " + it.type + " " + PEOPLE[it.owner].n).toLowerCase().indexOf(S.q.toLowerCase()) < 0) return false;
+      return true;
+    }).sort(function (a, b) {
+      if (S.sort === "name") return a.name.localeCompare(b.name);
+      if (S.sort === "size") return b.size - a.size;
+      return a.ord - b.ord;
+    });
+  }
+  function mineAll() { return items.filter(function (it) { return it.owner === S.user; }); }
+  function counts() {
+    var vis = items.filter(function (it) { return it.owner === S.user || it.shared.indexOf(S.user) > -1 || it.shared.indexOf("household") > -1; });
+    var c = { all: vis.length, image: 0, video: 0, audio: 0, doc: 0, with: 0, by: 0 };
+    vis.forEach(function (it) { c[it.kind]++; if (it.owner !== S.user) c.with++; else if (it.shared.length) c.by++; });
+    return c;
+  }
+  function usage() {
+    var u = { image: 0, video: 0, audio: 0, doc: 0 }, tot = 0, n = 0;
+    mineAll().forEach(function (it) { u[it.kind] += it.size; tot += it.size; n++; });
+    var tb = 0; trash.forEach(function (t) { tb += t.size; });
+    return { u: u, tot: tot, n: n, trash: tb };
+  }
+  function storageHtml() {
+    var us = usage(), cap = 20 * GB, scale = us.tot * 40, segs = [["image", "Pictures", "--seg-image"], ["video", "Videos", "--seg-video"], ["audio", "Songs", "--seg-audio"], ["doc", "Documents", "--seg-doc"]];
+    // the demo draws a household that is further along than the 16 sample items: scale the bars so they read
+    var demo = isChild() ? { image: 0.6 * GB, video: 0.2 * GB, audio: 0.1 * GB, doc: 0 } : { image: 4.6 * GB, video: 5.1 * GB, audio: 0.9 * GB, doc: 0.3 * GB }, dt = 0; for (var k in demo) dt += demo[k];
+    var bar = segs.map(function (s) { return '<i style="width:' + (demo[s[0]] / cap * 100).toFixed(1) + '%;background:var(' + s[2] + ')"></i>'; }).join("");
+    var leg = segs.map(function (s) { return '<span><em style="background:var(' + s[2] + ')"></em>' + s[1] + '<b>' + fmt(demo[s[0]]) + '</b></span>'; }).join("");
+    return '<section class="storage" aria-label="Storage"><div class="top"><span><b>' + fmt(dt) + '</b> of 20 GB used</span><span>' + Math.round(dt / cap * 100) + '%</span></div><div class="sbar" role="img" aria-label="' + fmt(dt) + ' used of 20 GB">' + bar + '</div><div class="legend">' + leg + '</div><div class="hint">' + (isChild() ? "Ask a grown-up if you need more room." : "Trash holds " + fmt(us.trash + 1.3 * GB) + " that still counts until it is emptied.") + '</div></section>';
+  }
+  function sideHtml() {
+    var c = counts(), secs = [["all", "folder", "All files"], ["image", "img", "Pictures"], ["video", "vid", "Videos"], ["audio", "music", "Songs"], ["doc", "file", "Documents"]], sec2 = [["with", "users", "Shared with me"], ["by", "share", "Shared by me"], ["trash", "trash", "Trash"]];
+    function b(s) { return '<button class="sec" data-sec="' + s[0] + '" aria-current="' + (S.section === s[0]) + '">' + ICON(s[1]) + s[2] + '<span class="n">' + (s[0] === "trash" ? trash.length : (c[s[0]] || 0)) + '</span></button>'; }
+    return '<nav class="side" aria-label="Library sections"><h2>Library</h2>' + secs.map(b).join("") + '<hr>' + sec2.map(b).join("") + '<div class="grow"></div>' + storageHtml() + '</nav>';
+  }
+  function railHtml() {
+    var p = PEOPLE[S.user];
+    return '<nav class="rail" aria-label="Main">' + '<span class="ic">' + ICON("home") + '</span><span class="ic">' + ICON("search") + '</span><span class="ic">' + ICON("chat") + '</span><span class="ic" aria-current="page" aria-label="Library">' + ICON("folder") + '</span><span class="ic">' + ICON("users") + '</span><span class="sp"></span><span class="avatar ' + p.c + '" style="width:32px;height:32px">' + p.n[0] + '</span></nav>';
+  }
+  function thumb(it, big) {
+    if (it.kind === "doc") return '<div class="th doc">' + ICON(kindIcon(it.kind), "big") + '<span class="ext">' + it.type + '</span></div>';
+    var inner = it.kind === "video" ? '<span style="width:44px;height:44px;border-radius:50%;background:rgba(4,10,20,.55);display:grid;place-items:center">' + ICON("play", "fill") + '</span>' : it.kind === "audio" ? ICON("music", "big") : "";
+    var badge = it.kind === "video" || it.kind === "audio" ? '<span class="badge br">' + it.dur + '</span>' : "";
+    return '<div class="th" style="background:' + GRAD[it.g] + '">' + inner + badge + '</div>';
+  }
+  function tileHtml(it) {
+    var sel = !!S.sel[it.id];
+    var keepNote = it.expires ? '<span title="Goes with its chat on ' + it.expires + '. Open it and choose Keep.">' + ICON("clock").replace('class="i ', 'style="width:14px;height:14px" class="i ') + ' ' + it.expires + '</span>' : "";
+    return '<div class="tile" role="listitem" data-id="' + it.id + '" aria-selected="' + sel + '">' + thumb(it) +
+      '<button class="open" data-open="' + it.id + '" aria-label="Open ' + it.name + '"></button>' +
+      '<button class="chk" data-chk="' + it.id + '" aria-label="Select ' + it.name + '">' + ICON("check") + '</button>' +
+      '<button class="more" data-more="' + it.id + '" aria-label="Actions for ' + it.name + '">' + ICON("more") + '</button>' +
+      '<div class="meta"><div class="nm">' + it.name + '</div><div class="sub">' + (it.owner === S.user ? "You" : PEOPLE[it.owner].n) + ' · ' + fmt(it.size) + (keepNote ? ' · ' + keepNote : "") + '<span class="sa">' + shareAv(it) + '</span></div></div></div>';
+  }
+  function rowHtml(it) {
+    var sel = !!S.sel[it.id];
+    return '<tr data-id="' + it.id + '" aria-selected="' + sel + '"><td style="width:36px"><input type="checkbox" data-chk="' + it.id + '" ' + (sel ? "checked" : "") + ' aria-label="Select ' + it.name + '" style="width:20px;height:20px;accent-color:var(--primary)"></td>' +
+      '<td><button data-open="' + it.id + '" style="display:flex;align-items:center;text-align:left"><span class="lth" style="background:' + (it.kind === "doc" ? "var(--card-2);color:var(--muted-foreground)" : GRAD[it.g]) + '">' + ICON(kindIcon(it.kind)) + '</span><span class="nm">' + it.name + '</span></button></td>' +
+      '<td class="hide-m">' + it.type + '</td><td>' + fmt(it.size) + '</td><td class="hide-m">' + (it.owner === S.user ? "You" : PEOPLE[it.owner].n) + '</td><td class="hide-m">' + (it.shared.length ? '<span class="sa">' + shareAv(it) + '</span>' : '<span style="color:var(--muted-foreground)">Only you</span>') + '</td><td class="hide-m">' + it.date + '</td>' +
+      '<td style="width:44px"><button class="btn icon ghost" data-more="' + it.id + '" aria-label="Actions for ' + it.name + '">' + ICON("more") + '</button></td></tr>';
+  }
+  function trashHtml() {
+    if (!trash.length) return '<div class="empty"><div class="art">' + ICON("trash") + '</div><h3>Trash is empty</h3><p>Things you delete wait here for 30 days before they are gone for good.</p></div>';
+    return '<div class="grid" role="list">' + trash.map(function (t) {
+      return '<div class="tile" role="listitem">' + thumb(t) + '<div class="meta"><div class="nm">' + t.name + '</div><div class="sub">' + fmt(t.size) + ' · gone in ' + t.left + ' days</div>' +
+        '<div style="display:flex;gap:6px;margin-top:6px"><button class="btn" data-restore="' + t.id + '" style="flex:1;justify-content:center">' + ICON("restore") + ' Restore</button><button class="btn danger icon" data-purge="' + t.id + '" aria-label="Delete ' + t.name + ' forever">' + ICON("trash") + '</button></div></div></div>';
+    }).join("") + '</div>';
+  }
+  var TITLES = { all: "All files", image: "Pictures", video: "Videos", audio: "Songs", doc: "Documents", with: "Shared with me", by: "Shared by me", trash: "Trash" };
+  function mainHtml() {
+    var list = visible(), us = usage(), h = "";
+    var total = list.reduce(function (n, it) { return n + it.size; }, 0);
+    var secs = [["all", "All"], ["image", "Pictures"], ["video", "Videos"], ["audio", "Songs"], ["doc", "Documents"], ["with", "Shared with me"], ["by", "Shared by me"]].concat([["trash", "Trash"]]);
+    h += '<div class="head"><div class="row1">' + (S.w === "phone" ? '<button class="btn icon ghost" aria-label="Open the menu">' + ICON("menu") + '</button>' : "") + '<h1>' + TITLES[S.section] + '</h1><span class="count">' + (S.section === "trash" ? trash.length + " items · 30 days then gone" : (S.state === "empty" ? "0 items" : (S.section === "all" && !S.q && S.type === "all" && S.own === "all" && S.shr === "all" && !isChild() ? "97 items · 10.9 GB" : list.length + " items · " + fmt(total)))) + '</span><span class="spacer"></span>' +
+      (S.section === "trash" ? (trash.length ? '<button class="btn danger" data-empty>Empty Trash</button>' : "") : '<button class="btn primary" data-upload>' + ICON("upload") + '<span>' + (isChild() ? "Ask to add a file" : "Upload") + '</span></button>') + '</div></div>';
+    if (S.w === "phone") h += '<div class="phone-chips" role="group" aria-label="Sections" style="display:flex">' + secs.map(function (s) { return '<button class="chip" data-sec="' + s[0] + '" aria-pressed="' + (S.section === s[0]) + '">' + s[1] + '</button>'; }).join("") + '</div>';
+    if (S.section !== "trash") {
+      h += '<div class="tools"><label class="search">' + ICON("search") + '<input type="search" id="q" placeholder="Search your Library" value="' + S.q.replace(/"/g, "&quot;") + '" aria-label="Search your Library"></label>' +
+        '<div class="chips" role="group" aria-label="Filters">' +
+        [["all", "Any type"], ["image", "Pictures"], ["video", "Videos"], ["audio", "Songs"], ["doc", "Documents"]].filter(function (x) { return S.w === "desktop" || x[0] === "all" || true; }).slice(0, S.w === "phone" ? 0 : 5).map(function (x) { return '<button class="chip" data-type="' + x[0] + '" aria-pressed="' + (S.type === x[0]) + '">' + x[1] + '</button>'; }).join("") +
+        '</div><div class="chips" role="group" aria-label="Owner and sharing"><button class="chip" data-own="me" aria-pressed="' + (S.own === "me") + '">Mine</button><button class="chip" data-shr="shared" aria-pressed="' + (S.shr === "shared") + '">Shared</button><button class="chip" data-shr="private" aria-pressed="' + (S.shr === "private") + '">Only me</button></div><span class="spacer"></span>' +
+        '<select class="sel" id="sort" aria-label="Sort by"><option value="new"' + (S.sort === "new" ? " selected" : "") + '>Newest</option><option value="name"' + (S.sort === "name" ? " selected" : "") + '>Name</option><option value="size"' + (S.sort === "size" ? " selected" : "") + '>Size, largest first</option></select>' +
+        '<div class="seg" role="group" aria-label="View"><button data-view="grid" aria-pressed="' + (S.view === "grid") + '" aria-label="Grid">' + ICON("grid") + '</button><button data-view="list" aria-pressed="' + (S.view === "list") + '" aria-label="List">' + ICON("list") + '</button></div>' +
+        '<button class="btn" data-select aria-pressed="' + S.selecting + '">' + (S.selecting ? "Done" : "Select") + '</button></div>';
+      if (isChild()) h += '<p class="kid-note">You see your own things and things shared with you. Ask a grown-up to share something with the family.</p>';
+    }
+    var n = Object.keys(S.sel).length;
+    if (S.dlg && S.dlg.kind === "confirm") h += '<div class="confirm" role="alert"><b>' + S.dlg.title + '</b><span>' + S.dlg.body + '</span><div class="acts"><button class="btn danger" data-doconfirm>' + S.dlg.ok + '</button><button class="btn" data-dlgclose>Keep it</button></div></div>';
+    if (S.selecting || n) h += '<div class="batch" role="toolbar" aria-label="Batch actions"><b>' + n + ' selected</b>' + (isChild() ? "" : '<button class="btn" data-bshare ' + (n ? "" : "disabled") + '>' + ICON("share") + ' Share</button>') + '<button class="btn" data-bdl ' + (n ? "" : "disabled") + '>' + ICON("dl") + ' Download</button><button class="btn danger" data-bdel ' + (n ? "" : "disabled") + '>' + ICON("trash") + ' Delete</button><button class="btn ghost" data-select>Done</button></div>';
+    if (S.state === "error") h += '<div class="alert" role="alert">' + ICON("info") + '<p><b>Home could not load your Library.</b> Check that Home is running, then try again.</p><button class="btn" data-retry>Try again</button></div>';
+    h += '<div class="scroll ' + (S.selecting || n ? "selecting" : "") + '" id="scroll">';
+    if (S.state === "loading") h += '<div class="grid">' + new Array(10).join('<div class="skel"></div>') + '</div>';
+    else if (S.state === "error") h += "";
+    else if (S.section === "trash") h += trashHtml();
+    else if (S.state === "empty" || !list.length) h += '<div class="empty"><div class="art">' + ICON("folder") + '</div><h3>' + (S.state === "empty" ? "Nothing here yet" : "No matches") + '</h3><p>' + (S.state === "empty" ? "Pictures, videos and songs you make in chat land here, along with files you upload. Drop a file anywhere on this page to add it." : "Try a different word or clear a filter.") + '</p>' + (S.state === "empty" ? '<button class="btn primary" data-upload>' + ICON("upload") + ' Upload a file</button>' : '<button class="btn" data-clear>Clear filters</button>') + '</div>';
+    else if (S.view === "grid") h += '<div class="grid" role="list" aria-label="Library items">' + list.map(tileHtml).join("") + '</div>';
+    else h += '<table class="list"><thead><tr><th></th><th>Name</th><th class="hide-m">Type</th><th>Size</th><th class="hide-m">Owner</th><th class="hide-m">Shared with</th><th class="hide-m">Modified</th><th></th></tr></thead><tbody>' + list.map(rowHtml).join("") + '</tbody></table>';
+    h += '</div>';
+    if (S.drag) h += '<div class="drop">Drop to add to your Library</div>';
+    if (S.state === "upload") h += '<div class="tray" role="status" aria-label="Uploads"><b>Uploading 3 files</b><div class="u"><div><span>Trip photos.zip</span><span>64%</span></div><div class="pb"><i style="width:64%"></i></div></div><div class="u"><div><span>Recipe.pdf</span><span>Done</span></div><div class="pb"><i style="width:100%;background:var(--ok)"></i></div></div><div class="u"><div><span>Big video.mov</span><span>Waiting</span></div><div class="pb"><i style="width:0"></i></div></div></div>';
+    h += '<button class="fab" data-upload aria-label="Upload">' + ICON("upload") + '</button>';
+    return '<div class="main">' + h + '</div>';
+  }
+  function actions(it) {
+    var mine = it.owner === S.user, a = [["open", "play", "Open"]];
+    if (!isChild() || mine) a.push(["share", "share", mine ? "Share" : "Share with others"]);
+    if (isChild()) a = a.filter(function (x) { return x[0] !== "share"; });
+    a.push(["dl", "dl", "Download"]);
+    if (it.kind === "video") a.push(["native", "upload", "Send to this device"]);
+    if (mine && it.kind === "image") a.push(["edit", "edit", "Open in the picture editor"]);
+    if (mine) a.push(["rename", "edit", "Rename"]);
+    if (mine && it.expires) a.push(["keep", "clock", "Keep (stop it going with its chat)"]);
+    if (!isChild()) a.push(["link", "link", "Copy link for people in your home"]);
+    if (mine) a.push(["del", "trash", "Delete"]);
+    return a;
+  }
+  function menuHtml() {
+    if (!S.menu) return "";
+    var it = items.filter(function (x) { return x.id === S.menu.id; })[0]; if (!it) return "";
+    var acts = actions(it);
+    if (S.w === "phone") return '<div class="scrim" data-closemenu></div><div class="sheet" role="dialog" aria-label="Actions"><div class="grab"></div><div class="ttl">' + it.name + '</div>' + acts.map(function (a) { return '<button class="' + (a[0] === "del" ? "danger" : "") + '" data-act="' + a[0] + '" data-id="' + it.id + '">' + ICON(a[1]) + a[2] + '</button>'; }).join("") + '</div>';
+    return '<div class="menu" role="menu" style="left:' + S.menu.x + 'px;top:' + S.menu.y + 'px">' + acts.map(function (a) { return (a[0] === "del" ? "<hr>" : "") + '<button role="menuitem" class="' + (a[0] === "del" ? "danger" : "") + '" data-act="' + a[0] + '" data-id="' + it.id + '">' + ICON(a[1]) + a[2] + '</button>'; }).join("") + '</div>';
+  }
+  function dlgHtml() {
+    if (!S.dlg) return "";
+    var d = S.dlg;
+    if (d.kind === "share") {
+      var many = d.ids.length > 1, base = items.filter(function (x) { return x.id === d.ids[0]; })[0];
+      var others = ["sage", "marlow", "nova", "bramble"].filter(function (k) { return k !== S.user; });
+      return '<div class="scrim"><div class="dlg" role="dialog" aria-label="Share"><h3>Share ' + (many ? d.ids.length + " items" : '"' + base.name + '"') + '</h3><p>Sharing lets people in your home see it. Nothing is sent outside your home, and you can stop at any time.</p><div class="ppl">' +
+        '<label class="who"><input type="checkbox" id="hh" ' + (base.shared.indexOf("household") > -1 ? "checked" : "") + '><span class="avatar" style="background:var(--muted);color:var(--foreground)">' + ICON("users") + '</span><span style="flex:1"><b>Everyone in the home</b><br><small style="color:var(--muted-foreground)">Anyone who joins later can see it too</small></span></label>' +
+        others.map(function (k) { return '<label class="who"><input type="checkbox" class="pp" value="' + k + '" ' + (base.shared.indexOf(k) > -1 ? "checked" : "") + '>' + av(k) + '<span style="flex:1"><b>' + PEOPLE[k].n + '</b></span></label>'; }).join("") + '</div>' +
+        '<div class="acts"><button class="btn" data-dlgclose>Cancel</button><button class="btn primary" data-doshare>Save sharing</button></div></div></div>';
+    }
+    if (d.kind === "confirm") return "";
+    if (d.kind === "rename") return '<div class="scrim"><div class="dlg" role="dialog" aria-label="Rename"><h3>Rename</h3><input id="rn" class="sel" style="width:100%" value="' + d.name.replace(/"/g, "&quot;") + '" aria-label="Name"><div class="acts"><button class="btn" data-dlgclose>Cancel</button><button class="btn primary" data-dorename>Save</button></div></div></div>';
+    return "";
+  }
+  function lbHtml() {
+    if (S.open === null) return "";
+    var list = visible(), idx = list.map(function (x) { return x.id; }).indexOf(S.open), it = list[idx]; if (!it) return "";
+    var mine = it.owner === S.user, acts = actions(it).filter(function (a) { return ["share", "dl", "edit", "del"].indexOf(a[0]) > -1; });
+    var stage;
+    if (it.kind === "image") stage = '<div class="art" style="background:' + GRAD[it.g] + ';transform:scale(' + S.zoom + ')"></div>';
+    else if (it.kind === "video") stage = '<div class="art" style="background:' + GRAD[it.g] + '"><span style="width:72px;height:72px;border-radius:50%;background:rgba(4,10,20,.55);display:grid;place-items:center">' + ICON("play", "fill") + '</span></div><div class="ctl"><button class="btn icon" aria-label="Play">' + ICON("play", "fill") + '</button><span>0:00</span><div class="pb"><i style="width:0"></i></div><span>' + it.dur + '</span></div>';
+    else if (it.kind === "audio") stage = '<div class="art sq" style="background:' + GRAD[it.g] + '">' + ICON("music").replace('class="i ', 'style="width:88px;height:88px" class="i ') + '</div><div class="ctl"><button class="btn icon" aria-label="Play">' + ICON("play", "fill") + '</button><span>0:00</span><div class="pb"><i style="width:0"></i></div><span>' + it.dur + '</span></div>';
+    else stage = '<div class="art" style="background:var(--card-2);color:var(--muted-foreground);aspect-ratio:3/4;width:min(46%,340px)">' + ICON("file").replace('class="i ', 'style="width:72px;height:72px" class="i ') + '<span style="font-weight:800;margin-top:-30px">' + it.type + ' preview</span></div>';
+    var info = '<aside class="info" id="info" ' + (S.info ? "" : "hidden") + ' aria-label="Details"><div><h4>Details</h4><dl><dt>Name</dt><dd>' + it.name + '</dd><dt>Type</dt><dd>' + it.type + '</dd><dt>Size</dt><dd>' + fmt(it.size) + '</dd><dt>Added</dt><dd>' + it.date + '</dd><dt>Owner</dt><dd>' + (mine ? "You" : PEOPLE[it.owner].n) + '</dd></dl></div>' +
+      '<div><h4>How it was made</h4><p style="margin:0;font-size:14px">' + it.made + '</p></div>' +
+      '<div><h4>Who can see it</h4>' + (it.shared.length ? it.shared.map(function (k) { return '<div class="who">' + (k === "household" ? '<span class="avatar" style="background:var(--muted);color:var(--foreground)">' + ICON("users") + '</span>Everyone in the home' : av(k) + PEOPLE[k].n) + '</div>'; }).join("") : '<div class="who">' + av(it.owner) + (mine ? "Only you" : PEOPLE[it.owner].n + " only") + '</div>') + (mine && !isChild() ? '<button class="btn" data-act="share" data-id="' + it.id + '" style="margin-top:8px">' + ICON("share") + ' Manage sharing</button>' : "") + '</div>' +
+      '<div><h4>Keeping</h4><p style="margin:0;font-size:14px">' + (it.expires ? 'Goes with its chat on ' + it.expires + '.' : 'Kept until you delete it.') + '</p>' + (mine && it.expires ? '<button class="btn" data-act="keep" data-id="' + it.id + '" style="margin-top:8px">' + ICON("clock") + ' Keep it</button>' : "") + '</div><p class="help">Arrow keys move between items. I shows or hides details. Esc closes.</p></aside>';
+    return '<div class="lb" role="dialog" aria-modal="true" aria-label="Preview of ' + it.name + '"><div class="top"><button class="btn icon" data-lbclose aria-label="Close">' + ICON("x") + '</button><div class="t">' + it.name + '</div>' +
+      (it.kind === "image" ? '<button class="btn" data-zoom aria-label="Zoom">' + ICON("zoom") + '<span class="lbl">' + (S.zoom > 1 ? "Fit" : "Zoom") + '</span></button>' : "") +
+      acts.map(function (a) { return '<button class="btn ' + (a[0] === "del" ? "danger" : "") + '" data-act="' + a[0] + '" data-id="' + it.id + '" aria-label="' + a[2] + '">' + ICON(a[1]) + '<span class="lbl">' + a[2].replace("Open in the picture editor", "Edit") + '</span></button>'; }).join("") +
+      '<button class="btn icon" data-info aria-label="Details" aria-pressed="' + S.info + '">' + ICON("info") + '</button></div><div class="body"><div class="stage2">' +
+      (idx > 0 ? '<button class="nav l" data-prev aria-label="Previous">' + ICON("left") + '</button>' : "") + stage + (idx < list.length - 1 ? '<button class="nav r" data-next aria-label="Next">' + ICON("right") + '</button>' : "") + '</div>' + info + '</div></div>';
+  }
+  function toastHtml() { return S.toast ? '<div class="toast" role="status"><span>' + S.toast.msg + '</span>' + (S.toast.undo ? '<button data-undo>Undo</button>' : "") + '</div>' : ""; }
+
+  function render() {
+    document.documentElement.setAttribute("data-theme", S.theme);
+    frame.className = "frame" + (S.w === "phone" ? " phone" : "");
+    var active = document.activeElement && document.activeElement.id;
+    frame.innerHTML = railHtml() + (S.w === "phone" ? "" : sideHtml()) + mainHtml() + menuHtml() + dlgHtml() + lbHtml() + toastHtml();
+    var q = $("#q"); if (q && active === "q") { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    document.querySelectorAll(".bar [aria-pressed]").forEach(function (b) {
+      var d = b.dataset; var on = (d.w && d.w === S.w) || (d.t && d.t === S.theme) || (d.u && d.u === S.user) || (d.s && d.s === S.state); if (d.w || d.t || d.u || d.s) b.setAttribute("aria-pressed", String(!!on));
+    });
+  }
+  var toastTimer;
+  function toast(msg, undo) { S.toast = { msg: msg, undo: undo }; clearTimeout(toastTimer); toastTimer = setTimeout(function () { S.toast = null; render(); }, 6000); }
+  function byId(id) { return items.filter(function (x) { return x.id === +id; })[0]; }
+  function del(ids) {
+    var removed = items.filter(function (x) { return ids.indexOf(x.id) > -1; });
+    removed.forEach(function (r) { r.left = 30; });
+    items = items.filter(function (x) { return ids.indexOf(x.id) < 0; });
+    trash = removed.concat(trash);
+    S.sel = {}; S.selecting = false; if (S.open !== null && ids.indexOf(S.open) > -1) { var l = visible(); S.open = l.length ? l[0].id : null; if (!l.length) S.open = null; }
+    var one = removed.length === 1 ? '"' + removed[0].name + '"' : removed.length + " items";
+    toast(one + " moved to Trash. Kept 30 days.", function () { trash = trash.filter(function (t) { return removed.indexOf(t) < 0; }); items = items.concat(removed); });
+    S.undoSet = removed;
+  }
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-w],[data-t],[data-u],[data-s]");
+    if (t && t.closest(".bar")) { var d = t.dataset; if (d.w) S.w = d.w; if (d.t) S.theme = d.t; if (d.u) { S.user = d.u; S.section = "all"; S.sel = {}; S.open = null; } if (d.s) S.state = d.s; render(); return; }
+    if (!frame.contains(e.target)) return;
+    var x = e.target.closest("button, input, [data-open]"); if (!x) { if (S.menu) { S.menu = null; render(); } return; }
+    var ds = x.dataset;
+    if (ds.sec) { S.section = ds.sec; S.sel = {}; S.selecting = false; S.type = "all"; render(); return; }
+    if (ds.type) { S.type = ds.type; render(); return; }
+    if (ds.own) { S.own = S.own === ds.own ? "all" : ds.own; render(); return; }
+    if (ds.shr) { S.shr = S.shr === ds.shr ? "all" : ds.shr; render(); return; }
+    if (ds.view) { S.view = ds.view; render(); return; }
+    if (x.hasAttribute("data-select")) { S.selecting = !S.selecting; if (!S.selecting) S.sel = {}; render(); return; }
+    if (ds.chk) { if (S.sel[ds.chk]) delete S.sel[ds.chk]; else S.sel[ds.chk] = true; S.selecting = true; render(); return; }
+    if (ds.open) { if (S.selecting) { if (S.sel[ds.open]) delete S.sel[ds.open]; else S.sel[ds.open] = true; } else { S.open = +ds.open; S.zoom = 1; S.info = S.w === "desktop"; } render(); return; }
+    if (ds.more) { var r = x.getBoundingClientRect(), fr = frame.getBoundingClientRect(); S.menu = { id: +ds.more, x: Math.min(r.left - fr.left - 150, fr.width - 230), y: Math.min(r.bottom - fr.top + 4, fr.height - 330) }; render(); return; }
+    if (x.hasAttribute("data-closemenu")) { S.menu = null; render(); return; }
+    if (ds.act) {
+      var it = byId(ds.id); S.menu = null; var a = ds.act;
+      if (a === "open") { S.open = it.id; S.info = S.w === "desktop"; }
+      else if (a === "share") S.dlg = { kind: "share", ids: [it.id] };
+      else if (a === "del") { if (it.shared.length) S.dlg = { kind: "confirm", title: "Delete \"" + it.name + "\"?", body: "It is shared with " + it.shared.map(function (k) { return k === "household" ? "everyone in the home" : PEOPLE[k].n; }).join(", ") + ". They lose access now. You can get it back from Trash for 30 days.", ok: "Move to Trash", ids: [it.id] }; else del([it.id]); }
+      else if (a === "rename") S.dlg = { kind: "rename", id: it.id, name: it.name };
+      else if (a === "keep") { it.expires = null; it.keep = true; toast("Kept. \"" + it.name + "\" stays until you delete it."); }
+      else if (a === "link") toast("Link copied. It opens only for people in your home who can see this item.");
+      else if (a === "dl") toast("Download started (design preview).");
+      else if (a === "native") toast("Opening your device's share sheet (design preview).");
+      else if (a === "edit") toast("Opens the picture editor in the chat where it was made.");
+      render(); return;
+    }
+    if (x.hasAttribute("data-bdel")) { var ids = Object.keys(S.sel).map(Number); var sh = items.filter(function (i) { return ids.indexOf(i.id) > -1 && i.shared.length; }).length; if (sh) S.dlg = { kind: "confirm", title: "Delete " + ids.length + " items?", body: sh + " of them " + (sh === 1 ? "is" : "are") + " shared. People lose access now. You can get them back from Trash for 30 days.", ok: "Move to Trash", ids: ids }; else del(ids); render(); return; }
+    if (x.hasAttribute("data-bshare")) { S.dlg = { kind: "share", ids: Object.keys(S.sel).map(Number) }; render(); return; }
+    if (x.hasAttribute("data-bdl")) { toast("Download started for " + Object.keys(S.sel).length + " items (design preview)."); render(); return; }
+    if (x.hasAttribute("data-dlgclose")) { S.dlg = null; render(); return; }
+    if (x.hasAttribute("data-doconfirm")) { del(S.dlg.ids); S.dlg = null; render(); return; }
+    if (x.hasAttribute("data-dorename")) { var nm = $("#rn").value.trim(); if (nm) { byId(S.dlg.id).name = nm; toast("Renamed."); } S.dlg = null; render(); return; }
+    if (x.hasAttribute("data-doshare")) {
+      var targets = S.dlg.ids.map(byId), hh = $("#hh").checked, pp = Array.prototype.slice.call(document.querySelectorAll(".pp:checked")).map(function (c) { return c.value; });
+      targets.forEach(function (i) { i.shared = (hh ? ["household"] : []).concat(pp); }); S.dlg = null; toast(hh || pp.length ? "Sharing saved." : "Not shared with anyone now."); render(); return;
+    }
+    if (x.hasAttribute("data-undo")) { if (S.undoSet) { trash = trash.filter(function (t) { return S.undoSet.indexOf(t) < 0; }); items = items.concat(S.undoSet); S.undoSet = null; } S.toast = null; render(); return; }
+    if (ds.restore) { var tt = trash.filter(function (t) { return t.id === +ds.restore; })[0]; trash = trash.filter(function (t) { return t !== tt; }); items.push(tt); toast("Restored \"" + tt.name + "\"."); render(); return; }
+    if (ds.purge) { var pt = trash.filter(function (t) { return t.id === +ds.purge; })[0]; S.dlg = { kind: "confirm", title: "Delete \"" + pt.name + "\" forever?", body: "This cannot be undone.", ok: "Delete forever", purge: pt.id }; render(); return; }
+    if (x.hasAttribute("data-empty")) { S.dlg = { kind: "confirm", title: "Empty Trash?", body: trash.length + " items go for good. This cannot be undone.", ok: "Empty Trash", purgeAll: true }; render(); return; }
+    if (x.hasAttribute("data-upload")) { S.state = "upload"; render(); return; }
+    if (x.hasAttribute("data-clear")) { S.q = ""; S.type = "all"; S.own = "all"; S.shr = "all"; S.section = "all"; render(); return; }
+    if (x.hasAttribute("data-retry")) { S.state = "normal"; render(); return; }
+    if (x.hasAttribute("data-lbclose")) { S.open = null; render(); return; }
+    if (x.hasAttribute("data-prev")) { step(-1); return; }
+    if (x.hasAttribute("data-next")) { step(1); return; }
+    if (x.hasAttribute("data-zoom")) { S.zoom = S.zoom > 1 ? 1 : 1.8; render(); return; }
+    if (x.hasAttribute("data-info")) { S.info = !S.info; render(); return; }
+  });
+  // purge confirms reuse the same dialog
+  var origConfirm = null;
+  document.addEventListener("click", function (e) {
+    var x = e.target.closest("[data-doconfirm]"); if (!x || !S.dlg) return;
+    if (S.dlg.purge) { trash = trash.filter(function (t) { return t.id !== S.dlg.purge; }); S.dlg = null; toast("Deleted forever."); render(); e.stopImmediatePropagation(); }
+    else if (S.dlg.purgeAll) { trash = []; S.dlg = null; toast("Trash emptied."); render(); e.stopImmediatePropagation(); }
+  }, true);
+  document.addEventListener("input", function (e) { if (e.target.id === "q") { S.q = e.target.value; var pos = e.target.selectionStart; render(); } });
+  document.addEventListener("change", function (e) { if (e.target.id === "sort") { S.sort = e.target.value; render(); } });
+  function step(d) { var l = visible(), i = l.map(function (x) { return x.id; }).indexOf(S.open), n = l[i + d]; if (n) { S.open = n.id; S.zoom = 1; render(); } }
+  document.addEventListener("keydown", function (e) {
+    if (e.target.matches("input, select, textarea")) return;
+    if (S.open !== null) { if (e.key === "Escape") { S.open = null; render(); } else if (e.key === "ArrowRight") step(1); else if (e.key === "ArrowLeft") step(-1); else if (e.key.toLowerCase() === "i") { S.info = !S.info; render(); } return; }
+    if (e.key === "Escape") { S.menu = null; S.dlg = null; S.sel = {}; S.selecting = false; render(); }
+    if (e.key.toLowerCase() === "s" && !e.metaKey && !e.ctrlKey) { S.selecting = !S.selecting; if (!S.selecting) S.sel = {}; render(); }
+  });
+  frame.addEventListener("dragenter", function (e) { e.preventDefault(); S.drag = true; render(); });
+  frame.addEventListener("dragover", function (e) { e.preventDefault(); });
+  frame.addEventListener("dragleave", function (e) { if (e.target === frame) { S.drag = false; render(); } });
+  frame.addEventListener("drop", function (e) { e.preventDefault(); S.drag = false; S.state = "upload"; render(); });
+  render();
+})();
+</script>
+</body>
+</html>
