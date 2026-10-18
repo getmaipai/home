@@ -5,6 +5,7 @@
 // of anything is wrong even when it is faster") and the lesson from a
 // code review that same day (memory.ts's own isOwnerOrAdmin() duplicated
 // an equivalent inline check elsewhere).
+import { speakerAgeBand } from "./ageBand";
 import { eq, isNull } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, people, shares } from "@/db/schema";
@@ -89,9 +90,10 @@ export function listActivePeople(): PersonRow[] {
 // its owner or an admin reads through Files, even if old shares still exist.
 // Other listeners go through the media item's band and source gate.
 export function canAccessFile(actor: PersonRow, ownerPersonId: string, fileId: string): boolean {
-  const file = db.select({ origin: attachments.origin, owner: attachments.ownerPersonId }).from(attachments).where(eq(attachments.id, fileId)).get();
+  const file = db.select({ origin: attachments.origin, owner: attachments.ownerPersonId, provenance: attachments.provenance }).from(attachments).where(eq(attachments.id, fileId)).get();
   if (!file || file.owner !== ownerPersonId) return false;
   if (actor.id === ownerPersonId) return true;
+  if (!canReadFileAudience(actor, { ownerPersonId, provenance: file.provenance })) return false;
   if (file.origin === "fetched") return isOwnerOrAdmin(actor);
   const rows = db.select({ to: shares.to }).from(shares).where(eq(shares.fileId, fileId)).all();
   return rows.some((row) => row.to === "household" || row.to === actor.id);
@@ -118,4 +120,22 @@ export function canAccessFile(actor: PersonRow, ownerPersonId: string, fileId: s
 export function fileDisclosure(ownerPersonId: string): "child_ok" | "adult_only" {
   const role = getPersonRole(ownerPersonId);
   return role === "child" || role === "teen" ? "child_ok" : "adult_only";
+}
+
+/** Recorded class only: missing, malformed and unknown values remain unclassified.
+ * The spec has no audience field yet, so generators put it in their provenance JSON. */
+export function fileAudience(provenance: string): "all-ages" | "adult-only" | null {
+  const prefixes = ["picture-gen:", "video-gen:", "video-poster:", "image-edit:"];
+  const prefix = prefixes.find(value => provenance.startsWith(value));
+  if (!prefix) return null;
+  try {
+    const audience: unknown = JSON.parse(provenance.slice(prefix.length)).audience;
+    return audience === "all-ages" || audience === "adult-only" ? audience : null;
+  } catch { return null; }
+}
+
+/** Audience ceiling shared by Library, content, shares and derived conversation reads.
+ * Ownership always wins; every other minor reader needs an explicit all-ages class. */
+export function canReadFileAudience(actor: PersonRow, file: { ownerPersonId: string; provenance: string }): boolean {
+  return actor.id === file.ownerPersonId || speakerAgeBand(actor, new Date()) === "adult" || fileAudience(file.provenance) === "all-ages";
 }

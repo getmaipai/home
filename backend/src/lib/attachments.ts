@@ -19,7 +19,7 @@ import { newFileId, newShareId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { checkStorageCap, kindForMediaType } from "@/lib/storage/usage";
-import { canAccessFile, canAccessPerson } from "@/lib/access";
+import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
 import type { PersonRow } from "@/types";
 
 export type AttachmentOpResult<T> =
@@ -286,7 +286,7 @@ export function readAttachment(actor: PersonRow, id: string): AttachmentOpResult
  * while the general Library keeps its explicit-share rule. */
 export function readAttachmentForConversation(actor: PersonRow, conversationId: string, id: string): AttachmentOpResult<{ record: FileRecord; bytes: Uint8Array }> {
   const row = db.select().from(attachments).where(eq(attachments.id, id)).get();
-  if (!row || row.conversationId !== conversationId) return { ok: false, status: 404, error: "attachment not found" };
+  if (!row || row.conversationId !== conversationId || !canReadFileAudience(actor, row)) return { ok: false, status: 404, error: "attachment not found" };
   const conversation = db.select({ personId: conversations.personId }).from(conversations).where(eq(conversations.id, conversationId)).get();
   if (!conversation || !canAccessPerson(actor, conversation.personId)) return { ok: false, status: 404, error: "attachment not found" };
   const filePath = attachmentFilePath(row.storagePath);

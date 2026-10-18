@@ -260,7 +260,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
       if (job.request.edit) {
         // IMGEDIT-01: a change to a picture already in the chat is the next version of that picture (its Original and Undo stay in the editor).
         const source = loadSource(actor, conversationId, job.request.edit.source_id, true);
-        const version = await saveVersion(actor, source, raw, { op: "comment", label: job.request.edit.label, model: meta.model ?? undefined, ms: meta.ms ?? undefined });
+        const version = await saveVersion(actor, source, raw, { op: "comment", audience: adult ? "adult-only" : "all-ages", label: job.request.edit.label, model: meta.model ?? undefined, ms: meta.ms ?? undefined });
         storedIds.push(version.id);
         files.push({ id: version.id, width: version.width ?? width, height: version.height ?? height, ...meta });
         continue;
@@ -272,7 +272,7 @@ async function finish(job: PictureJob, actor: PersonRow, pics: StackPic[]): Prom
         continue;
       }
       if (!job.turnId || !(await waitForTurnRow(job.turnId, job))) { if (stopped(job)) { discardStored(storedIds); return; } throw new Error("turn row never appeared"); }
-      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, job: job.id, index, ...meta, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false, retention: "kept" });
+      const created = createAttachment(actor, { conversationId, turnId: job.turnId, mediaType: "image/png", bytes: raw, provenance: `picture-gen:${JSON.stringify({ v: 1, audience: adult ? "adult-only" : "all-ages", job: job.id, index, ...meta, width, height, ...(job.request.likeness ? { likeness: job.request.likeness.subject } : {}) })}`, deduplicate: false, retention: "kept" });
       if (!created.ok) {
         fail(created.status === 403 ? `${PICTURE_FAILED_PREFIX} Your storage is full. Delete some files in Settings, Storage, then try again.` : `${PICTURE_FAILED_PREFIX} The picture couldn't be saved. Try again.`);
         return;

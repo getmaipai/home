@@ -1,3 +1,4 @@
+import { canReadFileAudience } from "@/lib/access";
 // IMGTOOLS-03/04: the picture editor's server half. The person opens a
 // picture they already have (a chat attachment) in the canvas and runs a
 // tool on it: remove the background, erase an object under a painted mask,
@@ -191,6 +192,8 @@ function childOwnCartoonsOnly(actor: PersonRow): boolean {
 }
 
 export function loadSource(actor: PersonRow, conversationId: string, id: string, write: boolean): SourcePicture {
+  const stored = db.select().from(attachments).where(eq(attachments.id, id)).get();
+  if (stored && !canReadFileAudience(actor, stored)) throw new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
   const childLane = childOwnCartoonsOnly(actor);
   if (!photoUploadsAllowed(actor) && !childLane) throw new ImageEditError(403, PICTURES_OFF_REASON, "pictures_off");
   const gone = new ImageEditError(404, "That picture isn't available. Open it from the chat again.", "not_found");
@@ -236,9 +239,9 @@ export function listVersions(actor: PersonRow, conversationId: string, id: strin
     return versions;
   }
   const root = db.select().from(attachments).where(eq(attachments.id, source.rootId)).get();
-  if (root && root.conversationId === conversationId) versions.push({ id: root.id, url: pictureUrl(conversationId, root.id), label: "Original", created_at: root.createdAt, op: "original", width: null, height: null, media_type: root.mediaType, source: null, source_sha256: null });
+  if (root && root.conversationId === conversationId && canReadFileAudience(actor, root)) versions.push({ id: root.id, url: pictureUrl(conversationId, root.id), label: "Original", created_at: root.createdAt, op: "original", width: null, height: null, media_type: root.mediaType, source: null, source_sha256: null });
   const rows = db.select().from(attachments).where(and(eq(attachments.conversationId, conversationId), like(attachments.provenance, `${EDIT_NOTE}%`))).all();
-  const chain = rows.map((row) => ({ row, p: parseProvenance(row.provenance) })).filter((entry): entry is { row: typeof entry.row; p: EditProvenance } => entry.p !== null && entry.p.root === source.rootId);
+  const chain = rows.map((row) => ({ row, p: parseProvenance(row.provenance) })).filter((entry): entry is { row: typeof entry.row; p: EditProvenance } => entry.p !== null && entry.p.root === source.rootId && canReadFileAudience(actor, entry.row));
   chain.sort((a, b) => (a.row.createdAt === b.row.createdAt ? a.row.hlc.localeCompare(b.row.hlc) : a.row.createdAt.localeCompare(b.row.createdAt)));
   for (const { row, p } of chain) versions.push({ id: row.id, url: pictureUrl(conversationId, row.id), label: p.label, created_at: row.createdAt, op: p.op, width: p.width, height: p.height, media_type: row.mediaType, source: p.source, source_sha256: p.source_sha256 });
   return versions;
@@ -251,7 +254,7 @@ export function readPicture(actor: PersonRow, conversationId: string, id: string
 }
 
 /** Writes a PNG as the next version of `source`'s chain. The bytes are re-encoded here (metadata dropped), never trusted as sent. */
-export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; engine?: string; model?: string; ms?: number }): Promise<PictureVersion> {
+export async function saveVersion(actor: PersonRow, source: SourcePicture, png: Uint8Array, meta: { op: EditProvenanceOp; label: string; audience?: "all-ages" | "adult-only"; engine?: string; model?: string; ms?: number }): Promise<PictureVersion> {
   let clean: Buffer;
   let info: OutputInfo;
   try {
@@ -262,7 +265,7 @@ export async function saveVersion(actor: PersonRow, source: SourcePicture, png: 
     throw new ImageEditError(422, "That picture could not be read. Try the edit again.", "bad_image");
   }
   const bytes = new Uint8Array(clean);
-  const provenance: EditProvenance = { v: 1, op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
+  const provenance: EditProvenance & { audience?: "all-ages" | "adult-only" } = { v: 1, ...(meta.audience ? { audience: meta.audience } : {}), op: meta.op, label: meta.label.slice(0, 80), source: source.id, source_sha256: source.sha256, root: source.rootId, ...(meta.engine ? { engine: meta.engine } : {}), ...(meta.model ? { model: meta.model } : {}), ...(meta.ms !== undefined ? { ms: meta.ms } : {}), width: info.width, height: info.height };
   if (source.temporary) {
     const id = newFileId();
     storeTemporaryChatImage({ id, turnId: `edit-${source.rootId}`, conversationId: source.conversationId, ownerPersonId: actor.id, name: source.name, mediaType: "image/png", width: info.width, height: info.height, bytes, edit: provenance });

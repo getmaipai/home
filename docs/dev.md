@@ -37514,3 +37514,10 @@ properties, spreads and client aliases. Outside llm.ts and reasoningReserve.ts,
 ceilings declare `// answer-budget` for small blocking calls through the
 wrappers, `// exact-ceiling: <reason>` for probes, or
 `// stream-ceiling: <reason>` for streaming ceilings that own their reserve.
+
+
+### 2026-10-18: shared Library file audience (BUG-LIBRARY-SHARE-CHILD-01)
+
+Picture and video completion reuse their existing adult-only decision to record `audience: "all-ages" | "adult-only"` in the JSON inside the existing provenance note. Video posters and generated picture edits carry the same decision. The pinned spec has no file audience field, so no spec shape or database migration changes here; LIBRARY-REVAMP-03 will move the field into the spec. Missing, malformed or unknown audience is unclassified, with no guessed backfill.
+
+`canReadFileAudience` in `backend/src/lib/access.ts` is the read ceiling: owners always see their own files; adults remain subject to existing access rules; other child and teen readers require an explicit all-ages class. Bands use the viewer's role only. `canAccessFile` applies it to Library and profile lists, metadata, content and file-share reads. Share mutations, stored conversation image reads, thumbnails, video files and editor version lists use the same ceiling. Hidden direct ids return 404. Share-target restrictions remain in LIBRARY-REVAMP-04.

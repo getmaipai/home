@@ -66,7 +66,7 @@ function conversationFor(actor: typeof people.$inferSelect) {
 function uploadFile(actor: typeof people.$inferSelect, text = "picture bytes") {
   const conversationId = conversationFor(actor);
   const turnId = turnFor(actor, conversationId);
-  const created = createAttachment(actor, { conversationId, turnId, mediaType: "image/png", bytes: new TextEncoder().encode(text) });
+  const created = createAttachment(actor, { conversationId, turnId, mediaType: "image/png", provenance: 'picture-gen:{"v":1,"audience":"all-ages"}', bytes: new TextEncoder().encode(text) });
   if (!created.ok) throw new Error(created.error);
   return created.value;
 }

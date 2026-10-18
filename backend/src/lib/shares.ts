@@ -25,7 +25,7 @@ import { attachments, people, shares } from "@/db/schema";
 import { Share as ShareSchema, type Share } from "@maipai/spec/gen/ts/share.js";
 import { newShareId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
-import { canAccessFile, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
+import { canAccessFile, canReadFileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
 import { toRecord } from "@/lib/attachments";
 import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
@@ -68,7 +68,7 @@ function isValidShareTarget(to: string): boolean {
  * target that already has a live pointer just returns it. */
 export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpResult<Share, 400 | 403 | 404> {
   const file = db.select().from(attachments).where(eq(attachments.id, input.fileId)).get();
-  if (!file) return { ok: false, status: 404, error: "file not found" };
+  if (!file || !canReadFileAudience(actor, file)) return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
 
   if (!canAccessFile(actor, file.ownerPersonId, input.fileId)) {
     return { ok: false, status: 403, error: "you do not have access to this file" };
@@ -168,7 +168,7 @@ export function deleteShare(actor: PersonRow, shareId: string): ShareOpResult<{ 
   const share = db.select().from(shares).where(eq(shares.id, shareId)).get();
   if (!share) return { ok: false, status: 404, error: "share not found" };
   const file = db.select().from(attachments).where(eq(attachments.id, share.fileId)).get();
-  if (!file) return { ok: false, status: 404, error: "file not found" };
+  if (!file || !canReadFileAudience(actor, file)) return { ok: false, status: 404, error: "File unavailable. Ask the owner to share a suitable file." };
 
   const canDelete =
     actor.id === share.fromPersonId ||
