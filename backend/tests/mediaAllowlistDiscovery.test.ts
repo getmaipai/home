@@ -8,6 +8,7 @@ import type { PersonRow } from "@/types";
 import { DISCOVERY_IDS, mediaAppData, MEDIA_APPS, type MediaAppId } from "@/lib/media/appHost";
 import { setValue, __resetSettingsCacheForTests } from "@/lib/settings";
 import { readableItem } from "@/lib/media/access";
+import { mediaManifest } from "@/lib/offline/media";
 import { listItems } from "@/lib/media/items";
 import { createCollection, setSharedTo, addItem, sharedVisibleTo } from "@/lib/media/collections";
 import { resetDb } from "./reset-db";
@@ -105,4 +106,10 @@ test("a minor never sees a shared collection whose title trips the floor; an adu
   expect(sharedVisibleTo(sprout).map((c) => c.id)).not.toContain(playlist.id);
   expect(sharedVisibleTo(nova).map((c) => c.id)).not.toContain(playlist.id);
   expect(sharedVisibleTo(atlas).map((c) => c.id)).toContain(playlist.id);
+});
+
+test("the offline manifest never offers an unnamed household feed item to a guest, a child or an allowlisted teen", () => {
+  allowlist(nova, true);
+  for (const who of [pippa, sprout, nova]) expect(mediaManifest(who, "media-feedvideo01")).toBeNull();
+  expect(mediaManifest(marlow, "media-feedvideo01")).not.toBeNull();
 });

@@ -3,6 +3,7 @@
 // only `band_ok: child` items) and by each source's `visible_to`. lib/media/ holds the rules; this file is only the wire.
 import { createRoute, z } from "@hono/zod-openapi";
 import type { Context } from "hono";
+import type { PersonRow } from "@/types";
 import { getCookie } from "hono/cookie";
 import { and, eq, isNull } from "drizzle-orm";
 import { hashSessionToken } from "@/lib/session";
@@ -44,11 +45,18 @@ const SourceView = z.object({
   last_scan: ScanSummarySchema.nullable(),
 });
 
-function sourceView(row: typeof mediaSources.$inferSelect, admin: boolean) {
+/** A source as `actor` may see it. Only an admin sees where a folder lives, the deleted-title archive, the last scan's details,
+ * the feed address, who made it and its provenance, and the count of every item; anyone else sees a count of what they may read. */
+function sourceView(row: typeof mediaSources.$inferSelect, actor: PersonRow) {
   const source = sourceFromRow(row);
-  if (!admin && source.root) source.root = { ...source.root, path: "" }; // only an admin sees where a folder lives on the disk
-  const count = (sqlite.query("SELECT count(*) AS n FROM media_items WHERE source_id = ? AND deleted_at IS NULL").get(row.id) as { n: number }).n;
-  return { source, item_count: count, scanning: isScanning(row.id), last_scan: row.lastScanSummary ? (JSON.parse(row.lastScanSummary) as ScanSummary) : null };
+  if (isMediaAdmin(actor)) {
+    const count = (sqlite.query("SELECT count(*) AS n FROM media_items WHERE source_id = ? AND deleted_at IS NULL").get(row.id) as { n: number }).n;
+    return { source, item_count: count, scanning: isScanning(row.id), last_scan: row.lastScanSummary ? (JSON.parse(row.lastScanSummary) as ScanSummary) : null };
+  }
+  const ids = sqlite.query("SELECT id FROM media_items WHERE source_id = ? AND deleted_at IS NULL AND hidden = 0").all(row.id) as Array<{ id: string }>;
+  const readable = ids.filter(({ id }) => readableItem(actor, id) !== null).length;
+  const shown = { ...source, root: source.root ? { ...source.root, path: "" } : null, archive: [], url: null, owner_person_id: null, provenance: "hub" };
+  return { source: shown, item_count: readable, scanning: isScanning(row.id), last_scan: null };
 }
 
 // ---- sources ----
@@ -63,10 +71,9 @@ const listSourcesRoute = createRoute({
 });
 mediaRoutes.openapi(listSourcesRoute, (c) => {
   const actor = c.get("person");
-  const admin = isMediaAdmin(actor);
   const visible = new Set(listSourcesFor((source) => sourceVisibleTo(source, actor)).map((source) => source.id));
   const rows = db.select().from(mediaSources).all().filter((row) => visible.has(row.id));
-  return c.json(rows.map((row) => sourceView(row, admin)), 200);
+  return c.json(rows.map((row) => sourceView(row, actor)), 200);
 });
 
 const addRootRoute = createRoute({
@@ -103,7 +110,7 @@ mediaRoutes.openapi(addRootRoute, (c) => {
   if (!result.ok) return c.json({ error: result.error }, result.status);
   syncMediaScanner();
   trackBackgroundWork(scanRoot(result.source.id).catch(() => undefined));
-  return c.json(sourceView(db.select().from(mediaSources).where(eq(mediaSources.id, result.source.id)).get()!, true), 201);
+  return c.json(sourceView(db.select().from(mediaSources).where(eq(mediaSources.id, result.source.id)).get()!, c.get("person")), 201);
 });
 
 const removeSourceRoute = createRoute({
@@ -591,7 +598,7 @@ mediaRoutes.openapi(reorderRoute, (c) => {
   const actor = c.get("person");
   const collection = resolveCollection(actor.id, c.req.valid("param").id);
   if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
-  return c.json(reorderItems(collection, c.req.valid("json").media_ids), 200);
+  return c.json(visibleView(actor, reorderItems(collection, c.req.valid("json").media_ids)), 200);
 });
 
 const removeFromCollectionRoute = createRoute({
@@ -608,5 +615,5 @@ mediaRoutes.openapi(removeFromCollectionRoute, (c) => {
   const { id, media_id } = c.req.valid("param");
   const collection = resolveCollection(actor.id, id);
   if (!collection || collection.person_id !== actor.id) return c.json({ error: "That collection is not there." }, 404);
-  return c.json(removeItemFrom(collection, media_id), 200);
+  return c.json(visibleView(actor, removeItemFrom(collection, media_id)), 200);
 });
