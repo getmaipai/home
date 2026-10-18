@@ -13,7 +13,7 @@ import { NotFoundPage } from "@/shell/pages/NotFoundPage";
 import { usePinnedApps } from "@/shell/usePinnedApps";
 import { useAppRows } from "@/shell/useAppCatalog";
 import { useTabItem } from "@/shell/tabIdentity";
-import { appHomeLabel, isMediaApp, playPageOf } from "@/shell/mediaApps";
+import { appHomeLabel, isMediaApp, playPageOf, usesFamilyHeader } from "@/shell/mediaApps";
 import { useMediaDock } from "@/shell/mediaHost";
 
 /** APP-KIND-04: one route, `apps/*`, for every installed package app. `/apps/<package>` opens its `index` page and
@@ -47,6 +47,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
   const location = useLocation();
   const navigate = useNavigate();
   const media = isMediaApp(packageId);
+  const familyHeader = usesFamilyHeader(packageId);
   // Only a media app reads its query as state: News and others mirror a tab in the query themselves.
   const queryState = useMemo<Record<string, string>>(() => (media ? Object.fromEntries(new URLSearchParams(location.search)) : {}), [media, location.search]);
   const hasQuery = Object.keys(queryState).length > 0;
@@ -67,8 +68,8 @@ export function PackageAppPage({ person }: { person: Roster }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2" data-testid="package-app" data-package={packageId}>
-      {media ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
-      {app ? <AppToolbar person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} media={media} /> : null}
+      {familyHeader ? null : <h1 className="sr-only">{app?.label ?? "App"}</h1>}
+      {app ? <AppToolbar person={person} to={app.to} label={app.label} homeLabel={appHomeLabel(packageId, media)} settingsArea={app.settings_area?.id} sections={app.sections} current={pageId} familyHeader={familyHeader} /> : null}
       <AsyncState
         data={page.isError ? null : page.data}
         error={page.isError}
@@ -107,7 +108,7 @@ export function PackageAppPage({ person }: { person: Roster }) {
 }
 
 /** The app's own sections as tabs (when it has any) and the pin control. Pins are per person and private. */
-function AppToolbar({ person, to, label, homeLabel, settingsArea, sections, current, media }: { person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; media: boolean }) {
+function AppToolbar({ person, to, label, homeLabel, settingsArea, sections, current, familyHeader }: { person: Roster; to: string; label: string; homeLabel: string; settingsArea?: string; sections: Array<{ page: string; label: string }>; current: string; familyHeader: boolean }) {
   const navigate = useNavigate();
   const { isPinned, togglePin, isLoading, isSaving } = usePinnedApps(person.id);
   const pinned = isPinned(to);
@@ -115,7 +116,7 @@ function AppToolbar({ person, to, label, homeLabel, settingsArea, sections, curr
   const GearIcon = getIcon("settings");
   // MEDIA-POLISH-01: a media app's own header, as the native app has it (YouTube's): its name large with its icon controls on the
   // end side, then its sections as chip tabs. The play page has no header: the picture starts the page.
-  if (media) {
+  if (familyHeader) {
     if (current === playPageOf(to.split("/")[2] ?? "")) return null;
     return (
       <div className="flex flex-col gap-2">

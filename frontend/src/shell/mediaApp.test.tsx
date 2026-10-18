@@ -12,7 +12,7 @@ import { createQueryClient } from "@maipai/ui/src/queryClient";
 import { Routes } from "@/shell/Routes";
 import { mockHome, makePerson, type HomeFixture } from "@/shell/pages/settings/settingsTestKit";
 import { chaptersWithEnds, MediaPlayerRegistration } from "@/shell/MediaPlayerRegistration";
-import { mediaAppOfPath, playPageOf, playRoute } from "@/shell/mediaApps";
+import { isMediaApp, mediaAppOfPath, playPageOf, playRoute, usesFamilyHeader } from "@/shell/mediaApps";
 import { createMediaStore } from "@/shell/mediaHost";
 import type { AppRow } from "@/lib/api";
 
@@ -20,6 +20,12 @@ const row: AppRow = {
   package: "videos", page: "index", label: "Videos", icon: "circle-play", description: "Videos.", category: "Media", keywords: [],
   sections: [{ page: "library", label: "Library", icon: null }, { page: "watch", label: "Watch", icon: null }], to: "/apps/videos", incognito: "unaffected",
 };
+const newsRow: AppRow = {
+  package: "news", page: "index", label: "News", icon: "newspaper", description: "News.", category: "Info", keywords: [],
+  sections: [{ page: "following", label: "Following", icon: null }, { page: "saved", label: "Saved", icon: null }], to: "/apps/news", incognito: "unaffected",
+  settings_area: { id: "news" },
+} as unknown as AppRow;
+const newsPage = { type: "page", id: "news", title: "Today", body: [{ type: "empty_state", icon: "newspaper", text: "No stories yet. Check back soon." }] };
 const shelf = (path: string) => ({
   type: "media_shelf", heading: path, bind: { source: "package", path }, item_key_field: "id", item_label_field: "title", item_media_field: "thumbnail", aspect: "wide",
   on_select: { play: { media_id: "{id}" } }, empty_state: { type: "empty_state", icon: "film", text: "Nothing here." },
@@ -40,7 +46,8 @@ beforeEach(() => {
   baseFetch = globalThis.fetch;
   globalThis.fetch = ((input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input.toString();
-    if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row]));
+    if (url.startsWith("/api/apps")) return Promise.resolve(Response.json([row, newsRow]));
+    if (url.startsWith("/api/plugins/news/pages/")) return Promise.resolve(Response.json(newsPage));
     if (url.startsWith("/api/plugins/videos/pages/index")) return Promise.resolve(Response.json(indexPage));
     if (url.startsWith("/api/plugins/videos/pages/watch")) return Promise.resolve(Response.json(watchPage));
     if (url.startsWith("/api/plugins/videos/data/recent")) return Promise.resolve(Response.json([{ id: "media-aaaaaa", title: "Building a birdhouse", kind: "video", thumbnail: null }]));
@@ -208,5 +215,34 @@ describe("an app's first tab for the apps that are not media apps", () => {
     expect(appHomeLabel("news", false)).toBe("Today");
     expect(appHomeLabel("weather", false)).toBe("Overview");
     expect(appHomeLabel("music", true)).toBe("Listen now");
+  });
+});
+
+describe("News draws its header in the media family without being a media app", () => {
+  test("usesFamilyHeader is the media apps and News; isMediaApp stays the media apps", () => {
+    expect(["videos", "shows", "music", "podcasts", "books", "news"].every(usesFamilyHeader)).toBe(true);
+    expect(usesFamilyHeader("weather")).toBe(false);
+    expect(isMediaApp("news")).toBe(false);
+  });
+
+  test("the title is large, the controls are icons on the end side, and the sections are pill tabs starting at Today", async () => {
+    const view = open("/apps/news");
+    await view.findByRole("tab", { name: "Today" });
+    const headings = view.getAllByRole("heading", { level: 1, name: "News" });
+    expect(headings.some((heading) => heading.className.includes("text-2xl"))).toBe(true);
+    // The app's own sr-only heading is gone (the visible title is the heading), as for a media app.
+    expect(headings.some((heading) => heading.className.includes("sr-only") && heading.closest("[data-testid=package-app]") !== null)).toBe(false);
+    expect(await view.findByRole("tab", { name: "Today" })).toBeTruthy();
+    expect(view.getByRole("tab", { name: "Following" })).toBeTruthy();
+    expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
+    expect(view.getByRole("link", { name: "News settings" })).toBeTruthy();
+    expect(view.getByRole("button", { name: "Add to favorites" })).toBeTruthy();
+    expect(view.queryByRole("button", { name: /Close the player/ })).toBeNull();
+  });
+
+  test("a media app keeps the same header", async () => {
+    const view = open("/apps/videos");
+    expect((await view.findAllByRole("heading", { level: 1, name: "Videos" })).length).toBeGreaterThan(0);
+    expect(view.getByRole("tablist", { name: "Sections" }).getAttribute("data-variant")).toBe("pill");
   });
 });
