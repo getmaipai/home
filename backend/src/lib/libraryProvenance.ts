@@ -18,7 +18,8 @@ export function libraryProvenanceSql(column: string): string {
   }).join(" ")} ELSE '{}' END)`;
 }
 
-/** A file Home made (a picture, video, edit, poster or song), by its origin or the note its writer left. */
+/** A file Home made (a picture, video, edit, poster or song), by the note its writer left in provenance (the one source;
+ * the stored origin is only "sent" or "fetched"). */
 export function isGeneratedFile(row: { origin: string; provenance: string }): boolean {
-  return row.origin === "made" || Boolean(libraryProvenance(row.provenance).writer) || generationOf(row.provenance) !== null;
+  return Boolean(libraryProvenance(row.provenance).writer) || generationOf(row.provenance) !== null;
 }

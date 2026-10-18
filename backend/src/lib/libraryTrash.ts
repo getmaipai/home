@@ -8,7 +8,7 @@
 //
 // Ahead of the spec: deleted_at and trash_until are columns on `attachments` until `file.deleted_at` and `file.trash_until`
 // exist in commons (LIBRARY-REVAMP-03).
-import { and, eq, inArray, isNotNull, lte } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, lte } from "drizzle-orm";
 import { db, sqlite } from "@/db";
 import { attachments, musicJobs, shares } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
@@ -46,6 +46,19 @@ function companionsOf(row: Row): Row[] {
   return db.select().from(attachments).where(and(inArray(attachments.id, ids), eq(attachments.ownerPersonId, row.ownerPersonId))).all();
 }
 
+/** The live item a companion file belongs to (an edit's picture, a poster's video, a cover's song), if any. */
+function parentOf(row: Row): Row | undefined {
+  const meta = libraryProvenance(row.provenance);
+  const live = (id: string) => db.select().from(attachments).where(and(eq(attachments.id, id), eq(attachments.ownerPersonId, row.ownerPersonId), isNull(attachments.deletedAt))).get();
+  if (meta.writer === "image-edit" && typeof meta.root === "string") return live(meta.root);
+  if (meta.writer === "video-poster" && typeof meta.job === "string") {
+    const found = sqlite.query<{ id: string }, string[]>(`SELECT a.id FROM attachments a WHERE a.owner_person_id = ? AND a.deleted_at IS NULL AND a.provenance LIKE 'video-gen:%' AND json_extract(${libraryProvenanceSql("a.provenance")}, '$.job') = ?`).get(row.ownerPersonId, meta.job);
+    return found ? live(found.id) : undefined;
+  }
+  const job = db.select({ file: musicJobs.fileId }).from(musicJobs).where(eq(musicJobs.coverFileId, row.id)).get();
+  return job?.file ? live(job.file) : undefined;
+}
+
 /** A readable name for the Trash list, built from the same notes the Library listing reads. */
 function titleOf(row: Row): string {
   if (row.name) return row.name.slice(0, 80);
@@ -64,6 +77,7 @@ export function trashFile(actor: PersonRow, id: string, now = new Date()): Trash
   // Not the owner's, or already gone: the same answer, so an id never confirms a file someone else holds.
   if (!row || row.ownerPersonId !== actor.id || row.deletedAt !== null) return { ok: false, status: 404, error: "That file is not in your Library. Refresh the page and try again." };
   if (row.origin === "fetched") return { ok: false, status: 403, error: "Saved media belongs to its app. Remove it there." };
+  if (parentOf(row)) return { ok: false, status: 403, error: "This file belongs to another item. Delete that item instead." };
   const deletedAt = now.toISOString();
   const trashUntil = new Date(now.getTime() + trashDays() * DAY).toISOString();
   db.transaction(() => {
@@ -77,9 +91,18 @@ export function trashFile(actor: PersonRow, id: string, now = new Date()): Trash
 
 function trashedMain(person: PersonRow): Row[] {
   const trashed = db.select().from(attachments).where(and(eq(attachments.ownerPersonId, person.id), isNotNull(attachments.deletedAt), isNotNull(attachments.trashUntil))).all();
-  const companions = new Set<string>();
-  for (const row of trashed) for (const other of companionsOf(row)) if (other.deletedAt === row.deletedAt) companions.add(other.id);
-  return trashed.filter((row) => !companions.has(row.id)).sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!) || a.id.localeCompare(b.id));
+  if (trashed.length === 0) return [];
+  // Companions among the trashed rows only (one pass over them, not a scan of the whole Library per row).
+  const ids = new Set(trashed.map((row) => row.id));
+  const videoJobs = new Set<string>();
+  const metas = trashed.map((row) => ({ row, meta: libraryProvenance(row.provenance) }));
+  for (const { meta } of metas) if (meta.writer === "video-gen" && typeof meta.job === "string") videoJobs.add(meta.job);
+  const covers = new Set(db.select({ cover: musicJobs.coverFileId }).from(musicJobs).where(inArray(musicJobs.fileId, [...ids])).all().map((job) => job.cover).filter((id): id is string => Boolean(id)));
+  const companion = (row: Row, meta: ReturnType<typeof libraryProvenance>) =>
+    (meta.writer === "image-edit" && typeof meta.root === "string" && ids.has(meta.root)) ||
+    (meta.writer === "video-poster" && typeof meta.job === "string" && videoJobs.has(meta.job)) ||
+    covers.has(row.id);
+  return metas.filter(({ row, meta }) => !companion(row, meta)).map(({ row }) => row).sort((a, b) => b.deletedAt!.localeCompare(a.deletedAt!) || a.id.localeCompare(b.id));
 }
 
 export function listTrashedFiles(person: PersonRow, now = new Date()): Array<{ id: string; title: string; deleted_at: string; trash_until: string; can_restore: boolean }> {
@@ -129,12 +152,13 @@ function dropLibraryReference(rows: Row[]): void {
       gone.push(row.id);
     }
     const doomed = db.select().from(attachments).where(inArray(attachments.id, gone.length ? gone : [""])).all();
-    deleteMusicJobsForFiles(gone);
-    deletePictureJobsForFiles(gone);
     for (const row of doomed) {
       const blob = purgeFileRecord(row);
       if (blob) blobs.push(blob);
     }
+    // After the records are gone, so a pinned item's job (which a still-present pinned file would protect) goes with it.
+    deleteMusicJobsForFiles(gone);
+    deletePictureJobsForFiles(gone);
   });
   removeFileBlobs(blobs);
 }

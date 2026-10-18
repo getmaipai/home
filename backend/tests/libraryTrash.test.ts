@@ -247,3 +247,18 @@ describe("generated items outlive their chats (LIBRARY-REVAMP-02)", () => {
     expect(db.select().from(pictureJobs).all()).toHaveLength(1);
   });
 });
+
+describe("companions", () => {
+  test("a companion file cannot be deleted on its own; a pinned item's job goes when it is purged from Trash", async () => {
+    const h = await household();
+    const root = file(h.sageRow(), "pinned original", { retention: "kept", detach: true });
+    const version = file(h.sageRow(), "pinned version", { retention: "kept", detach: true, provenance: `image-edit:${JSON.stringify({ v: 1, audience: "all-ages", root: root.id })}` });
+    const refused = await h.sage.request(`/api/files/${version.id}`, { method: "DELETE" });
+    expect(refused.status).toBe(403);
+    expect(row(version.id)?.deletedAt).toBeNull();
+    db.insert(pictureJobs).values({ id: "picture-pinned", personId: h.sageId, turnId: null, kind: "generate", request: "{}", prompt: "a boat", state: "done", files: JSON.stringify([{ id: root.id }]), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), hlc: nextHlc() }).run();
+    await h.sage.request(`/api/files/${root.id}`, { method: "DELETE" });
+    await h.sage.request(`/api/trash/file/${root.id}`, { method: "DELETE" });
+    expect(db.select().from(pictureJobs).all()).toHaveLength(0);
+  });
+});

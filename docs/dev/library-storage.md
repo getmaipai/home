@@ -75,3 +75,15 @@ zero references. A chat deleted while its file is in Trash does not take the fil
 chat attachment goes with its chat. The picture and music job records that name such a file survive too, so the Library keeps
 its prompt and title. `generatedLibraryReport()` (`lib/libraryGenerated.ts`) is the read-only dry run: items and bytes
 generated, pinned, following the storage rules, and still tied to a chat.
+
+## Known limits
+
+- A chat that shows a file keeps reading it through the conversation route after the Library item is in Trash or purged; that
+  is the orphan-safe chat copy, not a leak. Restore brings the item back with the same shares; a share of an adult-only file
+  to a minor stays unreadable because the audience gate runs on every read.
+- A companion (an edit version, a poster, a cover) cannot be deleted alone; delete its picture, video or song.
+- Upload reads the body into memory (picture cleaning and hashing need the bytes). Bun's default request limit of 128 MB applies
+  until the server option is raised, so the 500 MB figure in the design is not yet reachable; streaming the upload to disk is a
+  follow-up if larger files are wanted.
+- New generated items still default to retention `kept` (pinned); moving that default to "follows the storage rules" waits for the
+  Keep control on the page.
