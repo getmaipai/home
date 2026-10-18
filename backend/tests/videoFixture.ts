@@ -56,7 +56,7 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 
 export function installFakeVideoStack(options: { pollsToFinish?: number } = {}): FakeVideoStack {
   const fake: FakeVideoStack = {
-    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: [...TEST_VIDEO_LORAS], detailed: undefined, quickMissing: false,
+    jobs: [], submitted: [], converted: [], pollsToFinish: options.pollsToFinish ?? 3, failWith: null, pausedForMemory: false, refuseSubmit: null, live: null, previewFetches: 0, loras: TEST_VIDEO_LORAS.map((lora) => ({ ...lora })), detailed: undefined, quickMissing: false,
     restore() { __setVideoPollMsForTests(null); __setVideosFetchForTests(null); __setVideoStatusForTests(undefined); __resetVideoAdapterCacheForTests(); __resetVideoJobsForTests(); },
   };
   __setVideoStatusForTests(readyVideoStatusForTests());
