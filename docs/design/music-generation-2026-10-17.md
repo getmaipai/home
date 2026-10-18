@@ -375,6 +375,122 @@ Music component (`ace-step-1-5-turbo`) on the live Stack from Models and storage
 Not yet measured on the live hub: a Full song (FIX SETUP's call) and the in-chat flow (ask, change a part, play, Make it full), which Jesse runs.
 The MUSIC-GEN rows that need them stay open until then.
 
+## 18. Jesse's first songs (v0.2.21, 2026-10-18): five fixes
+
+Jesse asked for "a modern heavy metal song about bananas" (Home job `mus-d8n46d1nai`). The evidence is a read-only copy of the live row and turn.
+The model called `generate_music` in the first turn. Five things went wrong, and this section decides each one. They are built in this order,
+one small landing each: 18.1, 18.2, 18.3 (verify), 18.4, 18.5.
+
+### 18.1 Sung words that are not in the lyrics (MUSIC-GEN-17)
+
+**What happened.** The lyrics were a whole song (24 sung lines, about 106 s by the tool's own estimate of 4 s a line plus 10 s), but a Quick
+song is at most 60 s. ACE-Step sang the intro, verse, pre-chorus and most of the first chorus. Its own timed lyrics (`lrc`) then put the rest
+of the chorus, the second verse, the bridge, the second chorus and the outro all at 0:59.92: about 13 lines squeezed into the last second.
+Jesse heard garbled words there ("eleven bytes", then "peel and bites": the outro line "Peel, bite, bleed yellow" squeezed into the end).
+
+**Reproduced** on a scratch Stack (port 8895, its own data, GPU lock held) with the live request and seed 670964457. The file is within 0.5
+percent of the live size, and the timed lyrics squeeze the same lines into the last second (0:58.56). The words were transcribed with
+`whisper-large-v3-turbo` and lined up against the lyrics in order:
+
+| Run (60 s, seed) | Lyrics | Words sung in order | Heard words not in the lyrics | Where |
+|---|---|---:|---:|---|
+| live request, 670964457 | 24 lines (whole song) | 36 percent of the lyrics | 12 | "heated", "I should" in the last 7 s, where the engine squeezed 13 lines; the rest misheard growls |
+| fitted to the length, 670964457, two runs | 11 lines (intro to first chorus) | 44 and 64 percent | 12 and 25 | none squeezed; one run has "I don't know" in the long intro gap |
+| fitted, seed 22 | 11 lines | 81 percent | 19 | misheard growls, "thank you" at the end |
+| fitted, seed 11 | 11 lines | 36 percent | 21 | "we'll be right back" in the last 3 s |
+| fitted plus `[Outro] [Instrumental]`, 3 seeds | 11 lines | 59 to 76 percent | 7 to 14 | a word or two in the gaps |
+
+The transcription uses whisper's anti-loop settings (no carry-over of earlier text, a 2 s silence check). Without them, whisper repeats a
+phrase 5 times over the instrumental ending, and that looked like invented singing. With them, most of the leftover extras are growls
+misheard ("heal the light" for "peel the night"), plus whisper's well-known endings on music ("thank you", "we'll be right back"). The same
+request and seed do not give the same song twice on MLX, so every number is per run. Growled metal is the hardest case. The earlier folk proof (section 16) sang 98 percent of its words in order.
+
+**The fix (Home, deterministic, no new model):**
+
+1. **Fit the words to the length.** Before a song is sent, `fitLyricsToLength` keeps whole sections from the top while their estimated time
+   (4 s a sung line plus 10 s, the measured rate: 11 lines filled 55 s) fits the song's length. The song's `lyrics` are the fitted words, so
+   the card shows only what is sung. The person's full words are kept as `written_lyrics`, and **Make it full** sings all of them. A song
+   always keeps its first section, even when that one section runs long.
+2. **Trust the engine's timing after the song.** When the engine puts two or more lines in the last 1.5 s of the song, those lines
+   were squeezed in and were not really sung. The card's lyrics and the karaoke list (18.5) leave such lines out. A regression test reads the live `lrc` from this song.
+3. **Quick and Full scale the words, in code.** Fitting (point 1) cuts the words to the length, so the model is given no line count (rule
+   5: no instruction tells the model how many words to write). The tool's own result text states the fact: a quick song sings the first
+   sections that fit, and Make it full sings every part.
+4. **A standing check in the music proof.** `scripts/bench/music-sung-words.py` (Stack, bench lane, on demand) makes a song, transcribes it
+   with the settings above and reports, next to each other, words sung in order and heard words not in the lyrics with where they fall. The
+   pass or fail signal is deterministic: the check fails when the engine's `lrc` puts two or more lines in the last 1.5 s (the squeezed
+   ending, which Jesse's song shows). The extra-word count is reported but does not fail the check: whisper mishears growls.
+
+**Children.** Music stays adults only: `musicViewDenial` refuses a teen or child before any picture lane is consulted (rule 0, tests in
+`musicSafety.test.ts`). No child hears a song, so no child hears invented words. This fix adds a **hard precondition** to MUSIC-GEN-15:
+any future teen or child music lane must, before the song is offered, transcribe the finished song with this whisper model (measured: 4.9 s
+for a 60 s song cold, 3.7 s for a 3:30 song warm, about 2 GB) and run the music floors on what was sung. A hit, or a transcript that cannot
+be read, withholds the song. It must also use Quick songs only, with fitted lyrics. Until that exists, the adult check in `musicViewDenial`
+is the floor, and a test pins it. An independent review checks this reasoning.
+
+### 18.2 A card while the song is made (MUSIC-GEN-18)
+
+**What happened.** The song's part (`song`) is added to the message only at the turn's final `done` event
+(`frontend/src/apps/chat/chatModelAdapter.ts`). The streamed `tool_result` already carries `musicJobId`, but the client drops it. The reply
+then ran about 1500 characters of lyrics. With the Stack pausing the song while chat writes (ISOLATION-01), `done` came only seconds before
+the song was ready, and the card appeared under all that text. Pictures and videos have the same `done`-only path, but their one-line
+replies hide it.
+
+**The fix (rule S6, the existing card).** When a streamed `tool_result` carries `musicJobId`, the adapter adds the same `song` part (same id
+as the one at `done`, so `done` keeps the card) at once. The kit `MusicTrack` then shows stage, time left, the bar, Stop and "Paused while chat
+is working" from the job record, polled as now. Before the first poll returns, `MusicToolRender` draws the queued card instead of nothing. No
+new status surface, banner or polling loop. Pictures and videos can take the same streamed part later (a separate row).
+
+### 18.3 A short reply (FIX SETUP's 74a2516f, verified here)
+
+FIX SETUP landed the short tool answer: no lyrics, no style or tempo, never "is ready", plus one re-ask when a song request is answered with
+lyrics only. This note adds a turn test for the case seen live: the reply after a `generate_music` call carries no lyric line and no "is
+ready", and the `song` part arrives during the stream (18.2). The `quality: "detailed"` in the Stack job is the engine setting chosen for this
+computer (the Stack's `default_quality`), not the song's length. Quick and Full are the only words a person sees, and the reply and card never
+name a quality.
+
+### 18.4 Cover art (MUSIC-GEN-19)
+
+Every finished song gets a cover made with the Quick picture model (`flux2-klein-4b`).
+
+- **When.** After the song is stored (in the music job's `finish`), never alongside it. A picture asked for while the song worker runs waits
+  at the Stack's governor and can time out. Starting after the song means the cover queues behind it, the warm song worker's memory is
+  counted by the governor's free-memory check, and chat is never evicted (the governor never evicts, ISOLATION-01 pauses generators for chat).
+- **Prompt.** Built on the hub from the title, the style and the first lyric lines: "Album cover art for a song called <title>: <style>.
+  Theme: <first two sung lines>. No text, no letters." The text passes `refusePrompt` and the absolute lines like any picture.
+- **Gate.** The person's own picture audience (`routeAudience`, as the pictures route does), so `pictureDenial` and the household switch apply.
+  If pictures are off or refused, the song keeps a plain note icon and no error is shown. Music is adults only (18.1), so the kids picture lane
+  is never reached; if a teen or child music lane ever opens, its covers use that lane's picture rules (cartoon style for children).
+- **Stored** as the song's `cover_file_id` (new column, migration) pointing at an image attachment. Its versions use the existing picture
+  version chain (`saveVersion` in `lib/imageEdit.ts`).
+- **New cover** makes another cover from the same prompt with a new seed, as a new version. **Edit cover** opens the existing picture editor
+  pane (the kit `ImageEditor`, `useImageEditor`) on the cover. Its prompt box goes through `/api/image-edit/pictures/:id/comment` with every
+  editing floor, and the applied edit is the cover's next version.
+- **Shown** on the card and as the player's artwork: the kit `MusicTrack` gets a `cover` prop (commons first, rule 9) that it passes to the
+  kit `Player` as `poster`, which also feeds the media session artwork. Where the song is in the media library, the record's `artwork`
+  is `{file_id}`.
+
+### 18.5 Karaoke (MUSIC-GEN-20)
+
+ACE-Step already returns timed lyrics, and Home stores them in `music_jobs.lrc`, so no alignment model is needed.
+
+- **Home** parses `lrc` into `timed_lyrics: [{ t, line, section }]` on the card route: sung lines only, per 18.1.
+- **Kit (commons first, rule 9).** `MusicTrack` takes `timedLyrics`. Its existing Lyrics toggle shows the lines as buttons. The line being
+  sung is highlighted (`aria-current`), following the player's own media element (`timeupdate` through the Player's `mediaRef`). Tapping a line
+  seeks to it. The list scrolls the current line into view, without smooth scrolling under `prefers-reduced-motion`. It works at phone width.
+  Without timed lyrics it shows the plain words, as now. One tag through the tag agent, then one Home pin.
+- **Reuse check.** `react-lrc` and `liricle` parse LRC and scroll a lyric list, but each draws its own list and styling outside the kit
+  (rule 9). The kit `Player`'s `captions` (WebVTT) show one cue over the media, not a lyric list you can tap. ACE-Step's timing removes the
+  need for whisper or a forced aligner. So the kit Element adds the list from its own primitives, and Home parses LRC (one timestamp and one
+  line per row) in a few lines. Cover art reuses `startPictureJob`, the picture version chain and the `ImageEditor` pane unchanged. Fitting
+  the lyrics reuses the tool's measured estimate (`secondsFromLyrics`).
+
+### 18.6 Rules check
+
+S6 (18.2 feeds the existing job card). Rule 9 (cover and karaoke are props on the shipped `MusicTrack`, added in commons first, with no Home
+wrapper). Rule 0 (music stays adults only; 18.1 adds a precondition and no new lane). Rule 6 (a failed cover never fails the song). Rule 5
+(no line count is given to the model; fitting is in code). No rule changes.
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s music table rows marked `(?)`: ACE-Step 1.5 runs on Apple silicon through its official MLX path, with
@@ -385,4 +501,7 @@ The MUSIC-GEN rows that need them stay open until then.
   in a JSON-lines worker (section 3), so the Stack supervises no second server or port and holds no API key for it.
 - The backlog row "Verdicts for the features absent from both this file and the rebuild" (its "Music Studio, karaoke and stems" item): generation
   is this note, the studio is MUSIC-STUDIO-01 and stems are MUSIC-GEN-12; karaoke keeps its own verdict line there. The row is annotated.
+  Section 18.5 now decides karaoke for songs made in chat (timed lyrics on the song card). That verdict line still covers karaoke for other music.
+- Section 5's guidance that a song without a given length is as long as its words is kept. Section 18.1 adds the reverse case: words that are
+  too long for the length are fitted to whole sections, not sent whole.
 - Nothing in `RULES.md` changes.
