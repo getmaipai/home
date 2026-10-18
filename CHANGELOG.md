@@ -11,6 +11,9 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 - **The song card shows while the song is made.** It appears as soon as chat starts the song, with its stage, time left, a bar and Stop, and "Paused while chat is working" while chat answers. It used to appear only when chat finished its reply. (MUSIC-GEN-18)
 - **A quick song sings only the words that fit.** Long words used to be squeezed into the last second of a quick song and sung as nonsense. Now a quick song sings the first whole parts that fit, the card shows just those words, and **Make it full** sings every part. Lines the engine squeezed into an older song are left off its card. (MUSIC-GEN-17)
 
+### Licences
+- Licences: the setup page Before you start now says, in its existing item Home goes online for you, that you also accept the licences of the AI models and tools Home installs. Home keeps one household record of that (who, when, terms version, which licences). A covered licence, such as the Detailed video model, installs without its own accept click; a new or changed licence still asks once. A Home set up earlier shows one prompt in Repairs and Models and storage to accept once, then one button to install the recommended extras (about 74 GB, never started by itself). New household setting install.recommended_auto_on_upgrade (off). LICENCE-ACK-01.
+
 ## [0.2.21] - 2026-10-18
 
 A small News release: a shelf's channel button now opens the channel, News's first tab reads Today, and the guides are refreshed. The engine is unchanged (Stack a89e7ff). Pins: spec-v0.1.179 and ui-v0.5.268 (News thumbnail rows keep their padding). Migrations: none since 0.2.20.

@@ -3,4 +3,4 @@
 // the Recommended plan on the 128 GB tier, so the wizard shows its licence and the install waits for the accept (VIDEO-LTX-03).
 export const LICENSED_ROWS: Readonly<Record<string, string>> = { "video-detailed": "ltx-2-3-distilled-mlx" };
 export const isLicensedRow = (rowId: string): boolean => Object.hasOwn(LICENSED_ROWS, rowId);
-export interface PlanLicence { row_id: string; component: string; id: string; name: string; url: string; summary: string[]; accepted_at: string | null }
+export interface PlanLicence { row_id: string; component: string; id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered?: boolean }

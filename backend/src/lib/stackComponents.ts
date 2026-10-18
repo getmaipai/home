@@ -3,6 +3,7 @@
 // what to do first), so it is passed through; nothing here words a refusal itself. A test replaces `fetch`
 // with `__setComponentsFetchForTests`.
 import { getStackUrl } from "@/lib/stackEngine";
+import { ackCovers, currentLicenceAck } from "@/lib/licenceAcceptance";
 
 export type ComponentGroup = "chat" | "voice" | "pictures" | "video" | "music" | "tools" | "loras";
 export interface StackComponent {
@@ -14,7 +15,7 @@ export interface StackComponent {
   last_used_at: string | null; used_by: string[]; depends_on: string[];
   job: string | null; percent: number | null; failure: string | null;
   /** A licence with terms of its own (the Detailed video model): accepted once by an admin before the first install. null for every other part. */
-  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null } | null;
+  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered?: boolean } | null;
   can_install: boolean; install_block: string | null; can_uninstall: boolean; uninstall_block: string | null;
 }
 export interface StackComponentList { tier: string | null; free_disk_bytes: number | null; disk_margin_bytes: number; installed_bytes: number; components: StackComponent[] }
@@ -48,7 +49,19 @@ export async function listStackComponents(): Promise<StackComponentList> {
   return await res.json() as StackComponentList;
 }
 
-export async function installStackComponent(id: string, consent: { acceptedLicence?: string; acceptedBy?: string } = {}): Promise<{ job: string | null; component: string; joined?: boolean; already_installed?: boolean }> {
+/** LICENCE-ACK-01: a part whose licence the household record covers installs with no click: the Stack still gets the notice id it requires. Null when nothing is covered or the list cannot be read. */
+async function coveredConsent(id: string): Promise<{ acceptedLicence: string; acceptedBy?: string } | null> {
+  const ack = currentLicenceAck();
+  if (!ack) return null;
+  try {
+    const licence = (await listStackComponents()).components.find((component) => component.id === id)?.licence;
+    if (!licence || licence.accepted_at || !ackCovers(ack, licence.id)) return null;
+    return { acceptedLicence: licence.id, ...(ack.by !== "setup" ? { acceptedBy: ack.by } : {}) };
+  } catch { return null; }
+}
+
+export async function installStackComponent(id: string, givenConsent: { acceptedLicence?: string; acceptedBy?: string } = {}): Promise<{ job: string | null; component: string; joined?: boolean; already_installed?: boolean }> {
+  const consent = givenConsent.acceptedLicence ? givenConsent : (await coveredConsent(id)) ?? givenConsent;
   const body = consent.acceptedLicence ? { accepted_licence: consent.acceptedLicence, ...(consent.acceptedBy ? { accepted_by: consent.acceptedBy } : {}) } : null;
   const res = await call(`/stack/v1/components/${encodeURIComponent(id)}/install`, body ? { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) } : { method: "POST" });
   if (!res.ok) return failure(res);

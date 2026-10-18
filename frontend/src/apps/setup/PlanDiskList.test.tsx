@@ -132,6 +132,20 @@ describe("the plan step's disk list", () => {
     expect(call[2]).toEqual([licence.id]);
   });
 
+  test("a covered licence is information: LTX is checked by default and Install needs no accept", async () => {
+    const start = mock(async () => ({}));
+    const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [{ ...licence, covered: true }] })} start={start} onInstalled={() => {}} />);
+    await view.findByText("What gets installed");
+    expect(view.getByRole("checkbox", { name: /Detailed videos/ }).getAttribute("aria-checked")).toBe("true");
+    expect(view.queryByTestId("plan-licence")).toBeNull();
+    expect(view.getByTestId("plan-licence-info").textContent).toMatch(/You accepted its licence at the start/);
+    const install = view.getByRole("button", { name: "Install and continue" }) as HTMLButtonElement;
+    expect(install.disabled).toBe(false);
+    fireEvent.click(install);
+    await waitFor(() => expect(start).toHaveBeenCalledTimes(1));
+    expect((start.mock.calls[0] as unknown[])[2]).toEqual([]);
+  });
+
   test("while the licence is not accepted the button says why, and a started download is answered under the button", async () => {
     const start = mock(async () => ({ started: true, models: 1 }));
     const view = render(<PlanStep readPlan={async () => ({ wording: wording("p128", 800 * GIB), licences: [licence] })} start={start} onInstalled={() => {}} />);

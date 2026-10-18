@@ -754,6 +754,7 @@ export const api = {
   setupChecks: () => request<{ rows: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string; action?: string; actionLabel?: string; actionRoute?: "settings" | "setup" }>; state: SetupState; searchCandidate: string | null; searchNeeded?: boolean }>("/api/setup/checks/run", { method: "POST" }),
   setupReviewValues: () => request<{ engine: unknown; checks: Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }> }>("/api/repairs/review"),
   repairsChecks: () => request<Array<{ id: string; title: string; state: "green" | "amber" | "red" | "idle"; text: string }>>("/api/repairs/checks", { method: "POST" }),
+  setupAcceptLicences: () => request<{ accepted: true }>("/api/setup/licences/accept", { method: "POST" }),
   setupPlan: (vramGb?: number) => request<{ plan: unknown; wording: PlanWording; licences?: import("../../../shared/licensedRows").PlanLicence[] }>(`/api/setup/plan${vramGb ? `?vram_gb=${vramGb}` : ""}`),
   setupInstall: (vramGb?: number, components?: string[], acceptedLicences?: string[]) => request<{ started: true; models: number }>("/api/setup/install", { method: "POST", body: JSON.stringify({ ...(vramGb ? { vram_gb: vramGb } : {}), ...(components ? { components } : {}), ...(acceptedLicences?.length ? { accepted_licences: acceptedLicences } : {}) }) }),
   /** Wizard (before an owner): start or restart the AI engine install on this computer. */

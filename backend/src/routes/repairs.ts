@@ -13,6 +13,7 @@ import { apiRouter, errorResponses, idParamSchema } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { listIssues, fixIssue, dismissIssue, raiseIssue, resolveIssue } from "@/lib/issues";
 import { syncStackHealthIssues } from "@/lib/stackHealthSync";
+import { syncLicenceIssue } from "@/lib/licenceRepair";
 import { Issue } from "@maipai/spec/gen/ts/issue.js";
 import { runSetupChecks, healthItems, type SetupCheck } from "@/setup/checks/checks";
 import { getHouseholdSettingValue } from "@/lib/settings";
@@ -81,6 +82,7 @@ const listRoute = createRoute({
 });
 repairsRoutes.openapi(listRoute, async (c) => {
   await syncStackHealthIssues();
+  await syncLicenceIssue().catch(() => undefined);
   const includeResolved = c.req.valid("query").include_resolved === "true";
   return c.json(listIssues({ includeResolved }), 200);
 });

@@ -25,9 +25,11 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
   const original = globalThis.fetch;
   let state: SetupState | { done: true } = structuredClone(initial);
   const posts: string[] = [];
+  const licenceAccepts: string[] = [];
   const bodies: Record<string, { engine?: { where: string } }> = {};
   globalThis.fetch = mock(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
+    if (url.includes("/api/setup/licences/accept")) { licenceAccepts.push("accepted"); return new Response(JSON.stringify({ accepted: true }), { status: 200 }); }
     if (url.includes("/api/setup/state")) return new Response(JSON.stringify(state), { status: 200 });
     if (url.includes("/api/setup/plan") && init?.method !== "POST") {
       if (plan === "unreachable") return new Response(JSON.stringify({ error: "The AI engine isn't answering yet.", next: "Wait a minute and press Check again." }), { status: 503 });
@@ -62,7 +64,7 @@ function harness(initial = freshState(), checkRows: unknown[] = GREEN_ROWS, plan
     }
     throw new Error(`Unstubbed request ${url}`);
   }) as unknown as typeof fetch;
-  return { posts, bodies, restore: () => { globalThis.fetch = original; } };
+  return { posts, bodies, licenceAccepts, restore: () => { globalThis.fetch = original; } };
 }
 
 function view(onDone = () => {}) {
@@ -188,6 +190,22 @@ describe("SetupWizard", () => {
       await waitFor(() => expect(rendered.container.textContent).toContain("How should Home run?"));
       await advanceTo(rendered, "Continue", "Choose where to store data");
       expect(h.posts).toEqual(["welcome", "engine_location"]);
+    } finally { h.restore(); }
+  });
+
+  test("the licences are named inside the existing internet item (no new item), and I understand records the acknowledgement before the step", async () => {
+    const h = harness();
+    try {
+      const rendered = view();
+      await waitFor(() => expect(rendered.getByRole("button", { name: "Set up my Home" })).toBeTruthy());
+      await advanceTo(rendered, "Set up my Home", "Before you start");
+      fireEvent.click(rendered.getByRole("button", { name: "Home goes online for you" }));
+      expect(rendered.container.textContent).toContain("You also accept the licences of the AI models and tools Home installs for you.");
+      expect(rendered.getAllByRole("button", { name: /AI can be wrong|Kids may still|People can grow|Home goes online/ }).length).toBe(4);
+      expect(h.licenceAccepts).toEqual([]);
+      await advanceTo(rendered, "I understand", "How should Home run?");
+      expect(h.licenceAccepts).toEqual(["accepted"]);
+      expect(h.posts).toEqual(["welcome"]);
     } finally { h.restore(); }
   });
 

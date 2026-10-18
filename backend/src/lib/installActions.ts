@@ -12,6 +12,7 @@ import { shippedDiskPlan } from "@/lib/diskPlan";
 import { diskVerdict, type DiskPlan, type DiskVolume } from "../../../shared/diskPlanMath";
 import { setInstallSelection } from "@/lib/setupState";
 import { installStackComponent, listStackComponents } from "@/lib/stackComponents";
+import { licenceCovered } from "@/lib/licenceAcceptance";
 import { isLicensedRow, LICENSED_ROWS, type PlanLicence } from "../../../shared/licensedRows";
 import type { StackInstallPlan } from "@/lib/stack/client";
 
@@ -34,7 +35,7 @@ async function licencesFor(rowIds: readonly string[]): Promise<PlanLicence[]> {
     const list = (await listStackComponents()).components;
     return wanted.flatMap((rowId) => {
       const part = list.find((component) => component.id === LICENSED_ROWS[rowId]);
-      return part?.licence ? [{ row_id: rowId, component: part.id, ...part.licence }] : [];
+      return part?.licence ? [{ row_id: rowId, component: part.id, ...part.licence, covered: licenceCovered(part.licence.id) }] : [];
     });
   } catch { return []; }
 }
@@ -103,15 +104,15 @@ export async function beginInstall(requestedGb: number | undefined, recordInSetu
       for (const row of wanted) {
         const notice = known.find((candidate) => candidate.row_id === row.id);
         if (!notice) return { ok: false, error: `Home couldn't read the licence for "${row.label}", so it can't install that yet.`, next: "Turn that row off, or press Install again in a minute." };
-        if (!notice.accepted_at && !acceptedLicences.includes(notice.id)) return { ok: false, error: `"${row.label}" comes with its maker's licence (${notice.name}). It needs your accept before it downloads.`, next: "Read and accept the licence on the list, or turn that row off, then press Install again." };
-        licensed.push({ component: notice.component, licence: notice.id });
+        if (!notice.accepted_at && !notice.covered && !acceptedLicences.includes(notice.id)) return { ok: false, error: `"${row.label}" comes with its maker's licence (${notice.name}). It needs your accept before it downloads.`, next: "Read and accept the licence on the list, or turn that row off, then press Install again." };
+        licensed.push({ component: notice.component, licence: notice.covered && !notice.accepted_at && !acceptedLicences.includes(notice.id) ? "" : notice.id });
       }
     }
   }
   // A licensed part starts here, before the answer: a refusal from the Stack (no room, engine not ready, licence) is the answer to the click, in the Stack's own sentence, not a line in a log nobody reads.
   let startedLicensed = 0;
   for (const part of licensed) {
-    try { await installStackComponent(part.component, { acceptedLicence: part.licence }); startedLicensed += 1; }
+    try { await installStackComponent(part.component, part.licence ? { acceptedLicence: part.licence } : {}); startedLicensed += 1; }
     catch (error) { return { ok: false, error: error instanceof Error && error.message ? error.message : "The engine did not start that download.", next: "Check that the engine is running, then press the button again, or turn that row off." }; }
   }
   resetInstallStatusCache();

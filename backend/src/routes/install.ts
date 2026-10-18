@@ -3,6 +3,8 @@
 // `GET /api/setup/install` before an owner exists.
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
+import { autoInstallOnUpgrade, acceptLicences, installRecommendedExtras, licenceOverview } from "@/lib/licenceFlow";
+import { syncLicenceIssue } from "@/lib/licenceRepair";
 import { requireAuth } from "@/middleware/auth";
 import { isOwnerOrAdmin } from "@/lib/access";
 import { getInstallStatus, resetInstallStatusCache } from "@/lib/installStatus";
@@ -94,6 +96,46 @@ installRoutes.openapi(startRoute, async (c) => {
   if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "Only an owner or admin can change the AI." }, 403);
   const body = c.req.valid("json");
   const result = await beginInstall(body.vram_gb, false, body.components, body.accepted_licences);
+  if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
+  return c.json({ started: true as const, models: result.models }, 202);
+});
+
+// LICENCE-ACK-01: the household's licence acknowledgement for installs that never saw the wizard item (the one admin prompt),
+// and the one button that installs the recommended extras after it. Owner and admin only.
+const licenceBody = z.object({ stack: z.enum(["ok", "unreachable"]), terms_version: z.string(), acknowledged: z.unknown().nullable(), needs_prompt: z.boolean(), licences: z.array(z.unknown()), extras: z.unknown().nullable() });
+const licencesRoute = createRoute({
+  method: "get", path: "/licences", tags: ["Install"], summary: "The licences of the AI parts Home installs, and whether the household accepted them",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: licenceBody } }, description: "Each licensed part with its terms, the household acknowledgement, and whether to show the one admin prompt." }, ...errorResponses({ 403: "Only an owner or admin may do this" }) },
+});
+installRoutes.openapi(licencesRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "Only an owner or admin can see the licences." }, 403);
+  await syncLicenceIssue().catch(() => undefined);
+  return c.json(await licenceOverview(), 200);
+});
+const acceptRoute = createRoute({
+  method: "post", path: "/licences/accept", tags: ["Install"], summary: "Accept the licences of the AI parts Home installs, once for the household",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ accepted: z.literal(true), auto_install: z.boolean() }) } }, description: "Recorded. When the household policy install.recommended_auto_on_upgrade is on, the recommended extras start too." }, ...errorResponses({ 403: "Only an owner or admin may do this", 409: "Home could not read the licence list" }) },
+});
+installRoutes.openapi(acceptRoute, async (c) => {
+  const person = c.get("person");
+  if (!isOwnerOrAdmin(person)) return c.json({ error: "Only an owner or admin can accept the licences." }, 403);
+  const result = await acceptLicences(person.id);
+  if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
+  await syncLicenceIssue().catch(() => undefined);
+  let auto = false;
+  if (autoInstallOnUpgrade()) auto = (await installRecommendedExtras()).ok;
+  return c.json({ accepted: true as const, auto_install: auto }, 200);
+});
+const extrasRoute = createRoute({
+  method: "post", path: "/licences/install-extras", tags: ["Install"], summary: "Install the recommended extras (after the licences are accepted)",
+  middleware: [requireAuth] as const,
+  responses: { 202: { content: { "application/json": { schema: z.object({ started: z.literal(true), models: z.number() }) } }, description: "The downloads started; the install strip shows progress." }, ...errorResponses({ 403: "Only an owner or admin may do this", 409: "Not accepted yet, no room, or the engine is not ready (the message says which)" }) },
+});
+installRoutes.openapi(extrasRoute, async (c) => {
+  if (!isOwnerOrAdmin(c.get("person"))) return c.json({ error: "Only an owner or admin can install the extras." }, 403);
+  const result = await installRecommendedExtras();
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   return c.json({ started: true as const, models: result.models }, 202);
 });

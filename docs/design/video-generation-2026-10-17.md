@@ -364,6 +364,30 @@ default, it can be unticked, and the Recommended free-space figure on that tier 
   fresh install's wizard or an explicit admin Install downloads it.
 - **Unchanged.** Quick video stays optional; teens and children stay Quick-only (the kids lane gate does not look at installs).
 
+## 18. One household licence acknowledgement (LICENCE-ACK-01, owner ask 2026-10-18)
+
+Jesse accepted the LTX licence item by item in Settings and asked for the expectation to live at the start instead. Rulings and build:
+
+- **Wording.** No new item or page. The wizard's existing "Home goes online for you" item (id `internet`, "Before you start") gains one
+  sentence (`shared/licenceTerms.ts`): you also accept the licences of the AI models and tools Home installs for you, listed with their terms
+  on the Plan page and in Models and storage. "I understand" is still the one required action. The sentence is legal-sounding copy for
+  the owner's review.
+- **One record.** `_licences.accepted`, a household row in the existing settings store (the `_tours.*` internal-row pattern, so no migration and no
+  registry key): `item_id` (`internet`), `by` (person id; `setup` until the owner exists, then adopted), `at`, `terms_version`
+  (`LICENCE_TERMS_VERSION`), `component_ids`, `licence_ids`. The lists come from the Stack's components route (one definition of a licence);
+  the first-run record is widened to the plan's licences when Install starts. Changing the item's wording or what it covers means bumping the
+  terms version: every older record then covers nothing and the prompt returns.
+- **No gate when covered.** A licence the current record lists is information only: `beginInstall`, the components route and the wizard plan
+  install without an accept click, and Home still sends the Stack the notice id it requires (with the acknowledging person as `accepted_by`).
+  A licence the record does not list, or any licence at an older terms version, still asks once through the per-item flow.
+- **Existing installs (rule S6).** With no current record and a licensed part in the Stack's list, one Repairs item
+  (`install` / `licences.accept`, no notification) links to Models and storage, whose top shows one prompt: See the licences, then Accept.
+  Accepting resolves the item.
+- **Recommended extras.** A fresh install checks Detailed video in the plan and it installs with the first-run downloads. On an upgrade the
+  decision is: no silent 74 GB download. After the accept, Models and storage shows one button, "Install the recommended extras (size)", which
+  runs the disk check first, then the usual strip progress. The household flag `install.recommended_auto_on_upgrade` (default off, declared
+  ahead of spec in `scripts/settings-ahead-of-spec.json`) makes the accept start them too.
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s video table: the animated path is Wan2.2 TI2V-5B FastWan on MLX, not LTX-2 (licence), and the

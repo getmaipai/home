@@ -52,7 +52,8 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
   const badge = stateBadge(row);
   const installed = row.state === "installed";
   // A part with a licence of its own asks once: the admin reads the points and accepts, then the install starts.
-  const needsLicence = !!row.licence && !row.licence.accepted_at;
+  // A licence the household's acknowledgement covers is information only: the row just installs (LICENCE-ACK-01).
+  const needsLicence = !!row.licence && !row.licence.accepted_at && !row.licence.covered;
   async function install(accepted?: string) {
     setError(null); setBusy(true);
     try { await componentsApi.install(row.id, accepted); refresh(); }
@@ -126,6 +127,69 @@ function Row({ row, refresh, setError }: { row: ComponentRow; refresh: () => voi
   );
 }
 
+/** LICENCE-ACK-01: the one admin prompt (a Home that never saw the wizard's licence wording), then the one extras button. */
+function LicencePrompt({ refresh, setError, installing }: { refresh: () => void; setError: (message: string | null) => void; installing: boolean }) {
+  const queryClient = useQueryClient();
+  const [open, setOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const query = useQuery({ queryKey: ["licences"], queryFn: componentsApi.licences });
+  const data = query.data;
+  if (!data || data.stack !== "ok") return null;
+  const done = () => { void queryClient.invalidateQueries({ queryKey: ["licences"] }); refresh(); };
+  async function accept() {
+    setError(null); setBusy(true); setOpen(false);
+    try { await componentsApi.acceptLicences(); done(); } catch (e) { setError(messageOf(e, "Home couldn't save your accept. Check that the engine is running, then press Accept again.")); } finally { setBusy(false); }
+  }
+  async function installExtras() {
+    setError(null); setBusy(true);
+    try { await componentsApi.installExtras(); done(); } catch (e) { setError(messageOf(e, "Home couldn't start the extras. Check that the engine is running, then try again.")); } finally { setBusy(false); }
+  }
+  if (data.needs_prompt) return (
+    <section aria-label="Licences" data-testid="licence-prompt">
+    <Alert>
+      <AlertTitle>Accept the licences for the AI models Home installs</AlertTitle>
+      <AlertDescription>
+        <p>Accept once, and Home installs any of them without asking again.</p>
+        <Button type="button" onClick={() => setOpen(true)} disabled={busy}>See the licences</Button>
+      </AlertDescription>
+      <AlertDialog open={open} onOpenChange={setOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Licences of the AI models Home installs</AlertDialogTitle>
+            <AlertDialogDescription>These are the licences that come with parts Home installs for you. Accepting covers all of them.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex max-h-72 flex-col gap-4 overflow-y-auto text-sm">
+            {data.licences.map((licence) => (
+              <div key={licence.id} className="flex flex-col gap-1">
+                <p className="font-medium">{licence.label}: {licence.name}</p>
+                <ul className="flex list-disc flex-col gap-1 pl-5">{licence.summary.map((line) => <li key={line}>{line}</li>)}</ul>
+                <p>The full licence: <span className="font-mono break-all">{licence.url}</span></p>
+              </div>
+            ))}
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Not now</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void accept()}>Accept</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Alert>
+    </section>
+  );
+  if (data.extras && !installing) return (
+    <section aria-label="Recommended extras" data-testid="licence-extras">
+    <Alert>
+      <AlertTitle>Recommended extras are not installed</AlertTitle>
+      <AlertDescription>
+        <p>{data.extras.labels.join(", ")}. The licences are accepted. Progress shows on the install strip.</p>
+        <Button type="button" onClick={() => void installExtras()} disabled={busy}>Install the recommended extras ({data.extras.size})</Button>
+      </AlertDescription>
+    </Alert>
+    </section>
+  );
+  return null;
+}
+
 export function ModelsAndStorageSection() {
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
@@ -143,6 +207,7 @@ export function ModelsAndStorageSection() {
           {sizeWords(data.installed_bytes)} of AI on this computer{data.free_disk_bytes !== null ? `, ${sizeWords(data.free_disk_bytes)} free` : ""}. Add or remove parts here. Everything stays on this computer.
         </p>
       ) : null}
+      <LicencePrompt refresh={refresh} setError={setError} installing={!!data?.components?.some((row) => row.state === "installing")} />
       {query.isError ? <Alert variant="destructive"><AlertTitle>The list did not load</AlertTitle><AlertDescription>{messageOf(query.error, "Check that Home is running, then reload this page.")}</AlertDescription></Alert> : null}
       {data?.stack === "unreachable" ? <Alert><AlertTitle>The AI engine isn't answering</AlertTitle><AlertDescription>{data.message ?? "Check that the engine is running, then reload this page."}</AlertDescription></Alert> : null}
       {error ? <Alert variant="destructive"><AlertTitle>That did not work</AlertTitle><AlertDescription>{error}</AlertDescription></Alert> : null}

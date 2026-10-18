@@ -11,8 +11,14 @@ export interface ComponentRow {
   last_used_at: string | null; used_by: string[]; depends_on: string[];
   job: string | null; percent: number | null; failure: string | null;
   /** VIDEO-LTX-01: a licence with terms of its own, accepted once by an admin before the first install (null for every other part). */
-  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null } | null;
+  licence?: { id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered?: boolean } | null;
   can_install: boolean; install_block: string | null; can_uninstall: boolean; uninstall_block: string | null;
+}
+export interface LicenceEntry { component: string; label: string; id: string; name: string; url: string; summary: string[]; accepted_at: string | null; covered: boolean }
+/** LICENCE-ACK-01: the household's licence acknowledgement, the one admin prompt and the recommended extras. */
+export interface LicenceOverview {
+  stack: "ok" | "unreachable"; terms_version: string; acknowledged: { by: string; at: string; terms_version: string } | null;
+  needs_prompt: boolean; licences: LicenceEntry[]; extras: { ids: string[]; labels: string[]; bytes: number; size: string } | null;
 }
 export interface ComponentsOverview {
   stack: "ok" | "unreachable"; message: string | null; tier: string | null;
@@ -29,5 +35,8 @@ async function send<T>(path: string, init: RequestInit = {}): Promise<T> {
 export const componentsApi = {
   list: () => send<ComponentsOverview>("/api/components"),
   install: (id: string, acceptedLicence?: string) => send<{ job: string | null; component: string }>(`/api/components/${encodeURIComponent(id)}/install`, { method: "POST", ...(acceptedLicence ? { headers: { "content-type": "application/json" }, body: JSON.stringify({ accepted_licence: acceptedLicence }) } : {}) }),
+  licences: () => send<LicenceOverview>("/api/install/licences"),
+  acceptLicences: () => send<{ accepted: true; auto_install: boolean }>("/api/install/licences/accept", { method: "POST" }),
+  installExtras: () => send<{ started: true; models: number }>("/api/install/licences/install-extras", { method: "POST" }),
   uninstall: (id: string) => send<{ component: string; freed_bytes: number; removed: boolean }>(`/api/components/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };

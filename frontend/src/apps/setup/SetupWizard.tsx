@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { LICENCE_ACK_SENTENCE } from "../../../../shared/licenceTerms";
 import { getIcon } from "@maipai/ui/src/icons";
 import { Alert, AlertDescription } from "@maipai/ui/src/ui/alert";
 import { useNavigate } from "react-router-dom";
@@ -95,7 +96,7 @@ const BEFORE_START_DETAILS = [
   { id: "ai", title: "AI can be wrong or say the wrong thing", detail: "Answers can be inaccurate, offensive, or harmful. They are not medical, legal, or professional advice, and you are responsible for how you use them." },
   { id: "kids", title: "Kids may still see things they shouldn't", detail: "Child profiles start restricted, and parents choose what they can reach. No protection is perfect, so stay involved." },
   { id: "attachment", title: "People can grow attached to AI", detail: "It is easy to feel close to a chatbot or companion, so keep real relationships first and talk with children about it. In Home settings, under Users, you can turn off AI companions for one person or for the household." },
-  { id: "internet", title: "Home goes online for you", detail: "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work." },
+  { id: "internet", title: "Home goes online for you", detail: "Home fetches downloads, updates, and searches you ask for the way you would. Some sites limit, block, or disallow automated visits, so now and then a site may not work. " + LICENCE_ACK_SENTENCE },
 ];
 const OWNER_COPY = "You manage this Home, its people, files, and backups. Nobody can remove the owner.";
 const SECRET_SERVER_TEXT = "secret must be 4-128 characters";
@@ -295,6 +296,10 @@ export function SetupWizard({ onDone, initialScreen }: SetupWizardProps) {
     // Saying where the AI runs is what decides whether Home installs the
     // AI engine on this computer, so the choice itself is sent.
     const engineChoice = screen === "engine_location" ? { engine: { where: engine, hardware: state?.engine?.hardware ?? {} } } : {};
+    // LICENCE-ACK-01: "I understand" on the Before you start list also accepts the licences named in its internet item.
+    if (screen === "before_start") {
+      try { await api.setupAcceptLicences(); } catch (reason) { setError(reason instanceof Error ? reason.message : "Home couldn't save your acknowledgement. Press I understand again."); return; }
+    }
     const updated = await record(stepId, deferred ? "deferred" : "done", { ...folders, ...engineChoice });
     if (!updated) return;
     if (screen === "before_start") {

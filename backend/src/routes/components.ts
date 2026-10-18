@@ -7,6 +7,7 @@ import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
 import { requireRole } from "@/middleware/auth";
 import { installStackComponent, listStackComponents, StackComponentError, uninstallStackComponent } from "@/lib/stackComponents";
+import { licenceCovered } from "@/lib/licenceAcceptance";
 import { resetInstallStatusCache } from "@/lib/installStatus";
 import { dropPictureStatusCache } from "@/lib/pictures/ready";
 import { dropAdapterCache, forgetAdapterPref } from "@/lib/pictures/adapters";
@@ -23,7 +24,7 @@ const ComponentSchema = z.object({
   plan_need: z.enum(["required", "recommended", "optional"]).nullable(), requirement: z.enum(["required", "optional", "unsupported"]), requirement_reason: z.string().nullable(),
   last_used_at: z.string().nullable(), used_by: z.array(z.string()), depends_on: z.array(z.string()),
   job: z.string().nullable(), percent: z.number().nullable(), failure: z.string().nullable(),
-  licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable() }).nullable().optional().describe("A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."),
+  licence: z.object({ id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() }).nullable().optional().describe("A licence with terms of its own (the Detailed video model). An admin accepts it once before the first install: send its `id` as `accepted_licence` with the install."),
   can_install: z.boolean(), install_block: z.string().nullable(), can_uninstall: z.boolean(), uninstall_block: z.string().nullable(),
 });
 const ListSchema = z.object({
@@ -48,7 +49,9 @@ const listRoute = createRoute({
 componentsRoutes.openapi(listRoute, async (c) => {
   try {
     const list = await listStackComponents();
-    return c.json({ stack: "ok" as const, message: null, ...list }, 200);
+    // LICENCE-ACK-01: a licence the household's acknowledgement covers is information, not a gate.
+    const components = list.components.map((part) => part.licence ? { ...part, licence: { ...part.licence, covered: licenceCovered(part.licence.id) } } : part);
+    return c.json({ stack: "ok" as const, message: null, ...list, components }, 200);
   } catch (error) {
     if (error instanceof StackComponentError) return c.json({ stack: "unreachable" as const, message: error.message, tier: null, free_disk_bytes: null, disk_margin_bytes: 0, installed_bytes: 0, components: [] }, 200);
     throw error;

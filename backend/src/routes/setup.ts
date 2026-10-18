@@ -33,6 +33,8 @@ import { startEngineInstall } from "@/lib/stackInstall";
 import { getStackClient } from "@/lib/stackEngine";
 import { getInstallStatus } from "@/lib/installStatus";
 import { InstallStatusSchema } from "@/routes/install";
+import { adoptLicenceAck } from "@/lib/licenceAcceptance";
+import { acceptLicences, licenceOverview, widenLicenceAck } from "@/lib/licenceFlow";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { REMOTE_ALLOW_TAILNET_KEY, refreshConfiguredEngineLink, validateRemoteEngineSetting } from "@/lib/remoteStackSettings";
 
@@ -91,7 +93,7 @@ const planQuery = z.object({ vram_gb: z.coerce.number().int().min(1).max(512).op
 const planRoute = createRoute({
   method: "get", path: "/plan", tags: ["Setup"], summary: "What Home would install on the AI computer",
   request: { query: planQuery },
-  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted.") }) } }, description: "The Stack's plan and Home's words for it." } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ plan: z.unknown().nullable(), wording: PlanWordingSchema, licences: z.array(z.object({ row_id: z.string(), component: z.string(), id: z.string(), name: z.string(), url: z.string(), summary: z.array(z.string()), accepted_at: z.string().nullable(), covered: z.boolean().optional() })).optional().describe("The licences of the licensed rows on this plan (Detailed video): the notice to show, and whether it was already accepted.") }) } }, description: "The Stack's plan and Home's words for it." } },
 });
 setupRoutes.openapi(planRoute, async (c) => {
   const { vram_gb: vramGb } = c.req.valid("query");
@@ -110,9 +112,29 @@ setupRoutes.openapi(installStartRoute, async (c) => {
   // This router is open on the local network until Home has an owner.
   if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "Change the AI under Home settings." }, 409);
   const { vram_gb: vramGb, components, accepted_licences: acceptedLicences } = c.req.valid("json");
+  // LICENCE-ACK-01: the first-run record now names every licence the plan page listed.
+  await widenLicenceAck("setup");
   const result = await beginInstall(vramGb, true, components, acceptedLicences);
   if (!result.ok) return c.json({ error: result.error, next: result.next }, 409);
   return c.json({ started: true as const, models: result.models }, 202);
+});
+
+const licencesRoute = createRoute({
+  method: "get", path: "/licences", tags: ["Setup"], summary: "The licences Home lists with the wizard's internet item, and whether they were accepted",
+  responses: { 200: { content: { "application/json": { schema: z.object({ stack: z.enum(["ok", "unreachable"]), terms_version: z.string(), acknowledged: z.unknown().nullable(), licences: z.array(z.unknown()) }) } }, description: "Each licensed part the AI engine lists (empty before the engine exists)." } },
+});
+setupRoutes.openapi(licencesRoute, async (c) => {
+  const { stack, terms_version, acknowledged, licences } = await licenceOverview();
+  return c.json({ stack, terms_version, acknowledged, licences }, 200);
+});
+const licencesAcceptRoute = createRoute({
+  method: "post", path: "/licences/accept", tags: ["Setup"], summary: "Record the wizard's acknowledgement, including the licences",
+  responses: { 200: { content: { "application/json": { schema: z.object({ accepted: z.literal(true) }) } }, description: "Recorded for the household." }, 409: { content: { "application/json": { schema: SetupErrorSchemaForInstall } }, description: "Home already has an owner: the admin prompt in Home settings does this instead." } },
+});
+setupRoutes.openapi(licencesAcceptRoute, async (c) => {
+  if (db.select({ id: people.id }).from(people).limit(1).get()) return c.json({ error: "Home is already set up. Sign in instead.", next: "An owner or admin accepts the licences from the prompt in Home settings." }, 409);
+  await acceptLicences("setup");
+  return c.json({ accepted: true as const }, 200);
 });
 
 const engineInstallRoute = createRoute({
@@ -421,6 +443,11 @@ setupRoutes.openapi(setupStepRoute, async (c) => {
     storageChoice = layout;
   }
   const updated = replaceSetupStep(step, { ...stepResult, ...(storageChoice ? { storageChoice } : {}) });
+  // LICENCE-ACK-01: the first-run licence record belongs to the owner once there is one.
+  if (step === "owner" && stepResult.status === "done") {
+    const owner = (() => { const token = getCookie(c, "session"); return token ? resolveHumanSession(token) : null; })();
+    if (owner) adoptLicenceAck(owner.id);
+  }
   // "This computer runs the AI" is the moment the MaiPai Stack gets built
   // (INSTALL-SPLIT-01). "Another computer" installs nothing here. Before an
   // owner exists only: later changes go through Home settings.

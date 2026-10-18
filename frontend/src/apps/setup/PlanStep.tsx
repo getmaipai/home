@@ -83,7 +83,9 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
   const verdict = disk ? liveVerdict(disk, selected) : null;
   const diskShort = disk ? verdict!.state === "red" : !!wording?.diskLine;
   const canRecheck = !!wording && !wording.needsMemoryAnswer && (wording.level === "unknown" || diskShort || verdict?.state === "amber");
-  const owed = licences.filter((licence) => selected.has(licence.row_id) && !licence.accepted_at);
+  const owed = licences.filter((licence) => selected.has(licence.row_id) && !licence.accepted_at && !licence.covered);
+  // Covered by the wizard's acknowledgement (LICENCE-ACK-01): shown as information, never a gate.
+  const known = licences.filter((licence) => selected.has(licence.row_id) && (licence.accepted_at || licence.covered));
   const unaccepted = owed.some((licence) => !accepted.has(licence.id));
   const canInstall = !!wording && (wording.level === "recommended" || wording.level === "moderate" || wording.level === "minimal") && !diskShort;
   // Continue stays blocked while the plan is still being read and while the
@@ -143,6 +145,9 @@ export function PlanStep({ onInstalled, onReady, readPlan = api.setupPlan, start
               <span className="block text-muted-foreground">Not for you? Untick the Detailed videos row above and nothing of it downloads.</span>
             </AlertDescription>
           </Alert>
+        ))}
+        {known.map((licence) => (
+          <p key={licence.id} className="text-muted-foreground" data-testid="plan-licence-info">{licence.name} comes with this part. You accepted its licence at the start; the terms are in Models and storage.</p>
         ))}
         {error ? <Alert variant="destructive"><ErrorIcon /><AlertDescription>{error}</AlertDescription></Alert> : null}
         {canRecheck ? <Button type="button" variant="secondary" onClick={() => { setWording(null); setAttempt((n) => n + 1); }}>Check again</Button> : null}

@@ -3,10 +3,10 @@ import { afterEach, describe, expect, mock, test } from "bun:test";
 import { cleanup, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithQueryClient } from "../../../tests/renderWithQueryClient";
 import { ModelsAndStorageSection, lastUsedWords, sizeWords } from "@/apps/settings/ModelsAndStorageSection";
-import { componentsApi, type ComponentRow, type ComponentsOverview } from "@/lib/componentsApi";
+import { componentsApi, type ComponentRow, type ComponentsOverview, type LicenceOverview } from "@/lib/componentsApi";
 import { ApiError } from "@/lib/api";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); licenceData = { stack: "ok", terms_version: "v", acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false, licences: [], extras: null }; });
 
 const row = (over: Partial<ComponentRow>): ComponentRow => ({
   id: "z-image-turbo", label: "Pictures: Z-Image-Turbo", summary: "A higher-detail picture model for the largest computers.", group: "pictures", kind: "model", state: "notInstalled",
@@ -15,9 +15,13 @@ const row = (over: Partial<ComponentRow>): ComponentRow => ({
 });
 const overview = (rows: ComponentRow[], over: Partial<ComponentsOverview> = {}): ComponentsOverview => ({ stack: "ok", message: null, tier: "p128", free_disk_bytes: 1_500_000_000_000, disk_margin_bytes: 5e9, installed_bytes: 90_000_000_000, components: rows, ...over });
 
+let licenceData: LicenceOverview = { stack: "ok", terms_version: "v", acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false, licences: [], extras: null };
 function mount(data: ComponentsOverview) {
   const original = { ...componentsApi };
   componentsApi.list = mock(async () => data);
+  componentsApi.licences = mock(async () => licenceData);
+  componentsApi.acceptLicences = mock(async () => ({ accepted: true as const, auto_install: false }));
+  componentsApi.installExtras = mock(async () => ({ started: true as const, models: 1 }));
   componentsApi.install = mock(async (id: string) => ({ job: "j1", component: id }));
   componentsApi.uninstall = mock(async (id: string) => ({ component: id, freed_bytes: 41_000_000_000, removed: true }));
   const view = renderWithQueryClient(<ModelsAndStorageSection />);
@@ -96,6 +100,39 @@ describe("Models and storage", () => {
     expect(componentsApi.install).not.toHaveBeenCalled();
     fireEvent.click(v.getByRole("button", { name: "I accept, get it" }));
     await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", "ltx-2.x-community-2026-08-11"));
+    v.restore();
+  });
+
+  test("a licence the household acknowledgement covers installs with one click and no dialog", async () => {
+    const licence = { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: true };
+    const v = mount(overview([row({ id: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", licence })]));
+    fireEvent.click(await v.findByLabelText("Install Video: Detailed (LTX-2.3)"));
+    await waitFor(() => expect(componentsApi.install).toHaveBeenCalledWith("ltx-2-3-distilled-mlx", undefined));
+    expect(v.queryByRole("button", { name: "I accept, get it" })).toBeNull();
+    v.restore();
+  });
+
+  test("no acknowledgement: one prompt, it opens the licence list, one Accept records it and the prompt goes away", async () => {
+    licenceData = { stack: "ok", terms_version: "v", acknowledged: null, needs_prompt: true, extras: null, licences: [{ component: "ltx-2-3-distilled-mlx", label: "Video: Detailed (LTX-2.3)", id: "ltx", name: "LTX licence", url: "https://example.com/licence", summary: ["Free under $10 million a year."], accepted_at: null, covered: false }] };
+    const v = mount(overview([]));
+    expect(await v.findByText("Accept the licences for the AI models Home installs")).toBeTruthy();
+    fireEvent.click(v.getByRole("button", { name: "See the licences" }));
+    expect(await v.findByText("Free under $10 million a year.")).toBeTruthy();
+    expect(componentsApi.acceptLicences).not.toHaveBeenCalled();
+    licenceData = { ...licenceData, acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false };
+    fireEvent.click(v.getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(componentsApi.acceptLicences).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(v.queryByTestId("licence-prompt")).toBeNull());
+    expect(componentsApi.installExtras).not.toHaveBeenCalled();
+    v.restore();
+  });
+
+  test("after the accept the extras are one explicit button with the size, never started by themselves", async () => {
+    licenceData = { stack: "ok", terms_version: "v", acknowledged: { by: "p", at: "t", terms_version: "v" }, needs_prompt: false, licences: [], extras: { ids: ["video-detailed"], labels: ["Detailed videos"], bytes: 74e9, size: "74 GB" } };
+    const v = mount(overview([]));
+    expect(componentsApi.installExtras).not.toHaveBeenCalled();
+    fireEvent.click(await v.findByRole("button", { name: "Install the recommended extras (74 GB)" }));
+    await waitFor(() => expect(componentsApi.installExtras).toHaveBeenCalledTimes(1));
     v.restore();
   });
 
