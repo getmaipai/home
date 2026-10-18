@@ -1,5 +1,5 @@
 // MEDIA-KID-01: refusal tests first. All rows are hand-written, with no media service traffic.
-import { beforeEach, expect, test } from "bun:test";
+import { afterEach, beforeEach, expect, setSystemTime, test } from "bun:test";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { mediaItems, mediaSources, people, notificationDeliveries, notificationHolds } from "@/db/schema";
@@ -17,7 +17,10 @@ import { __resetProgressForTests, writeProgress, getProgress } from "@/lib/media
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 
-beforeEach(() => { resetDb(); __resetProgressForTests(); });
+// One injected clock for the whole file: the routes read the system clock, and `clock()` stamps ticks at 12:00 of "today". Pinning the
+// system clock to 12:30 of a fixed day keeps every route write after the ticks on the same day, whatever the real time or zone.
+beforeEach(() => { setSystemTime(new Date(2026, 9, 14, 12, 30, 0, 0)); resetDb(); __resetProgressForTests(); });
+afterEach(() => { setSystemTime(); });
 
 async function setup() {
   const owner = new TestClient();
