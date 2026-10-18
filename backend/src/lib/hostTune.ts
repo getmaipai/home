@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { repoRoot, classDir } from "@/lib/paths";
 
 export const HOST_TUNE_IDS = [
-  "no-spotlight", "no-timemachine-models", "power", "wired-limit", "no-auto-major-upgrade", "remote-login",
+  "no-spotlight", "no-timemachine-models", "power", "display-awake", "wired-limit", "no-auto-major-upgrade", "remote-login",
   "advice-accounts", "advice-radios", "advice-network", "advice-toolchains", "advice-login", "advice-screensaver",
 ] as const;
 

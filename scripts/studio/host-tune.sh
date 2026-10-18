@@ -12,7 +12,7 @@
 # --data-dir <dir> and --models-dir <dir> (Home's folders for the two AUTO items).
 #
 # Modes: auto (inside Home's folders, no administrator), consent (changes the
-# whole Mac, needs sudo), advice (never scripted, guidance only).
+# host, with permission), advice (never scripted, guidance only).
 # Exit codes: 0 ok, 2 bad use, 3 needs an administrator, 4 the change failed,
 # 5 not macOS.
 set -uo pipefail
@@ -22,6 +22,8 @@ ROOT="${MAIPAI_HOST_TUNE_ROOT:-}"
 STATE_DIR="$ROOT/Library/Application Support/MaiPai/host-tune"
 DAEMON_LABEL="com.maipai.wired-limit"
 DAEMON_PLIST="$ROOT/Library/LaunchDaemons/$DAEMON_LABEL.plist"
+DISPLAY_LABEL="com.maipai.display-awake"
+DISPLAY_PLIST="${ROOT:-$HOME}/Library/LaunchAgents/$DISPLAY_LABEL.plist"
 SU_PREFS="$ROOT/Library/Preferences/com.apple.SoftwareUpdate"
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 
@@ -31,7 +33,7 @@ DATA_DIR="${MAIPAI_DATA_DIR:-}"
 MODELS_DIR="${MAIPAI_MODELS_DIR:-}"
 WOULD=()
 
-IDS="no-spotlight no-timemachine-models power wired-limit no-auto-major-upgrade remote-login advice-accounts advice-radios advice-network advice-toolchains advice-login advice-screensaver"
+IDS="no-spotlight no-timemachine-models power display-awake wired-limit no-auto-major-upgrade remote-login advice-accounts advice-radios advice-network advice-toolchains advice-login advice-screensaver"
 
 jstr() { printf '"%s"' "$(printf '%s' "$1" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g' | awk 'NR>1{printf "\\n"} {printf "%s",$0}')"; }
 
@@ -101,6 +103,19 @@ load_item() {
       first_val="$(pmset_val sleep)"
       if [ -z "$first_val" ]; then T_STATE=unknown; T_CURRENT="Could not read power settings. Run pmset -g."; return; fi
       if [ "$all" = 1 ]; then T_STATE=ok; else T_STATE=needs; fi ;;
+    display-awake)
+      T_TITLE="Keep the screen from sleeping"; T_MODE=consent
+      T_WHY="Some monitors lose their picture when the screen sleeps and do not wake until the Mac is turned off and back on. This keeps the screen awake, so Home stays reachable at the Mac too. It uses a small login service and needs no administrator."
+      T_PROPOSED="A login service keeps the screen and the Mac awake"
+      if [ ! -f "$DISPLAY_PLIST" ]; then T_STATE=needs; T_CURRENT="The login service is not installed"; return; fi
+      local domain="gui/$(id -u)" job
+      if job="$(launchctl print "$domain/$DISPLAY_LABEL" 2>/dev/null)"; then
+        if printf '%s\n' "$job" | grep -Eq '^[[:space:]]*state = running[[:space:]]*$'; then
+          T_STATE=ok; T_CURRENT="The login service is running"
+        else T_STATE=needs; T_CURRENT="The login service is installed but is not running"; fi
+      elif launchctl print "$domain" >/dev/null 2>&1; then
+        T_STATE=needs; T_CURRENT="The login service is installed but is not loaded"
+      else T_CURRENT="Could not ask the login service. Sign in at the Mac, then run detect again."; fi ;;
     wired-limit)
       T_TITLE="Let the GPU use more of the memory"; T_MODE=consent
       T_WHY="Needed only for big AI models later. The Mac normally lets the graphics chip use about three quarters of its memory. This raises that, and always leaves at least 12 GB (or 15 percent) for macOS and Home. It is set again at every start."
@@ -211,6 +226,22 @@ do_apply() {
         write_file "$STATE_DIR/power.prev" "$prev"
       fi
       run pmset -a sleep 0 disksleep 0 displaysleep 10 autorestart 1 womp 1 powernap 0 ;;
+    display-awake)
+      is_root && die 2 wrong-user "The screen login service must belong to your Mac account. Run this item as the signed-in user without sudo."
+      local domain="gui/$(id -u)"
+      write_file "$DISPLAY_PLIST" "<?xml version=\"1.0\" encoding=\"UTF-8\"?>
+<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">
+<plist version=\"1.0\"><dict>
+<key>Label</key><string>$DISPLAY_LABEL</string>
+<key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-d</string><string>-i</string></array>
+<key>RunAtLoad</key><true/>
+<key>KeepAlive</key><true/>
+<key>ProcessType</key><string>Background</string>
+</dict></plist>
+"
+      run plutil -lint "$DISPLAY_PLIST"
+      if launchctl print "$domain/$DISPLAY_LABEL" >/dev/null 2>&1; then run launchctl bootout "$domain/$DISPLAY_LABEL"; fi
+      run launchctl bootstrap "$domain" "$DISPLAY_PLIST" ;;
     wired-limit)
       need_root apply wired-limit
       [ -n "${WIRED_MB:-}" ] || die 4 failed "This Mac is not eligible for this change: $T_CURRENT. Nothing was changed."
@@ -264,6 +295,11 @@ do_revert() {
       # shellcheck disable=SC2086
       run pmset -a $args
       [ "$DRY" = 1 ] || rm -f "$STATE_DIR/power.prev" ;;
+    display-awake)
+      is_root && die 2 wrong-user "The screen login service belongs to your Mac account. Run this item as the signed-in user without sudo."
+      local domain="gui/$(id -u)"
+      if launchctl print "$domain/$DISPLAY_LABEL" >/dev/null 2>&1; then run launchctl bootout "$domain/$DISPLAY_LABEL"; fi
+      run rm -f "$DISPLAY_PLIST" ;;
     wired-limit)
       need_root revert wired-limit
       run sysctl -w iogpu.wired_limit_mb=0

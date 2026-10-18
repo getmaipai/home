@@ -37107,12 +37107,16 @@ the exact next step. Items (`id`, `title`, `why`, `mode`, `state` ok|needs|unkno
 
 - **auto** (Home's folders only, no sudo): `no-spotlight` (`.metadata_never_index` in the data and models folders) and
   `no-timemachine-models` (`tmutil addexclusion` on the models folder only; Home's data stays in the backup path).
-- **consent** (whole Mac, root; without root the script exits 3 and prints `sudo bash <script> apply <id> --yes`): `power` (`pmset -a sleep 0
+- **consent** (except `display-awake`, whole Mac, root; without root the script exits 3 and prints `sudo bash <script> apply <id> --yes`): `power` (`pmset -a sleep 0
   disksleep 0 displaysleep 10 autorestart 1 womp 1 powernap 0`; the old values are saved under `/Library/Application Support/MaiPai/host-tune/power.prev`
   and `revert` restores them, or macOS defaults), `wired-limit` (`iogpu.wired_limit_mb` = memory minus max(12 GB, 15 percent); 111412 MB on
   128 GB; persisted by the `com.maipai.wired-limit` LaunchDaemon; not offered under 32 GB; labelled as needed only for big models later),
   `no-auto-major-upgrade` (`AutomaticallyInstallMacOSUpdates` off, `CriticalUpdateInstall` and `ConfigDataInstall` on), `remote-login`
   (`systemsetup -setremotelogin on`; a refusal names System Settings, Sharing as the manual route).
+- **consent, user login service**: `display-awake` runs `/usr/bin/caffeinate -d -i` from
+  `~/Library/LaunchAgents/com.maipai.display-awake.plist`, with RunAtLoad and KeepAlive. It needs no sudo and refuses root.
+  Detect requires both the plist and a running job; an unreadable login session is unknown. Revert unloads and removes it.
+  See [Studio runbook](dev/studio-runbook.md) for recovery when the monitor loses its picture.
 - **advice** (never scripted, `apply` refuses): Apple services off for the hub account, radios, fixed address and the Tailscale approval,
   no extra toolchains, automatic login on with FileVault off (Jesse's decision 2026-10-16: unattended recovery after a power cut
   outweighs disk encryption), screen saver.

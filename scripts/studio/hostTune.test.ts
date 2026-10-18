@@ -43,8 +43,19 @@ esac`);
   read) f="$FAKE/def.$3"; [ -f "$f" ] && cat "$f" || exit 1 ;;
   write) v=0; [ "$4" = "-bool" ] && { [ "$5" = true ] && v=1 || v=0; }; echo "$v" > "$FAKE/def.$3" ;;
 esac`);
-  tool("launchctl", `case "$1" in print-disabled) cat "$FAKE/launchd" 2>/dev/null; echo '{'; echo '}' ;; esac`);
+  tool("launchctl", `[ -n "\${FAKE_LAUNCH_FAIL:-}" ] && exit 1
+case "$1" in
+  print-disabled) cat "$FAKE/launchd" 2>/dev/null; echo '{'; echo '}' ;;
+  print) case "$2" in
+    gui/*/com.maipai.display-awake) [ -f "$FAKE/display-job" ] || exit 1; cat "$FAKE/display-job" ;;
+    gui/*) exit 0 ;;
+  esac ;;
+  bootstrap) echo 'state = running' > "$FAKE/display-job" ;;
+  bootout) rm -f "$FAKE/display-job" ;;
+esac`);
   tool("systemsetup", `[ -n "\${FAKE_SETUP_FAIL:-}" ] && { echo "needs Full Disk Access"; exit 1; }; echo '"com.openssh.sshd" => enabled' > "$FAKE/launchd"`);
+  tool("plutil", "exit 0");
+  tool("sudo", "exit 99");
   tool("nc", "exit 1");
 });
 afterEach(() => rmSync(fake, { recursive: true, force: true }));
@@ -66,7 +77,7 @@ describe("host-tune.sh detect", () => {
   test("lists every item with the contract fields, without root", async () => {
     const { supported, items } = await detect({ FAKE_UID: "501" });
     expect(supported).toBe(true);
-    expect(items.map((i) => i.id)).toEqual(expect.arrayContaining(["no-spotlight", "no-timemachine-models", "power", "wired-limit", "no-auto-major-upgrade", "remote-login", "advice-login"]));
+    expect(items.map((i) => i.id)).toEqual(expect.arrayContaining(["no-spotlight", "no-timemachine-models", "power", "display-awake", "wired-limit", "no-auto-major-upgrade", "remote-login", "advice-login"]));
     for (const item of items) {
       expect(Object.keys(item).sort()).toEqual(["current", "id", "mode", "proposed", "state", "title", "why"]);
       expect(["auto", "consent", "advice"]).toContain(item.mode);
@@ -191,5 +202,72 @@ describe("host-tune.sh apply and revert", () => {
     const result = await host(["--json", "--yes", "apply", "no-timemachine-models"], { FAKE_UID: "501" });
     expect(result.code).toBe(4);
     expect(JSON.parse(result.out).error).toContain("not allowed");
+  });
+});
+
+const displayPlist = () => join(sysroot, "Library/LaunchAgents/com.maipai.display-awake.plist");
+const userEnv = { FAKE_UID: "501" };
+function installDisplayPlist() {
+  mkdirSync(join(sysroot, "Library/LaunchAgents"), { recursive: true });
+  writeFileSync(displayPlist(), "plist");
+}
+
+describe("display-awake login service", () => {
+  test("detect needs a plist and a running job, and reports unreadable launchctl", async () => {
+    expect(byId((await detect(userEnv)).items, "display-awake").state).toBe("needs");
+    installDisplayPlist();
+    expect(byId((await detect(userEnv)).items, "display-awake").state).toBe("needs");
+    writeFileSync(join(fake, "display-job"), "state = waiting\n");
+    expect(byId((await detect(userEnv)).items, "display-awake").state).toBe("needs");
+    writeFileSync(join(fake, "display-job"), "  state = running\n");
+    expect(byId((await detect(userEnv)).items, "display-awake").state).toBe("ok");
+    expect(byId((await detect({ ...userEnv, FAKE_LAUNCH_FAIL: "1" })).items, "display-awake").state).toBe("unknown");
+  });
+
+  test("dry-run prints the plist and commands without changing anything", async () => {
+    const result = await host(["--json", "apply", "display-awake"], userEnv);
+    expect(result.code).toBe(0);
+    const body = JSON.parse(result.out);
+    expect(body.dryRun).toBe(true);
+    expect(body.would).toContain(`write ${displayPlist()}`);
+    expect(body.would).toContain(`plutil -lint ${displayPlist()}`);
+    expect(body.would).toContain(`launchctl bootstrap gui/501 ${displayPlist()}`);
+    expect(existsSync(displayPlist())).toBe(false);
+    expect(calls()).not.toContain("launchctl bootstrap");
+    expect(calls()).not.toContain("plutil");
+  });
+
+  test("apply needs no sudo, validates the plist, reloads idempotently and reverts", async () => {
+    const apply = () => host(["--json", "--yes", "apply", "display-awake"], userEnv);
+    const result = await apply();
+    expect(result.code).toBe(0);
+    expect(JSON.parse(result.out).item.state).toBe("applied");
+    const plist = readFileSync(displayPlist(), "utf8");
+    expect(plist).toContain("<key>Label</key><string>com.maipai.display-awake</string>");
+    expect(plist).toContain("<key>ProgramArguments</key><array><string>/usr/bin/caffeinate</string><string>-d</string><string>-i</string></array>");
+    for (const key of ["RunAtLoad", "KeepAlive"]) expect(plist).toContain(`<key>${key}</key><true/>`);
+    expect(plist).toContain("<key>ProcessType</key><string>Background</string>");
+    expect(calls()).toContain(`plutil -lint ${displayPlist()}`);
+    expect(calls()).toContain(`launchctl bootstrap gui/501 ${displayPlist()}`);
+    expect((await apply()).code).toBe(0);
+    expect(calls()).toContain("launchctl bootout gui/501/com.maipai.display-awake");
+    expect(calls()).not.toContain("sudo");
+    const dry = await host(["--json", "revert", "display-awake"], userEnv);
+    expect(JSON.parse(dry.out).dryRun).toBe(true);
+    expect(existsSync(displayPlist())).toBe(true);
+    expect((await host(["--yes", "revert", "display-awake"], userEnv)).code).toBe(0);
+    expect(existsSync(displayPlist())).toBe(false);
+    expect(existsSync(join(fake, "display-job"))).toBe(false);
+    expect((await host(["--yes", "revert", "display-awake"], userEnv)).code).toBe(0);
+  });
+
+  test("apply refuses root even in dry-run and explains which account to use", async () => {
+    for (const flags of [[], ["--yes"]]) {
+      const result = await host(["--json", ...flags, "apply", "display-awake"]);
+      expect(result.code).toBe(2);
+      expect(JSON.parse(result.out).error).toContain("signed-in user without sudo");
+    }
+    expect(existsSync(displayPlist())).toBe(false);
+    expect(calls()).not.toContain("launchctl bootstrap");
   });
 });

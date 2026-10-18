@@ -50,6 +50,12 @@ describe("setup host-tune routes", () => {
     expect((await argv()).slice(-3)).toEqual(["--yes", "apply", "power"]);
   });
 
+  test("display-awake is allowed and reaches the script", async () => {
+    stub(`echo '{"item":${JSON.stringify({ ...item, id: "display-awake", state: "applied" })}}'`);
+    expect((await post("apply", { id: "display-awake" })).status).toBe(200);
+    expect((await argv()).slice(-3)).toEqual(["--yes", "apply", "display-awake"]);
+  });
+
   test("revert runs the revert verb", async () => {
     stub(`echo '{"item":${JSON.stringify(item)}}'`);
     expect((await post("revert", { id: "power" })).status).toBe(200);

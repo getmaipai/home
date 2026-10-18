@@ -73,9 +73,10 @@ A Mac that runs Home all day works best with a few settings changed. Setup shows
 bash /usr/local/maipai-home/scripts/studio/host-tune.sh detect
 ```
 
-Two kinds of change are in the list.
+Three kinds of change are in the list.
 
 - Changes inside Home's own folders. Home makes them for you. They keep Spotlight out of Home's files and keep the big AI models out of Time Machine. Home's data stays in your backups.
+- Keep the screen awake (`display-awake`). Some monitors lose their picture after the screen sleeps. A small service starts when you log in and keeps the screen and Mac awake. It needs no administrator password. Run this as your Mac user, without sudo: `bash /usr/local/maipai-home/scripts/studio/host-tune.sh apply display-awake --yes`.
 - Changes to the whole Mac. These need an administrator, so Home asks first. If Home cannot do one, it shows the exact line to paste in Terminal at the Mac. They stop the Mac from sleeping, turn it back on after a power cut, stop big macOS upgrades by themselves (security updates stay on), and turn on SSH. One more lets the graphics chip use more memory. You only need that one for very big AI models later.
 
 Every change can be undone. Run the same line with `revert` and the name of the item.
