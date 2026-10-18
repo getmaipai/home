@@ -200,7 +200,8 @@ export function recordRecent(personId: string, band: AgeBand, rawQuery: string, 
   const problems = validateNewsSearchRecent(draft, band);
   if (problems.length > 0) return false;
   return db.transaction(() => {
-    const existing = db.select().from(newsSearchRecents).where(and(eq(newsSearchRecents.personId, personId), sql`lower(${newsSearchRecents.q}) = ${q.toLowerCase()}`)).get();
+    // Folded by SQLite's own lower(), the fold the unique index uses (ASCII only): a JS toLowerCase() here matched a row the index then refused (a 500).
+    const existing = db.select().from(newsSearchRecents).where(and(eq(newsSearchRecents.personId, personId), sql`lower(${newsSearchRecents.q}) = lower(${q})`)).get();
     if (existing) db.update(newsSearchRecents).set({ q, at: nowIso, hlc: draft.hlc }).where(eq(newsSearchRecents.id, existing.id)).run();
     else db.insert(newsSearchRecents).values({ id: draft.id, personId, q, at: nowIso, hlc: draft.hlc, provenance: draft.provenance }).run();
     const rows = db.select({ id: newsSearchRecents.id }).from(newsSearchRecents).where(eq(newsSearchRecents.personId, personId)).orderBy(desc(newsSearchRecents.at), desc(newsSearchRecents.id)).all();
