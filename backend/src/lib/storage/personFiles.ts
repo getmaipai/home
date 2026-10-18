@@ -34,6 +34,7 @@ import { dirname, join } from "node:path";
 import { attachmentsDir } from "@/lib/paths";
 import * as tar from "tar";
 import { attachmentFilePath, purgeFileRecord, removeTemporaryChatImagesForPerson, toRecord } from "@/lib/attachments";
+import { syncFileReferences } from "@/lib/fileContent";
 import { pruneUnreachableShares } from "@/lib/shares";
 
 /** A pointer that still gives a living person other than the departing
@@ -103,6 +104,7 @@ export function releaseFilesOfDeletedPerson(personId: string): ReleasedFiles {
     ),
   ];
   db.delete(shares).where(eq(shares.to, personId)).run();
+  for (const fileId of touchedFileIds) syncFileReferences(fileId);
   const othersFiles = touchedFileIds.length > 0
     ? db.select().from(attachments).where(and(inArray(attachments.id, touchedFileIds), ne(attachments.ownerPersonId, personId))).all()
     : [];
@@ -131,6 +133,7 @@ export function releaseFilesOfDeletedPerson(personId: string): ReleasedFiles {
       .set({ conversationId: null, turnId: null, retention: "kept", hlc: nextHlc() })
       .where(eq(attachments.id, row.id))
       .run();
+    syncFileReferences(row.id);
     released.keptForHousehold += 1;
   }
 

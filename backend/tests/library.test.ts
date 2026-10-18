@@ -24,7 +24,7 @@ async function fixture() {
   const id = result.person.id;
   function file(n: number, mediaType = "image/png", provenance = "composer:upload") {
     const key = `file-${n.toString(16).padStart(16, "0")}`;
-    db.insert(attachments).values({ id: key, ownerPersonId: id, conversationId: null, turnId: null, mediaType, size: n + 1, sha256: "a".repeat(64), storagePath: `people/${id}/attachments/${key}`, provenance, createdAt: "2026-10-14T12:00:00.000Z", hlc: nextHlc() }).run();
+    db.insert(attachments).values({ id: key, ownerPersonId: id, conversationId: null, turnId: null, mediaType, size: n + 1, sha256: createHash("sha256").update(key).digest("hex"), storagePath: `people/${id}/attachments/${key}`, provenance, createdAt: "2026-10-14T12:00:00.000Z", hlc: nextHlc() }).run();
     return key;
   }
   return { client, id, file };

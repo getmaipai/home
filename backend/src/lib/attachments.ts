@@ -5,8 +5,8 @@ import { deleteMusicJobsForPerson, deleteMusicJobsForTurns } from "@/lib/music/s
 // only by its validated relative storage_path.
 import { deletePictureJobsForPerson, deletePictureJobsForTurns, dropTemporaryPictureJobs, dropTemporaryPictureJobsForPerson } from "@/lib/pictures/jobStore";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
-import { isAbsolute, normalize, relative, resolve } from "node:path";
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from "node:fs";
+import { dirname, isAbsolute, normalize, relative, resolve } from "node:path";
 import { and, eq, inArray } from "drizzle-orm";
 // Renamed from the `File` export to `FileRecordSchema` locally: `File` is a
 // Bun/Fetch global (the Web API type for a multipart upload), so importing
@@ -15,10 +15,11 @@ import { and, eq, inArray } from "drizzle-orm";
 import { File as FileRecordSchema, type File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import { db } from "@/db";
 import { attachments, conversationTurns, conversations, shares } from "@/db/schema";
-import { newFileId, newShareId } from "@/lib/id";
+import { newFileId } from "@/lib/id";
 import { attachmentsDir, dataDir, ensureDataDir } from "@/lib/paths";
 import { nextHlc } from "@/lib/hlc";
 import { checkStorageCap, kindForMediaType } from "@/lib/storage/usage";
+import { contentFor, dropFileReferences, ensureContent, releaseContent, syncFileReferences } from "@/lib/fileContent";
 import { canAccessFile, canAccessPerson, canReadFileAudience } from "@/lib/access";
 import type { PersonRow } from "@/types";
 
@@ -37,20 +38,18 @@ export interface CreateAttachmentInput {
 }
 
 /** Check whether bytes would fit before an expensive consumer (such as
- * Tika) runs. Mirrors createAttachment's household-wide digest dedupe:
- * existing bytes need no new storage and therefore no quota. The write
- * path still repeats this check to cover changes during extraction. */
+ * Tika) runs. Mirrors createAttachment's cost rule (LIBRARY-DEDUP-01):
+ * bytes this person already holds cost them nothing, bytes the household
+ * already stores cost the household nothing, and a person's usage counts
+ * identical bytes once. The write path repeats this check to cover
+ * changes during extraction. */
 export function checkAttachmentCapacity(actor: PersonRow, mediaTypeInput: string, bytesInput: Uint8Array): AttachmentOpResult<null> {
   const mediaType = mediaTypeInput.trim().toLowerCase();
   if (!FileRecordSchema.shape.media_type.safeParse(mediaType).success) {
     return { ok: false, status: 400, error: "invalid attachment media type" };
   }
   const sha256 = createHash("sha256").update(bytesInput).digest("hex");
-  // Only another chat upload counts: a fetched media copy is owner-only and never adopted by an upload (MEDIA-PODCASTS-01).
-  if (db.select({ id: attachments.id }).from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"))).get()) {
-    return { ok: true, value: null };
-  }
-  const capCheck = checkStorageCap(actor.role, actor.id, bytesInput.byteLength);
+  const capCheck = checkStorageCap(actor.role, actor.id, bytesInput.byteLength, sha256);
   return capCheck.ok
     ? { ok: true, value: null }
     : { ok: false, status: 403, error: capCheck.error! };
@@ -126,31 +125,6 @@ export function toRecord(row: typeof attachments.$inferSelect): FileRecord {
   return parsed.data;
 }
 
-// A system-granted share, not a person's own share action (lib/shares.ts's
-// createShare() is that, and it requires the actor to already have access
-// to grant to someone else - the dedupe case is the opposite: the new
-// arrival has no access yet, and never asked for a share, they just typed
-// the same bytes someone else already stored). from_person_id names the
-// existing owner, since they are, structurally, the one whose bytes this
-// now points at; idempotent, so a person re-sending the same file twice
-// doesn't grow a second pointer.
-function grantDedupeShare(existingOwnerId: string, recipientId: string, fileId: string): void {
-  const already = db.select().from(shares).where(and(eq(shares.fileId, fileId), eq(shares.to, recipientId))).get();
-  if (already) return;
-  db
-    .insert(shares)
-    .values({
-      id: newShareId(),
-      fileId,
-      fromPersonId: existingOwnerId,
-      to: recipientId,
-      provenance: "dedupe:same-bytes",
-      createdAt: new Date().toISOString(),
-      hlc: nextHlc(),
-    })
-    .run();
-}
-
 function removeFile(storagePath: string): void {
   try {
     const filePath = attachmentFilePath(storagePath);
@@ -187,40 +161,28 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   const bytes = new Uint8Array(input.bytes);
   const sha256 = createHash("sha256").update(bytes).digest("hex");
 
-  // STORE-SHARE-01 / file.schema.json's own sha256 doc-comment: "the blob
-  // store keys on this value: bytes are written once per digest, so a
-  // second person's identical bytes never create a second blob... only a
-  // second file record with its own owner is avoided too." Household-wide
-  // (not scoped to actor): the first arrival keeps ownership no matter
-  // who uploads the same bytes next, and the second person gets a share
-  // pointer to the existing row instead of a new blob and a new row -
-  // "no duplicates at any level" (household-storage-2026-09-23.md). This
-  // runs before checkStorageCap(): a dedupe hit writes no new blob and no
-  // new File row, so it is not "a write that would take the owner past
-  // their cap" (household-storage-2026-09-23.md, "Enforcement") - usage
-  // (storage/usage.ts) is the sum of `size` over File rows that exist,
-  // and a dedupe never adds one, so charging the cap here would refuse a
-  // person for bytes that were never going to land on disk a second time.
-  const existing = input.deduplicate === false ? undefined : db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"))).get();
-  if (existing) {
-    if (existing.ownerPersonId !== actor.id) grantDedupeShare(existing.ownerPersonId, actor.id, existing.id);
-    return { ok: true, value: toRecord(existing) };
-  }
+  // LIBRARY-DEDUP-01: one stored blob per sha256, one file record per owner. A person who sends the same bytes
+  // again gets their existing record back; a different person gets their own record that points at the same stored
+  // blob, so deleting one person's copy never takes the other's and no second copy is written to disk. This replaces
+  // the old share pointer to the first uploader's record (STORE-SHARE-01's dedupe), which made the second person's copy
+  // vanish with the first.
+  const mine = input.deduplicate === false
+    ? undefined
+    : db.select().from(attachments).where(and(eq(attachments.sha256, sha256), eq(attachments.origin, "sent"), eq(attachments.ownerPersonId, actor.id))).get();
+  if (mine) return { ok: true, value: toRecord(mine) };
 
-  // STORE-CAP-01: refused before anything is written to disk - the two
-  // caps (this person's own, the household total), in the person's own
-  // words (household-storage-2026-09-23.md, decision 3). Only reached for
-  // bytes that are actually new (the dedupe check above already returned
-  // for a hash match), so this is exactly the "new bytes on disk" case
-  // the cap was designed to gate.
-  const capCheck = checkStorageCap(actor.role, actor.id, bytes.byteLength);
+  // STORE-CAP-01: refused before anything is written to disk, in the person's own words. Bytes this person already
+  // holds, or that the household already stores, add nothing to the matching total (storage/usage.ts).
+  const capCheck = checkStorageCap(actor.role, actor.id, bytes.byteLength, sha256);
   if (!capCheck.ok) return { ok: false, status: 403, error: capCheck.error! };
 
   const id = newFileId();
-  const storagePath = storagePathFor(actor.id, id);
+  const stored = contentFor(sha256);
+  const storagePath = stored ? stored.storagePath : storagePathFor(actor.id, id);
   const filePath = attachmentFilePath(storagePath);
-  const directory = resolve(attachmentsDir, actor.id, "attachments");
-  ensureDataDir(directory);
+  // Write unless the one stored copy is really on disk (a missing copy is rewritten from these bytes).
+  const needsWrite = !stored || !existsSync(filePath);
+  if (needsWrite) ensureDataDir(dirname(filePath));
   const row = {
     id,
     ownerPersonId: actor.id,
@@ -239,14 +201,20 @@ export function createAttachment(actor: PersonRow, input: CreateAttachmentInput)
   };
   const record = toRecord(row);
 
-  writeFileSync(filePath, bytes, { mode: 0o600 });
+  if (needsWrite) writeFileSync(filePath, bytes, { mode: 0o600 });
   try {
-    db.insert(attachments).values(row).run();
+    db.transaction(() => {
+      ensureContent(sha256, storagePath, bytes.byteLength);
+      db.insert(attachments).values(row).run();
+      syncFileReferences(id);
+    });
   } catch (err) {
-    try {
-      unlinkSync(filePath);
-    } catch {
-      // Preserve the database error if cleanup itself cannot complete.
+    if (!stored) {
+      try {
+        unlinkSync(filePath);
+      } catch {
+        // Preserve the database error if cleanup itself cannot complete.
+      }
     }
     throw err;
   }
@@ -307,6 +275,7 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
       // Conversations are tombstoned, not removed. Keep that provenance for
       // conversation reads; only the turn FK must be cleared before deletion.
       db.update(attachments).set({ turnId: null }).where(eq(attachments.id, row.id)).run();
+      syncFileReferences(row.id); // the chat reference ends with the turn; the owner's reference keeps the bytes
     } else {
       const blob = purgeFileRecord(row);
       if (blob) removeFile(blob);
@@ -326,9 +295,9 @@ export function deleteAttachmentsForTurns(turnIds: string[]): number {
  * so today no two records share one. */
 export function purgeFileRecord(row: typeof attachments.$inferSelect): string | null {
   db.delete(shares).where(eq(shares.fileId, row.id)).run();
+  dropFileReferences(row.id);
   db.delete(attachments).where(eq(attachments.id, row.id)).run();
-  const stillReferenced = db.select({ id: attachments.id }).from(attachments).where(eq(attachments.storagePath, row.storagePath)).get();
-  return stillReferenced ? null : row.storagePath;
+  return releaseContent(row.sha256, row.storagePath);
 }
 
 /** Unlink the bytes purgeFileRecord() released. Best effort: a file that

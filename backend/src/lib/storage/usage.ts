@@ -14,13 +14,14 @@ import { DOCUMENT_MEDIA_TYPES, isDocumentMediaType } from "@/lib/documentMediaTy
 import { statSync } from "node:fs";
 import { relative } from "node:path";
 import { eq, isNotNull, sql } from "drizzle-orm";
-import { db } from "@/db";
-import { attachments, people as peopleTable } from "@/db/schema";
+import { db, sqlite } from "@/db";
+import { attachments, fileBlobRemovals, fileContents, people as peopleTable } from "@/db/schema";
 import { attachmentsDir, dataDir } from "@/lib/paths";
 import { getHouseholdSettingValue, getSettingValueForPerson } from "@/lib/settings";
 import { raiseIssue, resolveIssue } from "@/lib/issues";
 import { walkFiles } from "@/lib/storage";
 import { listActivePeople, isOwnerOrAdmin } from "@/lib/access";
+import { contentStored, personHoldsContent } from "@/lib/fileContent";
 import { HOUSEHOLD_STORAGE_CAP_KEY, PERSON_DEFAULT_STORAGE_CAP_KEY, PERSON_STORAGE_CAP_KEY } from "@/settings/storageKeys";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
 import type { PersonRow } from "@/types";
@@ -41,22 +42,18 @@ export function kindForMediaType(mediaType: string): FileRecord["kind"] {
   return "other";
 }
 
-/** Bytes owned by one person, summed straight from the File records. */
+/** Bytes owned by one person, summed from the File records. LIBRARY-DEDUP-01: identical bytes count once per person
+ * ("Identical files count once"), however many records of them the person holds. */
 export function personUsageBytes(personId: string): number {
-  const row = db
-    .select({ total: sql<number>`coalesce(sum(${attachments.size}), 0)` })
-    .from(attachments)
-    .where(eq(attachments.ownerPersonId, personId))
-    .get();
-  return (row?.total as number | undefined) ?? 0;
+  const row = sqlite.query("select coalesce(sum(size), 0) as total from (select max(size) as size from attachments where owner_person_id = ? group by sha256)").get(personId) as { total: number } | null;
+  return Number(row?.total ?? 0);
 }
 
-/** The whole household's bytes: the same sum with no owner filter - one
- * pass over the same rows personUsageBytes() reads, so a person's number
- * and the household's number can never drift against each other. */
+/** The whole household's bytes: each stored blob counts once, whoever holds it. The same records personUsageBytes()
+ * reads, so a person's number and the household's can never drift apart. */
 export function householdUsageBytes(): number {
-  const row = db.select({ total: sql<number>`coalesce(sum(${attachments.size}), 0)` }).from(attachments).get();
-  return (row?.total as number | undefined) ?? 0;
+  const row = sqlite.query("select coalesce(sum(size), 0) as total from (select max(size) as size from attachments group by sha256)").get() as { total: number } | null;
+  return Number(row?.total ?? 0);
 }
 
 /** STORE-DELETE-01: files whose owner was deleted while the file was
@@ -82,9 +79,10 @@ export function householdInheritedUsage(): { files: number; bytes: number } {
  * silently drift from it the next time that classification changes. */
 export function personUsageByKind(personId: string): Array<{ kind: FileRecord["kind"]; bytes: number }> {
   const rows = db
-    .select({ mediaType: attachments.mediaType, size: attachments.size })
+    .select({ mediaType: sql<string>`max(${attachments.mediaType})`, size: sql<number>`max(${attachments.size})` })
     .from(attachments)
     .where(eq(attachments.ownerPersonId, personId))
+    .groupBy(attachments.sha256)
     .all();
   const totals = new Map<FileRecord["kind"], number>();
   for (const row of rows) {
@@ -162,13 +160,17 @@ export function storageRefusalMessage(role: string): string {
  * function that job calls the day it's built, not a second copy of the
  * check. Refuses on the person's own cap first, then the household total;
  * either one being over is the same refusal in the person's words. */
-export function checkStorageCap(personRole: string, personId: string, additionalBytes: number): { ok: boolean; error?: string } {
+export function checkStorageCap(personRole: string, personId: string, additionalBytes: number, sha256?: string): { ok: boolean; error?: string } {
+  // LIBRARY-DEDUP-01: bytes this person already holds add nothing to their total, and bytes the household already
+  // stores add nothing to the household total, so a second copy is never refused for space it does not use.
+  const personAdd = sha256 && personHoldsContent(personId, sha256) ? 0 : additionalBytes;
+  const householdAdd = sha256 && contentStored(sha256) ? 0 : additionalBytes;
   const personCap = personCapBytes(personId);
-  if (personCap > 0 && personUsageBytes(personId) + additionalBytes > personCap) {
+  if (personCap > 0 && personUsageBytes(personId) + personAdd > personCap) {
     return { ok: false, error: storageRefusalMessage(personRole) };
   }
   const householdCap = householdCapBytes();
-  if (householdCap > 0 && householdUsageBytes() + additionalBytes > householdCap) {
+  if (householdCap > 0 && householdUsageBytes() + householdAdd > householdCap) {
     return { ok: false, error: storageRefusalMessage(personRole) };
   }
   return { ok: true };
@@ -207,10 +209,13 @@ function filesOnDisk(): Set<string> {
 export function reconcileFileStore(): void {
   const rows = db.select({ storagePath: attachments.storagePath }).from(attachments).all();
   const recordPaths = new Set(rows.map((r) => r.storagePath));
+  for (const content of db.select({ storagePath: fileContents.storagePath }).from(fileContents).all()) recordPaths.add(content.storagePath);
+  // Duplicates the dedup migration queued are about to be reclaimed, not orphans (lib/fileBlobs.ts).
+  const queuedPaths = new Set(db.select({ storagePath: fileBlobRemovals.storagePath }).from(fileBlobRemovals).all().map((r) => r.storagePath));
   const diskPaths = filesOnDisk();
 
   const recordsWithNoBytes = [...recordPaths].filter((p) => !diskPaths.has(p));
-  const bytesWithNoRecord = [...diskPaths].filter((p) => !recordPaths.has(p));
+  const bytesWithNoRecord = [...diskPaths].filter((p) => !recordPaths.has(p) && !queuedPaths.has(p));
 
   if (recordsWithNoBytes.length === 0 && bytesWithNoRecord.length === 0) {
     resolveIssue(RECONCILE_ISSUE_SOURCE, RECONCILE_ISSUE_KEY);

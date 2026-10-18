@@ -156,6 +156,11 @@ export function newFileId(): string {
   return `file-${randomSuffix(10)}`;
 }
 
+/** Not a spec record: a LIBRARY-DEDUP-01 reference row (lib/fileContent.ts) is Home's own storage bookkeeping. */
+export function newFileReferenceId(): string {
+  return `fref-${randomSuffix(10)}`;
+}
+
 /** Matches spec/schemas/share.schema.json's `^share-[a-z0-9]{6,}$`
  * (STORE-SHARE-01). */
 export function newShareId(): string {

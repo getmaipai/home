@@ -1,6 +1,6 @@
 import { describe, expect, test, beforeEach } from "bun:test";
 import { db } from "@/db";
-import { attachments, people } from "@/db/schema";
+import { attachments, people, shares } from "@/db/schema";
 import { createAttachment, getAttachment } from "@/lib/attachments";
 import { createShare, deleteShare, listFilesVisibleToActor, listPersonFilesVisibleToActor } from "@/lib/shares";
 import { newConversationTurnId, newPersonId } from "@/lib/id";
@@ -506,7 +506,7 @@ describe("muting a sender (NOTIFY-SHARE-02, docs/plans/people-profile-2026-09-26
 });
 
 describe("dedupe - no duplicates at any level (STORE-SPEC-01)", () => {
-  test("a second person's identical bytes become a share pointer to the first person's file", async () => {
+  test("a second person's identical bytes become their own file on the one stored copy (LIBRARY-DEDUP-01)", async () => {
     const ownerPerson = await owner();
     const lucia = person("adult", "Lucia");
     const bytes = "identical photo bytes";
@@ -518,11 +518,13 @@ describe("dedupe - no duplicates at any level (STORE-SPEC-01)", () => {
     expect(second.ok).toBe(true);
     if (!second.ok) return;
 
-    expect(second.value.id).toBe(first.id);
-    expect(second.value.owner_person_id).toBe(ownerPerson.id);
-    expect(db.select().from(attachments).all()).toHaveLength(1);
-    expect(getAttachment(lucia, first.id).ok).toBe(true);
-    expect(listFilesVisibleToActor(lucia).some((row) => row.file.id === first.id)).toBe(true);
+    expect(second.value.id).not.toBe(first.id);
+    expect(second.value.owner_person_id).toBe(lucia.id);
+    expect(second.value.storage_path).toBe(first.storage_path);
+    expect(db.select().from(attachments).all()).toHaveLength(2);
+    expect(db.select().from(shares).all()).toHaveLength(0); // no pointer: each person holds their own record
+    expect(getAttachment(lucia, second.value.id).ok).toBe(true);
+    expect(getAttachment(lucia, first.id).ok).toBe(false); // the first person's copy is still theirs alone
   });
 
   test("the same person re-uploading identical bytes doesn't create a duplicate row", async () => {

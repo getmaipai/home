@@ -6,6 +6,7 @@
 import { and, eq, isNull } from "drizzle-orm";
 import { generateOpml, parseFeed, parseOpml } from "feedsmith";
 import { db } from "@/db";
+import { syncFileReferences } from "@/lib/fileContent";
 import { attachments, mediaItems, mediaProgress, mediaSources, people } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newMediaItemId, newMediaSourceId } from "@/lib/id";
@@ -422,6 +423,7 @@ export async function saveEpisode(actor: PersonRow, itemId: string, options: Sav
       return { ok: false, status: 409, error: "The episode changed while it was downloading. Open Podcasts and try Save again." };
     }
     db.update(mediaItems).set({ locFileId: stored.value.id, size: stored.value.size, fingerprint: stored.value.sha256, mediaType, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
+    syncFileReferences(stored.value.id);
     return { ok: true, value: itemFromRow(itemRow(row.id)!) };
   } catch (error) {
     if (error instanceof RedirectLimitError) return { ok: false, status: 502, error: "The episode server sent more than five redirects or left out the next address. Try again later or ask the show for a direct episode link." };

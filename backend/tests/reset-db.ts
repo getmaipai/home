@@ -41,6 +41,9 @@ import {
   conversationTurns,
   shares,
   attachments,
+  fileBlobRemovals,
+  fileContents,
+  fileReferences,
   pictureJobs,
   kidUsage,
   pictureAdapterPrefs,
@@ -185,8 +188,11 @@ export function resetDb(): void {
   db.delete(episodeEmbeddings).run();
   db.delete(episodes).run();
   db.delete(projects).run(); // PROJECT-RUN-01: references people
+  db.delete(fileReferences).run(); // LIBRARY-DEDUP-01: references attachments and file_contents, deleted first
+  db.delete(fileBlobRemovals).run();
   db.delete(shares).run(); // STORE-SHARE-01: references attachments (the file table), deleted first
   db.delete(attachments).run();
+  db.delete(fileContents).run();
   db.delete(kidUsage).run(); // KIDS-CREATE-01: references people
   db.delete(pictureJobs).run(); // IMGGEN-HOME-01: references people
   db.delete(pictureAdapterPrefs).run();

@@ -27,6 +27,7 @@ import { newShareId } from "@/lib/id";
 import { nextHlc } from "@/lib/hlc";
 import { canAccessFile, canReadFileAudience, getPersonRole, isOwnerOrAdmin, listActivePeople } from "@/lib/access";
 import { toRecord } from "@/lib/attachments";
+import { syncFileReferences } from "@/lib/fileContent";
 import { trigger } from "@/lib/notifications";
 import { trackBackgroundWork } from "@/lib/backgroundWork";
 import type { File as FileRecord } from "@maipai/spec/gen/ts/file.js";
@@ -94,6 +95,7 @@ export function createShare(actor: PersonRow, input: CreateShareInput): ShareOpR
     hlc: nextHlc(),
   };
   db.insert(shares).values(row).run();
+  syncFileReferences(input.fileId);
   notifyShareCreated(actor, to, file);
   return { ok: true, value: toShareRecord(row) };
 }
@@ -178,6 +180,7 @@ export function deleteShare(actor: PersonRow, shareId: string): ShareOpResult<{ 
 
   db.delete(shares).where(eq(shares.id, shareId)).run();
   const pruned = pruneUnreachableShares(share.fileId, file.ownerPersonId);
+  syncFileReferences(share.fileId);
   return { ok: true, value: { deletedShareIds: [shareId, ...pruned] } };
 }
 
@@ -241,6 +244,7 @@ export function pruneUnreachableShares(fileId: string, ownerPersonId: string, de
     for (const row of dead) db.delete(shares).where(eq(shares.id, row.id)).run();
     removed.push(...dead.map((row) => row.id));
   }
+  if (removed.length > 0) syncFileReferences(fileId);
   return removed;
 }
 

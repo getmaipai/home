@@ -4,7 +4,7 @@ import { existsSync, readFileSync, readdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, conversationTurns, mediaItems, mediaSources, shares, people } from "@/db/schema";
+import { attachments, conversationTurns, fileReferences, mediaItems, mediaSources, shares, people } from "@/db/schema";
 import { TestClient } from "./client";
 import { resetDb } from "./reset-db";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
@@ -433,6 +433,7 @@ describe("Podcasts review regressions", () => {
     const id = await idOf("Question 3");
     expect((await owner.post("/api/plugins/podcasts/save", { media_id: id })).status).toBe(200);
     const fileId = db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.locFileId!;
+    db.delete(fileReferences).where(eq(fileReferences.fileId, fileId)).run();
     db.delete(attachments).where(eq(attachments.id, fileId)).run();
     expect((await owner.post("/api/plugins/podcasts/save", { media_id: id, on: false })).status).toBe(200);
     expect(db.select().from(mediaItems).where(eq(mediaItems.id, id)).get()!.locFileId).toBeNull();

@@ -3,6 +3,7 @@
 import { and, eq, isNotNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { attachments, mediaItems } from "@/db/schema";
+import { syncFileReferences } from "@/lib/fileContent";
 import { nextHlc } from "@/lib/hlc";
 import { newMediaItemId } from "@/lib/id";
 import { isMediaAdmin, readableItem } from "@/lib/media/access";
@@ -32,6 +33,7 @@ export function trashPodcastCopy(row: MediaItemRow, now = new Date()): void {
       artwork: null, deletedAt: now.toISOString(), trashUntil: until, provenance: PREFIX + row.id, hlc: nextHlc() }).run();
     db.update(mediaItems).set({ locFileId: null, fingerprint: null, hlc: nextHlc() }).where(eq(mediaItems.id, row.id)).run();
   });
+  syncFileReferences(row.locFileId);
 }
 
 function copies() {
@@ -60,6 +62,7 @@ registerTrashProvider({
       db.update(mediaItems).set({ locFileId: row.locFileId, fingerprint: row.fingerprint, size: row.size, hlc: nextHlc() }).where(eq(mediaItems.id, original.id)).run();
       db.delete(mediaItems).where(eq(mediaItems.id, row.id)).run();
     });
+    if (row.locFileId) syncFileReferences(row.locFileId);
     return true;
   },
   purge(person, id) {

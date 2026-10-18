@@ -718,6 +718,39 @@ export const attachments = sqliteTable(
   ],
 );
 
+// LIBRARY-DEDUP-01 (docs/design/library-2026-10-18.md section 3.16): single-instance storage. One stored blob per
+// sha256 (`file_contents`); every owner, chat, collection and share is a row in `file_references`. Bytes go only when the
+// last reference is gone. Home-internal bookkeeping, not a synced spec record, so there is no hlc.
+export const fileContents = sqliteTable("file_contents", {
+  sha256: text("sha256").primaryKey(),
+  storagePath: text("storage_path").notNull().unique(),
+  size: integer("size").notNull(),
+  createdAt: text("created_at").notNull(),
+});
+
+export const fileReferences = sqliteTable(
+  "file_references",
+  {
+    id: text("id").primaryKey(),
+    sha256: text("sha256").notNull().references(() => fileContents.sha256),
+    fileId: text("file_id").notNull().references(() => attachments.id),
+    kind: text("kind").notNull(), // owner | chat | collection | share
+    holderId: text("holder_id").notNull(), // person id | conversation id | media item id | share id
+    createdAt: text("created_at").notNull(),
+  },
+  (table) => [
+    uniqueIndex("file_references_holder_idx").on(table.fileId, table.kind, table.holderId),
+    index("file_references_sha256_idx").on(table.sha256),
+  ],
+);
+
+// Duplicate blobs the LIBRARY-DEDUP-01 migration folded into one canonical path, waiting for the startup step
+// (lib/fileContent.ts reclaimQueuedBlobs) to remove them from disk once the canonical bytes are confirmed.
+export const fileBlobRemovals = sqliteTable("file_blob_removals", {
+  storagePath: text("storage_path").primaryKey(),
+  queuedAt: text("queued_at").notNull(),
+});
+
 // STORE-SHARE-01 (spec/schemas/share.schema.json): one pointer record
 // granting another person or the household read access to one file
 // (`attachments` above, the table backing the spec's `file` shape) -

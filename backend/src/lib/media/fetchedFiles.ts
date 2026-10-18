@@ -1,12 +1,13 @@
 // Fetched copies are owner-scoped files. Other listeners read only through the media item's band and source gate.
 import { createHash } from "node:crypto";
-import { closeSync, openSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
-import { resolve } from "node:path";
+import { closeSync, existsSync, openSync, renameSync, unlinkSync, writeFileSync, writeSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { attachments, shares } from "@/db/schema";
+import { attachments } from "@/db/schema";
 import { File as FileRecordSchema } from "@maipai/spec/gen/ts/file.js";
-import { attachmentFilePath, toRecord } from "@/lib/attachments";
+import { attachmentFilePath, purgeFileRecord, removeFileBlobs, toRecord } from "@/lib/attachments";
+import { contentFor, ensureContent, syncFileReferences } from "@/lib/fileContent";
 import { nextHlc } from "@/lib/hlc";
 import { newFileId } from "@/lib/id";
 import { attachmentsDir, ensureDataDir } from "@/lib/paths";
@@ -32,16 +33,24 @@ function existingCopy(owner: PersonRow, input: Metadata, sha256: string): Fetche
 }
 
 function storeRow(owner: PersonRow, input: Metadata, id: string, size: number, sha256: string, write: (path: string) => void): FetchedFileResult {
-  const storagePath = `people/${owner.id}/attachments/${id}`;
+  // LIBRARY-DEDUP-01: identical bytes already stored (a chat upload, another person's copy) are not written again.
+  const stored = contentFor(sha256);
+  const storagePath = stored ? stored.storagePath : `people/${owner.id}/attachments/${id}`;
   const filePath = attachmentFilePath(storagePath);
+  const reuse = stored !== undefined && existsSync(filePath);
   const row = {
     id, ownerPersonId: owner.id, conversationId: null, turnId: null, mediaType: normalizedType(input.mediaType), size, sha256, storagePath, retention: "kept" as const,
     provenance: input.note, origin: "fetched", mediaSourceId: input.mediaSourceId, createdAt: new Date().toISOString(), hlc: nextHlc(),
   };
   const record = toRecord(row);
-  write(filePath);
-  try { db.insert(attachments).values(row).run(); }
-  catch (error) { try { unlinkSync(filePath); } catch { /* already gone */ } throw error; }
+  if (!reuse) { ensureDataDir(dirname(filePath)); write(filePath); }
+  try {
+    db.transaction(() => {
+      ensureContent(sha256, storagePath, size);
+      db.insert(attachments).values(row).run();
+      syncFileReferences(id);
+    });
+  } catch (error) { if (!reuse && !stored) { try { unlinkSync(filePath); } catch { /* already gone */ } } throw error; }
   return { ok: true, value: record };
 }
 
@@ -51,7 +60,7 @@ export function createFetchedFile(owner: PersonRow, input: FetchedFileInput): Fe
   const sha256 = createHash("sha256").update(input.bytes).digest("hex");
   const existing = existingCopy(owner, input, sha256);
   if (existing) return { ok: true, value: existing };
-  const cap = checkStorageCap(owner.role, owner.id, input.bytes.byteLength);
+  const cap = checkStorageCap(owner.role, owner.id, input.bytes.byteLength, sha256);
   if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
   ensureDataDir(resolve(attachmentsDir, owner.id, "attachments"));
   return storeRow(owner, input, newFileId(), input.bytes.byteLength, sha256, (path) => writeFileSync(path, input.bytes, { mode: 0o600 }));
@@ -97,7 +106,7 @@ export async function createFetchedFileFromResponse(owner: PersonRow, input: Met
     const existing = existingCopy(owner, input, sha256);
     if (existing) return { ok: true, value: existing };
     // Recheck after yielding: other jobs may have consumed space during the download.
-    const cap = checkStorageCap(owner.role, owner.id, size);
+    const cap = checkStorageCap(owner.role, owner.id, size, sha256);
     if (!cap.ok) return { ok: false, status: 403, error: cap.error! };
     return storeRow(owner, input, id, size, sha256, (path) => renameSync(temporary, path));
   } finally {
@@ -112,8 +121,8 @@ export async function createFetchedFileFromResponse(owner: PersonRow, input: Met
 export function removeFetchedFile(fileId: string): boolean {
   const row = db.select().from(attachments).where(and(eq(attachments.id, fileId), eq(attachments.origin, "fetched"))).get();
   if (!row) return false;
-  db.delete(shares).where(eq(shares.fileId, fileId)).run();
-  db.delete(attachments).where(eq(attachments.id, fileId)).run();
-  try { unlinkSync(attachmentFilePath(row.storagePath)); } catch { /* already gone */ }
+  // LIBRARY-DEDUP-01: the bytes leave the disk only when no other record or reference holds them.
+  const blob = purgeFileRecord(row);
+  if (blob) removeFileBlobs([blob]);
   return true;
 }
