@@ -7,11 +7,36 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- Fixed: pressing Download what's missing with Detailed videos ticked did nothing you could see. The licensed download now starts before the answer, so a refusal from the engine shows as the red message in the engine's own words, and the page says right under the button what happened (started, nothing to download, or why it is waiting for the licence accept). A child's cartoon switch now sits on the child's own Limits tab in People; the home switch and the daily limits are in Home settings, Pictures and videos.
-- Detailed videos (LTX-2.3, longer clips with sound and speech, about 74 GB) are now part of the Recommended plan on a Mac with 128 GB of memory. The setup wizard checks the row by default, shows the maker's licence (free under 10 million dollars of yearly revenue; the model's own markings stay) and waits for you to accept it before anything downloads. Untick the row to skip it; the total and the free-space check update at once. The Recommended free space on that Mac is 145 GB (was 61 GB). An upgrade never downloads it by itself: it shows as "Recommended, not installed" under Models and storage with an Install button. Teens and children still get Quick videos only.
-- Music app: derived albums and artists, songs, liked songs, local radio, your own queue and playlists (New playlist, Add to playlist). Album, artist and playlist pages open with a Play, Shuffle or Start radio header; lists use the kit's grid, round artist art and compact rows. Chat artist lookup is kept.
+## [0.2.18] - 2026-10-17
+
+News, Podcasts and Music apps, a daily media time limit for children, and Detailed video from a picture.
+
+### News
+- **A News app.** Open **News** from your apps for Today, Following, Saved and a story reader, built on the same news shelf Home uses when you ask for headlines. Teens and adults also get **My Mix**, which learns from your own reading on this hub, can be reset, and can be switched off. Children get stories from the Kids' lists only, their reading is never used to learn interests, and every story is checked before a child sees it. Settings, News holds the reading choices.
+
+### Podcasts
+- **A Podcasts app.** Follow shows, listen now, stream an episode or save it on the hub, and import a list of shows. Saved episodes follow the same age and access rules as other media, and a removed episode goes to the Trash for 30 days.
 - **Podcasts review fixes.** Saved episodes and show pictures cannot bypass age or show access through Files, including old household shares. Downloads stream to disk within storage caps; keep rules run in a background queue, one run per show. OPML imports use the normal polling limit, and a News address conflict cannot stop Podcasts checks. Only a copy's owner or an adult admin can unsave it; removed copies go to Trash for 30 days. Removing a show cleans up its picture. Old http episode links use https, enclosure downloads allow five redirects, and the privacy text covers automatic downloads, file hosts and the home's IP.
+
+### Music
+- Music app: derived albums and artists, songs, liked songs, local radio, your own queue and playlists (New playlist, Add to playlist). Album, artist and playlist pages open with a Play, Shuffle or Start radio header; lists use the kit's grid, round artist art and compact rows. Chat artist lookup is kept.
+
+### Media library
+- **A daily media time limit for children and teens.** An owner or admin sets the minutes for a person, and when time is up the player stops and the file stops loading. A child sees "Screen time is done for today. Ask a grown-up for more." Admins get one notice a day, and can add minutes until midnight.
+- A grown-up can limit a child or teen to approved sources only.
 - "Keep on this device" now has one shared path for apps to use. Media uses it first, with the same browser storage and device protections. Settings, Devices labels copies by kind and clears them together. News stories, reference pages and chat exports are still open.
+
+### Pictures and videos
+- A picture can start a Detailed video when the Stack says it can, and the first frame shows while the video is made.
+- Detailed videos (LTX-2.3, longer clips with sound and speech, about 74 GB) are now part of the Recommended plan on a Mac with 128 GB of memory. The setup wizard checks the row by default, shows the maker's licence (free under 10 million dollars of yearly revenue; the model's own markings stay) and waits for you to accept it before anything downloads. Untick the row to skip it; the total and the free-space check update at once. The Recommended free space on that Mac is 145 GB (was 61 GB). An upgrade never downloads it by itself: it shows as "Recommended, not installed" under Models and storage with an Install button. Teens and children still get Quick videos only.
+- Fixed: pressing Download what's missing with Detailed videos ticked did nothing you could see. The licensed download now starts before the answer, so a refusal from the engine shows as the red message in the engine's own words, and the page says right under the button what happened (started, nothing to download, or why it is waiting for the licence accept). A child's cartoon switch now sits on the child's own Limits tab in People; the home switch and the daily limits are in Home settings, Pictures and videos.
+
+### Safety
+- A setting a grown-up holds for a child (News My Mix, where stories open, and the digest) can no longer be changed by the child.
+- The Thinking mode button meets the 48 px touch size.
+
+### Reliability
+- The Stack is updated to the build that fixes Detailed video from a picture, music model loading, and test leaks. Upgrading never downloads Detailed videos by itself.
 
 ## [0.2.17] - 2026-10-17
 
