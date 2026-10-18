@@ -9,7 +9,7 @@ import { mediaItems, mediaSources } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
-import { readableItem, sourceVisibleTo } from "./access";
+import { discoveryAllowed, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
 import { itemFromRow, sourceFromRow, type MediaCollection, type MediaItem, type MediaSource } from "./model";
@@ -84,6 +84,10 @@ export function mediaAppAllowed(person: PersonRow, appId: string): boolean {
 export function allowlistOnly(person: PersonRow): boolean {
   return person.role === "guest" || mediaBandOf(person) === "child";
 }
+
+/** No discovery rows and no autoplay suggestion: a child or guest, or anyone whose own `media.allowlist_only` is on (a teen or an
+ * adult a guardian or admin set it for). Stricter than either alone; every discovery gate in the media apps uses this one test. */
+export const noDiscovery = (person: PersonRow): boolean => allowlistOnly(person) || !discoveryAllowed(person);
 
 export function allowedSources(person: PersonRow): MediaSource[] {
   const live = db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all().map(sourceFromRow).filter((source) => sourceVisibleTo(source, person));
@@ -235,7 +239,7 @@ export function registerItemView(appId: MediaAppId, hook: ItemViewHook): void { 
 export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: string, params: DataParams): MediaRow[] | MediaItemView | MediaItemView[] | { as_of: string; rows: Array<{ id: string; label: string }> } | null {
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
   dataId = dataId.replace(/_/g, "-"); // manifest ids use hyphens; the underscore spelling of a page written earlier still answers
-  if (allowlistOnly(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
+  if (noDiscovery(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
   if (appId === "music") {
     const music = musicData(person, dataId, params);
     if (music !== null) return music as never;
@@ -352,7 +356,7 @@ function itemView(person: PersonRow, appId: MediaAppId, item: MediaItem): MediaI
   const base = rowOf(item, context);
   const progress = getProgress(person.id, item.id);
   // A child's screen never counts down to the next video by itself (the Player's autoplay needs `up_next`).
-  const queue = appId === "music" ? musicNext(person, item.id)[0] : allowlistOnly(person) ? undefined : upNextItems(person, appId, item, 1)[0];
+  const queue = appId === "music" ? musicNext(person, item.id)[0] : noDiscovery(person) ? undefined : upNextItems(person, appId, item, 1)[0];
   const seconds = progress && "seconds" in progress.position ? progress.position.seconds : undefined;
   const address = (item.location as { url?: string }).url;
   const direct = item.kind === "podcast_episode" ? address?.replace(/^http:\/\//i, "https://") : address;
@@ -532,7 +536,7 @@ function musicData(person: PersonRow, dataId: string, params: DataParams): unkno
     return [...groupTracks(tracks, "album")].map(([id, group]) => albumTile(person, id, group)).sort((a, b) => a.title.localeCompare(b.title));
   }
   if (dataId === "radio-seeds") {
-    if (allowlistOnly(person)) return [];
+    if (noDiscovery(person)) return [];
     return [...groupTracks(musicLibrary(person), "artist")].map(([, tracks]) => ({ ...rowsOf(person, [tracks.find((item) => item.artwork) ?? tracks[0]!])[0]!, id: tracks[0]!.id, title: `${artistKey(tracks[0]!)} radio`, channel: null, kind: "track", queue_mode: "radio", radio_seed: tracks[0]!.id }));
   }
   if (dataId === "playlists") return visiblePlaylists(person).map((collection) => playlistTile(person, collection));

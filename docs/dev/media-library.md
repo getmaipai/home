@@ -167,7 +167,7 @@ off for Teen and Adult controls. A child or teen cannot set or reset it. An owne
 `access.ts` applies it to every source read: only household roots or sources whose `visible_to` explicitly includes the person
 pass. Existing scope, visibility, `band_ok`, explicit advisory and text-floor checks still apply after any override. Search uses
 that same library gate. `discoveryAllowed(person)` is the app-route gate for discovery shelves and chips; such rows must be empty
-when it returns false. No discovery route or media player is shipped by this slice.
+when it returns false. No discovery route or media player is shipped by this slice. The media app host joins both tests in one gate, `noDiscovery(person)` (`lib/media/appHost.ts`): a child or guest, or anyone whose own `media.allowlist_only` is on, gets empty `featured`, `new`, `recent`, `more-from` and Music `radio-seeds` rows and no autoplay suggestion, in every media app (`tests/mediaAllowlistDiscovery.test.ts`).
 
 The daily budget reuses `allowance.media.daily_minutes`, read by `dailyMinutesAllowed(personId, "Media")`. There is no
 `media.daily_minutes` key. Child and Teen controls cannot set or reset the allowance. Zero means no limit. An admin can set the

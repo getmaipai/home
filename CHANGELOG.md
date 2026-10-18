@@ -7,6 +7,8 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+- **Approved media only, fixed.** When a grown-up turns on "Approved media only" for a teen or an adult, the media apps now hide every suggestion row (Featured, New, Recently added, More from, Music radio picks) and the next-video suggestion, as they already did for a child.
+
 ## [0.2.18] - 2026-10-17
 
 News, Podcasts and Music apps, a daily media time limit for children, and Detailed video from a picture.
