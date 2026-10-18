@@ -1,3 +1,4 @@
+import { runNewsSummaryTick } from "@/lib/news/summary";
 import { recomputeNightlyMixes, pruneReads } from "@/lib/news/records";
 // The durable scheduler (platform plan 4.7): "one-shot and recurring
 // jobs... persisted, survives restarts. Timers, reminders, routines,
@@ -311,6 +312,7 @@ const CORE_JOBS: Record<string, CoreJobHandler> = {
   // while the house is quiet (lib/shelf/shelfPoller.ts), and a daily prune
   // to the household's retention (news.retention_days).
   "news.full_text.prefetch": async () => { await prefetchNewsText(); },
+  "news.shelf.summaries": async () => { await runNewsSummaryTick(); },
   "news.shelf.poll": async () => {
     await runShelfTick();
     recomputeNightlyMixes();
@@ -468,7 +470,7 @@ export function runDueJobs(
 // query returned it. A plain, exported function (not inlined into
 // runDueJobsUnguarded below) so the ordering rule itself is directly
 // testable without running real jobs.
-const LOW_PRIORITY_CORE_JOBS = new Set(["memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune", "news.full_text.prefetch"]);
+const LOW_PRIORITY_CORE_JOBS = new Set(["memory.judge", "memory.consolidate", "news.shelf.poll", "news.shelf.prune", "news.shelf.summaries", "news.full_text.prefetch"]);
 export function sortDueJobsForPriority<T extends { job: string }>(rows: readonly T[]): T[] {
   return [...rows].sort((a, b) => Number(LOW_PRIORITY_CORE_JOBS.has(a.job)) - Number(LOW_PRIORITY_CORE_JOBS.has(b.job)));
 }

@@ -2172,3 +2172,13 @@ export const musicJobs = sqliteTable("music_jobs", {
   chosenAt: text("chosen_at"), createdAt: text("created_at").notNull(), updatedAt: text("updated_at").notNull(), hlc: text("hlc").notNull(),
 }, (table) => [index("music_jobs_person_id_idx").on(table.personId), index("music_jobs_turn_id_idx").on(table.turnId),
   index("music_jobs_person_conversation_idx").on(table.personId, table.conversationId), index("music_jobs_file_id_idx").on(table.fileId)]);
+
+// NEWS-04: hub-authored cached text, keyed by story and content band.
+export const newsStorySummaries = sqliteTable("news_story_summaries", {
+  storyId: text("story_id").notNull(),
+  band: text("band").notNull(),
+  summary: text("summary").notNull(),
+  updatedAt: text("updated_at").notNull(),
+  hlc: text("hlc").notNull(),
+  provenance: text("provenance").notNull(),
+}, (table) => [uniqueIndex("news_story_summaries_story_band_idx").on(table.storyId, table.band)]);

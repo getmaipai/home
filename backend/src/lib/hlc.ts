@@ -68,6 +68,7 @@ export const HLC_BEARING_TABLES = [
   "news_interests",
   "news_saves",
   "news_reads",
+  "news_story_summaries",
 ] as const;
 
 /** Seeds from every hlc already on disk, across every table that stamps

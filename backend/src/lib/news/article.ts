@@ -29,7 +29,7 @@ function variantOf(band: "child" | "teen" | "adult"): ContentVariant {
   return band;
 }
 
-function textOfBlocks(blocks: readonly ArticleBlock[]): string {
+export function textOfBlocks(blocks: readonly ArticleBlock[]): string {
   return blocks.map((block) => {
     switch (block.type) {
       case "paragraph": return inlineText(block.inlines);
@@ -60,8 +60,8 @@ export interface LoadedContent { blocks: ArticleBlock[]; source: ContentSource; 
 const opening = new Map<string, Promise<LoadedContent>>();
 
 /** The item's article for this band: the stored copy when it is fresh (or a saved story pinned it), else one fetch. */
-export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null; background?: boolean } = {}): Promise<LoadedContent> {
-  const key = `${item.id}:${band}`;
+export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null; background?: boolean; storedOnly?: boolean } = {}): Promise<LoadedContent> {
+  const key = `${item.id}:${band}:${options.storedOnly === true}`;
   const running = opening.get(key);
   if (running && !options.retry) return running;
   const next = loadContentOnce(item, band, options).finally(() => { if (opening.get(key) === next) opening.delete(key); });
@@ -69,7 +69,7 @@ export function loadContent(item: ShelfItem, band: "child" | "teen" | "adult", o
   return next;
 }
 
-async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null; background?: boolean }): Promise<LoadedContent> {
+async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult", options: { retry?: boolean; store?: ShelfStore | null; background?: boolean; storedOnly?: boolean }): Promise<LoadedContent> {
   const store = options.store === undefined ? sharedShelfStore() : options.store;
   const variant = variantOf(band);
   const stored = store?.getContent(item.id, variant) ?? null;
@@ -88,6 +88,7 @@ async function loadContentOnce(item: ShelfItem, band: "child" | "teen" | "adult"
     if (usable) return { blocks: usable.blocks as ArticleBlock[], source: usable.source, reading_s: usable.reading_s, stored: true };
     return teaser();
   };
+  if (options.storedOnly) return fallback();
   if (options.retry) failures.forget(item.url);
   else if (failures.has(item.url)) return fallback();
   try {

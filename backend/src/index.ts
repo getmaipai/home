@@ -142,6 +142,7 @@ ensureCoreJob("memory.consolidate", "every:7d");
 ensureCoreJob("news.shelf.poll", "every:15m");
 ensureCoreJob("news.full_text.prefetch", "every:1m");
 ensureCoreJob("news.shelf.prune", "every:1d");
+ensureCoreJob("news.shelf.summaries", "every:15m");
 // 2.5 asks for "daily at a household-set time in the nightly window";
 // the scheduler's `when` grammar has no time-of-day concept yet (a
 // pre-existing, already-documented gap, see lib/scheduler.ts's own header

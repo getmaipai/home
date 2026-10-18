@@ -2,7 +2,7 @@
 // reset_mix. Each acts on the asking person's own records and nobody else's, and only on an item or channel their band is
 // released (a guessed id is a refusal, not data). The role gate and the owning page's floor run before this (the route), then
 // the band rules here: a child never gets feedback ("Less like this"), reset_mix or My Mix, and nothing a child does writes an
-// inferred row. `summarize` is NEWS-04's and is not an action yet.
+// inferred row. `summarize` is optional and never prevents reading.
 import { visibleFeedIds } from "@/lib/shelf/shelfRead";
 import { sharedShelfStore } from "@/lib/shelf/shelfStore";
 import type { PersonRow } from "@/types";
@@ -13,9 +13,11 @@ import { addSave, itemIsSaved, recordRead, removeSave, resetMix, recomputeMix, s
 import { topicOfferedTo } from "./topics";
 import { viewerOf } from "./data";
 
+import { summarizeStory, SUMMARY_SOURCE_NOTE } from "./summary";
+
 export type ActionResult = { ok: true; status: 200; value: Record<string, unknown> } | { ok: false; status: 400 | 403 | 404; error: string };
 
-export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix"] as const;
+export const NEWS_ACTIONS = ["follow", "save", "read", "feedback", "reset_mix", "summarize"] as const;
 export type NewsActionName = (typeof NEWS_ACTIONS)[number];
 
 const MAX_SAVE_BATCH = 20;
@@ -102,6 +104,12 @@ function resetMixAction(person: PersonRow, viewer: Viewer): ActionResult {
 export async function runNewsAction(person: PersonRow, action: NewsActionName, body: Record<string, unknown>, now = new Date()): Promise<ActionResult> {
   const viewer = viewerOf(person, now);
   switch (action) {
+    case "summarize": {
+      const item = releasedItem(viewer, body.id);
+      if (!item) return gone();
+      const summary = await summarizeStory(storyIdOf(item), viewer.band);
+      return ok({ summary: summary ? { ...summary, source_note: SUMMARY_SOURCE_NOTE } : null });
+    }
     case "follow": return follow(person, viewer, body);
     case "save": return save(person, viewer, body);
     case "read": return read(person, viewer, body);
