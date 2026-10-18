@@ -7,6 +7,18 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
+## [0.2.21] - 2026-10-18
+
+A small News release: a shelf's channel button now opens the channel, News's first tab reads Today, and the guides are refreshed. The engine is unchanged (Stack a89e7ff). Pins: spec-v0.1.179 and ui-v0.5.268 (News thumbnail rows keep their padding). Migrations: none since 0.2.20.
+
+### News
+- **A shelf's channel button opens the channel.** On Today and My Mix, the button on a shelf's heading now opens that channel's page.
+- **News's first tab reads Today.** It was "Overview"; the page is the day's stories.
+- **Thumbnail rows keep their padding.** Story rows with a picture no longer sit against the edge.
+
+### Documentation
+- User guides refreshed for 0.2.18 to 0.2.20: the settings page name, the cartoon controls, the slow-job note and the Detailed video licence.
+
 ## [0.2.20] - 2026-10-17
 
 Quick and full songs, chat that is never slowed by a job being made, and a child-safety fix for the screen-time player. The engine is rebuilt from a newer Stack (a89e7ff). Migrations: none since 0.2.19.
