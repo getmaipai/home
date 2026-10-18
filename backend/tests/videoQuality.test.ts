@@ -35,6 +35,8 @@ let fake: FakeVideoStack;
 
 const LTX_LORA = { ...TEST_VIDEO_LORAS[0]!, id: "lora-4444444444444444", name: "Talking Heads", sha256: "4".repeat(64), base_model: "ltx-2.3", trigger_words: ["talkinghead"] };
 const engineWith = (detailed: "installed" | "missing" | undefined) => readyVideoStatusForTests(detailed ? { detailed } : {});
+/** A Stack that says Detailed can start from a picture (VIDEO-LTX-02, Stack d443349 and later). */
+const newStack = () => readyVideoStatusForTests({ detailed: "installed", detailedPicture: true });
 
 beforeEach(() => {
   resetDb();
@@ -94,7 +96,16 @@ describe("the choice", () => {
     expect(chooseVideoQuality({ style: { base_model: "ltx-2.3" }, requested: "quick", engine: engineWith("installed") })).toMatchObject({ quality: "detailed", note: "style_needs_detailed" });
     expect(chooseVideoQuality({ style: { base_model: "wan2.2-ti2v-5b" }, requested: "detailed", engine: engineWith("installed") })).toMatchObject({ quality: "quick", note: "style_needs_quick" });
   });
-  test("a picture starts a Quick clip only: Detailed asked for outright (or by length) is made Quick with the reason; the household default stays quiet", () => {
+  test("a Stack that says Detailed can start from a picture lets one: the asked-for kind, the household default and a long length all stand (VIDEO-LTX-02)", () => {
+    expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), hasPicture: true })).toMatchObject({ quality: "detailed", note: null, seconds: 5, announce: true });
+    expect(chooseVideoQuality({ engine: newStack(), household: "detailed", hasPicture: true })).toMatchObject({ quality: "detailed", note: null });
+    expect(chooseVideoQuality({ engine: newStack(), household: "quick", seconds: 9, hasPicture: true })).toMatchObject({ quality: "detailed", seconds: 9, note: null });
+    expect(chooseVideoQuality({ engine: newStack(), household: "quick", hasPicture: true })).toMatchObject({ quality: "quick", note: null });
+    // A teen or a child is Quick whatever the Stack can do.
+    expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), hasPicture: true, quickOnly: true })).toMatchObject({ quality: "quick", note: null });
+    expect(chooseVideoQuality({ requested: "detailed", engine: newStack(), quickOnly: true })).toMatchObject({ quality: "quick", note: null });
+  });
+  test("an older Stack (no image_to_video on Detailed): a picture starts a Quick clip only: Detailed asked for outright (or by length) is made Quick with the reason; the household default stays quiet", () => {
     expect(chooseVideoQuality({ requested: "detailed", engine: engineWith("installed"), hasPicture: true })).toMatchObject({ quality: "quick", note: "picture_needs_quick", seconds: 5 });
     expect(chooseVideoQuality({ engine: engineWith("installed"), household: "quick", seconds: 9, hasPicture: true })).toMatchObject({ quality: "quick", note: "picture_needs_quick", seconds: 5, shortened: true });
     expect(chooseVideoQuality({ engine: engineWith("installed"), household: "detailed", hasPicture: true })).toMatchObject({ quality: "quick", note: null });

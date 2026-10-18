@@ -56,7 +56,7 @@ export interface VideoQualityChoice {
  * Detailed (a fact of the models, not a reading of words), else the request's own choice, else the household's setting. Detailed
  * that is not installed falls back to Quick with a note and the five second ceiling.
  */
-export function chooseVideoQuality(input: { requested?: VideoQuality | undefined; style?: { base_model: string } | null; seconds?: number | undefined; engine: StackVideoStatus | null; household?: VideoQuality; /** The clip starts from a picture: only Quick can do that yet. */ hasPicture?: boolean; /** A teen or a child: Quick and nothing else, whatever was asked (the job starter enforces it again). */ quickOnly?: boolean }): VideoQualityChoice {
+export function chooseVideoQuality(input: { requested?: VideoQuality | undefined; style?: { base_model: string } | null; seconds?: number | undefined; engine: StackVideoStatus | null; household?: VideoQuality; /** The clip starts from a picture: Detailed can take it only when the Stack says so (`qualities.detailed.image_to_video`). */ hasPicture?: boolean; /** A teen or a child: Quick and nothing else, whatever was asked (the job starter enforces it again). */ quickOnly?: boolean }): VideoQualityChoice {
   const asked = typeof input.seconds === "number" && Number.isFinite(input.seconds) ? Math.round(input.seconds) : undefined;
   const base = qualityOfBase(input.style?.base_model);
   const quickOk = quickVideoReady(input.engine);
@@ -72,8 +72,8 @@ export function chooseVideoQuality(input: { requested?: VideoQuality | undefined
     return fit("quick", input.requested === "detailed" ? "style_needs_quick" : null, false);
   }
   const wanted = input.requested ?? (asked !== undefined && asked > QUICK_MAX_SECONDS ? "detailed" : input.household ?? householdVideoQuality());
-  // A picture starts a Quick clip only (the Detailed model starts from words); the household's own default stays quiet, a request for Detailed is told why not.
-  if (input.hasPicture && wanted === "detailed") return fit("quick", input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS) ? "picture_needs_quick" : null, false);
+  // A picture starts a Quick clip only on a Stack that does not say Detailed can start from one (VIDEO-LTX-02); the household's own default stays quiet, a request for Detailed is told why not.
+  if (input.hasPicture && wanted === "detailed" && input.engine?.qualities?.detailed.image_to_video !== true) return fit("quick", input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS) ? "picture_needs_quick" : null, false);
   if (wanted === "detailed") {
     if (detailedOk) return fit("detailed", null, input.requested === "detailed" || (asked !== undefined && asked > QUICK_MAX_SECONDS));
     return fit("quick", "detailed_not_installed", false);

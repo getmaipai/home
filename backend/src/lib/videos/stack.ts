@@ -51,6 +51,8 @@ export interface StackVideoQuality {
   install: { models: Array<{ id: string; approx_bytes: number; installed: boolean }>; remaining_bytes: number; download_bytes: number };
   licence: { id: string; name: string; url: string } | null;
   lora_base_model: string;
+  /** A picture can start a clip of this model. Absent on a Stack older than 2026-10-17, which keeps Detailed to words (VIDEO-LTX-02). */
+  image_to_video?: boolean;
 }
 
 export interface StackVideoStatus {

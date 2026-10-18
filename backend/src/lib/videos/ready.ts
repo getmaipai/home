@@ -36,8 +36,8 @@ export async function videoEngineReady(): Promise<boolean> {
 }
 
 /** A ready status for tests. `detailed: "installed"` or `"missing"` adds the Stack's `qualities` (VIDEO-LTX-01); left out is an older Stack with Quick only. */
-export function readyVideoStatusForTests(overrides: Partial<StackVideoStatus> & { detailed?: "installed" | "missing"; quickMissing?: boolean } = {}): StackVideoStatus {
-  const { detailed, quickMissing, ...rest } = overrides;
+export function readyVideoStatusForTests(overrides: Partial<StackVideoStatus> & { detailed?: "installed" | "missing"; quickMissing?: boolean; /** A Stack that can start a Detailed clip from a picture. */ detailedPicture?: boolean } = {}): StackVideoStatus {
+  const { detailed, quickMissing, detailedPicture, ...rest } = overrides;
   const base: StackVideoStatus = {
     state: "idle", phase: null, available: true, code: null, reason: null, tier: "p128",
     memory: { fits: true, reason: null, peak_gb: 44.1 }, model: { id: "wan2.2-ti2v-5b-fastwan-mlx", installed: true },
@@ -50,6 +50,7 @@ export function readyVideoStatusForTests(overrides: Partial<StackVideoStatus> & 
   const quality = (id: string, installed: boolean, audio: boolean, maxSeconds: number, size: string): NonNullable<StackVideoStatus["qualities"]>["quick"] => ({
     id, installed, available: true, audio, limits: { max_seconds: maxSeconds, fps: 24, default_size: size }, memory: { fits: true, reason: null, peak_gb: 44 },
     install: { models: [], remaining_bytes: installed ? 0 : 73_572_000_000, download_bytes: 73_572_000_000 }, licence: audio ? { id: "ltx-2.x-community-2026-08-11", name: "LTX-2.x Community License Agreement (2026-08-11)", url: "https://example.com/licence" } : null, lora_base_model: audio ? "ltx-2.3" : "wan2.2-ti2v-5b",
+    ...(detailedPicture ? { image_to_video: true } : {}),
   });
   return { ...base, state: quickMissing ? "not-installed" : base.state, qualities: { quick: quality("fastwan2-2-ti2v-5b-mlx-bf16", !quickMissing, false, 5, "832x480"), detailed: quality("ltx-2-3-distilled-mlx", detailed === "installed", true, 10, "768x448") } };
 }
