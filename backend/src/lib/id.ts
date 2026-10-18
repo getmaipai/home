@@ -1,12 +1,19 @@
 // randomSuffix itself lives in @maipai/core/src/id now (core-v0.1.0,
 // since it names no spec record type); every newXId() below still owns
 // its own prefix and pattern, which is Home's own.
+import { randomBytes } from "node:crypto";
 import { randomSuffix } from "@maipai/core/src/id";
 export { randomSuffix };
 
 /** Matches spec/schemas/person.schema.json's `^person-[a-z0-9]{6,}$`. */
 export function newPersonId(): string {
   return `person-${randomSuffix(10)}`;
+}
+
+/** Matches spec/schemas/api-key.schema.json's `^key_[a-z0-9]{6,}$`. The id is also the lookup half of a key secret
+ * (`maipai_<id>_<random>`), so it is 96 random bits from the OS generator, not the shorter record suffix. */
+export function newApiKeyId(): string {
+  return `key_${randomBytes(12).toString("hex")}`;
 }
 
 /** Matches spec/schemas/biometric-print.schema.json's `^print-[a-z0-9]{6,}$`. */

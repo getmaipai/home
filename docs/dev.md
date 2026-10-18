@@ -6,6 +6,37 @@ fresh, do not migrate; decision 11), chapters 3 and 4 are the hub's
 architecture, chapter 13 is the release roadmap. This file is the dev-tier
 design doc; it grows as the hub is built.
 
+## Personal keys: one key store with scopes (CODE-KEYS-01, 2026-10-18)
+
+`api_keys` (migration 0120, schema version 77) replaces the single interim `person_api_tokens` row per person. A key is the spec
+`api-key` record (`key_<24 hex>` id, name 1 to 60, scopes `turn` and `code`, required expiry of 7, 30, 90 or 365 days with 90 the
+default and 30 the most for a child or teen, `hint` of the last four characters, `limits.requests_per_minute` copied from
+`coding.api.rate_per_minute`, `last_used_at` and `last_used_from`) plus hub-only columns that never reach the wire.
+
+- **Secret.** `maipai_<id>_<32 random bytes as base32>`, shown once in the create response. Only `HMAC-SHA256(secret_pepper, secret)`
+  is stored (`hashApiKeySecret` in `lib/secret.ts`, the same pepper as sign-in secrets). The lookup is by the id inside the secret,
+  the compare is `crypto.timingSafeEqual` on fixed-size digests, and an unknown id runs the same compare against a zero digest.
+  Every failure (no key, unknown id, wrong secret, wrong scope, expired, revoked, suspended) gives the same 401, so a key id cannot be probed.
+- **Cap and rules.** At most 10 keys per adult and 3 per child or teen, counting suspended keys. Rename and revoke are per owner.
+  `suspended` is computed on every request, never stored: for `code` it needs Coding on and not paused, no `deny` grant `use:code`,
+  an `allow` grant for a minor (or `coding.adults_by_default` for an adult), the person not a guest, and `coding.person.api_keys` on.
+  `turn` keeps the interim token's rules (any person who is not deleted).
+- **Use.** `requireApiKey(scope)` (`middleware/auth.ts`) replaces `requireApiToken` on `/v1/chat/completions` and in the Wyoming
+  handshake, both with scope `turn`. `last_used_at` and `last_used_from` (`home_network` or `away` plus the address) are written at most once a minute per key.
+- **Routes** (`routes/settings.ts`): `GET/POST /api/settings/api-keys`, `PATCH/DELETE /api/settings/api-keys/{id}`, an admin read
+  `GET /api/settings/api-keys/people/{personId}` (id, scopes, status and dates only: no name, hint, address or use, rule 6a), and the old
+  `POST/DELETE /api/settings/api-token` with the same shapes, now backed by a key named "Voice and Home Assistant".
+- **Migration.** Each unexpired `person_api_tokens` row becomes a `turn` key named "Voice and Home Assistant", expiring 90 days after the
+  migration. Its old SHA-256 stays in `legacy_hash` only until the token is next used (it is then re-hashed under the pepper and the
+  column cleared) or until the key expires. `person_api_tokens` stays in place and is never read; a later migration drops it. Re-running
+  the migration adds nothing.
+- **Rotate.** Make a new key, switch the client, revoke the old one. For the voice token, `POST /api-token` replaces it in one step.
+- **Gitleaks.** `.gitleaks.toml` has a `maipai-api-key` rule; `maipai_key_example...` placeholders are allowed.
+
+Changed files: `backend/src/lib/apiKeys.ts` (was `apiToken.ts`), `backend/src/lib/secret.ts`, `backend/src/lib/id.ts`, `backend/src/lib/hlc.ts`,
+`backend/src/db/schema.ts`, `backend/src/db/migrations/0120_api_keys.sql`, `backend/src/middleware/auth.ts`, `backend/src/routes/openai.ts`,
+`backend/src/routes/settings.ts`, `backend/src/lib/wyomingServer.ts`, `.gitleaks.toml`, `docs/api/openapi.json`.
+
 ## Music chat covers (2026-10-18)
 
 The chat song card passes stored cover art to MusicTrack and keeps its existing poll running while the cover picture is queued or running, with a 30 second startup grace and no wait for private chats or an absent picture engine.

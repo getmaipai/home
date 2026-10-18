@@ -13,7 +13,7 @@
 // ran unauthenticated; not that"). This implementation requires a real
 // `authenticate` message (a MaiPai-specific extension to the base
 // protocol, since Wyoming itself defines none) as the FIRST message on
-// every connection, checked against lib/apiToken.ts's own interim
+// every connection, checked against lib/apiKeys.ts's own interim
 // per-person token - the identical credential POST /v1/chat/completions
 // already authenticates against, not a second auth system. Any other
 // first message, a missing/invalid token, or a second connection
@@ -21,7 +21,7 @@
 // not needed) gets the connection closed outright, no data ever crosses
 // into `describe`/`transcribe`/`synthesize`/`handle`.
 import { readWavPcm, WyomingFramer, encodeWyomingMessage, type WyomingMessage } from "@/lib/wyoming";
-import { resolveApiToken } from "@/lib/apiToken";
+import { resolveApiKey, keyOriginOf } from "@/lib/apiKeys";
 import { transcribeUtterance } from "@/lib/stt";
 import { isStackConfigured } from "@/lib/stackEngine";
 import { synthesizeSpeech } from "@/lib/tts";
@@ -81,7 +81,7 @@ function pcm16ToFloat32(bytes: Uint8Array): Float32Array {
 }
 
 async function handleMessage(
-  socket: { write: (data: Uint8Array) => void; end: () => void },
+  socket: { write: (data: Uint8Array) => void; end: () => void; remoteAddress?: string },
   state: ConnectionState,
   msg: WyomingMessage,
 ): Promise<void> {
@@ -90,7 +90,7 @@ async function handleMessage(
       socket.end();
       return;
     }
-    const person = resolveApiToken(msg.data.token);
+    const person = resolveApiKey(msg.data.token, "turn", keyOriginOf(socket.remoteAddress));
     if (!person) {
       socket.end();
       return;

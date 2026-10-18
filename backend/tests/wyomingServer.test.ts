@@ -9,7 +9,7 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetLlmSupervisorForTests } from "@/lib/llmSupervisor";
 import { startWyomingServer, type WyomingServerHandle } from "@/lib/wyomingServer";
 import { WyomingFramer, encodeWyomingMessage, type WyomingMessage } from "@/lib/wyoming";
-import { issueApiToken } from "@/lib/apiToken";
+import { issueApiToken } from "@/lib/apiKeys";
 import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { PERSON_TURN_BUDGET } from "@/lib/llm";
 import { sqlite } from "@/db";

@@ -105,26 +105,7 @@ export const setupState = sqliteTable("setup_state", {
   value: text("value").notNull(),
 }, (table) => [check("setup_state_singleton", sql`${table.slot} = 1`)]);
 
-// Session C step 8 (session-c-brain-and-voice.md): "authenticated by a
-// device token (F's deviceTokens.ts; a per-person API token setting
-// until it lands)" - F's real device-token table (session-f-platform-
-// and-trust.md step 6) does not exist yet, so this is the interim
-// mechanism `/v1/chat/completions` and the Wyoming satellite server both
-// authenticate against. Deliberately its own table, not a `secret: true`
-// settings value the way `voice.hf_token` is stored: a settings value
-// round-trips (it can be decrypted and shown back), which is exactly
-// wrong for a bearer credential - this follows `sessions`' own shape
-// instead (a one-way SHA-256 hash, never the raw token, verified the
-// same way lib/session.ts's hashSessionToken() already is), the org's
-// own "one-way secrets are hashed... never encrypted" rule applied to a
-// long-lived API token instead of a short PIN. One token per person at a
-// time (generating a new one replaces the old, `tokenHash` unique) -
-// simpler than a list, and matches the plan's own singular "a per-person
-// API token." `expiresAt` follows lib/deviceTokens.ts's own year-long TTL
-// (CLAUDE.md: "every stored credential has a status, an expiry, and a
-// one-click revoke" - a leaked bearer token with no expiry never dies on
-// its own, matching that rule was a code-review finding on this table's
-// first version, fixed here rather than deferred).
+// Retained unread until the legacy-key transition ends; migration 0118 copies these rows.
 export const personApiTokens = sqliteTable("person_api_tokens", {
   personId: text("person_id")
     .primaryKey()
@@ -133,6 +114,29 @@ export const personApiTokens = sqliteTable("person_api_tokens", {
   createdAt: text("created_at").notNull(),
   expiresAt: text("expires_at").notNull(),
   lastUsedAt: text("last_used_at"),
+});
+
+// Spec api-key record. Hashes and compatibility markers are hub-only.
+export const apiKeys = sqliteTable("api_keys", {
+  id: text("id").primaryKey(),
+  personId: text("person_id").notNull().references(() => people.id),
+  name: text("name").notNull(),
+  scopes: text("scopes", { mode: "json" }).$type<("turn" | "code")[]>().notNull(),
+  createdAt: text("created_at").notNull(),
+  expiresAt: text("expires_at").notNull(),
+  revokedAt: text("revoked_at"),
+  status: text("status", { enum: ["active", "expired", "revoked", "suspended"] }).notNull(),
+  lastUsedAt: text("last_used_at"),
+  lastUsedFrom: text("last_used_from", { mode: "json" }).$type<{ place: "home_network" | "away"; address: string }>(),
+  limits: text("limits", { mode: "json" }).$type<{ requests_per_minute: number }>().notNull(),
+  hint: text("hint").notNull(),
+  secretHash: text("secret_hash").unique(),
+  legacyHash: text("legacy_hash").unique(),
+  legacyFormat: integer("legacy_format", { mode: "boolean" }).notNull().default(false),
+  compatibility: integer("compatibility", { mode: "boolean" }).notNull().default(false),
+  provenance: text("provenance").notNull(),
+  hlc: text("hlc").notNull(),
+  updatedAt: text("updated_at").notNull(),
 });
 
 // Backs the spec's {prefix}{seq}-{device6} id shape (3.1) for

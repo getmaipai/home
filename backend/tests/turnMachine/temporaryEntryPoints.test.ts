@@ -29,7 +29,7 @@ import { __resetRateLimiterForTests } from "@/lib/rateLimiter";
 import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { __resetPortOwnershipForTests } from "@/lib/sidecars";
 import { setHouseholdSettingValue } from "@/lib/settings";
-import { issueApiToken } from "@/lib/apiToken";
+import { issueApiToken } from "@/lib/apiKeys";
 import { startWyomingServer, type WyomingServerHandle } from "@/lib/wyomingServer";
 import { WyomingFramer, encodeWyomingMessage, type WyomingMessage } from "@/lib/wyoming";
 import { useDefaultScriptedStack } from "../stackFixture";
@@ -73,7 +73,10 @@ function snapshot(): Record<string, string> {
 /** The tables whose content differs between two snapshots. */
 function changed(before: Record<string, string>, after: Record<string, string>): string[] {
   // auth bookkeeping: the token is stamped on use, it is not conversation data
-  return Object.keys(after).filter((name) => name === "person_api_tokens" ? JSON.stringify((JSON.parse(after[name]!) as Record<string, unknown>[]).map(({ last_used_at: _lastUsedAt, ...row }) => row)) !== JSON.stringify((JSON.parse(before[name]!) as Record<string, unknown>[]).map(({ last_used_at: _lastUsedAt, ...row }) => row)) : after[name] !== before[name]).sort();
+  // Key use stamps only usage metadata (last use, where from, and the record clock); every other column must be untouched.
+  const usage = new Set(["last_used_at", "last_used_from", "hlc", "updated_at"]);
+  const stripped = (table: Record<string, string>, name: string) => JSON.stringify((JSON.parse(table[name]!) as Record<string, unknown>[]).map((row) => Object.fromEntries(Object.entries(row).filter(([k]) => !usage.has(k)))));
+  return Object.keys(after).filter((name) => name === "person_api_tokens" || name === "api_keys" ? stripped(after, name) !== stripped(before, name) : after[name] !== before[name]).sort();
 }
 
 /** Row count of one table (an ordinary request's footprint). */

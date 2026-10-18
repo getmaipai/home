@@ -21,6 +21,7 @@
 //    that simply vanishes is indistinguishable, to a robot syncing later,
 //    from a row it has not been told about yet, so the delete would
 //    silently undo itself on the next sync. A tombstone transfers.
+import { revokeAllApiKeys } from "@/lib/apiKeys";
 import { and, eq, isNull, ne, lt } from "drizzle-orm";
 import { existsSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
@@ -599,6 +600,7 @@ function revokeAllCredentialsAndSessions(personId: string): { sessions: number }
   db.delete(devices).where(eq(devices.personId, personId)).run();
   const sessionRows = sqlite.query("DELETE FROM sessions WHERE person_id = ?").run(personId).changes;
   db.delete(totpSecrets).where(eq(totpSecrets.personId, personId)).run();
+  revokeAllApiKeys(personId);
   invalidateSessionCacheForPerson(personId);
   return { sessions: sessionRows };
 }

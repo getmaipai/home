@@ -42,3 +42,13 @@ paths = [
   '''\.pyc$''',
   '''\.tsbuildinfo$''',
 ]
+
+# CODE-KEYS-01: personal API keys are `maipai_key_<id>_<52 base32 characters>`, and the earlier interim token was
+# `maipai_<64 hex>`. A committed one is a live credential. Placeholders spelled `maipai_key_example...` are allowed.
+[[rules]]
+id = "maipai-api-key"
+description = "MaiPai personal API key"
+regex = '''maipai_(?:key_[a-z0-9]{6,}_[A-Z2-7]{52}|[a-f0-9]{64})'''
+keywords = ["maipai_"]
+[rules.allowlist]
+regexes = ['''maipai_key_example''']

@@ -1,9 +1,13 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { apiRouter, errorResponses } from "@/lib/openapi";
-import { requireAuth } from "@/middleware/auth";
+import { requireAuth, requireRole } from "@/middleware/auth";
+import { db } from "@/db";
+import { people } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import type { PersonRow } from "@/types";
 import { listValues, setValue, resetValue } from "@/lib/settings";
 import { getRegistry } from "@/lib/settingsRegistry";
-import { issueApiToken, revokeApiToken } from "@/lib/apiToken";
+import { issueApiToken, revokeApiToken, listApiKeys, listApiKeysForAdmin, createApiKey, renameApiKey, revokeApiKey, CreateApiKeyInput } from "@/lib/apiKeys";
 import { SettingsKey } from "@maipai/spec/gen/ts/settings-key.js";
 import { listRobotsPairedUnderPerson, publishSettingsChanged } from "@/lib/deviceCommands";
 import { listDevicesByKind } from "@/lib/devices";
@@ -255,4 +259,71 @@ settingsRoutes.openapi(apiTokenRevokeRoute, (c) => {
   const actor = c.get("person");
   revokeApiToken(actor.id);
   return c.json({ success: true as const }, 200);
+});
+
+// CODE-KEYS-01: the personal key store (lib/apiKeys.ts). The secret is in the create response only, once.
+const ApiKeySchema = z.object({
+  id: z.string(), person_id: z.string(), name: z.string(), scopes: z.array(z.enum(["turn", "code"])),
+  created_at: z.string(), expires_at: z.string(), revoked_at: z.string().nullable(),
+  status: z.enum(["active", "expired", "revoked", "suspended"]),
+  last_used_at: z.string().nullable(), last_used_from: z.object({ place: z.enum(["home_network", "away"]), address: z.string() }).nullable(),
+  limits: z.object({ requests_per_minute: z.number().int().min(1) }), hint: z.string(), provenance: z.string(), hlc: z.string(),
+});
+const AdminApiKeySchema = ApiKeySchema.pick({ id: true, person_id: true, scopes: true, status: true, created_at: true, expires_at: true, revoked_at: true });
+const keyIdParam = z.object({ id: z.string().regex(/^key_[a-z0-9]{6,}$/) });
+
+settingsRoutes.openapi(createRoute({
+  method: "get", path: "/api-keys", tags: ["Settings"],
+  summary: "List the signed-in person's keys (never a secret)",
+  middleware: [requireAuth] as const,
+  responses: { 200: { content: { "application/json": { schema: z.object({ keys: z.array(ApiKeySchema) }) } }, description: "The person's keys." }, ...errorResponses({ 401: "Not signed in" }) },
+}), (c) => c.json({ keys: listApiKeys(c.get("person")) }, 200));
+
+settingsRoutes.openapi(createRoute({
+  method: "post", path: "/api-keys", tags: ["Settings"],
+  summary: "Make a key. The secret is returned in this response only.",
+  middleware: [requireAuth] as const,
+  request: { body: { content: { "application/json": { schema: CreateApiKeyInput } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ key: ApiKeySchema, secret: z.string() }) } }, description: "The new key and its secret, shown once." },
+    ...errorResponses({ 400: "The key details or the person's access do not allow this key", 401: "Not signed in" }) },
+}), (c) => {
+  try { return c.json(createApiKey(c.get("person"), c.req.valid("json")), 200); }
+  catch (e) { return c.json({ error: e instanceof Error ? e.message : "The key could not be made. Check the details and try again." }, 400); }
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "patch", path: "/api-keys/{id}", tags: ["Settings"],
+  summary: "Rename one of the signed-in person's keys",
+  middleware: [requireAuth] as const,
+  request: { params: keyIdParam, body: { content: { "application/json": { schema: z.object({ name: z.string().trim().min(1).max(60) }).strict() } } } },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Renamed." },
+    ...errorResponses({ 401: "Not signed in", 404: "No such key" }) },
+}), (c) => {
+  const found = renameApiKey(c.get("person").id, c.req.valid("param").id, c.req.valid("json").name);
+  return found ? c.json({ success: true as const }, 200) : c.json({ error: "No such key. Reload the list and try again." }, 404);
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "delete", path: "/api-keys/{id}", tags: ["Settings"],
+  summary: "Revoke one of the signed-in person's keys",
+  middleware: [requireAuth] as const,
+  request: { params: keyIdParam },
+  responses: { 200: { content: { "application/json": { schema: z.object({ success: z.literal(true) }) } }, description: "Revoked." },
+    ...errorResponses({ 401: "Not signed in", 404: "No such key" }) },
+}), (c) => {
+  const found = revokeApiKey(c.get("person").id, c.req.valid("param").id);
+  return found ? c.json({ success: true as const }, 200) : c.json({ error: "No such key. Reload the list and try again." }, 404);
+});
+
+settingsRoutes.openapi(createRoute({
+  method: "get", path: "/api-keys/people/{personId}", tags: ["Settings"],
+  summary: "Admin read of a person's keys: ids, scopes, status and dates only (no names, hints, hosts or use)",
+  middleware: [requireRole("owner", "admin")] as const,
+  request: { params: z.object({ personId: z.string() }) },
+  responses: { 200: { content: { "application/json": { schema: z.object({ keys: z.array(AdminApiKeySchema) }) } }, description: "The person's keys, without private details." },
+    ...errorResponses({ 401: "Not signed in", 403: "Not allowed", 404: "No such person" }) },
+}), (c) => {
+  const target = db.select().from(people).where(eq(people.id, c.req.valid("param").personId)).get() as PersonRow | undefined;
+  if (!target || target.deletedAt) return c.json({ error: "No such person. Reload the people list and try again." }, 404);
+  return c.json({ keys: listApiKeysForAdmin(target) }, 200);
 });

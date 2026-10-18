@@ -8,7 +8,8 @@ import { hashSessionToken } from "@/lib/session";
 import { resolveDeviceToken, hashDeviceToken } from "@/lib/deviceTokens";
 import { mayHoldMediaOffline } from "@/lib/devices";
 import { mediaBandOf } from "@/lib/media/band";
-import { resolveApiToken } from "@/lib/apiToken";
+import { resolveApiKey, keyOriginOf, API_KEY_REFUSAL, type ApiKeyScope } from "@/lib/apiKeys";
+import { getClientIp } from "@/lib/secretThrottle";
 import { TRUST_PROXY } from "@/lib/trustProxy";
 import { personIsGranted } from "@/lib/grants";
 import { getDeviceById, type DeviceKind } from "@/lib/devices";
@@ -349,16 +350,19 @@ export function requireDeviceSession(kind: DeviceKind, capability?: string) {
 // inbound API surface should never silently also accept "whatever browser
 // session happens to be attached to this request," which isn't a
 // coherent concept for a satellite or a script calling in anyway.
-export const requireApiToken = createMiddleware<AppEnv>(async (c, next) => {
-  const authHeader = c.req.header("authorization");
-  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
-  if (!token) return c.json({ error: "Unauthorized" }, 401);
+export function requireApiKey(scope: ApiKeyScope) {
+  return createMiddleware<AppEnv>(async (c, next) => {
+    const authHeader = c.req.header("authorization");
+    const token = authHeader?.startsWith("Bearer ") ? authHeader.slice("Bearer ".length) : undefined;
+    // One refusal for a missing, unknown, wrong, expired, revoked, suspended or wrong-scope key, so a key id cannot be probed.
+    if (!token) return c.json({ error: "Unauthorized", message: API_KEY_REFUSAL }, 401);
 
-  const person = resolveApiToken(token);
-  if (!person) return c.json({ error: "Unauthorized" }, 401);
-  c.set("person", person);
-  await next();
-});
+    const person = resolveApiKey(token, scope, keyOriginOf(getClientIp(c)));
+    if (!person) return c.json({ error: "Unauthorized", message: API_KEY_REFUSAL }, 401);
+    c.set("person", person);
+    await next();
+  });
+}
 
 export type OfflineScope = "media.offline" | "offline.records";
 /** Bearer admission is opt-in at each route. Never use this in the general session authenticator. `scope` is one scope, or a function

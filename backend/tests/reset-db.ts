@@ -23,6 +23,7 @@ import {
   personCredentials,
   sessions,
   personApiTokens,
+  apiKeys,
   memoryRecords,
   memoryEmbeddings,
   pendingEmbeddings,
@@ -279,6 +280,7 @@ export function resetDb(): void {
   // installed set (boot); a fresh database is a fresh boot.
   __resetOutputNotificationsForTests(); // CHAT-02: once-per-turn notification keys
   db.delete(idSequences).run();
+  db.delete(apiKeys).run();
   db.delete(personApiTokens).run();
   db.delete(personCredentials).run();
   db.delete(people).run();

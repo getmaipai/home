@@ -11,8 +11,8 @@
 // document in our OpenAPI schema - a client integrating against it reads
 // OpenAI's docs, not /api/docs.
 //
-// Authenticated by lib/apiToken.ts's interim per-person API token
-// (requireApiToken, middleware/auth.ts), never a cookie session - see
+// Authenticated by lib/apiKeys.ts's interim per-person API token
+// (requireApiKey("turn"), middleware/auth.ts), never a cookie session - see
 // that file's own header for why this is a real, if temporary,
 // mechanism rather than a stub. `surface` (the retired turn engine's Surface enum)
 // comes from an `X-MaiPai-Surface` header per the plan's own "surface
@@ -32,7 +32,7 @@
 // dropped context (documented here and in docs/dev/session-c.md).
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
-import { requireApiToken } from "@/middleware/auth";
+import { requireApiKey } from "@/middleware/auth";
 import { StreamSafetyRefusal, type Surface } from "@/lib/turnShared";
 import { runTurnNext, runTurnNextStream } from "@/lib/turnMachine/turnNext";
 import { personWithinTurnBudget } from "@/lib/llm";
@@ -70,7 +70,7 @@ function chunkId(): string {
 // history can be large, so this is more generous than turn.ts's own
 // limit, but runTurn()/runTurnStream()'s MAX_TURN_TEXT_LENGTH still caps
 // the extracted last-user-message text underneath this.
-openaiRoutes.post("/v1/chat/completions", requireApiToken, bodyLimit({ maxSize: 256 * 1024 }), async (c) => {
+openaiRoutes.post("/v1/chat/completions", requireApiKey("turn"), bodyLimit({ maxSize: 256 * 1024 }), async (c) => {
   const actor = c.get("person");
   if (!personWithinTurnBudget(actor.id)) {
     return c.json(RATE_LIMIT_RESPONSE, 429);

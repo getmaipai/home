@@ -70,3 +70,8 @@ export async function verifySecret(
 export function __resetPepperCacheForTests(): void {
   cachedPepper = null;
 }
+
+/** One-way API-key digest under the existing sign-in pepper. */
+export function hashApiKeySecret(secret: string): string {
+  return createHmac("sha256", getPepper()).update(secret).digest("hex");
+}
