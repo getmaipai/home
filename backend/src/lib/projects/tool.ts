@@ -134,16 +134,19 @@ export function projectTypeForArgs(args: unknown): ProjectType | undefined {
 // "compile once, reuse" shape ajv itself recommends, keyed here rather
 // than on ProjectType itself since the registry (projectTypes.ts) has no
 // reason to know ajv exists.
-const compiledParamsValidators = new Map<string, ReturnType<typeof ajv.compile>>();
+// Keyed by the schema object itself, not the type id: a type registered again under the same id with a
+// different schema (a package reload, or a test registering a stand-in first) must not reuse a stale validator.
+const compiledParamsValidators = new WeakMap<object, ReturnType<typeof ajv.compile>>();
 
 /** The type's own schema check, shared by policy.ts (before it ever asks
  * for a yes) and runStartProjectTool() below (before it starts anything):
  * null when `params` pass, the validator's message when they do not. */
 export function validateProjectParams(projectType: ProjectType, params: Record<string, unknown>): string | null {
-  let validate = compiledParamsValidators.get(projectType.id);
+  const schema = projectType.paramsSchema as object;
+  let validate = compiledParamsValidators.get(schema);
   if (!validate) {
-    validate = ajv.compile(projectType.paramsSchema as object);
-    compiledParamsValidators.set(projectType.id, validate);
+    validate = ajv.compile(schema);
+    compiledParamsValidators.set(schema, validate);
   }
   if (validate(params)) return null;
   return ajv.errorsText(validate.errors, { separator: "; " });
