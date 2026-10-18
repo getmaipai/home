@@ -2,7 +2,7 @@
 import { secondsForWords } from "@/lib/music/sections";
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
 import { eq } from "drizzle-orm";
-import { unlinkSync } from "node:fs";
+import { existsSync, unlinkSync } from "node:fs";
 import { db, sqlite } from "@/db";
 import { attachments, musicJobs } from "@/db/schema";
 import { resetDb } from "./reset-db";
@@ -114,6 +114,8 @@ describe("cheap edits and file reads", () => {
       expect(musicForOutcomes([out])?.id).toBeDefined(); expect(fake.submitted.at(-1)).not.toHaveProperty("source");
       await waitForMusic(() => liveJobs.size === 0);
     }
+    // LIBRARY-DEDUP-01: the fake engine returns the same bytes each time, so a remake rewrote the one stored file; remove it again.
+    if (existsSync(attachmentFilePath(row.storagePath))) unlinkSync(attachmentFilePath(row.storagePath));
     const before = fake.submitted.length;
     const cover = await runEditMusic({ state, args: { track: original.fileId, change: "restyle", description: "jazz" }, callId: "e", spoken: false });
     expect(musicForOutcomes([cover])).toBeFalsy(); expect(fake.submitted).toHaveLength(before);
