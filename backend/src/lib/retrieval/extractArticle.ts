@@ -6,6 +6,7 @@
 // References, See also and the other tail sections are dropped. Pure and
 // deterministic: HTML in, a plain record out, no network.
 import { parseHTML } from "linkedom";
+import { cleanArticleDocument } from "./articleClean";
 
 type Element = ReturnType<typeof parseHTML>["document"]["body"];
 type Node = Element;
@@ -60,6 +61,7 @@ export function extractFullArticle(html: string, opts: FullArticleOptions): Full
   const redirectTo = document.querySelector(".redirectMsg a, .redirectText a, #redirectedfrom a")?.getAttribute("href") ?? null;
   document.querySelectorAll(FULL_ARTICLE_DROP).forEach((n: Node) => n.remove());
   if (news) document.querySelectorAll(NEWS_DROP).forEach((n: Node) => n.remove());
+  if (news) cleanArticleDocument(document);
   document.querySelectorAll(".redirectMsg, .redirectText, #redirectedfrom").forEach((n: Node) => n.remove());
   document.querySelectorAll("[style*='display:none'],[style*='display: none'],[hidden]").forEach((n: Node) => n.remove());
   const title = cleanText((document.querySelector("h1") ?? document.querySelector("title"))?.textContent ?? "");

@@ -90,3 +90,20 @@ describe("inline whitespace around a link (verification pass: 'Readthe full repo
     expect(flat).toBe("Read the full report now, and bold too.");
   });
 });
+
+test("news cleans promos and CMS chrome while reference keeps them", () => {
+  const html = '<html><body><article><p>Story text.</p><p>Get our newsletter</p><div data-component="ad-slot-inline"><p>Advert</p></div><p role="note">Note</p></article></body></html>';
+  expect(extractFullArticle(html, { ...base, allowLinks: true }).blocks).toEqual([{ type: "paragraph", inlines: [{ type: "text", text: "Story text." }] }]);
+  expect(extractFullArticle(html, { ...base, mode: "reference", allowLinks: true }).blocks).toHaveLength(4);
+});
+test("news removes skip links, timestamps and credits and keeps long Get ready prose", () => {
+  const prose = `Get ready for the garden opening. ${"The paths wind through native flowers and offer visitors a chance to learn about the landscape. ".repeat(3)}`.trim();
+  const html = `<html><body><article><p><a href="#body">Skip to article</a>${prose}<span class="photo-credit">Credit</span></p><p>Published October 18, 2026 9 am</p></article></body></html>`;
+  expect(extractFullArticle(html, { ...base, allowLinks: true }).blocks).toEqual([{ type: "paragraph", inlines: [{ type: "text", text: prose }] }]);
+});
+test("news deduplicates captions and drops related links and tail lists", () => {
+  const html = '<html><body><article><figure><img src="https://example.com/a.jpg"><figcaption>Garden view</figcaption></figure><figure><img src="https://example.com/b.jpg"><figcaption>Garden view</figcaption></figure><p>Read more: <a href="https://example.com/more">Plans</a></p><h2>Recommended</h2><ul><li><a href="https://example.com/next">Next story</a></li></ul></article></body></html>';
+  const news = extractFullArticle(html, { ...base, allowLinks: true, allowImages: true });
+  expect(news.blocks).toEqual([{ type: "figure", src: "https://example.com/a.jpg", alt: "", caption: "Garden view" }, { type: "figure", src: "https://example.com/b.jpg", alt: "", caption: "" }]);
+  expect(news.toc).toEqual([]);
+});
