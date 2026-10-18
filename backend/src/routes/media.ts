@@ -25,7 +25,7 @@ import { MediaProgress } from "@maipai/spec/gen/ts/media-progress.js";
 import { MediaCollection } from "@maipai/spec/gen/ts/media-collection.js";
 import { extendMediaBudget, mediaBudget, mediaTimeUpRefusal } from "@/lib/media/watchTime";
 import { correctedStamp, getProgress, getProgressMany, writeProgress, type ProgressWrite, type WriteRefusal } from "@/lib/media/progress";
-import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedWith } from "@/lib/media/collections";
+import { addItem, createCollection, deleteCollection, listCollections, MADE_KINDS, removeItemFrom, renameCollection, reorderItems, resolveCollection, setPointer, setSharedTo, sharedVisibleTo } from "@/lib/media/collections";
 
 export const mediaRoutes = apiRouter();
 
@@ -484,7 +484,7 @@ const sharedCollectionsRoute = createRoute({
   middleware: [requireAuth] as const,
   responses: { 200: { content: { "application/json": { schema: z.array(MediaCollection) } }, description: "Shared with me." }, ...errorResponses({ 401: "Not signed in" }) },
 });
-mediaRoutes.openapi(sharedCollectionsRoute, (c) => c.json(sharedWith(c.get("person").id).map((collection) => visibleView(c.get("person"), collection)), 200));
+mediaRoutes.openapi(sharedCollectionsRoute, (c) => c.json(sharedVisibleTo(c.get("person")).map((collection) => visibleView(c.get("person"), collection)), 200));
 
 /** A collection as this person may see it: titles they may not read (the band, a removed folder) are left out. */
 function visibleView(actor: Parameters<typeof readableItem>[0], collection: ReturnType<typeof listCollections>[number]) {
@@ -519,7 +519,7 @@ mediaRoutes.openapi(getCollectionRoute, (c) => {
   const actor = c.get("person");
   const { id } = c.req.valid("param");
   const own = resolveCollection(actor.id, id);
-  const found = own ?? sharedWith(actor.id).find((collection) => collection.id === id) ?? null;
+  const found = own ?? sharedVisibleTo(actor).find((collection) => collection.id === id) ?? null;
   return found ? c.json(visibleView(actor, found), 200) : c.json({ error: "That collection is not there." }, 404);
 });
 

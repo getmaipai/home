@@ -9,7 +9,7 @@ import { mediaItems, mediaSources } from "@/db/schema";
 import { loadManifestOnly } from "@/lib/plugins";
 import { appIndexFloorOk, appVisibleTo } from "@/lib/apps";
 import type { PersonRow } from "@/types";
-import { discoveryAllowed, readableItem, sourceVisibleTo } from "./access";
+import { noDiscovery, readableItem, sourceVisibleTo } from "./access";
 import { allowedBandsFor, bandAllows, mediaBandOf, trips } from "./band";
 import { addItem, createCollection, removeItemFrom, resolveCollection, listCollections, setItems, setPointer } from "./collections";
 import { itemFromRow, sourceFromRow, type MediaCollection, type MediaItem, type MediaSource } from "./model";
@@ -85,9 +85,7 @@ export function allowlistOnly(person: PersonRow): boolean {
   return person.role === "guest" || mediaBandOf(person) === "child";
 }
 
-/** No discovery rows and no autoplay suggestion: a child or guest, or anyone whose own `media.allowlist_only` is on (a teen or an
- * adult a guardian or admin set it for). Stricter than either alone; every discovery gate in the media apps uses this one test. */
-export const noDiscovery = (person: PersonRow): boolean => allowlistOnly(person) || !discoveryAllowed(person);
+export { noDiscovery };
 
 export function allowedSources(person: PersonRow): MediaSource[] {
   const live = db.select().from(mediaSources).where(isNull(mediaSources.deletedAt)).all().map(sourceFromRow).filter((source) => sourceVisibleTo(source, person));
@@ -240,6 +238,8 @@ export function mediaAppData(person: PersonRow, appId: MediaAppId, dataId: strin
   const limit = Math.min(Math.max(params.limit ?? 20, 1), 200);
   dataId = dataId.replace(/_/g, "-"); // manifest ids use hyphens; the underscore spelling of a page written earlier still answers
   if (noDiscovery(person) && (DISCOVERY_IDS as readonly string[]).includes(dataId)) return [];
+  // Up next outside Music is a suggestion list (series order, then the newest); Music's up-next is the person's own queue.
+  if (noDiscovery(person) && dataId === "up-next" && appId !== "music") return [];
   if (appId === "music") {
     const music = musicData(person, dataId, params);
     if (music !== null) return music as never;

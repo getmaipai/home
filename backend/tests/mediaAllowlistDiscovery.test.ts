@@ -7,19 +7,26 @@ import { people, mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { DISCOVERY_IDS, mediaAppData, MEDIA_APPS, type MediaAppId } from "@/lib/media/appHost";
 import { setValue, __resetSettingsCacheForTests } from "@/lib/settings";
+import { readableItem } from "@/lib/media/access";
+import { listItems } from "@/lib/media/items";
+import { createCollection, setSharedTo, addItem, sharedVisibleTo } from "@/lib/media/collections";
 import { resetDb } from "./reset-db";
 import { __resetProgressForTests } from "@/lib/media/progress";
 
-let atlas: PersonRow, marlow: PersonRow, nova: PersonRow, sprout: PersonRow;
+let atlas: PersonRow, marlow: PersonRow, nova: PersonRow, sprout: PersonRow, pippa: PersonRow;
 const person = (name: string) => db.select().from(people).where(eq(people.displayName, name)).get() as PersonRow;
 
 beforeEach(() => {
   resetDb(); __resetProgressForTests(); __resetSettingsCacheForTests();
   const now = new Date().toISOString();
-  for (const [name, role, birthdate] of [["atlas", "owner", null], ["marlow", "adult", null], ["nova", "teen", "2011-03-01"], ["sprout", "child", "2018-03-01"]] as const) {
+  for (const [name, role, birthdate] of [["atlas", "owner", null], ["marlow", "adult", null], ["nova", "teen", "2011-03-01"], ["sprout", "child", "2018-03-01"], ["pippa", "guest", null]] as const) {
     db.insert(people).values({ id: `person-${name}00001`, displayName: name, role, birthdate, avatarSeed: "s", source: "local", createdAt: now, updatedAt: now, hlc: "1:0:aaaaaa" }).run();
   }
-  [atlas, marlow, nova, sprout] = ["atlas", "marlow", "nova", "sprout"].map(person) as [PersonRow, PersonRow, PersonRow, PersonRow];
+  [atlas, marlow, nova, sprout, pippa] = ["atlas", "marlow", "nova", "sprout", "pippa"].map(person) as [PersonRow, PersonRow, PersonRow, PersonRow, PersonRow];
+  // A household feed nobody named anyone on: outside every allowlist.
+  db.insert(mediaSources).values({ id: "msrc-feed00000001", kind: "feed", scope: "household", visibleTo: '"household"', label: "Other feed", createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
+  db.insert(mediaItems).values({ id: "media-feedvideo01", sourceId: "msrc-feed00000001", kind: "video", locUrl: "https://example.com/v.mp4", title: "Other feed video", bandOk: "child",
+    mediaType: "video/mp4", playable: "original", addedAt: now, createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   db.insert(mediaSources).values({ id: "msrc-library0001", kind: "root", scope: "household", label: "Library", createdAt: now, hlc: "1:0:aaaaaa", provenance: "test" }).run();
   let n = 0;
   for (const [kind, title, subtitle] of [["video", "Garden walk", "Pippa"], ["video", "River trip", "Pippa"], ["track", "Morning song", "Riff"], ["track", "Evening song", "Riff"], ["episode", "Pilot", "Willow"], ["film", "Kite day", null], ["podcast_episode", "Question 1", "Quill"]] as const) {
@@ -68,4 +75,34 @@ test("the item view offers no autoplay suggestion when the person's allowlist is
   const view = mediaAppData(nova, "videos", "item", { id: "media-disc00001" }) as Array<{ up_next?: unknown }> | { up_next?: unknown };
   const item = Array.isArray(view) ? view[0] : view;
   expect(item?.up_next ?? null).toBeNull();
+});
+
+test("guest_lists_only_allowed_sources_via_listItems_and_readableItem", () => {
+  expect(readableItem(pippa, "media-feedvideo01")).toBeNull();
+  expect(listItems(pippa, { kind: "video", limit: 50, offset: 0 }).items.map((item) => item.id)).not.toContain("media-feedvideo01");
+  expect(readableItem(pippa, "media-disc00001")).not.toBeNull(); // the household library stays readable
+});
+
+test("a child on the default allowlist and a teen whose allowlist is on never read an unnamed household feed item", () => {
+  allowlist(nova, true);
+  for (const who of [sprout, nova]) {
+    expect(readableItem(who, "media-feedvideo01")).toBeNull();
+    expect(listItems(who, { kind: "video", limit: 50, offset: 0 }).items.map((item) => item.id)).not.toContain("media-feedvideo01");
+  }
+  expect(readableItem(marlow, "media-feedvideo01")).not.toBeNull(); // an adult with the setting off still reads it
+});
+
+test("noDiscovery_person_up_next_data_id_empty_in_videos_not_music", () => {
+  allowlist(nova, true);
+  expect(rows(nova, "videos", "up-next", { id: "media-disc00001" })).toEqual([]);
+  expect(rows(nova, "podcasts", "up-next", { id: "media-disc00007" })).toEqual([]);
+  expect(rows(marlow, "videos", "up-next", { id: "media-disc00001" }).length).toBeGreaterThan(0);
+});
+
+test("a minor never sees a shared collection whose title trips the floor; an adult does", () => {
+  const playlist = createCollection(marlow.id, "playlist", "Hardcore porn mix");
+  setSharedTo(addItem(playlist, "media-disc00003"), "household");
+  expect(sharedVisibleTo(sprout).map((c) => c.id)).not.toContain(playlist.id);
+  expect(sharedVisibleTo(nova).map((c) => c.id)).not.toContain(playlist.id);
+  expect(sharedVisibleTo(atlas).map((c) => c.id)).toContain(playlist.id);
 });

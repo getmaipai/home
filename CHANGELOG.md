@@ -7,7 +7,7 @@ checklist (`docs/dev.md`). The first release is 0.1.0.
 
 ## [Unreleased]
 
-- **Approved media only, fixed.** When a grown-up turns on "Approved media only" for a teen or an adult, the media apps now hide every suggestion row (Featured, New, Recently added, More from, Music radio picks) and the next-video suggestion, as they already did for a child.
+- **Approved media only, fixed.** When a grown-up turns on "Approved media only" for a teen or an adult, the media apps now hide every suggestion row (Featured, New, Recently added, More from, Music radio picks) and the next-video suggestion, as they already did for a child. A guest now sees only the home library, as intended, and a child or teen never sees a shared playlist whose name is not for them.
 
 ## [0.2.18] - 2026-10-17
 

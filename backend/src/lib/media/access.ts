@@ -6,7 +6,7 @@ import { mediaItems, mediaSources } from "@/db/schema";
 import type { PersonRow } from "@/types";
 import { getPersonSettingValue } from "@/lib/settings";
 import { MEDIA_ALLOWLIST_KEY } from "@/settings/mediaKeys";
-import { bandAllows } from "./band";
+import { bandAllows, mediaBandOf } from "./band";
 import { itemFromRow, sourceFromRow, type MediaItem, type MediaSource } from "./model";
 
 export function isMediaAdmin(actor: PersonRow): boolean {
@@ -18,6 +18,19 @@ export function discoveryAllowed(actor: PersonRow): boolean {
   return getPersonSettingValue(actor, MEDIA_ALLOWLIST_KEY) !== true;
 }
 
+/** Source allowlist mode for every media read (MEDIA-KID-01): a guest always (a guest's settings resolve as an adult's, so the
+ * setting alone would leave a guest open), and anyone whose `media.allowlist_only` is on (the child default; an admin may turn it
+ * off for one child, design note section 11). */
+export function allowlistMode(actor: PersonRow): boolean {
+  return actor.role === "guest" || !discoveryAllowed(actor);
+}
+
+/** No discovery rows and no autoplay suggestion: allowlist mode, or any child even when an admin turned allowlist mode off (the
+ * override opens sources, not suggestion rows). Every discovery gate in the media apps uses this one test. */
+export function noDiscovery(actor: PersonRow): boolean {
+  return allowlistMode(actor) || mediaBandOf(actor) === "child";
+}
+
 export function sourceVisibleTo(source: Pick<MediaSource, "kind" | "visible_to" | "deleted_at" | "scope" | "owner_person_id">, actor: PersonRow): boolean {
   if (source.deleted_at) return false;
   if (source.scope === "person" && source.owner_person_id !== actor.id) return false;
@@ -25,7 +38,7 @@ export function sourceVisibleTo(source: Pick<MediaSource, "kind" | "visible_to" 
   // Allowlist mode (MEDIA-KID-01): the household library, a source an adult named this person on, or a source made for this
   // person (scope person, owned by them: an adult sets these up; a child never adds one).
   const ownSource = source.scope === "person" && source.owner_person_id === actor.id;
-  if (!discoveryAllowed(actor) && !(source.kind === "root" && source.scope === "household") && !named && !ownSource) return false;
+  if (allowlistMode(actor) && !(source.kind === "root" && source.scope === "household") && !named && !ownSource) return false;
   return source.visible_to === "household" || named;
 }
 

@@ -7,6 +7,8 @@ import { db } from "@/db";
 import { mediaCollections } from "@/db/schema";
 import { nextHlc } from "@/lib/hlc";
 import { newMediaCollectionId } from "@/lib/id";
+import type { PersonRow } from "@/types";
+import { mediaBandOf, trips } from "./band";
 import { collectionFromRow, type MediaCollection } from "./model";
 
 export const SINGLETON_KINDS = ["liked", "watch_later", "queue"] as const;
@@ -119,4 +121,11 @@ export function deleteCollection(collection: MediaCollection): boolean {
 export function sharedWith(personId: string): MediaCollection[] {
   return db.select().from(mediaCollections).where(isNull(mediaCollections.deletedAt)).all().map(collectionFromRow)
     .filter((c) => c.person_id !== personId && (c.shared_to === "household" || (Array.isArray(c.shared_to) && c.shared_to.includes(personId))));
+}
+
+/** The collections shared with this person that they may see: a minor never sees one whose title trips the floor (an adult's shared
+ * playlist name is content too). The items inside are filtered separately by the read gate. */
+export function sharedVisibleTo(person: PersonRow): MediaCollection[] {
+  const minor = mediaBandOf(person) !== "adult";
+  return sharedWith(person.id).filter((collection) => !minor || !trips(collection.title));
 }
