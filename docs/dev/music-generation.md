@@ -34,7 +34,9 @@ Never against the live Stack (8770) or Home (3000). Take `mkdir /private/tmp/cla
 2. Install the music component: `POST /stack/v1/components/ace-step-1-5-turbo/install`; install a small chat model the same way and its
    `llama-server` engine (`POST /stack/v1/engines/llama-server/install`), then load it (`POST /stack/v1/models/<id>/actions {"action":"load"}`).
 3. Run a Home from a worktree: `PORT=8896 MAIPAI_DATA_DIR=<folder> MAIPAI_HUB_LOCK_PATH=<folder>/hub.lock MAIPAI_STACK_PORT=1 bun src/index.ts`
-   in `backend/`, sign up a test person, then set `engines.stack.url` to `http://127.0.0.1:8895` (household setting).
+   in `backend/`, sign up a test person, then set `engines.stack.url` to `http://127.0.0.1:8895` (household setting). Set
+   `MAIPAI_STACK_PORT=1` on that command only: exported in the shell that runs `scripts/check.sh`, it fails three `install.sh` tests that
+   expect the default 8770.
 4. Ask in chat for a song, then for a change, and open the chat in a browser.
 
 ## Tests

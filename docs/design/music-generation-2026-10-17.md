@@ -363,6 +363,18 @@ model to write a short lyric for a quick song and every part for a full one.
 the admission asked for the whole 33 GB peak again although the warm worker already held about 21 GB of it. A song on a warm worker now asks for
 the rest of its peak (12 GB); regression test in the Stack.
 
+## 17. On the live hub (v0.2.20, 2026-10-17)
+
+Shipped in Home v0.2.20 with ISOLATION-01 (heavy workers pause while a chat or voice request is in flight). The release agent installed the
+Music component (`ace-step-1-5-turbo`) on the live Stack from Models and storage and made **one Quick song through the live API**:
+
+| Song | Wall time | Available memory | Chat |
+|---|---:|---:|---|
+| Quick, 45 s with lyrics, cold worker | 55 s | about 97 GB before, 67.8 GB during (about 29 GB drop, inside the 33 GB admission peak) | stayed ready, nothing evicted |
+
+Not yet measured on the live hub: a Full song (FIX SETUP's call) and the in-chat flow (ask, change a part, play, Make it full), which Jesse runs.
+The MUSIC-GEN rows that need them stay open until then.
+
 ## Supersedes
 
 - `hub-on-apple-silicon-2026-09-17.md`'s music table rows marked `(?)`: ACE-Step 1.5 runs on Apple silicon through its official MLX path, with
