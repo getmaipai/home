@@ -84,7 +84,8 @@ export function songOnItsWay(request: MusicRequest, downgraded = false): string 
   const kind = length === "full" ? `A full song of about ${Math.round(request.seconds / 60 * 2) / 2} minutes` : `A quick ${request.seconds} second song`;
   const wait = length === "full" ? "about a minute or two" : "under a minute";
   const note = downgraded ? " Full songs need a computer with 128 GB of memory, so this one is quick; say so in one short sentence." : "";
-  return `${kind} is on its way. It takes ${wait} and appears below your reply when it is ready. You have not heard it: do not describe a song you have not heard. Tell the person that it is on its way and about how long it takes. The lyrics you wrote are the words that are sung and the person will see them.${note}`;
+  const title = request.title ? ` called "${request.title}"` : "";
+  return `${kind}${title} is on its way. It takes ${wait} and the player appears below your reply when it is ready. Reply in one or two short sentences: say the song is on its way and about how long it takes. Do not say it is ready, do not describe it, and do not repeat the lyrics, style or tempo: the player shows the words and the person has not heard it yet.${note}`;
 }
 export const SECTION_LINE = "Which part should I change? Give its start and end in seconds.";
 export const WHICH_PART_LINE = "Tell me which part the new words replace, for example the chorus or verse 2.";

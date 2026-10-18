@@ -13,7 +13,7 @@ import { loadManifestOnly } from "@/lib/plugins";
 import { VIRTUAL_TOOL_REGISTRY } from "@/lib/projects/tool";
 import { isBarePronoun, ownWordsQuery } from "@/lib/text";
 import { detectCsam } from "@maipai/spec/safety/ts/signals.js";
-import { asksForMedia, claimsMedia, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION } from "@/lib/mediaClaims";
+import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong, MEDIA_NOT_STARTED_LINE, MEDIA_REASK_INSTRUCTION, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { peopleGuidanceSuffix, PICTURE_NOT_HERE_LINE } from "@/lib/pictures/policy";
 import { laneOfPerson } from "@/lib/pictures/laneGate";
 import type { Lane } from "@/lib/pictures/lane";
@@ -1093,6 +1093,16 @@ const modelRound: Node<ModelInput, ModelOutput> = async (state, input, signal) =
       if (second?.ok && (second.toolCalls?.length ?? 0) > 0) attempt = second;
       else if (second?.ok && !claimsMedia(second.text) && second.text.trim().length > 0) attempt = second;
       else attempt = { ...attempt, text: mediaOffered ? MEDIA_NOT_STARTED_LINE : PICTURE_NOT_HERE_LINE };
+    } else if (tools.some((t) => t.id === "generate_music") && asksForSong(input.utterance) && lyricsInsteadOfSong(attempt.text)) {
+      // A song was asked for and the model wrote the lyrics as text: one re-ask to call the tool with them; if it still does not,
+      // the lyrics stand as written with a line on how to start the music (no claim was made, so nothing is replaced).
+      let second: GenerationResult | undefined;
+      if (!signal.aborted) {
+        console.error("[model] a song was asked for and the reply is lyrics with no tool call; asking once more");
+        second = await runOneGeneration(state, [...messages, { role: "assistant", content: attempt.text }, { role: "user", content: SONG_LYRICS_REASK_INSTRUCTION }], tools, "auto", false, replyMaxTokensFor(state, false), "media_reask", signal, "media");
+      }
+      if (second?.ok && (second.toolCalls?.length ?? 0) > 0) attempt = second;
+      else attempt = { ...attempt, text: `${attempt.text.trimEnd()}\n\n${SONG_LYRICS_ONLY_NOTE}` };
     }
   }
 

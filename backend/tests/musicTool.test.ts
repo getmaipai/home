@@ -48,7 +48,7 @@ describe("music jobs and their private files", () => {
     const id = musicForOutcomes(result.output.outcomes)!.id;
     const part = result.output.toolEvents.find((e) => e.t === "tool_result");
     expect(part && "outcome" in part && part.outcome).toMatchObject({ musicJobId: id });
-    expect(result.output.outcomes[0]?.result?.reply?.text).toContain("do not describe a song you have not heard");
+    expect(result.output.outcomes[0]?.result?.reply?.text).toContain("do not repeat the lyrics, style or tempo");
     expect(getMusicJobFor(people.owner, id)?.state).not.toBe("done");
     expect(fake.submitted[0]).toMatchObject({ task: "text2music", caption: ARGS.description, lyrics: LYRICS, duration_s: 60, timeout_ms: 1, bpm: 100, key: "C major", language: "en" });
     expect(fake.submitted[0]).not.toHaveProperty("title");

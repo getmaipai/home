@@ -9,12 +9,12 @@ import { __resetThrottleForTests } from "@/lib/secretThrottle";
 import { withStub } from "./turnMachine/toolHarness";
 import { useDefaultScriptedStack } from "./stackFixture";
 import { installFakeMusicStack, waitForMusic } from "./musicFixture";
-import { __setMusicStatusForTests } from "@/lib/music/ready";
+import { __setMusicStatusForTests, readyMusicStatusForTests, settleMusicStatus } from "@/lib/music/ready";
 import { setHouseholdSettingValue } from "@/lib/settings";
 import { runTurnNext } from "@/lib/turnMachine/turnNext";
 import { getMusicJobFor } from "@/lib/music/jobs";
 import { householdAllowsMusic } from "@/lib/music/policy";
-import { MEDIA_NOT_STARTED_LINE } from "@/lib/mediaClaims";
+import { MEDIA_NOT_STARTED_LINE, SONG_LYRICS_ONLY_NOTE, SONG_LYRICS_REASK_INSTRUCTION } from "@/lib/mediaClaims";
 import { getRegistryKey } from "@/lib/settingsRegistry";
 import type { ChatCompletionRequest } from "@maipai/spec/llm/ts/types.js";
 let people: ReturnType<typeof createBenchPeople>;
@@ -80,4 +80,48 @@ test("a song claim with no generate_music call is held and replaced by the hones
     expect(MEDIA_NOT_STARTED_LINE).toContain("song");
     expect(fake.submitted).toHaveLength(0);
   });
+});
+
+const LYRICS = "Here you go.\n\n[Verse]\nYellow moon on the banana tree\nWhistling winds sing back to me\n\n[Chorus]\nBanana skies, banana skies\nSun in every pair of eyes";
+const reasked = (r: ChatCompletionRequest) => r.messages.some((m) => m.role === "user" && String(m.content) === SONG_LYRICS_REASK_INSTRUCTION);
+test("lyrics written as text for a song request get one re-ask, and the tool call starts the song", async () => {
+  const call = { id: "songcall", name: "generate_music", args: JSON.stringify({ description: "a banana song", lyrics: "[Verse]\nYellow moon\n[Chorus]\nBanana skies" }) };
+  await withStub({ calls: (r) => r.tool_choice === "none" || isPhrasing(r) ? undefined : reasked(r) ? [call] : undefined, reply: (r) => isPhrasing(r) ? "Your song is on its way." : LYRICS }, async (seen) => {
+    const result = await runTurnNext(people.owner, "chat", "write me a song about bananas");
+    if (!result.ok) throw new Error("turn failed");
+    expect(result.value.music?.id).toBeDefined();
+    expect(seen.filter(reasked)).toHaveLength(1);
+    expect(result.value.reply.text).not.toContain("[Verse]");
+  });
+});
+test("lyrics that stay text after the re-ask stand as written with the one line on how to start the music", async () => {
+  await withStub({ calls: () => undefined, reply: () => LYRICS }, async (seen) => {
+    const result = await runTurnNext(people.owner, "chat", "sing me a song about bananas");
+    if (!result.ok) throw new Error("turn failed");
+    expect(result.value.music).toBeUndefined();
+    expect(result.value.reply.text).toContain("[Verse]");
+    expect(result.value.reply.text).toContain(SONG_LYRICS_ONLY_NOTE);
+    expect(seen.filter(reasked)).toHaveLength(1);
+  });
+});
+test("a plain answer to a song request is untouched, and lyrics for a message that asks for none cause no re-ask", async () => {
+  await withStub({ calls: () => undefined, reply: () => "Do you want it quick or a full song?" }, async (seen) => {
+    const result = await runTurnNext(people.owner, "chat", "make me a song");
+    if (!result.ok) throw new Error("turn failed");
+    expect(result.value.reply.text).toBe("Do you want it quick or a full song?");
+    expect(seen.filter(reasked)).toHaveLength(0);
+  });
+  await withStub({ calls: () => undefined, reply: () => LYRICS }, async (seen) => {
+    await runTurnNext(people.owner, "chat", "what are the lyrics of a banana song");
+    expect(seen.filter(reasked)).toHaveLength(0);
+  });
+});
+
+test("a failed status read keeps the song tool offered for five minutes, a real answer does not", () => {
+  const ready = { at: 1_000, status: readyMusicStatusForTests() };
+  expect(settleMusicStatus(null, ready, 1_000 + 60_000)).toBe(ready.status);
+  expect(settleMusicStatus(null, ready, 1_000 + 6 * 60_000)).toBeNull();
+  expect(settleMusicStatus(null, null, 5)).toBeNull();
+  const off = readyMusicStatusForTests({ state: "not-installed", available: false });
+  expect(settleMusicStatus(off, ready, 2_000)).toBe(off);
 });

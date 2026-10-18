@@ -1,10 +1,10 @@
 {
   "id": "generate_music",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "kind": "plugin",
   "category": "Media",
   "display": "Make a Song",
-  "description": "Make a song or an instrumental here, with lyrics you write.",
+  "description": "Make a real sung song or an instrumental, with lyrics you write, whenever asked to make, write or sing one.",
   "offer": {
     "mode": "conditional",
     "gate": "musicAllowed",
@@ -21,7 +21,11 @@
       "make a minute of piano music",
       "create an instrumental for reading",
       "make a song with these lyrics",
-      "write a jazz tune with an original voice"
+      "write a jazz tune with an original voice",
+      "write me a song about bananas",
+      "compose a heavy metal song",
+      "sing me a song",
+      "can you write a song for my dad's birthday"
     ],
     "patterns": []
   },
@@ -34,14 +38,14 @@
       "description": {
         "type": "string",
         "grounded": false,
-        "description": "Genre, mood, instruments and original voice, based on the request. Never claim a song exists without calling this tool.",
+        "description": "Genre, mood, instruments and original voice, based on the request. Never claim a song exists without calling this tool, and never answer a song request with lyrics alone.",
         "minLength": 3,
         "maxLength": 1200
       },
       "lyrics": {
         "type": "string",
         "grounded": false,
-        "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the person will see them. Omit for an instrumental.",
+        "description": "Write the lyrics yourself with [Verse] and [Chorus] tags. The words you write are the words that are sung and the player shows them. Put them here, never repeat them in your reply. Omit for an instrumental.",
         "maxLength": 4000
       },
       "bpm": {

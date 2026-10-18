@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { asksForMedia, claimsMedia } from "@/lib/mediaClaims";
+import { asksForMedia, asksForSong, claimsMedia, lyricsInsteadOfSong } from "@/lib/mediaClaims";
 
 describe("asksForMedia", () => {
   test.each(["make me a picture of a red fox", "draw a lighthouse at dusk", "can you generate an image of a dragon", "create a short video of a paper boat", "animate this picture", "Please make a clip of a kite", "give me a poster for my bakery", "paint a mountain lake"])("yes: %s", (m) => expect(asksForMedia(m)).toBe(true));
@@ -20,4 +20,15 @@ describe("claimsMedia", () => {
     "I can't make videos here.", "I couldn't make that picture. Try again.", "What size would you like, square or wide?", "A lighthouse at dusk usually has a warm light.", "Pictures can only be made in a written chat on your own screen.",
     "You're asking for a lighthouse at dusk.", "I haven't made one yet.",
   ])("no claim: %s", (r) => expect(claimsMedia(r)).toBe(false));
+});
+
+describe("asking for a song and answering with lyrics only (live, 2026-10-18)", () => {
+  test.each(["write me a song about bananas", "make a song about the sea", "compose a heavy metal song", "sing me a song", "can you write a song for my dad's birthday", "create a modern heavy metal song about bananas"])("asks: %s", (m) => { expect(asksForMedia(m)).toBe(true); expect(asksForSong(m)).toBe(true); });
+  test.each(["what is a good song to learn on guitar", "who wrote this song", "make me a picture of a fox"])("not a song request: %s", (m) => expect(asksForSong(m)).toBe(false));
+  test("tagged lyrics and a block of short lines are lyrics; prose is not", () => {
+    expect(lyricsInsteadOfSong("Here you go.\n\n[Verse]\nYellow moon\n\n[Chorus]\nSing it loud")).toBe(true);
+    expect(lyricsInsteadOfSong("**Verse 1**\nA\n**Chorus**\nB")).toBe(true);
+    expect(lyricsInsteadOfSong(Array.from({ length: 10 }, (_, i) => `Banana line number ${i} sings`).join("\n"))).toBe(true);
+    expect(lyricsInsteadOfSong("Sure. Which style do you want, and should it be quick or full length?")).toBe(false);
+  });
 });

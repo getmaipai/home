@@ -6,7 +6,7 @@
 // that safety net on such a turn; the decision to call the tool stays the model's.
 
 const MEDIA_NOUN = "(?:pictures?|images?|photos?|photographs?|illustrations?|drawings?|paintings?|artworks?|posters?|logos?|wallpapers?|banners?|videos?|clips?|animations?|gifs?|renders?|songs?|music|tracks?|tunes?|jingles?)";
-const MAKE_VERB = "(?:make|makes|create|generate|draw|paint|render|produce|animate|sketch|illustrate|design|film|compose|write|show me|give me|get me)";
+const MAKE_VERB = "(?:make|makes|sing|create|generate|draw|paint|render|produce|animate|sketch|illustrate|design|film|compose|write|show me|give me|get me)";
 const DRAW_ONLY = /\b(?:draw|paint|sketch|animate|illustrate|doodle)\b/;
 const ASK_VERB_NOUN = new RegExp(`\\b${MAKE_VERB}\\b[^.!?\\n]{0,60}\\b${MEDIA_NOUN}\\b`);
 // IMGEDIT-01: asking for a picture they already have to be changed ("remove the man from this photo", "make the sky clear in the picture").
@@ -41,3 +41,30 @@ export const MEDIA_NOT_STARTED_LINE = "I didn't start that picture, video or son
 
 /** The one re-ask: the held reply claimed a result and no tool ran. */
 export const MEDIA_REASK_INSTRUCTION = "You wrote that a picture, video or song is made or on its way, but you did not call the Make a Picture, Make a Video or Make a Song tool, so nothing was made. If the person asked for one, call the tool now with their request. If you cannot make it, say so plainly in one sentence. Do not say anything is being made unless you call the tool in this reply.";
+
+// Lyrics instead of a song (live, 2026-10-18: "asked for a song and chat answered with text lyrics and no actual music").
+// A reply that is only words to sing claims nothing, so claimsMedia lets it through; on a song request with the music tool
+// offered it gets the same one guarded re-ask, and stands as written (with one line saying how to start it) if the tool still is not called.
+const SONG_NOUN = /\b(?:songs?|tunes?|jingles?|lyrics|raps?|ballads?|anthems?|chorus|choruses)\b/;
+const SECTION_TAG = /^\s*(?:\*\*)?\[?(?:intro|verse|pre-?chorus|chorus|hook|bridge|refrain|outro)(?:\s*\d+)?\]?:?(?:\*\*)?\s*$/im;
+
+/** Whether the person's message plainly asks for a song (a loose test, used only beside lyricsInsteadOfSong). */
+export function asksForSong(message: string): boolean {
+  const text = message.toLowerCase();
+  return ASK_VERB_NOUN.test(text) && SONG_NOUN.test(text);
+}
+
+/** Whether a reply is song lyrics: two or more section tags, or a block of at least eight lines, most of them short. */
+export function lyricsInsteadOfSong(reply: string): boolean {
+  const tags = reply.split(/\r?\n/).filter((l) => SECTION_TAG.test(l)).length;
+  if (tags >= 2) return true;
+  const lines = reply.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const short = lines.filter((l) => l.length <= 70);
+  return short.length >= 8 && short.length / lines.length >= 0.7;
+}
+
+/** The one re-ask when a song was asked for and the reply is lyrics with no Make a Song call. */
+export const SONG_LYRICS_REASK_INSTRUCTION = "The person asked for a song, and you wrote lyrics as text but did not call the Make a Song tool, so no music was made. Call the Make a Song tool now: put your lyrics in its lyrics argument and the style in its description. Do not write the lyrics in your reply.";
+
+/** The line added under lyrics that stand because the tool still was not called. */
+export const SONG_LYRICS_ONLY_NOTE = "These are only words so far. Say \"make this into a song\" and I'll start the music.";
