@@ -113,12 +113,12 @@ describe("music jobs and their private files", () => {
     const failed = await runGenerateMusic({ state: musicState(people.owner, true), args: ARGS, callId: "c", spoken: false });
     expect(failed).toMatchObject({ status: "failed", failureKind: "unavailable" }); expect(JSON.stringify(failed)).not.toContain("PRIVATE_RAW_LYRICS");
   });
-  test("forgetting turns, conversations and people deletes requests and stops watchers without resurrecting them", async () => {
+  test("forgetting turns and chats keeps finished songs; forgetting the person deletes requests and stops watchers without resurrecting them", async () => {
     const state = musicState(people.owner);
     const job = await generate(state);
-    deleteAttachmentsForTurns([state.turnId]); expect(getMusicJobFor(people.owner, job.id)).toBeNull();
+    deleteAttachmentsForTurns([state.turnId]); expect(getMusicJobFor(people.owner, job.id)).not.toBeNull(); // BUG-LIBRARY-KEPT-01: a finished song is a kept Library item and outlives its turn
     const nextState = musicState(people.owner); const next = await generate(nextState);
-    expect(deleteConversationById(people.owner, nextState.conversationId).ok).toBe(true); expect(getMusicJobFor(people.owner, next.id)).toBeNull();
+    expect(deleteConversationById(people.owner, nextState.conversationId).ok).toBe(true); expect(getMusicJobFor(people.owner, next.id)).not.toBeNull(); // and outlives its chat
     const third = await generate(); deleteAttachmentsForPerson(people.owner.id); expect(getMusicJobFor(people.owner, third.id)).toBeNull();
     fake.pollsToFinish = 1000;
     const pending = musicState(people.owner, true);
