@@ -94,5 +94,7 @@ export function librarySummary(actor: PersonRow, q: LibraryQuery) {
     FROM (SELECT DISTINCT kind FROM filtered) f`).all(...b.params);
   const per_kind: Record<string, { items: number; bytes: number }> = Object.fromEntries(["image","video","audio","document","story","file"].map(kind => [kind,{ items: 0, bytes: 0 }]));
   for (const row of rows) per_kind[row.kind] = { items: row.items, bytes: row.bytes };
-  return { items: rows.reduce((n,r) => n+r.items,0), bytes: rows.reduce((n,r) => n+r.bytes,0), per_kind, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } };
+  // One total over the whole set, so identical bytes filed under two kinds are still counted once.
+  const total = sqlite.query<{ bytes: number }, (string | number)[]>(`${b.sql} SELECT coalesce(sum(u.size),0) AS bytes FROM (SELECT max(size) AS size FROM filtered GROUP BY sha256) u`).get(...b.params)?.bytes ?? 0;
+  return { items: rows.reduce((n,r) => n+r.items,0), bytes: total, per_kind, trash: { items: 0, bytes: 0 }, expiring: { items: 0, bytes: 0 } };
 }

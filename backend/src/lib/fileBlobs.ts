@@ -38,7 +38,14 @@ export async function reclaimQueuedBlobs(): Promise<ReclaimResult> {
     if (!existsSync(queuedFile)) { drop(); result.dropped += 1; continue; }
     const digest = await digestOfFile(queuedFile);
     const content = digest ? db.select().from(fileContents).where(eq(fileContents.sha256, digest)).get() : undefined;
-    if (!content) { result.kept += 1; continue; } // not a known duplicate: leave it for the reconcile report
+    if (!content) {
+      // The content was released (every record of it was purged) before this duplicate was reached: no record can ever need
+      // these bytes, so they go too. Anything else is not a known duplicate: leave it for the reconcile report.
+      const held = digest ? db.select({ id: attachments.id }).from(attachments).where(eq(attachments.sha256, digest)).get() : undefined;
+      if (digest && !held) { try { unlinkSync(queuedFile); result.removed += 1; drop(); } catch { result.kept += 1; } continue; }
+      result.kept += 1;
+      continue;
+    }
     const canonical = attachmentFilePath(content.storagePath);
     const canonicalIntact = existsSync(canonical) && (await digestOfFile(canonical)) === content.sha256;
     if (!canonicalIntact) {

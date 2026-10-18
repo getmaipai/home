@@ -157,6 +157,29 @@ describe("library summary agrees with storage", () => {
   });
 });
 
+describe("summary across kinds and a duplicate left behind", () => {
+  test("identical bytes filed under two kinds count once in the summary total", async () => {
+    const { librarySummary } = await import("@/lib/library");
+    const sage = person("owner", "Sage");
+    const a = upload(sage, "ten bytes!", { deduplicate: false });
+    const b = upload(sage, "ten bytes!", { deduplicate: false });
+    db.update(attachments).set({ mediaType: "audio/mpeg" }).where(eq(attachments.id, b.id)).run();
+    expect(a.id).not.toBe(b.id);
+    expect(librarySummary(sage, {}).bytes).toBe("ten bytes!".length);
+  });
+  test("a queued duplicate is removed when every record of its bytes was purged before it was reached", async () => {
+    const sage = person("owner", "Sage");
+    const canonicalPath = `people/${sage.id}/attachments/file-canon999`;
+    const duplicatePath = `people/${sage.id}/attachments/file-dupe9999`;
+    for (const path of [canonicalPath, duplicatePath]) mkdirSync(dirname(attachmentFilePath(path)), { recursive: true });
+    writeFileSync(attachmentFilePath(duplicatePath), "purged before reclaim");
+    db.insert(fileBlobRemovals).values({ storagePath: duplicatePath, queuedAt: new Date().toISOString() }).run();
+    expect(await reclaimQueuedBlobs()).toEqual({ removed: 1, promoted: 0, kept: 0, dropped: 0 });
+    expect(existsSync(attachmentFilePath(duplicatePath))).toBe(false);
+    expect(db.select().from(fileBlobRemovals).all()).toHaveLength(0);
+  });
+});
+
 describe("usage of a departed person's files", () => {
   test("bytes an active person also holds are not counted as inherited", () => {
     const sage = person("owner", "Sage");
